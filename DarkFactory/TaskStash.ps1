@@ -16,10 +16,8 @@ function Restore-TaskStash {
     # so the shift applies the newest such stash itself when the task
     # is claimed again. Returns the note put in front of the run's prompt, '' for none.
     param([string]$Id, [string]$Repo = $Root)
-    $pattern = "^(\S+) .*: darkfactory $([regex]::Escape($Id)) "
-    $entry = @(git -C $Repo stash list --format='%H %gs' 2>$null) | Where-Object { $_ -match $pattern } | Select-Object -First 1
-    if (-not $entry) { return '' }
-    $sha = ($entry -split ' ', 2)[0]
+    $sha = Get-TaskStashSha $Id $Repo
+    if (-not $sha) { return '' }
     $applied = $false
     if (-not (@(git -C $Repo status --porcelain) | Where-Object { $_ })) {
         git -C $Repo stash apply -q $sha 2>&1 | Out-Null
@@ -62,6 +60,127 @@ carry over what still fits rather than starting over.
 "@
 }
 
+# ---------------------------------------------------------------------------- split
+
+# A task over its cost cap is split by one bounded headless run (BL-3091, ADR-0759): at most
+# once per task per day, on Sonnet, with a small cost and turn cap of its own.
+$TaskSplitBudgetUsd = 1
+$TaskSplitMaxTurns = 30
+$TaskSplitMinutes = 20
+
+function Get-TaskStashSha {
+    # The hash of the newest "darkfactory <id> <stamp>" stash (Save-StrayChanges), '' for none.
+    param([string]$Id, [string]$Repo = $Root)
+    $pattern = "^(\S+) .*: darkfactory $([regex]::Escape($Id)) "
+    $entry = @(git -C $Repo stash list --format='%H %gs' 2>$null) | Where-Object { $_ -match $pattern } | Select-Object -First 1
+    if (-not $entry) { return '' }
+    return ($entry -split ' ', 2)[0]
+}
+
+function Register-TaskSplitAttempt {
+    # $true the first time -Id is offered for a split on -Now's day, which it records as a
+    # marker file in -MarkerDir; $false on every later offer that day.
+    param([string]$Id, [datetime]$Now, [string]$MarkerDir)
+    $marker = Join-Path $MarkerDir "$Id-$($Now.ToString('yyyyMMdd')).txt"
+    if (Test-Path $marker) { return $false }
+    New-Item -ItemType Directory -Force -Path $MarkerDir | Out-Null
+    Set-Content -Path $marker -Value $Now.ToString('o')
+    return $true
+}
+
+function Get-TaskSplitArguments {
+    # The cmd.exe argument line the split run is launched with.
+    param([string[]]$Deny, [string]$Context, [string]$ErrPath)
+    $denied = ($Deny | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
+    $budget = ([double]$TaskSplitBudgetUsd).ToString([System.Globalization.CultureInfo]::InvariantCulture)
+    return "/d /c claude -p --model sonnet --dangerously-skip-permissions --output-format stream-json --verbose $Context --max-budget-usd $budget --max-turns $TaskSplitMaxTurns --disallowedTools $denied 2>`"$ErrPath`""
+}
+
+function Invoke-TaskSplitRun {
+    # Runs the split prompt -Text in this checkout and returns @{ ExitCode }; a run past
+    # $TaskSplitMinutes is killed and reported as exit -1.
+    param([string]$Id, [string]$Text)
+    $raw = Join-Path $LogDir "split-$Id-$Stamp$LaneTag.jsonl"
+    $err = Join-Path $LogDir "split-$Id-$Stamp$LaneTag.err.txt"
+    $psi = New-ClaudeRunStartInfo (Get-TaskSplitArguments $SplitForbidden (Get-LaneContextArguments $Root $LogDir) $err)
+    $psi.EnvironmentVariables['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
+    $psi.EnvironmentVariables['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $p.StandardInput.Write($Text)
+    $p.StandardInput.Close()
+    $deadline = (Get-Date).AddMinutes($TaskSplitMinutes)
+    $pending = $p.StandardOutput.ReadLineAsync()
+    while ($true) {
+        Write-HeartbeatIfDue
+        if ($pending.Wait(1000)) {
+            if ($null -eq $pending.Result) { break }
+            Add-Content -Path $raw -Value $pending.Result -Encoding UTF8
+            $pending = $p.StandardOutput.ReadLineAsync()
+        } elseif ((Get-Date) -gt $deadline) {
+            & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
+            $p.WaitForExit()
+            return @{ ExitCode = -1 }
+        }
+    }
+    $p.WaitForExit()
+    return @{ ExitCode = $p.ExitCode }
+}
+
+function Invoke-TaskSplit {
+    # Splits -Id, which is over its cost cap for -Why, into smaller tasks with one split run,
+    # then commits and pushes the board change under the integrate lock. Returns 'skipped'
+    # when -Id was already offered for a split on -Now's day, 'split' when the run filed new
+    # tasks and deferred -Id, or 'blocked' when it failed and -Id went to Blocked instead.
+    # The stash is only ever stored under the new IDs by hash, never popped.
+    param(
+        [string]$Id, [string]$Why, [datetime]$Now = (Get-Date), [string]$MarkerDir = (Join-Path $LogDir 'splits'),
+        [scriptblock]$RunSplit = { param($SplitId, $Text) Invoke-TaskSplitRun $SplitId $Text },
+        [scriptblock]$ListTaskIds = { @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter 'BL-*.md' | ForEach-Object { $_.Name -replace '^(BL-\d+).*$', '$1' }) },
+        [scriptblock]$StashSha = { param($SplitId) Get-TaskStashSha $SplitId },
+        [scriptblock]$TaskState = { param($SplitId) Get-TaskState $SplitId },
+        [scriptblock]$EnterLock = { Enter-Lock },
+        [scriptblock]$Git = { param([string[]]$GitArgs) Invoke-Git $GitArgs },
+        [scriptblock]$Board = { param([string[]]$BoardArgs) Invoke-Board $BoardArgs },
+        [switch]$PullOnRefusal)
+    if (-not (Register-TaskSplitAttempt $Id $Now $MarkerDir)) { return 'skipped' }
+    $sha = & $StashSha $Id
+    $stash = if ($sha) { "The shift kept its unfinished work as stash $sha." } else { 'It left no stashed work, so there is no stash to store.' }
+    $text = $SplitPrompt.Replace('{ID}', $Id).Replace('{WHY}', $Why).Replace('{STASH}', $stash).Replace('{SHA}', $(if ($sha) { $sha } else { '<none>' })).Replace('{STAMP}', $Now.ToString('yyyyMMdd-HHmmss'))
+    Write-Trace $Id 'split' "over its cost cap; one split run of at most `$$TaskSplitBudgetUsd and $TaskSplitMaxTurns turns" 'Yellow'
+    $before = @(& $ListTaskIds)
+    $run = & $RunSplit $Id $text
+    $new = @(& $ListTaskIds | Where-Object { $before -notcontains $_ } | Sort-Object -Unique)
+    $state = & $TaskState $Id
+    $failure = if ($run.ExitCode -ne 0) { "the split run exited $($run.ExitCode)" }
+        elseif (-not $new.Count) { 'the split run filed no new tasks' }
+        elseif ($state -ne 'Deferred') { "the split run left it in $state, not Deferred" } else { '' }
+    $lock = & $EnterLock
+    try {
+        if (-not $failure) {
+            & $Git @('add', '-A', 'Tasks') | Out-Null
+            & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - over its cost cap", '-m', $SkipCiNote) | Out-Null
+            $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch")
+            # A claim synced this checkout to the shared branch, so it may take what other lanes
+            # pushed since; after a run the lane may hold commits of its own, which only the
+            # shift's integration may push, so there the split commit is left for it.
+            if (-not $pushed -and $PullOnRefusal -and (& $Git @('pull', '-q', '--rebase', 'origin', $Branch))) { $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch") }
+            if ($pushed -or -not $PullOnRefusal) { Write-Trace $Id 'split' "split into $($new -join ', ')$(if (-not $pushed) { '; left for the shift to integrate' })" 'Cyan'; return 'split' }
+            $failure = 'the push of the split was refused'
+            & $Git @('reset', '-q', '--hard', 'HEAD~1') | Out-Null
+        }
+        # A failed split leaves nothing of its own behind: the board goes back to how it
+        # was and the task is blocked as before the split existed.
+        & $Git @('checkout', '-q', '--', 'Tasks') | Out-Null
+        & $Git @('clean', '-fdq', '--', 'Tasks') | Out-Null
+        & $Board @('move', '-Id', $Id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $Why; the automatic split failed: $failure") | Out-Null
+        & $Git @('add', '-A', 'Tasks') | Out-Null
+        & $Git @('commit', '-q', '-m', "chore(tasks): block $Id - automatic split failed: $failure", '-m', $SkipCiNote) | Out-Null
+        & $Git @('push', '-q', 'origin', "HEAD:$Branch") | Out-Null
+        Write-Trace $Id 'split' "failed: $failure; blocked" 'Red'
+        return 'blocked'
+    } finally { $lock.Dispose() }
+}
+
 if ($TestTaskStash) {
     $repo = Join-Path ([IO.Path]::GetTempPath()) "df-task-stash-$PID"
     New-Item -ItemType Directory -Force -Path $repo | Out-Null
@@ -100,6 +219,49 @@ if ($TestTaskStash) {
         & $check 'a conflict leaves the worktree clean' "five - True" "$(& $read 'a.txt') $(& $read 'b.txt') $(-not (git -C $repo status --porcelain))"
         $sha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
         & $check 'the note gives the hash to read it by' 'True' "$($note.Contains("git diff $sha^1 $sha"))"
+        # The split of a task over its cost cap (BL-3091), with every step injected.
+        # Prompts.ps1 is loaded after this file; its last line marks a file finished, which this one is not.
+        . (Join-Path $PSScriptRoot 'Prompts.ps1'); $AreaFileFinished = $false
+        $markers = Join-Path $repo 'split-markers'
+        $script:splitSteps = [System.Collections.Generic.List[string]]::new()
+        $script:splitIds = @('BL-1')
+        $script:splitState = 'Deferred'
+        $script:splitPushes = $true
+        $runs = [System.Collections.Generic.List[string]]::new()
+        $okRun = { param($SplitId, $Text) $runs.Add($Text); $script:splitIds = @('BL-1', 'BL-2', 'BL-3'); @{ ExitCode = 0 } }
+        $lockStub = { $script:splitSteps.Add('lock'); $o = [pscustomobject]@{}; $o | Add-Member ScriptMethod Dispose { $script:splitSteps.Add('unlock') }; $o }
+        $gitStub = { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'push') { $script:splitPushes } else { $true } }
+        $boardStub = { param([string[]]$BoardArgs) $script:splitSteps.Add("board $($BoardArgs[4]): $($BoardArgs[6])") }
+        $split = { param($Day, $RunStub, [switch]$Pull)
+            $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
+            Invoke-TaskSplit 'BL-1' 'cost cap: spent $9' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $RunStub -ListTaskIds { $script:splitIds } `
+                -StashSha { 'abc123' } -TaskState { $script:splitState } -EnterLock $lockStub -Git $gitStub -Board $boardStub -PullOnRefusal:$Pull }
+        & $check 'first capped sighting today runs the split' 'split 1' "$(& $split '2026-10-22 09:00' $okRun) $($runs.Count)"
+        & $check 'a second sighting the same day does not' 'skipped 1' "$(& $split '2026-10-22 23:59' $okRun) $($runs.Count)"
+        & $check 'the next day it runs again' 'split 2' "$(& $split '2026-10-23 00:01' $okRun) $($runs.Count)"
+        & $check 'commit and push happen inside the lock' 'lock add commit push unlock' ($script:splitSteps -join ' ')
+        $text = (Get-Command Invoke-TaskSplit).Definition
+        & $check 'the code commits and pushes between Enter-Lock and Dispose' 'True' "$($text -match '(?s)\$lock = & \$EnterLock.*''commit''.*''push''.*\$lock\.Dispose\(\)')"
+        & $check 'the prompt names git stash store with the hash' 'True' "$($runs[0].Contains('git stash store -m "darkfactory <new id> 20261022-090000" abc123'))"
+        & $check 'the prompt names Deferred and depends-on repointing' 'True' "$($runs[0] -match 'move -To Deferred' -and $runs[0] -match 'Repoint depends-on')"
+        $line = Get-TaskSplitArguments $SplitForbidden '--strict-mcp-config' 'err.txt'
+        & $check 'the split run uses --model sonnet' 'True' "$($line.Contains('claude -p --model sonnet '))"
+        $usd = if ($line -match '--max-budget-usd (\S+)') { [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture) } else { 99 }
+        & $check 'the split run costs at most 2 US dollars' 'True' "$($usd -gt 0 -and $usd -le 2)"
+        & $check 'the split run has a turn cap' 'True' "$($line -match '--max-turns [1-9]\d*')"
+        & $check 'the split run may store a stash but never pop one' 'True' "$($line.Contains('Bash(git stash pop:*)') -and -not $line.Contains('Bash(git stash:*)'))"
+        $code = ((Get-Command Invoke-TaskSplit, Invoke-TaskSplitRun, Register-TaskSplitAttempt, Get-TaskStashSha | ForEach-Object Definition) -join "`n") + $SplitPrompt
+        & $check 'no stash pop in the split code or prompt' 'False' "$($code -match 'stash pop')"
+        & $check 'a failed run is blocked with its exit code' 'blocked True' "$(& $split '2026-10-24' { param($a, $b) @{ ExitCode = 3 } }) $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*split run exited 3' }).Count -eq 1)"
+        & $check 'a run that files nothing is blocked' 'blocked True' "$(& $split '2026-10-25' { param($a, $b) @{ ExitCode = 0 } }) $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*filed no new tasks' }).Count -eq 1)"
+        $script:splitState = 'Backlog'
+        & $check 'a run that leaves it undeferred is blocked' 'blocked True' "$(& $split '2026-10-26' $okRun) $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*left it in Backlog' }).Count -eq 1)"
+        $script:splitState = 'Deferred'
+        & $check 'a successful split blocks nothing' 'split 0' "$(& $split '2026-10-27' $okRun) $(@($script:splitSteps | Where-Object { $_ -like 'board*' }).Count)"
+        $script:splitPushes = $false
+        & $check 'a claim''s refused push is blocked after a pull' 'blocked True' "$(& $split '2026-10-28' $okRun -Pull) $(($script:splitSteps -join ' ') -match 'push pull push reset checkout clean board Blocked: .*push of the split was refused')"
+        & $check 'after a run a refused push is left to integration' 'split 0' "$(& $split '2026-10-29' $okRun) $(@($script:splitSteps | Where-Object { $_ -like 'board*' }).Count)"
+        & $check 'Claim.ps1 and ShiftRunner.ps1 call Invoke-TaskSplit' 'True' "$((Get-Content (Join-Path $PSScriptRoot 'Claim.ps1') -Raw) -match 'Invoke-TaskSplit \$due' -and (Get-Content (Join-Path $PSScriptRoot 'ShiftRunner.ps1') -Raw) -match 'Invoke-TaskSplit \$id')"
     } finally {
         Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
     }

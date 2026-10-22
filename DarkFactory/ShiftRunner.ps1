@@ -189,11 +189,17 @@ while ($true) {
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
             elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
-        $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
-        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
-        git -C $Root add -A Tasks 2>&1 | Out-Null
-        git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
-        if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
+        # A task stopped by its cost cap is split by one bounded run (BL-3091), which defers or
+        # blocks it itself; one already offered for a split today is blocked as before.
+        $capped = $capWhy -or (-not $run.TimedOut -and (Test-BudgetSpent))
+        $split = if ($capped) { Invoke-TaskSplit $id $why } else { 'skipped' }
+        if ($split -eq 'skipped') {
+            $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
+            Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
+            git -C $Root add -A Tasks 2>&1 | Out-Null
+            git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
+            if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
+        }
         $state = Get-TaskState $id
     }
     Save-StrayChanges $id
