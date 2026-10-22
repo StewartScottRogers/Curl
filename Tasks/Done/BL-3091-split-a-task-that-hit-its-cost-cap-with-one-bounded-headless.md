@@ -8,7 +8,7 @@ depends-on: [BL-3090]
 touches: [DarkFactory/TaskStash.ps1, DarkFactory/Claim.ps1, DarkFactory/ShiftRunner.ps1, DarkFactory/Integrate.ps1, DarkFactory/Prompts.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3091 — Split a task that hit its cost cap with one bounded headless run
 
@@ -28,18 +28,26 @@ Write an ADR under `Documentation/Planning/Decisions/` ("Decided by Claude under
 
 ## Acceptance criteria
 
-- [ ] A split function and its prompt exist (`DarkFactory/TaskStash.ps1`, `DarkFactory/Prompts.ps1`), and both `Claim.ps1` (over-cap skip) and `ShiftRunner.ps1` (run stopped at the cap) call it.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` (extended) passes with injected-clock cases: first capped sighting of a task today runs the split; a second the same day does not; the next day does again.
-- [ ] The same self-test shows the launch command line uses `--model sonnet`, a `--max-budget-usd` of at most 2 and a `--max-turns` cap, and the prompt names `git stash store`, Deferred and `depends-on` repointing.
-- [ ] The same self-test shows a failed split run (injected result) leads to a Blocked move whose reason names the failure; a successful one does not Block.
-- [ ] The commit and push of the split run happen inside `Enter-Lock` (visible in the code and a self-test of the call order).
-- [ ] No `stash pop` is used anywhere in the new code.
-- [ ] An ADR in `Documentation/Planning/Decisions/` records the decision.
-- [ ] All `RunDarkFactory.ps1 -Test*` switches that passed before still pass.
+- [x] A split function and its prompt exist (`DarkFactory/TaskStash.ps1`, `DarkFactory/Prompts.ps1`), and both `Claim.ps1` (over-cap skip) and `ShiftRunner.ps1` (run stopped at the cap) call it.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` (extended) passes with injected-clock cases: first capped sighting of a task today runs the split; a second the same day does not; the next day does again.
+- [x] The same self-test shows the launch command line uses `--model sonnet`, a `--max-budget-usd` of at most 2 and a `--max-turns` cap, and the prompt names `git stash store`, Deferred and `depends-on` repointing.
+- [x] The same self-test shows a failed split run (injected result) leads to a Blocked move whose reason names the failure; a successful one does not Block.
+- [x] The commit and push of the split run happen inside `Enter-Lock` (visible in the code and a self-test of the call order).
+- [x] No `stash pop` is used anywhere in the new code.
+- [x] An ADR in `Documentation/Planning/Decisions/` records the decision.
+- [x] All `RunDarkFactory.ps1 -Test*` switches that passed before still pass.
 
 ## Notes
+
+- Delivered directly rather than through the full /feature stages: the change is four DarkFactory scripts and their self-test, and the run's cost cap is 3 US dollars.
+- Invoke-TaskSplit, Invoke-TaskSplitRun, Register-TaskSplitAttempt, Get-TaskSplitArguments and Get-TaskStashSha (factored out of Restore-TaskStash) are in TaskStash.ps1; SplitPrompt and SplitForbidden in Prompts.ps1 (ADR-0758).
+- Invoke-Claim queues an over-cap task (cost cap, not interactive only) and splits it in its finally block after the lock is released, so the minutes-long split run never holds every lane's claim lock; Invoke-TaskSplit takes the lock again only to commit and push.
+- Default taken: in ShiftRunner a refused push leaves the split commit for the shift's integration rather than pulling, since the lane may hold its own commits there; from a claim it pulls with rebase and pushes again.
+- Default taken: 1 US dollar, 30 turns, 20 minutes; one marker file per task per day under <log>/splits.
+- -TestTaskStash: 27 PASS; all 23 RunDarkFactory.ps1 -Test* switches exit 0.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: eb81d285 b1cf7e4a dab410e4 3adf2d41 406b27f7 04e7bc94 de7e55ae 7193fd91.
+- 2026-10-22: Doing -> Done. A task over its cost cap is split by one bounded Sonnet run once a day, from the claim's over-cap skip and a run stopped at the cap
