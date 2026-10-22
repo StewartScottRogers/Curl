@@ -221,6 +221,7 @@ function Invoke-TaskSplit {
         if (-not $failure) {
             & $Git @('add', '-A', 'Tasks') | Out-Null
             $headBefore = & $HeadSha
+            $rebasedSplit = $null
             $committed = & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - over its cost cap", '-m', $SkipCiNote)
             $pushed = $committed -and -not $LeaveForIntegration -and (& $Git @('push', '-q', 'origin', "HEAD:$Branch"))
             # A claim synced this checkout to the shared branch, so it may take what other lanes
@@ -228,13 +229,18 @@ function Invoke-TaskSplit {
             # shift's integration may push, so there (-LeaveForIntegration) neither the split commit nor
             # the block commit is pushed and both are left for it.
             if ($committed -and -not $pushed -and $PullOnRefusal) {
-                if (& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) { $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch") }
+                if (& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) { $rebasedSplit = & $HeadSha; $pushed = & $Git @('push', '-q', 'origin', "HEAD:$Branch") }
                 else { & $Git @('rebase', '--abort') | Out-Null }
             }
             if ($committed -and ($pushed -or -not $PullOnRefusal -or $LeaveForIntegration)) { Write-Trace $Id 'split' "split into $($new -join ', ')$(if (-not $pushed) { '; left for the shift to integrate' })" 'Cyan'; return 'split' }
             $failure = if ($committed) { 'the push of the split was refused' } else { 'the commit of the split failed' }
-            # Only the split's own commit is removed, by the hash HEAD had before it; never HEAD~1.
-            if ($committed -and $headBefore) { & $Git @('reset', '-q', '--hard', $headBefore) | Out-Null }
+            # Only the split's own commit is removed. After a successful pull it was rebased onto
+            # the commits the pull brought in, which stay: its parent is the target. Without a
+            # rebase it is the hash HEAD had before the commit. A failed commit leaves the split's
+            # new task files in the index, so they are unstaged for the checkout below to restore.
+            if ($committed -and $rebasedSplit) { & $Git @('reset', '-q', '--hard', "$rebasedSplit~1") | Out-Null }
+            elseif ($committed -and $headBefore) { & $Git @('reset', '-q', '--hard', $headBefore) | Out-Null }
+            elseif (-not $committed) { & $Git @('reset', '-q', '--', 'Tasks') | Out-Null }
         }
         # A failed split leaves nothing of its own behind: the board goes back to how it
         # was and the task is blocked as before the split existed, with the stashes it stored dropped.
@@ -360,10 +366,43 @@ if ($TestTaskStash) {
             $script:splitCmds.Clear(); $script:splitIds = @('BL-1'); $script:failGit = $Fail
             Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } `
                 -StashSha { '' } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $cmdStub -HeadSha { 'cafe01' } -Board $boardStub -PullOnRefusal }
-        & $check 'a failed commit is blocked without any reset' 'blocked False False' "$(& $cmdSplit '2026-11-10' 'commit') $(($script:splitCmds -join '|') -match 'reset') $(($script:splitCmds -join '|') -match 'HEAD~1')"
+        & $check 'a failed commit is blocked, unstaging Tasks and never resetting hard' 'blocked True False' "$(& $cmdSplit '2026-11-10' 'commit') $(($script:splitCmds -join '|') -match 'reset -q -- Tasks\|checkout' -and ($script:splitCmds -join '|') -notmatch 'hard') $(($script:splitCmds -join '|') -match 'HEAD~1')"
         & $check 'a failed commit never pulls or pushes the split' 'False' "$(($script:splitCmds -join '|') -match '^pull|\|pull|push.*push')"
         & $check 'a conflicting pull aborts the rebase before the reset to the recorded hash' 'blocked True False' "$(& $cmdSplit '2026-11-11' 'pull') $(($script:splitCmds -join '|') -match 'pull[^|]*\|rebase --abort\|reset -q --hard cafe01') $(($script:splitCmds -join '|') -match 'HEAD~1')"
-        # In a lane after a run nothing is pushed, even when the push would be accepted (BL-3100).
+        # Real git (BL-3107): a commit that fails after add leaves the block commit only the Blocked move;
+        # a refused push after a successful pull keeps the pulled commits.
+        $tasksDir = Join-Path $repo 'Tasks'; New-Item -ItemType Directory -Force -Path $tasksDir | Out-Null
+        Set-Content -Path (Join-Path $tasksDir 'BL-1-x.md') -Value 'task'
+        git -C $repo add Tasks; git -C $repo commit -q -m tasks 2>&1 | Out-Null
+        $script:realFailCommit = $false; $script:realPull = $false
+        $realGit = { param([string[]]$GitArgs)
+            if ($GitArgs[0] -eq 'push') { return $false }
+            if ($GitArgs[0] -eq 'commit' -and $script:realFailCommit) { $script:realFailCommit = $false; return $false }
+            if ($GitArgs[0] -eq 'pull') {
+                if (-not $script:realPull) { return $false }
+                $split = "$(git -C $repo rev-parse HEAD)".Trim()
+                git -C $repo reset -q --hard HEAD~1 2>&1 | Out-Null
+                Set-Content -Path (Join-Path $repo 'pulled.txt') -Value 'pulled'
+                git -C $repo add pulled.txt; git -C $repo commit -q -m 'pulled commit' 2>&1 | Out-Null
+                git -C $repo cherry-pick $split 2>&1 | Out-Null
+                return $true }
+            git -C $repo @GitArgs 2>&1 | Out-Null; $LASTEXITCODE -eq 0 }
+        $realRun = { param($a, $b) Set-Content -Path (Join-Path $tasksDir 'BL-2-y.md') -Value 'new'; $script:splitIds = @('BL-1', 'BL-2'); @{ ExitCode = 0 } }
+        $realBoard = { param([string[]]$BoardArgs) Set-Content -Path (Join-Path $tasksDir 'blocked.txt') -Value 'blocked' }
+        $realHead = { "$(git -C $repo rev-parse HEAD)".Trim() }
+        $realFailSplit = { param($Day)
+            $script:splitIds = @('BL-1')
+            Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $realRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+                -TaskState { 'Deferred' } -EnterLock $lockStub -Git $realGit -HeadSha $realHead -Board $realBoard -PullOnRefusal }
+        $script:realFailCommit = $true
+        $r = & $realFailSplit '2026-11-20'
+        $lastFiles = @(git -C $repo show --name-only --format= HEAD) -join ','
+        & $check 'a commit failing after add blocks with only the Blocked move in the block commit' 'blocked Tasks/blocked.txt' "$r $lastFiles"
+        & $check 'a commit failing after add leaves no split task file' 'False' "$(Test-Path (Join-Path $tasksDir 'BL-2-y.md'))"
+        $script:realPull = $true
+        $r = & $realFailSplit '2026-11-21'
+        $log = @(git -C $repo log --format=%s) -join '|'
+        & $check 'a refused push after a pull keeps the pulled commit and drops the split commit' 'blocked True True False' "$r $($log -match 'pulled commit') $(Test-Path (Join-Path $repo 'pulled.txt')) $($log -match 'split BL-1')"        # In a lane after a run nothing is pushed, even when the push would be accepted (BL-3100).
         $script:splitPushes = $true
         $null = & $split '2026-11-12' $okRun -Leave
         & $check 'after a run the split commit is not pushed' 'False' ($script:splitSteps -contains 'push').ToString()
