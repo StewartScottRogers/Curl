@@ -33,3 +33,4 @@ Resolver half of BL-2969. BL-3011 landed the code and BL-3012 amended ADR-0738 w
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 6208194f 06955b45 af2d943f.
