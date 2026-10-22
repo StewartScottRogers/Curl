@@ -9,7 +9,7 @@ touches: [Gap/Tools/Measure-UpstreamCases.cs]
 lane: no
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-22
 ---
 # BL-2857 — Measure the 20 Linux gap cases whose perl precheck or postcheck the gap tool defeats: 608, 610, 611, 612, 615, 624, 625, 627, 638, 639, 762, 1027, 1082, 1083, 1291, 1443, 1444, 1445, 1583 and 1683
 
@@ -44,3 +44,4 @@ Fix: stop substituting `%PERL` in the gap tool (the runner binds its own `%PERL`
 
 - 2026-10-19: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 85c52118 5909e2b3 3c42afd5 01b4bff2 23b442b3.
+- 2026-10-22: Doing -> Done. The gap tool leaves %PERL for the runner; 27 Windows cases and 28 Linux and macOS cases now measure match (gap PR #195, run 39803629751).
