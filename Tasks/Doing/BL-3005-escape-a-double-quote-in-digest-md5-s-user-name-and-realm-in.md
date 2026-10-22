@@ -31,3 +31,4 @@ Found by BL-2834 (ADR-0751): test907 (user us"er, realm cu"rl) differs at line 3
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: fbecace0.
