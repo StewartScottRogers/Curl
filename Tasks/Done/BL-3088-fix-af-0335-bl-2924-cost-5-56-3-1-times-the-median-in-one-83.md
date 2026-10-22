@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3088 — Fix AF-0335: BL-2924 cost $5.56, 3.1 times the median, in one 83-turn run plus a rebase-conflict resolve
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: BL-2924 was one legitimate unit-program port (unit1658) that needed a long build-and-test loop; cost is turn count (83) times context size (10.9M cache-read tokens), not retries, plus a 12-turn rebase-conflict resolve ($0.51) caused by other lanes landing concurrently. No avoidable waste in the factory scripts: the run is already bounded by the per-task cost cap and the lane rules on batching builds. Recorded as unavoidable; no code change. Build and fast tests green.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named (one long legitimate port run plus a rebase resolve), recorded as unavoidable
