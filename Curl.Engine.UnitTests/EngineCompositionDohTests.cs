@@ -113,8 +113,9 @@ public sealed class EngineCompositionDohTests
     public async Task Connect_UnderTraceConfigDnsOrDoh_WritesTheDnsFilterAndDohLinesToTheTransfer(string component)
     {
         // curl -v --trace-config doh (or dns, which writes the same) --doh-url ... http://example.test:P/:
-        // the filter's lines, the DoH lines once both queries are done, then the resolve and Trying
-        // (measured, BL-1102 Notes; the DoH lines' texts as BL-850 measured them), each DoH sub-transfer's
+        // the filter's lines, each query's completed line or, for the AAAA answer that does not decode,
+        // its error line, then the resolve and Trying (measured, BL-1102 Notes; the error line as
+        // BL-2970 measured it with curl 8.22.0), each DoH sub-transfer's
         // [DNS] lines before them (BL-1180; the scripted DoH server reports no connect lines); network's [HAPPY-EYEBALLS], [TCP] and [TIMER] lines (BL-1161, BL-1186) aside.
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         RecordingEvents events = new();
@@ -136,11 +137,7 @@ public sealed class EngineCompositionDohTests
                 "[DNS] using HTTP/1.x",
                 "[DNS] upload completely sent off: 30 bytes",
                 "[DNS] Connection #2 to host 127.0.0.1:48711 left intact",
-                "[DNS] a DoH request is completed, 0 to go",
-                "[DNS] DoH: Unexpected TYPE type AAAA for example.test",
-                "[DNS] hostname: example.test",
-                "[DoH] TTL: 60 seconds",
-                "[DoH] A: 127.0.0.1",
+                "[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE",
                 "[DNS] resolve complete for example.test:48712",
                 "Host example.test:48712 was resolved.",
                 "IPv6: (none)",
