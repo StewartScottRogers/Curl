@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3126 — Fix AF-0346: Lib1582_PerformsWithNegotiateAndAnswersItsCode never checks that Negotiate is asked for
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Lib1582 test now captures the performed EasyAuthenticationOptions through FakeCurlEngine.Performing and asserts HttpAuthentication is Negotiate and UserPassword is ":" before the exit code, so the asserts fall inside the reproduction's 8 lines of context. Test-only change: no production code, so no Measure-CodeQuality run. dotnet build clean (0 warnings) and the fast tests green on Windows; the change is platform-neutral.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Lib1582 test asserts the performed options ask for Negotiate with credentials ':'
