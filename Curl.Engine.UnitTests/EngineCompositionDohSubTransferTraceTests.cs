@@ -54,10 +54,10 @@ public sealed class EngineCompositionDohSubTransferTraceTests
             "* [DNS] created DNS filter for example.test:47113, transport=3, queries=3",
             "* [DNS] added",
             "* [DNS] cf_dns_start host example.test:47113",
-            .. SubTransferLines(1, "1 to go", 3),
-            .. SubTransferLines(2, "0 to go", 3),
-            "* [DNS] DoH: Too small type A for example.test",
-            "* [DNS] DoH: Too small type AAAA for example.test",
+            .. SubTransferLines(1, null, 3),
+            "* [DoH] [DoH] [A] error decoding response: Too small",
+            .. SubTransferLines(2, null, 3),
+            "* [DoH] [DoH] [AAAA] error decoding response: Too small",
             "* Could not resolve host: example.test",
         ];
         Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
@@ -66,18 +66,15 @@ public sealed class EngineCompositionDohSubTransferTraceTests
     }
 
     [TestMethod]
-    public async Task Connect_UnderTraceConfigDns_WhenTheDohAnswerResolves_WritesEachSubTransfersPrefixedLinesBeforeTheEntry()
+    public async Task Connect_UnderTraceConfigDns_WhenTheDohAnswerResolves_WritesEachSubTransfersPrefixedLinesThenTheAaaaDecodeFailure()
     {
         ConnectResult result = await ConnectAsync([AAnswer, AAnswer]);
 
         string[] expected =
         [
             .. SubTransferLines(1, "1 to go", 46),
-            .. SubTransferLines(2, "0 to go", 46),
-            "* [DNS] DoH: Unexpected TYPE type AAAA for example.test",
-            "* [DNS] hostname: example.test",
-            "* [DoH] TTL: 60 seconds",
-            "* [DoH] A: 127.0.0.1",
+            .. SubTransferLines(2, null, 46),
+            "* [DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE",
             "* [DNS] resolve complete for example.test:47113",
             "* Host example.test:47113 was resolved.",
         ];
@@ -98,7 +95,8 @@ public sealed class EngineCompositionDohSubTransferTraceTests
     // One sub-transfer's lines as curl writes them, the poll-timing ones left out; the POST's
     // head is the measured one. The second finds the DoH server's address in the DNS cache, as
     // curl's does.
-    private static string[] SubTransferLines(int connectionNumber, string toGo, int answerLength)
+    // toGo is null for a query that failed, which curl 8.22.0 ends with its error line in place of the completed line (BL-2970).
+    private static string[] SubTransferLines(int connectionNumber, string? toGo, int answerLength)
     {
         return
         [
@@ -128,7 +126,7 @@ public sealed class EngineCompositionDohSubTransferTraceTests
             "< ",
             $"{{ [{answerLength} bytes data]",
             $"* [DNS] Connection #{connectionNumber} to host 127.0.0.1:47112 left intact",
-            $"* [DNS] a DoH request is completed, {toGo}",
+            .. toGo is null ? Array.Empty<string>() : [$"* [DNS] a DoH request is completed, {toGo}"],
         ];
     }
 
