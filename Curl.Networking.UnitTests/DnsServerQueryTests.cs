@@ -110,6 +110,23 @@ public sealed class DnsServerQueryTests
     }
 
     [TestMethod]
+    public void Match_TheReplyWithTheLastLetterInAnotherCase_IsComplete()
+    {
+        var query = DnsServerQuery.Build("zz.example", DnsRecordType.A, 0x1234, Cookie).Bytes;
+        var reply = DnsTestReplies.Answer(query, [IPAddress.Loopback]);
+        reply[13] = (byte)'Z';
+        Diagnostics.Bytes("query", query);
+        Diagnostics.Bytes("reply", reply);
+        Diagnostics.Arrange("changed reply byte 13", "'Z'");
+
+        var match = DnsServerQuery.Match(query, reply);
+
+        Diagnostics.Act("match", match);
+        Diagnostics.Assert("match", DnsReplyMatch.Complete, match);
+        Assert.AreEqual(DnsReplyMatch.Complete, DnsServerQuery.Match(query, reply));
+    }
+
+    [TestMethod]
     public void Match_ATruncatedReply_IsTruncated()
     {
         var query = Query();
