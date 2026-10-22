@@ -39,3 +39,4 @@ The other nine `--libcurl` cases (1400 to 1404, 1406, 1420, 1465, 1481) already 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 0b924be1 61dab663 782ca8e4 7eaf8a6e.
