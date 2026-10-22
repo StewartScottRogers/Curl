@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskBudget.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3061 — Read run logs with shared access so a locked file never ends a lane
 
@@ -24,14 +24,17 @@ Fix: read the lines through a `FileStream` opened with `FileMode.Open, FileAcces
 
 ## Acceptance criteria
 
-- [ ] `-TestTaskBudget` has a case that holds a `.jsonl` open for writing with `FileShare.Read` (or none) from another handle, with assistant usage lines already written, and `Get-LogEstimatedCostUsd` returns the same cost it returns once the handle is closed.
-- [ ] `-TestTaskBudget` has a case where the file stays locked exclusively for the whole call: the function returns 0.0 without throwing.
-- [ ] `Get-LogEstimatedCostUsd` no longer calls `[System.IO.File]::ReadLines`, and `Select-String 'ReadLines' DarkFactory\*.ps1` finds none.
-- [ ] `RunDarkFactory.ps1 -TestTaskBudget` passes and `RunDarkFactory.ps1` still parses.
+- [x] `-TestTaskBudget` has a case that holds a `.jsonl` open for writing with `FileShare.Read` (or none) from another handle, with assistant usage lines already written, and `Get-LogEstimatedCostUsd` returns the same cost it returns once the handle is closed.
+- [x] `-TestTaskBudget` has a case where the file stays locked exclusively for the whole call: the function returns 0.0 without throwing.
+- [x] `Get-LogEstimatedCostUsd` no longer calls `[System.IO.File]::ReadLines`, and `Select-String 'ReadLines' DarkFactory\*.ps1` finds none.
+- [x] `RunDarkFactory.ps1 -TestTaskBudget` passes and `RunDarkFactory.ps1` still parses.
 
 ## Notes
+
+- Added Read-SharedLogLines (FileShare.ReadWrite|Delete, 5 tries 200 ms apart on IOException, unreadable = no lines). Other Get-Content readers use -ErrorAction SilentlyContinue; none named as follow-up.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 21dfe1e6 37c11953 5be53930 2448417f.
+- 2026-10-22: Doing -> Done. Run logs are read with shared access and retried; a locked log costs 0 and never throws
