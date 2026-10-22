@@ -48,3 +48,4 @@ A failed split has a related problem. It puts the board back as it was (`TaskSta
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 798f000e 28b53e68 194fd556 98d0b224 95ad9451.
