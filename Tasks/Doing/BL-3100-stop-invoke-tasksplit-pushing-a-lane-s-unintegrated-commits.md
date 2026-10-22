@@ -43,3 +43,4 @@ The push on the failure path (`TaskStash.ps1:176`) has the same problem. The exi
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: fe2306b6 dd817d75 bddde03b 95ad9451.
