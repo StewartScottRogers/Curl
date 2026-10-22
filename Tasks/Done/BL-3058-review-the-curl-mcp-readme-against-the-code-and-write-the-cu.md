@@ -9,7 +9,7 @@ touches: [Curl.Mcp/README.md, Curl.Mcp.UnitLibrary/README.md]
 model: sonnet
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3058 — Review the Curl.Mcp README against the code and write the Curl.Mcp.UnitLibrary README
 
@@ -23,10 +23,10 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." The com
 
 ## Acceptance criteria
 
-- [ ] The README exists in the project folder and states what the project is, how it is used (a short example that compiles or is a command that runs), its folder or type map, and its quality gates and relationship to its sibling projects.
-- [ ] Every type, member, option, file and command the README names exists in the code as it is now.
-- [ ] If a test reads or checks the README, it still passes; any code sample in it is exercised by that test where the project already does so.
-- [ ] No source file other than the README changes, and `dotnet build` of the project is clean with warnings as errors and the fast tests of Curl.Mcp.UnitTests pass (`dotnet test Curl.Mcp.UnitTests --filter "TestCategory!=Integration"`).
+- [x] The README exists in the project folder and states what the project is, how it is used (a short example that compiles or is a command that runs), its folder or type map, and its quality gates and relationship to its sibling projects.
+- [x] Every type, member, option, file and command the README names exists in the code as it is now.
+- [x] If a test reads or checks the README, it still passes; any code sample in it is exercised by that test where the project already does so.
+- [x] No source file other than the README changes, and `dotnet build` of the project is clean with warnings as errors and the fast tests of Curl.Mcp.UnitTests pass (`dotnet test Curl.Mcp.UnitTests --filter "TestCategory!=Integration"`).
 
 ## Notes
 
@@ -34,3 +34,4 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." The com
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: cdc198fa fc2f372c 0e267b12 4ebfbfb8.
+- 2026-10-22: Doing -> Done. Curl.Mcp README verified against the code; Curl.Mcp.UnitLibrary README written

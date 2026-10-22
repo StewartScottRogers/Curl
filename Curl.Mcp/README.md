@@ -102,7 +102,7 @@ Add to `.mcp.json` in the solution folder (or `%USERPROFILE%\.mcp.json` for ever
 
 ## Package
 
-`dotnet pack Curl.Mcp` produces a NuGet package of type `McpServer`, with `.mcp/server.json`
+`dotnet pack Curl.Mcp` produces a NuGet package of type `McpServer` (tool command `curl-mcp`), with `.mcp/server.json`
 naming it `io.github.StewartScottRogers/Curl`, which points at one package per runtime identifier.
 Every package is native AOT (ADR-0621): `Curl.Mcp.csproj` sets `PublishAot`, so `dotnet pack Curl.Mcp`
 makes the tool package, and `dotnet pack Curl.Mcp -r <rid>` makes one runtime's package with its
