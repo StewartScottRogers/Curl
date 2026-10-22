@@ -86,6 +86,8 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
   (see the requeue note above), amend ADR-0738, build, fast tests, one quality run. Requeued only
   because this claim's cost cap ($1.57) could not cover that.
 
+- 2026-10-21, lane 2, third claim. The stash applied cleanly (git diff --stat matches the second claim's 13 files). Requeued at once with nothing new done: this claim's cost cap was $1.02, too small for the trace-test port, the Engine test lines, the ADR-0738 amendment, a build, the fast tests and a quality run. The next claim needs a cap of about $2.50 or more; what is left is unchanged from the second claim's note.
+
 ## Log
 
 - 2026-10-21: Created.
@@ -94,3 +96,4 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
 - 2026-10-21: Doing -> Backlog. Cost cap: library side ported onto BL-2981's split files and builds; trace and Engine tests, ADR amendment and quality run left, see Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
+- 2026-10-21: Doing -> Backlog. Cost cap: this claim's $1.02 cap cannot cover the trace and Engine tests, ADR amendment, build, tests and quality run; work stays in the stash, see Notes
