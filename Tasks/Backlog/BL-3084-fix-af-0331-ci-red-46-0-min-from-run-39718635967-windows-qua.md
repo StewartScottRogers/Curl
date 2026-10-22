@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
+lane: no
 requirement: none
 created: 2026-10-22
 completed:
@@ -46,7 +47,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Interactive only: the finding's reproduction runs the audit office's process measuring tool over audit logs, which the audit guard refuses a lane. The cause is already fixed by BL-3028 (597082cb8): CiWatch.ps1 files CI tasks with real touches, never empty; `RunDarkFactory.ps1 -TestCiWatch` passes (checked 2026-10-22). Remove lane: no once an interactive session has run the reproduction and ticked the boxes.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Backlog. Interactive only: reproduction needs audit paths; cause already fixed by BL-3028
