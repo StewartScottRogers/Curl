@@ -50,7 +50,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-22: The fix already shipped as ADR-0744 (BL-2946, Done 2026-10-21 14:15): a lane claims CI-fix tasks past the usage stop. The reproduction reads a past audit log copy (spell 39362208615, 2026-10-20) through audit-office tools a lane may not run; that data cannot change. No code change is left in DarkFactory/CiWatch.ps1. Only the next process re-audit of new spells can close AF-0308.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Blocked. Stewart: reproduction reads a past audit log, so it cannot change; fix is already ADR-0744 - close AF-0308 at the next process re-audit and drop this task?
