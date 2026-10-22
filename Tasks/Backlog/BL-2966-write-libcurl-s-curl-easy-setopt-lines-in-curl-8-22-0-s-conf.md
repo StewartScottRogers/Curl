@@ -34,6 +34,8 @@ The other nine `--libcurl` cases (1400 to 1404, 1406, 1420, 1465, 1481) already 
 
 ## Notes
 
+- BL-2965 measured with the vendored files: 1402, 1404, 1406 and 1465 also fail on order, CURLOPT_USERAGENT written after POSTFIELDS, the mime parts or CURLOPT_UPLOAD instead of in credentials_and_headers_setopts. Moving the whole generator to 8.22.0 order should fix them too; add each that then passes to PassingUpstreamCases.txt. Only 1400, 1401, 1403, 1420 and 1481 are listed so far.
+
 ## Log
 
 - 2026-10-21: Created.

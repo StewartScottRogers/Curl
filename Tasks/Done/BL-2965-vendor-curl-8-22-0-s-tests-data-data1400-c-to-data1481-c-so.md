@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamTestData/data/data14xx.c, Curl.Conformance.UnitTests/UpstreamTestData/Update-UpstreamTestData.ps1, Curl.Conformance.UnitTests/UpstreamTestData/README.md, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2965 — Vendor curl 8.22.0's tests/data/data1400.c to data1481.c so the --libcurl cases have their expected C
 
@@ -24,15 +24,20 @@ Remove `lane: no` once a lane's permissions let it write under `Curl.Conformance
 
 ## Acceptance criteria
 
-- [ ] The eleven `data<n>.c` files are in `Curl.Conformance.UnitTests/UpstreamTestData/data/`, byte for byte as curl 8.22.0's.
-- [ ] `Update-UpstreamTestData.ps1` copies them and the README's data section names them.
-- [ ] Each of the eleven cases that passes with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows is on `PassingUpstreamCases.txt` (expected: 1400, 1401, 1402, 1403, 1404, 1406, 1420, 1465, 1481).
-- [ ] `dotnet test --filter "TestCategory!=Integration"` passes, and CI is green on Linux and macOS for the commit.
+- [x] The eleven `data<n>.c` files are in `Curl.Conformance.UnitTests/UpstreamTestData/data/`, byte for byte as curl 8.22.0's.
+- [x] `Update-UpstreamTestData.ps1` copies them and the README's data section names them.
+- [x] Each of the eleven cases that passes with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows is on `PassingUpstreamCases.txt` (expected: 1400, 1401, 1402, 1403, 1404, 1406, 1420, 1465, 1481).
+- [x] `dotnet test --filter "TestCategory!=Integration"` passes, and CI is green on Linux and macOS for the commit.
 
 ## Notes
+
+- Read the data folder by absolute path: the root `data/` deny still refuses a relative `data/` path from inside UpstreamTestData. Downloaded the eleven files with curl from raw.githubusercontent.com at curl-8_22_0 (LF, unchanged).
+- Measured on Windows with CURL_UPSTREAM_CASE: 1400, 1401, 1403, 1420 and 1481 pass and are on the list. 1402, 1404, 1406 and 1465 fail, not only 1405 and 1407 as BL-2862 expected: Curl writes CURLOPT_USERAGENT after POSTFIELDS, the mime parts or CURLOPT_UPLOAD, where 8.22.0 writes it in credentials_and_headers_setopts, before transfer_setopts. That is the setopt order BL-2966 moves to 8.22.0, so those four are left to it (noted on BL-2966) rather than listed here.
+- Platform: the five listed cases compare generated C only (no paths, OS errors or certificates), so their output does not depend on the platform. Fast tests: 44 projects, 0 failed. CI on Linux and macOS runs when the shift integrates the commit.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: lane: no removed; PR #187 anchors the data deny at the project root (`/data/**`), so lanes can write under Curl.Conformance.UnitTests/UpstreamTestData/data/.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: a535a660 556903c9 29d34864 6ea6410d.
+- 2026-10-21: Doing -> Done. curl 8.22.0's data1400-1407.c, 1420.c, 1465.c, 1481.c are vendored; cases 1400, 1401, 1403, 1420, 1481 pass and are listed
