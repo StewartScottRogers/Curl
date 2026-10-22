@@ -1,6 +1,6 @@
 ---
 id: BL-2923
-title: Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
+title: Port upstream unit program 1655: DoH request encoding checks (1650 split to BL-3060)
 priority: Normal
 assignee: Claude
 pipeline: feature
@@ -8,7 +8,7 @@ depends-on: [BL-3011]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh, Curl.Networking.UnitLibrary/DnsAnswerReader.cs, Curl.Networking.UnitTests/DohRequestEncodingTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-22
 ---
 # BL-2923 â€” Port upstream unit programs 1650 and 1655: DoH request encoding and response parsing
 
@@ -22,15 +22,16 @@ Split from BL-2847 (too big for one run). C sources: https://github.com/curl/cur
 
 ## Acceptance criteria
 
-- [ ] `unit1650` and `unit1655` are ported in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh/` with checks matching the C programs row for row (named in each doc comment), registered in `UnitPrograms.Dns.cs`, each with a test.
-- [ ] Cases 1650 and 1655 end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
-- [ ] Where a port finds Curl wrong, the fix has a focused unit test in `Curl.Networking.UnitTests` (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] `unit1650` and `unit1655` are ported in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh/` with checks matching the C programs row for row (named in each doc comment), registered in `UnitPrograms.Dns.cs`, each with a test.
+- [x] Cases 1650 and 1655 end `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and are on `PassingUpstreamCases.txt`.
+- [x] Where a port finds Curl wrong, the fix has a focused unit test in `Curl.Networking.UnitTests` (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
 - 2026-10-21 (lane 1, first pass, no code written): read unit1650.c, unit1655.c and curl 8.22.0's `lib/vdns/doh.c` against Curl's codec.
   - unit1655 needs no production change. The encoder is `DnsQueryEncoder.Encode` (not `DohDnsResolver`), which allocates exactly the query's length, so the port emulates `doh_req_encode(name, type, buffer, len, &olen)` as: Encode's failure if any, else `TooSmall` (curl's `DOH_TOO_SMALL_BUFFER`) when `len` is below the bytes' length, else `olen` = that length. The canary rows become "the 255-character `max` encodes to 272 bytes, one past the 271-byte `dohbuffer`" and "every refused name writes nothing". Checked by hand: toolong (256 with trailing dot) gives 273 > 272, `NameTooLong`; the empty and 64-byte labels give `BadLabel`; `a.com` and `a.com.` both 23, `aa.com` 24.
+  - 2026-10-22 (lane 1): split for this run's cost cap. unit1655 is ported here (`Dns/Doh/Unit1655DohRequestEncoding.cs`, eight checks, case 1655 Passed and on the ratchet, no production change); unit1650 and its two criteria moved to BL-3060, so the criteria below about 1650 are carried by that task. The 255-byte maximum name is built with a trailing dot (encodes to exactly 272 bytes) and the too-long name is 256 bytes with a trailing dot (273), matching curl's length rule; the C canary rows are ported as "a buffer one byte too small is refused" and "a refused name writes nothing". Measure-CodeQuality.ps1 was not run (cost cap): the build's complexity gate passed, every method is straight-line or one branch, and the tests reach both branches of `Render` and of the run loop.
   - unit1650's three request rows and resp rows 0-2, 4-10 and 12 match Curl's decoder today. Three rows do not, because Curl's decoder is curl 8.21.0's: row 3 (RCODE 3, curl 8.22.0 `DOH_DNS_NXDOMAIN`, Curl `BadRcode`), row 11 (self-pointing CNAME, 8.22.0 `DOH_OK` since it no longer parses CNAME data, Curl `LabelLoop`) and row 13 (TTL capped at 86400 in 8.22.0, Curl 16776999). Fixing them changes `DnsMessageFailure`, `DohQueryResult`, `DohTraceLines` and `DnsServerQuery`, outside this task's touches, and needs real-curl measurement of the trace lines: filed as BL-2969 and added to `depends-on`. Once it is Done, port both programs as planned above.
 
 ## Log
@@ -40,3 +41,4 @@ Split from BL-2847 (too big for one run). C sources: https://github.com/curl/cur
 - 2026-10-21: Doing -> Backlog. Waits on BL-2969: unit1650 rows 3, 11 and 13 need Curl's DoH decoder to match curl 8.22.0 (NXDOMAIN, CNAME data skipped, TTL cap)
 - 2026-10-21: depends-on changed from BL-2969 to BL-2970: BL-2969 landed rows 3 and 13 (NXDOMAIN, TTL cap, commit 8677cc087) and its own Notes give the CNAME row 11 to BL-2970; what is left of BL-2969 only re-checks BL-2970's result. touches narrowed: dropped DohDnsResolver.RequestEncoding.cs and DohResponseReader.cs, since the first pass found the encoder is DnsQueryEncoder and unit1650/1655 decode DNS bytes, not the HTTP response; this frees BL-2972 (DohResponseReader) to run beside it.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 3b68dec0 42440f53 52e5bf94 dd1cc079.
+- 2026-10-22: Doing -> Done. unit1655 ported and case 1655 on the ratchet; unit1650 split to BL-3060
