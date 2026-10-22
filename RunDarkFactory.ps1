@@ -197,7 +197,14 @@
     "Fix CI failure <test> on Linux and macOS", "Fix flaky CI test <test> that failed once
     on Linux" or "Fix CI build error CS1002 in X.cs on macOS" - naming the platforms, the
     run and its link, the first failing commit and the error message, with `touches` set to
-    the test project and its library. It files nothing while a Backlog, Doing or Blocked
+    the test project and its library. A failed job step that names no test (BL-3028) gets
+    the files its `::error file=` lines name and the files declaring each member "outside a
+    gate", or else Measure-CodeQuality.ps1 for a quality step and Curl.slnx for any other;
+    no CI task is filed with empty touches, which no lane would take. When the newest run is
+    green and its commit contains the filing of a Backlog "Fix CI failure", "Fix CI build" or
+    "Fix flaky CI test" task, the watch moves that task to Deferred, "already fixed, CI green
+    on <sha>", pushed the same way (ADR-0756); a task in Doing is left to its lane.
+    It files nothing while a Backlog, Doing or Blocked
     task names the test, or when a finished task names it and the failing run predates that
     task's last commit. The task is committed in a detached worktree,
     <repo>.lanes\ci-watch, and pushed straight to the shift's branch, so lanes claim it on
