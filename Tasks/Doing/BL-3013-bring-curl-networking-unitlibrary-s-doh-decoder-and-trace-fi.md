@@ -31,3 +31,4 @@ Split from BL-2970. BL-3011 lands the code and its tests but does not run the qu
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 5b56393b b4737a67 604ae9a6.
