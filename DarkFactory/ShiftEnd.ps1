@@ -12,19 +12,17 @@ $SkipCiNote = '[skip ci] Board change only; the run on the code before it stands
 # 20261018-103803 unmerged once a run in progress was no longer cancelled (ADR-0693).
 $MergeCiWaitMinutes = 60
 
-function Invoke-MergeToMaster {
-    # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
-    # into master through a pull request - only when the CI workflow passed, on every
-    # platform, for the exact commit being merged. Returns a line for the trace.
-    param([string]$Branch)
-    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return 'not merged: gh is not installed' }
-    git -C $Root fetch -q origin master $Branch 2>&1 | Out-Null
-    if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
-    $head = (git -C $Root rev-parse "origin/$Branch").Trim()
+function Wait-MergeCiRun {
+    # Waits for the CI run on -Head, following a newer branch head when a push replaced it, and
+    # calls -OnPoll every -PollMinutes meanwhile. Returns Run, Head and, when the wait failed,
+    # Failure: the "not merged: ..." line for the trace.
+    param([string]$Branch, [string]$Head, [scriptblock]$OnPoll, [int]$PollMinutes = 5)
+    $head = $Head
     $short = $head.Substring(0, 7)
     # Wait for the run on this exact commit. A run on the branch in progress always finishes
     # first (ADR-0693), and each takes 15 to 25 minutes, so allow two runs and some slack.
     $deadline = (Get-Date).AddMinutes($MergeCiWaitMinutes)
+    $nextPoll = (Get-Date).AddMinutes($PollMinutes)
     $run = $null
     # A board-only head commit started no run (AF-0089), so start one on it by hand.
     if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
@@ -36,14 +34,35 @@ function Invoke-MergeToMaster {
         if ($run.Count -and $run[0].conclusion -eq 'cancelled') {
             git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
             $newer = (git -C $Root rev-parse "origin/$Branch").Trim()
-            if ($newer -eq $head) { return "not merged: CI cancelled on $short" }
+            if ($newer -eq $head) { return @{ Failure = "not merged: CI cancelled on $short" } }
             $head = $newer
             $short = $head.Substring(0, 7)
             if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
         }
-        if ((Get-Date) -ge $deadline) { return "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" }
+        if ((Get-Date) -ge $deadline) { return @{ Failure = "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" } }
+        if ($OnPoll -and (Get-Date) -ge $nextPoll) { $nextPoll = (Get-Date).AddMinutes($PollMinutes); & $OnPoll }
         Start-Sleep -Seconds 30
     }
+    return @{ Run = $run; Head = $head }
+}
+
+function Invoke-MergeToMaster {
+    # Stewart's standing permission (2026-09-27): at the end of a shift, merge the branch
+    # into master through a pull request - only when the CI workflow passed, on every
+    # platform, for the exact commit being merged. Returns a line for the trace.
+    # -OnPoll, when given, runs every -PollMinutes of the CI wait (BL-3142), so a -Continuous
+    # coordinator can start the next shift while the merge waits.
+    param([string]$Branch, [scriptblock]$OnPoll, [int]$PollMinutes = 5)
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return 'not merged: gh is not installed' }
+    git -C $Root fetch -q origin master $Branch 2>&1 | Out-Null
+    if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
+    $head = (git -C $Root rev-parse "origin/$Branch").Trim()
+    $short = $head.Substring(0, 7)
+    $wait = Wait-MergeCiRun -Branch $Branch -Head $head -OnPoll $OnPoll -PollMinutes $PollMinutes
+    if ($wait.Failure) { return $wait.Failure }
+    $run = $wait.Run
+    $head = $wait.Head
+    $short = $head.Substring(0, 7)
     if ($run[0].conclusion -ne 'success') { return "not merged: CI $($run[0].conclusion) on $short" }
     # The pull request comes from a branch pinned at the commit CI passed, not from $Branch:
     # a board push to $Branch while CI ran ([skip ci], so no checks) became the request's head,

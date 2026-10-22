@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/ShiftEnd.ps1]
+touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/ShiftEnd.ps1, DarkFactory/LaneState.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3142 — Start the next -Continuous shift while the shift-end merge waits for CI, once a task is claimable
 
@@ -24,14 +24,18 @@ Where to start: the end-of-shift sequence in `ShiftCoordinator.ps1` (Invoke-Merg
 
 ## Acceptance criteria
 
-- [ ] While the shift-end merge waits for CI under `-Continuous`, the coordinator checks the board every `-IdlePollMinutes` and starts the next shift once a task is claimable. The merge still completes (or reports why not) after the hand-over, and only one next shift is ever started.
-- [ ] A `RunDarkFactory.ps1 -Test*` self-test pins it: with the merge's CI wait stubbed as pending and a task claimable at the second poll, the next shift is started once and the merge line is still traced.
-- [ ] The comment above the idle poll in `ShiftCoordinator.ps1` and ADR-0758 say the poll also runs during the merge wait.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] While the shift-end merge waits for CI under `-Continuous`, the coordinator checks the board every `-IdlePollMinutes` and starts the next shift once a task is claimable. The merge still completes (or reports why not) after the hand-over, and only one next shift is ever started.
+- [x] A `RunDarkFactory.ps1 -Test*` self-test pins it: with the merge's CI wait stubbed as pending and a task claimable at the second poll, the next shift is started once and the merge line is still traced.
+- [x] The comment above the idle poll in `ShiftCoordinator.ps1` and ADR-0758 say the poll also runs during the merge wait.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added DarkFactory/LaneState.ps1 to touches: the -TestHeartbeat self-test lives there; no other Doing task touches it.
+- Wait-MergeCiRun (ShiftEnd.ps1) holds the CI wait loop and calls -OnPoll every -PollMinutes; the coordinator hands over with `$startNextShift -Beside` and finishes the review afterwards. ADR-0758 amended. Linux/macOS CI: scripts only, platform-neutral.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 5fd3e226 2e7342fb 4c18bf29 9742157d.
+- 2026-10-22: Doing -> Done. The -Continuous coordinator polls the board during the shift-end merge's CI wait and starts the next shift once a task is claimable
