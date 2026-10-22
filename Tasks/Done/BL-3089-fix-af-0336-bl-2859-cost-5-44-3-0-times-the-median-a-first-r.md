@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3089 — Fix AF-0336: BL-2859 cost $5.44, 3.0 times the median: a first run requeued on a dependency, then a 79-turn second run
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause of AF-0336: BL-2859 had two runs. Run 1 (23 turns, $1.01) did the prerequisite pass and correctly requeued on BL-2955 (socks5unix engine work). Run 2 (79 turns, $4.44) implemented two server stand-ins with 62 build/test mentions. The requeue was the intended behaviour (lane rule 4 and AF-0147 already require the prerequisite pass before any edit) and was cheap; run 2 was genuine implementation work for two stand-ins. Unavoidable: no change to DarkFactory/Claim.ps1 is warranted.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost was a cheap correct requeue plus genuine stand-in work; no avoidable waste, recorded in Notes
