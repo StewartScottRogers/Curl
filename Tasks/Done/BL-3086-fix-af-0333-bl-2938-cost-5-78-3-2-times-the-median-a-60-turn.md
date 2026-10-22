@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3086 — Fix AF-0333: BL-2938 cost $5.78, 3.2 times the median: a 60-turn first run whose stash did not apply on the second claim
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause (AF-0333): BL-2938's first claim (60 turns, $3.12) was real work on a task that then waited on BL-2956; BL-2956 landed in the same files, so the stash conflicted on the second claim. Restore-TaskStash already handles that (DarkFactory/TaskStash.ps1: the worktree is reset clean and the run is told the stash hash, and AF-0327 already drops an applied stash). The second run (47 turns, $2.20) and resolve run ($0.46) were the cost of redoing a conflicting change. Recorded as unavoidable: a partial 3-way apply would leave conflict markers and risk more waste. No code change.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cause named: stash conflicted because BL-2956 landed in the same files; recorded as unavoidable, existing fallback suffices
