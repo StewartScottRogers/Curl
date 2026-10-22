@@ -53,3 +53,4 @@ One `IUnitProgram` per case in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Eas
 - 2026-10-21: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs (unit1652 infof truncation fix), and Curl.Engine.UnitLibrary is in the touches of BL-2934 (Doing); plan for all four cases is under Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
 - 2026-10-21: Doing -> Backlog. Run cost budget used up with the work nearly done; code is left in place, Notes list the four steps left
+- 2026-10-21: Backlog -> Doing. Criteria at claim: c0969e39 2e3e75ab aca7e1a2 dd1cc079.
