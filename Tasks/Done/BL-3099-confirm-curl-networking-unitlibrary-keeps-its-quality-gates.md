@@ -8,7 +8,7 @@ depends-on: [BL-3097, BL-3098]
 touches: [Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3099 — Confirm Curl.Networking.UnitLibrary keeps its quality gates after the curl 8.22.0 DoH decode
 
@@ -22,8 +22,8 @@ Gate half of BL-2969, run after BL-3097 and BL-3098. BL-3013 already measured th
 
 ## Acceptance criteria
 
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line and branch coverage and complexity at most 10 for every member.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 100% line and branch coverage and complexity at most 10 for every member.
 
 ## Notes
 
@@ -33,3 +33,4 @@ Gate half of BL-2969, run after BL-3097 and BL-3098. BL-3013 already measured th
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: c5f8cef6 990cf5be.
+- 2026-10-22: Doing -> Done. Build clean, fast tests green, Curl.Networking.UnitLibrary 0 failing members (full coverage, complexity within gate)
