@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3131 — Fix AF-0351: task-board.ps1's help says next prints a task or 'No task is ready.'; it also prints 'No task can start yet: ...'
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-22 (interactive): fixed on the audit branch, commit 230dc99ca, merged to master by PR #205 (CI green on Windows, Linux and macOS, which also covers the build and fast-test criterion). The help for next now names all three answers; the reproduction now matches line 16 for 'No task can start yet'.
 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. task-board.ps1's next help names its third answer (230dc99ca, PR #205).
