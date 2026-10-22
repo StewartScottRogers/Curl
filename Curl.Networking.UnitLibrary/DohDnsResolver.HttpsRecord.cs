@@ -60,8 +60,14 @@ public sealed partial class DohDnsResolver
     /// <inheritdoc />
     public ServiceBindingRecord? HttpsRecordFor(string host, int port) => _httpsRecords.GetValueOrDefault((host, port));
 
+    /// <summary>
+    /// Gets which of the HTTPS query's trace lines are written: <see cref="DohHttpsRecordTrace.All" />
+    /// unless the run's <c>--trace-config</c> leaves some out (ADR-0727's BL-2979 amendment).
+    /// </summary>
+    public DohHttpsRecordTrace HttpsRecordTrace { get; init; } = DohHttpsRecordTrace.All;
+
     // Posts the HTTPS query, reports its trace lines and decodes the answer's first record; null
-    // when nothing is asked or answered.
+    // when nothing is asked or answered, and for a status outside 200-299, which curl 8.22.0 refuses.
     private async ValueTask<ServiceBindingRecord?> QueryHttpsRecordAsync(string host, int port, CancellationToken cancellationToken)
     {
         if (HttpsQueryFor(host, port) is not { } query)
@@ -70,11 +76,19 @@ public sealed partial class DohDnsResolver
         }
 
         var result = await QueryAsync(query, DnsRecordType.Https, SubTransferEvents, cancellationToken).ConfigureAwait(false);
-        DohTraceLines.ReportHttpsRecord(_dohTrace, _describeExitCode, result);
-        return result.Answer is { Failure: DnsMessageFailure.None, HttpsRecordData: [var first, ..] }
+        DohTraceLines.ReportHttpsRecord(_dohTrace, _describeExitCode, result, HttpsRecordTrace);
+        return FirstHttpsRecordOf(result);
+    }
+
+    // The answer's first HTTPS record decoded; null for a status outside 200-299, which curl 8.22.0
+    // refuses, a failed exchange or decode, no record, or a first record that does not decode.
+    private static ServiceBindingRecord? FirstHttpsRecordOf(DohQueryResult result) =>
+        result.HasSuccessStatus ? FirstHttpsRecordOf(result.Answer) : null;
+
+    private static ServiceBindingRecord? FirstHttpsRecordOf(DnsAnswer? answer) =>
+        answer is { Failure: DnsMessageFailure.None, HttpsRecordData: [var first, ..] }
             ? ServiceBindingRecordDecoder.Decode(first).Record
             : null;
-    }
 
     /// <summary>
     /// Finds <paramref name="host" />'s ECHConfigList for <c>--ech true</c> or <c>hard</c>: the

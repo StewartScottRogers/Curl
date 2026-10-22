@@ -17,20 +17,20 @@ public sealed partial class DohDnsResolver
         await using (connection.ConfigureAwait(false))
         {
             events.ReportInfo("using HTTP/1.x");
-            var body = await ExchangeAsync(connection, BuildRequestHead(query), query, events, cancellationToken).ConfigureAwait(false);
-            if (body is null)
+            var response = await ExchangeAsync(connection, BuildRequestHead(query), query, events, cancellationToken).ConfigureAwait(false);
+            if (response is null)
             {
                 return new DohQueryResult(recordType, CurlExitCode.RecvError, null);
             }
 
             events.ReportInfo(FormattableString.Invariant($"Connection #{connectionNumber} to host {_dohServer.Host}:{_dohServer.Port} left intact"));
-            return new DohQueryResult(recordType, CurlExitCode.Ok, DecodeAnswer(body, recordType));
+            return new DohQueryResult(recordType, CurlExitCode.Ok, DecodeAnswer(response.Body, recordType)) { StatusCode = response.StatusCode };
         }
     }
 
-    // Writes the POST and reads the answer's body; null when the connection fails mid-exchange or
-    // the response is not read whole, which curl reports as "Failure when receiving data from the peer".
-    private static async ValueTask<byte[]?> ExchangeAsync(IConnection connection, byte[] head, byte[] query, ITransferEvents events, CancellationToken cancellationToken)
+    // Writes the POST and reads the answer; null when the connection fails mid-exchange or the
+    // response is not read whole, which curl reports as "Failure when receiving data from the peer".
+    private static async ValueTask<DohResponseReader.Response?> ExchangeAsync(IConnection connection, byte[] head, byte[] query, ITransferEvents events, CancellationToken cancellationToken)
     {
         try
         {
@@ -40,7 +40,7 @@ public sealed partial class DohDnsResolver
             events.ReportRequestHeader(head);
             events.ReportDataSent(query);
             events.ReportInfo($"upload completely sent off: {query.Length} bytes");
-            return await DohResponseReader.ReadBodyAsync(connection, events, cancellationToken).ConfigureAwait(false);
+            return await DohResponseReader.ReadResponseAsync(connection, events, cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {

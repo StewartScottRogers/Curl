@@ -14,6 +14,15 @@ internal sealed record DohQueryResult(DnsRecordType RecordType, CurlExitCode Exc
     private const int MaximumEntryAddresses = 24;
 
     /// <summary>
+    /// Gets the response's HTTP status code, which only the HTTPS query looks at (curl 8.22.0's
+    /// <c>doh_probe_done</c>, ADR-0727's BL-2979 amendment); 200 when the exchange failed.
+    /// </summary>
+    public int StatusCode { get; init; } = 200;
+
+    /// <summary>Gets a value indicating whether <see cref="StatusCode" /> is in 200-299.</summary>
+    public bool HasSuccessStatus => StatusCode is >= 200 and <= 299;
+
+    /// <summary>
     /// Gets the addresses the query's answer held, including those a failed decode read before it
     /// stopped, which curl's shared entry keeps (BL-958); empty when the exchange failed.
     /// </summary>
