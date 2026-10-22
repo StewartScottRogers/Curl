@@ -31,7 +31,7 @@ Split from BL-2881, after BL-3018 commits the generator. `Curl.Cli.UnitTests` ha
 - Made `ManualOptionHeader` and `ManualOptionPage` public (with doc comments on the header's properties) so `Curl.Cli.UnitTests` can test them directly, as the Context directs.
 - Coverage was already 100% except one branch in `UnknownExampleOption` (an unreachable null check from a `Match` property pattern). But the coverage tool counted complexity 12 to 22 for eight methods (`Parse`, `Write`, `Extra`, `Examples`, `SeeAlso`, `Leading`, `Foot`, `UnknownExampleOption`). Refactored them without changing output: `Parse` reads each line in `ReadLine`; `Write` chains `WriteOption`, `WriteDescription` and `WriteFoot` with `??`; the `Multi` lines come from a template table; and the see-also and mutex lists share `JoinNames` ("a", "a and b", "a, b and c"), because both loops built the same join. `ManualPageGeneratorTests` pass unchanged.
 - The ASCII layout indents each continuation line with a tab and four spaces. The full ASCII test pins that byte for byte, as the ported generator writes it.
-- Measured with `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: neither type has a failing member now. `ManualOptionIndex.Add` (complexity 14) still fails the gate and no task names it, so it is filed as BL-3024.
+- Measured with `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`: neither type has a failing member now. `ManualOptionIndex.Add` (complexity 14) still fails the gate and no task names it, so it is filed as BL-3025.
 
 ## Log
 

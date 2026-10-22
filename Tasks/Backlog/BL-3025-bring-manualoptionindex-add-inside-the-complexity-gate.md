@@ -1,5 +1,5 @@
 ---
-id: BL-3024
+id: BL-3025
 title: Bring ManualOptionIndex.Add inside the complexity gate
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-3024 — Bring ManualOptionIndex.Add inside the complexity gate
+# BL-3025 — Bring ManualOptionIndex.Add inside the complexity gate
 
 ## Goal
 
