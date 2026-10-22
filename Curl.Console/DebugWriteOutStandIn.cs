@@ -92,6 +92,10 @@ internal sealed record DebugWriteOutStandIn(long? FixedTime, long? DebugSize, st
     /// <summary>Ticks in one microsecond.</summary>
     private const long TicksPerMicrosecond = TimeSpan.TicksPerMillisecond / 1000;
 
+    /// <summary>Lays <c>CURL_TIME</c> over the answers the debug build replaces with it: the local port, every time (as that many microseconds) and both speeds.</summary>
+    /// <param name="info">The measured answers.</param>
+    /// <param name="value">The <c>CURL_TIME</c> number.</param>
+    /// <returns>The answers with the fixed values.</returns>
     private static TransferInfo WithFixedTime(TransferInfo info, long value)
     {
         TimeSpan time = TimeSpan.FromTicks(value * TicksPerMicrosecond);
@@ -112,6 +116,10 @@ internal sealed record DebugWriteOutStandIn(long? FixedTime, long? DebugSize, st
         };
     }
 
+    /// <summary>Reads an environment variable's text as a non-negative whole number, with digits only.</summary>
+    /// <param name="text">The variable's text, or <see langword="null" /> when it is not set.</param>
+    /// <param name="maximum">The largest number honoured.</param>
+    /// <returns>The number, or <see langword="null" /> when the text is not set, not digits, or above <paramref name="maximum" />.</returns>
     private static long? NumberOf(string? text, long maximum) =>
         long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out long number) && number <= maximum ? number : null;
 }

@@ -11,6 +11,7 @@ namespace Curl.Console;
 /// <param name="inner">The reader that reads the files.</param>
 internal sealed class RecordingDataFileReader(IDataFileReader inner) : IDataFileReader
 {
+    /// <summary>Each <see cref="TryReadFile" /> call so far, in call order; the other reads are not recorded.</summary>
     private readonly List<(string Path, bool WasRead)> filesTried = [];
 
     /// <summary>

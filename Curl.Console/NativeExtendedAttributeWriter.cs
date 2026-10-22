@@ -20,12 +20,17 @@ namespace Curl.Console;
 [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0320: a thin libc adapter, measured by the Integration run.")]
 internal sealed partial class NativeExtendedAttributeWriter : IExtendedAttributeWriter
 {
+    /// <summary>The library the three imports below resolve in; the runtime maps it to the platform's C library.</summary>
     private const string LibC = "libc";
 
+    /// <summary>FreeBSD's <c>EXTATTR_NAMESPACE_USER</c>, the namespace <c>--xattr</c> attributes live in (they have no <c>user.</c> prefix there).</summary>
     private const int FreeBsdUserNamespace = 1;
 
+    /// <summary>Makes the platform's call for a path, an attribute name and a value; gives 0 on success and a negative number on failure, leaving the error in the last P/Invoke error.</summary>
     private readonly Func<string, string, byte[], int> setAttribute;
 
+    /// <summary>Creates a writer over one platform's call.</summary>
+    /// <param name="setAttribute">The call, as described for the field it is kept in.</param>
     private NativeExtendedAttributeWriter(Func<string, string, byte[], int> setAttribute) =>
         this.setAttribute = setAttribute;
 
@@ -68,12 +73,15 @@ internal sealed partial class NativeExtendedAttributeWriter : IExtendedAttribute
         return false;
     }
 
+    /// <summary>Linux's <c>setxattr(path, name, value, size, flags)</c>; flags 0 creates or replaces. Gives 0, or -1 with <c>errno</c> set.</summary>
     [LibraryImport(LibC, EntryPoint = "setxattr", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial int LinuxSetXattr(string path, string name, byte[] value, nuint size, int flags);
 
+    /// <summary>macOS's <c>setxattr(path, name, value, size, position, options)</c>, which takes an extra <c>position</c> (0 for all but resource forks); options 0 creates or replaces. Gives 0, or -1 with <c>errno</c> set.</summary>
     [LibraryImport(LibC, EntryPoint = "setxattr", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial int MacSetXattr(string path, string name, byte[] value, nuint size, uint position, int options);
 
+    /// <summary>FreeBSD's <c>extattr_set_file(path, namespace, name, value, size)</c>. Gives the bytes written, or -1 with <c>errno</c> set.</summary>
     [LibraryImport(LibC, EntryPoint = "extattr_set_file", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial nint FreeBsdExtattrSetFile(string path, int attributeNamespace, string name, byte[] value, nuint size);
 }

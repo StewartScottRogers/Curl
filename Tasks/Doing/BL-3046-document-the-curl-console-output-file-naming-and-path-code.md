@@ -31,6 +31,8 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Notes
 
+- Audited all 21 files. Most were already fully documented and true of the code. Added docs to the private constants, fields, helpers and native imports whose names did not say enough (NativeExtendedAttributeWriter, NativeRegularFileTest, DebugWriteOutStandIn, EasyHandleWriteOutInfo, RecordingDataFileReader) and one inline comment naming the Win32 codes in PhysicalOutputPaths. Comments only.
+
 ## Log
 
 - 2026-10-22: Created.
