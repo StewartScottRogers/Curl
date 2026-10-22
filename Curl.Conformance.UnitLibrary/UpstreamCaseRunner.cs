@@ -35,7 +35,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> and <c>%CLIENT6IP</c> are <c>[::1]</c>, <c>%CLIENT6IP-NB</c> is <c>::1</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%FTP6PORT</c> is <see cref="Ftp6Port"/>, <c>%GOPHER6PORT</c> is <see cref="Gopher6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%HTTP3PORT</c> is <see cref="Http3Port"/> when the caller names a certificate directory and gives an <see cref="UpstreamHttp3Server"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%SOCKSUNIXPATH</c> is <see cref="SocksServerConnector.SocksUnixPath"/>, <c>%HTTPS-MTLSPORT</c> is <see cref="HttpsServerConnector.HttpsMtlsPort"/> when a certificate directory is named, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%HTTP3PORT</c> is <see cref="Http3Port"/> when the caller names a certificate directory and gives an <see cref="UpstreamHttp3Server"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%SOCKSUNIXPATH</c> is <see cref="SocksServerConnector.SocksUnixPath"/>, <c>%HTTPS-MTLSPORT</c> is <see cref="HttpsServerConnector.HttpsMtlsPort"/> when a certificate directory is named, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), <c>%VERSION</c> and <c>%VERNUM</c> are <see cref="CurlVersion"/>, and <c>%DATE</c> is the UTC date of the runner's start time, which a perl command script is given as <c>SOURCE_DATE_EPOCH</c>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -102,6 +102,9 @@ public sealed class UpstreamCaseRunner(
     private readonly UpstreamStandInFronts fronts = UpstreamStandInFronts.Create(sshServer, http2Server, http3Server);
 
     private readonly UpstreamCurlPlatform platform = UpstreamStandInFronts.Create(sshServer, http2Server, http3Server).WithFeatures(platform);
+
+    // runtests.pl's start time, to the second: it exports it as SOURCE_DATE_EPOCH and gives %DATE its UTC date.
+    private readonly DateTimeOffset startTime = DateTimeOffset.FromUnixTimeSeconds(timeProvider.GetUtcNow().ToUnixTimeSeconds());
 
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
@@ -396,6 +399,9 @@ public sealed class UpstreamCaseRunner(
             ["LOGDIR"] = logDirectory,
             ["FILE_PWD"] = UpstreamTestDirectoryComposition.FilePwdBefore(logDirectory),
             ["VERSION"] = CurlVersion,
+            // runtests.pl's leading digits and dots of the version.
+            ["VERNUM"] = CurlVersion,
+            ["DATE"] = startTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             ["DEV_NULL"] = platform.NullDevice,
             ["PERL"] = UpstreamPerlOneLiner.Program,
             ["RESOLVE"] = UpstreamResolveCheck.Program,
@@ -460,7 +466,7 @@ public sealed class UpstreamCaseRunner(
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, fronts.WrapDatagram(dns, standIns), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, fronts.WrapDatagram(dns, standIns), perlScript is null ? EnvironmentVariables(testCase) : ScriptEnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, unitProgram, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {
@@ -529,6 +535,15 @@ public sealed class UpstreamCaseRunner(
             }
         }
 
+        return variables;
+    }
+
+    // runtests.pl exports SOURCE_DATE_EPOCH, its start time, to every command; only a script reads it (managen's
+    // page date, test1705 and test1706), so only a script's run is given it. A case's own <setenv> wins.
+    private Dictionary<string, string> ScriptEnvironmentVariables(UpstreamTestCase testCase)
+    {
+        Dictionary<string, string> variables = EnvironmentVariables(testCase);
+        variables.TryAdd("SOURCE_DATE_EPOCH", startTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
         return variables;
     }
 

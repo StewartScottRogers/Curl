@@ -1092,6 +1092,60 @@ public sealed partial class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_DateAndVernum_AreTheStartTimesUtcDateAndTheVersion()
+    {
+        // runtests.pl's %DATE is strftime "%Y-%m-%d", gmtime of its start time; %VERNUM the version's digits and dots.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string[]? arguments = null;
+        UpstreamCaseRunner runner = new(
+            invocation =>
+            {
+                arguments = CommandArguments(invocation);
+                return Task.FromResult(0);
+            },
+            UpstreamCurlPlatform.Unix,
+            new StartTimeProvider(new DateTimeOffset(2026, 3, 4, 23, 59, 30, TimeSpan.FromHours(-5))),
+            TimeSpan.FromSeconds(10));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\n%DATE %VERNUM\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("command words", "2026-03-05 8.22.0", string.Join(' ', arguments!));
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        CollectionAssert.AreEqual(new[] { "2026-03-05", "8.22.0" }, arguments);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandScript_IsGivenTheStartTimeAsSourceDateEpoch()
+    {
+        // runtests.pl exports SOURCE_DATE_EPOCH, its start time, which managen reads for the page date.
+        var diagnostics = TestDiagnostics.For(TestContext);
+        IReadOnlyDictionary<string, string>? environment = null;
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            new StartTimeProvider(DateTimeOffset.FromUnixTimeSeconds(1772668770).AddMilliseconds(400)),
+            TimeSpan.FromSeconds(10),
+            perlCommandScripts: new Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>>
+            {
+                ["test1707.pl"] = (invocation, _) =>
+                {
+                    environment = invocation.EnvironmentVariables;
+                    return Task.FromResult(0);
+                },
+            });
+
+        await RunAsync(runner, "<testcase>\n<client>\n<server>\nnone\n</server>\n<command type=\"perl\">\n/src/tests/test1707.pl\n</command>\n</client>\n</testcase>\n");
+
+        diagnostics.Assert("SOURCE_DATE_EPOCH", "1772668770", environment!.GetValueOrDefault("SOURCE_DATE_EPOCH"));
+        Assert.AreEqual("1772668770", environment!["SOURCE_DATE_EPOCH"]);
+    }
+
+    private sealed class StartTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now.ToUniversalTime();
+    }
+
+    [TestMethod]
     public async Task RunAsync_PerlCommandWithoutInterpretations_SkipsAsAPerlCommand()
     {
         UpstreamCaseOutcome outcome = await RunAsync(Runner(_ => Task.FromResult(0)), PerlCurlCase);
