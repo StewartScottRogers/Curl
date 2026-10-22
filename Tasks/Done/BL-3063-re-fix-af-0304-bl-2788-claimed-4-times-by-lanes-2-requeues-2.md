@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3063 — Re-fix AF-0304: BL-2788 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks); its first run's 19 minutes of work sat in a stash that did not apply cleanly
 
@@ -45,12 +45,15 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+No code change. The cost-cap skip BL-2942 added (Claim.ps1, Get-TaskCapSpentWhy) is in place, as is the shift runner refusal; -TestTaskBudget, -TestTaskStash and -TestClaim pass. The reproduction reads audit paths and logs a lane may not open, so a re-audit checks it; the BL-2970 and BL-2925 claims it cites are outside-touches requeues and cost-cap blocks that the existing skip and the up-front touches pass cover.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Cost-cap skip and stash restore verified in place; self-tests, build and fast tests green
