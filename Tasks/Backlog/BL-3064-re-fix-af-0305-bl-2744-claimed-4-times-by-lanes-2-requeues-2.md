@@ -5,6 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
+lane: no
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
@@ -50,7 +51,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+Interactive only: the acceptance reproduction runs a script from the audit office folder against logs under Z:eposCurl.audit, which a lane may not read. Its recurrences (BL-2970, BL-2925) are touches-overlap requeues (by design, rule 3) and cost-cap events that BL-2942 and BL-3063 already address. Remove `lane: no` once an interactive session has run the reproduction against current logs and says which cause, if any, remains.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Backlog. Interactive only: the reproduction needs paths a lane cannot read
