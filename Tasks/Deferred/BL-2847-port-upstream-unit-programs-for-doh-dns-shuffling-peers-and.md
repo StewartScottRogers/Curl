@@ -53,3 +53,4 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Dns/ and their tests in Cur
 - 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2922, BL-2923, BL-2924, BL-2925 and BL-2921, which port the ten cases between them
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
 - 2026-10-22: Doing -> Backlog. Waits on BL-3062: case 1650 (split from BL-2923) is not yet ported; the other nine cases are on PassingUpstreamCases.txt
+- 2026-10-22: Backlog -> Deferred. Split into BL-3095 (verify the ten cases and gates) and BL-3096 (CI green); all ten ports are already done

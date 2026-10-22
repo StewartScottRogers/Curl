@@ -112,7 +112,10 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    Before committing a change to a library's production code, run Measure-CodeQuality.ps1
    for that library once and fix any method past the complexity gate, so the push does not
    turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
-   quality run and CI stayed red for 137 minutes). Never run a search over the whole
+   quality run and CI stayed red for 137 minutes). Run it for every such change, however
+   small: adding no branch, or leaving coverage to another task, is no reason to skip it
+   (AF-0330, AF-0331: BL-2856 and BL-3022 skipped it and the quality job stayed red for 48
+   and 46 minutes). Never run a search over the whole
    drive, such as `find /` or `Get-ChildItem C:\ -Recurse`, and never leave a command
    running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
    kept BL-2180's lane busy for 22 minutes after its run was done).
@@ -138,6 +141,14 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    persisted tool-result file under .claude\projects; run a narrower command instead.
    Start git diff, show and log with --stat or the paths you need. Send Curl and
    Record-CurlExchange output to a file and read only the lines you need.
+11. A lane cannot see CI for its own push, so never requeue a task only to wait for CI.
+   A criterion about CI on Linux and macOS is met by keeping the change platform-neutral
+   (the platform check above) and the fast tests green here: tick it with a Notes line
+   saying so and finish the task; the shift's CI watch files a task for any failure. When you file a task,
+   name files or narrow subfolders in its touches, never a whole library it only adds to,
+   so it does not hold files other tasks need (AF-0329: BL-2834 was requeued once for a
+   file BL-2921 held as the whole Curl.Engine.UnitLibrary and once only to wait for CI,
+   $4.93 over three claims).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -291,7 +302,10 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    Before committing a change to a library's production code, run Measure-CodeQuality.ps1
    for that library once and fix any method past the complexity gate, so the push does not
    turn the CI quality job red (AF-0213: BL-2177 pushed four methods past the gate with no
-   quality run and CI stayed red for 137 minutes). Never run a search over the whole
+   quality run and CI stayed red for 137 minutes). Run it for every such change, however
+   small: adding no branch, or leaving coverage to another task, is no reason to skip it
+   (AF-0330, AF-0331: BL-2856 and BL-3022 skipped it and the quality job stayed red for 48
+   and 46 minutes). Never run a search over the whole
    drive, such as `find /` or `Get-ChildItem C:\ -Recurse`, and never leave a command
    running when you finish: the lane stays held until it ends (AF-0213: a `find / -maxdepth 6`
    kept BL-2180's lane busy for 22 minutes after its run was done).
@@ -317,6 +331,14 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    persisted tool-result file under .claude\projects; run a narrower command instead.
    Start git diff, show and log with --stat or the paths you need. Send Curl and
    Record-CurlExchange output to a file and read only the lines you need.
+11. A lane cannot see CI for its own push, so never requeue a task only to wait for CI.
+   A criterion about CI on Linux and macOS is met by keeping the change platform-neutral
+   (the platform check above) and the fast tests green here: tick it with a Notes line
+   saying so and finish the task; the shift's CI watch files a task for any failure. When you file a task,
+   name files or narrow subfolders in its touches, never a whole library it only adds to,
+   so it does not hold files other tasks need (AF-0329: BL-2834 was requeued once for a
+   file BL-2921 held as the whole Curl.Engine.UnitLibrary and once only to wait for CI,
+   $4.93 over three claims).
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -407,8 +429,8 @@ $Forbidden = @(
 )
 # A lane's run also never touches the remote or the branch: the shift owns both.
 $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
-# The split run (Invoke-TaskSplit) may list stashes and store one by hash, nothing else of
-# git stash, and the shift commits and pushes what it changes.
+# The split run (Invoke-TaskSplit) is told to run no git stash subcommand (the shift stores
+# the stash itself), and the shift commits and pushes what it changes.
 $SplitForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git commit',
     'git stash push', 'git stash save', 'git stash apply', 'git stash pop', 'git stash drop', 'git stash clear', 'git stash create', 'git stash branch')
 
@@ -425,9 +447,9 @@ Split it into smaller tasks, each sized for one run, exactly as an interactive s
 2. File each one with `powershell -NoProfile -ExecutionPolicy Bypass -File
    .claude/skills/task-board/task-board.ps1 new` (its depends-on carries {ID}'s, plus the
    earlier subtasks it needs), and say under its Notes that it was split from {ID}.
-3. For each new task that continues the stashed work, re-store that stash under the new ID by
-   its hash: `git stash store -m "darkfactory <new id> {STAMP}" {SHA}`. Use no other git
-   stash subcommand than store and list. Skip this step when there is no stash.
+3. For each new task that continues the stashed work, add the line "Continues the stashed work
+   of {ID}." under its Notes; the shift then stores the stash ({SHA}) under that task's ID
+   itself. Run no git stash subcommand. Skip this step when there is no stash.
 4. Move {ID} to Deferred with the board script's move -To Deferred and a -Reason naming the
    new task IDs.
 5. Repoint depends-on: every task outside Done whose depends-on names {ID} names the new
