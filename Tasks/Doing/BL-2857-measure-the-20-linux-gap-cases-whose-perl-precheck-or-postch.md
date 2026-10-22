@@ -27,13 +27,18 @@ Fix: stop substituting `%PERL` in the gap tool (the runner binds its own `%PERL`
 
 ## Acceptance criteria
 
-- [ ] `Gap/Tools/Measure-UpstreamCases.cs` leaves `%PERL` for the runner to bind, and no longer substitutes a perl path (`FindPerl` is gone). Its `--self-test` fails on the old substitution (`%PERL is left for the runner ...`) and passes on the new one. It also runs a `%PERL -e` precheck case and a `%PERL ... test610.pl` precheck case through the runner as the tool leaves them.
-- [ ] A local Windows run of the tool on the 8.22.0 `tests/data`, converted by `ConvertTo-BehaviourMeasurement.ps1`, measures all 27 Windows cases in the Goal as `match`. The old tool measures them as `unmeasured | harness-unsupported`.
-- [ ] A `gap-platforms.yml` run of the change measures the 28 Linux and macOS cases in the Goal as `match` (or, per case, `excluded` with a reason). On each platform, the count of `unmeasured | harness-unsupported` cases falls from 30 to at most 2. The run's id and the counts are in Notes.
-- [ ] Any `excluded` case that this fix reveals as a gap is left to the gap office's own triage (`Gap/Triage.md`); this task files nothing in `Gap/Findings`.
-- [ ] The change is made on the `gap` branch's guarded path (interactive session only), and its pull request gap -> master is open for the session to merge under the standing exception once `CI` is green.
+- [x] `Gap/Tools/Measure-UpstreamCases.cs` leaves `%PERL` for the runner to bind, and no longer substitutes a perl path (`FindPerl` is gone). Its `--self-test` fails on the old substitution (`%PERL is left for the runner ...`) and passes on the new one. It also runs a `%PERL -e` precheck case and a `%PERL ... test610.pl` precheck case through the runner as the tool leaves them.
+- [x] A local Windows run of the tool on the 8.22.0 `tests/data`, converted by `ConvertTo-BehaviourMeasurement.ps1`, measures all 27 Windows cases in the Goal as `match`. The old tool measures them as `unmeasured | harness-unsupported`.
+- [x] A `gap-platforms.yml` run of the change measures the 28 Linux and macOS cases in the Goal as `match` (or, per case, `excluded` with a reason). On each platform, the count of `unmeasured | harness-unsupported` cases falls from 30 to at most 2. The run's id and the counts are in Notes.
+- [x] Any `excluded` case that this fix reveals as a gap is left to the gap office's own triage (`Gap/Triage.md`); this task files nothing in `Gap/Findings`.
+- [x] The change is made on the `gap` branch's guarded path (interactive session only), and its pull request gap -> master is open for the session to merge under the standing exception once `CI` is green.
 
 ## Notes
+
+- Fix: gap PR #195 (merged 2026-10-22 09:27 Arizona); master merged into work/dark-factory as 596dbf3a6.
+- Windows, local re-measure: the 27 cases went from `unmeasured | harness-unsupported` to `match`; 1454, 375 and 2090 stay unmeasured (they need Curl built without IPv6, proxy or Schannel).
+- gap-platforms.yml run 39803629751: Linux and macOS each measure match 1488, gap 0, unmeasured 2 (1454, 375), excluded 582. Before: 30 unmeasured on each.
+- Nothing was filed in Gap/Findings.
 
 ## Log
 
