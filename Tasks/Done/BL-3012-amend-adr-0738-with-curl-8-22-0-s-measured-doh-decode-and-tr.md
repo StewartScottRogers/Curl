@@ -9,7 +9,7 @@ touches: [Documentation/Planning/Decisions/ADR-0738-doh-answers-decode-nxdomain-
 model: sonnet
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3012 — Amend ADR-0738 with curl 8.22.0's measured DoH decode and trace behaviour (CNAME skipped, NXDOMAIN, empty answer, HTTP 500)
 
@@ -29,9 +29,9 @@ State in the amendment, marked "Decided by Claude under Stewart's delegation", f
 
 ## Acceptance criteria
 
-- [ ] ADR-0738 has a dated amendment section stating each measured line and exit code listed above, the curl version (8.22.0), how it was measured, and the decisions, and it names BL-3011, BL-2972 and BL-2973 as the tasks that apply it.
-- [ ] The ADR still says "Decided by Claude under Stewart's delegation", and intent that BL-3011 has not yet landed is written as intent, so no statement contradicts the code as it is now.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean (no code changed).
+- [x] ADR-0738 has a dated amendment section stating each measured line and exit code listed above, the curl version (8.22.0), how it was measured, and the decisions, and it names BL-3011, BL-2972 and BL-2973 as the tasks that apply it.
+- [x] The ADR still says "Decided by Claude under Stewart's delegation", and intent that BL-3011 has not yet landed is written as intent, so no statement contradicts the code as it is now.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean (no code changed).
 
 ## Notes
 
@@ -39,3 +39,4 @@ State in the amendment, marked "Decided by Claude under Stewart's delegation", f
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 1e707886 fdb16ee7 6b7dfd0c.
+- 2026-10-21: Doing -> Done. ADR-0738 amended with curl 8.22.0 measured DoH decode and trace behaviour
