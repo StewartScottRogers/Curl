@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3136 — Fix AF-0356: BL-2972 cost $1.92 over two claims; the first was requeued because it needed a file outside its touches
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: BL-2972's first claim (L3) had touches too narrow; it needed Curl.Networking.UnitLibrary/DohTr~ and requeued after 17 turns ($0.59 discarded, 2-hour delay). Already fixed: the lane prompt (DarkFactory/Prompts.ps1, rule 3) now tells a run to read other Doing tasks' touches on the shared branch, add the file to its own touches and carry on, requeueing only on a real overlap. No further waste to remove; the rest ($1.33 second claim) was the task's real work.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named (touches too narrow); already fixed by lane rule 3 widening touches instead of requeueing
