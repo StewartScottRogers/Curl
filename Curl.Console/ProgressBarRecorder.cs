@@ -54,34 +54,49 @@ internal sealed class ProgressBarRecorder
         360419, 375568, 390841, 406221, 421693, 437243, 452854, 468513, 484202, 499907,
     ];
 
+    /// <summary>The clock every call reads.</summary>
     private readonly TimeProvider timeProvider;
 
+    /// <summary>The <c>-C</c> offset, counted into the position and the total as curl's <c>initial_size</c>.</summary>
     private readonly long initialSize;
 
+    /// <summary>The bar width, from <see cref="Width" />.</summary>
     private readonly int width;
 
+    /// <summary>Everything drawn so far, returned by <see cref="Drawn" />.</summary>
     private readonly StringBuilder drawn = new();
 
+    /// <summary>The body bytes received, as last reported.</summary>
     private long downloaded;
 
+    /// <summary>The expected download size, as last reported; 0 when unknown.</summary>
     private long downloadTotal;
 
+    /// <summary>The body bytes sent, as last reported.</summary>
     private long uploaded;
 
+    /// <summary>The expected upload size, as last reported; 0 when unknown.</summary>
     private long uploadTotal;
 
+    /// <summary>Whether the handler reported any bytes, which decides whether <see cref="Finish" /> adds a call.</summary>
     private bool bytesReported;
 
+    /// <summary>How many calls of the callback went past its early return; the first always does.</summary>
     private int calls;
 
+    /// <summary>The position at the last call that went on, curl's <c>prev</c>.</summary>
     private long previousPoint;
 
+    /// <summary>The timestamp of the last call that went on.</summary>
     private long previousTime;
 
+    /// <summary>Where <see cref="Fly" /> is on the sine table, starting at curl's 150.</summary>
     private int tick = 150;
 
+    /// <summary>Where the <c>-=O=-</c> starts on the line.</summary>
     private int flyPosition;
 
+    /// <summary>Which way the <c>-=O=-</c> slides: 1 to the right, -1 to the left.</summary>
     private int flyMove = 1;
 
     /// <summary>
@@ -226,6 +241,7 @@ internal sealed class ProgressBarRecorder
     {
         char[] line = new string(' ', width).ToCharArray();
         "-=O=-".CopyTo(0, line, flyPosition, 5);
+        // The table holds 0 to 999999; dividing by step maps each value onto a column of the line.
         int step = 1000000 / (width - 2);
         for (int offset = 0; offset < 20; offset += 5)
         {
