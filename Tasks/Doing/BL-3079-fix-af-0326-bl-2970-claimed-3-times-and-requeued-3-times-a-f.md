@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. DarkFactory/TaskBudget.ps1 is held by BL-3090 in Doing; resume once BL-3090 is Done
+- 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
