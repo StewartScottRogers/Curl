@@ -98,12 +98,13 @@ function Copy-TaskStash {
     # Stores a copy of stash -Sha under -Id as "darkfactory <id> <stamp>" and returns the copy's
     # hash. A copy, not the same hash: git stash store writes no entry for a hash already at the
     # top of the list or already stored, so one stash for several tasks needs one commit each.
-    param([string]$Id, [string]$Sha, [string]$Stamp, [string]$Repo = $Root)
+    param([string]$Id, [string]$Sha, [string]$Stamp, [string]$Repo = $Root, [string]$ParentId = '')
+    # -ParentId, the task whose stash is copied, goes into the commit message so a later move knows whose work this is (BL-3112).
     # Throws when any git command fails (another lane may hold the stash ref lock).
     $revList = git -C $Repo rev-list --parents -n 1 $Sha 2>&1
     if ($LASTEXITCODE -ne 0) { throw "git rev-list of stash $Sha failed: $revList" }
     $parents = @("$revList" -split ' ' | Select-Object -Skip 1)
-    $commitArgs = @('commit-tree', "$Sha^{tree}") + @($parents | ForEach-Object { '-p'; $_ }) + @('-m', "darkfactory $Id $Stamp")
+    $commitArgs = @('commit-tree', "$Sha^{tree}") + @($parents | ForEach-Object { '-p'; $_ }) + @('-m', "darkfactory $Id $Stamp") + $(if ($ParentId) { @('-m', "stash-continues $ParentId") } else { @() })
     $copy = "$(git -C $Repo @commitArgs 2>&1)".Trim()
     if ($LASTEXITCODE -ne 0 -or -not $copy) { throw "git commit-tree of stash $Sha failed: $copy" }
     $storeOutput = git -C $Repo stash store -m "darkfactory $Id $Stamp" $copy 2>&1
@@ -126,29 +127,58 @@ function Remove-TaskStashEntries {
     }
 }
 
+function Get-ContinuedStashParent {
+    # The ID in the "Continues the stashed work of BL-<n>" line of task -Id's file, '' for none.
+    param([string]$Id)
+    $line = @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-String -Pattern 'Continues the stashed work of (BL-\d+)' | Select-Object -First 1)
+    if (-not $line.Count) { return '' }
+    return $line[0].Matches[0].Groups[1].Value
+}
+
 function Move-RenumberedTaskStash {
     # A split stored a copy of the parent's stash as "darkfactory <old> <stamp>" for a new task, and
     # the task was then renumbered <old> -> <new> as a duplicate ID (Invoke-RenumberDuplicates). The
     # copy follows it: re-stored under <new>, the old entry dropped by hash, so no stash is offered
     # to the other task that kept <old>. Only a copy stored by Copy-TaskStash (bare subject, no
     # "On <branch>:" prefix, which Save-StrayChanges writes for a task's own run) moves, and only
-    # when the renumbered task's file says it continues the stashed work. Returns the new hashes.
-    # -ContinuesStash is a test hook.
+    # the one whose commit message names the parent the renumbered task's file says it continues
+    # (BL-3112): two lanes can split different parents into tasks that share <old>.
+    # Returns the new hashes. -ParentOf (renumbered ID -> parent ID, '' for none) is a test hook.
     param(
         [string]$OldId, [string]$NewId, [string]$Repo = $Root,
-        [scriptblock]$ContinuesStash = { param($Id) @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-String -Pattern 'Continues the stashed work of' -List).Count -gt 0 })
-    if (-not (& $ContinuesStash $NewId)) { return @() }
+        [scriptblock]$ParentOf = { param($Id) Get-ContinuedStashParent $Id })
+    $parent = & $ParentOf $NewId
+    if (-not $parent) { return @() }
     $moved = @()
     $pattern = "^(\S+) darkfactory $([regex]::Escape($OldId)) (\S+)$"
     foreach ($entry in @(git -C $Repo stash list --format='%H %gs' 2>$null | Where-Object { $_ -match $pattern })) {
         $null = $entry -match $pattern
         $sha = $Matches[1]; $stamp = $Matches[2]
-        $copy = Copy-TaskStash $NewId $sha $stamp $Repo
+        $message = @(git -C $Repo show -s --format=%B $sha 2>$null) -join "`n"
+        if ($message -notmatch "(?m)^stash-continues $([regex]::Escape($parent))\s*$") { continue }
+        $copy = Copy-TaskStash $NewId $sha $stamp $Repo -ParentId $parent
         Remove-TaskStashEntries @($sha) $Repo -Id $NewId
         $moved += $copy
         Write-Trace $NewId 'stash' "moved the stash copy $($sha.Substring(0, 8)) of $OldId to $NewId, which was renumbered from it (now $($copy.Substring(0, 8)))" 'Yellow'
     }
     return $moved
+}
+
+function Move-RenumberedStashesAfterPush {
+    # Runs -Push, the push of a duplicate-ID renumbering, and only when it returns true moves each
+    # renumbered task's stash copy (BL-3112): a refused push is reset away by the next Sync-Lane, so
+    # a copy moved before it would sit under an ID origin never saw. A move that throws is traced
+    # with the IDs and git's message and the copy stays under the old ID. -Renumbered is the board's
+    # "BL-old -> BL-new" lines. Returns the push result.
+    param([string]$Id, [string[]]$Renumbered, [scriptblock]$Push)
+    if (-not (& $Push)) { return $false }
+    foreach ($line in $Renumbered) {
+        if ($line -notmatch '^(BL-\d+) -> (BL-\d+)') { continue }
+        $oldId = $Matches[1]; $newId = $Matches[2]
+        try { $null = Move-RenumberedTaskStash $oldId $newId }
+        catch { Write-Trace $Id 'renum' "moving the stash copy of $oldId to $newId failed: $($_.Exception.Message); it stays under $oldId" 'Red' }
+    }
+    return $true
 }
 
 function Register-TaskSplitAttempt {
@@ -204,7 +234,7 @@ function Invoke-TaskSplit {
     # Splits -Id, which is over its cost cap for -Why, into smaller tasks with one split run,
     # then commits and pushes the board change under the integrate lock. Returns 'skipped'
     # when -Id was already offered for a split on -Now's day, 'split' when the run filed new
-    # tasks and deferred -Id, or 'blocked' when it failed and -Id went to Blocked instead.
+    # tasks and deferred -Id, 'blocked' when it failed and -Id is now in Blocked, or 'failed' when it\n    # failed and -Id is not in Blocked or a reset of the split commit failed; the caller then blocks -Id itself.
     # The stash is only ever copied under the new IDs, never popped.
     param(
         [string]$Id, [string]$Why, [datetime]$Now = (Get-Date), [string]$MarkerDir = (Join-Path $LogDir 'splits'),
@@ -212,7 +242,7 @@ function Invoke-TaskSplit {
         [scriptblock]$ListTaskIds = { @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter 'BL-*.md' | ForEach-Object { $_.Name -replace '^(BL-\d+).*$', '$1' }) },
         [scriptblock]$StashSha = { param($SplitId) Get-TaskStashSha $SplitId },
         [scriptblock]$ContinuesStash = { param($NewId, $SplitId) @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$NewId-*.md" | Select-String -SimpleMatch "Continues the stashed work of $SplitId" -List).Count -gt 0 },
-        [scriptblock]$StoreStash = { param($NewId, $Sha, $Stamp) Copy-TaskStash $NewId $Sha $Stamp },
+        [scriptblock]$StoreStash = { param($NewId, $Sha, $Stamp, $SplitId) Copy-TaskStash $NewId $Sha $Stamp -ParentId $SplitId },
         [scriptblock]$DropStash = { param($Shas) Remove-TaskStashEntries $Shas },
         [scriptblock]$TaskState = { param($SplitId) Get-TaskState $SplitId },
         [scriptblock]$EnterLock = { Enter-Lock },
@@ -239,7 +269,7 @@ function Invoke-TaskSplit {
         if (-not $failure) {
             # The shift stores the stash once per new task that says it continues the work.
             if ($sha) {
-                try { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss')) } } }
+                try { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss') $Id) } } }
                 catch { $failure = "storing the stash for a new task failed: $($_.Exception.Message)" }
                 if (-not $failure -and -not $stored.Count) { Write-Trace $Id 'split' "stash $sha is continued by no new task ($($new -join ', ')); its work stays under $Id" 'Red' }
             }
@@ -263,9 +293,13 @@ function Invoke-TaskSplit {
             # the commits the pull brought in, which stay: its parent is the target. Without a
             # rebase it is the hash HEAD had before the commit. A failed commit leaves the split's
             # new task files in the index, so they are unstaged for the checkout below to restore.
-            if ($committed -and $rebasedSplit) { & $Git @('reset', '-q', '--hard', "$rebasedSplit~1") | Out-Null }
-            elseif ($committed -and $headBefore) { & $Git @('reset', '-q', '--hard', $headBefore) | Out-Null }
-            elseif (-not $committed) { & $Git @('reset', '-q', '--', 'Tasks') | Out-Null }
+            $resetArgs = if ($committed -and $rebasedSplit) { @('reset', '-q', '--hard', "$rebasedSplit~1") }
+                elseif ($committed -and $headBefore) { @('reset', '-q', '--hard', $headBefore) }
+                elseif (-not $committed) { @('reset', '-q', '--', 'Tasks') }
+            if ($resetArgs -and -not (& $Git $resetArgs)) {
+                Write-Trace $Id 'split' "failed: $failure; its reset failed, so nothing more is committed or pushed on top of the split" 'Red'
+                return 'failed'
+            }
         }
         # A failed split leaves nothing of its own behind: the board goes back to how it
         # was and the task is blocked as before the split existed, with the stashes it stored dropped.
@@ -276,6 +310,7 @@ function Invoke-TaskSplit {
         & $Git @('add', '-A', 'Tasks') | Out-Null
         & $Git @('commit', '-q', '-m', "chore(tasks): block $Id - automatic split failed: $failure", '-m', $SkipCiNote) | Out-Null
         if (-not $LeaveForIntegration) { & $Git @('push', '-q', 'origin', "HEAD:$Branch") | Out-Null }
+        if ((& $TaskState $Id) -ne 'Blocked') { Write-Trace $Id 'split' "failed: $failure; the move to Blocked did not take" 'Red'; return 'failed' }
         Write-Trace $Id 'split' "failed: $failure; blocked" 'Red'
         return 'blocked'
     } catch {
@@ -284,9 +319,17 @@ function Invoke-TaskSplit {
         # task is blocked with the exception text (BL-3110).
         $thrown = Get-Short $_.Exception.Message 200
         $undo = { param([scriptblock]$Step) try { & $Step | Out-Null } catch { Write-Trace $Id 'split' "undo after the throw failed: $(Get-Short $_.Exception.Message 100)" 'Red' } }
-        if ($committed -and -not $pushed -and $rebasedSplit) { & $undo { & $Git @('reset', '-q', '--hard', "$rebasedSplit~1") } }
-        elseif ($committed -and -not $pushed -and $headBefore) { & $undo { & $Git @('reset', '-q', '--hard', $headBefore) } }
-        elseif (-not $committed) { & $undo { & $Git @('reset', '-q', '--', 'Tasks') } }
+        $resetArgs = if ($committed -and -not $pushed -and $rebasedSplit) { @('reset', '-q', '--hard', "$rebasedSplit~1") }
+            elseif ($committed -and -not $pushed -and $headBefore) { @('reset', '-q', '--hard', $headBefore) }
+            elseif (-not $committed) { @('reset', '-q', '--', 'Tasks') }
+        if ($resetArgs) {
+            $reset = @{ Ok = $false }
+            & $undo { $reset.Ok = [bool](& $Git $resetArgs) }
+            if (-not $reset.Ok) {
+                Write-Trace $Id 'split' "threw: $thrown; its reset failed, so nothing more is committed or pushed on top of the split" 'Red'
+                return 'failed'
+            }
+        }
         if ($stored.Count) { & $undo { & $DropStash $stored } }
         & $undo { & $Git @('checkout', '-q', '--', 'Tasks') }
         & $undo { & $Git @('clean', '-fdq', '--', 'Tasks') }
@@ -294,6 +337,9 @@ function Invoke-TaskSplit {
         & $undo { & $Git @('add', '-A', 'Tasks') }
         & $undo { & $Git @('commit', '-q', '-m', "chore(tasks): block $Id - automatic split threw: $thrown", '-m', $SkipCiNote) }
         if (-not $LeaveForIntegration) { & $undo { & $Git @('push', '-q', 'origin', "HEAD:$Branch") } }
+        $after = @{ State = '' }
+        & $undo { $after.State = & $TaskState $Id }
+        if ($after.State -ne 'Blocked') { Write-Trace $Id 'split' "threw: $thrown; the move to Blocked did not take" 'Red'; return 'failed' }
         Write-Trace $Id 'split' "threw: $thrown; blocked" 'Red'
         return 'blocked'
     } finally { $lock.Dispose() }
@@ -372,10 +418,11 @@ if ($TestTaskStash) {
         $lockStub = { $script:splitSteps.Add('lock'); $o = [pscustomobject]@{}; $o | Add-Member ScriptMethod Dispose { $script:splitSteps.Add('unlock') }; $o }
         $gitStub = { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'push') { $script:splitPushes } else { $true } }
         $boardStub = { param([string[]]$BoardArgs) $script:splitSteps.Add("board $($BoardArgs[4]): $($BoardArgs[6])") }
+        $stateStub = { if (@($script:splitSteps | Where-Object { $_ -like 'board Blocked*' }).Count) { 'Blocked' } else { $script:splitState } }
         $split = { param($Day, $RunStub, [switch]$Pull, [switch]$Leave)
             $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
             Invoke-TaskSplit 'BL-1' 'cost cap: spent $9' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $RunStub -ListTaskIds { $script:splitIds } `
-                -StashSha { 'abc123' } -ContinuesStash { param($n, $s) $n -ne 'BL-3' } -StoreStash { param($n, $h, $st) $script:splitSteps.Add("store $n"); "copy-$n" } -DropStash { param($h) $script:splitSteps.Add("drop $($h -join ',')") } -TaskState { $script:splitState } -EnterLock $lockStub -Git $gitStub -Board $boardStub -PullOnRefusal:$Pull -LeaveForIntegration:$Leave }
+                -StashSha { 'abc123' } -ContinuesStash { param($n, $s) $n -ne 'BL-3' } -StoreStash { param($n, $h, $st) $script:splitSteps.Add("store $n"); "copy-$n" } -DropStash { param($h) $script:splitSteps.Add("drop $($h -join ',')") } -TaskState $stateStub -EnterLock $lockStub -Git $gitStub -Board $boardStub -PullOnRefusal:$Pull -LeaveForIntegration:$Leave }
         & $check 'first capped sighting today runs the split' 'split 1' "$(& $split '2026-10-22 09:00' $okRun) $($runs.Count)"
         & $check 'a second sighting the same day does not' 'skipped 1' "$(& $split '2026-10-22 23:59' $okRun) $($runs.Count)"
         & $check 'the next day it runs again' 'split 2' "$(& $split '2026-10-23 00:01' $okRun) $($runs.Count)"
@@ -407,9 +454,9 @@ if ($TestTaskStash) {
         $script:failGit = ''
         $cmdStub = { param([string[]]$GitArgs) $script:splitCmds.Add($GitArgs -join ' '); $GitArgs[0] -ne $script:failGit -and $GitArgs[0] -ne 'push' }
         $cmdSplit = { param($Day, $Fail)
-            $script:splitCmds.Clear(); $script:splitIds = @('BL-1'); $script:failGit = $Fail
+            $script:splitCmds.Clear(); $script:splitSteps.Clear(); $script:splitIds = @('BL-1'); $script:failGit = $Fail
             Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } `
-                -StashSha { '' } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $cmdStub -HeadSha { 'cafe01' } -Board $boardStub -PullOnRefusal }
+                -StashSha { '' } -TaskState $stateStub -EnterLock $lockStub -Git $cmdStub -HeadSha { 'cafe01' } -Board $boardStub -PullOnRefusal }
         & $check 'a failed commit is blocked, unstaging Tasks and never resetting hard' 'blocked True False' "$(& $cmdSplit '2026-11-10' 'commit') $(($script:splitCmds -join '|') -match 'reset -q -- Tasks\|checkout' -and ($script:splitCmds -join '|') -notmatch 'hard') $(($script:splitCmds -join '|') -match 'HEAD~1')"
         & $check 'a failed commit never pulls or pushes the split' 'False' "$(($script:splitCmds -join '|') -match '^pull|\|pull|push.*push')"
         & $check 'a conflicting pull aborts the rebase before the reset to the recorded hash' 'blocked True False' "$(& $cmdSplit '2026-11-11' 'pull') $(($script:splitCmds -join '|') -match 'pull[^|]*\|rebase --abort\|reset -q --hard cafe01') $(($script:splitCmds -join '|') -match 'HEAD~1')"
@@ -432,12 +479,13 @@ if ($TestTaskStash) {
                 return $true }
             git -C $repo @GitArgs 2>&1 | Out-Null; $LASTEXITCODE -eq 0 }
         $realRun = { param($a, $b) Set-Content -Path (Join-Path $tasksDir 'BL-2-y.md') -Value 'new'; $script:splitIds = @('BL-1', 'BL-2'); @{ ExitCode = 0 } }
-        $realBoard = { param([string[]]$BoardArgs) Set-Content -Path (Join-Path $tasksDir 'blocked.txt') -Value 'blocked' }
+        $realBoard = { param([string[]]$BoardArgs) Set-Content -Path (Join-Path $tasksDir 'blocked.txt') -Value 'blocked'; $script:realBlocked = $true }
+        $realState = { if ($script:realBlocked) { 'Blocked' } else { 'Deferred' } }
         $realHead = { "$(git -C $repo rev-parse HEAD)".Trim() }
         $realFailSplit = { param($Day)
-            $script:splitIds = @('BL-1')
+            $script:splitIds = @('BL-1'); $script:realBlocked = $false
             Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $realRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
-                -TaskState { 'Deferred' } -EnterLock $lockStub -Git $realGit -HeadSha $realHead -Board $realBoard -PullOnRefusal }
+                -TaskState $realState -EnterLock $lockStub -Git $realGit -HeadSha $realHead -Board $realBoard -PullOnRefusal }
         $script:realFailCommit = $true
         $r = & $realFailSplit '2026-11-20'
         $lastFiles = @(git -C $repo show --name-only --format= HEAD) -join ','
@@ -446,7 +494,8 @@ if ($TestTaskStash) {
         $script:realPull = $true
         $r = & $realFailSplit '2026-11-21'
         $log = @(git -C $repo log --format=%s) -join '|'
-        & $check 'a refused push after a pull keeps the pulled commit and drops the split commit' 'blocked True True False' "$r $($log -match 'pulled commit') $(Test-Path (Join-Path $repo 'pulled.txt')) $($log -match 'split BL-1')"        # In a lane after a run nothing is pushed, even when the push would be accepted (BL-3100).
+        & $check 'a refused push after a pull keeps the pulled commit and drops the split commit' 'blocked True True False' "$r $($log -match 'pulled commit') $(Test-Path (Join-Path $repo 'pulled.txt')) $($log -match 'split BL-1')"        
+        # In a lane after a run nothing is pushed, even when the push would be accepted (BL-3100).
         $script:splitPushes = $true
         $null = & $split '2026-11-12' $okRun -Leave
         & $check 'after a run the split commit is not pushed' 'False' ($script:splitSteps -contains 'push').ToString()
@@ -488,7 +537,7 @@ if ($TestTaskStash) {
         $realSplit = { param($Day)
             $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
             Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]$Day) -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { $orig } `
-                -ContinuesStash { $true } -StoreStash $realStore -DropStash $realDrop -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $boardStub -PullOnRefusal }
+                -ContinuesStash { $true } -StoreStash $realStore -DropStash $realDrop -TaskState $stateStub -EnterLock $lockStub -Git $gitStub -Board $boardStub -PullOnRefusal }
         $script:splitPushes = $false
         & $check 'a failed split is blocked' 'blocked' "$(& $realSplit '2026-11-01')"
         & $check 'a failed split leaves the stash list as it was' $listBefore ((@(git -C $repo stash list --format='%H %gs') -join "`n"))
@@ -498,24 +547,43 @@ if ($TestTaskStash) {
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
         $failingStore = { param($n, $h, $st) if ($n -eq 'BL-3') { throw 'git stash store of x for BL-3 failed: ref locked' }; $script:splitSteps.Add("store $n"); "copy-$n" }
         $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-03') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
-            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) $script:splitSteps.Add("drop $($h -join ',')") } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $boardStub
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) $script:splitSteps.Add("drop $($h -join ',')") } -TaskState $stateStub -EnterLock $lockStub -Git $gitStub -Board $boardStub
         & $check 'a failing store blocks the split, dropping the copies made' 'blocked True True' "$r $(($script:splitSteps -join ' ') -match 'store BL-2 drop copy-BL-2') $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*storing the stash.*ref locked' }).Count -eq 1)"
         # A stash drop or board move that throws (BL-3110): Tasks is restored and the task still ends Blocked.
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1'); $script:boardCalls = 0
         $throwingDrop = { param($h) throw 'drop exploded' }
         $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-05') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
-            -ContinuesStash { $true } -StoreStash $failingStore -DropStash $throwingDrop -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $boardStub
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash $throwingDrop -TaskState $stateStub -EnterLock $lockStub -Git $gitStub -Board $boardStub
         $joined = $script:splitSteps -join ' '
         & $check 'a throwing stash drop restores Tasks and blocks the task with the exception' 'blocked True True True' "$r $($joined -match 'checkout clean') $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*threw: drop exploded' }).Count -eq 1) $($joined -match 'unlock$')"
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
         $throwOnceBoard = { param([string[]]$BoardArgs) $script:boardCalls++; if ($script:boardCalls -eq 1) { throw 'board exploded' }; $script:splitSteps.Add("board $($BoardArgs[4]): $($BoardArgs[6])") }
         $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-06') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
-            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $throwOnceBoard
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git $gitStub -Board $throwOnceBoard
         & $check 'a throwing board move is retried as a block naming the exception' 'blocked True' "$r $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*threw: board exploded' }).Count -eq 1)"
+        # A reset git refuses stops the undo (BL-3113): nothing is committed or pushed on top of the split commit.
+        $resetRefusingGit = { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'reset' -or $GitArgs[0] -eq 'push') { $false } else { $true } }
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1'); $script:splitPushes = $false
+        $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-07') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git $resetRefusingGit -Board $boardStub -PullOnRefusal
+        $joined = $script:splitSteps -join ' '
+        & $check 'a refused reset after a failed push stops: no checkout, block commit or second push' 'failed 2 1 False' "$r $(@($script:splitSteps | Where-Object { $_ -eq 'push' }).Count) $(@($script:splitSteps | Where-Object { $_ -eq 'commit' }).Count) $($joined -match 'checkout|board')"
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
+        $throwingGitOnPush = { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'reset') { $false } elseif ($GitArgs[0] -eq 'checkout') { $true } elseif ($GitArgs[0] -eq 'push') { throw 'push exploded' } else { $true } }
+        $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-08') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git $throwingGitOnPush -Board $boardStub -PullOnRefusal
+        $joined = $script:splitSteps -join ' '
+        & $check 'a refused reset after a throw stops: no checkout, block commit or second push' 'failed 1 1 False' "$r $(@($script:splitSteps | Where-Object { $_ -eq 'push' }).Count) $(@($script:splitSteps | Where-Object { $_ -eq 'commit' }).Count) $($joined -match 'checkout|board')"
+        # Board moves that all throw leave the task out of Blocked, so the caller blocks it (BL-3113).
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1'); $script:splitPushes = $true
+        $allThrowBoard = { param([string[]]$BoardArgs) throw 'board down' }
+        $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-09') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git { param([string[]]$GitArgs) $script:splitSteps.Add($GitArgs[0]); if ($GitArgs[0] -eq 'push') { $false } else { $true } } -Board $allThrowBoard -PullOnRefusal
+        & $check 'when every board move throws the split does not report blocked' 'failed' "$r"
         # A split with a stash and no continuing task traces it in red.
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
         $traceText = & { Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-04') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
-            -ContinuesStash { $false } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $boardStub } 6>&1 | Out-String
+            -ContinuesStash { $false } -StoreStash $failingStore -DropStash { param($h) } -TaskState $stateStub -EnterLock $lockStub -Git $gitStub -Board $boardStub } 6>&1 | Out-String
         & $check 'a stash no new task continues is traced with its hash and the id' 'True' "$($traceText -match 'abc123' -and $traceText -match 'BL-1')"
         # Real git: a stash hash git does not know fails Copy-TaskStash.
         $threw = $false; try { $null = Copy-TaskStash 'BL-4' ('0' * 40) '20260103-000002' $repo } catch { $threw = $true }
@@ -525,18 +593,47 @@ if ($TestTaskStash) {
         Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent'
         git -C $repo stash push -q -m 'darkfactory BL-7 20260105-000000' 2>&1 | Out-Null
         $parentSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
-        $null = Copy-TaskStash 'BL-8' $parentSha '20260105-000001' $repo
+        $null = Copy-TaskStash 'BL-8' $parentSha '20260105-000001' $repo -ParentId 'BL-7'
         Set-Content -Path (Join-Path $repo 'a.txt') -Value 'theirs'
         git -C $repo stash push -q -m 'darkfactory BL-8 20260105-000002' 2>&1 | Out-Null
-        $notContinuing = Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { $false }
+        $notContinuing = Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { '' }
         & $check 'a renumbered task that continues no stash moves nothing' '0' "$(@($notContinuing).Count)"
-        $traceText = & { $script:movedStash = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { $true }) } 6>&1 | Out-String
+        $traceText = & { $script:movedStash = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { 'BL-7' }) } 6>&1 | Out-String
         $subjects = @(git -C $repo stash list --format='%gs')
         & $check 'the copy is re-stored under the new ID' '1' "$(@($subjects | Where-Object { $_ -eq 'darkfactory BL-9 20260105-000001' }).Count)"
         & $check 'the old ID keeps no copy' '0' "$(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260105-000001' }).Count)"
         & $check 'the other task''s own stash and the parent stash stay' '2' "$(@($subjects | Where-Object { $_ -match 'darkfactory BL-8 20260105-000002$|darkfactory BL-7 ' }).Count)"
         & $check 'the moved copy is found for the new ID, not offered to the old' 'True False' "$((Get-TaskStashSha 'BL-9' $repo) -eq $script:movedStash[0]) $((Get-TaskStashSha 'BL-8' $repo) -eq $script:movedStash[0])"
         & $check 'the trace says the stash moved to the renumbered ID' 'True' "$($traceText -match 'moved the stash copy' -and $traceText -match 'BL-8 to BL-9')"
+
+        # Two lanes split different parents into tasks that share BL-8: only the renumbered task's copy moves (BL-3112).
+        git -C $repo stash clear
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent six'
+        git -C $repo stash push -q -m 'darkfactory BL-6 20260106-000000' 2>&1 | Out-Null
+        $sixSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent seven'
+        git -C $repo stash push -q -m 'darkfactory BL-7 20260106-000001' 2>&1 | Out-Null
+        $sevenSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        $null = Copy-TaskStash 'BL-8' $sixSha '20260106-000002' $repo -ParentId 'BL-6'
+        $null = Copy-TaskStash 'BL-8' $sevenSha '20260106-000003' $repo -ParentId 'BL-7'
+        $movedSeven = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { 'BL-7' })
+        $subjects = @(git -C $repo stash list --format='%gs')
+        & $check 'only the renumbered task''s own copy moves' '1 1 0 1' "$($movedSeven.Count) $(@($subjects | Where-Object { $_ -eq 'darkfactory BL-9 20260106-000003' }).Count) $(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260106-000003' }).Count) $(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260106-000002' }).Count)"
+        & $check 'the task that kept the old ID keeps its copy of its own parent' 'True' "$((@(git -C $repo show -s --format=%B (Get-TaskStashSha 'BL-8' $repo)) -join "`n") -match 'stash-continues BL-6')"
+        # A refused renumber push moves nothing; a move that throws is traced and the claim goes on (BL-3112).
+        $before = @(git -C $repo stash list --format='%H %gs') -join '|'
+        $script:moveCalls = 0
+        $refused = & {
+            function Move-RenumberedTaskStash { $script:moveCalls++ }
+            Move-RenumberedStashesAfterPush 'BL-8' @('BL-8 -> BL-9  x') { $false }
+        }
+        & $check 'a refused renumber push moves no stash and returns false' '0 False' "$script:moveCalls $refused"
+        & $check 'a refused renumber push leaves the stash list unchanged' $before ((@(git -C $repo stash list --format='%H %gs')) -join '|')
+        $outcome = & {
+            function Move-RenumberedTaskStash { $script:moveCalls++; throw 'ref locked' }
+            Move-RenumberedStashesAfterPush 'BL-8' @('BL-8 -> BL-9  x') { $true }
+        } 6>&1 | Out-String
+        & $check 'a throwing move is traced in full and the claim goes on' '1 True True True True' "$script:moveCalls $($outcome -match 'BL-8') $($outcome -match 'BL-9') $($outcome -match 'ref locked') $($outcome -match 'True')"
     } finally {
         Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
     }
