@@ -35,3 +35,4 @@ Split from BL-2881 (2026-10-21), which builds the generator (`Curl.Cli.UnitLibra
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 294eb782 69030254 c5f8cef6.
