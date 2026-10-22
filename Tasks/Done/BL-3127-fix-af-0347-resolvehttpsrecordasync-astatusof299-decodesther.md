@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3127 — Fix AF-0347: ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord checks only that a record is not null
 
@@ -52,3 +52,4 @@ The test now compares priority, ALPN list, port and ECH config list with AlpnAnd
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Test now compares the decoded record's fields
