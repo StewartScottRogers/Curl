@@ -11,20 +11,25 @@ function Get-MedianCost {
     return ([double]$sorted[$mid - 1] + [double]$sorted[$mid]) / 2
 }
 
+# The least a run is worth starting with (BL-3079, ADR-0760): a requeued claim left $1.02
+# of its cap ran 5 turns and requeued again (AF-0326: BL-2970), so a task's runs of the last
+# day must leave at least this much of the cap or the task is not run again.
+$MinRunBudgetUsd = 2.0
+
 function Get-RunBudgetUsd {
     # The cost cap for the next headless run (AF-0033, ADR-0407, ADR-0478): 4 times the
     # median of the recent task runs' costs, so a task that needs a few more turns than most
     # still finishes, never above -TaskBudgetUsd and never below $3. Fewer than 10
     # recent costs leaves -TaskBudgetUsd as it is; -TaskBudgetUsd 0 means no cap.
     # -SpentUsd is what the task's earlier runs of the last day already cost (AF-0095): it
-    # comes off the cap, down to $1, so a task requeued and run again stays near one cap
+    # comes off the cap, down to $MinRunBudgetUsd ($2), so a task requeued and run again stays near one cap
     # in all rather than two.
     param([double]$Ceiling, [double[]]$RecentCosts, [double]$SpentUsd = 0)
     if ($Ceiling -le 0) { return 0.0 }
     $costs = @($RecentCosts | Where-Object { $_ -gt 0 })
     $cap = if ($costs.Count -lt 10) { $Ceiling } else { [math]::Min($Ceiling, [math]::Max(3.0, [math]::Round(4.0 * (Get-MedianCost $costs), 2))) }
     if ($SpentUsd -le 0) { return $cap }
-    return [math]::Max(1.0, [math]::Round($cap - $SpentUsd, 2))
+    return [math]::Max($MinRunBudgetUsd, [math]::Round($cap - $SpentUsd, 2))
 }
 
 # List-price estimates in US dollars per million tokens, used only for a run whose log has no
@@ -176,17 +181,17 @@ function Close-UnfinishedRunLogs {
 }
 
 function Test-TaskCapSpent {
-    # Whether a task's runs of the last day already cost all but $1 of its cap (AF-0096).
-    # Get-RunBudgetUsd never gives a run less than $1, so without this a task requeued
+    # Whether a task's runs of the last day leave less than $MinRunBudgetUsd ($2) of its cap
+    # (AF-0096, AF-0326). Get-RunBudgetUsd never gives a run less than that, so without this a task requeued
     # again and again got $1 and a turn more each time (BL-1609: five runs, $5.17).
     param([double]$Cap, [double]$SpentUsd)
-    return ($Cap -gt 0 -and $SpentUsd -gt 0 -and ($Cap - $SpentUsd) -lt 1.0)
+    return ($Cap -gt 0 -and $SpentUsd -gt 0 -and ($Cap - $SpentUsd) -lt $MinRunBudgetUsd)
 }
 
 function Test-CapBlockRequeueDue {
     # Whether a Blocked task may go back to Backlog because the cost cap's daily rule
     # (AF-0096) no longer holds for it (BL-2117): its Blocked reason is the daily-rule
-    # refusal ("so it was not run again") and its runs of the last day now leave $1 or more
+    # refusal ("so it was not run again") and its runs of the last day now leave $MinRunBudgetUsd or more
     # of -Cap. A task blocked because a run itself stopped at the cap ("stopped at its ...
     # cost cap") is too big for one run and stays Blocked to be split.
     param([string]$Reason, [double]$Cap, [double]$SpentUsd)
@@ -246,15 +251,17 @@ if ($TestTaskBudget) {
     $cases += ,@('a task spent its last day of task and resumed runs only', '3.5', "$(Get-TaskSpentUsd $dir 'BL-2')")
     $cases += ,@('a task with no runs spent nothing', '0', "$(Get-TaskSpentUsd $dir 'BL-9')")
     $cases += ,@('earlier runs come off the cap', '3.7', "$(Get-RunBudgetUsd 10 $twelve 1.5)")
-    $cases += ,@('a spent cap still leaves 1 dollar', '1', "$(Get-RunBudgetUsd 10 $twelve 4.73)")
+    $cases += ,@('a spent cap still leaves 2 dollars', '2', "$(Get-RunBudgetUsd 10 $twelve 4.73)")
     $cases += ,@('earlier runs come off -TaskBudgetUsd too', '8', "$(Get-RunBudgetUsd 10 ([double[]](1.0, 1.0, 1.0)) 2)")
     $cases += ,@('-TaskBudgetUsd 0 stays no cap after spending', '0', "$(Get-RunBudgetUsd 0 $twelve 2)")
-    # A task whose runs of the last day left less than $1 of its cap is not run again (AF-0096).
-    $cases += ,@('a cap with 1 dollar or more left is not spent', 'False', "$(Test-TaskCapSpent 3.21 2.21)")
-    $cases += ,@('a cap with under 1 dollar left is spent', 'True', "$(Test-TaskCapSpent 3.21 2.22)")
+    # A task whose runs of the last day left less than $2 of its cap is not run again (AF-0096).
+    $cases += ,@('a cap with 2 dollars or more left is not spent', 'False', "$(Test-TaskCapSpent 3.21 1.21)")
+    $cases += ,@('a cap with under 2 dollars left is spent', 'True', "$(Test-TaskCapSpent 3.21 1.22)")
     $cases += ,@('a task with no runs has not spent its cap', 'False', "$(Test-TaskCapSpent 0.5 0)")
     $cases += ,@('-TaskBudgetUsd 0 is never spent', 'False', "$(Test-TaskCapSpent 0 9)")
-    $cases += ,@('BL-1609 stops after its third run', 'False,False,True', "$((Test-TaskCapSpent 3.21 0.41), (Test-TaskCapSpent 3.21 1.56), (Test-TaskCapSpent 3.21 3.59) -join ',')")
+    $cases += ,@('BL-1609 stops after its second run', 'False,True,True', "$((Test-TaskCapSpent 3.21 0.41), (Test-TaskCapSpent 3.21 1.56), (Test-TaskCapSpent 3.21 3.59) -join ',')")
+    # BL-2970's second claim got $1.02 of its cap and its third $0.46 more; now neither runs (AF-0326).
+    $cases += ,@('BL-2970 is not run again after its first claim', 'True,1.02', "$(Test-TaskCapSpent 5.29 4.27),$(5.29 - 4.27)")
     # A task the daily rule blocked goes back to Backlog once its 24-hour window has passed;
     # one blocked because a run stopped at the cap stays Blocked (BL-2117).
     $refused = '2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see x'
@@ -263,10 +270,10 @@ if ($TestTaskBudget) {
     $t0 = [datetime]'2026-10-22 01:00'
     $twoRuns = @([pscustomobject]@{ Time = $t0.AddHours(2); Usd = 1.5 }, [pscustomobject]@{ Time = $t0; Usd = 1.5 })
     $cases += ,@('two runs in the day free the cap when the oldest leaves it', '2026-10-23 01:00', ((Get-CapResetTime $twoRuns 3.5).ToString('yyyy-MM-dd HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)))
-    $cases += ,@('three runs free the cap only when enough leave', '2026-10-23 03:00', ((Get-CapResetTime ($twoRuns + [pscustomobject]@{ Time = $t0.AddHours(4); Usd = 2.0 }) 3.5).ToString('yyyy-MM-dd HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)))
+    $cases += ,@('three runs free the cap only when enough leave', '2026-10-23 03:00', ((Get-CapResetTime ($twoRuns + [pscustomobject]@{ Time = $t0.AddHours(4); Usd = 2.0 }) 4.5).ToString('yyyy-MM-dd HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)))
     $cases += ,@('a task not capped has no cap reset time', 'True', "$($null -eq (Get-CapResetTime @([pscustomobject]@{ Time = $t0; Usd = 1.0 }) 3.5))")
     $cases += ,@('a task with no runs has no cap reset time', 'True', "$($null -eq (Get-CapResetTime @() 3.5))")
-    $cases += ,@('a refused task is requeued once its last day leaves 1 dollar', 'True,True', "$((Test-CapBlockRequeueDue $refused 2.10 0), (Test-CapBlockRequeueDue $refused 2.10 1.10) -join ',')")
+    $cases += ,@('a refused task is requeued once its last day leaves 2 dollars', 'True,True', "$((Test-CapBlockRequeueDue $refused 3.10 0), (Test-CapBlockRequeueDue $refused 3.10 1.10) -join ',')")
     $cases += ,@('a refused task stays Blocked while its cap is still spent', 'False', "$(Test-CapBlockRequeueDue $refused 2.10 1.16)")
     $cases += ,@('a run that stopped at the cap is never requeued', 'False,False', "$((Test-CapBlockRequeueDue $stopped 3.2 0), (Test-CapBlockRequeueDue $stopped 0 0) -join ',')")
     $cases += ,@('a task blocked for another reason is not requeued by the cap', 'False', "$(Test-CapBlockRequeueDue '2026-10-11: Doing -> Blocked. Stewart: which package?' 3 0)")
