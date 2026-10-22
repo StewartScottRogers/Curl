@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/Claim.ps1]
+touches: [DarkFactory/Claim.ps1, DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3110 — Restore Tasks and block the task when Invoke-TaskSplit throws during a claim
 
@@ -26,12 +26,15 @@ Found by the shift-end review of 2026-10-22 (silent-failure-hunter, ADR-0710) in
 
 ## Acceptance criteria
 
-- [ ] When `Invoke-TaskSplit` throws, the catch in `DarkFactory/Claim.ps1` (or a catch inside `Invoke-TaskSplit`) removes the split's own commit if one was made, restores `Tasks` (`checkout`/`clean`), drops any stash copies it stored, and moves the task to `Blocked` with a reason naming the exception.
-- [ ] A self-test with a `-Board` or `-DropStash` stub that throws shows the task ends `Blocked`, `git status --short -- Tasks` is empty, and the claim result is still returned; the self-test passes.
+- [x] When `Invoke-TaskSplit` throws, the catch in `DarkFactory/Claim.ps1` (or a catch inside `Invoke-TaskSplit`) removes the split's own commit if one was made, restores `Tasks` (`checkout`/`clean`), drops any stash copies it stored, and moves the task to `Blocked` with a reason naming the exception.
+- [x] A self-test with a `-Board` or `-DropStash` stub that throws shows the task ends `Blocked`, `git status --short -- Tasks` is empty, and the claim result is still returned; the self-test passes.
 
 ## Notes
+
+- Catch added inside Invoke-TaskSplit (DarkFactory/TaskStash.ps1, added to touches): each undo (reset of the split commit if unpushed, drop stash copies, checkout/clean Tasks) runs on its own, then the task is blocked with the exception text. Claim.ps1 already returns the claim result. Self-test (-TestTaskStash) passes with throwing DropStash and Board stubs.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 211f9b20 2d8c670c.
+- 2026-10-22: Doing -> Done. Invoke-TaskSplit throws now restore Tasks and block the task with the exception
