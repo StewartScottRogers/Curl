@@ -36,10 +36,10 @@ The existing self-test is `RunDarkFactory.ps1 -TestIntegrateLock` (body in `Dark
 
 ## Notes
 
-- Decided by Claude: "covered by the test selection" is taken at its stated minimum: an incoming change is board-only when every changed path starts with ; anything else re-verifies and spends an attempt as before. The fast retry is bounded at 10 tries () and runs the dedupe/archive housekeeping (now ) before each re-push.
-- Shift-end review: the reviewer prompt no longer pushes;  in ShiftEnd.ps1 fetches, rebases and pushes its commit while holding , after the run ends. The reviewer's own  still runs before that, so an ID taken by a lane meanwhile is not renumbered at push time.
-- Coordinator: the board-move push (return of orphans to Backlog) takes . The coordinator's other board pushes, if any, are in files outside .
-- Self-test:  redefines  as a counting stand-in that pushes from the other clone; the two lock checks are text checks of ShiftEnd.ps1 and ShiftCoordinator.ps1.
+- Decided by Claude: "covered by the test selection" is taken at its stated minimum: an incoming change is board-only when every changed path starts with `Tasks/`; anything else re-verifies and spends an attempt as before. The fast retry is bounded at 10 tries (`Invoke-PushRetryWithoutVerify`) and runs the dedupe/archive housekeeping (now `Update-BoardBeforePush`) before each re-push.
+- Shift-end review: the reviewer prompt no longer pushes; `Push-ReviewCommitsUnderLock` in ShiftEnd.ps1 fetches, rebases and pushes its commit while holding `Enter-Lock`, after the run ends. The reviewer's own dedupe still runs before that, so an ID taken by a lane meanwhile is not renumbered at push time.
+- Coordinator: the board-move push (return of orphans to Backlog) takes `Enter-Lock`. The coordinator has no other push to the branch.
+- Self-test: `-TestIntegrateLock` redefines `Test-Green` as a counting stand-in that pushes from the other clone; the two lock checks are text checks of ShiftEnd.ps1 and ShiftCoordinator.ps1.
 ## Log
 
 - 2026-10-22: Created.
