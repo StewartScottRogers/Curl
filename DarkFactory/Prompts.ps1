@@ -10,12 +10,12 @@ wait for input; nobody will reply.
 
 Run /task-run {ID}.
 
-Rules for this unattended run, in addition to CLAUDE.md:
+Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRules.md):
 0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
    for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
-2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
+2. Design and behaviour decisions are yours: Stewart has delegated them (the lane rules,
    "Decisions"). Decide by his standing rules - match the platform's curl, measure real
    curl before pinning output, BCL only - record the decision and why in an ADR marked
    "Decided by Claude under Stewart's delegation", and carry on. Only a new package or
@@ -177,12 +177,12 @@ projects from yours.
 Run /task-run {ID}. The shift has already claimed {ID}: it is in Tasks/Doing. Skip the
 claim step, do not move it to Doing again, and do not take any other task.
 
-Rules for this unattended run, in addition to CLAUDE.md:
+Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRules.md):
 0. No Python, not even a one-liner: PowerShell for scripts and checks, the Edit tool
    for edits, and Record-CurlExchange.ps1 to measure real curl (extend it if needed).
 1. Where a choice has a sensible default, take it and record the choice and why under
    the task's Notes.
-2. Design and behaviour decisions are yours: Stewart has delegated them (CLAUDE.md,
+2. Design and behaviour decisions are yours: Stewart has delegated them (the lane rules,
    "Decisions"). Decide by his standing rules - match the platform's curl, measure real
    curl before pinning output, BCL only - record the decision and why in an ADR marked
    "Decided by Claude under Stewart's delegation", and carry on. Only a new package or

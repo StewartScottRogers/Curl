@@ -172,6 +172,17 @@ while ($true) {
     }
     $apiRetries = 0
 
+    # A run that reached the turn cap is too big for one run: back to Backlog for a split (BL-3001).
+    if ($state -eq 'Doing' -and (Test-TurnCapReached)) {
+        Save-StrayChanges $id
+        $why = "stopped at its $MaxRunTurns-turn cap, so the task is too big for one run: split it in the first turns of the next claim"
+        Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
+        git -C $Root add -A Tasks 2>&1 | Out-Null
+        git -C $Root commit -q -m "chore(tasks): requeue $id - dark factory $why" 2>&1 | Out-Null
+        if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
+        $state = Get-TaskState $id
+    }
+
     if ($state -eq 'Doing') {
         $why = if ($capWhy) { $capWhy }
             elseif ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }

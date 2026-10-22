@@ -149,9 +149,9 @@ function Get-ModelCostSummary {
         if (-not $byModel.ContainsKey($name)) { $byModel[$name] = @{ Runs = 0; Tasks = @{}; Usd = 0.0 } }
         $byModel[$name].Runs++
         $byModel[$name].Tasks[(Get-TaskIdFromFileName $log.Name)] = $true
-        $line = Get-Content $log.FullName -Tail 5 -ErrorAction SilentlyContinue | Where-Object { $_ -match '"total_cost_usd"' } | Select-Object -Last 1
-        $evt = try { $line | ConvertFrom-Json } catch { $null }
-        if ($evt -and $evt.type -eq 'result') { $byModel[$name].Usd += [double]$evt.total_cost_usd }
+        # A killed run's cost is estimated from its usage, as the task budget counts it (BL-3001).
+        $cost = Get-RunLogCost $log.FullName
+        if ($cost) { $byModel[$name].Usd += $cost.Usd }
     }
     if (-not $byModel.Count) { return 'models: none' }
     return 'models: ' + ((@($byModel.Keys | Sort-Object) | ForEach-Object {

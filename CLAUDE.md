@@ -168,7 +168,9 @@ the weekly budget evenly to its reset (ADR-0130, BL-806). Lane runs load
 MCP servers and a `-MaxRunTurns` turn cap, so a rule a lane needs goes in both files
 (BL-3001). The factory picks the Claude
 model per task - a task's front-matter `model:` wins, else opus for security, crypto,
-feature, protocol, retried and CI-fix work and sonnet for the rest - and `-Model` forces
+feature, protocol, retried and CI-fix work and sonnet for the rest, a routine feature
+task (an upstream unit program port, a harness stand-in and the like, naming no hard
+work) included - and `-Model` forces
 one model for every task (BL-1705). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart

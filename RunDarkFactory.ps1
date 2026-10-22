@@ -82,8 +82,9 @@
     among them, still run), no MCP server or claude.ai connector, no auto memory, and
     DarkFactory\LaneRules.md in place of the root CLAUDE.md; a project folder's own
     CLAUDE.md still loads when the run works there. Each run is also capped at
-    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops with its task
-    too big for one run. -TestLaneFlags proves the flags.
+    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops, and its task
+    goes back to Backlog as too big for one run, to be split in the first turns of its next
+    claim. -TestLaneFlags proves the flags.
 
     THE MODEL PER TASK
 
@@ -96,7 +97,11 @@
       3. Otherwise opus when the task's touches name a hand-built security or crypto
          library (Curl.Cryptography, Curl.Tls, Curl.Quic, Curl.Kerberos, Curl.Ntlm,
          Curl.Protocol.Ssh, or their .UnitTests or .IntegrationTests twin), its pipeline is
-         feature or protocol, its Log shows an earlier claim that came back ("Doing ->
+         protocol, or feature unless its title is routine and names no hard work (BL-3001:
+         $RoutineFeatureTitles and $HardWorkMarkers in DarkFactory\ModelChoice.ps1, such as
+         an upstream unit program port or a harness stand-in with no TLS, crypto, QUIC,
+         HTTP/2 or /3, SSH, Kerberos, NTLM, DoH or concurrency in it, which runs on sonnet),
+         its Log shows an earlier claim that came back ("Doing ->
          Backlog" or "Doing -> Blocked": a requeue, a park, a hand-back or a failed run),
          or it is a High "Fix CI failure ..." or "Fix flaky CI test ..." task; sonnet for
          everything else. The rule never picks haiku.

@@ -116,7 +116,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         param([int]$N)
         $hoursLeft = [Math]::Max(0.01, ($shiftEnd - (Get-Date)).TotalHours).ToString([System.Globalization.CultureInfo]::InvariantCulture)
         @('-Lane', $N, '-Branch', $branch, '-Hours', $hoursLeft, '-MaxTasks', $MaxTasks,
-          '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
+          '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
     }
     $procs = @()
     $laneTabs = @{}
@@ -449,7 +449,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
-        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }

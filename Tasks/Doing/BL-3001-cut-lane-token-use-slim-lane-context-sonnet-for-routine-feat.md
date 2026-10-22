@@ -30,22 +30,22 @@ per-task cost cap undercounts them.
 
 ## Acceptance criteria
 
-- [ ] Slim lane context: lane runs load no MCP servers, no user-level plugins, skills or hooks that
+- [x] Slim lane context: lane runs load no MCP servers, no user-level plugins, skills or hooks that
       the factory does not use, and a short lane rules file (`DarkFactory/LaneRules.md`) in place of
       the full CLAUDE.md, which keeps every rule a lane needs; the first call's cache write is
       measurably smaller than the 37K-token median.
-- [ ] Routine feature tasks (upstream-case ports, stand-ins and similar, by a rule written down in
+- [x] Routine feature tasks (upstream-case ports, stand-ins and similar, by a rule written down in
       the model-choice code) run on Sonnet; security, crypto, protocol, retried and CI-fix work stays
       on Opus; a task's `model:` front matter still wins.
-- [ ] Before claiming, a script-only check refuses or flags a task whose `touches` is empty or names
+- [x] Before claiming, a script-only check refuses or flags a task whose `touches` is empty or names
       a whole project it only adds to, or which is too big for one run, so it is fixed before an Opus
       run spends tokens on it.
-- [ ] The lane prompt limits exploration: capped search output, large files read in parts, and no
+- [x] The lane prompt limits exploration: capped search output, large files read in parts, and no
       re-reading of a whole file already read.
-- [ ] A run that reaches a turn cap hands its task back for a split instead of running on.
-- [ ] A killed or unfinished run's cost is estimated from its logged usage and counts toward the
+- [x] A run that reaches a turn cap hands its task back for a split instead of running on.
+- [x] A killed or unfinished run's cost is estimated from its logged usage and counts toward the
       task's spend and the recent-run costs.
-- [ ] Every self-test switch still passes, new behaviour has self-test cases, and an ADR records
+- [x] Every self-test switch still passes, new behaviour has self-test cases, and an ADR records
       the decisions.
 
 ## Notes
