@@ -407,6 +407,35 @@ $Forbidden = @(
 )
 # A lane's run also never touches the remote or the branch: the shift owns both.
 $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
+# The split run (Invoke-TaskSplit) may list stashes and store one by hash, nothing else of
+# git stash, and the shift commits and pushes what it changes.
+$SplitForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git commit',
+    'git stash push', 'git stash save', 'git stash apply', 'git stash pop', 'git stash drop', 'git stash clear', 'git stash create', 'git stash branch')
+
+# The split run's prompt (BL-3091): a task over its cost cap is split into smaller tasks.
+$SplitPrompt = @'
+DARK FACTORY TASK SPLIT. Stewart is away and cannot answer. Never ask a question and never
+wait for input; nobody will reply. Write no code and run no build or test.
+
+{ID} is over its cost cap: {WHY}. {STASH}
+Split it into smaller tasks, each sized for one run, exactly as an interactive session would:
+1. Read Tasks/*/{ID}-*.md and .claude/skills/task-board/SKILL.md. Decide the smaller tasks
+   that together meet every acceptance criterion of {ID}, each with its own criteria and
+   file-level touches taken from {ID}'s touches.
+2. File each one with `powershell -NoProfile -ExecutionPolicy Bypass -File
+   .claude/skills/task-board/task-board.ps1 new` (its depends-on carries {ID}'s, plus the
+   earlier subtasks it needs), and say under its Notes that it was split from {ID}.
+3. For each new task that continues the stashed work, re-store that stash under the new ID by
+   its hash: `git stash store -m "darkfactory <new id> {STAMP}" {SHA}`. Use no other git
+   stash subcommand than store and list. Skip this step when there is no stash.
+4. Move {ID} to Deferred with the board script's move -To Deferred and a -Reason naming the
+   new task IDs.
+5. Repoint depends-on: every task outside Done whose depends-on names {ID} names the new
+   task IDs instead (edit only that front-matter line, with the Edit tool).
+Touch nothing else: no file outside Tasks/, no commit and no push; the shift commits them.
+
+End your reply with exactly one line: FACTORY: SPLIT {ID} <the new task IDs>
+'@
 # The conflict resolver needs `git rebase --continue`, and nothing that throws work away.
 $ResolveForbidden = $Forbidden + @('git push', 'git pull', 'git rebase --abort', 'git rebase --skip', 'git checkout', 'git switch', 'git worktree', 'git stash')
 # The run that resolves a rebase conflict for task -Id, which Invoke-Integrate makes with the

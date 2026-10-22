@@ -440,6 +440,17 @@ public sealed class ManagedEasyWebSocketTests
     }
 
     [TestMethod]
+    public async Task SendAsync_NonEmptyFirstPartWithFragmentSizeZero_AnswersBadFunctionArgumentAndWritesNothing()
+    {
+        (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
+
+        CurlWebSocketSendResult result = await webSocket.SendAsync("a"u8.ToArray(), 0, CurlWebSocketFlags.Text | CurlWebSocketFlags.Offset, CancellationToken.None);
+
+        Assert.AreEqual(new CurlWebSocketSendResult(CurlCode.BadFunctionArgument, 0), result);
+        Assert.IsEmpty(peer.Written);
+    }
+
+    [TestMethod]
     public async Task SendAsync_FirstPartLongerThanTheFragmentSize_AnswersBadFunctionArgumentAndWritesNothing()
     {
         (ManagedEasyWebSocket webSocket, QueuedConnection peer) = await OpenAsync();
