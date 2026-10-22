@@ -34,3 +34,4 @@ Fix: read the lines through a `FileStream` opened with `FileMode.Open, FileAcces
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 21dfe1e6 37c11953 5be53930 2448417f.
