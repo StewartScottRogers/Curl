@@ -127,6 +127,8 @@ public sealed class CurlWebSocket : IAsyncDisposable
     {
         ThrowIfDisposed();
         ReadOnlyMemory<byte> left = data;
+
+        // do/while, not while: an empty payload (a bare ping, pong or close) is still one curl_ws_send.
         do
         {
             CurlWebSocketSendResult sent = await SendOnceAsync(left, flags, cancellationToken).ConfigureAwait(false);
@@ -151,6 +153,7 @@ public sealed class CurlWebSocket : IAsyncDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             CurlWebSocketReceiveResult received = await _easy.WebSocket.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
+            // CURLE_AGAIN means no data is ready yet, not a failure: wait and ask again.
             if (received.Result != CurlCode.Again)
             {
                 CurlException.ThrowIfFailed(received.Result, string.Empty);
@@ -289,5 +292,6 @@ public sealed class CurlWebSocket : IAsyncDisposable
         }
     }
 
+    /// <summary>Throws <see cref="ObjectDisposedException"/> once <see cref="DisposeAsync"/> has run.</summary>
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 }

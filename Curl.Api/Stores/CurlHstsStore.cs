@@ -130,6 +130,7 @@ public sealed class CurlHstsStore
         };
     }
 
+    /// <summary>Replaces every entry with a copy of <paramref name="entries"/>.</summary>
     private void ReplaceWith(IReadOnlyList<HstsEntry> entries)
     {
         lock (_gate)
@@ -138,9 +139,11 @@ public sealed class CurlHstsStore
         }
     }
 
+    /// <summary>An entry as a cache-file line: <c>[.]host "expiry"</c>, <c>unlimited</c> when it never expires.</summary>
     private static string LineOf(HstsEntry entry) =>
         $"{(entry.IncludeSubDomains ? "." : string.Empty)}{entry.Name} \"{entry.Expire ?? UnlimitedText}\"";
 
+    /// <summary>The entry a cache-file line holds, or <see langword="null"/> for a line without a quoted expiry.</summary>
     private static HstsEntry? EntryOf(string line)
     {
         string[] parts = line.Trim().Split(' ', 2);
@@ -153,6 +156,7 @@ public sealed class CurlHstsStore
         return new HstsEntry(parts[0][(includeSubDomains ? 1 : 0)..], includeSubDomains, expiry == UnlimitedText ? null : expiry);
     }
 
+    /// <summary>The text between a leading and a trailing double quote, or <see langword="null"/> when it is not quoted.</summary>
     private static string? UnquotedOf(string text) =>
         text.Length >= 2 && text[0] == '"' && text[^1] == '"' ? text[1..^1] : null;
 }
