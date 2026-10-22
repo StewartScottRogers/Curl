@@ -53,3 +53,4 @@ Investigated 2026-10-21 (shift log DarkFactory-20261018-192454.log lines 104-125
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-21: Doing -> Blocked. Stewart: accept AF-0307 as inherent (CI about 21 min plus a busy overlapping lane), or authorise pre-empting a running lane for High CI-fix tasks?
+- 2026-10-21: Blocked -> Doing. Criteria at claim: b49d23ab 9742157d.
