@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3123 — Fix AF-0343: DnsServerList.TryParsePortSuffix's given > IPEndPoint.MaxPort can become >= with no test failing, so --dns-servers host:65535 is refused
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix, done directly rather than through the full feature pipeline: no production code changes. `DnsServerListTests` gains `192.0.2.1:65535` (accepted, kept as port 65535) and `1.2.3.4:65536` (refused), pinning both sides of `IPEndPoint.MaxPort`.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`given >= IPEndPoint.MaxPort`): `TryParse_OneEntry_ReturnsItsEndPoint ("192.0.2.1:65535")` failed (1 of 27 DnsServerListTests), so the mutant is killed; the change was then reverted. The re-audit runs the tool itself.
+- Build clean, fast tests green (44 test projects, 0 failed). The test is platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. --dns-servers port 65535 accepted and 65536 refused are pinned by DnsServerListTests, killing AF-0343's mutant
