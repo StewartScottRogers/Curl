@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ShufflingDnsResolver.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3024 — Keep DoH, DNS-server and HTTPS-RR resolver behaviour when DNS shuffle wraps the resolver
 
@@ -30,14 +30,18 @@ Found by the shift-end review of 2026-10-21 (ADR-0710), pr-review-toolkit code-r
 
 ## Acceptance criteria
 
-- [ ] A `Curl.Networking.UnitTests` test shows a `TcpConnector` over `ShufflingDnsResolver` wrapping a `DohDnsResolver` sends the HTTPS-RR query for an `https://` origin, as it does unwrapped.
-- [ ] A test shows a DoH lookup failure through the shuffle wrapper gives the same trace lines as without it.
-- [ ] A test shows a `DnsServerResolver` failure through the shuffle wrapper is cached as a negative DNS entry.
-- [ ] `dotnet build` is clean and the fast tests pass; the 100% coverage gates still hold for `Curl.Networking.UnitLibrary`.
+- [x] A `Curl.Networking.UnitTests` test shows a `TcpConnector` over `ShufflingDnsResolver` wrapping a `DohDnsResolver` sends the HTTPS-RR query for an `https://` origin, as it does unwrapped.
+- [x] A test shows a DoH lookup failure through the shuffle wrapper gives the same trace lines as without it.
+- [x] A test shows a `DnsServerResolver` failure through the shuffle wrapper is cached as a negative DNS entry.
+- [x] `dotnet build` is clean and the fast tests pass; the 100% coverage gates still hold for `Curl.Networking.UnitLibrary`.
 
 ## Notes
+
+Added `ShufflingDnsResolver.Inner`; `TcpConnector.KindOfResolver` unwraps it for the DoH, DNS-server and HTTPS-RR type tests. Tests in `TcpConnectorShuffledResolverTests`. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
+
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: caaca4ed 4d363ca1 6aad2ab5 3d0d2435.
+- 2026-10-21: Doing -> Done. TcpConnector keeps DoH, DNS-server and HTTPS-RR behaviour under DNS shuffle

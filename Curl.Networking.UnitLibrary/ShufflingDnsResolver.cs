@@ -13,6 +13,9 @@ namespace Curl.Networking;
 /// <param name="randomBelow">Gives a random index from zero up to, not including, its argument.</param>
 public sealed class ShufflingDnsResolver(IDnsResolver inner, Func<int, int> randomBelow) : IDnsResolverWithFailureReason
 {
+    /// <summary>Gets the resolver whose addresses this one shuffles, for callers that act on the kind of resolver they were given.</summary>
+    public IDnsResolver Inner => inner;
+
     /// <summary>
     /// Gives <paramref name="resolver" /> wrapped in a <see cref="ShufflingDnsResolver" /> over the cryptographic
     /// generator when <paramref name="shuffleAddresses" /> is set, else <paramref name="resolver" /> itself.
