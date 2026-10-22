@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs for the zero-timeout test; BL-3127 holds Curl.Networking.UnitTests
+- 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
