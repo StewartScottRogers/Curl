@@ -389,6 +389,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestClaimDuplicates
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskReadiness
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock
 #>
 [CmdletBinding()]
@@ -474,6 +475,7 @@ param(
     # ID renumbers the later one, pushes that and claims, and that a claim the board refuses
     # for another reason is traced with the board's own words (BL-2014), and exit.
     [switch]$TestClaimDuplicates,
+    [switch]$TestTaskReadiness,
     # Prove, on a throwaway repository with a stand-in resolver, that an integration pushes,
     # that a rebase conflict is resolved with the integrate lock released and the rebased
     # work pushed, and that a resolver that fails leaves no rebase in progress (BL-2967), and exit.
