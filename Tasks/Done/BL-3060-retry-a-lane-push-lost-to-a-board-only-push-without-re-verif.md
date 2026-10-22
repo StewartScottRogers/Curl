@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1, DarkFactory/ShiftEnd.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3060 — Retry a lane push lost to a board-only push without re-verifying or spending an attempt
 
@@ -28,15 +28,20 @@ The existing self-test is `RunDarkFactory.ps1 -TestIntegrateLock` (body in `Dark
 
 ## Acceptance criteria
 
-- [ ] `-TestIntegrateLock` has a case where a Tasks/-only commit is pushed from the other clone during the lane's verify; the lane's push then succeeds, the stand-in verify ran once, and the attempt count is unchanged.
-- [ ] `-TestIntegrateLock` has a case where the incoming commit changes a file the test selection covers; the lane re-verifies and spends an attempt, as before.
-- [ ] `-TestIntegrateLock` has a case where three covered-file races in a row still end with "push kept being refused", so the 3-attempt limit stands.
-- [ ] The coordinator's shift-end review push and its board-move push are made while holding the integrate lock, or Notes states why one cannot; a self-test or a text check in the self-tests covers each.
-- [ ] `RunDarkFactory.ps1 -TestIntegrateLock` and the other `-Test*` self-tests that exist for the touched files pass, and `RunDarkFactory.ps1` still parses.
+- [x] `-TestIntegrateLock` has a case where a Tasks/-only commit is pushed from the other clone during the lane's verify; the lane's push then succeeds, the stand-in verify ran once, and the attempt count is unchanged.
+- [x] `-TestIntegrateLock` has a case where the incoming commit changes a file the test selection covers; the lane re-verifies and spends an attempt, as before.
+- [x] `-TestIntegrateLock` has a case where three covered-file races in a row still end with "push kept being refused", so the 3-attempt limit stands.
+- [x] The coordinator's shift-end review push and its board-move push are made while holding the integrate lock, or Notes states why one cannot; a self-test or a text check in the self-tests covers each.
+- [x] `RunDarkFactory.ps1 -TestIntegrateLock` and the other `-Test*` self-tests that exist for the touched files pass, and `RunDarkFactory.ps1` still parses.
 
 ## Notes
 
+- Decided by Claude: "covered by the test selection" is taken at its stated minimum: an incoming change is board-only when every changed path starts with ; anything else re-verifies and spends an attempt as before. The fast retry is bounded at 10 tries () and runs the dedupe/archive housekeeping (now ) before each re-push.
+- Shift-end review: the reviewer prompt no longer pushes;  in ShiftEnd.ps1 fetches, rebases and pushes its commit while holding , after the run ends. The reviewer's own  still runs before that, so an ID taken by a lane meanwhile is not renumbered at push time.
+- Coordinator: the board-move push (return of orphans to Backlog) takes . The coordinator's other board pushes, if any, are in files outside .
+- Self-test:  redefines  as a counting stand-in that pushes from the other clone; the two lock checks are text checks of ShiftEnd.ps1 and ShiftCoordinator.ps1.
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: fdb4f146 4e309858 9f16808d d4846cb4 270ab631.
+- 2026-10-22: Doing -> Done. A lane push lost to a Tasks-only push is retried without re-verifying or spending an attempt; coordinator and review pushes take the integrate lock

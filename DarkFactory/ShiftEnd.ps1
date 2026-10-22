@@ -84,9 +84,30 @@ You are the dark factory's shift-end reviewer (ADR-0710). This checkout is detac
 1. Run /pr-review-toolkit:review-pr errors types code parallel, scoped to that diff (the changed files and lines, not the whole repository). Review only: change no file but the task files and the report below, and never run the code-simplifier.
 2. Keep only issues that are real and that the diff introduced, checked against the code, CLAUDE.md and the project's own CLAUDE.md files. Drop style preferences and anything the repository's rules already decide another way.
 3. For each Critical or Important issue left, file one task with powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 new -Title "<what to fix>" -Priority <High for Critical, Normal for Important> -Assignee Claude -Pipeline direct -Touches "<the projects or files>", then fill its Goal, Context (the file and line, the reviewer that found it, what is wrong and why) and checkable Acceptance criteria. File none for Suggestions. Never file one that touches an audit path or a guard file.
-4. Commit only the new task files, with the message "chore(tasks): file shift-end review findings" and [skip ci] in the body, run task-board.ps1 dedupe -Since origin/{BRANCH}, and push to origin {BRANCH}: on a refused push, git pull --rebase origin {BRANCH} and push again, up to five times.
+4. Commit only the new task files, with the message "chore(tasks): file shift-end review findings" and [skip ci] in the body, run task-board.ps1 dedupe -Since origin/{BRANCH}, and stop there: do not push. The coordinator pushes the commit once the run ends, holding the lock every lane takes to push (BL-3060).
 5. Write the review summary (Critical, Important and Suggestions, each with the task ID filed for it) to {REPORT}. Its last line is exactly "FILED: <number of tasks filed>".
 '@
+
+function Push-ReviewCommitsUnderLock {
+    # Pushes the commits the review run made in its worktree, holding the integrate lock every
+    # lane takes to push, so the push cannot land in the middle of a lane's verify and cost it
+    # its own push (BL-3060). Up to five tries: fetch, rebase onto the branch, push. Returns
+    # '' when nothing needed pushing or the push worked, or why it did not.
+    param([string]$Dir, [string]$Head, [string]$Branch)
+    if ("$(git -C $Dir rev-parse HEAD 2>$null)".Trim() -eq $Head) { return '' }
+    $lock = Enter-Lock
+    try {
+        for ($try = 0; $try -lt 5; $try++) {
+            git -C $Dir fetch -q origin $Branch 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { continue }
+            git -C $Dir rebase -q "origin/$Branch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { git -C $Dir rebase --abort 2>&1 | Out-Null; return 'its commit would not rebase onto the branch' }
+            git -C $Dir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { return '' }
+        }
+        return 'its push was refused 5 times'
+    } finally { $lock.Dispose() }
+}
 
 function Invoke-ShiftReview {
     # After the shift-end merge: one headless run of three of the PR Review Toolkit's
@@ -125,6 +146,8 @@ function Invoke-ShiftReview {
             }
         }
         $p.WaitForExit()
+        $pushed = Push-ReviewCommitsUnderLock -Dir $dir -Head $Head -Branch $Branch
+        if ($pushed) { Write-Trace '-' 'review' "review of $short filed tasks but $pushed" 'Yellow' }
         $filed = if (Test-Path $report) { [regex]::Match((Get-Content $report -Raw), 'FILED:\s*(\d+)\s*$').Groups[1].Value } else { '' }
         if (-not $filed) { return "review of $short ended (exit $($p.ExitCode)) without a report; see $raw" }
         return "reviewed $short; $filed task(s) filed; report $report"
