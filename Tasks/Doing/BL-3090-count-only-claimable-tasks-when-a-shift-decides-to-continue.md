@@ -42,3 +42,4 @@ Record the decision in a short ADR under `Documentation/Planning/Decisions/` mar
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 45da9160 9adb2d10 c5eb2107 4fe08f63 5a5f154d 7adb49ac de7e55ae 7193fd91.
