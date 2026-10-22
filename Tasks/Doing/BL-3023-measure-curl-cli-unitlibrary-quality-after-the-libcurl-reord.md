@@ -31,3 +31,4 @@ Split from BL-2966. Run `powershell -NoProfile -File Measure-CodeQuality.ps1 -Li
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: f1c8149c 809c786e 48b212cd.
