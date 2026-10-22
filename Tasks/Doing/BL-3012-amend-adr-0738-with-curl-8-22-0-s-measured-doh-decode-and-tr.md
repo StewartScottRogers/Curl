@@ -38,3 +38,4 @@ State in the amendment, marked "Decided by Claude under Stewart's delegation", f
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 1e707886 fdb16ee7 6b7dfd0c.
