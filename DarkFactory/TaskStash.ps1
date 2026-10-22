@@ -98,12 +98,13 @@ function Copy-TaskStash {
     # Stores a copy of stash -Sha under -Id as "darkfactory <id> <stamp>" and returns the copy's
     # hash. A copy, not the same hash: git stash store writes no entry for a hash already at the
     # top of the list or already stored, so one stash for several tasks needs one commit each.
-    param([string]$Id, [string]$Sha, [string]$Stamp, [string]$Repo = $Root)
+    param([string]$Id, [string]$Sha, [string]$Stamp, [string]$Repo = $Root, [string]$ParentId = '')
+    # -ParentId, the task whose stash is copied, goes into the commit message so a later move knows whose work this is (BL-3112).
     # Throws when any git command fails (another lane may hold the stash ref lock).
     $revList = git -C $Repo rev-list --parents -n 1 $Sha 2>&1
     if ($LASTEXITCODE -ne 0) { throw "git rev-list of stash $Sha failed: $revList" }
     $parents = @("$revList" -split ' ' | Select-Object -Skip 1)
-    $commitArgs = @('commit-tree', "$Sha^{tree}") + @($parents | ForEach-Object { '-p'; $_ }) + @('-m', "darkfactory $Id $Stamp")
+    $commitArgs = @('commit-tree', "$Sha^{tree}") + @($parents | ForEach-Object { '-p'; $_ }) + @('-m', "darkfactory $Id $Stamp") + $(if ($ParentId) { @('-m', "stash-continues $ParentId") } else { @() })
     $copy = "$(git -C $Repo @commitArgs 2>&1)".Trim()
     if ($LASTEXITCODE -ne 0 -or -not $copy) { throw "git commit-tree of stash $Sha failed: $copy" }
     $storeOutput = git -C $Repo stash store -m "darkfactory $Id $Stamp" $copy 2>&1
@@ -126,29 +127,58 @@ function Remove-TaskStashEntries {
     }
 }
 
+function Get-ContinuedStashParent {
+    # The ID in the "Continues the stashed work of BL-<n>" line of task -Id's file, '' for none.
+    param([string]$Id)
+    $line = @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-String -Pattern 'Continues the stashed work of (BL-\d+)' | Select-Object -First 1)
+    if (-not $line.Count) { return '' }
+    return $line[0].Matches[0].Groups[1].Value
+}
+
 function Move-RenumberedTaskStash {
     # A split stored a copy of the parent's stash as "darkfactory <old> <stamp>" for a new task, and
     # the task was then renumbered <old> -> <new> as a duplicate ID (Invoke-RenumberDuplicates). The
     # copy follows it: re-stored under <new>, the old entry dropped by hash, so no stash is offered
     # to the other task that kept <old>. Only a copy stored by Copy-TaskStash (bare subject, no
     # "On <branch>:" prefix, which Save-StrayChanges writes for a task's own run) moves, and only
-    # when the renumbered task's file says it continues the stashed work. Returns the new hashes.
-    # -ContinuesStash is a test hook.
+    # the one whose commit message names the parent the renumbered task's file says it continues
+    # (BL-3112): two lanes can split different parents into tasks that share <old>.
+    # Returns the new hashes. -ParentOf (renumbered ID -> parent ID, '' for none) is a test hook.
     param(
         [string]$OldId, [string]$NewId, [string]$Repo = $Root,
-        [scriptblock]$ContinuesStash = { param($Id) @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" | Select-String -Pattern 'Continues the stashed work of' -List).Count -gt 0 })
-    if (-not (& $ContinuesStash $NewId)) { return @() }
+        [scriptblock]$ParentOf = { param($Id) Get-ContinuedStashParent $Id })
+    $parent = & $ParentOf $NewId
+    if (-not $parent) { return @() }
     $moved = @()
     $pattern = "^(\S+) darkfactory $([regex]::Escape($OldId)) (\S+)$"
     foreach ($entry in @(git -C $Repo stash list --format='%H %gs' 2>$null | Where-Object { $_ -match $pattern })) {
         $null = $entry -match $pattern
         $sha = $Matches[1]; $stamp = $Matches[2]
-        $copy = Copy-TaskStash $NewId $sha $stamp $Repo
+        $message = @(git -C $Repo show -s --format=%B $sha 2>$null) -join "`n"
+        if ($message -notmatch "(?m)^stash-continues $([regex]::Escape($parent))\s*$") { continue }
+        $copy = Copy-TaskStash $NewId $sha $stamp $Repo -ParentId $parent
         Remove-TaskStashEntries @($sha) $Repo -Id $NewId
         $moved += $copy
         Write-Trace $NewId 'stash' "moved the stash copy $($sha.Substring(0, 8)) of $OldId to $NewId, which was renumbered from it (now $($copy.Substring(0, 8)))" 'Yellow'
     }
     return $moved
+}
+
+function Move-RenumberedStashesAfterPush {
+    # Runs -Push, the push of a duplicate-ID renumbering, and only when it returns true moves each
+    # renumbered task's stash copy (BL-3112): a refused push is reset away by the next Sync-Lane, so
+    # a copy moved before it would sit under an ID origin never saw. A move that throws is traced
+    # with the IDs and git's message and the copy stays under the old ID. -Renumbered is the board's
+    # "BL-old -> BL-new" lines. Returns the push result.
+    param([string]$Id, [string[]]$Renumbered, [scriptblock]$Push)
+    if (-not (& $Push)) { return $false }
+    foreach ($line in $Renumbered) {
+        if ($line -notmatch '^(BL-\d+) -> (BL-\d+)') { continue }
+        $oldId = $Matches[1]; $newId = $Matches[2]
+        try { $null = Move-RenumberedTaskStash $oldId $newId }
+        catch { Write-Trace $Id 'renum' "moving the stash copy of $oldId to $newId failed: $($_.Exception.Message); it stays under $oldId" 'Red' }
+    }
+    return $true
 }
 
 function Register-TaskSplitAttempt {
@@ -212,7 +242,7 @@ function Invoke-TaskSplit {
         [scriptblock]$ListTaskIds = { @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter 'BL-*.md' | ForEach-Object { $_.Name -replace '^(BL-\d+).*$', '$1' }) },
         [scriptblock]$StashSha = { param($SplitId) Get-TaskStashSha $SplitId },
         [scriptblock]$ContinuesStash = { param($NewId, $SplitId) @(Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$NewId-*.md" | Select-String -SimpleMatch "Continues the stashed work of $SplitId" -List).Count -gt 0 },
-        [scriptblock]$StoreStash = { param($NewId, $Sha, $Stamp) Copy-TaskStash $NewId $Sha $Stamp },
+        [scriptblock]$StoreStash = { param($NewId, $Sha, $Stamp, $SplitId) Copy-TaskStash $NewId $Sha $Stamp -ParentId $SplitId },
         [scriptblock]$DropStash = { param($Shas) Remove-TaskStashEntries $Shas },
         [scriptblock]$TaskState = { param($SplitId) Get-TaskState $SplitId },
         [scriptblock]$EnterLock = { Enter-Lock },
@@ -239,7 +269,7 @@ function Invoke-TaskSplit {
         if (-not $failure) {
             # The shift stores the stash once per new task that says it continues the work.
             if ($sha) {
-                try { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss')) } } }
+                try { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss') $Id) } } }
                 catch { $failure = "storing the stash for a new task failed: $($_.Exception.Message)" }
                 if (-not $failure -and -not $stored.Count) { Write-Trace $Id 'split' "stash $sha is continued by no new task ($($new -join ', ')); its work stays under $Id" 'Red' }
             }
@@ -446,7 +476,8 @@ if ($TestTaskStash) {
         $script:realPull = $true
         $r = & $realFailSplit '2026-11-21'
         $log = @(git -C $repo log --format=%s) -join '|'
-        & $check 'a refused push after a pull keeps the pulled commit and drops the split commit' 'blocked True True False' "$r $($log -match 'pulled commit') $(Test-Path (Join-Path $repo 'pulled.txt')) $($log -match 'split BL-1')"        # In a lane after a run nothing is pushed, even when the push would be accepted (BL-3100).
+        & $check 'a refused push after a pull keeps the pulled commit and drops the split commit' 'blocked True True False' "$r $($log -match 'pulled commit') $(Test-Path (Join-Path $repo 'pulled.txt')) $($log -match 'split BL-1')"        
+        # In a lane after a run nothing is pushed, even when the push would be accepted (BL-3100).
         $script:splitPushes = $true
         $null = & $split '2026-11-12' $okRun -Leave
         & $check 'after a run the split commit is not pushed' 'False' ($script:splitSteps -contains 'push').ToString()
@@ -525,18 +556,47 @@ if ($TestTaskStash) {
         Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent'
         git -C $repo stash push -q -m 'darkfactory BL-7 20260105-000000' 2>&1 | Out-Null
         $parentSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
-        $null = Copy-TaskStash 'BL-8' $parentSha '20260105-000001' $repo
+        $null = Copy-TaskStash 'BL-8' $parentSha '20260105-000001' $repo -ParentId 'BL-7'
         Set-Content -Path (Join-Path $repo 'a.txt') -Value 'theirs'
         git -C $repo stash push -q -m 'darkfactory BL-8 20260105-000002' 2>&1 | Out-Null
-        $notContinuing = Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { $false }
+        $notContinuing = Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { '' }
         & $check 'a renumbered task that continues no stash moves nothing' '0' "$(@($notContinuing).Count)"
-        $traceText = & { $script:movedStash = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { $true }) } 6>&1 | Out-String
+        $traceText = & { $script:movedStash = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { 'BL-7' }) } 6>&1 | Out-String
         $subjects = @(git -C $repo stash list --format='%gs')
         & $check 'the copy is re-stored under the new ID' '1' "$(@($subjects | Where-Object { $_ -eq 'darkfactory BL-9 20260105-000001' }).Count)"
         & $check 'the old ID keeps no copy' '0' "$(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260105-000001' }).Count)"
         & $check 'the other task''s own stash and the parent stash stay' '2' "$(@($subjects | Where-Object { $_ -match 'darkfactory BL-8 20260105-000002$|darkfactory BL-7 ' }).Count)"
         & $check 'the moved copy is found for the new ID, not offered to the old' 'True False' "$((Get-TaskStashSha 'BL-9' $repo) -eq $script:movedStash[0]) $((Get-TaskStashSha 'BL-8' $repo) -eq $script:movedStash[0])"
         & $check 'the trace says the stash moved to the renumbered ID' 'True' "$($traceText -match 'moved the stash copy' -and $traceText -match 'BL-8 to BL-9')"
+
+        # Two lanes split different parents into tasks that share BL-8: only the renumbered task's copy moves (BL-3112).
+        git -C $repo stash clear
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent six'
+        git -C $repo stash push -q -m 'darkfactory BL-6 20260106-000000' 2>&1 | Out-Null
+        $sixSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'parent seven'
+        git -C $repo stash push -q -m 'darkfactory BL-7 20260106-000001' 2>&1 | Out-Null
+        $sevenSha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        $null = Copy-TaskStash 'BL-8' $sixSha '20260106-000002' $repo -ParentId 'BL-6'
+        $null = Copy-TaskStash 'BL-8' $sevenSha '20260106-000003' $repo -ParentId 'BL-7'
+        $movedSeven = @(Move-RenumberedTaskStash 'BL-8' 'BL-9' $repo { 'BL-7' })
+        $subjects = @(git -C $repo stash list --format='%gs')
+        & $check 'only the renumbered task''s own copy moves' '1 1 0 1' "$($movedSeven.Count) $(@($subjects | Where-Object { $_ -eq 'darkfactory BL-9 20260106-000003' }).Count) $(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260106-000003' }).Count) $(@($subjects | Where-Object { $_ -eq 'darkfactory BL-8 20260106-000002' }).Count)"
+        & $check 'the task that kept the old ID keeps its copy of its own parent' 'True' "$((@(git -C $repo show -s --format=%B (Get-TaskStashSha 'BL-8' $repo)) -join "`n") -match 'stash-continues BL-6')"
+        # A refused renumber push moves nothing; a move that throws is traced and the claim goes on (BL-3112).
+        $before = @(git -C $repo stash list --format='%H %gs') -join '|'
+        $script:moveCalls = 0
+        $refused = & {
+            function Move-RenumberedTaskStash { $script:moveCalls++ }
+            Move-RenumberedStashesAfterPush 'BL-8' @('BL-8 -> BL-9  x') { $false }
+        }
+        & $check 'a refused renumber push moves no stash and returns false' '0 False' "$script:moveCalls $refused"
+        & $check 'a refused renumber push leaves the stash list unchanged' $before ((@(git -C $repo stash list --format='%H %gs')) -join '|')
+        $outcome = & {
+            function Move-RenumberedTaskStash { $script:moveCalls++; throw 'ref locked' }
+            Move-RenumberedStashesAfterPush 'BL-8' @('BL-8 -> BL-9  x') { $true }
+        } 6>&1 | Out-String
+        & $check 'a throwing move is traced in full and the claim goes on' '1 True True True True' "$script:moveCalls $($outcome -match 'BL-8') $($outcome -match 'BL-9') $($outcome -match 'ref locked') $($outcome -match 'True')"
     } finally {
         Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
     }

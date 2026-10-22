@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1, DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3112 — Make the renumbered task's stash move happen only after the renumber is pushed, move only that task's own copy, and never end the lane when it fails
 
@@ -35,16 +35,20 @@ Found by the shift-end review (ADR-0710) of 585348e22...432525fe2. silent-failur
 
 ## Acceptance criteria
 
-- [ ] `Invoke-RenumberDuplicates` calls `Move-RenumberedTaskStash` only after the renumber push has returned true. When the push is refused, no stash entry changes.
-- [ ] A throw from `Move-RenumberedTaskStash` (or `Copy-TaskStash` under it) is caught in `Invoke-RenumberDuplicates`, traced in red with the IDs and git's message, and the claim carries on. The copy stays under the old ID.
-- [ ] `Move-RenumberedTaskStash` moves only the copy that belongs to the renumbered task. It reads the parent ID from the task's "Continues the stashed work of BL-<n>" line, and matches the copy to that parent, for example by comparing the copy's tree with the parent stash's tree, or by putting the parent ID in the copy's subject when `Copy-TaskStash` writes it.
-- [ ] A `-TestTaskStash` case with real git stores two copies under one ID from two different parents. It renumbers one task and proves that only its own copy moves and that the other task keeps its copy.
-- [ ] A `-TestTaskStash` case proves that a refused renumber push leaves the stash list unchanged.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] `Invoke-RenumberDuplicates` calls `Move-RenumberedTaskStash` only after the renumber push has returned true. When the push is refused, no stash entry changes.
+- [x] A throw from `Move-RenumberedTaskStash` (or `Copy-TaskStash` under it) is caught in `Invoke-RenumberDuplicates`, traced in red with the IDs and git's message, and the claim carries on. The copy stays under the old ID.
+- [x] `Move-RenumberedTaskStash` moves only the copy that belongs to the renumbered task. It reads the parent ID from the task's "Continues the stashed work of BL-<n>" line, and matches the copy to that parent, for example by comparing the copy's tree with the parent stash's tree, or by putting the parent ID in the copy's subject when `Copy-TaskStash` writes it.
+- [x] A `-TestTaskStash` case with real git stores two copies under one ID from two different parents. It renumbers one task and proves that only its own copy moves and that the other task keeps its copy.
+- [x] A `-TestTaskStash` case proves that a refused renumber push leaves the stash list unchanged.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+- The copy is matched to its parent by a `stash-continues BL-<n>` line Copy-TaskStash now writes in the copy commit message (new `-ParentId`; Invoke-TaskSplit passes the split task). Copies without that line (stored before this change) are not moved: safer than moving someone else's work. The post-push move lives in `Move-RenumberedStashesAfterPush` (TaskStash.ps1) so -TestTaskStash can reach it; Invoke-RenumberDuplicates calls it.
+- Tests: -TestTaskStash and -TestClaimDuplicates pass. No C# changed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: fb854554 eabfc875 93a7bb37 8e01f45b 88a76509 95ad9451.
+- 2026-10-22: Doing -> Done. Renumber stash move runs only after a successful push, moves only its own parent's copy, and a failed move is traced instead of ending the lane
