@@ -104,7 +104,7 @@ internal static class EasyNetworkOptionSetters
     private static CurlCode SetUrl(ref EasyOptions o, object? v) => Set(ref o, n => n with { Url = (string?)v });
 
     /// <summary>
-    /// <c>CURLOPT_CURLU</c>: a <see cref="CurlUrlHandle"/>x27s engine handle, held by reference as libcurl
+    /// <c>CURLOPT_CURLU</c>: a <see cref="CurlUrlHandle"/>'s engine handle, held by reference as libcurl
     /// holds the pointer; <see langword="null"/> clears it, and any other object is
     /// <see cref="CurlCode.BadFunctionArgument"/> (ADR-0590).
     /// </summary>
@@ -117,10 +117,13 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetPathAsIs(ref EasyOptions o, object? v) => Set(ref o, n => n with { PathAsIs = IsOn(v) });
 
+    /// <summary><c>CURLOPT_PROTOCOLS</c>: the <c>CURLPROTO_*</c> bitmask is stored as its <c>_STR</c> name list (<see cref="ProtocolsOf"/>), the one form the options hold.</summary>
     private static CurlCode SetProtocolBits(ref EasyOptions o, object? v) => Set(ref o, n => n with { Protocols = ProtocolsOf(NumberOf(v)) });
 
+    /// <summary><c>CURLOPT_REDIR_PROTOCOLS</c>: stored as its <c>_STR</c> name list, as <see cref="SetProtocolBits"/> does.</summary>
     private static CurlCode SetRedirectProtocolBits(ref EasyOptions o, object? v) => Set(ref o, n => n with { RedirectProtocols = ProtocolsOf(NumberOf(v)) });
 
+    /// <summary><c>CURLOPT_PROTOCOLS_STR</c>: the list is kept as given once <see cref="CheckProtocolNames"/> accepts it.</summary>
     private static CurlCode SetProtocols(ref EasyOptions o, object? v)
     {
         var check = CheckProtocolNames(v);
@@ -128,6 +131,7 @@ internal static class EasyNetworkOptionSetters
         return check == CurlCode.Ok ? Set(ref o, n => n with { Protocols = names }) : check;
     }
 
+    /// <summary><c>CURLOPT_REDIR_PROTOCOLS_STR</c>: checked and kept as <see cref="SetProtocols"/> does, for redirects only.</summary>
     private static CurlCode SetRedirectProtocols(ref EasyOptions o, object? v)
     {
         var check = CheckProtocolNames(v);
@@ -195,6 +199,7 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetForbidReuse(ref EasyOptions o, object? v) => Set(ref o, n => n with { ForbidReuse = IsOn(v) });
 
+    /// <summary><c>CURLOPT_MAXCONNECTS</c>: 1 to <c>INT_MAX</c>; 0 and below are <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetMaxConnects(ref EasyOptions o, object? v) => SetInRange(ref o, v, 1, MostCount, (n, count) => n with { MaxConnects = (int)count });
 
     private static CurlCode SetMaxIdleConnectionAge(ref EasyOptions o, object? v) => SetCount(ref o, v, (n, seconds) => n with { MaxIdleConnectionAge = TimeSpan.FromSeconds(seconds) });
@@ -227,6 +232,7 @@ internal static class EasyNetworkOptionSetters
             : Set(ref options, n => n with { DnsCacheTimeout = seconds == -1 ? Timeout.InfiniteTimeSpan : TimeSpan.FromSeconds(Math.Min(seconds, MostCount)) });
     }
 
+    /// <summary>Replaces the handle's <see cref="EasyNetworkOptions"/> with the copy <paramref name="change"/> returns; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Set(ref EasyOptions options, Func<EasyNetworkOptions, EasyNetworkOptions> change)
     {
         options = options with { Network = change(options.Network) };
@@ -290,8 +296,10 @@ internal static class EasyNetworkOptionSetters
         return names.Length == ProtocolNames.Length ? "all" : string.Join(',', names);
     }
 
+    /// <summary>A private copy of a string list option (<c>curl_slist</c>), so a later change by the caller does not alter the handle; <see langword="null"/> is an empty list.</summary>
     private static IReadOnlyList<string> ListOf(object? value) => value is IEnumerable<string> lines ? [.. lines] : [];
 
+    /// <summary>Whether a <c>CURLOT_LONG</c> on/off value is on: any value but 0, as in libcurl.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 
     private static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);
