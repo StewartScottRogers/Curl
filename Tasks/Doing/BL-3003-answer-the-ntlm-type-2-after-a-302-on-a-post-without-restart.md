@@ -31,3 +31,4 @@ Found by BL-2834 (ADR-0751), Debug now reported to both: test1100 differs at lin
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: fbecace0.
