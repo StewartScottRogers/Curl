@@ -14,6 +14,7 @@ namespace Libcurl.Info;
 /// </summary>
 internal static partial class EasyInfoReaders
 {
+    /// <summary>The divisor from the microsecond count to the double seconds form.</summary>
     private const double MicrosecondsPerSecond = 1_000_000;
 
     static partial void AddTimeReaders(Dictionary<CurlInfo, EasyInfoReader> readers)
@@ -51,8 +52,14 @@ internal static partial class EasyInfoReaders
         readers[CurlInfo.ContentLengthUploadT] = new EasyInfoReader(ReadContentLengthUploadT);
     }
 
+    /// <summary>The whole microseconds of <paramref name="time"/>, the value upstream's <c>_T</c> infos hold (finer ticks are dropped).</summary>
+    /// <param name="time">The time to convert.</param>
+    /// <returns>The microseconds.</returns>
     private static long Microseconds(TimeSpan time) => time.Ticks / TimeSpan.TicksPerMicrosecond;
 
+    /// <summary>The seconds of <paramref name="time"/> as upstream's double infos give them: whole microseconds over 1,000,000.</summary>
+    /// <param name="time">The time to convert.</param>
+    /// <returns>The seconds.</returns>
     private static double Seconds(TimeSpan time) => Microseconds(time) / MicrosecondsPerSecond;
 
     private static object? ReadTotalTime(TransferInfo info, EasyOptions options) => Seconds(info.TotalTime);

@@ -66,6 +66,7 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadCertInfo(TransferInfo info, EasyOptions options) => info.CertInfo;
 
+    // The native session pointer is always null: Curl's TLS is managed, so only the backend id is real (see CurlTlsSessionInfo).
     private static object? ReadTlsSessionInfo(TransferInfo info, EasyOptions options) =>
         new CurlTlsSessionInfo(info.TlsSslBackend, null);
 }

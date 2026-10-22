@@ -14,9 +14,10 @@ internal static class MultiOptionSetters
     private static readonly CurlOptionType[] TypesByBase =
         [CurlOptionType.Values, CurlOptionType.Object, CurlOptionType.Function, CurlOptionType.OffT];
 
+    /// <summary>The setter rows, built once, by option.</summary>
     private static readonly Dictionary<CurlMultiOption, MultiOptionSetter> Setters = Create();
 
-    /// <summary><c>CURLMOPT_MAX_CONCURRENT_STREAMS</c>' value outside 1 to <see cref="int.MaxValue"/>.</summary>
+    /// <summary>What <c>CURLMOPT_MAX_CONCURRENT_STREAMS</c> becomes when given a value outside 1 to <see cref="int.MaxValue"/>.</summary>
     private const long DefaultConcurrentStreams = 100;
 
     /// <summary>Sets <paramref name="option"/> to <paramref name="value"/> on <paramref name="options"/>.</summary>
@@ -39,6 +40,8 @@ internal static class MultiOptionSetters
             : CurlMultiCode.BadFunctionArgument;
     }
 
+    /// <summary>Builds the rows of every option group into one table.</summary>
+    /// <returns>The rows, by option.</returns>
     private static Dictionary<CurlMultiOption, MultiOptionSetter> Create()
     {
         var setters = new Dictionary<CurlMultiOption, MultiOptionSetter>();
@@ -49,6 +52,8 @@ internal static class MultiOptionSetters
         return setters;
     }
 
+    /// <summary>Adds the connection-count options and the stream limit.</summary>
+    /// <param name="setters">The rows to add to.</param>
     private static void AddConnectionSetters(Dictionary<CurlMultiOption, MultiOptionSetter> setters)
     {
         setters[CurlMultiOption.MaxConnects] = Count(uint.MaxValue, static (o, n) => o with { MaxConnects = n });
@@ -57,12 +62,16 @@ internal static class MultiOptionSetters
         setters[CurlMultiOption.MaxConcurrentStreams] = SetConcurrentStreams;
     }
 
+    /// <summary>Adds the <c>PIPELINING</c> and <c>NETWORK_CHANGED</c> options, which take any <c>long</c>.</summary>
+    /// <param name="setters">The rows to add to.</param>
     private static void AddSharingSetters(Dictionary<CurlMultiOption, MultiOptionSetter> setters)
     {
         setters[CurlMultiOption.Pipelining] = Long(static (o, n) => o with { Pipelining = (CurlPipelining)n });
         setters[CurlMultiOption.NetworkChanged] = Long(static (o, n) => o with { NetworkChanged = (CurlNetworkChange)n });
     }
 
+    /// <summary>Adds the four callback options (socket, timer, push, notify), stored on the engine's options.</summary>
+    /// <param name="setters">The rows to add to.</param>
     private static void AddFunctionSetters(Dictionary<CurlMultiOption, MultiOptionSetter> setters)
     {
         setters[CurlMultiOption.SocketFunction] = Function<MultiSocketCallback>(static (o, f) => o with { Socket = f });
@@ -130,8 +139,16 @@ internal static class MultiOptionSetters
         return Set(ref options, options with { MaxConcurrentStreams = kept });
     }
 
+    /// <summary>The row of an option that takes its value and changes nothing.</summary>
+    /// <param name="options">The handle's options, left as they are.</param>
+    /// <param name="value">The value given, unused.</param>
+    /// <returns><see cref="CurlMultiCode.Ok"/>.</returns>
     private static CurlMultiCode Ignore(ref MultiOptions options, object? value) => CurlMultiCode.Ok;
 
+    /// <summary>Replaces <paramref name="options"/> with <paramref name="changed"/>, so a row's lambda can end in one expression.</summary>
+    /// <param name="options">The handle's options, replaced.</param>
+    /// <param name="changed">The options with the new value set.</param>
+    /// <returns><see cref="CurlMultiCode.Ok"/>.</returns>
     private static CurlMultiCode Set(ref MultiOptions options, MultiOptions changed)
     {
         options = changed;

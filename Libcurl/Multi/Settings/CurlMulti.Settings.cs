@@ -33,6 +33,10 @@ public sealed partial class CurlMulti
         _ => SetEngineOption(option, value),
     };
 
+    /// <summary>Sets an option on a copy of the engine's options, writing it back only when the setter answered Ok.</summary>
+    /// <param name="option">The option to set.</param>
+    /// <param name="value">The value to set it to.</param>
+    /// <returns>The setter's answer.</returns>
     private CurlMultiCode SetEngineOption(CurlMultiOption option, object? value)
     {
         var live = LiveTransfer();
@@ -115,6 +119,9 @@ public sealed partial class CurlMulti
         return IsKnown(notification) ? live.DisableNotification(notification) : CurlMultiCode.UnknownOption;
     }
 
+    /// <summary>Whether <paramref name="notification"/> is one <c>multi.h</c> names (<c>CURLMNOTIFY_INFO_READ</c>, <c>_EASY_DONE</c>).</summary>
+    /// <param name="notification">The notification to check.</param>
+    /// <returns><see langword="true"/> for a named notification.</returns>
     private static bool IsKnown(CurlMultiNotification notification) =>
         notification is CurlMultiNotification.InfoRead or CurlMultiNotification.EasyDone;
 }

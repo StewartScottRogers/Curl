@@ -62,10 +62,16 @@ public sealed partial class CurlMulti
         return CurlMultiCode.Ok;
     }
 
+    /// <summary>Adapts the application's socket callback to the engine's, mapping the engine's transfer back to the added <see cref="Easy.CurlEasy"/>.</summary>
+    /// <param name="callback">The application's socket callback.</param>
+    /// <returns>The engine callback.</returns>
     private MultiSocketCallback SocketCallbackOver(CurlMultiSocketCallback callback) =>
         (IEasyTransfer easyTransfer, CurlSocket socket, CurlPoll what, object? socketState) =>
             callback(handles[easyTransfer], socket, what, socketState);
 
+    /// <summary>Adapts the application's timer callback to the engine's, passing this multi handle as libcurl's <c>multi</c> argument.</summary>
+    /// <param name="callback">The application's timer callback.</param>
+    /// <returns>The engine callback.</returns>
     private MultiTimerCallback TimerCallbackOver(CurlMultiTimerCallback callback) =>
         timeoutMilliseconds => callback(this, timeoutMilliseconds);
 }
