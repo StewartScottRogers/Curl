@@ -1,5 +1,5 @@
 ---
-id: BL-3098
+id: BL-3103
 title: Make Restore-TaskStash drop only the stash it applied
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3098 — Make Restore-TaskStash drop only the stash it applied
+# BL-3103 — Make Restore-TaskStash drop only the stash it applied
 
 ## Goal
 

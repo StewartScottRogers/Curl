@@ -1,5 +1,5 @@
 ---
-id: BL-3099
+id: BL-3104
 title: Keep Invoke-Claim's claim result when a split after the claim throws
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3099 — Keep Invoke-Claim's claim result when a split after the claim throws
+# BL-3104 — Keep Invoke-Claim's claim result when a split after the claim throws
 
 ## Goal
 

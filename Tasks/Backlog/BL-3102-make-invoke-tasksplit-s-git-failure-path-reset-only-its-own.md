@@ -1,5 +1,5 @@
 ---
-id: BL-3096
+id: BL-3102
 title: Make Invoke-TaskSplit's git failure path reset only its own commit and abort a failed rebase
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3096 — Make Invoke-TaskSplit's git failure path reset only its own commit and abort a failed rebase
+# BL-3102 — Make Invoke-TaskSplit's git failure path reset only its own commit and abort a failed rebase
 
 ## Goal
 
