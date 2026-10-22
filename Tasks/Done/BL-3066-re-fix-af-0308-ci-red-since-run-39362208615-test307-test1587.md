@@ -6,9 +6,10 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
+lane: no
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3066 — Re-fix AF-0308: CI red since run 39362208615 (test307, test1587 on Linux and macOS) and still red at log copy; fix tasks sat 43 min unclaimed because the weekly window was used up
 
@@ -45,15 +46,20 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-21 14:13:29 (7268b92b1, ADR-0744: CI-fix tasks are claimed past the usage stop), shows no red spell over 30 minutes during which the shift held its lanes at a usage stop.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-22: The fix already shipped as ADR-0744 (BL-2946, Done 2026-10-21 14:15): a lane claims CI-fix tasks past the usage stop. The reproduction reads a past audit log copy (spell 39362208615, 2026-10-20) through audit-office tools a lane may not run; that data cannot change. No code change is left in DarkFactory/CiWatch.ps1. Only the next process re-audit of new spells can close AF-0308.
+
+- 2026-10-22 (interactive): Live window 2026-10-21 14:13:29 to 2026-10-22 09:50: five red spells (14.83, 14.82, 24.72, 48.35 and 46.02 minutes). The two over 30 minutes (39691487971, 39718635967) ran with no usage stop in their shift logs (DarkFactory-20261021-150011.log and -203534.log have no usage, weekly or token-hold line in them); their causes are AF-0330 and AF-0331 (BL-3083, BL-3084). Since 2026-10-22 02:44 there is no red spell at all.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Blocked. Stewart: reproduction reads a past audit log, so it cannot change; fix is already ADR-0744 - close AF-0308 at the next process re-audit and drop this task?
+- 2026-10-22: Blocked -> Backlog. Criterion 1 reworded to the live-window measurement (process findings about past behaviour are measured on logs written after the fix)
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 93b6d477 9742157d.
+- 2026-10-22: Doing -> Done. Live logs since 2026-10-21 14:13:29: no red spell over 30 minutes ran during a usage stop
