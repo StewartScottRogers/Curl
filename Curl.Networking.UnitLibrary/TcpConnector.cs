@@ -591,7 +591,7 @@ public sealed partial class TcpConnector(
             : DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
+            return ConnectResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError);
         }
 
         var result = await ConnectWithinTimeoutAsync(target, destination, started, connectLimit, cancellationToken).ConfigureAwait(false);
@@ -665,7 +665,7 @@ public sealed partial class TcpConnector(
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError)));
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError)));
         }
 
         if (OnionAddress.IsRefused(destination.Host))

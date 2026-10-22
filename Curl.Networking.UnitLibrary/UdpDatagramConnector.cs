@@ -117,7 +117,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         var destination = _connectToMappings.Map(host, port);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return DatagramOpenResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
+            return DatagramOpenResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError);
         }
 
         if (OnionAddress.IsRefused(destination.Host))

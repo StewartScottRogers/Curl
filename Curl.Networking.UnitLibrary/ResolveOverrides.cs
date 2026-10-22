@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net;
 
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -57,6 +59,17 @@ public sealed class ResolveOverrides
     /// <see langword="null" /> when every entry parsed.
     /// </summary>
     public string? ParseError { get; }
+
+    /// <summary>
+    /// Gets the exit code a connect fails with when these entries or <paramref name="destination" />
+    /// do not parse: exit 49 for an entry here, else the destination's own
+    /// <see cref="ConnectDestination.ParseErrorCode" />, which is exit 4 for an IPv6 destination
+    /// in a build without IPv6 (upstream test1454, BL-2996).
+    /// </summary>
+    /// <param name="destination">The <c>--connect-to</c> destination of the connect.</param>
+    /// <returns>The exit code.</returns>
+    internal CurlExitCode ParseFailureCodeWith(ConnectDestination destination) =>
+        ParseError is null ? destination.ParseErrorCode : CurlExitCode.SetoptOptionSyntax;
 
     /// <summary>
     /// Gets the entries that parsed, in the order given and up to the first that did not;
