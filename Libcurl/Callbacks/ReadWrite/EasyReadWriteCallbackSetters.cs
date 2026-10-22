@@ -42,6 +42,7 @@ internal static class EasyReadWriteCallbackSetters
             ? SetCallbacks(ref options, options.Callbacks with { Header = (HeaderCallback?)value })
             : CurlCode.BadFunctionArgument;
 
+    // A *DATA row only matters for a Stream, libcurl's FILE * for its default function; anything else is taken and ignored.
     private static CurlCode SetWriteData(ref EasyOptions options, object? value) =>
         value is Stream stream && IsDefaultFunction(options.Callbacks.Write)
             ? SetCallbacks(ref options, options.Callbacks with { Write = new StreamDataCallbacks(stream).Write })
@@ -62,6 +63,10 @@ internal static class EasyReadWriteCallbackSetters
     /// <returns><see langword="true"/> when a <c>*DATA</c> stream may replace it.</returns>
     private static bool IsDefaultFunction(Delegate? callback) => callback is null || callback.Target is StreamDataCallbacks;
 
+    /// <summary>Stores <paramref name="callbacks"/> as the options' callbacks.</summary>
+    /// <param name="options">The options to update.</param>
+    /// <param name="callbacks">The callbacks to keep.</param>
+    /// <returns><see cref="CurlCode.Ok"/>.</returns>
     private static CurlCode SetCallbacks(ref EasyOptions options, EasyCallbackOptions callbacks)
     {
         options = options with { Callbacks = callbacks };
