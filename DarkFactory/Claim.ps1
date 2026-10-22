@@ -184,6 +184,45 @@ function Add-ShiftUnready {
     return $true
 }
 
+function Complete-ClaimSplit {
+    # Acts on what Invoke-TaskSplit returned for a capped task the claim offered, as ShiftRunner.ps1
+    # does, under the integrate lock. A result the caller must block ('skipped', 'failed') moves
+    # the task to Blocked with a "Stewart:" reason, then commits and pushes. 'reset-failed' left the
+    # split commit in place: it is pushed (valid, so origin sees the new IDs its stash copies
+    # carry), else the stash copies stored under those IDs are dropped, since origin never saw
+    # them. Returns 'blocked', 'pushed', 'stash-dropped' or '' for any other result.
+    param(
+        [string]$Id, [string]$Why, [string]$SplitResult,
+        [scriptblock]$Git = { param([string[]]$GitArgs) Invoke-Git $GitArgs })
+    if (Test-TaskSplitLeavesBlockToCaller $SplitResult) {
+        $lock = Enter-Lock
+        try {
+            Invoke-Board @('move', '-Id', $Id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $Why; the automatic split returned '$SplitResult'") | Out-Null
+            & $Git @('add', '-A', 'Tasks') | Out-Null
+            & $Git @('commit', '-q', '-m', "chore(tasks): block $Id - automatic split returned '$SplitResult'", '-m', $SkipCiNote) | Out-Null
+            $pushed = (& $Git @('push', '-q', 'origin', "HEAD:$Branch")) -or ((& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) -and (& $Git @('push', '-q', 'origin', "HEAD:$Branch")))
+            Write-Trace $Id 'split' "the split returned '$SplitResult'; blocked$(if (-not $pushed) { ', but the push was refused' })" 'Red'
+        } finally { $lock.Dispose() }
+        return 'blocked'
+    }
+    if ($SplitResult -ne 'reset-failed') { return '' }
+    $lock = Enter-Lock
+    try {
+        if (& $Git @('push', '-q', 'origin', "HEAD:$Branch")) {
+            Write-Trace $Id 'split' 'the split commit could not be reset, so it was pushed' 'Yellow'
+            return 'pushed'
+        }
+        $subject = "$(& git -C $Root log -1 --format=%s 2>$null)"
+        $newIds = if ($subject -match '^chore\(tasks\): split \S+ into (.+?) - over') { @($Matches[1] -split ', ') } else { @() }
+        foreach ($newId in $newIds) {
+            $sha = Get-TaskStashSha $newId
+            if ($sha) { Remove-TaskStashEntries @($sha) -Id $newId }
+        }
+        Write-Trace $Id 'split' "the split commit could not be reset or pushed; dropped the stash copies of $($newIds -join ', ') that origin never saw" 'Red'
+        return 'stash-dropped'
+    } finally { $lock.Dispose() }
+}
+
 function Invoke-Claim {
     # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
     # overlaps work in progress (or nothing is ready but other lanes may unlock more, or the
@@ -227,7 +266,7 @@ function Invoke-Claim {
                 $overCap = [bool]$notClaimableWhy
                 if ($overCap) { Write-Trace $id 'unclaimable' "$(Get-Short $notClaimableWhy 80); not claimed" 'Yellow'; $skipNow += $id }
                 # One over its cost cap (not one only interactive) is split once the lock is released (BL-3091).
-                if ($overCap -and (Get-TaskCapSpentWhy $id)) { $splitDue += @{ Id = $id; Why = $notClaimableWhy } }
+                if ($overCap -and (Get-TaskCapSpentWhy $id) -and $splitDue.Id -notcontains $id) { $splitDue += @{ Id = $id; Why = $notClaimableWhy } }
                 # An unready task that overlaps work in Doing is never offered: next holds back
                 # every task behind it instead ("No task can start yet ... e.g. BL-### with ...").
                 # Skipping it releases them; without that, BL-3026 (touches: []) held lane 1 in
@@ -283,7 +322,7 @@ function Invoke-Claim {
         # Invoke-TaskSplit takes it again only to commit and push. At most once a day each.
         # A split that throws is traced and must not replace the claim result being returned.
         foreach ($due in $splitDue) {
-            try { Invoke-TaskSplit $due.Id $due.Why -PullOnRefusal | Out-Null }
+            try { Complete-ClaimSplit $due.Id $due.Why (Invoke-TaskSplit $due.Id $due.Why -PullOnRefusal) | Out-Null }
             catch { Write-Trace $due.Id 'split' "the split threw: $(Get-Short $_.Exception.Message 100)" 'Red' }
         }
     }
@@ -314,22 +353,37 @@ if ($TestClaimDuplicates) {
     & $file 'second'
     # A third, High task is offered first, reported over its cost cap, and so split after the claim; the split throws.
     & $file 'capped' 'BL-009' 'High'
+    & $file 'splitfails' 'BL-010' 'High'
+    & $file 'resetfails' 'BL-011' 'High'
     git -C $repo push -q origin work 2>&1 | Out-Null
     $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
     $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
     $env:CLAUDE_PROJECT_DIR = $repo
     $failed = 0
-    function Get-TaskNotClaimableWhy { param($Id) if ($Id -eq 'BL-009') { 'over its cost cap' } else { '' } }
+    $script:TraceFile = Join-Path $LogDir 'trace.log'; New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    function Get-TaskNotClaimableWhy { param($Id) if ($Id -in 'BL-009', 'BL-010', 'BL-011') { 'over its cost cap' } else { '' } }
     function Get-TaskCapSpentWhy { param($Id) 'spent' }
-    function Invoke-TaskSplit { throw 'claude is not on PATH' }
+    function Invoke-TaskSplit { param($Id) if ($Id -eq 'BL-010') { 'failed' } elseif ($Id -eq 'BL-011') { 'reset-failed' } else { throw 'claude is not on PATH' } }
     try {
         $claim = Invoke-Claim -Skip @()
         git -C $repo fetch -q origin work 2>&1 | Out-Null
         $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) | Where-Object { $_ -match 'BL-\d+-' }
         $ids = @($shared | ForEach-Object { if ($_ -match '(BL-\d+)-') { $Matches[1] } })
+        $dropGit = { param([string[]]$GitArgs) if ($GitArgs[0] -eq 'push') { $false } else { Invoke-Git $GitArgs } }
+        Set-Content -Path (Join-Path $repo 'stashed.txt') -Value 'x'
+        git -C $repo add stashed.txt 2>&1 | Out-Null
+        git -C $repo stash push -q -m 'darkfactory BL-777 20260101-000000' 2>&1 | Out-Null
+        git -C $repo commit -q --allow-empty -m 'chore(tasks): split BL-011 into BL-777 - over its cost cap' 2>&1 | Out-Null
+        $dropped = Complete-ClaimSplit 'BL-011' 'over its cost cap' 'reset-failed' -Git $dropGit
+        $trace = @(Get-Content $TraceFile -ErrorAction SilentlyContinue)
+        git -C $repo fetch -q origin work 2>&1 | Out-Null
+        $blockedFile = @(git -C $repo show origin/work:Tasks/Blocked/BL-010-splitfails.md 2>&1) -join "`n"
         $cases = @(
+            ,@('a split that returned failed leaves the task Blocked with a Stewart reason on the shared branch', 'True', "$($blockedFile -match 'Stewart: dark factory over its cost cap; the automatic split returned .failed.')")
+            ,@('a split that returned reset-failed is pushed and traced', 'True', "$(@($trace | Where-Object { $_ -match 'BL-011.*could not be reset, so it was pushed' }).Count -eq 1)")
+            ,@('an unpushable reset-failed split drops its stash copies and says so', 'stash-dropped 0 True', "$dropped $(@(git -C $repo stash list).Count) $(@($trace | Where-Object { $_ -match 'dropped the stash copies of BL-777' }).Count -eq 1)")
             ,@('a duplicate ID is renumbered and the claim goes on', 'claimed', $(if ($claim.Id) { 'claimed' } else { "waited: $($claim.Why)" }))
-            ,@('no ID is left naming two tasks on the shared branch', '3 tasks, 3 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
+            ,@('no ID is left naming two tasks on the shared branch', '5 tasks, 5 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
             ,@('the first task to be filed keeps its ID', 'True', "$(@($shared | Where-Object { $_ -match 'BL-001-first' }).Count -eq 1)")
             ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
         )

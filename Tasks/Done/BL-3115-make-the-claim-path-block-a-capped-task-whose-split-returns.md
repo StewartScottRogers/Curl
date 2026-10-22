@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3115 — Make the claim path block a capped task whose split returns failed
 
@@ -30,14 +30,19 @@ Found by the shift-end review (ADR-0710) of 5619f1500...466ddef0f. silent-failur
 
 ## Acceptance criteria
 
-- [ ] `DarkFactory/Claim.ps1` keeps the result of each `Invoke-TaskSplit` call. When `Test-TaskSplitLeavesBlockToCaller` is true, it moves the task to Blocked with a "Stewart:" reason, commits and pushes, under the integrate lock.
-- [ ] A `'reset-failed'` result in the claim path is either pushed (the split commit is valid) or its stored stash copies are dropped, and is traced saying which. No stash copy is left under an ID that origin never saw.
-- [ ] A case in `RunDarkFactory.ps1 -TestClaimDuplicates` (or a new claim self-test) covers both results with a stubbed `Invoke-TaskSplit`.
-- [ ] `RunDarkFactory.ps1 -TestClaimDuplicates` and `-TestTaskStash` pass.
+- [x] `DarkFactory/Claim.ps1` keeps the result of each `Invoke-TaskSplit` call. When `Test-TaskSplitLeavesBlockToCaller` is true, it moves the task to Blocked with a "Stewart:" reason, commits and pushes, under the integrate lock.
+- [x] A `'reset-failed'` result in the claim path is either pushed (the split commit is valid) or its stored stash copies are dropped, and is traced saying which. No stash copy is left under an ID that origin never saw.
+- [x] A case in `RunDarkFactory.ps1 -TestClaimDuplicates` (or a new claim self-test) covers both results with a stubbed `Invoke-TaskSplit`.
+- [x] `RunDarkFactory.ps1 -TestClaimDuplicates` and `-TestTaskStash` pass.
 
 ## Notes
+
+- Added `Complete-ClaimSplit` to Claim.ps1: it acts on each split result under the integrate lock. 'skipped'/'failed' move the task to Blocked (Stewart: reason), commit, push (one pull --rebase retry). 'reset-failed' is pushed if it can be (the split commit is valid); otherwise the stash copies stored under the new IDs (read from the commit subject) are dropped. Both are traced. Decision: the split commit is pushed first because it is a valid board change; dropping is the fallback.
+- The claim loop could list one capped task twice in `splitDue` after a retry (renumber); it now lists it once.
+- Found: Invoke-TaskSplit's `[scriptblock]$Board` parameter shadows the board script path Invoke-Board reads, so its default board call cannot work; filed BL-3116. Complete-ClaimSplit calls Invoke-Board directly for that reason.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 3a2803c4 389e394e 56ec3e3b 7779796a.
+- 2026-10-22: Doing -> Done. the claim path blocks a task whose split failed and pushes or drops a reset-failed split's stash copies
