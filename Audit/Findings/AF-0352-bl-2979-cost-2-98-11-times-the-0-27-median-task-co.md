@@ -3,12 +3,12 @@ id: AF-0352
 title: BL-2979 cost $2.98, 11 times the $0.27 median task cost
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2979:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-3132
+tasks: BL-3132
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

@@ -3,12 +3,12 @@ id: AF-0337
 title: Two AwsSigV4HttpAuthenticatorTests fail on the unmutated tree: Sign writes the secret key into the -v 'Server auth using AWS_SIGV4' line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs:Sign:baseline-failure
 reproduction: none
-task: none
-tasks:
+task: BL-3117
+tasks: BL-3117
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ dotnet test Curl.Engine.UnitTests --filter "FullyQualifiedName~AwsSigV4HttpAuthe
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

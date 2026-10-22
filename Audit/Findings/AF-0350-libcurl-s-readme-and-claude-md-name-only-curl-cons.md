@@ -3,12 +3,12 @@ id: AF-0350
 title: Libcurl's README and CLAUDE.md name only Curl.Console and Curl.Api beside it as naming exceptions; Curl.Config and Curl.Mcp are too
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Libcurl/README.md:Libcurl:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-3130
+tasks: BL-3130
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ Select-String -Path Libcurl/README.md, Libcurl/CLAUDE.md -Pattern 'naming except
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

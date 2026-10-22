@@ -3,12 +3,12 @@ id: AF-0342
 title: TcpConnector's UDP-tunnel connect timeout > TimeSpan.Zero can become >= with no test failing, so --connect-timeout 0 times HTTP/3 through a proxy out at once
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:ConnectMultiplexedThroughProxyTracedAsync-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:93:>
-task: none
-tasks:
+task: BL-3122
+tasks: BL-3122
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

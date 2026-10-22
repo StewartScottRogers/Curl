@@ -3,12 +3,12 @@ id: AF-0351
 title: task-board.ps1's help says next prints a task or 'No task is ready.'; it also prints 'No task can start yet: ...'
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:next:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-3131
+tasks: BL-3131
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'or "No ta
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

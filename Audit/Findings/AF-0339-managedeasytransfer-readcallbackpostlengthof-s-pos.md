@@ -3,12 +3,12 @@ id: AF-0339
 title: ManagedEasyTransfer.ReadCallbackPostLengthOf's PostFieldSize < 0 can become <= 0 with no test failing, so a read-callback post with CURLOPT_POSTFIELDSIZE 0 goes chunked
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:ReadCallbackPostLengthOf-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:916:<
-task: none
-tasks:
+task: BL-3119
+tasks: BL-3119
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
