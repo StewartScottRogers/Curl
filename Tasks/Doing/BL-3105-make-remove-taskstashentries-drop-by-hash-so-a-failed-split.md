@@ -33,3 +33,4 @@ Found by the shift-end review (ADR-0710) of 1c1f9cb05...ea67815c6, by silent-fai
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 86040f37 5946f3c8 f32dbf2b 95ad9451.
