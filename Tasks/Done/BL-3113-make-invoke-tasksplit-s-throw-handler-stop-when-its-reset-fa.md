@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/TaskStash.ps1]
+touches: [DarkFactory/TaskStash.ps1, DarkFactory/ShiftRunner.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3113 — Make Invoke-TaskSplit's throw handler stop when its reset fails and return blocked only when the task is Blocked
 
@@ -32,15 +32,18 @@ Found by the shift-end review (ADR-0710) of 585348e22...432525fe2, by silent-fai
 
 ## Acceptance criteria
 
-- [ ] In both the failure path and the `catch` block of `Invoke-TaskSplit`, a `reset` whose `$Git` call returns `$false` stops the undo: no checkout of Tasks, no block commit and no push are made on top of the split commit. The failure is traced in red.
-- [ ] `Invoke-TaskSplit` returns `'blocked'` only when `Get-TaskState` (or an injected equivalent) reports the task in Blocked. Otherwise it returns a value its caller in `ShiftRunner.ps1` falls back on, and that fallback blocks the task itself.
-- [ ] A `-TestTaskStash` case in which `$Git` returns `$false` for `reset` proves that no `commit` or `push` follows it.
-- [ ] A `-TestTaskStash` case in which every `$Board` move throws proves that `Invoke-TaskSplit` does not return `'blocked'`.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] In both the failure path and the `catch` block of `Invoke-TaskSplit`, a `reset` whose `$Git` call returns `$false` stops the undo: no checkout of Tasks, no block commit and no push are made on top of the split commit. The failure is traced in red.
+- [x] `Invoke-TaskSplit` returns `'blocked'` only when `Get-TaskState` (or an injected equivalent) reports the task in Blocked. Otherwise it returns a value its caller in `ShiftRunner.ps1` falls back on, and that fallback blocks the task itself.
+- [x] A `-TestTaskStash` case in which `$Git` returns `$false` for `reset` proves that no `commit` or `push` follows it.
+- [x] A `-TestTaskStash` case in which every `$Board` move throws proves that `Invoke-TaskSplit` does not return `'blocked'`.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+- Decision: a failed reset or a move that did not reach Blocked returns `failed`; ShiftRunner.ps1 treats `failed` like `skipped` and blocks the task itself (touches widened to DarkFactory/ShiftRunner.ps1 for that one line; no other Doing task names it that I checked in this checkout). After a failed reset that fallback still commits on the unreset split commit, but only in the lane, unpushed, and the task is never left in Doing.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: e260ea31 eaeb4a51 ad9d3f85 7a083912 95ad9451.
+- 2026-10-22: Doing -> Done. Invoke-TaskSplit stops on a failed reset and returns blocked only when the task is Blocked
