@@ -82,3 +82,25 @@ then the `[AAAA]` error, then connection #2 and the `[A]` error. Plain `-v` writ
 8. Left to other tasks: the `[DoH] ` sub-transfer prefix, the `DoH request complete` wording and
    the AAAA-first order are BL-2973; the non-2xx `HTTP status N` failure is BL-2972; BL-3011 applies
    decisions 5-7 in code and tests.
+
+## Amendment: the DoH sub-transfer lines (BL-2973)
+
+Decided by Claude under Stewart's delegation, 2026-10-22, from the curl 8.22.0 (Schannel)
+measurements in BL-2973's Context (`Record-CurlExchange.ps1 -NoServer -DohPort 18453 -CurlArgs
+-v,--trace-config,doh,...`, with and without `-4`, with and without `-DnsResponseCode 3`).
+
+9. `DohSubTransferEvents.Prefix` is `[DoH] `, 8.22.0's, in place of 8.21.0's `[DNS] `; the DNS
+   filter lines inside a sub-transfer read `[DoH] [DNS] ...`, and the filter's creation line keeps
+   its one `[DNS] ` prefix as before.
+10. A query that succeeded ends `DoH request complete, N to go`.
+11. The AAAA query goes first: traced, its sub-transfer runs and is reported whole before the A
+    query's; untraced, both still run in parallel and their outcomes (the error lines on the DoH
+    trace) are reported AAAA first. `N to go` counts the queries still to report. The results
+    keep their A-then-AAAA order, so `DohQueryResult.AsOneEntry` and the resolved address order
+    (AAAA's, then A's) are unchanged. Which untraced connection opens first is not observable,
+    so it stays A first.
+12. The error lines stay on the DoH trace sink as `[DoH] [DoH] [A|AAAA] error ...` (decision 7):
+    they already read as 8.22.0 writes them, so moving them onto the sub-transfer events gains
+    nothing.
+13. `Connection #1 is not open enough, cannot reuse` stays out, as ADR-0380 leaves out every
+    poll-timing line of a sub-transfer.

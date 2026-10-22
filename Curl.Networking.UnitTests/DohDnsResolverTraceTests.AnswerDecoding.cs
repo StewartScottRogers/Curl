@@ -55,14 +55,14 @@ public sealed partial class DohDnsResolverTraceTests
     [TestMethod]
     public async Task ResolveAsync_AnNxdomainAnswerToBothQueries_ReportsNoSuchNameForEach()
     {
-        // Measured without -4: one error line per query (8.22.0 sends AAAA first; Curl's order is A first).
+        // Measured without -4: one error line per query (8.22.0 sends AAAA first, and so does Curl, BL-2973).
         var nxdomain = Convert.FromHexString(MeasuredAAnswer);
         nxdomain[3] = 0x83;
 
         var lines = await TraceAsync(Ok(nxdomain));
 
         AssertLines(
-            ["[DoH] [DoH] [A] error decoding response: No such name", "[DoH] [DoH] [AAAA] error decoding response: No such name"],
+            ["[DoH] [DoH] [AAAA] error decoding response: No such name", "[DoH] [DoH] [A] error decoding response: No such name"],
             lines);
     }
 
@@ -76,7 +76,7 @@ public sealed partial class DohDnsResolverTraceTests
         var lines = await TraceAsync([.. Response($"HTTP/1.1 200 OK\r\nContent-Length: {answer.Length - 1}\r\n\r\n"), .. answer]);
 
         AssertLines(
-            ["[DoH] [DoH] [A] error decoding response: Out of range", "[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE"],
+            ["[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE", "[DoH] [DoH] [A] error decoding response: Out of range"],
             lines);
     }
 
@@ -99,13 +99,13 @@ public sealed partial class DohDnsResolverTraceTests
     {
         // Measured with 8.21.0 (BL-958): both decodes failed, no entry, exit 6.
         var connector = new FakeConnector();
-        connector.BytesToRead.Add(Ok(Convert.FromHexString(AThenAaaaAnswerToA)));
         connector.BytesToRead.Add(Ok(Convert.FromHexString(AaaaThenAAnswerToAaaa)));
+        connector.BytesToRead.Add(Ok(Convert.FromHexString(AThenAaaaAnswerToA)));
 
         var (lines, addresses) = await ResolveAsync(connector, System.Net.Sockets.AddressFamily.Unspecified);
 
         AssertLines(
-            ["[DoH] [DoH] [A] error decoding response: Unexpected TYPE", "[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE"],
+            ["[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE", "[DoH] [DoH] [A] error decoding response: Unexpected TYPE"],
             lines);
         Assert.IsEmpty(addresses);
     }

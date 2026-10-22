@@ -12,8 +12,9 @@ namespace Curl.Engine;
 /// <summary>
 /// Pins the <c>-v</c> lines of each DoH sub-transfer under <c>--trace-config dns</c> against curl
 /// 8.21.0 (mingw, Schannel) measured on 2026-10-02 with <c>Record-CurlExchange.ps1 -Tls -Connections 2</c>
-/// (BL-1157 Notes): every line prefixed <c>[DNS] </c> but the head and data lines, A's sub-transfer
-/// whole before AAAA's (ADR-0380), and the poll-timing lines (<c>Connection #1 is not open enough</c>,
+/// (BL-1157 Notes), with curl 8.22.0's changes measured on 2026-10-21 (BL-2973, ADR-0738): every
+/// line prefixed <c>[DoH] </c> but the head and data lines, AAAA's sub-transfer whole before A's
+/// (ADR-0380), a succeeded query ending <c>DoH request complete, N to go</c>, and the poll-timing lines (<c>Connection #1 is not open enough</c>,
 /// <c>Hostname 127.0.0.1 was found in DNS cache</c>) left out. The DoH URL is <c>http://</c>, so the
 /// Schannel trust and ALPN lines, which <c>DohSubTransferEventsTests</c> pins, are not part of it. Both
 /// connectors are the composition's, over scripted dialers, and the lines are written by
@@ -55,9 +56,9 @@ public sealed class EngineCompositionDohSubTransferTraceTests
             "* [DNS] added",
             "* [DNS] cf_dns_start host example.test:47113",
             .. SubTransferLines(1, null, 3),
-            "* [DoH] [DoH] [A] error decoding response: Too small",
-            .. SubTransferLines(2, null, 3),
             "* [DoH] [DoH] [AAAA] error decoding response: Too small",
+            .. SubTransferLines(2, null, 3),
+            "* [DoH] [DoH] [A] error decoding response: Too small",
             "* Could not resolve host: example.test",
         ];
         Diagnostics.Assert("result.ExitCode", CurlExitCode.CouldntResolveHost, result.ExitCode);
@@ -66,15 +67,15 @@ public sealed class EngineCompositionDohSubTransferTraceTests
     }
 
     [TestMethod]
-    public async Task Connect_UnderTraceConfigDns_WhenTheDohAnswerResolves_WritesEachSubTransfersPrefixedLinesThenTheAaaaDecodeFailure()
+    public async Task Connect_UnderTraceConfigDns_WhenTheDohAnswerResolves_WritesTheAaaaDecodeFailureThenTheASubTransfersCompletedLine()
     {
         ConnectResult result = await ConnectAsync([AAnswer, AAnswer]);
 
         string[] expected =
         [
-            .. SubTransferLines(1, "1 to go", 46),
-            .. SubTransferLines(2, null, 46),
+            .. SubTransferLines(1, null, 46),
             "* [DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE",
+            .. SubTransferLines(2, "0 to go", 46),
             "* [DNS] resolve complete for example.test:47113",
             "* Host example.test:47113 was resolved.",
         ];
@@ -88,8 +89,8 @@ public sealed class EngineCompositionDohSubTransferTraceTests
     {
         await ConnectAsync([AAnswer, AAnswer], "-v");
 
-        Diagnostics.Assert("sub-transfer line present", false, StandardErrorLines().Any(line => line.Contains("DoH request is completed", StringComparison.Ordinal) || line.StartsWith("> POST", StringComparison.Ordinal)));
-        Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("DoH request is completed", StringComparison.Ordinal) || line.StartsWith("> POST", StringComparison.Ordinal)));
+        Diagnostics.Assert("sub-transfer line present", false, StandardErrorLines().Any(line => line.Contains("DoH request complete", StringComparison.Ordinal) || line.StartsWith("> POST", StringComparison.Ordinal)));
+        Assert.IsFalse(StandardErrorLines().Any(line => line.Contains("DoH request complete", StringComparison.Ordinal) || line.StartsWith("> POST", StringComparison.Ordinal)));
     }
 
     // One sub-transfer's lines as curl writes them, the poll-timing ones left out; the POST's
@@ -101,17 +102,17 @@ public sealed class EngineCompositionDohSubTransferTraceTests
         return
         [
             "* [DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3",
-            "* [DNS] [DNS] added",
-            "* [DNS] [DNS] cf_dns_start host 127.0.0.1:47112",
-            .. connectionNumber > 1 ? ["* [DNS] Hostname 127.0.0.1 was found in DNS cache"] : Array.Empty<string>(),
-            "* [DNS]   Trying 127.0.0.1:47112...",
-            "* [DNS] [DNS] Curl_conn_connect(block=0) -> 0, done=0",
-            "* [DNS] [DNS] connected filter chain below",
-            "* [DNS] [DNS] Curl_conn_connect(block=0) -> 0, done=1",
-            "* [DNS] Established connection to 127.0.0.1 (127.0.0.1 port 47112) from 127.0.0.1 port 50000 ",
-            "* [DNS] [DNS] removing connected setup filter",
-            "* [DNS] [DNS] destroy",
-            "* [DNS] using HTTP/1.x",
+            "* [DoH] [DNS] added",
+            "* [DoH] [DNS] cf_dns_start host 127.0.0.1:47112",
+            .. connectionNumber > 1 ? ["* [DoH] Hostname 127.0.0.1 was found in DNS cache"] : Array.Empty<string>(),
+            "* [DoH]   Trying 127.0.0.1:47112...",
+            "* [DoH] [DNS] Curl_conn_connect(block=0) -> 0, done=0",
+            "* [DoH] [DNS] connected filter chain below",
+            "* [DoH] [DNS] Curl_conn_connect(block=0) -> 0, done=1",
+            "* [DoH] Established connection to 127.0.0.1 (127.0.0.1 port 47112) from 127.0.0.1 port 50000 ",
+            "* [DoH] [DNS] removing connected setup filter",
+            "* [DoH] [DNS] destroy",
+            "* [DoH] using HTTP/1.x",
             "> POST /dns-query HTTP/1.1",
             "> Host: 127.0.0.1:47112",
             "> Accept: */*",
@@ -119,14 +120,14 @@ public sealed class EngineCompositionDohSubTransferTraceTests
             "> Content-Length: 30",
             "> ",
             "} [30 bytes data]",
-            "* [DNS] upload completely sent off: 30 bytes",
+            "* [DoH] upload completely sent off: 30 bytes",
             "< HTTP/1.1 200 OK",
             "< Content-Type: application/dns-message",
             $"< Content-Length: {answerLength}",
             "< ",
             $"{{ [{answerLength} bytes data]",
-            $"* [DNS] Connection #{connectionNumber} to host 127.0.0.1:47112 left intact",
-            .. toGo is null ? Array.Empty<string>() : [$"* [DNS] a DoH request is completed, {toGo}"],
+            $"* [DoH] Connection #{connectionNumber} to host 127.0.0.1:47112 left intact",
+            .. toGo is null ? Array.Empty<string>() : [$"* [DoH] DoH request complete, {toGo}"],
         ];
     }
 

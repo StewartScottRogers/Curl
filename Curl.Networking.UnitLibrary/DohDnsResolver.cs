@@ -106,9 +106,9 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfig
     /// writes them under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c> (BL-1180): the
     /// connector's connect lines, <c>using HTTP/1.x</c>, the POST's head and body, <c>upload
     /// completely sent off</c>, the answer's head and body, <c>Connection #N to host H:P left
-    /// intact</c> and <c>a DoH request is completed, K to go</c>. The composition root wraps them so
-    /// each line gets curl's <c>[DNS] </c> prefix. When given, the queries run one after another, A's
-    /// whole before AAAA's, so the lines come in a fixed order (ADR-0380); the default,
+    /// intact</c> and <c>DoH request complete, K to go</c>. The composition root wraps them so
+    /// each line gets curl 8.22.0's <c>[DoH] </c> prefix. When given, the queries run one after
+    /// another, AAAA's whole before A's as curl 8.22.0 runs them, so the lines come in a fixed order (ADR-0380); the default,
     /// <see cref="NoTransferEvents.Instance" />, reports nothing and runs them in parallel.
     /// </summary>
     public ITransferEvents SubTransferEvents { get; init; } = NoTransferEvents.Instance;

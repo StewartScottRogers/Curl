@@ -8,10 +8,11 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins the lines each DoH sub-transfer of <see cref="DohDnsResolver" /> reports on its
-/// <see cref="DohDnsResolver.SubTransferEvents" /> (BL-1180): the queries run one after another, A's
-/// lines whole before AAAA's (ADR-0380), each with curl 8.21.0's <c>using HTTP/1.x</c>, POST head and
-/// body, <c>upload completely sent off</c>, answer head and body, <c>left intact</c> and
-/// for a query that succeeded <c>a DoH request is completed</c> lines (BL-2970), before any <c>[DNS] </c> prefix the console adds.
+/// <see cref="DohDnsResolver.SubTransferEvents" /> (BL-1180): the queries run one after another, AAAA's
+/// lines whole before A's as curl 8.22.0 runs them (ADR-0380, BL-2973), each with curl's <c>using HTTP/1.x</c>,
+/// POST head and body, <c>upload completely sent off</c>, answer head and body, <c>left intact</c> and
+/// for a query that succeeded curl 8.22.0's <c>DoH request complete, N to go</c> line (BL-2970, BL-2973),
+/// before the <c>[DoH] </c> prefix the console adds.
 /// </summary>
 [TestClass]
 public sealed class DohDnsResolverSubTransferTests
@@ -112,6 +113,38 @@ public sealed class DohDnsResolverSubTransferTests
             },
             events.Lines);
     }
+
+    [TestMethod]
+    public async Task ResolveAsync_WithSubTransferEventsAndBothAnswers_SendsAaaaFirstAndEndsEachWithDohRequestComplete()
+    {
+        var queryA = DnsQueryEncoder.Encode("example.test", DnsRecordType.A).Bytes;
+        var queryAaaa = DnsQueryEncoder.Encode("example.test", DnsRecordType.Aaaa).Bytes;
+        var events = new SubTransferRecorder();
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Answer(DnsTestReplies.Answer(queryAaaa, [System.Net.IPAddress.IPv6Loopback])));
+        connector.BytesToRead.Add(Answer(DnsTestReplies.Answer(queryA, [System.Net.IPAddress.Loopback])));
+        Diagnostics.Arrange("answers queued", "the AAAA answer, then the A answer");
+
+        var addresses = await new DohDnsResolver(connector, DohUrl) { SubTransferEvents = events }.ResolveAsync("example.test", CancellationToken.None);
+
+        WriteEventLinesAndLastLine(events, "* DoH request complete, 0 to go");
+        string[] expectedInfo =
+        [
+            "* using HTTP/1.x",
+            "* upload completely sent off: 30 bytes",
+            "* Connection #1 to host 127.0.0.1:47112 left intact",
+            "* DoH request complete, 1 to go",
+            "* using HTTP/1.x",
+            "* upload completely sent off: 30 bytes",
+            "* Connection #2 to host 127.0.0.1:47112 left intact",
+            "* DoH request complete, 0 to go",
+        ];
+        CollectionAssert.AreEqual(expectedInfo, events.Lines.Where(line => line.StartsWith("* ", StringComparison.Ordinal)).ToArray());
+        CollectionAssert.AreEqual(new[] { System.Net.IPAddress.IPv6Loopback, System.Net.IPAddress.Loopback }, addresses.ToArray());
+    }
+
+    private static byte[] Answer(byte[] message) =>
+        [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {message.Length}\r\n\r\n"), .. message];
 
     private static byte[] Response(string text) => Encoding.Latin1.GetBytes(text);
 

@@ -116,7 +116,7 @@ public sealed class EngineCompositionDohTests
         // the filter's lines, each query's completed line or, for the AAAA answer that does not decode,
         // its error line, then the resolve and Trying (measured, BL-1102 Notes; the error line as
         // BL-2970 measured it with curl 8.22.0), each DoH sub-transfer's
-        // [DNS] lines before them (BL-1180; the scripted DoH server reports no connect lines); network's [HAPPY-EYEBALLS], [TCP] and [TIMER] lines (BL-1161, BL-1186) aside.
+        // [DoH] lines before them, AAAA's first (BL-1180, BL-2973; the scripted DoH server reports no connect lines); network's [HAPPY-EYEBALLS], [TCP] and [TIMER] lines (BL-1161, BL-1186) aside.
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         RecordingEvents events = new();
 
@@ -130,14 +130,14 @@ public sealed class EngineCompositionDohTests
                 "[DNS] created DNS filter for example.test:48712, transport=3, queries=3",
                 "[DNS] added",
                 "[DNS] cf_dns_start host example.test:48712",
-                "[DNS] using HTTP/1.x",
-                "[DNS] upload completely sent off: 30 bytes",
-                "[DNS] Connection #1 to host 127.0.0.1:48711 left intact",
-                "[DNS] a DoH request is completed, 1 to go",
-                "[DNS] using HTTP/1.x",
-                "[DNS] upload completely sent off: 30 bytes",
-                "[DNS] Connection #2 to host 127.0.0.1:48711 left intact",
+                "[DoH] using HTTP/1.x",
+                "[DoH] upload completely sent off: 30 bytes",
+                "[DoH] Connection #1 to host 127.0.0.1:48711 left intact",
                 "[DoH] [DoH] [AAAA] error decoding response: Unexpected TYPE",
+                "[DoH] using HTTP/1.x",
+                "[DoH] upload completely sent off: 30 bytes",
+                "[DoH] Connection #2 to host 127.0.0.1:48711 left intact",
+                "[DoH] DoH request complete, 0 to go",
                 "[DNS] resolve complete for example.test:48712",
                 "Host example.test:48712 was resolved.",
                 "IPv6: (none)",
@@ -160,8 +160,8 @@ public sealed class EngineCompositionDohTests
 
         await ConnectAsync(DohUrl, dohServer, new ScriptedConnector([]), events, "--doh-insecure", "-v", "--trace-config", "tls,http/1");
 
-        Diagnostics.Assert("[DNS] line present", false, events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal)));
-        Assert.IsFalse(events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal)));
+        Diagnostics.Assert("[DNS] or [DoH] line present", false, events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal) || line.StartsWith("[DoH]", StringComparison.Ordinal)));
+        Assert.IsFalse(events.Info.Any(line => line.StartsWith("[DNS]", StringComparison.Ordinal) || line.StartsWith("[DoH]", StringComparison.Ordinal)));
     }
 
     [TestMethod]

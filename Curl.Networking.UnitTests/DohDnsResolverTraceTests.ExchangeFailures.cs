@@ -12,7 +12,7 @@ public sealed partial class DohDnsResolverTraceTests
         var lines = await TraceAsync([.. Response("HTTP/1.1 200 OK\r\n\r\n"), .. Convert.FromHexString(MeasuredAAnswer)]);
 
         AssertLines(
-            ["[DoH] [DoH] [A] error: Failure when receiving data from the peer", "[DoH] [DoH] [AAAA] error: Failure when receiving data from the peer"],
+            ["[DoH] [DoH] [AAAA] error: Failure when receiving data from the peer", "[DoH] [DoH] [A] error: Failure when receiving data from the peer"],
             lines);
     }
 
@@ -28,7 +28,7 @@ public sealed partial class DohDnsResolverTraceTests
         var lines = await TraceAsync(connector);
 
         AssertLines(
-            ["[DoH] [DoH] [A] error: SSL peer certificate or SSH remote key was not OK", "[DoH] [DoH] [AAAA] error: SSL peer certificate or SSH remote key was not OK"],
+            ["[DoH] [DoH] [AAAA] error: SSL peer certificate or SSH remote key was not OK", "[DoH] [DoH] [A] error: SSL peer certificate or SSH remote key was not OK"],
             lines);
     }
 

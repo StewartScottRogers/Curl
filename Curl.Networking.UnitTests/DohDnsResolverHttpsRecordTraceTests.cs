@@ -35,7 +35,7 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
     public async Task ResolveHttpsOriginAsync_WithARecord_ReportsTheHttpsLinesAndNoneForTheDecodedAAndAaaaAnswers()
     {
         var trace = new RecordingTransferEvents();
-        var resolver = new DohDnsResolver(AnsweringAllThree(), DohUrl, trace, DescribeExitCode);
+        var resolver = new DohDnsResolver(AnsweringAllThree(aaaaFirst: false), DohUrl, trace, DescribeExitCode);
         Diagnostics.Arrange("origin", "https://foo.example.com/ with an HTTPS record holding alpn h2 and ech");
 
         _ = await resolver.ResolveHttpsOriginAsync("foo.example.com", 443, CancellationToken.None);
@@ -57,7 +57,7 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
     public async Task ResolveHttpsOriginAsync_WithSubTransferEvents_WritesTheHttpsSubTransferFirstOnConnectionOne()
     {
         var trace = new RecordingTransferEvents();
-        var resolver = new DohDnsResolver(AnsweringAllThree(), DohUrl, trace, DescribeExitCode) { SubTransferEvents = trace };
+        var resolver = new DohDnsResolver(AnsweringAllThree(aaaaFirst: true), DohUrl, trace, DescribeExitCode) { SubTransferEvents = trace };
         Diagnostics.Arrange("events", "one sink for the sub-transfer lines and the trace lines");
 
         _ = await resolver.ResolveHttpsOriginAsync("foo.example.com", 443, CancellationToken.None);
@@ -75,11 +75,11 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
                 "using HTTP/1.x",
                 "upload completely sent off: 33 bytes",
                 "Connection #2 to host 127.0.0.1:41444 left intact",
-                "a DoH request is completed, 1 to go",
+                "DoH request complete, 1 to go",
                 "using HTTP/1.x",
                 "upload completely sent off: 33 bytes",
                 "Connection #3 to host 127.0.0.1:41444 left intact",
-                "a DoH request is completed, 0 to go",
+                "DoH request complete, 0 to go",
             };
         string[] actualLines = [.. trace.Info.Take(expectedLines.Length)];
         Diagnostics.Diff("first lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
@@ -197,14 +197,16 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
         Assert.AreEqual("1 a.test.", text);
     }
 
-    private static FakeConnector AnsweringAllThree()
+    // Traced, the AAAA query's sub-transfer runs before the A query's (BL-2973); untraced, A's connects first.
+    private static FakeConnector AnsweringAllThree(bool aaaaFirst)
     {
         var queryA = Convert.FromHexString("000001000001000000000000" + FooExampleCom + "00010001");
         var queryAaaa = Convert.FromHexString("000001000001000000000000" + FooExampleCom + "001C0001");
         var connector = new FakeConnector();
         connector.BytesToRead.Add(Ok(HttpsAnswer(AlpnAndEchRecord)));
-        connector.BytesToRead.Add(Ok(DnsTestReplies.Answer(queryA, [IPAddress.Loopback])));
-        connector.BytesToRead.Add(Ok(DnsTestReplies.Answer(queryAaaa, [IPAddress.IPv6Loopback])));
+        byte[] answerA = Ok(DnsTestReplies.Answer(queryA, [IPAddress.Loopback]));
+        byte[] answerAaaa = Ok(DnsTestReplies.Answer(queryAaaa, [IPAddress.IPv6Loopback]));
+        connector.BytesToRead.AddRange(aaaaFirst ? [answerAaaa, answerA] : [answerA, answerAaaa]);
         return connector;
     }
 
