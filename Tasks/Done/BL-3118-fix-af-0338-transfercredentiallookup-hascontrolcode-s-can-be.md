@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/EasyAuthenticationOptionsReadingTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3118 — Fix AF-0338: TransferCredentialLookup.HasControlCode's && can become || with no test failing, so every non-null URL credential on a non-http scheme is refused
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `TryCheckUrlCredentials_PlainUrlCredentialsOnFtp_Passes` (`ftp://user:pw@h/` passes with no failure) to `EasyAuthenticationOptionsReadingTests`; no production change. Added that test file to `touches` (no other Doing task names it).
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`&&` to `||` at line 238): the new test failed (1 of 12), so the mutant is killed; reverted. Build clean, fast tests green (44 projects passed). No production code changed, so no Measure-CodeQuality.ps1 run.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. A unit test now kills the HasControlCode && to || mutant: plain ftp URL credentials must pass

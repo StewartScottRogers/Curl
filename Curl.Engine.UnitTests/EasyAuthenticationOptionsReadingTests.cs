@@ -165,6 +165,19 @@ public sealed class EasyAuthenticationOptionsReadingTests
         Assert.IsTrue(passedWithUser);
     }
 
+    [TestMethod]
+    public void TryCheckUrlCredentials_PlainUrlCredentialsOnFtp_Passes()
+    {
+        CurlUrl url = CurlUrl.Parse("ftp://user:pw@h/");
+        Diagnostics.Arrange("url", url);
+
+        bool passed = TransferCredentialLookup.TryCheckUrlCredentials(new EasyAuthenticationOptions(), url, out TransferResult? failure);
+        Diagnostics.Act("passed", passed);
+
+        Assert.IsTrue(passed);
+        Assert.IsNull(failure);
+    }
+
     private static TransferCredentialLookup Lookup(InMemoryDataFileReader? reader = null) =>
         new(ReadFileOf(reader ?? ReaderWithNetrc()), _ => null, runsOnWindows: false);
 
