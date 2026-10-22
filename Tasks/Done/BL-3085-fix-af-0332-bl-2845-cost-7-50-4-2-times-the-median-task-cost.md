@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Integrate.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3085 — Fix AF-0332: BL-2845 cost $7.50, 4.2 times the median task cost of $1.80: a full first run thrown away by a requeue, then an 80-turn second run and a rebase-conflict resolve
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause (BL-2845, $7.50), three parts. (1) The first run (46 turns, $2.54) only found that the port needed ten split tasks (BL-2899 to BL-2907) and requeued: the AF-0147 pattern. The lane prompt already requires the dependency, size and hook pass before the first edit (DarkFactory/Prompts.ps1, rule 4), so that cause is already fixed. (2) The 80-turn second run ($4.55) was the real work of a large upstream-port task: unavoidable. (3) The 8-turn rebase-conflict resolve ($0.41) is the shift's normal integration path when two lanes touch one file, and is cheap. No avoidable waste is left in DarkFactory/Integrate.ps1, so no code changed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named: requeue already prevented by the AF-0147 prompt rule, rest unavoidable; no code change
