@@ -68,13 +68,28 @@ public sealed class Unit2413ConnectionPeer(Func<string, Unit2413ConnectionPeer.P
     /// <param name="expected">The peer the row expects.</param>
     /// <returns>The mismatch text, or <see langword="null" /> when every check holds.</returns>
     private static string? Mismatch(string name, Peer peer, Peer expected) =>
+        NameMismatch(name, peer, expected) ?? AddressMismatch(name, peer, expected) ?? ZoneIdMismatch(name, peer, expected);
+
+    /// <summary>The C helper's first failing check of the scheme, the host string as given or the host name, or <see langword="null" />.</summary>
+    private static string? NameMismatch(string name, Peer peer, Peer expected) =>
         peer.Scheme != expected.Scheme ? $"{name}: has wrong scheme"
         : !string.Equals(peer.UserHostname, expected.UserHostname, StringComparison.OrdinalIgnoreCase) ? $"{name}: user_hostname={peer.UserHostname}, expected {expected.Hostname}"
         : !string.Equals(peer.Hostname, expected.Hostname, StringComparison.OrdinalIgnoreCase) ? $"{name}: hostname={peer.Hostname}, expected {expected.Hostname}"
-        : peer.Port != expected.Port ? $"{name}: port={peer.Port}, expected {expected.Port}"
-        : peer.IsIpv6 != expected.IsIpv6 ? $"{name}: ipv6={(peer.IsIpv6 ? 1 : 0)}, expected {(expected.IsIpv6 ? 1 : 0)}"
-        : !string.Equals(peer.ZoneId, expected.ZoneId, StringComparison.OrdinalIgnoreCase) ? $"{name}: zoneid={peer.ZoneId}, expected {expected.ZoneId ?? "nothing"}"
         : null;
+
+    /// <summary>The C helper's first failing check of the port or the IPv6 flag, or <see langword="null" />.</summary>
+    private static string? AddressMismatch(string name, Peer peer, Peer expected) =>
+        peer.Port != expected.Port ? $"{name}: port={peer.Port}, expected {expected.Port}"
+        : peer.IsIpv6 != expected.IsIpv6 ? $"{name}: ipv6={AsCFlag(peer.IsIpv6)}, expected {AsCFlag(expected.IsIpv6)}"
+        : null;
+
+    /// <summary>The C helper's check of the zone id, or <see langword="null" /> when it holds.</summary>
+    private static string? ZoneIdMismatch(string name, Peer peer, Peer expected) =>
+        !string.Equals(peer.ZoneId, expected.ZoneId, StringComparison.OrdinalIgnoreCase) ? $"{name}: zoneid={peer.ZoneId}, expected {expected.ZoneId ?? "nothing"}"
+        : null;
+
+    /// <summary>A flag as the C helper prints it: 1 or 0.</summary>
+    private static int AsCFlag(bool flag) => flag ? 1 : 0;
 
     private static Peer CreateThroughCore(string host)
     {

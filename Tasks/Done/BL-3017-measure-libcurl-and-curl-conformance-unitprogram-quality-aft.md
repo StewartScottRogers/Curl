@@ -8,7 +8,7 @@ depends-on: [BL-3014]
 touches: [Libcurl/Info/Longs/EasyInfoReaders.Longs.cs, Libcurl.UnitTests/Info/Longs/EasyInfoReadersLongsTests.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3017 — Measure Libcurl and Curl.Conformance.UnitProgram quality after the protocol-mask reader and the four Dns/Easy ports and close any gap
 
@@ -22,13 +22,17 @@ Split from BL-2925. Run `powershell -NoProfile -File Measure-CodeQuality.ps1 -Li
 
 ## Acceptance criteria
 
-- [ ] Measure-CodeQuality reports no member of the files named above outside the four gates.
-- [ ] Each test added fails when the branch it covers is removed.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Libcurl.UnitTests` and `Curl.Conformance.UnitProgram.UnitTests`.
+- [x] Measure-CodeQuality reports no member of the files named above outside the four gates.
+- [x] Each test added fails when the branch it covers is removed.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Libcurl.UnitTests` and `Curl.Conformance.UnitProgram.UnitTests`.
 
 ## Notes
+
+- Measured both libraries together: Libcurl 100/100, 0 failing members (worst CRAP 10, ReadProtocol inside the gates). Curl.Conformance.UnitProgram.UnitLibrary 100/100 with one failure: `Unit2413ConnectionPeer.Mismatch` complexity 18. Split it into NameMismatch, AddressMismatch and ZoneIdMismatch (plus AsCFlag) keeping the C helper's check order and wording; re-measured 0 failing members, worst CRAP 10.
+- No test added: the existing UnitProgramsDnsEasyTests still cover every branch (100% line and branch after the split), so there is no new branch for a test to pin.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: e28e0b09 3ae47afb 8df27ce5.
+- 2026-10-21: Doing -> Done. Both libraries inside all four gates; Unit2413ConnectionPeer.Mismatch split to complexity under 10.
