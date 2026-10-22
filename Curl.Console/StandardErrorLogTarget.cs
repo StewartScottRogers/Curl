@@ -4,8 +4,9 @@ namespace Curl.Console;
 
 /// <summary>
 /// The <see cref="TextWriter" /> the diagnostic log writes to when there is no <c>--log-file</c>:
-/// the runner's standard error as it stands at each write, so the lines follow <c>--stderr</c> and
-/// the run's write gate (ADR-0222, decision 4). Text is written as UTF-8.
+/// the runner's standard error as it stands at each write, so the lines follow <c>--stderr</c>
+/// (ADR-0222, decision 4). It takes no lock itself: <see cref="GatedDiagnosticLog" /> holds the run's
+/// write gate around each line. Text is written as UTF-8.
 /// </summary>
 /// <param name="currentStandardError">Gets the stream standard error goes to now.</param>
 internal sealed class StandardErrorLogTarget(Func<Stream> currentStandardError) : TextWriter
