@@ -3,8 +3,8 @@ id: AF-0257
 title: Lib582 CheckForCompletion's success = false can start as true with no test failing, hiding 'Error uploading file.'
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Fixed by BL-2768 (Done 2026-10-18): Lib582Run.CheckForCompletion became CompletionOutcome with bool? success = null, so the success = false site no longer exists and three re-audits could only report site-missing.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs:CheckForCompletion-false:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs:158:false
 task: BL-2768
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0257 - Lib582 CheckForCompletion's success = false can start as true with no test failing, hiding 'Error uploading file.'
 
@@ -51,3 +51,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Stewart closed it: Fixed by BL-2768 (Done 2026-10-18): Lib582Run.CheckForCompletion became CompletionOutcome with bool? success = null, so the success = false site no longer exists and three re-audits could only report site-missing.

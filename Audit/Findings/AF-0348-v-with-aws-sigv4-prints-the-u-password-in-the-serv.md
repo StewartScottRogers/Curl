@@ -3,12 +3,12 @@ id: AF-0348
 title: -v with --aws-sigv4 prints the -u password in the 'Server auth using AWS_SIGV4' line; curl prints only the user
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--aws-sigv4:auth-using-line-password:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-3128
+tasks: BL-3128
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -nologo | Out-Null; $r=(Get-Location).Path;
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

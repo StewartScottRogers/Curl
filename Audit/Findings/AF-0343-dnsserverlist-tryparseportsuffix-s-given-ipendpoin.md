@@ -3,12 +3,12 @@ id: AF-0343
 title: DnsServerList.TryParsePortSuffix's given > IPEndPoint.MaxPort can become >= with no test failing, so --dns-servers host:65535 is refused
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/DnsServerList.cs:TryParsePortSuffix-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsServerList.cs:113:>
-task: none
-tasks:
+task: BL-3123
+tasks: BL-3123
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

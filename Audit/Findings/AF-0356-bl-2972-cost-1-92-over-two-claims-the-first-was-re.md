@@ -3,12 +3,12 @@ id: AF-0356
 title: BL-2972 cost $1.92 over two claims; the first was requeued because it needed a file outside its touches
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2972:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-3136
+tasks: BL-3136
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

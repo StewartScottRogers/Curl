@@ -3,12 +3,12 @@ id: AF-0344
 title: OpenSslCipherSuites.Find's ignoreCase: false can become true with no test failing, so cipher names in the wrong case are accepted
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs:Find-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs:156:false
-task: none
-tasks:
+task: BL-3124
+tasks: BL-3124
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
