@@ -95,6 +95,7 @@ internal static partial class EasySetoptsFromCommandLine
         new(CurlOption.Haproxyprotocol, p => FlagOf(p.HaProxyProtocol)),
     ];
 
+    // The TLS (origin, proxy, then handle-wide), authentication and proxy rows, in the order the tool sets them.
     private static IEnumerable<EasySetopt> TlsAuthenticationAndProxySetoptsOf(EasyOptions options) =>
         SetoptsOf(OriginTlsRows, options.Tls, UnsetTls)
             .Concat(SetoptsOf(ProxyTlsRows, options.Tls, UnsetTls))
@@ -158,6 +159,7 @@ internal static partial class EasySetoptsFromCommandLine
         new(options[19], t => (long)peerOf(t).SslOptions),
     ];
 
+    // CURLOPT_SSL_VERIFYHOST takes 2 for on and 0 for off; 1 is not used.
     private static long VerifyHostOf(bool on) => on ? VerifyHostOn : 0L;
 
     // CURLOPT_ECH keeps only its four modes; any other mode text changes nothing.
@@ -166,5 +168,6 @@ internal static partial class EasySetoptsFromCommandLine
     // CURLOPT_ECH keeps a pn: or ecl: value only when at least two characters follow the prefix.
     private static bool IsSettableEchValue(string? value) => value is null || value.Length >= 2;
 
+    // The value with its pn: or ecl: prefix, as CURLOPT_ECH takes it; null stays unset.
     private static string? EchValueOf(string prefix, string? value) => value is null ? null : prefix + value;
 }
