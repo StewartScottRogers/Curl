@@ -36,6 +36,12 @@
          lists win32                          -> excluded, platform:windows
       4. <features> needs a name absent from
          -ReferenceFeatures (when given)      -> excluded, reference-lacks:<name>
+     4a. the harness's reason says the case
+         needs Curl without the feature <name>
+         (a <features> line !<name>): the one
+         measured Curl has every feature in,
+         so no build can be measured          -> excluded,
+                                                 needs-curl-without:<name>
       5. the harness's reason says it does
          not emulate the <name> server        -> unmeasured, needs-server:<name>
          or has no value for a %<NAME>PORT
@@ -49,7 +55,8 @@
          for any other variable (or %PERL
          with others)                         -> unmeasured, unknown-variable
       7. anything else                        -> unmeasured, harness-unsupported
-    A feature written !<name> asks for its absence and never fits rules 3 or 4 (rule 3a reads
+    Rule 4a comes after rule 4, so a case that also needs a feature the reference lacks keeps
+    reference-lacks:<name> (cases 959 to 961). A feature written !<name> asks for its absence and never fits rules 3 or 4 (rule 3a reads
     !win32 as "not on Windows"). A perl command that names %CURL runs curl and is not rule
     2a's: it falls through to the later rules. Feature
     names compare case-insensitively. Rules 5 to 7 read only the harness's own reason, never
@@ -179,6 +186,8 @@ function Get-SkippedVerdict($Tags, [string] $Detail, [string[]] $Available, [boo
             if (-not ($Available -contains $feature)) { return @('excluded', "reference-lacks:$feature") }
         }
     }
+    $without = [regex]::Match($Detail, '^the case needs Curl without the feature (\S+)$')
+    if ($without.Success) { return @('excluded', "needs-curl-without:$($without.Groups[1].Value)") }
     $server = Get-MissingServer $Detail
     if ($server) { return @('unmeasured', "needs-server:$server") }
     if ($Detail -eq 'the harness has no value for %PERL') { return @('unmeasured', 'no-perl') }
@@ -308,7 +317,9 @@ function Invoke-SelfTest {
         $unixRaw.platform = 'Unix'
         $u = @{}; foreach ($i in (ConvertTo-BehaviourMeasurement $unixRaw $data @() $null '9.9.9').items) { $u[$i.key] = $i }
         Report ($u['behaviour:test20'].state -eq 'excluded' -and $u['behaviour:test20'].reason -eq 'platform:windows') 'rule 3a: off Windows, a win32 feature gives excluded platform:windows'
-        Report ($u['behaviour:test18'].reason -eq 'harness-unsupported' -and $u['behaviour:test19'].reason -eq 'harness-unsupported') 'rule 3a: off Windows, !win32 and a precheck refusing MSWin32 are not platform-excluded'
+        Report ($u['behaviour:test18'].reason -eq 'needs-curl-without:win32' -and $u['behaviour:test19'].reason -eq 'harness-unsupported') 'rule 3a: off Windows, !win32 and a precheck refusing MSWin32 are not platform-excluded'
+        Report ($u['behaviour:test18'].state -eq 'excluded' -and $u['behaviour:test18'].evidence -eq 'the case needs Curl without the feature win32') 'rule 4a: a harness reason "needs Curl without the feature <name>" gives excluded needs-curl-without:<name>'
+        Report ($t['behaviour:test18'].reason -eq 'platform:unix') 'rule 4a comes after rule 3a: on Windows the same case stays platform:unix'
     } finally {
         if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }
     }

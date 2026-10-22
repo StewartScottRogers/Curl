@@ -302,6 +302,7 @@ The rest, by area:
 | | `upstream-source-check` | `excluded` | The case runs a perl script over upstream's own source, documents or test scripts and never runs curl (`<command type="perl">` without `%CURL`; ADR-0490). |
 | | `debug-build-only` | `excluded` | The case needs a debug build (`Debug`, `TrackMemory`, `unittest`). |
 | | `platform:<os>` | `excluded` | The case runs only on another platform: on Windows `platform:unix` for a `!win32` feature or a `<precheck>` that refuses `MSWin32`, elsewhere `platform:windows` for a `win32` feature (ADR-0490). |
+| | `needs-curl-without:<feature>` | `excluded` | The case's `<features>` lists `!<feature>`, so it runs only against a Curl built without that feature (written `needs-curl-without:IPv6`). The measured Curl is one build with every feature in, so no run can satisfy the case; it is excluded, not a gap, so no finding waits on a build Curl does not ship. It comes after `reference-lacks:<feature>` and `platform:<os>`, which keep the cases that also need a feature the reference lacks or belong to another platform. |
 | | `disabled-upstream` | `excluded` | The release's `tests/data/DISABLED` lists the case, so upstream's own test suite does not run it. |
 
 ```json
