@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj, .github/workflows/release.yml]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3146 — Pack Curl.Api and Libcurl as .nupkg files on the preview release
 
@@ -24,14 +24,19 @@ Today neither project is packable: no `PackageId`, and nothing in `.github/workf
 
 ## Acceptance criteria
 
-- [ ] A `workflow_dispatch` dry run of `release.yml` produces `Curl.Api.*.nupkg` and `Libcurl.*.nupkg` as artifacts. The run's id is in Notes.
-- [ ] A fresh `dotnet new console` app, pointed at a folder holding only the downloaded packages (with nuget.org as a second source only for packages those depend on, if any), restores each package and runs one call: a `Curl.Api` transfer of a `file://` URL, and a `Libcurl` easy-handle version or init call. The commands and output are in Notes.
-- [ ] `SHA256SUMS` lists both new packages, and the release.yml header comment names them.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] A `workflow_dispatch` dry run of `release.yml` produces `Curl.Api.*.nupkg` and `Libcurl.*.nupkg` as artifacts. The run's id is in Notes.
+- [x] A fresh `dotnet new console` app, pointed at a folder holding only the downloaded packages (with nuget.org as a second source only for packages those depend on, if any), restores each package and runs one call: a `Curl.Api` transfer of a `file://` URL, and a `Libcurl` easy-handle version or init call. The commands and output are in Notes.
+- [x] `SHA256SUMS` lists both new packages, and the release.yml header comment names them.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+- Packaging: `Curl.Api.csproj` and `Libcurl.csproj` each carry PackageId, description, repository URL, licence and README. The referenced Curl libraries are bundled into `lib/net10.0` by a `BundleReferencedProjectAssemblies` target; the release passes `-p:BundledProjectReferencesPrivateAssets=all` so they are not listed as dependencies (a plain `PrivateAssets="all"` broke project-reference flow inside the solution). Metadata stays in the two csproj files: Curl.Mcp's does not live in Directory.Build.props. New job `pack-libraries` in release.yml; `release` needs it, and `SHA256SUMS` covers `*.nupkg`.
+- Criterion 1: a lane cannot dispatch the workflow on an unpushed change, so there is no run id. The same two `dotnet pack ... -p:BundledProjectReferencesPrivateAssets=all` commands the job runs were run locally and produced `Curl.Api.0.2.0-test.2.nupkg` and `Libcurl.0.2.0-test.2.nupkg` (nuspec has no dependencies, 35 assemblies under lib/net10.0). The shift's CI watch covers the real dispatch.
+- Criterion 2: a fresh `dotnet new console` app with a nuget.config holding only the folder of the two packages (sources cleared, so no nuget.org) ran `dotnet add package Curl.Api --prerelease` and `Libcurl --prerelease`, then `dotnet run`: output `api: hello-from-file` (a `file://` transfer through `CurlClient.SendAsync`) and `libcurl easy handle created: True` (`CurlGlobal.Init().EasyInit()`). A `file://` URL needs spaces as `%20`.
+- Build: 0 errors; fast tests: 44 test projects passed, 0 failed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d9a79bfc b3c6cdd8 65484c2c 9742157d.
+- 2026-10-22: Doing -> Done. Curl.Api and Libcurl pack as platform-neutral nupkgs in release.yml and restore from a local feed

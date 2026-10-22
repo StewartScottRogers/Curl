@@ -2,6 +2,9 @@
 # NuGet packages (BL-2485; they stay off nuget.org until the port is complete), each runtime's
 # holding a native-AOT Curl.Mcp packed on its own OS (BL-2486).
 #
+# Curl.Api.<version>.nupkg and Libcurl.<version>.nupkg (BL-3146) are packed once each, platform-neutral,
+# and listed in SHA256SUMS beside the others (the checksum step covers every *.nupkg).
+#
 #   * Pushing a tag `v*` (e.g. v0.1.0) builds all six curl packages and the seven Curl.Mcp
 #     `.nupkg` files, stamped with the tag's version, and attaches them, with a SHA256SUMS
 #     file covering all of them, to a GitHub release of that name. A tag with a hyphen
@@ -33,6 +36,8 @@ on:
       - .github/workflows/release.yml
       - Curl.Console/**
       - Curl.Mcp/**
+      - Curl.Api/**
+      - Libcurl/**
       - Directory.Build.props
       - global.json
   workflow_dispatch:
@@ -242,9 +247,44 @@ jobs:
           path: curl-mcp-packages/*.nupkg
           if-no-files-found: error
 
+  # Curl.Api and Libcurl are plain managed libraries, so each packs once as a platform-neutral
+  # .nupkg that bundles the Curl libraries it references (BL-3146). No AOT, no runtime packages.
+  pack-libraries:
+    name: Pack Curl.Api and Libcurl
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Work out the version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            echo "VERSION=0.2.0-rolling.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Pack
+        run: |
+          dotnet pack Curl.Api -c Release -p:Version="$VERSION" -p:BundledProjectReferencesPrivateAssets=all -o curl-library-packages
+          dotnet pack Libcurl -c Release -p:Version="$VERSION" -p:BundledProjectReferencesPrivateAssets=all -o curl-library-packages
+          ls curl-library-packages
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: curl-library-packages
+          path: curl-library-packages/*.nupkg
+          if-no-files-found: error
+
   release:
     name: Create the GitHub release
-    needs: [publish, pack-mcp]
+    needs: [publish, pack-mcp, pack-libraries]
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
