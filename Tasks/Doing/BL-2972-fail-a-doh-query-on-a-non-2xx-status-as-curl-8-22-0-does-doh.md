@@ -35,3 +35,4 @@ Split from BL-2970 (ADR-0738). Measured 2026-10-21 with the local curl 8.22.0 (S
 - 2026-10-21: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a401cbb2 2a446683.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/DohTraceLines.cs, which BL-2973 (Doing) touches; requeue once BL-2973 lands
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a401cbb2 2a446683.
