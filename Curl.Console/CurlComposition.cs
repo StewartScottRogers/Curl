@@ -431,8 +431,8 @@ internal static class CurlComposition
         EngineTraceComponents traces = EasyOptionsFromCommandLine.TraceComponentsOf(options);
         EngineToolOptions tool = EasyOptionsFromCommandLine.ToolOptionsOf(options);
         QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, datagramConnector);
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
-        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections);
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts, featureMask: featureMask);
+        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections, featureMask);
         ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(

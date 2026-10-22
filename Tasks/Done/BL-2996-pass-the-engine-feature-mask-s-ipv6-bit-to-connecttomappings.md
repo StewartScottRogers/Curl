@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/EngineComposition.Connectors.cs, Curl.Engine.UnitTests/EngineCompositionConnectToFeatureMaskTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Console/CurlComposition.cs, Curl.Networking.UnitLibrary/ResolveOverrides.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs, Curl.Networking.UnitLibrary/UdpDatagramConnector.cs, Curl.Networking.UnitTests/ResolveOverridesParseFailureCodeTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2996 — Pass the engine feature mask's IPv6 bit to ConnectToMappings so upstream case 1454 exits 4
 
@@ -24,7 +24,7 @@ BL-2856 made the harness take `!proxy`, `!IPv6` and `!IDN` off the platform and 
 
 - [x] `EngineComposition` builds `ConnectToMappings` with `hidesIpv6` set from `EngineFeatureMask.Ipv6`, and an engine unit test pins exit 4 with the mask and no change without it.
 - [x] `$env:CURL_UPSTREAM_CASE='1454'` passes on Windows and 1454 is on `PassingUpstreamCases.txt`.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary,Curl.Console` reports no member outside a gate.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary,Curl.Console` reports no member outside a gate.
 
 ## Notes
 
@@ -34,6 +34,8 @@ BL-2856 made the harness take `!proxy`, `!IPv6` and `!IDN` off the platform and 
 - Criterion 3 cannot be met in a lane: 959 to 961 are `!win32`, and no finished `CI` run on `work/dark-factory` included BL-2856 (e75f7d1bd) yet (runs 39691487971 in progress, earlier ones cancelled). Listing them unmeasured risks red CI (AF-0226), so the measurement is BL-2997, now in `depends-on`; once it is Done this criterion is its result.
 - 2026-10-21 (BL-2999): `EngineComposition` is now a partial class split by area; `CreatePoolingConnector`, `CreateTcpConnector` and `CreateUdpDatagramConnector` moved unchanged to `Curl.Engine.UnitLibrary/EngineComposition.Connectors.cs`, and `touches` names that file in place of `EngineComposition.cs`. The stashed hunks for `EngineComposition.cs` will not apply to the split file: put `ConnectToMappingsOf` and the `featureMask` parameters in `EngineComposition.Connectors.cs` instead and leave `EngineComposition.cs` as it is.
 
+- 2026-10-21 (lane 2, second claim): stash carried over; the `EngineComposition.cs` hunks went into `EngineComposition.Connectors.cs` as BL-2999 asked (`ConnectToMappingsOf` and the `featureMask` parameters of `CreatePoolingConnector` and `CreateTcpConnector`). Measured: `dotnet build Curl.slnx -warnaserror` clean, the full fast test pass green (1454 included), and `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary,Curl.Console` reports 0 failing members.
+
 ## Log
 
 - 2026-10-21: Created.
@@ -41,3 +43,4 @@ BL-2856 made the harness take `!proxy`, `!IPv6` and `!IDN` off the platform and 
 - 2026-10-21: Doing -> Backlog. Waits on BL-2997: cases 959-961 are !win32 and need a Linux/macOS CI measurement; the 1454 fix is done and left for the stash
 - 2026-10-21: depends-on BL-2997 removed and the third criterion (959-961 on the ratchet once measured on Linux and macOS) handed to BL-2997, whose own first criterion is that same measurement, word for word; the 1454 work does not need it, and BL-2997 is interactive only, so the wait kept the finished 1454 fix out of every lane. Replaced it with the build, fast-test and quality run the Notes say the next claim still owes. Title and Goal follow. touches narrowed from the whole Curl.Engine.UnitTests to the one test file the stash adds (EngineCompositionConnectToFeatureMaskTests.cs).
 - 2026-10-21: Backlog -> Doing. Criteria at claim: bc4e5432 2ede4afd d6682083.
+- 2026-10-21: Doing -> Done. --connect-to parses under the feature mask's IPv6 bit, so upstream 1454 exits 4 and is on the ratchet

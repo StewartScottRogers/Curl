@@ -27,6 +27,7 @@ internal static partial class EngineComposition
     /// <param name="connector">Opens a connection when the pool has none to reuse.</param>
     /// <param name="timeProvider">The clock a pool of its own measures idle time on.</param>
     /// <param name="runConnections">The run's connection cache, or <see langword="null" />.</param>
+    /// <param name="featureMask">The features the run behaves as built without, which its <c>--connect-to</c> mappings parse under (<see cref="ConnectToMappingsOf" />).</param>
     /// <returns>The pooling connector.</returns>
     internal static PoolingConnector CreatePoolingConnector(
         EngineToolOptions tool,
@@ -36,13 +37,25 @@ internal static partial class EngineComposition
         EasyProxyOptions proxy,
         IConnector connector,
         TimeProvider timeProvider,
-        ConnectionCache? runConnections)
+        ConnectionCache? runConnections,
+        EngineFeatureMask featureMask = EngineFeatureMask.None)
     {
         bool waitsForMultiplexing = WaitsForMultiplexing(tool);
         return runConnections is null
             ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), new ConnectToMappings(network.ConnectTo)) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime };
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), ConnectToMappingsOf(network, featureMask)) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime };
     }
+
+    /// <summary>
+    /// The <c>--connect-to</c> mappings of <paramref name="network" />, parsed as a curl built without
+    /// IPv6 parses them when <paramref name="featureMask" /> hides <see cref="EngineFeatureMask.Ipv6" />:
+    /// a matching bracketed destination then fails with exit 4 (upstream test1454, BL-2996).
+    /// </summary>
+    /// <param name="network">The option group's network options, whose <c>--connect-to</c> values are mapped.</param>
+    /// <param name="featureMask">The features the run behaves as built without.</param>
+    /// <returns>The mappings.</returns>
+    internal static ConnectToMappings ConnectToMappingsOf(EasyNetworkOptions network, EngineFeatureMask featureMask) =>
+        new(network.ConnectTo, hidesIpv6: featureMask.HasFlag(EngineFeatureMask.Ipv6));
 
     /// <summary>
     /// Creates the run's <see cref="TcpConnector" /> over the given pieces, with the
@@ -87,6 +100,10 @@ internal static partial class EngineComposition
     /// The events <paramref name="dnsResolver" /> reports its <c>--trace-config doh</c> lines to, which
     /// the connector points at each resolving transfer's events (BL-1102); <see langword="null" /> for none.
     /// </param>
+    /// <param name="featureMask">
+    /// The features the run behaves as built without, which its <c>--connect-to</c> mappings parse under
+    /// (<see cref="ConnectToMappingsOf" />); <see cref="EngineFeatureMask.None" />, the default, hides none.
+    /// </param>
     /// <returns>
     /// The connector, writing curl's <c>[DNS]</c> filter lines when <see cref="TracesDns" /> says so.
     /// </returns>
@@ -106,7 +123,8 @@ internal static partial class EngineComposition
         QuicDialer? quicDialer = null,
         ISecurityContextFactory? socks5SecurityContexts = null,
         DnsCache? runDnsCache = null,
-        FlowScopedTransferEvents? resolverEvents = null) =>
+        FlowScopedTransferEvents? resolverEvents = null,
+        EngineFeatureMask featureMask = EngineFeatureMask.None) =>
         new(
             dnsResolver,
             tcpDialer,
@@ -114,7 +132,7 @@ internal static partial class EngineComposition
             timeProvider,
             proxyTunnelOptions,
             ResolveOverrides.Parse(network.Resolve),
-            new ConnectToMappings(network.ConnectTo),
+            ConnectToMappingsOf(network, featureMask),
             proxyTlsProvider,
             ConnectTimeoutOf(network, tool.MaxTime),
             AddressFamilyOf(network),
