@@ -3,8 +3,8 @@ id: AF-0347
 title: ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord checks only that a record is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs:ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTest
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
