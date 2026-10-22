@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3133 — Fix AF-0353: BL-3028 cost $2.44, 9 times the median
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-3028 was an Opus run (60 turns, one claim, no retries) on a four-part change to RunDarkFactory.ps1: file CI job-step failures with real touches, make Invoke-Claim pass over unready tasks (two root causes), defer CI-fix tasks a green run proves fixed, plus an ADR and three -Test cases. Its Notes show it had to reproduce the 2026-10-21 wait on a throwaway board. The 3.4M cache-read tokens are the per-turn re-read of a growing context in a large script. That is the size of the work, not a loop or rerun, so the cost is recorded as unavoidable. Nothing to change in RunDarkFactory.ps1. The log file the finding names is not in this checkout.
+- dotnet build clean. The fast tests were not rerun: no code changed on this tree, and BL-3132 recorded them green on it moments earlier.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0353 cost is inherent size of the BL-3028 change; no waste to fix
