@@ -33,3 +33,4 @@ Invoke-TaskSplit (DarkFactory/TaskStash.ps1) has a `[scriptblock]$Board` paramet
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: bc876eef 95ad9451 fbecace0.
