@@ -136,7 +136,7 @@ public sealed record CurlHttpOptions
     /// <summary><c>CURLOPT_SSL_ENABLE_ALPN</c>: offer the HTTP versions through ALPN. Default <see langword="true"/>.</summary>
     public bool SslEnableAlpn { get; init; } = true;
 
-    /// <summary><paramref name="http"/> with every member of this record set, its other members kept.</summary>
+    /// <summary><paramref name="http"/> with every member of this record set, its other members kept; <see cref="UserAgent"/> keeps the handle's value when this record has none, so the client's <see cref="CurlClientOptions.UserAgent"/> survives.</summary>
     /// <param name="http">The handle's HTTP options so far.</param>
     /// <returns>The seam's HTTP options.</returns>
     internal EasyHttpOptions ApplyTo(EasyHttpOptions http) => http with

@@ -13,6 +13,7 @@ namespace Curl.Api;
 /// </summary>
 public sealed record CurlAuthenticationOptions : IEasyOptionRecord<EasyAuthenticationOptions>
 {
+    /// <summary>What <see cref="ToString"/> prints in place of a secret that is set.</summary>
     private const string RedactedSecret = "<redacted>";
 
     /// <summary><c>CURLOPT_NETRC</c>: whether <c>.netrc</c> supplies credentials. Default <see cref="NetrcUsage.Ignored"/>.</summary>
@@ -155,6 +156,9 @@ public sealed record CurlAuthenticationOptions : IEasyOptionRecord<EasyAuthentic
         HttpSignatureHeaders = HttpSignatureHeaders,
     };
 
+    /// <summary>Writes every member for the record's generated <see cref="ToString"/>, with each secret redacted so it never reaches a log.</summary>
+    /// <param name="builder">Receives the member list.</param>
+    /// <returns><see langword="true"/>: the record has members to print.</returns>
     private bool PrintMembers(StringBuilder builder)
     {
         builder.Append($"Netrc = {Netrc}, NetrcFile = {NetrcFile}, ");
@@ -177,5 +181,6 @@ public sealed record CurlAuthenticationOptions : IEasyOptionRecord<EasyAuthentic
         return true;
     }
 
+    /// <summary>The placeholder for a set secret, or <see langword="null"/> for one that is not set, so the output still shows which are set.</summary>
     private static string? Redact(string? secret) => secret is null ? null : RedactedSecret;
 }
