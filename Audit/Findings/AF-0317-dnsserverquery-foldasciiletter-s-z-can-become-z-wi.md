@@ -3,8 +3,8 @@ id: AF-0317
 title: DnsServerQuery.FoldAsciiLetter's <= 'Z' can become < 'Z' with no test failing, so a --dns-servers reply whose echoed question differs only in the case of Z is rejected
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/DnsServerQuery.cs:FoldAsciiLetter-le:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsServerQuery.cs:143:<=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
