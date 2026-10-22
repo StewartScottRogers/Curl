@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3135 — Fix AF-0355: BL-3091 cost $2.00, 7.4 times the median, including a second run to resolve a rebase conflict
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-3091 was a code task in DarkFactory (Claim.ps1, Prompts.ps1, ShiftRunner.ps1, TaskStash.ps1: 259 added lines, plus a new ADR), run on Opus for 36 turns. Cache rereads (2.44M tokens) grow with turns, so cost tracks task size; the median is set by small tasks. The second run (13 turns, $0.27) was the shift's rebase resolver renumbering the ADR (commit 148a514e3, "renumber BL-3091's ADR to 0759"): two lanes picked the same ADR number, which the lane rules expect and delegate to that resolver. It is the designed way to resolve the collision and cost about 15%. Claimed once, no requeue.
+- Unavoidable: no avoidable waste found; RunDarkFactory.ps1 needs no change. The logs named by the finding are not in this checkout, so the numbers are taken from the finding and git history.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0355 cost named as task size plus designed ADR-renumber resolve run; unavoidable
