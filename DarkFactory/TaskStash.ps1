@@ -99,10 +99,15 @@ function Copy-TaskStash {
     # hash. A copy, not the same hash: git stash store writes no entry for a hash already at the
     # top of the list or already stored, so one stash for several tasks needs one commit each.
     param([string]$Id, [string]$Sha, [string]$Stamp, [string]$Repo = $Root)
-    $parents = @((git -C $Repo rev-list --parents -n 1 $Sha) -split ' ' | Select-Object -Skip 1)
+    # Throws when any git command fails (another lane may hold the stash ref lock).
+    $revList = git -C $Repo rev-list --parents -n 1 $Sha 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "git rev-list of stash $Sha failed: $revList" }
+    $parents = @("$revList" -split ' ' | Select-Object -Skip 1)
     $commitArgs = @('commit-tree', "$Sha^{tree}") + @($parents | ForEach-Object { '-p'; $_ }) + @('-m', "darkfactory $Id $Stamp")
-    $copy = "$(git -C $Repo @commitArgs)".Trim()
-    git -C $Repo stash store -m "darkfactory $Id $Stamp" $copy 2>&1 | Out-Null
+    $copy = "$(git -C $Repo @commitArgs 2>&1)".Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $copy) { throw "git commit-tree of stash $Sha failed: $copy" }
+    $storeOutput = git -C $Repo stash store -m "darkfactory $Id $Stamp" $copy 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "git stash store of $copy for $Id failed: $storeOutput" }
     return $copy
 }
 
@@ -207,7 +212,13 @@ function Invoke-TaskSplit {
     try {
         if (-not $failure) {
             # The shift stores the stash once per new task that says it continues the work.
-            if ($sha) { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss')) } } }
+            if ($sha) {
+                try { foreach ($newId in $new) { if (& $ContinuesStash $newId $Id) { $stored += @(& $StoreStash $newId $sha $Now.ToString('yyyyMMdd-HHmmss')) } } }
+                catch { $failure = "storing the stash for a new task failed: $($_.Exception.Message)" }
+                if (-not $failure -and -not $stored.Count) { Write-Trace $Id 'split' "stash $sha is continued by no new task ($($new -join ', ')); its work stays under $Id" 'Red' }
+            }
+        }
+        if (-not $failure) {
             & $Git @('add', '-A', 'Tasks') | Out-Null
             $headBefore = & $HeadSha
             $committed = & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - over its cost cap", '-m', $SkipCiNote)
@@ -400,6 +411,20 @@ if ($TestTaskStash) {
         & $check 'a failed split leaves the stash list as it was' $listBefore ((@(git -C $repo stash list --format='%H %gs') -join "`n"))
         $script:splitPushes = $true
         & $check 'a good split adds a stash for each new id' 'split 3' "$(& $realSplit '2026-11-02') $(@(git -C $repo stash list).Count)"
+        # A store git cannot make fails the split (BL-3106): the first copy is dropped, the task is blocked.
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
+        $failingStore = { param($n, $h, $st) if ($n -eq 'BL-3') { throw 'git stash store of x for BL-3 failed: ref locked' }; $script:splitSteps.Add("store $n"); "copy-$n" }
+        $r = Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-03') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
+            -ContinuesStash { $true } -StoreStash $failingStore -DropStash { param($h) $script:splitSteps.Add("drop $($h -join ',')") } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $boardStub
+        & $check 'a failing store blocks the split, dropping the copies made' 'blocked True True' "$r $(($script:splitSteps -join ' ') -match 'store BL-2 drop copy-BL-2') $(@($script:splitSteps | Where-Object { $_ -match '^board Blocked: .*storing the stash.*ref locked' }).Count -eq 1)"
+        # A split with a stash and no continuing task traces it in red.
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
+        $traceText = & { Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-04') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
+            -ContinuesStash { $false } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $gitStub -Board $boardStub } 6>&1 | Out-String
+        & $check 'a stash no new task continues is traced with its hash and the id' 'True' "$($traceText -match 'abc123' -and $traceText -match 'BL-1')"
+        # Real git: a stash hash git does not know fails Copy-TaskStash.
+        $threw = $false; try { $null = Copy-TaskStash 'BL-4' ('0' * 40) '20260103-000002' $repo } catch { $threw = $true }
+        & $check 'Copy-TaskStash throws when git cannot copy the stash' 'True' "$threw"
     } finally {
         Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
     }

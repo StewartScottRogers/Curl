@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3106 — Make Copy-TaskStash fail the split when git cannot store the copy, and trace a stash no new task continues
 
@@ -26,13 +26,16 @@ The same strands the work silently when the split run writes no "Continues the s
 
 ## Acceptance criteria
 
-- [ ] `Copy-TaskStash` throws, or returns '' that `Invoke-TaskSplit` treats as a failure, when any of its git commands exits non-zero; the split then goes down its failure path (drops what it stored, blocks the task) with a reason naming the store failure.
-- [ ] When the task had a stash and no new task continues it, `Invoke-TaskSplit` writes a red trace naming the stash hash and the original ID.
-- [ ] `-TestTaskStash` cases cover a failing store (injected) and a split with a stash and no continuing task.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] `Copy-TaskStash` throws, or returns '' that `Invoke-TaskSplit` treats as a failure, when any of its git commands exits non-zero; the split then goes down its failure path (drops what it stored, blocks the task) with a reason naming the store failure.
+- [x] When the task had a stash and no new task continues it, `Invoke-TaskSplit` writes a red trace naming the stash hash and the original ID.
+- [x] `-TestTaskStash` cases cover a failing store (injected) and a split with a stash and no continuing task.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 ## Notes
+
+Copy-TaskStash now throws on any git failure; Invoke-TaskSplit catches it, sets the failure (dropping stored copies, blocking the task) and traces a red line when a stash has no continuing task. -TestTaskStash: 48 PASS.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a8d55827 5fc047d2 a9837401 95ad9451.
+- 2026-10-22: Doing -> Done. Copy-TaskStash throws on git failure so the split blocks; unclaimed stash traced red
