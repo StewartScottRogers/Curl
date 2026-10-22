@@ -268,6 +268,23 @@ public sealed class Pop3ProtocolHandlerLoginTests
     }
 
     [TestMethod]
+    [DataRow(false, "=", DisplayName = "explicit empty response: LOGIN's empty password")]
+    [DataRow(true, "", DisplayName = "no message: DIGEST-MD5's answer to rspauth (upstream test869)")]
+    public async Task ExecuteAsync_EmptyAnswerToAChallenge_IsEqualsOrAnEmptyLineAsTheExchangeSays(bool sendsEmptyLine, string line)
+    {
+        var sasl = new ScriptedSaslAuthenticator(("LOGIN", ["u", string.Empty])) { SendsLastAnswerAsEmptyLine = sendsEmptyLine };
+        string expected = Capa + "AUTH LOGIN\r\ndQ==\r\n" + line + "\r\n" + List + Quit;
+
+        Pop3Run run = await RunAsync(
+            Greeting + CapaReply + "+ VXNlcm5hbWU6\r\n+ UGFzc3dvcmQ6\r\n+OK\r\n" + ListReply + Bye,
+            mail: new MailRequestOptions { LoginOptions = "AUTH=LOGIN" },
+            sasl: sasl);
+
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Assert.AreEqual(expected, run.Sent);
+    }
+
+    [TestMethod]
     [DataRow(true, "AUTH EXTERNAL =\r\n", DisplayName = "--sasl-ir: = on the line")]
     [DataRow(false, "AUTH EXTERNAL\r\n\r\n", DisplayName = "no --sasl-ir: an empty line after the continuation")]
     public async Task ExecuteAsync_EmptyInitialResponse_IsEqualsInlineAndAnEmptyLineAfterTheContinuation(bool initialResponse, string sent)

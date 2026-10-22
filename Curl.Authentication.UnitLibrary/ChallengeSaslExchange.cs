@@ -11,7 +11,8 @@ namespace Curl.Authentication;
 /// One function per expected challenge, each given the decoded challenge and answering the
 /// response, or <see langword="null" /> when curl would cancel. Once they run out,
 /// <see cref="RespondAsync" /> answers <see langword="null" />, as curl fails a challenge it
-/// does not expect.
+/// does not expect. An empty answer is curl's "no message", sent as an empty line, as
+/// DIGEST-MD5 answers <c>rspauth</c>: neither mechanism sends an explicit empty response.
 /// </param>
 internal sealed class ChallengeSaslExchange(string mechanism, params Func<byte[], byte[]?>[] answerChallenges) : ISaslExchange
 {
@@ -19,6 +20,9 @@ internal sealed class ChallengeSaslExchange(string mechanism, params Func<byte[]
 
     /// <inheritdoc />
     public string Mechanism => mechanism;
+
+    /// <inheritdoc />
+    public bool SendsLastAnswerAsEmptyLine => true;
 
     /// <inheritdoc />
     public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) =>

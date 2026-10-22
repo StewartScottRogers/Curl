@@ -126,6 +126,21 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    [DataRow(false, "=", DisplayName = "explicit empty response: LOGIN's empty password")]
+    [DataRow(true, "", DisplayName = "no message: DIGEST-MD5's answer to rspauth")]
+    public async Task ExecuteAsync_EmptyAnswerToA334_IsEqualsOrAnEmptyLineAsTheExchangeSays(bool sendsEmptyLine, string line)
+    {
+        var sasl = new FakeSaslAuthenticator("LOGIN", "u"u8.ToArray(), Array.Empty<byte>()) { SendsLastAnswerAsEmptyLine = sendsEmptyLine };
+        string expected = Ehlo + "AUTH LOGIN\r\ndQ==\r\n" + line + "\r\n" + HelpAndQuit;
+
+        SmtpRun run = await RunAsync(
+            Greeting + EhloReply + "334 VXNlcm5hbWU6\r\n334 UGFzc3dvcmQ6\r\n" + Accepted + HelpReplyAndBye, sasl);
+
+        Diagnostics.Diff("sent", expected, run.Sent);
+        Assert.AreEqual(expected, run.Sent);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LoginWithSaslIr_SendsTheUserOnTheAuthLineAndThePasswordAfter334()
     {
         var sasl = new FakeSaslAuthenticator("LOGIN", "u"u8.ToArray(), "p"u8.ToArray());

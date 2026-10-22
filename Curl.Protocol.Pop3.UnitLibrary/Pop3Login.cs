@@ -145,6 +145,11 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
     private static string Encode(byte[] message) =>
         message.Length == 0 ? EmptyMessage : Convert.ToBase64String(message);
 
+    // An answer to a challenge: as Encode, except that an exchange whose empty answer is curl's
+    // "no message" (DIGEST-MD5's answer to rspauth) sends an empty line (upstream test869).
+    private static string EncodeAnswer(ISaslExchange exchange, byte[] answer) =>
+        answer.Length == 0 && exchange.SendsLastAnswerAsEmptyLine ? string.Empty : Encode(answer);
+
     /// <summary>
     /// Encodes an initial response sent on its own line after a <c>+</c>: empty when the
     /// response is, as curl 8.22.0 sends <c>AUTH=EXTERNAL</c>'s empty user name (upstream
@@ -370,7 +375,7 @@ internal sealed class Pop3Login(Pop3ControlChannel channel, ISaslAuthenticator? 
 
         if (await exchange.RespondAsync(challenge, context.CancellationToken).ConfigureAwait(false) is { } answer)
         {
-            return Encode(answer);
+            return EncodeAnswer(exchange, answer);
         }
 
         return CancelOrDeny(exchange);
