@@ -8,8 +8,8 @@ internal sealed partial class DnsAnswerReader
 
     /// <summary>
     /// Reads the name at <paramref name="position" /> into <paramref name="name" />, following
-    /// compression pointers; like curl's <c>doh_store_cname</c>, it gives up after 128 labels
-    /// and pointers, which is how a pointer loop ends.
+    /// compression pointers; like curl 8.21.0's <c>doh_store_cname</c>, it gives up after 128
+    /// labels and pointers, which is how a pointer loop ends.
     /// </summary>
     private DnsMessageFailure FollowName(int position, StringBuilder name)
     {

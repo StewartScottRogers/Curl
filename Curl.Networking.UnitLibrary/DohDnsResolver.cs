@@ -28,9 +28,9 @@ namespace Curl.Networking;
 /// every name under <c>.localhost</c> as <c>::1</c> and <c>127.0.0.1</c>.
 /// </para>
 /// <para>
-/// Once both queries have finished, the lines curl prints under <c>-v --trace-config doh</c> go to
-/// the trace sink (<see cref="DohTraceLines" />, BL-850); the composition root passes a real sink
-/// only for that option.
+/// A query that failed has the error line curl 8.22.0 prints under <c>-v --trace-config doh</c> go
+/// to the trace sink (<see cref="DohTraceLines" />, BL-2970) in place of its completed line; the
+/// composition root passes a real sink only for that option.
 /// </para>
 /// </remarks>
 public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLookup
@@ -68,11 +68,11 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfig
     /// <param name="dohUrl">The absolute <c>--doh-url</c>, whose scheme says whether TLS is used.</param>
     /// <param name="dohTrace">
     /// Receives the <c>--trace-config doh</c> lines as <see cref="ITransferEvents.ReportInfo" /> texts,
-    /// e.g. <c>[DNS] DoH: Too small type A for example.test</c>.
+    /// e.g. <c>[DoH] [DoH] [A] error decoding response: No such name</c>.
     /// </param>
     /// <param name="describeExitCode">
     /// Gives curl's <c>curl_easy_strerror</c> text for the exit code a DoH connection or exchange
-    /// failed with, the text of its <c>[DNS] DoH request &lt;text&gt;</c> line.
+    /// failed with, the text of its <c>[DoH] [DoH] [A] error: &lt;text&gt;</c> line.
     /// </param>
     public DohDnsResolver(IConnector connector, Uri dohUrl, ITransferEvents dohTrace, Func<CurlExitCode, string> describeExitCode)
     {
@@ -135,7 +135,6 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfig
         }
 
         var results = DohQueryResult.AsOneEntry(await RunAddressQueriesAsync(AddressQueries(host, queryA.Bytes), cancellationToken).ConfigureAwait(false));
-        DohTraceLines.Report(_dohTrace, _describeExitCode, host, results);
         return ResolvedAddresses(results);
     }
 }

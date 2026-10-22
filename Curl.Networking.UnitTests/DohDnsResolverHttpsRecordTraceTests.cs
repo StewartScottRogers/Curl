@@ -32,7 +32,7 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    public async Task ResolveHttpsOriginAsync_WithARecord_ReportsTheHttpsLinesBeforeTheAAndAaaaLines()
+    public async Task ResolveHttpsOriginAsync_WithARecord_ReportsTheHttpsLinesAndNoneForTheDecodedAAndAaaaAnswers()
     {
         var trace = new RecordingTransferEvents();
         var resolver = new DohDnsResolver(AnsweringAllThree(), DohUrl, trace, DescribeExitCode);
@@ -47,10 +47,9 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
                 "[DNS] [HTTPS] record: 1 . alpn=h2",
                 "[DNS] [HTTPS] record: 1 . alpn=h2 ech=<6 bytes>",
                 "[DoH] DoH request complete, 0 to go",
-                "[DNS] hostname: foo.example.com",
             };
-        string[] actualLines = [.. trace.Info.Take(expectedLines.Length)];
-        Diagnostics.Diff("first trace lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
+        string[] actualLines = [.. trace.Info];
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
         CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
@@ -81,7 +80,6 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
                 "upload completely sent off: 33 bytes",
                 "Connection #3 to host 127.0.0.1:41444 left intact",
                 "a DoH request is completed, 0 to go",
-                "[DNS] hostname: foo.example.com",
             };
         string[] actualLines = [.. trace.Info.Take(expectedLines.Length)];
         Diagnostics.Diff("first lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
