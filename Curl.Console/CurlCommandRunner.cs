@@ -4540,6 +4540,7 @@ internal sealed class CurlCommandRunner(
     {
         RunningTransferState state = Running;
         state.StandardOutput.ClearWriteFailure();
+        // No output file: every attempt's body stays on standard output, so no retried bytes are kept or cut back.
         TransferResult result = await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null)
             .ConfigureAwait(false);
         await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
@@ -4591,6 +4592,7 @@ internal sealed class CurlCommandRunner(
     private EngineToolTransferInputs AttemptInputsOf(CommandLineOptions options, ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
     {
         RunningTransferState state = Running;
+        // Only a form built as a stream can be read at the rate; a form held in memory is sent as it is.
         HttpRequestBody? sentFormBody = formBody is StreamBody streamBody
             ? streamBody with { Content = SendRateLimited(options, streamBody.Content) }
             : formBody;

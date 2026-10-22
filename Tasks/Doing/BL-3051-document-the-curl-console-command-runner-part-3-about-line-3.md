@@ -31,6 +31,8 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Notes
 
+Reviewed lines 3520 to the end against the code: every member already had an accurate doc comment (BL-3050 and earlier work); added two inline comments (why only a stream form body is rate limited; why no retried bytes are kept for standard output). No logic changed.
+
 ## Log
 
 - 2026-10-22: Created.
