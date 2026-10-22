@@ -29,5 +29,12 @@ is spent).
 
 - A task that spent most of its cap goes to the split at once instead of through one or two
   short claims that only requeue.
-- A task can spend up to $2 more than its cap in a day (cap less $2.01 spent, then a $2 run),
-  against $1 before; the split is cheaper than the short claims it replaces.
+- A fresh claim never overshoots its cap: `Test-TaskCapSpent` refuses it once less than $2
+  of the cap is left, so a claim that starts has at least $2 left and `Get-RunBudgetUsd`
+  gives it `cap - spent`, which the $2 floor does not raise. Spending the cap exactly is the
+  most a fresh claim's runs add up to, plus the part of a turn a run overruns its own
+  `--max-budget-usd` by (the cap is checked between turns).
+- Only a run that skips that gate can overshoot: a resumed run and an overtime run
+  (`ShiftRunner.ps1` passes them without `Get-TaskCapSpentWhy`) get the $2 floor however
+  little is left, so such a task can spend up to $2 more than its cap in a day (cap fully
+  spent, then a $2 run), against $1 before.

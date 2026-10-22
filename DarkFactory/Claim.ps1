@@ -98,7 +98,11 @@ function Invoke-RenumberDuplicates {
     if (-not $renumbered.Count) { return $false }
     Invoke-Git @('add', '-A', 'Tasks') | Out-Null
     Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber duplicate task IDs`n`n$($renumbered -join "`n")", '-m', $SkipCiNote) | Out-Null
-    foreach ($line in $renumbered) { Write-Trace $Id 'renum' "renumbered duplicate task IDs $($line -replace '\s{2,}.*$', '')" 'DarkYellow' }
+    foreach ($line in $renumbered) {
+        # A split's stored stash copy follows its task to the new ID (BL-3109).
+        if ($line -match '^(BL-\d+) -> (BL-\d+)') { $null = Move-RenumberedTaskStash $Matches[1] $Matches[2] }
+        Write-Trace $Id 'renum' "renumbered duplicate task IDs $($line -replace '\s{2,}.*$', '')" 'DarkYellow'
+    }
     return (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))
 }
 

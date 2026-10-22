@@ -432,7 +432,7 @@ $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase
 # The split run (Invoke-TaskSplit) is told to run no git stash subcommand (the shift stores
 # the stash itself), and the shift commits and pushes what it changes.
 $SplitForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git commit',
-    'git stash push', 'git stash save', 'git stash apply', 'git stash pop', 'git stash drop', 'git stash clear', 'git stash create', 'git stash branch')
+    'git stash push', 'git stash save', 'git stash apply', 'git stash pop', 'git stash drop', 'git stash clear', 'git stash create', 'git stash branch', 'git stash store')
 
 # The split run's prompt (BL-3091): a task over its cost cap is split into smaller tasks.
 $SplitPrompt = @'
@@ -448,7 +448,7 @@ Split it into smaller tasks, each sized for one run, exactly as an interactive s
    .claude/skills/task-board/task-board.ps1 new` (its depends-on carries {ID}'s, plus the
    earlier subtasks it needs), and say under its Notes that it was split from {ID}.
 3. For each new task that continues the stashed work, add the line "Continues the stashed work
-   of {ID}." under its Notes; the shift then stores the stash ({SHA}) under that task's ID
+   of {ID}." under its Notes; the shift then stores the stash under that task's ID
    itself. Run no git stash subcommand. Skip this step when there is no stash.
 4. Move {ID} to Deferred with the board script's move -To Deferred and a -Reason naming the
    new task IDs.
