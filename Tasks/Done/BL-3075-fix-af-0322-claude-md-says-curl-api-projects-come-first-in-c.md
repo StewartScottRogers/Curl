@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3075 — Fix AF-0322: CLAUDE.md says Curl.Api projects come first in Curl.slnx and Libcurl sorts after every Curl.* project; the slnx groups by folder and does neither
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+CLAUDE.md now says the order in Curl.slnx follows its solution folders (ADR-0731), so the "come first, before" claim is gone and the reproduction's Select-String finds nothing; the slnx is unchanged.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. CLAUDE.md no longer claims Curl.Api first / Libcurl last in Curl.slnx; states folder order per ADR-0731

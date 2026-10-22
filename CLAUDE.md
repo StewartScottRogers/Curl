@@ -318,9 +318,9 @@ Curl/
   `Libcurl.UnitTests` tests `Libcurl`.
 - Names sort so each `.UnitTests` lands directly after the library it tests, and each
   `.IntegrationTests` directly before it (for `Curl.Console`, directly before
-  `Curl.Console.UnitTests`). Keep it that way. `Libcurl` and `Libcurl.UnitTests` sort after
-  every `Curl.*` project; in `Curl.slnx`, `Curl.Api`, `Curl.Api.UnitLibrary` and
-  `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
+  `Curl.Console.UnitTests`). Keep it that way. In `Curl.slnx` the order of projects is set
+  by their solution folders (ADR-0731), not by name: a project sits with its tests in the
+  folder for its area, and the folders follow one another in the file.
 
 In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
 under one folder for its group (ADR-0731):
