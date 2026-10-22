@@ -30,3 +30,4 @@ Found by BL-3019: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` report
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 408a2668 48b212cd.
