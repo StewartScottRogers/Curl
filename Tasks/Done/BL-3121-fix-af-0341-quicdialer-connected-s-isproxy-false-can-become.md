@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3121 — Fix AF-0341: QuicDialer.Connected's isProxy: false can become true with no test failing, so an HTTP/3 transfer reports its verify result as the proxy's
 
@@ -41,12 +41,13 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-22 (lane 2): The fix is a test only: a QUIC handshake test in Curl.Networking.UnitTests (beside TcpConnectorQuicTests.cs, using Fakes/QuicTestServer.cs) that asserts the verify result is reported with isProxy false (origin, not proxy). Added Curl.Networking.UnitTests to touches for that test; BL-3127 holds that whole project, so requeued until it is Done. No other prerequisite found.
+- 2026-10-22 (lane 1): Added `TcpConnectorQuicTests.VerifyResult.cs`: a QUIC handshake on the OpenSSL build (`matchesSchannelBuild: false`; the Schannel build reports no verify result) asserts the single `ReportCertificateVerifyResult` has `IsProxy` false. A lane may not run `Audit/Tools/Invoke-MutationTest.ps1` (audit paths are guarded), so the mutant was applied by hand instead: with `isProxy: true` at QuicDialer.cs:432 the test fails (killed), with the original line it passes; the source was restored unchanged. Test only, no production change, so no Measure-CodeQuality run was needed. `dotnet build` clean; fast tests green (44 test projects passed, 0 failed). The test is platform-neutral (in-memory QUIC server, no paths or OS text). The finding itself closes only on the quality auditor's re-audit.
 
 ## Log
 
@@ -54,3 +55,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitTests for the killing test; BL-3127 holds that project
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. A QUIC handshake test pins the origin verify result's isProxy false, killing AF-0341's mutant
