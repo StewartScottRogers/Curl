@@ -3,8 +3,8 @@ id: AF-0327
 title: BL-2968 claimed 3 times and requeued twice: it waited on BL-2975, then its criteria were rewritten, and its stash failed to apply on the third claim
 auditor: process
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: process:logs:BL-2968:redone-work
 reproduction: none
 task: BL-3080
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0327 - BL-2968 claimed 3 times and requeued twice: it waited on BL-2975, then its criteria were rewritten, and its stash failed to apply on the third claim
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Historical BL-2968 row unchanged (claims 3). In this window, BL-2847 was requeued once to wait on BL-3062 (1 claim), no stash failed, and no task crossed redone work for waiting on another task or rewritten criteria.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

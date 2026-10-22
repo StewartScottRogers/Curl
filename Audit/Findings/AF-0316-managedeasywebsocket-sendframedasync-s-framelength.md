@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: resolvedLine 231, mutant 'if (frameLength > 0 && buffer.Length > frameLength)' survived (score 0); two baseline-failing AwsSigV4 tests excluded, unrelated to WebSocket. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-10-22: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0336
 title: BL-2859 cost $5.44, 3.0 times the median: a first run requeued on a dependency, then a 79-turn second run
 auditor: process
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Audit 2026-10-22_1120.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3089) are Done at 608a75558667, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-2859:cost-outlier
 reproduction: none
 task: BL-3089
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: task-done-historical
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0336 - BL-2859 cost $5.44, 3.0 times the median: a first run requeued on a dependency, then a 79-turn second run
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Audit 2026-10-22_1120.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3089) are Done at 608a75558667, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

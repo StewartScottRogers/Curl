@@ -3,8 +3,8 @@ id: AF-0319
 title: -v auth-using line prints the -u password: 'Server auth using Basic with user 'u' password 'secret'' where curl prints only the user
 auditor: conformance
 severity: High
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs:AuthUsing:stderr
 reproduction: none
 task: BL-3072
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0319 - -v auth-using line prints the -u password: 'Server auth using Basic with user 'u' password 'secret'' where curl prints only the user
 
@@ -42,7 +42,10 @@ dotnet build Curl.Console -c Release -nologo | Out-Null; $r=(Get-Location).Path;
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel, using the Release build of the audited tree. Output: "curl: * Server auth using Basic with user 'u'" and "candidate: * Server auth using Basic with user 'u'". The Basic -u line no longer prints the password (HttpAuthUsingLines.cs:28 prints the user only). The same password leak is still present on the --aws-sigv4 path; I report it as a new finding (conformance:--aws-sigv4:auth-using-line-password:stderr).
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0323
 title: CLAUDE.md's layout says 93 projects; the root holds 98 C# projects (103 in Curl.slnx with the shared projects)
 auditor: truthfulness
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:ProjectCount:false-statement
 reproduction: none
 task: BL-3076
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0323 - CLAUDE.md's layout says 93 projects; the root holds 98 C# projects (103 in Curl.slnx with the shared projects)
 
@@ -42,7 +42,10 @@ Select-String -Path CLAUDE.md -Pattern '\d+ projects, one flat'; (Get-ChildItem 
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: CLAUDE.md:297 now says '98 projects, one flat alphabetical run', and the root holds 98 C# project directories.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
