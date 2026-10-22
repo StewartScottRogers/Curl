@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs]
 requirement: none
 created: 2026-10-22
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-22 (lane 2): The fix is a test, not a production change: the mutant survives because no test dials HTTP/3 through a UDP tunnel with `connectTimeout: TimeSpan.Zero`. Add one to `Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs` (model it on `TcpConnectorQuicTests.cs:284`, the direct-dial zero-timeout test) asserting the tunnelled dial is not timed out at once (the QuicDialRequest carries no timeout). Added that file to touches; it is in Curl.Networking.UnitTests, which BL-3127 holds whole, so requeued behind BL-3127 before any edit. A lane cannot run the finding reproduction (the audit tools are refused to lanes); the re-audit runs it.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs for the zero-timeout test; BL-3127 holds Curl.Networking.UnitTests
