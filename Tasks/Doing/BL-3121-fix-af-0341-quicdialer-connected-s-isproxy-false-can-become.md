@@ -53,3 +53,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitTests for the killing test; BL-3127 holds that project
+- 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
