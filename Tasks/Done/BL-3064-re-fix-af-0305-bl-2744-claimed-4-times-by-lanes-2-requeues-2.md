@@ -9,7 +9,7 @@ lane: no
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3064 — Re-fix AF-0305: BL-2744 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks): a file outside its touches, a stash that did not apply, then claims refused by the cost cap
 
@@ -46,8 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 08:07:46 (shift 20261022-080746, the first to run the stash drop 0480ede18 and the cost-cap split BL-3091 51865fb47), shows no task claimed 3 or more times, no stash that did not apply cleanly, and no task blocked by the cost cap after a refused claim.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 08:07:46 (shift 20261022-080746, the first to run the stash drop 0480ede18 and the cost-cap split BL-3091 51865fb47), shows no task claimed 3 or more times, no stash that did not apply cleanly, and no task blocked by the cost cap after a refused claim.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -60,3 +60,5 @@ Interactive only: the acceptance reproduction runs a script from the audit offic
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. Interactive only: the reproduction needs paths a lane cannot read
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a4065354 9742157d.
+- 2026-10-22: Doing -> Done. Live logs since 2026-10-22 08:07:46: no task claimed 3 times, no failed stash, no cost-cap block; over-cap tasks are split

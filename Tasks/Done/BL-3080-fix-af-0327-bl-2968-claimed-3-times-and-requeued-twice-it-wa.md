@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1, DarkFactory/TaskStash.ps1]
 lane: no
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3080 — Fix AF-0327: BL-2968 claimed 3 times and requeued twice: it waited on BL-2975, then its criteria were rewritten, and its stash failed to apply on the third claim
 
@@ -42,7 +42,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 08:07:46 (shift 20261022-080746, the first to run 0480ede18, which drops a stash once applied), shows no task claimed 3 or more times or requeued twice, and no stash offered again after it was applied (no `did not apply cleanly` line).
+- [x] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 08:07:46 (shift 20261022-080746, the first to run 0480ede18, which drops a stash once applied), shows no task claimed 3 or more times or requeued twice, and no stash offered again after it was applied (no `did not apply cleanly` line).
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -57,3 +57,5 @@ Cause: Restore-TaskStash applied a stash but left it in the list, so the next cl
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Blocked. Stewart: the fix is committed (applied stash is dropped), but the reproduction needs the audit tools a lane may not run; run it interactively and move to Done
 - 2026-10-22: Blocked -> Backlog. Criterion 1 reworded to the live-window measurement (process findings about past behaviour are measured on logs written after the fix)
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 42b3564e 9742157d.
+- 2026-10-22: Doing -> Done. Live logs since 2026-10-22 08:07:46: no task claimed 3 times or requeued twice, 0 stashes that did not apply

@@ -9,7 +9,7 @@ touches: [DarkFactory/CiWatch.ps1]
 lane: no
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3066 — Re-fix AF-0308: CI red since run 39362208615 (test307, test1587 on Linux and macOS) and still red at log copy; fix tasks sat 43 min unclaimed because the weekly window was used up
 
@@ -46,8 +46,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-21 14:13:29 (7268b92b1, ADR-0744: CI-fix tasks are claimed past the usage stop), shows no red spell over 30 minutes during which the shift held its lanes at a usage stop.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-21 14:13:29 (7268b92b1, ADR-0744: CI-fix tasks are claimed past the usage stop), shows no red spell over 30 minutes during which the shift held its lanes at a usage stop.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -61,3 +61,5 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Blocked. Stewart: reproduction reads a past audit log, so it cannot change; fix is already ADR-0744 - close AF-0308 at the next process re-audit and drop this task?
 - 2026-10-22: Blocked -> Backlog. Criterion 1 reworded to the live-window measurement (process findings about past behaviour are measured on logs written after the fix)
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 93b6d477 9742157d.
+- 2026-10-22: Doing -> Done. Live logs since 2026-10-21 14:13:29: no red spell over 30 minutes ran during a usage stop

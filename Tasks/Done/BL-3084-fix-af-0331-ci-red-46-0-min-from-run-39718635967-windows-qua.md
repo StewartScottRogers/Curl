@@ -9,7 +9,7 @@ touches: [DarkFactory/CiWatch.ps1]
 lane: no
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3084 — Fix AF-0331: CI red 46.0 min from run 39718635967 (Windows quality gate after BL-3022). Its fix task BL-3026 was filed with empty touches, so no lane would claim it, and lane 1 idled about 230 min on it
 
@@ -42,8 +42,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 02:44:38 (shift 20261022-024438, the first to run BL-3028's 597082cb8, CI tasks filed with real touches), shows no red spell over 30 minutes and no CI-fix task refused for empty or `*` touches.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 02:44:38 (shift 20261022-024438, the first to run BL-3028's 597082cb8, CI tasks filed with real touches), shows no red spell over 30 minutes and no CI-fix task refused for empty or `*` touches.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -56,3 +56,5 @@ Interactive only: the finding's reproduction runs the audit office's process mea
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Backlog. Interactive only: reproduction needs audit paths; cause already fixed by BL-3028
+- 2026-10-22: Backlog -> Doing. Criteria at claim: cf4ba031 9742157d.
+- 2026-10-22: Doing -> Done. Live logs since 2026-10-22 02:44:38: no red spell, no CI-fix task refused for empty touches; -TestCiWatch passes
