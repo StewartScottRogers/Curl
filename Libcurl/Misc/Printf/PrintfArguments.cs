@@ -58,6 +58,8 @@ internal static class PrintfArguments
         _ => new PrintfValue(CutToType(type, ReadIntegerBits(argument), platform), 0, null),
     };
 
+    // Keeps only the bits a C va_arg of the type would: 32 for int and, on Windows, long; 64 otherwise. Width and
+    // Precision arguments are ints too.
     private static long CutToType(PrintfInputType type, long bits, PrintfPlatform platform) => type switch
     {
         PrintfInputType.IntUnsigned => (uint)bits,

@@ -14,6 +14,7 @@ internal sealed class PrintfFormatParser
     /// <summary><c>MAX_SEGMENTS</c>: how many output segments one format may have.</summary>
     internal const int MaxSegments = 128;
 
+    // A conversion with no "n$" takes the next argument; a malformed or mixed-in "n$" is invalid.
     private const int NoPosition = -1;
     private const int InvalidPosition = -2;
 
@@ -73,6 +74,7 @@ internal sealed class PrintfFormatParser
     private readonly byte[] format;
     private readonly PrintfPlatform platform;
     private readonly List<PrintfSegment> segments = [];
+    // Per argument position: the type it is read as, and whether a conversion (or width or precision) claimed it.
     private readonly PrintfInputType[] inputTypes = new PrintfInputType[MaxParameters];
     private readonly bool[] used = new bool[MaxParameters];
     private int index;
@@ -90,6 +92,7 @@ internal sealed class PrintfFormatParser
         this.platform = platform;
     }
 
+    // Whether the format uses "n$" positions; the first conversion decides, and mixing the two styles is refused.
     private enum DollarUse
     {
         Unknown,
@@ -97,6 +100,7 @@ internal sealed class PrintfFormatParser
         Yes,
     }
 
+    // The outcome of reading one flag, width, precision or length character in a conversion.
     private enum FlagRead
     {
         Read,
@@ -104,6 +108,7 @@ internal sealed class PrintfFormatParser
         Invalid,
     }
 
+    // The kind of value a conversion character reads; with the length flags it picks the PrintfInputType.
     private enum ConversionKind
     {
         String,

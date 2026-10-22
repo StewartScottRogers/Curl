@@ -33,7 +33,8 @@ internal readonly record struct ExactDecimal(string Digits, int PointPosition)
             return new ExactDecimal(string.Empty, 0);
         }
 
-        // m × 2^e is m × 2^e exactly for e ≥ 0, and m × 5^-e over 10^-e for e < 0.
+        // The value is mantissa × 2^exponent. For exponent ≥ 0 that is a whole number; for exponent < 0 it is
+        // mantissa × 5^-exponent / 10^-exponent, so the digits of the product, with the point moved left by -exponent, are exact.
         BigInteger whole = exponent >= 0 ? new BigInteger(mantissa) << exponent : mantissa * BigInteger.Pow(5, -exponent);
         string text = whole.ToString(CultureInfo.InvariantCulture);
         return new ExactDecimal(text.TrimEnd('0'), text.Length + Math.Min(exponent, 0));

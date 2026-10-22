@@ -9,7 +9,7 @@ touches: [Libcurl/Misc/Printf]
 model: sonnet
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3040 — Document the Libcurl printf code
 
@@ -23,15 +23,18 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Acceptance criteria
 
-- [ ] Every internal or private type or member in scope whose name does not fully say what it does has an accurate XML doc comment; none restates its own name.
-- [ ] Every existing comment in the touched files is true of the code as it is now; any found wrong or vague is corrected.
-- [ ] New inline comments explain why or name the curl behaviour matched, and none narrates what the next line plainly does.
-- [ ] The diff changes comments and docs only: no logic, signature, accessibility or public name changed.
-- [ ] `dotnet build` of the project is clean with warnings as errors, and the fast tests of Libcurl.UnitTests pass (`dotnet test Libcurl.UnitTests --filter "TestCategory!=Integration"`).
+- [x] Every internal or private type or member in scope whose name does not fully say what it does has an accurate XML doc comment; none restates its own name.
+- [x] Every existing comment in the touched files is true of the code as it is now; any found wrong or vague is corrected.
+- [x] New inline comments explain why or name the curl behaviour matched, and none narrates what the next line plainly does.
+- [x] The diff changes comments and docs only: no logic, signature, accessibility or public name changed.
+- [x] `dotnet build` of the project is clean with warnings as errors, and the fast tests of Libcurl.UnitTests pass (`dotnet test Libcurl.UnitTests --filter "TestCategory!=Integration"`).
 
 ## Notes
+
+Added XML docs to the PrintfFlags and PrintfInputType members and comments on the parser's state, enums and sentinels, PrintfNumberWriter.FormatDigits and WriteField, and PrintfArguments.CutToType; rewrote ExactDecimal's tautological exponent comment. Existing docs checked against the code and found true. Comments only.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a8624aa0 d77f9e20 4a195610 ea3eb31b 3f9f1d6f.
+- 2026-10-22: Doing -> Done. Libcurl/Misc/Printf internal enums, parser state and helpers documented; comments only, build and 1331 tests green
