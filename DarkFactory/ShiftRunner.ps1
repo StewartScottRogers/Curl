@@ -193,7 +193,7 @@ while ($true) {
         # blocks it itself; one already offered for a split today is blocked as before.
         $capped = $capWhy -or (-not $run.TimedOut -and (Test-BudgetSpent))
         $split = if ($capped) { Invoke-TaskSplit $id $why -LeaveForIntegration:([bool]$Lane) } else { 'skipped' }
-        if ($split -in 'skipped', 'failed') {
+        if (Test-TaskSplitLeavesBlockToCaller $split) {
             $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
             Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
             git -C $Root add -A Tasks 2>&1 | Out-Null

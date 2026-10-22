@@ -30,14 +30,16 @@ Found by the shift-end review (ADR-0710) of 7fb0a59c7...18cf553c9. silent-failur
 
 ## Acceptance criteria
 
-- [ ] When a `reset --hard` of the split commit fails, `Invoke-TaskSplit` returns a result (for example `'reset-failed'`) for which `ShiftRunner.ps1` makes no commit and no push on top of the split commit. The task still does not stay in Doing, and the trace says what was left and why.
-- [ ] A failed `reset -q -- Tasks`, where no split commit exists, no longer returns early. The restore of Tasks (checkout and clean) still runs.
-- [ ] Every trace and comment about these paths is true of the code, the header comment of `Invoke-TaskSplit` included, which is two real `#` lines.
-- [ ] A `-TestTaskStash` case covers the failure path: the board stub returns normally while `-TaskState` stays `'Deferred'`, and `Invoke-TaskSplit` returns `'failed'`.
-- [ ] A `-TestTaskStash` case covers the reset-failed result: the caller's handling of it makes no `commit` and no `push`.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] When a `reset --hard` of the split commit fails, `Invoke-TaskSplit` returns a result (for example `'reset-failed'`) for which `ShiftRunner.ps1` makes no commit and no push on top of the split commit. The task still does not stay in Doing, and the trace says what was left and why.
+- [x] A failed `reset -q -- Tasks`, where no split commit exists, no longer returns early. The restore of Tasks (checkout and clean) still runs.
+- [x] Every trace and comment about these paths is true of the code, the header comment of `Invoke-TaskSplit` included, which is two real `#` lines.
+- [x] A `-TestTaskStash` case covers the failure path: the board stub returns normally while `-TaskState` stays `'Deferred'`, and `Invoke-TaskSplit` returns `'failed'`.
+- [x] A `-TestTaskStash` case covers the reset-failed result: the caller's handling of it makes no `commit` and no `push`.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+- Decision: a new result `reset-failed` (split commit stays, task stays Deferred as in it); `Test-TaskSplitLeavesBlockToCaller` is the caller's gate (blocks only skipped and failed). A failed unstaging reset (no commit) falls through to the restore.
 
 ## Log
 
