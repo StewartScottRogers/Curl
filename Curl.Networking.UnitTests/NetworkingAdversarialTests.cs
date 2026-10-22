@@ -39,11 +39,12 @@ public sealed class NetworkingAdversarialTests
 
     // Family 1, boundaries: exactly the header, with every count zero.
     [TestMethod]
-    public void DnsAnswerDecode_BareHeaderWithNoRecords_IsNoContent()
+    public void DnsAnswerDecode_BareHeaderWithNoRecords_DecodesWithNoAddress()
     {
+        // curl 8.22.0 has no "no content" result (BL-2970).
         var answer = DnsAnswerDecoder.Decode(new byte[12], DnsRecordType.A);
 
-        Assert.AreEqual(DnsMessageFailure.NoContent, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
         Assert.IsEmpty(answer.Addresses);
     }
 
@@ -61,11 +62,11 @@ public sealed class NetworkingAdversarialTests
         Assert.HasCount(expected, answer.Addresses);
     }
 
-    // Family 1, boundaries: curl's dohentry holds 4 CNAMEs; a fifth is read and dropped.
+    // Family 1, boundaries: curl 8.22.0's doh_rdata skips CNAME data unread, however many (BL-2970).
     [TestMethod]
-    [DataRow(4, 4)]
-    [DataRow(5, 4)]
-    public void DnsAnswerDecode_CnameRecordsAroundTheFourNameLimit_KeepsAtMostFour(int records, int expected)
+    [DataRow(4)]
+    [DataRow(5)]
+    public void DnsAnswerDecode_CnameRecordsAroundTheOldFourNameLimit_AreAllSkipped(int records)
     {
         // A CNAME for the question's name whose target is the question's name.
         const string cname = "C00C000500010000003C0002C00C";
@@ -73,15 +74,14 @@ public sealed class NetworkingAdversarialTests
         var answer = DnsAnswerDecoder.Decode(Message(Header(1, records) + QuestionA + Repeat(cname, records)), DnsRecordType.A);
 
         Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
-        Assert.HasCount(expected, answer.CanonicalNames);
-        Assert.AreEqual("example.test", answer.CanonicalNames[0]);
+        Assert.IsEmpty(answer.Addresses);
     }
 
-    // Family 1, boundaries: doh_store_cname gives up after 128 labels and pointers.
+    // Family 1, boundaries: 8.21.0's doh_store_cname gave up after 128 labels; 8.22.0 skips the data (BL-2970).
     [TestMethod]
     [DataRow(127, DnsMessageFailure.None)]
-    [DataRow(128, DnsMessageFailure.LabelLoop)]
-    public void DnsAnswerDecode_CnameTargetAroundTheHundredAndTwentyEightLabelLimit_StopsAtTheLimit(int labels, DnsMessageFailure expected)
+    [DataRow(128, DnsMessageFailure.None)]
+    public void DnsAnswerDecode_CnameTargetAroundTheHundredAndTwentyEightLabelLimit_IsSkippedUnread(int labels, DnsMessageFailure expected)
     {
         var target = Repeat("0161", labels) + "00";
         var cname = "C00C000500010000003C" + (target.Length / 2).ToString("X4") + target;
@@ -123,42 +123,43 @@ public sealed class NetworkingAdversarialTests
         Assert.AreEqual(expected, answer.TimeToLiveSeconds);
     }
 
-    // Family 2, malformed input: a CNAME whose target is a pointer to itself.
+    // Family 2, malformed input: a CNAME whose target is a pointer to itself; 8.22.0 skips CNAME data unread (BL-2970).
     [TestMethod]
     [Timeout(3000, CooperativeCancellation = true)]
-    public void DnsAnswerDecode_CnamePointingAtItself_IsLabelLoopWithoutHanging()
+    public void DnsAnswerDecode_CnamePointingAtItself_IsSkippedWithoutHanging()
     {
         // The CNAME's data starts at offset 12 + 18 + 12 = 42 (0x2A).
         var answer = DnsAnswerDecoder.Decode(Message(Header(1, 1) + QuestionA + "C00C000500010000003C0002C02A"), DnsRecordType.A);
 
-        Assert.AreEqual(DnsMessageFailure.LabelLoop, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
     }
 
-    // Family 2, malformed input: two CNAME targets pointing at each other.
+    // Family 2, malformed input: two CNAME targets pointing at each other, skipped unread (BL-2970).
     [TestMethod]
     [Timeout(3000, CooperativeCancellation = true)]
-    public void DnsAnswerDecode_TwoCnamesPointingAtEachOther_IsLabelLoopWithoutHanging()
+    public void DnsAnswerDecode_TwoCnamesPointingAtEachOther_AreSkippedWithoutHanging()
     {
         // The first CNAME's data is at 42 (0x2A); the second record starts at 44 and its data at 56 (0x38).
         var answer = DnsAnswerDecoder.Decode(
             Message(Header(1, 2) + QuestionA + "C00C000500010000003C0002C038" + "C00C000500010000003C0002C02A"),
             DnsRecordType.A);
 
-        Assert.AreEqual(DnsMessageFailure.LabelLoop, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
     }
 
-    // Family 2, malformed input: a CNAME target pointer past the end, one cut in half at the end, and a label longer than the data.
+    // Family 2, malformed input: a CNAME target pointer past the end, one cut in half at the end, and a label longer than the data,
+    // all inside the records RDLENGTH, which 8.22.0 skips unread (BL-2970).
     [TestMethod]
     [DataRow("0002C0FF")]
     [DataRow("0002FFFF")]
     [DataRow("0001C0")]
     [DataRow("0003056100")]
-    public void DnsAnswerDecode_CnameTargetRunningPastTheEnd_FailsWithoutThrowing(string lengthAndData)
+    public void DnsAnswerDecode_CnameTargetRunningPastTheEnd_IsSkippedUnread(string lengthAndData)
     {
         var answer = DnsAnswerDecoder.Decode(Message(Header(1, 1) + QuestionA + "C00C000500010000003C" + lengthAndData), DnsRecordType.A);
         TestDiagnostics.For(TestContext).Act("failure", answer.Failure);
 
-        Assert.AreNotEqual(DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
     }
 
     // Family 2, malformed input: a label length byte with a reserved top-bit pattern (01 or 10).
@@ -245,7 +246,7 @@ public sealed class NetworkingAdversarialTests
 
             var answer = DnsAnswerDecoder.Decode(message, askedType);
 
-            Assert.IsTrue(answer.Addresses.Count <= 24 && answer.CanonicalNames.Count <= 4 && answer.HttpsRecordData.Count <= 4, $"round {round}");
+            Assert.IsTrue(answer.Addresses.Count <= 24 && answer.HttpsRecordData.Count <= 4, $"round {round}");
         }
     }
 

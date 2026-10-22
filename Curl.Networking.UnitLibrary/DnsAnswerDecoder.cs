@@ -6,31 +6,32 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Decodes the DNS answer a DNS-over-HTTPS server returns (RFC 1035 section 4, RFC 3596) the way
-/// curl 8.21.0's <c>doh_resp_decode</c> does: ID 0 and RCODE 0 are required, though RCODE 3 is
-/// <see cref="DnsMessageFailure.NxDomain" /> and each answer TTL is capped at 86400 seconds
-/// (<c>MAX_DNS_TTL</c>) before the smallest is taken, as in curl 8.22.0 (BL-2969); each answer record
-/// must be the type asked for, a CNAME or a DNAME, of class IN; A and AAAA data are stored, CNAME
-/// targets are followed through compression pointers, and DNAME records and the authority and
-/// additional sections are skipped; every byte must be accounted for, and an answer with no
-/// address and no CNAME is <see cref="DnsMessageFailure.NoContent" />. For a
+/// curl 8.22.0's <c>doh_resp_decode</c> does: ID 0 and RCODE 0 are required, though RCODE 3 is
+/// <see cref="DnsMessageFailure.NxDomain" />, and each answer TTL is capped at 86400 seconds
+/// (<c>MAX_DNS_TTL</c>) before the smallest is taken (BL-2969); each answer record must be the type
+/// asked for, a CNAME or a DNAME, of class IN; A and AAAA data are stored, CNAME and DNAME data and
+/// the authority and additional sections are skipped unread, as 8.22.0's <c>doh_rdata</c> skips
+/// them (BL-2970); every byte must be accounted for, and an A or AAAA answer with no address decodes as
+/// <see cref="DnsMessageFailure.None" />, since 8.22.0 has no "no content" result for them. For a
 /// <see cref="DnsRecordType.Srv" /> query, which DoH never sends and <see cref="DnsServerResolver" />
-/// does (BL-694), SRV records are stored as <see cref="DnsAnswer.ServiceRecords" /> and count as content.
-/// For a <see cref="DnsRecordType.Https" /> query (BL-707), the first 4 HTTPS records' data are stored
-/// undecoded as <see cref="DnsAnswer.HttpsRecordData" />, as curl's <c>doh_store_https</c> does, and count as content.
-/// A failed decode keeps the addresses, CNAMEs and TTL it read before it stopped, as curl's
-/// <c>struct dohentry</c> does (BL-958).
+/// does (BL-694), SRV records are stored as <see cref="DnsAnswer.ServiceRecords" />, their targets
+/// followed through compression pointers. For a <see cref="DnsRecordType.Https" /> query (BL-707),
+/// the first 4 HTTPS records' data are stored undecoded as <see cref="DnsAnswer.HttpsRecordData" />,
+/// as curl's <c>doh_store_https</c> does, and an answer with no answer record is
+/// <see cref="DnsMessageFailure.NoContent" />, which the HTTPS trace reports as NXDOMAIN. A failed decode keeps the addresses and TTL it read before
+/// it stopped, as curl's <c>struct dohentry</c> does (BL-958).
 /// </summary>
 public static class DnsAnswerDecoder
 {
     /// <summary>Decodes <paramref name="message" /> as the answer to a query for <paramref name="askedType" />.</summary>
     /// <param name="message">The DNS message, the DoH response body.</param>
     /// <param name="askedType">The record type the query asked for, <see cref="DnsRecordType.A" />, <see cref="DnsRecordType.Aaaa" />, <see cref="DnsRecordType.Srv" /> or <see cref="DnsRecordType.Https" />.</param>
-    /// <returns>The addresses, CNAMEs and TTL, or the failure that stopped the decode.</returns>
+    /// <returns>The addresses and TTL, or the failure that stopped the decode.</returns>
     public static DnsAnswer Decode(ReadOnlySpan<byte> message, DnsRecordType askedType)
     {
         var reader = new DnsAnswerReader(message.ToArray(), askedType);
         var failure = reader.Read();
-        var answer = new DnsAnswer(failure, reader.Addresses, reader.CanonicalNames, reader.TimeToLiveSeconds);
+        var answer = new DnsAnswer(failure, reader.Addresses, reader.TimeToLiveSeconds);
         return failure == DnsMessageFailure.None
             ? answer with { ServiceRecords = reader.ServiceRecords, HttpsRecordData = reader.HttpsRecordData }
             : answer;
@@ -47,7 +48,6 @@ public static class DnsAnswerDecoder
         private const ushort DnameType = 39;
         private const ushort InternetClass = 1;
         private const int MaximumAddresses = 24;
-        private const int MaximumCanonicalNames = 4;
         private const int MaximumHttpsRecords = 4;
         private const int MaximumNameSteps = 128;
         private const uint MaximumTimeToLiveSeconds = 86400;
@@ -57,8 +57,6 @@ public static class DnsAnswerDecoder
         private int _recordDataLength;
 
         public List<IPAddress> Addresses { get; } = [];
-
-        public List<string> CanonicalNames { get; } = [];
 
         public List<DnsServiceRecord> ServiceRecords { get; } = [];
 
@@ -105,17 +103,11 @@ public static class DnsAnswerDecoder
             };
         }
 
-        private DnsMessageFailure CheckEnd()
-        {
-            if (_index != message.Length)
-            {
-                return DnsMessageFailure.Malformed;
-            }
-
-            return Addresses.Count == 0 && CanonicalNames.Count == 0 && ServiceRecords.Count == 0 && HttpsRecordData.Count == 0
-                ? DnsMessageFailure.NoContent
-                : DnsMessageFailure.None;
-        }
+        // An HTTPS query's answer with no answer record keeps 8.21.0's "no content", which the HTTPS
+        // trace writes as "No such name" (BL-2954); an A or AAAA answer never has it (BL-2970).
+        private DnsMessageFailure CheckEnd() => _index != message.Length
+            ? DnsMessageFailure.Malformed
+            : askedType == DnsRecordType.Https && ReadUInt16At(6) == 0 ? DnsMessageFailure.NoContent : DnsMessageFailure.None;
 
         private DnsMessageFailure RepeatForCount(int countOffset, Func<DnsMessageFailure> readOne)
         {
@@ -202,7 +194,6 @@ public static class DnsAnswerDecoder
             {
                 (ushort)DnsRecordType.A => StoreAddress(4),
                 (ushort)DnsRecordType.Aaaa => StoreAddress(16),
-                (ushort)DnsRecordType.Cname => StoreCanonicalName(),
                 (ushort)DnsRecordType.Srv => StoreServiceRecord(),
                 _ => StoreHttpsRecordData(),
             };
@@ -225,19 +216,6 @@ public static class DnsAnswerDecoder
             return DnsMessageFailure.None;
         }
 
-        private DnsMessageFailure StoreCanonicalName()
-        {
-            if (CanonicalNames.Count == MaximumCanonicalNames)
-            {
-                return DnsMessageFailure.None;
-            }
-
-            var name = new StringBuilder();
-            var failure = FollowName(_index, name);
-            CanonicalNames.Add(name.ToString());
-            return failure;
-        }
-
         /// <summary>
         /// Stores an SRV record's priority, weight, port and target (RFC 2782); data too short to
         /// hold the three numbers and a name is <see cref="DnsMessageFailure.RdataLength" />.
@@ -256,8 +234,8 @@ public static class DnsAnswerDecoder
         }
 
         /// <summary>
-        /// Keeps an HTTPS record's data undecoded, and ignores a DNAME's; past the fourth, HTTPS
-        /// records are silently ignored, as curl ignores them.
+        /// Keeps an HTTPS record's data undecoded, and ignores a CNAME's or a DNAME's; past the
+        /// fourth, HTTPS records are silently ignored, as curl ignores them.
         /// </summary>
         private DnsMessageFailure StoreHttpsRecordData()
         {
@@ -271,8 +249,8 @@ public static class DnsAnswerDecoder
 
         /// <summary>
         /// Reads the name at <paramref name="position" /> into <paramref name="name" />, following
-        /// compression pointers; like curl's <c>doh_store_cname</c>, it gives up after 128 labels
-        /// and pointers, which is how a pointer loop ends.
+        /// compression pointers; like curl 8.21.0's <c>doh_store_cname</c>, it gives up after 128
+        /// labels and pointers, which is how a pointer loop ends.
         /// </summary>
         private DnsMessageFailure FollowName(int position, StringBuilder name)
         {

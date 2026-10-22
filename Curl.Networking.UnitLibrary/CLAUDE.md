@@ -383,8 +383,8 @@ The DNS-over-HTTPS message codec (ADR-0152, BL-640) is pure code, bytes in and b
 curl 8.21.0's `lib/doh.c` does it. `DnsQueryEncoder` writes the measured query (ID 0, flags
 `0x0100`, one question, QCLASS IN) for a `DnsRecordType`, refusing an empty label or one over 63
 bytes and a query over 272 bytes. `DnsAnswerDecoder` returns a `DnsAnswer`: the addresses of the
-type asked for (at most 24), the CNAME targets followed through compression pointers (at most 4),
-the smallest TTL, or a `DnsMessageFailure`, a pointer loop ending as `LabelLoop` after 128 steps.
+type asked for (at most 24), the smallest TTL, or a `DnsMessageFailure`; CNAME and DNAME data are
+skipped unread as curl 8.22.0 skips them, and an A or AAAA answer with no address decodes (BL-2970).
 `DnsMessageFailureText` gives curl's `--trace-config doh` text for each failure. For an SRV query
 the decoder also keeps each SRV record as `DnsAnswer.ServiceRecords` (`DnsServiceRecord`). Per
 ADR-0312 (BL-707), for an HTTPS (type 65) query it keeps the first four HTTPS records' data
@@ -403,7 +403,9 @@ response as curl does: status and `Content-Type` ignored, a `Content-Length` or 
 most 3000 bytes, anything else a failure. It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
 Both answers fill one entry, as curl's `struct dohentry`: `DohQueryResult.AsOneEntry` cuts each,
-A first, to the 24 addresses and 4 CNAMEs the earlier ones left room for (measured, BL-1153).
+A first, to the 24 addresses the earlier ones left room for (measured, BL-1153). A query that
+failed writes curl 8.22.0's `[DoH] [DoH] [A] error ...` line on the trace in place of its completed
+line (`DohTraceLines.FailureLine`, BL-2970).
 IP literals and `localhost` (`TcpConnector.IsLocalhost`) are answered without a query.
 `ResolveHttpsRecordAsync` (ADR-0312, BL-707) POSTs one HTTPS query, for the host on port 443 and
 `_<port>._https.<host>` on any other, and returns the answer's first record decoded, its
