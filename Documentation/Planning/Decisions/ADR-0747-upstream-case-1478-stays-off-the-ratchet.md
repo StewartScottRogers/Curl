@@ -25,9 +25,10 @@ Curl has no `tool_listhelp.c`; its counterpart is `CurlHelpTable` in `Curl.Cli.U
 
 ## Decision
 
-- Case 1478 is not ported and stays off `PassingUpstreamCases.txt`. The harness keeps skipping it
-  with `the harness does not run a perl command`, since no interpretation of `managen` is
-  registered.
+- Case 1478 is not ported and stays off `PassingUpstreamCases.txt`. The harness registers a
+  `managen` script (`UpstreamPerlCommandScripts.Managen.cs`), so it no longer skips 1478 as an
+  unrun perl command; that script carries out only `mainpage` and `ascii`, not `listhelp`, so
+  1478 does not pass and is left off the ratchet.
 - What 1478 protects in upstream - that `curl --help` lists each option with its `Help:` line
   from the docs - is already pinned for Curl, more strictly, by `CurlHelpTextTests` in
   `Curl.Cli.UnitTests`: it compares Curl's `--help`, `--help all` and every `--help <category>`

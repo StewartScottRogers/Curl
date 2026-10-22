@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3078 — Fix AF-0325: ADR-0747 says case 1478 is skipped because no managen interpretation is registered; one is now registered
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Reworded ADR-0747 Decision bullet: managen is registered (mainpage and ascii only), so 1478 is no longer skipped as an unrun perl command but still does not pass; reproduction no longer matches "no interpretation of".
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. ADR-0747 now describes the registered managen script
