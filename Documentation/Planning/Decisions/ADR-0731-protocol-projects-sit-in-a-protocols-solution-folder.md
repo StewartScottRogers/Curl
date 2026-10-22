@@ -47,3 +47,19 @@ Stewart asked the same day to do the same for the shared projects. `Curl.slnx` h
 folder holding the five `.shproj` projects - Audit, Claude (`.claude`), Documentation, Gap and
 Tasks - flat and in alphabetical order, since none has a test project beside it. Only the solution
 file changes; the `Audit/` and `Gap/` folders themselves are untouched.
+
+## Amendment, 2026-10-21: every area in a group folder (BL-3009)
+
+Stewart asked the same day for groupings of the remaining flat projects ("There are too many projects
+to organise myself when looking at a flat representation of the solution") and accepted these. Each
+area sits with its tests in `/<Group>/<Area>/`, so no project stays in a flat run:
+
+- `/Hosts/`: Api, Console, Libcurl, Mcp - the four ways Curl is used.
+- `/CommandLine/`: Cli, Config, Output.
+- `/Transfer/`: Cookies, Core, Engine, Networking.
+- `/Wire/`: Http2, Http3, Quic, Zstandard - framing and encoding below the protocols.
+- `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
+
+Tls went to Security rather than Wire because it is hand-built cryptography; Zstandard to Wire as
+the nearest fit for an encoding; Cookies to Transfer, where the cookie engine runs. A new area goes in
+the group it belongs to, in a folder named for the area. As before, only the solution file changes.

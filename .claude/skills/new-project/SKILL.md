@@ -16,9 +16,10 @@ There is no `src/` and no `tests/` — do not create them.
    `dotnet new classlib --name Curl.<Area>.UnitLibrary --output Curl.<Area>.UnitLibrary --framework net10.0`
 4. Create the matching test project beside it:
    `dotnet new mstest --name Curl.<Area>.UnitTests --output Curl.<Area>.UnitTests --framework net10.0`
-5. Add both to the solution with no solution folder, so they stay in the flat run:
-   `dotnet sln Curl.slnx add Curl.<Area>.UnitLibrary Curl.<Area>.UnitTests`.
-   A protocol goes in its own folder under `Protocols` instead (ADR-0731):
+5. Add both to the solution in a folder for the area, under the group it belongs to
+   (Hosts, CommandLine, Transfer, Wire or Security; see CLAUDE.md, ADR-0731):
+   `dotnet sln Curl.slnx add --solution-folder <Group>/<Area> Curl.<Area>.UnitLibrary Curl.<Area>.UnitTests`.
+   A protocol goes in its own folder under `Protocols`:
    `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.UnitLibrary Curl.Protocol.<Name>.UnitTests`.
    A conformance part goes in its folder under `Conformance` the same way:
    `dotnet sln Curl.slnx add --solution-folder Conformance/<Part> Curl.Conformance.<Part>.UnitLibrary Curl.Conformance.<Part>.UnitTests`
@@ -54,9 +55,9 @@ agent - live only in `Curl.<Area>.IntegrationTests`, never in `Curl.<Area>.UnitT
    into every `*.UnitTests` and `*.IntegrationTests` project, and a copy is `error CS0579`.
 3. Add `<InternalsVisibleTo Include="Curl.<Area>.IntegrationTests" />` to the library's
    csproj only when the tests use its internals.
-4. Add it to `Curl.slnx` in its alphabetical place, with no solution folder:
-   `dotnet sln Curl.slnx add Curl.<Area>.IntegrationTests`. It sorts immediately before
-   `Curl.<Area>.UnitLibrary` (for `Curl.Console`, before `Curl.Console.UnitTests`). A
-   protocol's goes in its `Protocols/<Name>` folder, before the library there:
+4. Add it to `Curl.slnx` in the area's own solution folder, before the library there:
+   `dotnet sln Curl.slnx add --solution-folder <Group>/<Area> Curl.<Area>.IntegrationTests`.
+   It sorts immediately before `Curl.<Area>.UnitLibrary` (for `Curl.Console`, before
+   `Curl.Console.UnitTests`). A protocol's goes in its `Protocols/<Name>` folder:
    `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.IntegrationTests`.
 5. Run `dotnet build` and `dotnet test Curl.<Area>.IntegrationTests --filter "TestCategory=Integration"`.

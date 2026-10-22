@@ -321,14 +321,22 @@ Curl/
   every `Curl.*` project; in `Curl.slnx`, `Curl.Api`, `Curl.Api.UnitLibrary` and
   `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
 
-In `Curl.slnx`, projects are listed as one flat run with no solution folders around
-them, except the protocols and the conformance projects: each `Curl.Protocol.<Name>.*`
-project sits with its tests in the `/Protocols/<Name>/` solution folder,
-`Curl.Protocol.Abstractions.*` in `/Protocols/Abstractions/`, each
-`Curl.Conformance.<Part>.*` project in `/Conformance/<Part>/`, and the harness itself
-(`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`, and the
-shared projects (Audit, Claude, Documentation, Gap, Tasks) in `/Shared/` (ADR-0731).
-Solution folders change only the solution file; the
+In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
+under one folder for its group (ADR-0731):
+
+- `/Hosts/`: Api, Console, Libcurl, Mcp - the ways Curl is used.
+- `/CommandLine/`: Cli, Config, Output.
+- `/Transfer/`: Cookies, Core, Engine, Networking.
+- `/Wire/`: Http2, Http3, Quic, Zstandard - framing and encoding below the protocols.
+- `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
+- `/Protocols/<Name>/`: each `Curl.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
+  in `/Protocols/Abstractions/`.
+- `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
+  (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
+- `/Shared/`: the shared projects (Audit, Claude, Documentation, Gap, Tasks).
+
+A new area goes in the group it belongs to, in a folder named for the area. Solution
+folders change only the solution file; the
 directories on disk stay flat. The `Solution Items` and `Scripts` solution folders hold
 loose files only.
 
