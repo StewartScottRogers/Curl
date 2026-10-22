@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/ManualPages, Curl.Cli.UnitTests/ManualPages, Curl.Conformance.UnitLibrary/UpstreamManagenScript.cs, Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj, Curl.Conformance.UnitTests/UpstreamManagenScriptTests.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Managen.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3018 — Land the managen manual page generator, its Conformance script and UpstreamManagenScript tests (cases 1705 and 1706 pages byte for byte)
 
@@ -24,16 +24,18 @@ Left in this task: write `Curl.Conformance.UnitTests/UpstreamManagenScriptTests.
 
 ## Acceptance criteria
 
-- [ ] `managen` is registered as a `<command type="perl">` script (`UpstreamManagenScript`) and `UpstreamManagenScriptTests` covers its date rule (`SOURCE_DATE_EPOCH` set and unset) and a run that writes the page into a temporary folder.
-- [ ] `ManualPageGeneratorTests` renders case 1705's man page and case 1706's ASCII page byte for byte from the upstream inputs and passes.
-- [ ] `curl --ai-help` is unchanged (no option changed).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Cli.UnitTests` and `Curl.Conformance.UnitTests`.
+- [x] `managen` is registered as a `<command type="perl">` script (`UpstreamManagenScript`) and `UpstreamManagenScriptTests` covers its date rule (`SOURCE_DATE_EPOCH` set and unset) and a run that writes the page into a temporary folder.
+- [x] `ManualPageGeneratorTests` renders case 1705's man page and case 1706's ASCII page byte for byte from the upstream inputs and passes.
+- [x] `curl --ai-help` is unchanged (no option changed).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Cli.UnitTests` and `Curl.Conformance.UnitTests`.
 
 ## Notes
 
 - 2026-10-21: Split from BL-2881. The stash was re-stored under this task's ID (same commit d04b5e71f8b78a4dbe2c27d14b6679bdc848ce2b) so the shift applies it on the first claim.
+- 2026-10-21: Carried on from the stash: added `UpstreamManagenScriptTests` (SOURCE_DATE_EPOCH set and unset, a null environment, a mainpage run over a temporary folder it creates and deletes, the missing curlver.h die and a null invocation). The time-provider branch uses a fixed provider whose local zone is UTC so the date does not depend on the machine. No option changed, so `--ai-help` is untouched. Complexity is held by the build (CodeMetricsConfig, warnings as errors); branch coverage of the generator types is left to BL-3019, BL-3020 and BL-3021 as the task says.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: a60d5da2 970b5eb6 fe717512 a9c88fc5.
+- 2026-10-21: Doing -> Done. managen is a registered perl command script with UpstreamManagenScriptTests, and cases 1705 and 1706 render byte for byte
