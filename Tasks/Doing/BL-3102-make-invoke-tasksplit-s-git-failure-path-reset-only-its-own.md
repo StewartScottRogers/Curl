@@ -44,3 +44,4 @@ A failed commit causes the same problem, for example when `index.lock` is held o
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 0bf8c043 c341d42b 8e6335df 95ad9451.
