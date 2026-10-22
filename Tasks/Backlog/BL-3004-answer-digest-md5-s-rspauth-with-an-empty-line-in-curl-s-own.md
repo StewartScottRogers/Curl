@@ -1,5 +1,5 @@
 ---
-id: BL-3001
+id: BL-3004
 title: Answer DIGEST-MD5's rspauth with an empty line in curl's own form so upstream cases 823 and 869 pass
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-3001 — Answer DIGEST-MD5's rspauth with an empty line in curl's own form so upstream cases 823 and 869 pass
+# BL-3004 — Answer DIGEST-MD5's rspauth with an empty line in curl's own form so upstream cases 823 and 869 pass
 
 ## Goal
 

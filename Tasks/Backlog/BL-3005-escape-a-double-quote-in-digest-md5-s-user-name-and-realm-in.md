@@ -1,5 +1,5 @@
 ---
-id: BL-3002
+id: BL-3005
 title: Escape a double quote in DIGEST-MD5's user name and realm in curl's own form so upstream case 907 passes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-3002 — Escape a double quote in DIGEST-MD5's user name and realm in curl's own form so upstream case 907 passes
+# BL-3005 — Escape a double quote in DIGEST-MD5's user name and realm in curl's own form so upstream case 907 passes
 
 ## Goal
 
