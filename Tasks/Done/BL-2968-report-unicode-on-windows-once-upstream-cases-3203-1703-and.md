@@ -8,7 +8,7 @@ depends-on: [BL-2975]
 touches: [Curl.Conformance.UnitLibrary/UpstreamWindowsFeatures.cs, Curl.Conformance.UnitLibrary/UpstreamUtf8Words.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitLibrary/UpstreamCaseVerification.cs, Curl.Conformance.UnitTests/UpstreamUtf8WordsTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2968 — Report Unicode on Windows once upstream cases 3203, 1703 and 472 pass under it
 
@@ -28,9 +28,9 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 
 ## Acceptance criteria
 
-- [ ] The harness names `<client><file name>` and `<verify><file name>` files by the name's UTF-8 bytes (`UpstreamUtf8Words.AsSystemText`), `UpstreamWindowsFeatures.Names` still leaves `Unicode` out (ADR-0741), and test3203 still passes on Windows.
-- [ ] `UpstreamUtf8WordsTests` pins valid UTF-8, invalid bytes and ASCII.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] The harness names `<client><file name>` and `<verify><file name>` files by the name's UTF-8 bytes (`UpstreamUtf8Words.AsSystemText`), `UpstreamWindowsFeatures.Names` still leaves `Unicode` out (ADR-0741), and test3203 still passes on Windows.
+- [x] `UpstreamUtf8WordsTests` pins valid UTF-8, invalid bytes and ASCII.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
 
@@ -68,6 +68,8 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
   the new test file were added to `touches`: no Doing task on origin/work/dark-factory names them (lane 5's
   check). Fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary`: 0 failing members.
 
+- 2026-10-21 (lane 4): Verified only; no code change. The harness fix (1c92b86f8) and its tests were already committed; build -warnaserror clean, fast tests green (Conformance.UnitTests 4021 passed, test3203 on the ratchet), coverage and complexity measured by lane 2 with 0 failing members and no production change since.
+
 ## Log
 
 - 2026-10-21: Created.
@@ -77,3 +79,4 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 - 2026-10-21: Doing -> Backlog. Criteria rewritten: Unicode and test1703/test472 dropped per ADR-0741; harness UTF-8 file-name fix committed, next claim only verifies and completes
 - 2026-10-21: touches narrowed: dropped Curl.Protocol.File.UnitLibrary/UnitTests and Curl.Authentication.UnitLibrary/UnitTests, which served test1703's file:// path and test472's SigV4 query; both left this task's criteria under ADR-0741, and the remaining work is in the Conformance files already listed. Frees BL-2834 to run beside it.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 80698ca8 dc2ad84d dd1cc079.
+- 2026-10-21: Doing -> Done. Harness names case files by their UTF-8 bytes; test3203 passes on Windows; Unicode stays off per ADR-0741
