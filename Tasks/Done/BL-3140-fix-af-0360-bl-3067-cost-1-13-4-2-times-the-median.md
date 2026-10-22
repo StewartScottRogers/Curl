@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3140 — Fix AF-0360: BL-3067 cost $1.13, 4.2 times the median
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-3067 was a test-only mutant-kill task (two tests in AltSvcTransferCacheTests.cs). Its cost was cache rereads of a 24-turn run (1.09M cache_read tokens) plus one whole-solution build and fast-test pass (44 assemblies) to meet the build criterion. Its own Notes show one claim, no requeue, no rerun and no production change, so there was no avoidable waste in the run. Same shape as AF-0358 and AF-0359. Recorded as unavoidable; nothing in RunDarkFactory.ps1 changed.
+- Build clean; fast tests green (0 failed).
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0360 cost is cache rereads of one 24-turn test-only change; no avoidable waste
