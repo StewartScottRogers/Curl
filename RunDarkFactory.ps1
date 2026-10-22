@@ -74,6 +74,17 @@
     hours leave $1 or more of the cap. One whose own run stopped at the cap stays Blocked.
     -TaskBudgetUsd 0 removes the cap. -TestTaskBudget proves the arithmetic.
 
+    LANE CONTEXT AND TURN CAP
+
+    Every call of a headless run re-reads its fixed context, so runs load only what a lane
+    uses (BL-3001): project and local settings but not ~\.claude\settings.json (no user
+    hooks, plugins or their skills and agents; the project's hooks, the audit-path guard
+    among them, still run), no MCP server or claude.ai connector, no auto memory, and
+    DarkFactory\LaneRules.md in place of the root CLAUDE.md; a project folder's own
+    CLAUDE.md still loads when the run works there. Each run is also capped at
+    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops with its task
+    too big for one run. -TestLaneFlags proves the flags.
+
     THE MODEL PER TASK
 
     Each run uses the Claude model its task calls for (BL-1705), chosen in this order:
@@ -390,6 +401,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestClaimDuplicates
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestLaneFlags
 #>
 [CmdletBinding()]
 param(
@@ -404,6 +416,9 @@ param(
     # --max-budget-usd); the cap is 4 times the median recent run, at least $3, up to
     # this, and a run that reaches it has its task filed as Blocked. 0 means no cap (ADR-0288, ADR-0407, ADR-0478).
     [double]$TaskBudgetUsd = 10,
+    # The most turns a single headless run may take (claude's --max-turns); a run that
+    # reaches it stops, since its task is too big for one run. 0 means no cap (BL-3001).
+    [ValidateRange(0, 1000)][int]$MaxRunTurns = 80,
     # Model for every run, or auto (the default) to choose one per task; see THE MODEL PER
     # TASK above. "opus" is the moving alias RunClaude.cmd also uses.
     [string]$Model = $(if ($env:CLAUDE_MODEL) { $env:CLAUDE_MODEL } else { 'auto' }),
@@ -481,6 +496,9 @@ param(
     # Prove the trace labels an Edit or Write whose input names its file as path or
     # notebook_path or not at all, as it does one naming file_path (BL-2036), and exit.
     [switch]$TestToolLabels,
+    # Prove a headless run is launched with the slim lane context (no user settings, MCP
+    # servers or root CLAUDE.md; LaneRules.md instead) and the turn cap (BL-3001), and exit.
+    [switch]$TestLaneFlags,
     # How often, in minutes, the lanes' heartbeats are published as status.json on the
     # force-pushed board branch, plus once at shift end. 0 = never publish.
     [ValidateRange(0, 60)][int]$HeartbeatMinutes = 3,
