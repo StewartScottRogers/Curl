@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3104 — Keep Invoke-Claim's claim result when a split after the claim throws
 
@@ -30,13 +30,16 @@ For example, `Process.Start` can fail because `claude` is not on PATH, or a git 
 
 ## Acceptance criteria
 
-- [ ] Each `Invoke-TaskSplit` call in `Invoke-Claim`'s `finally` block is wrapped so that an exception is written to the trace and the next due split still runs.
-- [ ] `Invoke-Claim` returns its claim result when a split throws, and a factory self-test with a split stub that throws shows this.
-- [ ] The factory self-test that covers `Claim.ps1` passes.
+- [x] Each `Invoke-TaskSplit` call in `Invoke-Claim`'s `finally` block is wrapped so that an exception is written to the trace and the next due split still runs.
+- [x] `Invoke-Claim` returns its claim result when a split throws, and a factory self-test with a split stub that throws shows this.
+- [x] The factory self-test that covers `Claim.ps1` passes.
 
 ## Notes
+
+Self-test (-TestClaimDuplicates) gained a High task over its cost cap whose split stub throws; the claim still returns and the throw is traced.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 88e1eeeb f131c006 74336906.
+- 2026-10-22: Doing -> Done. Invoke-Claim traces a throwing split and still returns its claim

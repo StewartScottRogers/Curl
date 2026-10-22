@@ -281,7 +281,11 @@ function Invoke-Claim {
         $lock.Dispose()
         # A split run takes minutes, so it never holds the lock every lane's claim waits on;
         # Invoke-TaskSplit takes it again only to commit and push. At most once a day each.
-        foreach ($due in $splitDue) { Invoke-TaskSplit $due.Id $due.Why -PullOnRefusal | Out-Null }
+        # A split that throws is traced and must not replace the claim result being returned.
+        foreach ($due in $splitDue) {
+            try { Invoke-TaskSplit $due.Id $due.Why -PullOnRefusal | Out-Null }
+            catch { Write-Trace $due.Id 'split' "the split threw: $(Get-Short $_.Exception.Message 100)" 'Red' }
+        }
     }
 }
 
@@ -298,21 +302,26 @@ if ($TestClaimDuplicates) {
     git -C $repo checkout -q -b work 2>&1 | Out-Null
     foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $repo "Tasks\$state\.gitkeep") -Value '' }
     $file = {
-        param($Slug)
-        Set-Content -Path (Join-Path $repo "Tasks\Backlog\BL-001-$Slug.md") -Encoding UTF8 -Value @(
-            '---', 'id: BL-001', "title: $Slug", 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
+        param($Slug, $Id = 'BL-001', $Priority = 'Normal')
+        Set-Content -Path (Join-Path $repo "Tasks\Backlog\$Id-$Slug.md") -Encoding UTF8 -Value @(
+            '---', "id: $Id", "title: $Slug", "priority: $Priority", 'assignee: Claude', 'pipeline: direct',
             'depends-on: []', "touches: [$Slug]", 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
-            "# BL-001 - $Slug", '', '## Goal', '', '## Context', '', '## Acceptance criteria', '', '- [ ] Claimed.', '', '## Notes', '', '## Log', '', '- 2026-10-01: Created.')
+            "# $Id - $Slug", '', '## Goal', '', '## Context', '', '## Acceptance criteria', '', '- [ ] Claimed.', '', '## Notes', '', '## Log', '', '- 2026-10-01: Created.')
         git -C $repo add -A 2>&1 | Out-Null
         git -C $repo commit -q -m "file $Slug" 2>&1 | Out-Null
     }
     & $file 'first'
     & $file 'second'
+    # A third, High task is offered first, reported over its cost cap, and so split after the claim; the split throws.
+    & $file 'capped' 'BL-009' 'High'
     git -C $repo push -q origin work 2>&1 | Out-Null
     $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
     $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
     $env:CLAUDE_PROJECT_DIR = $repo
     $failed = 0
+    function Get-TaskNotClaimableWhy { param($Id) if ($Id -eq 'BL-009') { 'over its cost cap' } else { '' } }
+    function Get-TaskCapSpentWhy { param($Id) 'spent' }
+    function Invoke-TaskSplit { throw 'claude is not on PATH' }
     try {
         $claim = Invoke-Claim -Skip @()
         git -C $repo fetch -q origin work 2>&1 | Out-Null
@@ -320,7 +329,7 @@ if ($TestClaimDuplicates) {
         $ids = @($shared | ForEach-Object { if ($_ -match '(BL-\d+)-') { $Matches[1] } })
         $cases = @(
             ,@('a duplicate ID is renumbered and the claim goes on', 'claimed', $(if ($claim.Id) { 'claimed' } else { "waited: $($claim.Why)" }))
-            ,@('no ID is left naming two tasks on the shared branch', '2 tasks, 2 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
+            ,@('no ID is left naming two tasks on the shared branch', '3 tasks, 3 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
             ,@('the first task to be filed keeps its ID', 'True', "$(@($shared | Where-Object { $_ -match 'BL-001-first' }).Count -eq 1)")
             ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
         )
