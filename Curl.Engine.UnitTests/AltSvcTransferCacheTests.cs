@@ -78,6 +78,43 @@ public sealed class AltSvcTransferCacheTests
         Assert.AreEqual(expected, actual);
     }
 
+    /// <summary>
+    /// An entry whose alternative is another host is followed: the connection gets a route to that
+    /// alternative, which carries the origin's ALPN and the alternative's, host and port (AF-0314).
+    /// </summary>
+    [TestMethod]
+    public async Task ApplyTo_EntryForAnotherHost_RoutesToTheAlternative()
+    {
+        Diagnostics.Arrange("alt-svc header", "h2=\"other.test:8443\"");
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\"other.test:8443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
+
+        AltSvcRoute? actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions()).AltSvcRoute;
+        Diagnostics.Act("route", actual);
+
+        AltSvcRoute expected = new("h1", new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "other.test", 8443));
+        Diagnostics.Assert("route", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    /// <summary>
+    /// An entry whose alternative is the origin's own host and port dials no alternative: the
+    /// connection gets no route, only the alternative's version (AF-0314).
+    /// </summary>
+    [TestMethod]
+    public async Task ApplyTo_EntryForTheSameHostAndPort_GivesNoRoute()
+    {
+        Diagnostics.Arrange("alt-svc header", "h2=\":443\"");
+        AltSvcTransferCache cache = await AltSvcTransferCache.OpenAsync(new EasyHttpOptions { AltSvc = string.Empty }, [], new UnusedFileSystem(), TimeProvider.System);
+        cache.StoreFromResponse(CurlUrl.Parse("https://h.test/"), "h2=\":443\"", System.Net.HttpVersion.Version11, DateTimeOffset.UtcNow);
+
+        HttpRequestOptions actual = cache.ApplyTo(CurlUrl.Parse("https://h.test/"), new HttpRequestOptions { AltSvcRoute = new AltSvcRoute("h1", new Curl.Protocol.Abstractions.AltSvcAlternative("h2", "stale.test", 1)) });
+        Diagnostics.Act("route", actual.AltSvcRoute);
+
+        Diagnostics.Assert("route", (AltSvcRoute?)null, actual.AltSvcRoute);
+        Assert.IsNull(actual.AltSvcRoute);
+    }
+
     /// <summary>A file system the cache must never touch: an empty <c>--alt-svc</c> name reads and writes nothing.</summary>
     private sealed class UnusedFileSystem : IFileSystem
     {
