@@ -25,10 +25,12 @@ Found by the shift-end review of 2026-10-22 (code-reviewer, ADR-0710) in the dif
 
 ## Acceptance criteria
 
-- [ ] The bullet states the real bound as the code gives it (a fresh claim never starts with less than $2 left, so the floor does not overshoot for it; name any path that can overshoot, and that a run can overrun its own cap by part of a turn), and drops the "$2.01 spent, then a $2 run" example.
-- [ ] Every number in the bullet can be reproduced from `Get-RunBudgetUsd` and `Test-TaskCapSpent` in `DarkFactory/TaskBudget.ps1`.
+- [x] The bullet states the real bound as the code gives it (a fresh claim never starts with less than $2 left, so the floor does not overshoot for it; name any path that can overshoot, and that a run can overrun its own cap by part of a turn), and drops the "$2.01 spent, then a $2 run" example.
+- [x] Every number in the bullet can be reproduced from `Get-RunBudgetUsd` and `Test-TaskCapSpent` in `DarkFactory/TaskBudget.ps1`.
 
 ## Notes
+
+Checked against TaskBudget.ps1 (Get-RunBudgetUsd, Test-TaskCapSpent) and ShiftRunner.ps1:131 (resumed and overtime runs skip the gate). Documentation-only change; no build or tests needed.
 
 ## Log
 
