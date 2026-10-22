@@ -71,7 +71,6 @@ and `calloc` callbacks of `curl_global_init_mem`.
 
 `Libcurl` is held to 100% line and branch coverage, cyclomatic complexity at most 10 per method
 and a CRAP score at most 30, measured from the fast tests only. Its tests are in
-`Libcurl.UnitTests`, in the same folders. It depends on `Curl.Api.UnitLibrary` (result codes such as
+`Libcurl.UnitTests`, in the same folders. It depends on [`Curl.Api.UnitLibrary`](../Curl.Api.UnitLibrary/README.md) (result codes such as
 `CurlCode`) and `Curl.Engine.UnitLibrary` (the engine it drives), and the conformance runner
-`Curl.Conformance.UnitProgram.UnitLibrary` references it. See `CLAUDE.md` in this folder for the
-rules each area follows.
+`Curl.Conformance.UnitProgram.UnitLibrary` references it. Its .NET-idiomatic sibling over the same engine is [Curl.Api](../Curl.Api/README.md). See `CLAUDE.md` in this folder for the rules each area follows, and the [Glossary](../Documentation/Wiki/Glossary.md) for the terms.

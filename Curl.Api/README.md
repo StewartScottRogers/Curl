@@ -299,7 +299,6 @@ Every folder of `Curl.Api` is one concern; the namespace is `Curl.Api` (`Curl.Ap
 `Curl.Api` is held to the solution's gates: 100% line and branch coverage from the fast tests,
 cyclomatic complexity at most 10 per method and a CRAP score at most 30. Its tests are
 `Curl.Api.UnitTests`, which also test `Curl.Api.UnitLibrary`: run
-`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`. `Curl.Api` references
-`Curl.Api.UnitLibrary` (the engine contracts, callbacks, codes, info and option records that carry
+`dotnet test Curl.Api.UnitTests --filter "TestCategory!=Integration"`. `Curl.Api` references [`Curl.Api.UnitLibrary`](../Curl.Api.UnitLibrary/README.md) (the engine contracts, callbacks, codes, info and option records that carry
 no I/O) and `Curl.Engine.UnitLibrary` (the engine it sends through); `Curl.Api` is not itself a
-`Curl.<Area>.UnitLibrary`, but a naming exception like `Curl.Console` and `Libcurl`.
+`Curl.<Area>.UnitLibrary`, but a naming exception like [`Curl.Console`](../Curl.Console/README.md) and [`Libcurl`](../Libcurl/README.md), the libcurl-faithful programming interface over the same engine. Terms are those of the [Glossary](../Documentation/Wiki/Glossary.md).

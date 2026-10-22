@@ -5,9 +5,9 @@ curl command-line tool (<https://github.com/StewartScottRogers/Curl>), over stan
 output, using the Model Context Protocol (MCP). Any MCP client can use it: GitHub Copilot in VS
 Code and Visual Studio, Claude, and others.
 
-It is a thin host. The tool logic lives in `Curl.Mcp.UnitLibrary` (base class library only);
+It is a thin host. The tool logic lives in [`Curl.Mcp.UnitLibrary`](../Curl.Mcp.UnitLibrary/README.md) (base class library only);
 this project holds the Microsoft MCP SDK wiring and the packing. Design: ADR-0548 and
-`Documentation/Planning/Curl-Mcp.md`.
+`Documentation/Planning/Curl-Mcp.md`. It sits beside the other hosts, [Curl.Console](../Curl.Console/README.md) (the `curl` executable, whose `--ai-help` text it serves as MCP resources) and [Curl.Api](../Curl.Api/README.md). Terms are those of the [Glossary](../Documentation/Wiki/Glossary.md).
 
 ## Run it
 
