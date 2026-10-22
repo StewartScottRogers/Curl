@@ -26,6 +26,7 @@ public sealed class CurlUrlTool(McpUrlTool tool)
         + "returns the whole URL (curl_url_get). A part or URL the parser refuses, such as a bad port or no host, is a tool error "
         + "naming the part and the CURLUcode.";
 
+    // Shared by both tools so an agent sees one spelling of the flag names; McpUrlTool maps each name to a CURLU_* value.
     private const string FlagsDescription =
         "libcurl URL flags by name (CURLU_* without the prefix, in CamelCase), e.g. NonSupportScheme, DefaultPort, UrlDecode, "
         + "GuessScheme, PathAsIs; none when omitted.";
@@ -77,6 +78,10 @@ public sealed class CurlUrlTool(McpUrlTool tool)
         return ToCallToolResult(result.IsError, JsonSerializer.Serialize(result, CurlMcpJsonContext.Default.McpBuildUrlToolResult));
     }
 
+    /// <summary>Wraps a result already serialized to JSON as the one text block of a tool result.</summary>
+    /// <param name="isError">Whether the result is a tool error, so the agent sees the failure flag.</param>
+    /// <param name="json">The serialized result.</param>
+    /// <returns>The tool result.</returns>
     private static CallToolResult ToCallToolResult(bool isError, string json) =>
         new() { IsError = isError, Content = [new TextContentBlock { Text = json }] };
 }

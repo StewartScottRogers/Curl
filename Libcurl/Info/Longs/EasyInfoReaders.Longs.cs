@@ -54,6 +54,7 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadHttpVersion(TransferInfo info, EasyOptions options) => info.HttpVersion;
 
+    /// <summary>Reads the document's modification time in seconds; <see cref="CurlInfo.Filetime"/> and <see cref="CurlInfo.FiletimeT"/> share it.</summary>
     private static object? ReadFileTime(TransferInfo info, EasyOptions options) => info.FileTime;
 
     private static object? ReadRedirectCount(TransferInfo info, EasyOptions options) => info.RedirectCount;
@@ -91,7 +92,14 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadRtspCSeqReceived(TransferInfo info, EasyOptions options) => info.RtspCSeqReceived;
 
-    private static object? ReadProtocol(TransferInfo info, EasyOptions options) => info.Protocol;
+    /// <summary>
+    /// <c>CURLPROTO_MASK</c> (<c>urldata.h</c>): the public <c>CURLPROTO_*</c> bits, HTTP (bit 0) up to GOPHERS
+    /// (bit 29). <c>url.c</c> masks the connection's protocol with it for <see cref="CurlInfo.Protocol"/>, so a
+    /// ws, wss or mqtts transfer (bits 30, 31 and 32) reports 0.
+    /// </summary>
+    internal const long ProtocolMask = 0x3fffffff;
+
+    private static object? ReadProtocol(TransferInfo info, EasyOptions options) => info.Protocol & ProtocolMask;
 
     private static object? ReadProxyError(TransferInfo info, EasyOptions options) => info.ProxyError;
 

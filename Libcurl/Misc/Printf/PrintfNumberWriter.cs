@@ -49,6 +49,8 @@ internal static class PrintfNumberWriter
         }
     }
 
+    // Builds the digits with their octal '0' prefix and precision zeros, and takes their length (and that of the
+    // zeros) off the width, which is left as the room for padding and prefix.
     private static string FormatDigits(
         ulong magnitude, int numberBase, PrintfFlags flags, ref int width, int precision)
     {
@@ -99,6 +101,8 @@ internal static class PrintfNumberWriter
         return (flags & PrintfFlags.Upper) != 0 ? "0X" : "0x";
     }
 
+    // Pads around the prefix and digits: spaces before everything, or zeros between prefix and digits, or spaces after.
+    // The width is what is left once the prefix is counted.
     private static void WriteField(PrintfOutput output, PrintfFlags flags, int width, string prefix, string digits)
     {
         bool left = (flags & PrintfFlags.Left) != 0;

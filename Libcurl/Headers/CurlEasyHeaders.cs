@@ -40,6 +40,7 @@ public static class CurlEasyHeaders
     public static CurlHeader? NextHeader(this CurlEasy? easy, CurlHeaderOrigin origin, int request, CurlHeader? previous) =>
         LiveHeaders(easy)?.Next(origin, request, previous);
 
+    /// <summary>The easy handle's recorded headers, or <see langword="null"/> when <paramref name="easy"/> is <see langword="null"/> or cleaned up, which each caller answers as no header.</summary>
     private static ITransferHeaders? LiveHeaders(CurlEasy? easy) =>
         easy is null || easy.IsCleanedUp ? null : easy.Transfer.Headers;
 }

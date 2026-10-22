@@ -276,10 +276,10 @@ public sealed class DohDnsResolverTests
     }
 
     [TestMethod]
-    public async Task ResolveAsync_AnAnswerWithStatus500_IsStillDecoded()
+    public async Task ResolveAsync_AnAnswerWithStatus500_IsNotDecoded()
     {
-        // Measured on 2026-09-28 (BL-641): a 500 carrying a valid A answer resolved the name,
-        // curl printing "IPv4: 127.0.0.1" and going on to connect (exit 7).
+        // curl 8.21.0 decoded a 500 carrying a valid A answer (BL-641); 8.22.0's doh_probe_done
+        // fails the query before decoding it, so the name resolves to nothing (exit 6, BL-2972).
         var answer = AnswerTo(DnsRecordType.A, IPAddress.Loopback);
         var response = Encoding.Latin1.GetBytes($"HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n");
         var connector = Answering([.. response, .. answer]);
@@ -287,8 +287,8 @@ public sealed class DohDnsResolverTests
 
         var addresses = await new DohDnsResolver(connector, MeasuredDohUrl).ResolveAsync("example.test", CancellationToken.None);
 
-        WriteAddresses([IPAddress.Loopback], addresses);
-        CollectionAssert.AreEqual(new[] { IPAddress.Loopback }, addresses.ToArray());
+        WriteAddresses([], addresses);
+        Assert.IsEmpty(addresses);
     }
 
     [TestMethod]

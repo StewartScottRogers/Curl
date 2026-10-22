@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the <c>curl_easy_setopt</c> lines <see cref="LibcurlSourceCode" /> writes for the HTTP, output and
 /// connection options, and the <c>curl_slist</c> and <c>curl_mime</c> variables some of them need, against
-/// curl 8.21.0 (mingw, Schannel) measured on 2026-10-01 with <c>Record-CurlExchange.ps1</c> and
+/// curl 8.21.0 (mingw, Schannel) measured on 2026-10-01 and reordered to curl 8.22.0 (config2setopts.c order) with <c>Record-CurlExchange.ps1</c> and
 /// <c>--libcurl - -s</c> (BL-653 Notes). Each row is one measured command line, byte for byte.
 /// </summary>
 [TestClass]
@@ -50,7 +50,8 @@ public sealed class LibcurlSourceCodeOptionTests
     private const string PassiveIp = "  curl_easy_setopt(curl, CURLOPT_FTP_SKIP_PASV_IP, 1L);\n";
     private const string Tls = "  curl_easy_setopt(curl, CURLOPT_SSLVERSION, (long)CURL_SSLVERSION_TLSv1_2);\n";
     private const string KeepAlive = "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);\n";
-    private const string Plain = Agent + MaxRedirs + Tls + KeepAlive;
+    private const string Tail = MaxRedirs + Tls + KeepAlive;
+    private const string Plain = Agent + Tail;
 
     private const string Perform =
         "\n"
@@ -97,12 +98,12 @@ public sealed class LibcurlSourceCodeOptionTests
         + "                    (curl_seek_callback)fseek, NULL, stdin);\n";
 
     [TestMethod]
-    [DataRow("-X|PUT|" + Url, Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"PUT\");\n" + KeepAlive)]
-    [DataRow("-d|a=1|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a=1\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n" + Plain)]
-    [DataRow("-d|a=1|-d|b=2|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a=1&b=2\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)7);\n" + Plain)]
-    [DataRow("--data-raw|x@y|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"x@y\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n" + Plain)]
-    [DataRow("--data-urlencode|a b|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a+b\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n" + Plain)]
-    [DataRow("-d||" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"\");\n" + Plain)]
+    [DataRow("-X|PUT|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"PUT\");\n" + Tail)]
+    [DataRow("-d|a=1|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a=1\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n" + Tail)]
+    [DataRow("-d|a=1|-d|b=2|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a=1&b=2\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)7);\n" + Tail)]
+    [DataRow("--data-raw|x@y|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"x@y\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n" + Tail)]
+    [DataRow("--data-urlencode|a b|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a+b\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n" + Tail)]
+    [DataRow("-d||" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"\");\n" + Tail)]
     [DataRow("-u|user:pass|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"user:pass\");\n" + Plain)]
     [DataRow("-L|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);\n" + MaxRedirs + Tls + KeepAlive)]
     [DataRow("-e|http://ref/|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_REFERER, \"http://ref/\");\n" + Plain)]
@@ -113,23 +114,23 @@ public sealed class LibcurlSourceCodeOptionTests
     [DataRow("-b|jar.txt|-b|j2.txt|" + Url, Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar.txt\");\n  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"j2.txt\");\n" + Tls + KeepAlive)]
     [DataRow("-b|j2.txt|-b|a=1|" + Url, Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIE, \"a=1\");\n  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"j2.txt\");\n" + Tls + KeepAlive)]
     [DataRow("-c|jar.txt|" + Url, Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIEJAR, \"jar.txt\");\n" + Tls + KeepAlive)]
-    [DataRow("-b|a=1|-b|jar|-c|j|-R|" + Url, Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIE, \"a=1\");\n  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar\");\n  curl_easy_setopt(curl, CURLOPT_COOKIEJAR, \"j\");\n" + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + KeepAlive)]
+    [DataRow("-b|a=1|-b|jar|-c|j|-R|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIE, \"a=1\");\n  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar\");\n  curl_easy_setopt(curl, CURLOPT_COOKIEJAR, \"j\");\n" + Tls + KeepAlive)]
     [DataRow("--compressed|" + Url, Start + Agent + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, \"\");\n" + Tls + KeepAlive)]
-    [DataRow("-I|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n" + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + KeepAlive)]
-    [DataRow("-I|-6|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n" + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 2L);\n" + KeepAlive)]
-    [DataRow("-f|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n" + Plain)]
+    [DataRow("-I|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + Tail)]
+    [DataRow("-I|-6|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 2L);\n" + KeepAlive)]
+    [DataRow("-f|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n" + Tail)]
     [DataRow("--fail-with-body|" + Url, Start + Plain)]
     [DataRow("-o|out.txt|" + Url, Start + Plain)]
     [DataRow("-O|" + Url, Start + Plain)]
     [DataRow("-i|" + Url, Start + Plain)]
     [DataRow("--connect-timeout|5|" + Url, Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L);\n" + KeepAlive)]
     [DataRow("--connect-timeout|2.5|" + Url, Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2500L);\n" + KeepAlive)]
-    [DataRow("-m|10|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 10000L);\n" + Plain)]
-    [DataRow("-m|1.5|" + Url, Start + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 1500L);\n" + Plain)]
+    [DataRow("-m|10|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 10000L);\n" + Tail)]
+    [DataRow("-m|1.5|" + Url, Start + Agent + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 1500L);\n" + Tail)]
     [DataRow("--connect-timeout|0|-m|0|" + Url, Start + Plain)]
     [DataRow("-4|" + Url, Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n" + KeepAlive)]
     [DataRow("-6|" + Url, Start + Agent + MaxRedirs + Tls + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 2L);\n" + KeepAlive)]
-    [DataRow("-I|ftp://127.0.0.1:1/", FtpStart + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n" + Agent + PassiveIp + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + KeepAlive)]
+    [DataRow("-I|ftp://127.0.0.1:1/", FtpStart + Agent + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n" + PassiveIp + Tls + KeepAlive)]
     public void Generate_OptionWithoutVariables_WritesCurlsLinesByteForByte(string arguments, string transfer)
     {
         string expected = Top + Init + transfer + Perform + End;
@@ -144,26 +145,26 @@ public sealed class LibcurlSourceCodeOptionTests
     [DataRow("-H|X-A: 1|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X-A: 1\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Plain, Slist1Free)]
     [DataRow("-H|X-A: 1|-H|X-B: 2|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X-A: 1\");\n  slist1 = curl_slist_append(slist1, \"X-B: 2\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Plain, Slist1Free)]
     [DataRow("-H|X:|-H|Y;|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X:\");\n  slist1 = curl_slist_append(slist1, \"Y;\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Plain, Slist1Free)]
-    [DataRow("--json|{}|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"Content-Type: application/json\");\n  slist1 = curl_slist_append(slist1, \"Accept: application/json\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"{}\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)2);\n  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Plain, Slist1Free)]
-    [DataRow("-H|X: 1|--json|{}|-H|Accept: x|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X: 1\");\n  slist1 = curl_slist_append(slist1, \"Accept: x\");\n  slist1 = curl_slist_append(slist1, \"Content-Type: application/json\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"{}\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)2);\n  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Plain, Slist1Free)]
+    [DataRow("--json|{}|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"Content-Type: application/json\");\n  slist1 = curl_slist_append(slist1, \"Accept: application/json\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"{}\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)2);\n" + Tail, Slist1Free)]
+    [DataRow("-H|X: 1|--json|{}|-H|Accept: x|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X: 1\");\n  slist1 = curl_slist_append(slist1, \"Accept: x\");\n  slist1 = curl_slist_append(slist1, \"Content-Type: application/json\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n" + Agent + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"{}\");\n  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)2);\n" + Tail, Slist1Free)]
     [DataRow("--resolve|h:47653:127.0.0.1|http://h:47653/f.txt", Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"h:47653:127.0.0.1\");\n", HostStart + Plain + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist1);\n", Slist1Free)]
     [DataRow("--resolve|h:1:127.0.0.1|--resolve|g:1:127.0.0.1|" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"h:1:127.0.0.1\");\n  slist1 = curl_slist_append(slist1, \"g:1:127.0.0.1\");\n", Start + Plain + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist1);\n", Slist1Free)]
     [DataRow("--connect-to|h:47653:127.0.0.1:47653|http://h:47653/f.txt", Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"h:47653:127.0.0.1:47653\");\n", HostStart + Plain + "  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist1);\n", Slist1Free)]
-    [DataRow("-F|a=1|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|f=@up.txt|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_name(part1, \"f\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|a=1|-F|b=<up.txt;type=text/x|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n  part1 = curl_mime_addpart(mime1);\n  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_filename(part1, NULL);\n  curl_mime_name(part1, \"b\");\n  curl_mime_type(part1, \"text/x\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|f=@up.txt;type=text/plain;filename=n.txt|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_filename(part1, \"n.txt\");\n  curl_mime_name(part1, \"f\");\n  curl_mime_type(part1, \"text/plain\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|a=hi;filename=n.txt|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_data(part1, \"hi\", CURL_ZERO_TERMINATED);\n  curl_mime_filename(part1, \"n.txt\");\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("--form-string|a=@x;type=y|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_data(part1, \"@x;type=y\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|a=-|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_data(part1, \"-\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|=v|" + Url, Mime1, Mime1Null, Start + Mime1Init + "  curl_mime_data(part1, \"v\", CURL_ZERO_TERMINATED);\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|f=@-|" + Url, Mime1, Mime1Null, Start + Mime1Init + StdinData + "  curl_mime_filename(part1, \"-\");\n  curl_mime_name(part1, \"f\");\n" + Mime1Post + Plain, Mime1Free)]
-    [DataRow("-F|a=1;headers=X-P: 1;encoder=base64|" + Url, Mime1 + Slist1, Mime1Null + "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X-P: 1\");\n", Start + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_encoder(part1, \"base64\");\n  curl_mime_name(part1, \"a\");\n  curl_mime_headers(part1, slist1, 1);\n  slist1 = NULL;\n" + Mime1Post + Plain, Mime1Free + Slist1Free)]
-    [DataRow("-F|m=(;type=multipart/mixed|-F|a=1|-F|=)|" + Url, Mime1 + "  curl_mime *mime2;\n  curl_mimepart *part2;\n", Mime1Null + "  mime2 = NULL;\n", Start + Mime1Init + "  mime2 = curl_mime_init(curl);\n  part2 = curl_mime_addpart(mime2);\n  curl_mime_data(part2, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part2, \"a\");\n  curl_mime_subparts(part1, mime2);\n  mime2 = NULL;\n  curl_mime_name(part1, \"m\");\n  curl_mime_type(part1, \"multipart/mixed\");\n" + Mime1Post + Plain, Mime1Free + "  curl_mime_free(mime2);\n  mime2 = NULL;\n")]
-    [DataRow("-F|f=@up.txt,up.txt|" + Url, Mime1 + "  curl_mime *mime2;\n  curl_mimepart *part2;\n", Mime1Null + "  mime2 = NULL;\n", Start + Mime1Init + "  mime2 = curl_mime_init(curl);\n  part2 = curl_mime_addpart(mime2);\n  curl_mime_filedata(part2, \"up.txt\");\n  part2 = curl_mime_addpart(mime2);\n  curl_mime_filedata(part2, \"up.txt\");\n  curl_mime_subparts(part1, mime2);\n  mime2 = NULL;\n  curl_mime_name(part1, \"f\");\n" + Mime1Post + Plain, Mime1Free + "  curl_mime_free(mime2);\n  mime2 = NULL;\n")]
-    [DataRow("-F|a=<-;filename=x|-F|b=<up.txt;filename=y;type=t/x|-F|c=t;type=text/x;headers=H: 1;headers=H: 2|-F|d=<-|http://127.0.0.1:1/", Mime1 + Slist1, Mime1Null + "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"H: 1\");\n  slist1 = curl_slist_append(slist1, \"H: 2\");\n", "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n" + Mime1Init + StdinData + "  curl_mime_name(part1, \"a\");\n  part1 = curl_mime_addpart(mime1);\n  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_filename(part1, NULL);\n  curl_mime_name(part1, \"b\");\n  curl_mime_type(part1, \"t/x\");\n  part1 = curl_mime_addpart(mime1);\n  curl_mime_data(part1, \"t\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"c\");\n  curl_mime_type(part1, \"text/x\");\n  curl_mime_headers(part1, slist1, 1);\n  slist1 = NULL;\n  part1 = curl_mime_addpart(mime1);\n" + StdinData + "  curl_mime_name(part1, \"d\");\n" + Mime1Post + Plain, Mime1Free + Slist1Free)]
-    [DataRow("-F|a=1|ftp://127.0.0.1:1/", Mime1, Mime1Null, FtpStart + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Agent + PassiveIp + Tls + KeepAlive, Mime1Free)]
-    [DataRow("-I|-f|-H|X: 1|-X|HEAD|-u|u:p|-b|jar.txt|-A||" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X: 1\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n  curl_easy_setopt(curl, CURLOPT_USERPWD, \"u:p\");\n  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar.txt\");\n" + Tls + "  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"HEAD\");\n" + KeepAlive, Slist1Free)]
+    [DataRow("-F|a=1|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|f=@up.txt|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_name(part1, \"f\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|a=1|-F|b=<up.txt;type=text/x|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n  part1 = curl_mime_addpart(mime1);\n  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_filename(part1, NULL);\n  curl_mime_name(part1, \"b\");\n  curl_mime_type(part1, \"text/x\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|f=@up.txt;type=text/plain;filename=n.txt|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_filename(part1, \"n.txt\");\n  curl_mime_name(part1, \"f\");\n  curl_mime_type(part1, \"text/plain\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|a=hi;filename=n.txt|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_data(part1, \"hi\", CURL_ZERO_TERMINATED);\n  curl_mime_filename(part1, \"n.txt\");\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("--form-string|a=@x;type=y|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_data(part1, \"@x;type=y\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|a=-|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_data(part1, \"-\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|=v|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + "  curl_mime_data(part1, \"v\", CURL_ZERO_TERMINATED);\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|f=@-|" + Url, Mime1, Mime1Null, Start + Agent + Mime1Init + StdinData + "  curl_mime_filename(part1, \"-\");\n  curl_mime_name(part1, \"f\");\n" + Mime1Post + Tail, Mime1Free)]
+    [DataRow("-F|a=1;headers=X-P: 1;encoder=base64|" + Url, Mime1 + Slist1, Mime1Null + "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X-P: 1\");\n", Start + Agent + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_encoder(part1, \"base64\");\n  curl_mime_name(part1, \"a\");\n  curl_mime_headers(part1, slist1, 1);\n  slist1 = NULL;\n" + Mime1Post + Tail, Mime1Free + Slist1Free)]
+    [DataRow("-F|m=(;type=multipart/mixed|-F|a=1|-F|=)|" + Url, Mime1 + "  curl_mime *mime2;\n  curl_mimepart *part2;\n", Mime1Null + "  mime2 = NULL;\n", Start + Agent + Mime1Init + "  mime2 = curl_mime_init(curl);\n  part2 = curl_mime_addpart(mime2);\n  curl_mime_data(part2, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part2, \"a\");\n  curl_mime_subparts(part1, mime2);\n  mime2 = NULL;\n  curl_mime_name(part1, \"m\");\n  curl_mime_type(part1, \"multipart/mixed\");\n" + Mime1Post + Tail, Mime1Free + "  curl_mime_free(mime2);\n  mime2 = NULL;\n")]
+    [DataRow("-F|f=@up.txt,up.txt|" + Url, Mime1 + "  curl_mime *mime2;\n  curl_mimepart *part2;\n", Mime1Null + "  mime2 = NULL;\n", Start + Agent + Mime1Init + "  mime2 = curl_mime_init(curl);\n  part2 = curl_mime_addpart(mime2);\n  curl_mime_filedata(part2, \"up.txt\");\n  part2 = curl_mime_addpart(mime2);\n  curl_mime_filedata(part2, \"up.txt\");\n  curl_mime_subparts(part1, mime2);\n  mime2 = NULL;\n  curl_mime_name(part1, \"f\");\n" + Mime1Post + Tail, Mime1Free + "  curl_mime_free(mime2);\n  mime2 = NULL;\n")]
+    [DataRow("-F|a=<-;filename=x|-F|b=<up.txt;filename=y;type=t/x|-F|c=t;type=text/x;headers=H: 1;headers=H: 2|-F|d=<-|http://127.0.0.1:1/", Mime1 + Slist1, Mime1Null + "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"H: 1\");\n  slist1 = curl_slist_append(slist1, \"H: 2\");\n", "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n" + Agent + Mime1Init + StdinData + "  curl_mime_name(part1, \"a\");\n  part1 = curl_mime_addpart(mime1);\n  curl_mime_filedata(part1, \"up.txt\");\n  curl_mime_filename(part1, NULL);\n  curl_mime_name(part1, \"b\");\n  curl_mime_type(part1, \"t/x\");\n  part1 = curl_mime_addpart(mime1);\n  curl_mime_data(part1, \"t\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"c\");\n  curl_mime_type(part1, \"text/x\");\n  curl_mime_headers(part1, slist1, 1);\n  slist1 = NULL;\n  part1 = curl_mime_addpart(mime1);\n" + StdinData + "  curl_mime_name(part1, \"d\");\n" + Mime1Post + Tail, Mime1Free + Slist1Free)]
+    [DataRow("-F|a=1|ftp://127.0.0.1:1/", Mime1, Mime1Null, FtpStart + Agent + Mime1Init + "  curl_mime_data(part1, \"1\", CURL_ZERO_TERMINATED);\n  curl_mime_name(part1, \"a\");\n" + Mime1Post + PassiveIp + Tls + KeepAlive, Mime1Free)]
+    [DataRow("-I|-f|-H|X: 1|-X|HEAD|-u|u:p|-b|jar.txt|-A||" + Url, Slist1, "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X: 1\");\n", Start + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"u:p\");\n  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"\");\n  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);\n  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n  curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);\n  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"HEAD\");\n" + MaxRedirs + "  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar.txt\");\n" + Tls + KeepAlive, Slist1Free)]
     public void Generate_OptionWithVariables_DeclaresFillsAndFreesThemAsCurlDoes(string arguments, string declarations, string initialisations, string transfer, string cleanups)
     {
         string expected = Top + declarations + "\n" + initialisations + Init + transfer + Perform + cleanups + End;
@@ -189,21 +190,21 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  slist3 = NULL;\n  slist3 = curl_slist_append(slist3, \"h:47653:127.0.0.1:47653\");\n"
             + Init
             + HostStart
-            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"user:pass\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 10000L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a=1\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n"
             + "  curl_easy_setopt(curl, CURLOPT_REFERER, \"http://ref/\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"agent/1\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 10000L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a=1\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)3);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"PUT\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);\n"
             + MaxRedirs
             + "  curl_easy_setopt(curl, CURLOPT_ACCEPT_ENCODING, \"\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_COOKIE, \"a=1\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_COOKIEJAR, \"jar.txt\");\n"
             + Tls
-            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"PUT\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n"
             + KeepAlive
@@ -220,33 +221,34 @@ public sealed class LibcurlSourceCodeOptionTests
     }
 
     [TestMethod]
-    public void Generate_CombinedFormAndCookieOptions_WritesTheMimeBeforeTheHeaders()
+    public void Generate_CombinedFormAndCookieOptions_WritesTheMimeAfterTheHeaders()
     {
         string arguments = "-F|n=v|-H|X: 1|-b|a=1|-b|jar|-c|j|-L|-e|r;auto|--compressed|-f|-u|u:p|-A|ag|-X|POST"
             + "|--connect-timeout|3|-m|4|-6|--resolve|h:1:127.0.0.1|--connect-to|h:1:127.0.0.1:1|http://127.0.0.1:1/";
 
         string expected =
             Top
-            + Mime1 + Slist1 + "  struct curl_slist *slist2;\n  struct curl_slist *slist3;\n"
+            + Slist1 + Mime1 + "  struct curl_slist *slist2;\n  struct curl_slist *slist3;\n"
             + "\n"
-            + Mime1Null
             + "  slist1 = NULL;\n  slist1 = curl_slist_append(slist1, \"X: 1\");\n"
+            + Mime1Null
             + "  slist2 = NULL;\n  slist2 = curl_slist_append(slist2, \"h:1:127.0.0.1\");\n"
             + "  slist3 = NULL;\n  slist3 = curl_slist_append(slist3, \"h:1:127.0.0.1:1\");\n"
             + Init
             + "  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 102400L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"u:p\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_REFERER, \"r\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"ag\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 4000L);\n"
             + Mime1Init
             + "  curl_mime_data(part1, \"v\", CURL_ZERO_TERMINATED);\n"
             + "  curl_mime_name(part1, \"n\");\n"
             + Mime1Post
-            + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_REFERER, \"r\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"ag\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"POST\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_AUTOREFERER, 1L);\n"
             + MaxRedirs
@@ -255,14 +257,13 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_COOKIEFILE, \"jar\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_COOKIEJAR, \"j\");\n"
             + Tls
-            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"POST\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 3000L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 2L);\n"
             + KeepAlive
             + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist2);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECT_TO, slist3);\n"
             + Perform
-            + Mime1Free + Slist1Free + Slist2Free + Slist3Free
+            + Slist1Free + Mime1Free + Slist2Free + Slist3Free
             + End;
 
         string source = GenerateFor(arguments);
@@ -286,17 +287,17 @@ public sealed class LibcurlSourceCodeOptionTests
             + "  slist3 = NULL;\n  slist3 = curl_slist_append(slist3, \"::127.0.0.1:1\");\n"
             + Init
             + FtpStart
-            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"u:p\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 2000L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)1);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist1);\n"
             + "  curl_easy_setopt(curl, CURLOPT_REFERER, \"r\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"ag\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 2000L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, \"a\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)1);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"P\");\n"
             + PassiveIp
             + Tls
-            + "  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, \"P\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 1000L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_IPRESOLVE, 1L);\n"
             + KeepAlive

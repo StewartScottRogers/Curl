@@ -4,12 +4,12 @@ namespace Curl.Output;
 
 /// <summary>
 /// Passes a DoH sub-transfer's events on to the transfer's own <paramref name="inner" /> events
-/// with curl 8.21.0's <c>[DNS] </c> prefix on every info line, as curl writes a DoH sub-transfer's
-/// <c>-v</c> lines under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c> (measured, BL-1157 Notes;
-/// ADR-0380): the structured events - a connection opened or reused, a TLS handshake, message and
-/// trust - are worded here as <see cref="TransferEventInfoText" /> words them for
+/// with curl 8.22.0's <c>[DoH] </c> prefix on every info line, as curl writes a DoH sub-transfer's
+/// <c>-v</c> lines under <c>--trace-config dns</c>, <c>doh</c> or <c>all</c> (measured, BL-1157 Notes,
+/// BL-2973; ADR-0380): the structured events - a connection opened or reused, a TLS handshake, message
+/// and trust - are worded here as <see cref="TransferEventInfoText" /> words them for
 /// <paramref name="tlsBackend" /> and reported as prefixed info lines, so a DNS filter line such as
-/// <c>[DNS] added</c> becomes <c>[DNS] [DNS] added</c>. The header and data lines (<c>&gt;</c>,
+/// <c>[DNS] added</c> becomes <c>[DoH] [DNS] added</c>. The header and data lines (<c>&gt;</c>,
 /// <c>&lt;</c>, <c>}</c>, <c>{</c>) and the TLS bytes pass on unprefixed, as curl writes them.
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
@@ -22,7 +22,7 @@ namespace Curl.Output;
 public sealed class DohSubTransferEvents(ITransferEvents inner, TlsBackend tlsBackend) : ITransferEvents
 {
     /// <summary>The prefix curl puts on a DoH sub-transfer's info lines.</summary>
-    public const string Prefix = "[DNS] ";
+    public const string Prefix = "[DoH] ";
 
     private const string FilterCreatedLineStart = "[DNS] created DNS filter for ";
 

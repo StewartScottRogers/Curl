@@ -1,46 +1,23 @@
 using Curl.Networking.Fakes;
 using Curl.Protocol.Abstractions;
-using Curl.Testing;
 
 namespace Curl.Networking;
 
-// Pins the --trace-config doh lines for a DoH query whose connection or exchange failed (BL-850).
+// Pins the --trace-config doh lines for a DoH query whose connection or exchange failed (BL-850, BL-2970).
 public sealed partial class DohDnsResolverTraceTests
 {
     [TestMethod]
-    public async Task ResolveAsync_A500WithAnEmptyBody_ReportsTooSmallForBothTypes()
+    public async Task ResolveAsync_ACloseDelimitedBody_ReportsTheReceiveFailureForEachQuery()
     {
-        var lines = await TraceAsync(Response("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"));
-
-        var expectedLines = new[]
-            {
-                "[DNS] DoH: Too small type A for example.test",
-                "[DNS] DoH: Too small type AAAA for example.test",
-            };
-        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
-        CollectionAssert.AreEqual(expectedLines, lines);
-    }
-
-    [TestMethod]
-    public async Task ResolveAsync_ACloseDelimitedBody_ReportsTheReceiveFailuresAndAnEmptyEntry()
-    {
-        // curl skips the decode of a failed exchange, so it counts as answered and the entry,
-        // with no address and the TTL it starts from, is printed.
         var lines = await TraceAsync([.. Response("HTTP/1.1 200 OK\r\n\r\n"), .. Convert.FromHexString(MeasuredAAnswer)]);
 
-        var expectedLines = new[]
-            {
-                "[DNS] DoH request Failure when receiving data from the peer",
-                "[DNS] DoH request Failure when receiving data from the peer",
-                "[DNS] hostname: example.test",
-                "[DoH] TTL: 2147483647 seconds",
-            };
-        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
-        CollectionAssert.AreEqual(expectedLines, lines);
+        AssertLines(
+            ["[DoH] [DoH] [AAAA] error: Failure when receiving data from the peer", "[DoH] [DoH] [A] error: Failure when receiving data from the peer"],
+            lines);
     }
 
     [TestMethod]
-    public async Task ResolveAsync_ARefusedCertificate_ReportsTheConnectFailuresAndAnEmptyEntry()
+    public async Task ResolveAsync_ARefusedCertificate_ReportsTheConnectFailureForEachQuery()
     {
         // Without --doh-insecure: both handshakes failed with exit 60.
         var connector = new FakeConnector
@@ -50,34 +27,43 @@ public sealed partial class DohDnsResolverTraceTests
 
         var lines = await TraceAsync(connector);
 
-        var expectedLines = new[]
-            {
-                "[DNS] DoH request SSL peer certificate or SSH remote key was not OK",
-                "[DNS] DoH request SSL peer certificate or SSH remote key was not OK",
-                "[DNS] hostname: example.test",
-                "[DoH] TTL: 2147483647 seconds",
-            };
-        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
-        CollectionAssert.AreEqual(expectedLines, lines);
+        AssertLines(
+            ["[DoH] [DoH] [AAAA] error: SSL peer certificate or SSH remote key was not OK", "[DoH] [DoH] [A] error: SSL peer certificate or SSH remote key was not OK"],
+            lines);
     }
 
     [TestMethod]
-    public async Task ResolveAsync_OneExchangeFailingAndOneDecoding_ReportsBothWithTheDecodedAddress()
+    public async Task ResolveAsync_A500WithAnEmptyBody_ReportsTheHttpStatusAndResolvesNothing()
+    {
+        // Measured with curl 8.22.0 (Schannel) under -4: the status line, then exit 6 (BL-2972).
+        var (lines, addresses) = await TraceOnlyAAsync(Response("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n"));
+
+        AssertLines(["[DoH] [DoH] [A] error: HTTP status 500"], lines);
+        Assert.IsEmpty(addresses);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 301 Moved Permanently", "[DoH] [DoH] [AAAA] error: HTTP status 301", "[DoH] [DoH] [A] error: HTTP status 301")]
+    [DataRow("HTTP/1.1 199 Early", "[DoH] [DoH] [AAAA] error: HTTP status 199", "[DoH] [DoH] [A] error: HTTP status 199")]
+    public async Task ResolveAsync_AStatusOutside2xxWithAnAnswerBody_ReportsTheHttpStatusWithoutDecoding(string statusLine, string aaaaLine, string aLine)
+    {
+        // doh_probe_done (curl-8_22_0) fails any status below 200 or from 300 before doh_resp_decode.
+        byte[] answer = Convert.FromHexString(MeasuredAAnswer);
+        var lines = await TraceAsync([.. Response($"{statusLine}\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer]);
+
+        AssertLines([aaaaLine, aLine], lines);
+    }
+
+    [TestMethod]
+    public async Task ResolveAsync_OneExchangeFailingAndOneDecoding_ReportsTheFailureAndResolvesTheDecodedAddress()
     {
         var connector = new FakeConnector();
         connector.BytesToRead.Add(Ok(Convert.FromHexString(MeasuredAAnswer)));
         connector.BytesToRead.Add(Response("HTTP/1.1 200 OK\r\n\r\n"));
 
-        var lines = await TraceAsync(connector);
+        var (lines, addresses) = await ResolveAsync(connector, System.Net.Sockets.AddressFamily.Unspecified);
 
-        var expectedLines = new[]
-            {
-                "[DNS] DoH request Failure when receiving data from the peer",
-                "[DNS] hostname: example.test",
-                "[DoH] TTL: 60 seconds",
-                "[DoH] A: 127.0.0.1",
-            };
-        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", lines));
-        CollectionAssert.AreEqual(expectedLines, lines);
+        AssertLines(["[DoH] [DoH] [AAAA] error: Failure when receiving data from the peer"], lines);
+        Assert.AreEqual("127.0.0.1", addresses.Single());
     }
 }

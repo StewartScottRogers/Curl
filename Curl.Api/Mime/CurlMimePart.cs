@@ -133,5 +133,6 @@ public sealed record CurlMimePart
         CurlException.ThrowIfFailed(part.SetHeaders([.. Headers.Select(HeaderLine)]), string.Empty);
     }
 
+    /// <summary>The <c>curl_slist</c> line of one part header: <c>Name: value</c>.</summary>
     private static string HeaderLine(KeyValuePair<string, string> header) => $"{header.Key}: {header.Value}";
 }

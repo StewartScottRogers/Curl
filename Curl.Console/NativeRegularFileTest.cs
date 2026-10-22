@@ -19,8 +19,10 @@ namespace Curl.Console;
 [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0332: a thin stat adapter, tested off Windows.")]
 internal static partial class NativeRegularFileTest
 {
+    /// <summary>POSIX <c>S_IFMT</c>: the bits of <c>st_mode</c> that hold the file type.</summary>
     private const int FileTypeMask = 0xF000;
 
+    /// <summary>POSIX <c>S_IFREG</c>: the file type of a regular file.</summary>
     private const int RegularFileType = 0x8000;
 
     /// <summary>
@@ -39,6 +41,10 @@ internal static partial class NativeRegularFileTest
     internal static bool IsRegularFile(string path) =>
         Stat(path, out FileStatus status) == 0 && (status.Mode & FileTypeMask) == RegularFileType;
 
+    /// <summary>The runtime's <c>SystemNative_Stat</c>, which follows symbolic links.</summary>
+    /// <param name="path">The path.</param>
+    /// <param name="status">The file's status record.</param>
+    /// <returns>0 when <c>stat</c> succeeded, otherwise -1.</returns>
     [LibraryImport("libSystem.Native", EntryPoint = "SystemNative_Stat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
     private static partial int Stat(string path, out FileStatus status);
 

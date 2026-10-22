@@ -73,7 +73,9 @@ try {
     # data1461.txt and data1463.txt are curl's --help and --help file text, which cases 1461, 1463 and 1464 include (BL-2830).
     # data1400.c to data1407.c, data1420.c, data1465.c and data1481.c are the C the --libcurl cases expect (BL-2965).
     $libcurlFiles = '1400', '1401', '1402', '1403', '1404', '1405', '1406', '1407', '1420', '1465', '1481' | ForEach-Object { "data$_.c" }
-    foreach ($dataFile in @('data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1', 'data1461.txt', 'data1463.txt') + $libcurlFiles) {
+    # data1705-1.md to -4.md, data1706-1.md to -4.md, data1705-stdout.1 and data1706-stdout.txt are the managen cases' pages and expected output (BL-3002).
+    $managenFiles = @('1705', '1706' | ForEach-Object { $case = $_; '1', '2', '3', '4' | ForEach-Object { "data$case-$_.md" } }) + 'data1705-stdout.1', 'data1706-stdout.txt'
+    foreach ($dataFile in @('data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1', 'data1461.txt', 'data1463.txt') + $libcurlFiles + $managenFiles) {
         Copy-Item -LiteralPath (Join-Path $upstreamData $dataFile) -Destination (Join-Path $dataDestination $dataFile)
     }
 
@@ -127,7 +129,7 @@ try {
         Copy-Item -LiteralPath $header.FullName -Destination (Join-Path $includeDestination $header.Name)
     }
 
-    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, $($upstreamLibcurlDocs.Count) docs/libcurl files, $($upstreamLibcurlOptionDocs.Count) docs/libcurl/opts files, $($upstreamHeaders.Count) include/curl headers, the httpsig key files, data-xml1, data1461.txt, data1463.txt and COPYING from $Tag into $destination."
+    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, $($upstreamLibcurlDocs.Count) docs/libcurl files, $($upstreamLibcurlOptionDocs.Count) docs/libcurl/opts files, $($upstreamHeaders.Count) include/curl headers, the httpsig key files, data-xml1, data1461.txt, data1463.txt, the managen case files and COPYING from $Tag into $destination."
     Write-Output "If the count changed, update VendoredTestFileCount in UpstreamTestDataTests.cs and the tag in README.md."
 }
 finally {

@@ -66,44 +66,64 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </summary>
     private const int DiedConnectionDoneDrawCount = 1;
 
+    /// <summary>The clock every draw and speed sample reads.</summary>
     private readonly TimeProvider timeProvider;
 
+    /// <summary>The <c>-#</c> bar every report is passed on to, or <see langword="null" /> when it is not shown.</summary>
     private readonly ProgressBarRecorder? progressBar;
 
+    /// <summary>The bytes moved (received plus sent) at each kept speed sample, a ring of <see cref="SpeedSampleCount" />.</summary>
     private readonly long[] sampleBytes = new long[SpeedSampleCount];
 
+    /// <summary>The timestamp of each kept speed sample, parallel to <see cref="sampleBytes" />.</summary>
     private readonly long[] sampleTimes = new long[SpeedSampleCount];
 
+    /// <summary>Every status line drawn, returned by <see cref="StatusLines" />.</summary>
     private readonly StringBuilder statusLines = new();
 
+    /// <summary>Writes status lines to standard error as they are drawn, or <see langword="null" /> when the meter is not shown.</summary>
     private readonly Action<string>? writeLive;
 
+    /// <summary>The <c>-v</c> and trace output held while the meter's end is written, or <see langword="null" /> when the run has none.</summary>
     private readonly HoldableStream? eventOutput;
 
+    /// <summary>The transfer's share of the <c>-Z</c> run's combined meter, or <see langword="null" /> outside one.</summary>
     private readonly ParallelTransferProgress? parallelProgress;
 
+    /// <summary>How much of <see cref="statusLines" /> has been handed out by <see cref="TakeUnwrittenStatusLines" />.</summary>
     private int writtenLength;
 
+    /// <summary>The timestamp the Spent column counts from; kept across an authentication retry, moved by a redirect hop.</summary>
     private long start;
 
+    /// <summary>How many speed samples the hop has taken; the ring index of the next is this modulo <see cref="SpeedSampleCount" />.</summary>
     private int sampleCount;
 
+    /// <summary>The body bytes received this hop, as last reported.</summary>
     private long downloaded;
 
+    /// <summary>The expected download size this hop, or <see langword="null" /> when unknown.</summary>
     private long? downloadTotal;
 
+    /// <summary>The body bytes sent this hop, as last reported.</summary>
     private long uploaded;
 
+    /// <summary>The expected upload size this hop, or <see langword="null" /> when unknown.</summary>
     private long? uploadTotal;
 
+    /// <summary>The average download speed since <see cref="start" />, in bytes per second.</summary>
     private long downloadSpeed;
 
+    /// <summary>The average upload speed since <see cref="start" />, in bytes per second.</summary>
     private long uploadSpeed;
 
+    /// <summary>The speed over the kept samples, in bytes per second: the Curr.Speed column.</summary>
     private long currentSpeed;
 
+    /// <summary>The time since <see cref="start" /> at the last calculation, for the Spent column.</summary>
     private long spentMicroseconds;
 
+    /// <summary>Whether the handler reported any bytes this hop, which decides whether <see cref="Finish" /> draws.</summary>
     private bool bytesReported;
 
     /// <summary>
@@ -177,6 +197,13 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </remarks>
     public void ReportRequestResentOnFreshConnection() => StartRequest(restartsClock: false, DiedConnectionDoneDrawCount);
 
+    /// <summary>
+    /// Handles a request starting: the first only marks the transfer started and hands out the lines drawn
+    /// so far; a later one ends the hop before it (releasing the held <c>-v</c> lines, drawing it done and
+    /// ending its line) and starts the next.
+    /// </summary>
+    /// <param name="restartsClock">Whether the new hop moves the start time to now.</param>
+    /// <param name="doneDrawCount">How many done draws the hop before it gets.</param>
     private void StartRequest(bool restartsClock, int doneDrawCount)
     {
         if (HasTransferStarted)

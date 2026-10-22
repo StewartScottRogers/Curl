@@ -13,8 +13,10 @@ namespace Libcurl.Options;
 /// </summary>
 internal static class EasyTlsOptionSetters
 {
+    /// <summary>The most seconds <c>CURLOPT_CA_CACHE_TIMEOUT</c> keeps: libcurl stores it in an <see cref="int"/> and clamps larger values.</summary>
     private const long LargestCacheTimeoutSeconds = int.MaxValue;
 
+    /// <summary>The whole-string <c>CURLOPT_ECH</c> values that set the mode; the <c>ecl:</c> and <c>pn:</c> forms are matched by prefix.</summary>
     private static readonly HashSet<string> EncryptedClientHelloModes = new(StringComparer.Ordinal) { "false", "grease", "true", "hard" };
 
     /// <summary>Adds the TLS rows to <paramref name="setters"/>.</summary>
@@ -26,6 +28,7 @@ internal static class EasyTlsOptionSetters
         AddHandleSetters(setters);
     }
 
+    /// <summary>Adds the rows for the origin's TLS options, from <paramref name="peer"/>.</summary>
     private static void AddOriginSetters(Dictionary<CurlOption, EasyOptionSetter> setters, TlsPeerOptionSetters peer)
     {
         setters[CurlOption.Sslcert] = new(peer.SetCertificate);
@@ -50,6 +53,7 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.SslOptions] = new(peer.SetSslOptions);
     }
 
+    /// <summary>Adds the <c>PROXY_*</c> twin of each origin row, from <paramref name="peer"/>.</summary>
     private static void AddProxySetters(Dictionary<CurlOption, EasyOptionSetter> setters, TlsPeerOptionSetters peer)
     {
         setters[CurlOption.ProxySslcert] = new(peer.SetCertificate);
@@ -74,6 +78,7 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.ProxySslOptions] = new(peer.SetSslOptions);
     }
 
+    /// <summary>Adds the rows with no <c>PROXY_*</c> twin: the cache, ECH, DoH and engine options.</summary>
     private static void AddHandleSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.Sslengine] = new(SetEngine);
@@ -138,6 +143,7 @@ internal static class EasyTlsOptionSetters
         return Tls(ref o, t => EncryptedClientHelloOf(t, text));
     }
 
+    /// <summary>The TLS options after <c>CURLOPT_ECH</c> is given <paramref name="text"/>; <paramref name="tls"/> itself when the text matches no form.</summary>
     private static EasyTlsOptions EncryptedClientHelloOf(EasyTlsOptions tls, string? text)
     {
         if (text is null)
@@ -169,11 +175,13 @@ internal static class EasyTlsOptionSetters
 
     private static CurlCode SetDohVerifyStatus(ref EasyOptions o, object? v) => Tls(ref o, t => t with { DohVerifyStatus = IsOn(v) });
 
+    /// <summary>Replaces the TLS options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Tls(ref EasyOptions options, Func<EasyTlsOptions, EasyTlsOptions> change)
     {
         options = options with { Tls = change(options.Tls) };
         return CurlCode.Ok;
     }
 
+    /// <summary>Whether the option's integer value is not 0, as libcurl treats an on/off option.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 }

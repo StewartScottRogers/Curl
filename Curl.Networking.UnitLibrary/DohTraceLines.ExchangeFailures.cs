@@ -2,9 +2,13 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
-// The lines for a query whose connection or exchange failed.
+// The line for an A or AAAA query whose connection or exchange failed, or whose status is outside 200-299.
 internal static partial class DohTraceLines
 {
-    private static IEnumerable<string> ExchangeFailureLines(Func<CurlExitCode, string> describeExitCode, IReadOnlyList<DohQueryResult> results) =>
-        results.Where(result => result.ExchangeFailure != CurlExitCode.Ok).Select(failed => $"[DNS] DoH request {describeExitCode(failed.ExchangeFailure)}");
+    // curl 8.22.0's doh_probe_done fails a probe with a status outside 200-299 before it decodes
+    // the body, and says which status (measured, BL-2972).
+    private static string ExchangeFailureLine(Func<CurlExitCode, string> describeExitCode, string probe, DohQueryResult result) =>
+        result.ExchangeFailure != CurlExitCode.Ok
+            ? $"{probe}: {describeExitCode(result.ExchangeFailure)}"
+            : FormattableString.Invariant($"{probe}: HTTP status {result.StatusCode}");
 }

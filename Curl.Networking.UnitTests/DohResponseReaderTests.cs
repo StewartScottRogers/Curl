@@ -1,6 +1,7 @@
 using System.Text;
 
 using Curl.Networking.Fakes;
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Networking;
@@ -51,6 +52,19 @@ public sealed class DohResponseReaderTests
         Diagnostics.Assert("body length", 0, body?.Length);
         Assert.IsNotNull(body);
         Assert.IsEmpty(body);
+    }
+
+    [TestMethod]
+    public async Task ReadResponseAsync_WithA500AndAnEmptyBody_ReturnsTheStatusAndNoBytes()
+    {
+        var connection = new ScriptedConnection(Head("HTTP/1.1 500 Internal Server Error", "Content-Length: 0"));
+
+        var response = await DohResponseReader.ReadResponseAsync(connection, NoTransferEvents.Instance, CancellationToken.None);
+
+        Diagnostics.Assert("status code", 500, response?.StatusCode);
+        Assert.IsNotNull(response);
+        Assert.AreEqual(500, response.StatusCode);
+        Assert.IsEmpty(response.Body);
     }
 
     [TestMethod]

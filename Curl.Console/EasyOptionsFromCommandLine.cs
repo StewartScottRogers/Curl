@@ -72,6 +72,7 @@ internal static class EasyOptionsFromCommandLine
         (ImapUploadFlags.Seen, "seen"),
     ];
 
+    // The names of the flags set in <flags>, in UploadFlagNames' fixed order, not the order given.
     private static string[] UploadFlagNamesOf(ImapUploadFlags flags) =>
         [.. UploadFlagNames.Where(pair => flags.HasFlag(pair.Flag)).Select(pair => pair.Name)];
 
@@ -543,6 +544,7 @@ internal static class EasyOptionsFromCommandLine
     private static EasyMimeBody? MimeBodyOf(IReadOnlyList<FormPartSpecification> parts) =>
         parts.Count == 0 ? null : new EasyMimeBody { Parts = [.. parts.Select(MimePartOf)] };
 
+    // One -F part; a multipart part carries its nested parts as sub-parts, any other part carries its data.
     private static EasyMimePart MimePartOf(FormPartSpecification part) =>
         new()
         {
@@ -572,6 +574,7 @@ internal static class EasyOptionsFromCommandLine
         _ => new EasyMimeFile(part.Content),
     };
 
+    // --form-escape switches the form's name and file name to CURLMIMEOPT_FORMESCAPE, which backslash-escapes a double quote in names instead of percent-encoding it.
     private static MimeOptions MimeOptionsOf(CommandLineOptions options) =>
         options.FormEscape ? MimeOptions.FormEscape : MimeOptions.None;
 
@@ -588,6 +591,7 @@ internal static class EasyOptionsFromCommandLine
         };
     }
 
+    // The -b values that are cookie strings (they hold '=') when <cookieStrings> is true, else the ones that name cookie files.
     private static string[] CookieValuesOf(CommandLineOptions options, bool cookieStrings) =>
         [.. options.Cookies.Where(cookie => cookie.IsCookieString == cookieStrings).Select(cookie => cookie.Value)];
 
@@ -627,6 +631,7 @@ internal static class EasyOptionsFromCommandLine
         return headers;
     }
 
+    // Adds <header> unless a header with the same name (compared case-insensitively) is already there, as -H overrides --json's defaults.
     private static void AddHeaderUnlessNamed(List<string> headers, string header)
     {
         string nameAndColon = header[..(header.IndexOf(':', StringComparison.Ordinal) + 1)];
@@ -801,6 +806,7 @@ internal static class EasyOptionsFromCommandLine
             KnownHostsFile = options.SshKnownHostsFile,
         };
 
+    // The --mail-* options as CURLOPT_MAIL_FROM, MAIL_RCPT, MAIL_AUTH and MAIL_RCPT_ALLOWFAILS take them.
     private static EasySmtpOptions SmtpOf(CommandLineOptions options) =>
         new()
         {

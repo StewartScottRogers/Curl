@@ -1,8 +1,11 @@
 # ADR-0710: After each shift-end merge, five read-only reviewers read what the shift merged and file tasks
 
-- Status: Trial (2026-10-19): Stewart asked for two shifts' runs, then a decision on keeping it.
-  He fears it takes too long and repeats what the audit office already does.
-  `$ShiftReviewTrialShifts` (2) stops the review after two reports, until he decides.
+- Status: Accepted (Stewart, 2026-10-22, after a two-shift trial). The trial (2026-10-19) asked
+  whether it takes too long and repeats what the audit office already does. Its two runs took 24
+  and 8 minutes beside the next shift, cost $2.20 and $4.57 as the runs report it, and each filed
+  one real bug (BL-3024, BL-3029: `CURLOPT_DNS_SHUFFLE_ADDRESSES` hiding the resolver's type from
+  `TcpConnector`) that no audit finding names. The trial limit is removed; the review runs after
+  every shift-end merge.
 - Date: 2026-10-19
 - Decided by Claude under Stewart's delegation. Stewart chose this option (one review per shift) over a review of every lane task, or none.
 

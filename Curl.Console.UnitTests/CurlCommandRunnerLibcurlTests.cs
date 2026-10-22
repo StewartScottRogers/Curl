@@ -123,14 +123,17 @@ public sealed class CurlCommandRunnerLibcurlTests
 
         await RunAsync(["-s", "--libcurl", "-", "-T", "up.txt", Url]);
 
-        string expectedUploadLines =
-            "  curl_easy_setopt(curl, CURLOPT_URL, \"http://localhost:47652/up.txt\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n  curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);\n";
+        // curl 8.22.0's order: the URL, CURLOPT_NOPROGRESS, then the headers' CURLOPT_USERAGENT before the
+        // transfer's CURLOPT_UPLOAD, and the size last.
+        string expectedUrlLines =
+            "  curl_easy_setopt(curl, CURLOPT_URL, \"http://localhost:47652/up.txt\");\n  curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);\n  curl_easy_setopt(curl, CURLOPT_USERAGENT, \"curl/";
+        string expectedUploadLines = "\");\n  curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);\n  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);\n";
         string expectedSizeLines = "  curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, (curl_off_t)5);\n\n  /* Here is a list";
-        Diagnostics.Assert("stdout contains the URL and upload lines", true, StandardOutputText.Contains(expectedUploadLines, StringComparison.Ordinal));
+        Diagnostics.Assert("stdout contains the URL lines", true, StandardOutputText.Contains(expectedUrlLines, StringComparison.Ordinal));
+        Diagnostics.Assert("stdout contains the upload lines", true, StandardOutputText.Contains(expectedUploadLines, StringComparison.Ordinal));
         Diagnostics.Assert("stdout contains the size line", true, StandardOutputText.Contains(expectedSizeLines, StringComparison.Ordinal));
-        Assert.Contains(
-            expectedUploadLines,
-            StandardOutputText);
+        Assert.Contains(expectedUrlLines, StandardOutputText);
+        Assert.Contains(expectedUploadLines, StandardOutputText);
         Assert.Contains(expectedSizeLines, StandardOutputText);
     }
 

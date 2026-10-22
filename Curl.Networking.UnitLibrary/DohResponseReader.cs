@@ -7,8 +7,10 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Reads the HTTP/1.1 response a DNS-over-HTTPS server sends to one POST and returns its body
-/// as curl 8.21.0 takes it (measured, BL-641): the status code and <c>Content-Type</c> are not
-/// looked at, so a <c>500</c> or a <c>text/plain</c> answer is decoded all the same; the body is
+/// as curl takes it (measured, BL-641): the reader does not look at <c>Content-Type</c>, so a
+/// <c>text/plain</c> answer is decoded all the same, and hands the status code on through
+/// <see cref="ReadResponseAsync" />, outside 200-299 of which the resolver fails the query as
+/// curl 8.22.0 does (BL-2979, BL-2972); the body is
 /// framed by <c>Content-Length</c> or chunked transfer coding; and a body framed by neither (and
 /// so delimited by the close), cut short, or longer than curl's 3000-byte DoH buffer is a
 /// receive failure.
@@ -37,7 +39,19 @@ internal static class DohResponseReader
     /// <param name="events">The sub-transfer's events.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The body, or <see langword="null" /> when the response is a receive failure.</returns>
-    public static async ValueTask<byte[]?> ReadBodyAsync(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
+    public static async ValueTask<byte[]?> ReadBodyAsync(IConnection connection, ITransferEvents events, CancellationToken cancellationToken) =>
+        (await ReadResponseAsync(connection, events, cancellationToken).ConfigureAwait(false))?.Body;
+
+    /// <summary>
+    /// Reads one response as <see cref="ReadBodyAsync(IConnection, ITransferEvents, CancellationToken)" />
+    /// does and returns its status code with its body, for curl 8.22.0's <c>doh_probe_done</c>, which
+    /// refuses an HTTPS query's status outside 200-299 (ADR-0727's BL-2979 amendment).
+    /// </summary>
+    /// <param name="connection">The DoH connection the POST was written to.</param>
+    /// <param name="events">The sub-transfer's events.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The response, or <see langword="null" /> when it is a receive failure.</returns>
+    public static async ValueTask<Response?> ReadResponseAsync(IConnection connection, ITransferEvents events, CancellationToken cancellationToken)
     {
         var reader = new ConnectionByteReader(connection);
         var head = await ReadHeadAsync(reader, events, cancellationToken).ConfigureAwait(false);
@@ -54,20 +68,27 @@ internal static class DohResponseReader
             events.ReportDataReceived(body);
         }
 
-        return body;
+        return body is null ? null : new Response(head.StatusCode, body);
     }
 
     private static async ValueTask<ResponseHead?> ReadHeadAsync(ConnectionByteReader reader, ITransferEvents events, CancellationToken cancellationToken)
     {
         var statusLine = await ReadHeadLineAsync(reader, events, cancellationToken).ConfigureAwait(false);
         return statusLine?.StartsWith("HTTP/", StringComparison.Ordinal) == true
-            ? await ReadHeaderFieldsAsync(reader, events, cancellationToken).ConfigureAwait(false)
+            ? await ReadHeaderFieldsAsync(reader, events, StatusCodeOf(statusLine), cancellationToken).ConfigureAwait(false)
             : null;
     }
 
-    private static async ValueTask<ResponseHead?> ReadHeaderFieldsAsync(ConnectionByteReader reader, ITransferEvents events, CancellationToken cancellationToken)
+    // The status line's code; 0 when it has none that reads as a number.
+    private static int StatusCodeOf(string statusLine)
     {
-        var head = new ResponseHead();
+        var parts = statusLine.Split(' ', 3);
+        return parts.Length > 1 && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var code) ? code : 0;
+    }
+
+    private static async ValueTask<ResponseHead?> ReadHeaderFieldsAsync(ConnectionByteReader reader, ITransferEvents events, int statusCode, CancellationToken cancellationToken)
+    {
+        var head = new ResponseHead(statusCode);
         string? line;
         do
         {
@@ -188,9 +209,17 @@ internal static class DohResponseReader
         return next == '\n' ? Encoding.Latin1.GetString([.. line]).TrimEnd('\r') : null;
     }
 
-    /// <summary>The two header fields that frame the body.</summary>
-    private sealed class ResponseHead
+    /// <summary>One response's status code and body.</summary>
+    /// <param name="StatusCode">The status line's code; 0 when it has none that reads as a number.</param>
+    /// <param name="Body">The body.</param>
+    internal sealed record Response(int StatusCode, byte[] Body);
+
+    /// <summary>The status code and the two header fields that frame the body.</summary>
+    /// <param name="statusCode">The status line's code.</param>
+    private sealed class ResponseHead(int statusCode)
     {
+        public int StatusCode { get; } = statusCode;
+
         public long? ContentLength { get; private set; }
 
         public bool IsChunked { get; private set; }

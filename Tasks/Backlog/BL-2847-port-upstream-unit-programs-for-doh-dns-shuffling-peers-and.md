@@ -4,7 +4,7 @@ title: Port upstream unit programs for DoH, DNS shuffling, peers and TLS setting
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2886, BL-2922, BL-2923, BL-2924, BL-2925, BL-2921]
+depends-on: [BL-2886, BL-2922, BL-2923, BL-2924, BL-3014, BL-3015, BL-3016, BL-3017, BL-2921, BL-3062]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns, Curl.Conformance.UnitProgram.UnitTests/Dns]
 requirement: none
 created: 2026-10-19
@@ -42,9 +42,14 @@ Ports go in Curl.Conformance.UnitProgram.UnitLibrary/Dns/ and their tests in Cur
   BL-2921 (3303, 3304); each touches its own `Dns/<sub>` folders, and `UnitPrograms.Dns.cs` is union-merged, so
   they can run in parallel. Once all five are Done this task only confirms the ten cases pass, ticks its boxes
   and checks CI.
+- 2026-10-22 (lane 1, no code edited): 1608, 1652, 1655, 1658, 2413, 3219, 3302, 3303 and 3304 are on
+  `PassingUpstreamCases.txt`; 1650 is not - BL-2923 split it to BL-3062 (Backlog), which waits on BL-2969 for the
+  curl 8.22.0 DoH decoder. Added BL-3062 to `depends-on` and requeued.
 
 ## Log
 
 - 2026-10-19: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
 - 2026-10-21: Doing -> Backlog. Split for size: waits on BL-2922, BL-2923, BL-2924, BL-2925 and BL-2921, which port the ten cases between them
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 759c7e24 2e3e75ab e66ae9dd c0723528 620ebead.
+- 2026-10-22: Doing -> Backlog. Waits on BL-3062: case 1650 (split from BL-2923) is not yet ported; the other nine cases are on PassingUpstreamCases.txt

@@ -41,9 +41,11 @@ internal static class CurlMcpHost
         McpResponseCap cap = McpResponseCap.FromEnvironment(readEnvironmentVariable);
         Directory.SetCurrentDirectory(root.ResolvedRoot ?? Directory.GetCurrentDirectory());
         HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+        // Drop the default console provider: it writes to standard output, which carries only the protocol.
         builder.Logging.ClearProviders();
         builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
         builder.Services.AddSingleton(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap));
+        // One engine for the process, shared by the transfer, version and URL tools.
         ManagedCurlEngine engine = new();
         builder.Services.AddSingleton(new McpTransferTool(engine, cap));
         builder.Services.AddSingleton(new McpVersionTool(engine));

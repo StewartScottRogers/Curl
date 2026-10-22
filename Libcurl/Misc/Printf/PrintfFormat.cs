@@ -5,26 +5,55 @@ namespace Libcurl.Misc.Printf;
 internal enum PrintfFlags
 {
     None = 0,
+
+    /// <summary>The <c>space</c> flag: a space stands where a positive number's sign would.</summary>
     Space = 1 << 0,
     ShowSign = 1 << 1,
     Left = 1 << 2,
     Alternate = 1 << 3,
+    /// <summary>The <c>h</c> length modifier; only <c>%n</c> reads it, storing a 16-bit count.</summary>
     Short = 1 << 4,
+
+    /// <summary>One <c>l</c> (or Windows' <c>I32</c>): a C <c>long</c>.</summary>
     Long = 1 << 5,
+
+    /// <summary><c>ll</c>, <c>q</c>, <c>z</c>, <c>O</c> or Windows' <c>I</c>/<c>I64</c>: a 64-bit integer.</summary>
     LongLong = 1 << 6,
+
+    /// <summary>The <c>L</c> length modifier: a C <c>long double</c> (read here as a double).</summary>
     LongDouble = 1 << 7,
+    /// <summary>A leading <c>0</c> in the width, cleared by <see cref="Left"/>.</summary>
     PadWithZeros = 1 << 8,
+
+    /// <summary>The conversion reads an unsigned integer (<c>u o x X</c>).</summary>
     Unsigned = 1 << 9,
     Octal = 1 << 10,
     Hex = 1 << 11,
+    /// <summary>Upper-case output: <c>X</c>, <c>E</c>, <c>F</c> and <c>G</c>.</summary>
     Upper = 1 << 12,
+
+    /// <summary>The format gave a literal width.</summary>
     Width = 1 << 13,
+
+    /// <summary>The width is a <c>*</c>; <see cref="PrintfSegment.Width"/> is then an argument index.</summary>
     WidthFromArgument = 1 << 14,
+
+    /// <summary>The format gave a literal precision.</summary>
     Precision = 1 << 15,
+
+    /// <summary>The precision is a <c>.*</c>; <see cref="PrintfSegment.Precision"/> is then an argument index.</summary>
     PrecisionFromArgument = 1 << 16,
+
+    /// <summary>The <c>%c</c> conversion.</summary>
     Character = 1 << 17,
+
+    /// <summary>Exponential style (<c>e E</c>); with neither this nor <see cref="FloatG"/> a double prints fixed.</summary>
     FloatE = 1 << 18,
+
+    /// <summary>General style (<c>g G</c>).</summary>
     FloatG = 1 << 19,
+
+    /// <summary>The segment is format text only, with no conversion after it.</summary>
     TextOnly = 1 << 20,
 }
 
@@ -42,7 +71,11 @@ internal enum PrintfInputType
     LongLongUnsigned,
     Double,
     LongDouble,
+
+    /// <summary>An <c>int</c> read for a <c>*</c> width.</summary>
     Width,
+
+    /// <summary>An <c>int</c> read for a <c>.*</c> precision.</summary>
     Precision,
 }
 

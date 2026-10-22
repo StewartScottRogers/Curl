@@ -6,7 +6,8 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins <see cref="DnsAnswerDecoder" /> to curl 8.21.0's <c>doh_resp_decode</c>: the answers
-/// measured in BL-639 (ADR-0152) and the compression, CNAME and failure rules of that function.
+/// measured in BL-639 (ADR-0152) and the compression, CNAME and failure rules of that function, as
+/// curl 8.22.0 changed them (ADR-0738: RCODE 3, TTL cap, CNAME data skipped, no "no content").
 /// Messages are written in hex: <c>Header</c>, then the sections byte for byte.
 /// </summary>
 [TestClass]
@@ -44,11 +45,9 @@ public sealed class DnsAnswerDecoderTests
 
         Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
         Diagnostics.Assert("addresses", IPAddress.Loopback, Join(answer.Addresses));
-        Diagnostics.Assert("canonical name count", 0, answer.CanonicalNames.Count);
         Diagnostics.Assert("TTL seconds", 60u, answer.TimeToLiveSeconds);
         Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
         CollectionAssert.AreEqual(new[] { IPAddress.Loopback }, answer.Addresses.ToArray());
-        Assert.IsEmpty(answer.CanonicalNames);
         Assert.AreEqual(60u, answer.TimeToLiveSeconds);
     }
 
@@ -82,7 +81,7 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
-    public void Decode_ACnameChain_FollowsCompressedNamesAndKeepsTheSmallestTtl()
+    public void Decode_ACnameChain_SkipsTheCnamesAndKeepsTheSmallestTtl()
     {
         // www.example.test CNAME a.example.test (TTL 3600), a.example.test CNAME b.example.test
         // (TTL 300), b.example.test A 192.0.2.1 (TTL 120). "example.test" is at offset 16, the
@@ -96,57 +95,56 @@ public sealed class DnsAnswerDecoderTests
         var answer = Decode(message, DnsRecordType.A);
 
         Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
-        Diagnostics.Assert("canonical names", "a.example.test, b.example.test", Join(answer.CanonicalNames));
         Diagnostics.Assert("addresses", "192.0.2.1", Join(answer.Addresses));
         Diagnostics.Assert("TTL seconds", 120u, answer.TimeToLiveSeconds);
         Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
-        CollectionAssert.AreEqual(new[] { "a.example.test", "b.example.test" }, answer.CanonicalNames.ToArray());
         CollectionAssert.AreEqual(new[] { IPAddress.Parse("192.0.2.1") }, answer.Addresses.ToArray());
         Assert.AreEqual(120u, answer.TimeToLiveSeconds);
     }
 
     [TestMethod]
-    public void Decode_ACnameWithNoAddress_IsContent()
+    public void Decode_ACnameWithNoAddress_DecodesWithNoAddress()
     {
+        // Measured with curl 8.22.0 (BL-2970): a CNAME-only answer is "DoH request complete", no error.
         var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "C00C");
 
         var answer = Decode(message, DnsRecordType.A);
 
         Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
-        Diagnostics.Assert("canonical names", "example.test", Join(answer.CanonicalNames));
         Diagnostics.Assert("address count", 0, answer.Addresses.Count);
         Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
-        CollectionAssert.AreEqual(new[] { "example.test" }, answer.CanonicalNames.ToArray());
         Assert.IsEmpty(answer.Addresses);
     }
 
     [TestMethod]
-    public void Decode_ACnameToTheRoot_StoresAnEmptyName()
+    public void Decode_UnitSixteenFiftysSelfPointingCname_DecodesAsNone()
     {
-        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100001" + "00");
+        // unit1650's 46-byte row: a CNAME whose 7 data bytes start at offset 39 and are "any" then a
+        // pointer back to offset 39 (\x07\x03any\xc0\x27\x00). curl 8.22.0's doh_rdata skips CNAME
+        // data, so it is DOH_OK, where 8.21.0 followed it into DOH_DNS_LABEL_LOOP (BL-2970).
+        var message = Message(Header("8180", 1, 1) + "046375726C04746573740000010001" + "C00C00050001000000370007" + "03616E79C02700");
 
         var answer = Decode(message, DnsRecordType.A);
 
+        Diagnostics.Assert("message length", 46, message.Length);
         Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
-        Diagnostics.Assert("canonical names", "\"\"", Join(answer.CanonicalNames));
+        Assert.HasCount(46, message);
         Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
-        CollectionAssert.AreEqual(new[] { string.Empty }, answer.CanonicalNames.ToArray());
+        Assert.IsEmpty(answer.Addresses);
     }
 
     [TestMethod]
-    public void Decode_ACnamePointingAtItself_FailsWithLabelLoop()
+    public void Decode_ACnamePointingAtItself_IsSkippedUnread()
     {
         // The CNAME's data is at offset 42 and is a pointer to offset 42.
         var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "C02A");
 
         var answer = Decode(message, DnsRecordType.A);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.LabelLoop, answer.Failure);
-        Diagnostics.Assert("address count", 0, answer.Addresses.Count);
-        Diagnostics.Assert("canonical names", "\"\"", Join(answer.CanonicalNames));
-        Assert.AreEqual(DnsMessageFailure.LabelLoop, answer.Failure);
-        Assert.IsEmpty(answer.Addresses);
-        CollectionAssert.AreEqual(new[] { string.Empty }, answer.CanonicalNames.ToArray());
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
+        Diagnostics.Assert("TTL seconds", 3600u, answer.TimeToLiveSeconds);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(3600u, answer.TimeToLiveSeconds);
     }
 
     [TestMethod]
@@ -168,28 +166,32 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
-    public void Decode_ACnameOfOneHundredTwentySevenLabels_Succeeds()
+    public void Decode_ACnameOfOneHundredTwentyEightLabels_IsSkippedUnread()
     {
-        // 127 labels and the root are the 128 steps curl allows.
-        Diagnostics.Arrange("CNAME label count", 127);
-
-        var answer = Decode(CnameOfLabels(127), DnsRecordType.A);
-
-        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
-        Diagnostics.Assert("first canonical name length", 253, answer.CanonicalNames.Count > 0 ? answer.CanonicalNames[0].Length : -1);
-        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
-        Assert.AreEqual(string.Join('.', Enumerable.Repeat("a", 127)), answer.CanonicalNames[0]);
-    }
-
-    [TestMethod]
-    public void Decode_ACnameOfOneHundredTwentyEightLabels_FailsWithLabelLoop()
-    {
+        // 8.21.0 gave up after 128 labels; 8.22.0 never reads CNAME data (BL-2970).
         Diagnostics.Arrange("CNAME label count", 128);
 
         var answer = Decode(CnameOfLabels(128), DnsRecordType.A);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.LabelLoop, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.LabelLoop, answer.Failure);
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+    }
+
+    [TestMethod]
+    [DataRow(127, DnsMessageFailure.None)]
+    [DataRow(128, DnsMessageFailure.LabelLoop)]
+    public void Decode_AnSrvTargetAroundTheHundredAndTwentyEightLabelLimit_StopsAtTheLimit(int labelCount, DnsMessageFailure expected)
+    {
+        // 127 labels and the root are the 128 steps the name walk allows.
+        Diagnostics.Arrange("SRV target label count", labelCount);
+        const string QuestionSrv = "025F6B076578616D706C6504746573740000210001";
+        var target = string.Concat(Enumerable.Repeat("0161", labelCount)) + "00";
+        var message = Message(Header("8180", 1, 1) + QuestionSrv + "C00C002100010000003C" + $"{(target.Length / 2) + 6:X4}" + "000000000058" + target);
+
+        var answer = Decode(message, DnsRecordType.Srv);
+
+        Diagnostics.Assert("failure", expected, answer.Failure);
+        Assert.AreEqual(expected, answer.Failure);
     }
 
     [TestMethod]
@@ -288,28 +290,30 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
-    public void Decode_NoAnswerRecords_FailsWithNoContent()
+    public void Decode_NoAnswerRecords_DecodesAsNone()
     {
-        // Measured: an AAAA answer with no records is "DoH: No content type AAAA" (ADR-0152).
+        // Measured with curl 8.22.0 (BL-2970): an answer with no records is "DoH request complete",
+        // where 8.21.0 printed "DoH: No content type AAAA" (ADR-0152).
         var message = Message(Header("8180", 1, 0) + QuestionAaaa);
 
         var answer = Decode(message, DnsRecordType.Aaaa);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.NoContent, answer.Failure);
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
         Diagnostics.Assert("TTL seconds", (uint)int.MaxValue, answer.TimeToLiveSeconds);
-        Assert.AreEqual(DnsMessageFailure.NoContent, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        Assert.IsEmpty(answer.Addresses);
         Assert.AreEqual((uint)int.MaxValue, answer.TimeToLiveSeconds);
     }
 
     [TestMethod]
-    public void Decode_OnlyADnameRecord_SkipsItAndFailsWithNoContent()
+    public void Decode_OnlyADnameRecord_SkipsItAndDecodesAsNone()
     {
         var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0027000100000E100002" + "C00C");
 
         var answer = Decode(message, DnsRecordType.A);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.NoContent, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.NoContent, answer.Failure);
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
     }
 
     [TestMethod]
@@ -384,58 +388,38 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
-    public void Decode_ACnameLabelWithAReservedLengthPattern_FailsWithBadLabel()
+    [DataRow("8000", DnsMessageFailure.BadLabel, DisplayName = "A label with a reserved length pattern")]
+    [DataRow("0561", DnsMessageFailure.BadLabel, DisplayName = "A label running past the message")]
+    [DataRow("0161", DnsMessageFailure.OutOfRange, DisplayName = "A label ending exactly at the message end")]
+    [DataRow("C0FF", DnsMessageFailure.OutOfRange, DisplayName = "A pointer past the message")]
+    [DataRow("C0", DnsMessageFailure.OutOfRange, DisplayName = "Half a pointer")]
+    public void Decode_ABrokenSrvTarget_FailsAsTheNameWalkStops(string target, DnsMessageFailure expected)
     {
-        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "8000");
+        // An SRV record's priority, weight and port, then the target, which ends the message.
+        Diagnostics.Arrange("target", target);
+        const string QuestionSrv = "025F6B076578616D706C6504746573740000210001";
+        var message = Message(Header("8180", 1, 1) + QuestionSrv + "C00C002100010000003C" + $"{(target.Length / 2) + 6:X4}" + "000000000058" + target);
 
-        var answer = Decode(message, DnsRecordType.A);
+        var answer = Decode(message, DnsRecordType.Srv);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.BadLabel, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.BadLabel, answer.Failure);
+        Diagnostics.Assert("failure", expected, answer.Failure);
+        Assert.AreEqual(expected, answer.Failure);
     }
 
     [TestMethod]
-    public void Decode_ACnameLabelRunningPastTheMessage_FailsWithBadLabel()
+    [DataRow("8000", DisplayName = "A label with a reserved length pattern")]
+    [DataRow("0561", DisplayName = "A label running past the message")]
+    [DataRow("C0FF", DisplayName = "A pointer past the message")]
+    public void Decode_ABrokenCnameTarget_IsSkippedUnread(string target)
     {
-        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "0561");
+        // curl 8.22.0's doh_rdata skips CNAME data without reading it (BL-2970).
+        Diagnostics.Arrange("target", target);
+        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E10" + $"{target.Length / 2:X4}" + target);
 
         var answer = Decode(message, DnsRecordType.A);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.BadLabel, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.BadLabel, answer.Failure);
-    }
-
-    [TestMethod]
-    public void Decode_ACnameLabelEndingExactlyAtTheMessageEnd_IsReadAndThenFailsWithOutOfRange()
-    {
-        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "0161");
-
-        var answer = Decode(message, DnsRecordType.A);
-
-        Diagnostics.Assert("failure", DnsMessageFailure.OutOfRange, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.OutOfRange, answer.Failure);
-    }
-
-    [TestMethod]
-    public void Decode_ACnamePointerPastTheMessage_FailsWithOutOfRange()
-    {
-        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100002" + "C0FF");
-
-        var answer = Decode(message, DnsRecordType.A);
-
-        Diagnostics.Assert("failure", DnsMessageFailure.OutOfRange, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.OutOfRange, answer.Failure);
-    }
-
-    [TestMethod]
-    public void Decode_ACnameEndingInHalfAPointer_FailsWithOutOfRange()
-    {
-        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C0005000100000E100001" + "C0");
-
-        var answer = Decode(message, DnsRecordType.A);
-
-        Diagnostics.Assert("failure", DnsMessageFailure.OutOfRange, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.OutOfRange, answer.Failure);
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
     }
 
     [TestMethod]
@@ -456,18 +440,18 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
-    public void Decode_MoreThanFourCnames_KeepsTheFirstFour()
+    public void Decode_FiveCnamesBeforeAnAddress_SkipsThemAndKeepsTheAddress()
     {
         Diagnostics.Arrange("CNAME record count", 5);
-        var records = string.Concat(Enumerable.Repeat("C00C0005000100000E100002C00C", 5));
-        var message = Message(Header("8180", 1, 5) + QuestionA + records);
+        var records = string.Concat(Enumerable.Repeat("C00C0005000100000E100002C00C", 5)) + AnswerA;
+        var message = Message(Header("8180", 1, 6) + QuestionA + records);
 
         var answer = Decode(message, DnsRecordType.A);
 
         Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
-        Diagnostics.Assert("canonical name count", 4, answer.CanonicalNames.Count);
+        Diagnostics.Assert("addresses", IPAddress.Loopback, Join(answer.Addresses));
         Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
-        Assert.HasCount(4, answer.CanonicalNames);
+        CollectionAssert.AreEqual(new[] { IPAddress.Loopback }, answer.Addresses.ToArray());
     }
 
     [TestMethod]
@@ -514,8 +498,9 @@ public sealed class DnsAnswerDecoderTests
 
         var answer = Decode(message, (DnsRecordType)2);
 
-        Diagnostics.Assert("failure", DnsMessageFailure.NoContent, answer.Failure);
-        Assert.AreEqual(DnsMessageFailure.NoContent, answer.Failure);
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        Assert.IsEmpty(answer.Addresses);
     }
 
     [TestMethod]
@@ -605,7 +590,6 @@ public sealed class DnsAnswerDecoderTests
 
         Diagnostics.Act("failure", answer.Failure);
         Diagnostics.Act("addresses", Join(answer.Addresses));
-        Diagnostics.Act("canonical names", Join(answer.CanonicalNames));
         Diagnostics.Act("service records", Join(answer.ServiceRecords));
         Diagnostics.Act("HTTPS record count", answer.HttpsRecordData.Count);
         Diagnostics.Act("TTL seconds", answer.TimeToLiveSeconds);

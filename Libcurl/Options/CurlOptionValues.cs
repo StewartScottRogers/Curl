@@ -3,6 +3,7 @@ namespace Libcurl.Options;
 /// <summary>Which .NET values each <see cref="CurlOptionType"/> accepts, as its doc comment states.</summary>
 internal static class CurlOptionValues
 {
+    /// <summary>One test per <see cref="CurlOptionType"/>, indexed by the enum's number, so the order must follow that enum.</summary>
     private static readonly Func<object?, bool>[] Accepters =
     [
         IsInteger,

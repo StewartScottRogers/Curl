@@ -43,3 +43,64 @@ Skipping CNAME data and dropping `NoContent` changes those entry lines, so the t
 - unit1650's response rows 3 (NXDOMAIN) and 13 (TTL `0x00ffff37` gives 86400) decode as 8.22.0's do;
   row 11 (the self-pointing CNAME) still fails with `LabelLoop` until BL-2970.
 - An NXDOMAIN DoH answer's trace reads `No such name` where it read `Bad RCODE`.
+
+## Amendment 2026-10-21 (BL-3012): measured DoH decode and trace behaviour
+
+Decided by Claude under Stewart's delegation. This amendment turns decision 4 into measured
+facts and decisions. It records intent: BL-3011 applies the code changes, so until it lands the
+code still follows decisions 1-3 above and the 8.21.0 trace lines.
+
+### Measured
+
+Measured with the local curl 8.22.0 (tag `curl-8_22_0`, `lib/vdns/doh.c`; Schannel, debug build)
+through `Record-CurlExchange.ps1 -NoServer -DohPort 18453` (`-DnsResponseCode 3` for NXDOMAIN,
+`-DnsAnswerAddress ::1` for an A answer with no A record) and, for the CNAME-only answer
+(44 bytes, `example.test CNAME example.test`, TTL 60) and the HTTP 500, `-Tls -Response` as the DoH
+server. Arguments: `-v --trace-config doh --doh-insecure --doh-url https://127.0.0.1:P/dns-query -4
+http://example.test:18454/`. After `* [DoH] Connection #1 to host 127.0.0.1:P left intact`:
+
+| DoH answer | Lines | Exit |
+| --- | --- | --- |
+| A answer | `* [DoH] DoH request complete, 0 to go`, `* Host example.test:18454 was resolved.` | 7 (at connect) |
+| NXDOMAIN | `* [DoH] [DoH] [A] error decoding response: No such name` | 6 |
+| CNAME-only answer | `* [DoH] DoH request complete, 0 to go` | 6 (`Could not resolve host`) |
+| Empty answer | `* [DoH] DoH request complete, 0 to go` | 6 (`Could not resolve host`) |
+| HTTP 500, empty body | `* [DoH] [DoH] [A] error: HTTP status 500` | 6 |
+
+Without `-4` the AAAA probe is queried first: `Connection #1 is not open enough, cannot reuse`,
+then the `[AAAA]` error, then connection #2 and the `[A]` error. Plain `-v` writes no DoH line.
+
+### Decided
+
+5. The decoder skips CNAME and DNAME data unread and never returns `NoContent`. The enum value
+   stays, documented as unused, so `DnsMessageFailureText`'s value-indexed table keeps its places.
+6. `DnsAnswer.CanonicalNames` and `DohQueryResult`'s CNAME room (and its NoContent rule) are
+   removed; the shared 24-address room stays. The decoded-entry trace lines are gone.
+7. `DohTraceLines.FailureLine` writes the decode error (`[DoH] [DoH] [A|AAAA] error decoding
+   response: <doh_strerror>`) or the transfer error (`error: <curl_easy_strerror>`) on the DoH
+   trace sink, in place of the completed line.
+8. Left to other tasks: the `[DoH] ` sub-transfer prefix, the `DoH request complete` wording and
+   the AAAA-first order are BL-2973; the non-2xx `HTTP status N` failure is BL-2972; BL-3011 applies
+   decisions 5-7 in code and tests.
+
+## Amendment: the DoH sub-transfer lines (BL-2973)
+
+Decided by Claude under Stewart's delegation, 2026-10-22, from the curl 8.22.0 (Schannel)
+measurements in BL-2973's Context (`Record-CurlExchange.ps1 -NoServer -DohPort 18453 -CurlArgs
+-v,--trace-config,doh,...`, with and without `-4`, with and without `-DnsResponseCode 3`).
+
+9. `DohSubTransferEvents.Prefix` is `[DoH] `, 8.22.0's, in place of 8.21.0's `[DNS] `; the DNS
+   filter lines inside a sub-transfer read `[DoH] [DNS] ...`, and the filter's creation line keeps
+   its one `[DNS] ` prefix as before.
+10. A query that succeeded ends `DoH request complete, N to go`.
+11. The AAAA query goes first: traced, its sub-transfer runs and is reported whole before the A
+    query's; untraced, both still run in parallel and their outcomes (the error lines on the DoH
+    trace) are reported AAAA first. `N to go` counts the queries still to report. The results
+    keep their A-then-AAAA order, so `DohQueryResult.AsOneEntry` and the resolved address order
+    (AAAA's, then A's) are unchanged. Which untraced connection opens first is not observable,
+    so it stays A first.
+12. The error lines stay on the DoH trace sink as `[DoH] [DoH] [A|AAAA] error ...` (decision 7):
+    they already read as 8.22.0 writes them, so moving them onto the sub-transfer events gains
+    nothing.
+13. `Connection #1 is not open enough, cannot reuse` stays out, as ADR-0380 leaves out every
+    poll-timing line of a sub-transfer.

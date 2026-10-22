@@ -22,8 +22,11 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
     private readonly Queue<byte[]> _chunks = new();
     private readonly TaskCompletionSource _started = NewSignal();
     private TaskCompletionSource _arrived = NewSignal();
+    /// <summary>How far into the first queued chunk the reader has already read.</summary>
     private int _offset;
+    /// <summary>The bytes queued and not yet read; compared with the capacity to decide when to pause and resume.</summary>
     private long _buffered;
+    /// <summary>Whether the last write answered pause, so the reader must call resume once the buffer drains to half.</summary>
     private bool _paused;
     private bool _aborted;
     private bool _ended;
@@ -169,6 +172,9 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
         return null;
     }
 
+    /// <summary>Moves up to <paramref name="destination"/>.Length buffered bytes out in arrival order, dropping each chunk once it is fully read.</summary>
+    /// <param name="destination">Where the bytes go.</param>
+    /// <returns>The bytes copied; 0 when the buffer is empty.</returns>
     private int Copy(Span<byte> destination)
     {
         int copied = 0;
@@ -195,6 +201,8 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
         : closing.IsCancellationRequested ? closing
         : CancellationToken.None;
 
+    /// <summary>Replaces the arrival signal with a fresh one so a waiter that reads the old one is woken by the next delivery or end, never by an earlier one.</summary>
+    /// <returns>The signal being replaced, to complete or await.</returns>
     private TaskCompletionSource SwapArrived()
     {
         TaskCompletionSource arrived = _arrived;
@@ -202,5 +210,6 @@ internal sealed class ResponseBodyBuffer(int capacity, Action resume, Cancellati
         return arrived;
     }
 
+    /// <summary>A signal whose continuations run on the thread pool, so completing it on the engine thread never runs a reader inline.</summary>
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

@@ -76,6 +76,33 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
+    public async Task GetTimeout_TransferWithTimeoutHeldPendingByConnectionLimit_IsMinusOne()
+    {
+        TimerManualTimeProvider time = new();
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        multi.Options = new MultiOptions { MaxTotalConnections = 1 };
+        multi.Add(new ControlledEasyTransfer());
+        multi.Add(WithTimeout(TimeSpan.FromSeconds(5)));
+        await multi.PerformAsync(CancellationToken.None);
+        time.Advance(1200);
+
+        Assert.AreEqual((CurlMultiCode.Ok, -1L), multi.GetTimeout());
+    }
+
+    [TestMethod]
+    public async Task GetTimeout_FinishedTransferWithTimeoutAlreadyReported_IsMinusOne()
+    {
+        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
+        ControlledEasyTransfer transfer = WithTimeout(TimeSpan.FromSeconds(5));
+        multi.Add(transfer);
+        await multi.PerformAsync(CancellationToken.None);
+        transfer.Finish(CurlCode.Ok);
+        await multi.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual((CurlMultiCode.Ok, -1L), multi.GetTimeout());
+    }
+
+    [TestMethod]
     public async Task WaitAsync_NothingToWaitOn_ReturnsAtOnce()
     {
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());

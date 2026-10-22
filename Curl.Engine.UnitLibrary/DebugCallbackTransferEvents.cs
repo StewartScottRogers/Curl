@@ -19,6 +19,9 @@ namespace Curl.Engine;
 /// <param name="tlsBackend">The curl build whose TLS wording the TLS events get (ADR-0085).</param>
 internal sealed class DebugCallbackTransferEvents(DebugCallback debug, TlsBackend tlsBackend) : ITransferEvents
 {
+    /// <summary>The most bytes an info line, line feed included, reaches the callback with uncut: 2046.</summary>
+    internal const int MaxInfoLineBytes = 2046;
+
     /// <summary>
     /// The events a handle's transfer reports to: the debug callback under <c>CURLOPT_VERBOSE</c>, worded as
     /// the running platform's curl build words TLS; <see langword="null" />, for no events, when verbose is
@@ -94,5 +97,14 @@ internal sealed class DebugCallbackTransferEvents(DebugCallback debug, TlsBacken
         }
     }
 
-    private void ReportText(string line) => debug(CurlInfoType.Text, Encoding.UTF8.GetBytes(line + "\n"));
+    /// <summary>
+    /// Hands one info line to the callback with its line feed, cut as <c>Curl_infof</c>'s 2048-byte trace buffer
+    /// cuts it (<c>TRC_LINE_MAX</c>, <c>lib/curl_trc.c</c>): a line whose bytes with the line feed come to more than
+    /// <see cref="MaxInfoLineBytes" /> keeps its first 2043 bytes and ends in <c>...\n</c>, 2047 bytes in all.
+    /// </summary>
+    private void ReportText(string line)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(line + "\n");
+        debug(CurlInfoType.Text, bytes.Length <= MaxInfoLineBytes ? bytes : [.. bytes.AsSpan(0, MaxInfoLineBytes - 3), .. "...\n"u8]);
+    }
 }

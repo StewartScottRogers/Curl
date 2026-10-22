@@ -129,6 +129,59 @@ function Resolve-RebaseConflictUnlocked {
     return $false
 }
 
+function Update-BoardBeforePush {
+    param([string]$Id)
+    # The board housekeeping every push of this lane's commits needs, run under the integrate lock.
+    # Lanes number the tasks they file from their own copy of the board, so two
+    # lanes can file the same ID. The other lane's is already shared and keeps it;
+    # ours are renumbered, with our own references, before anyone else sees them.
+    $dedupe = (Invoke-Board @('dedupe', '-Since', "origin/$Branch")) | Where-Object { $_ -match '->' }
+    if ($dedupe) {
+        Invoke-Git @('add', '-A') | Out-Null
+        Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
+        foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
+    }
+    # Keep Done short enough for Stewart to read at a glance. Only the lane holding
+    # this lock archives, on top of every other lane's work, so two lanes never
+    # move the same finished tasks into different folders.
+    $archived = (Invoke-Board @('archive', '-WhenDoneIsLong')) | Where-Object { $_ -match '^Archived ' }
+    if ($archived) {
+        Invoke-Git @('add', '-A', '--', 'Tasks/Done') | Out-Null
+        Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
+        Write-Trace $Id 'archive' $archived
+    }
+}
+
+function Test-IncomingIsBoardOnly {
+    # True when every file that changed between two commits of the shared branch is a task
+    # file, which no test selection covers. False when git cannot say.
+    param([string]$From, [string]$To)
+    $names = @(git -C $Root diff --name-only --no-renames $From $To 2>$null | Where-Object { $_ })
+    if ($LASTEXITCODE -ne 0) { return $false }
+    return @($names | Where-Object { -not $_.StartsWith('Tasks/') }).Count -eq 0
+}
+
+function Invoke-PushRetryWithoutVerify {
+    # After a push origin refused on work already verified: rebases onto what was pushed meanwhile
+    # and pushes again, with no verify and no attempt spent, for as long as everything pushed
+    # meanwhile is task files (a board-only push, a shift-end review push). Returns 'pushed';
+    # 'conflict' (the rebase is in progress); or 'verify' when anything else came in, git failed,
+    # or $Most tries were not enough: the caller's verify-and-attempt path takes over.
+    param([string]$Id, [int]$Most = 10)
+    for ($try = 0; $try -lt $Most; $try++) {
+        $before = "$(git -C $Root rev-parse "origin/$Branch" 2>$null)".Trim()
+        $rebase = Invoke-RebaseOntoShared
+        if ($rebase -eq 'conflict') { return 'conflict' }
+        if ($rebase -ne 'clean') { return 'verify' }
+        $after = "$(git -C $Root rev-parse "origin/$Branch" 2>$null)".Trim()
+        if (-not $before -or -not (Test-IncomingIsBoardOnly $before $after)) { return 'verify' }
+        Write-Trace $Id 'push' 'refused after another push that changes only task files; pushing again without a new verify' 'DarkYellow'
+        Update-BoardBeforePush -Id $Id
+        if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return 'pushed' }
+    }
+    return 'verify'
+}
+
 function Invoke-Integrate {
     # Rebases this lane's commits onto the shared branch, checks them, and pushes. Returns
     # '' on success or why it could not. A rebase conflict is resolved with the integrate lock
@@ -165,24 +218,7 @@ function Invoke-Integrate {
                 if ($rebase -eq 'fetch failed') { Start-Sleep -Seconds 10; continue }
                 if ($rebase -eq 'rebase failed') { return 'rebase failed' }
                 if ($rebase -eq 'conflict') { $attempt--; $conflict = $true; break }
-                # Lanes number the tasks they file from their own copy of the board, so two
-                # lanes can file the same ID. The other lane's is already shared and keeps it;
-                # ours are renumbered, with our own references, before anyone else sees them.
-                $dedupe = (Invoke-Board @('dedupe', '-Since', "origin/$Branch")) | Where-Object { $_ -match '->' }
-                if ($dedupe) {
-                    Invoke-Git @('add', '-A') | Out-Null
-                    Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
-                    foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
-                }
-                # Keep Done short enough for Stewart to read at a glance. Only the lane holding
-                # this lock archives, on top of every other lane's work, so two lanes never
-                # move the same finished tasks into different folders.
-                $archived = (Invoke-Board @('archive', '-WhenDoneIsLong')) | Where-Object { $_ -match '^Archived ' }
-                if ($archived) {
-                    Invoke-Git @('add', '-A', '--', 'Tasks/Done') | Out-Null
-                    Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
-                    Write-Trace $Id 'archive' $archived
-                }
+                Update-BoardBeforePush -Id $Id
                 if ($State -eq 'Done') {
                     Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
                     $red = Test-Green -Id $Id -Base "origin/$Branch"
@@ -191,6 +227,11 @@ function Invoke-Integrate {
                     Write-Trace $Id 'verify' 'build and fast tests green on the shared branch'
                 }
                 if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return '' }
+                # Refused after a verify: when only task files came in meanwhile, push again
+                # at once, without a new verify and without spending another attempt.
+                $retry = Invoke-PushRetryWithoutVerify -Id $Id
+                if ($retry -eq 'pushed') { return '' }
+                if ($retry -eq 'conflict') { $attempt--; $conflict = $true; break }
             }
             if (-not $conflict) { return 'push kept being refused' }
         } finally { $lock.Dispose() }
@@ -258,9 +299,54 @@ if ($TestIntegrateLock) {
         # Git's refusals on a conflict are expected here, so their traces are not printed.
         return (Invoke-Integrate -Id 'BL-001' -State 'Blocked' 6>$null)
     }
+    # A race during the verify (BL-3060): the stand-in verify counts its runs and, on the runs
+    # -Races names ('board' = a task-file-only push, 'code' = a push changing a file the tests
+    # cover), pushes from the other clone before the lane's own push. Redefining Test-Green
+    # here replaces the real one only for this self-test, which exits when it has run.
+    $script:Verifies = 0; $script:Races = @{}; $script:Pushed = 0; $script:RaceCase = 0
+    function Test-Green {
+        param([string]$Id = '-', [string]$Base = '')
+        $script:Verifies++
+        $kind = $script:Races[$script:Verifies]
+        if ($kind) {
+            $script:Pushed++
+            $path = if ($kind -eq 'board') { "Tasks/Backlog/BL-9$($script:Pushed)-race.md" } else { "code-$($script:Pushed).txt" }
+            git -C $other pull -q --rebase origin work 2>&1 | Out-Null
+            New-Item -ItemType Directory -Force -Path (Split-Path (Join-Path $other $path)) | Out-Null
+            Set-Content -Path (Join-Path $other $path) -Value "race $($script:Pushed)"
+            git -C $other add -A 2>&1 | Out-Null; git -C $other commit -q -m "race $($script:Pushed)" 2>&1 | Out-Null
+            git -C $other push -q origin work 2>&1 | Out-Null
+        }
+        return ''
+    }
+    $lanePushes = {
+        param([hashtable]$Races)
+        & $fresh
+        $script:Verifies = 0; $script:Races = $Races; $script:RaceCase++
+        Set-Content -Path (Join-Path $repo "ours-case$($script:RaceCase).txt") -Value 'ours'
+        git -C $repo add -A 2>&1 | Out-Null; git -C $repo commit -q -m 'ours' 2>&1 | Out-Null
+        $r = Invoke-Integrate -Id 'BL-001' -State 'Done' 6>$null
+        $git = "$(git -C $repo ls-tree --name-only origin/work | Where-Object { $_ -eq "ours-case$($script:RaceCase).txt" })"
+        return "'$r' $($script:Verifies) verifies, lane work shared: $([bool]$git)"
+    }
+    $source = { param([string]$File) [IO.File]::ReadAllText((Join-Path $PSScriptRoot $File)) }
     $failed = 0
     try {
         $cases = @(
+            ,@('a task-file-only push during the verify is met by a second push, with no second verify', "'' 1 verifies, lane work shared: True", {
+                & $lanePushes @{ 1 = 'board' } })
+            ,@('a push changing a covered file during the verify makes the lane verify again', "'' 2 verifies, lane work shared: True", {
+                & $lanePushes @{ 1 = 'code' } })
+            ,@('three covered pushes in a row still end with the push kept being refused', "'push kept being refused' 3 verifies, lane work shared: False", {
+                & $lanePushes @{ 1 = 'code'; 2 = 'code'; 3 = 'code' } })
+            ,@('a task-file-only race on the third attempt still pushes: the fast retry spends no attempt', "'' 3 verifies, lane work shared: True", {
+                & $lanePushes @{ 1 = 'code'; 2 = 'code'; 3 = 'board' } })
+            ,@('the shift-end review push is made under the integrate lock, not by the reviewer', 'True False', {
+                $end = & $source 'ShiftEnd.ps1'
+                "$($end -match 'Push-ReviewCommitsUnderLock') $($end -match '(?m)^4\..*\band push to origin')" })
+            ,@('the coordinator takes the integrate lock around its board-move push', 'True', {
+                $text = (& $source 'ShiftCoordinator.ps1').Replace("`r`n", "`n")
+                "$($text -match '(?s)Enter-Lock\r?\n[^\n]*git -C \$Root push -q origin \"HEAD:\$branch\"')" })
             ,@('the probe sees the integrate lock while it is held', 'True False', {
                 $lock = Enter-Lock; $held = & $testLockHeld; $lock.Dispose()
                 "$held $(& $testLockHeld)" })

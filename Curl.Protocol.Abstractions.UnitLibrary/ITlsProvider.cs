@@ -8,8 +8,10 @@ namespace Curl.Protocol.Abstractions;
 /// another only by transport security. Implementing the handshake per protocol would
 /// mean nine copies of the most security-sensitive code in the solution; instead every
 /// protocol receives an already-secured <see cref="IConnection" /> and never knows the
-/// difference. The production implementation delegates to the .NET
-/// <c>SslStream</c> rather than implementing TLS.
+/// difference. Production has two providers: <c>SslStreamTlsProvider</c> hands the
+/// handshake to the .NET <c>SslStream</c>, and <c>HandBuiltTlsProvider</c> runs the
+/// hand-built TLS client in <c>Curl.Tls.UnitLibrary</c>; the engine picks one per
+/// transfer (ADR-0140).
 /// </remarks>
 public interface ITlsProvider
 {

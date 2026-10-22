@@ -190,6 +190,7 @@ function Invoke-Claim {
     # only ready tasks are unready for a lane), or @{ None = $true } when the board has
     # nothing left for this shift.
     param([string[]]$Skip, [switch]$CiFixOnly)
+    $splitDue = @()
     $lock = Enter-Lock
     try {
         foreach ($attempt in 1..5) {
@@ -221,17 +222,35 @@ function Invoke-Claim {
                     Write-Trace $id 'claim' "next offered it again although -Skip named it ($($skipNow -join ',')); waiting" 'DarkYellow'
                     return @{ Wait = $true; Why = "next kept offering skipped $id" }
                 }
-                $overCap = [bool]($id -and (Get-TaskCapSpentWhy $id))
-                if ($overCap) { Write-Trace $id 'cost cap' 'its runs of the last day already spent its cost cap; not claimed' 'Yellow'; $skipNow += $id }
-                $unreadyWhy = if ($id -and -not $overCap) { Get-TaskUnreadyWhy $id } else { '' }
+                # The shared claimable-now predicate (BL-3090): over its cost cap or interactive only.
+                $notClaimableWhy = if ($id) { Get-TaskNotClaimableWhy $id } else { '' }
+                $overCap = [bool]$notClaimableWhy
+                if ($overCap) { Write-Trace $id 'unclaimable' "$(Get-Short $notClaimableWhy 80); not claimed" 'Yellow'; $skipNow += $id }
+                # One over its cost cap (not one only interactive) is split once the lock is released (BL-3091).
+                if ($overCap -and (Get-TaskCapSpentWhy $id)) { $splitDue += @{ Id = $id; Why = $notClaimableWhy } }
+                # An unready task that overlaps work in Doing is never offered: next holds back
+                # every task behind it instead ("No task can start yet ... e.g. BL-### with ...").
+                # Skipping it releases them; without that, BL-3026 (touches: []) held lane 1 in
+                # a wait while ready tasks sat behind it (BL-3028).
+                $candidate = $id
+                if (-not $id -and $next -match 'can start yet.*?e\.g\. (BL-\d+) with' -and $skipNow -notcontains $Matches[1]) { $candidate = $Matches[1] }
+                $unreadyWhy = if ($candidate -and -not $overCap) { Get-TaskUnreadyWhy $candidate } else { '' }
                 if ($unreadyWhy) {
-                    if (Add-ShiftUnready $id $unreadyWhy) { Write-Trace $id 'unready' "not claimed: $unreadyWhy" 'Yellow' }
-                    $skipNow += $id
-                    $unready += $id
+                    if (Add-ShiftUnready $candidate $unreadyWhy) { Write-Trace $candidate 'unready' "not claimed: $unreadyWhy" 'Yellow' }
+                    $skipNow += $candidate
+                    $unready += $candidate
                 }
             } while ($overCap -or $unreadyWhy)
             if (-not $id) {
                 if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
+                # Ready tasks this lane already ran this shift (its -Skip) are not claimable by
+                # it, but they are not unready: end the lane so a fresh shift, whose lanes have
+                # run nothing yet, claims them. Waiting held lane 1 four hours on 2026-10-21
+                # with BL-3011 and BL-3023 ready behind the unready BL-3026 (BL-3028).
+                if ($unready.Count -and $skipNow.Count -gt $unready.Count) {
+                    $behind = Get-NextTaskId ((Invoke-Board @('next', '-Skip', ($unready -join ','))) -join "`n")
+                    if ($behind) { return @{ None = $true; Why = "only unready tasks and tasks this lane already ran this shift ($behind) are ready" } }
+                }
                 # Only unready tasks are ready: wait rather than end the lane, or -Continuous
                 # would start shift after shift that each pass them over.
                 if ($unready.Count) { return @{ Wait = $true; Why = (Get-Short "only unready tasks are ready ($($unready -join ', ')); see unready.txt" 80) } }
@@ -258,7 +277,12 @@ function Invoke-Claim {
         }
         $why = if ($lostRace) { 'claim kept losing races' } else { 'claim kept being refused by the board or origin' }
         return @{ Wait = $true; Why = $why }
-    } finally { $lock.Dispose() }
+    } finally {
+        $lock.Dispose()
+        # A split run takes minutes, so it never holds the lock every lane's claim waits on;
+        # Invoke-TaskSplit takes it again only to commit and push. At most once a day each.
+        foreach ($due in $splitDue) { Invoke-TaskSplit $due.Id $due.Why -PullOnRefusal | Out-Null }
+    }
 }
 
 if ($TestClaimDuplicates) {
@@ -360,8 +384,12 @@ if ($TestTaskReadiness) {
     foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $repo "Tasks\$state\.gitkeep") -Value '' }
     Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-001-anything.md') -Encoding UTF8 -Value ((& $taskText 'Change anything' '[]') -replace 'priority: Normal', 'priority: High')
     Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-002-narrow.md') -Encoding UTF8 -Value ((& $taskText 'Change one file') -replace 'BL-001', 'BL-002')
+    # A third ready task, and one in Doing that the unready task overlaps, so next holds
+    # back every task behind the unready one rather than offering it (BL-3028).
+    Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-003-other.md') -Encoding UTF8 -Value ((& $taskText 'Change another file' '[Curl.Cli.UnitLibrary/Bar.cs]') -replace 'BL-001', 'BL-003')
+    Set-Content -Path (Join-Path $repo 'Tasks\Doing\BL-004-running.md') -Encoding UTF8 -Value ((& $taskText 'Change a running file' '[Curl.Cli.UnitLibrary/Baz.cs]') -replace 'BL-001', 'BL-004')
     git -C $repo add -A 2>&1 | Out-Null
-    git -C $repo commit -q -m 'file two tasks' 2>&1 | Out-Null
+    git -C $repo commit -q -m 'file four tasks' 2>&1 | Out-Null
     git -C $repo push -q origin work 2>&1 | Out-Null
     $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
     $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
@@ -370,14 +398,23 @@ if ($TestTaskReadiness) {
     $env:CLAUDE_PROJECT_DIR = $repo
     try {
         $first = Invoke-Claim -Skip @()
-        # The narrow task is finished elsewhere: only the unready one is left, with nothing in Doing.
-        git -C $repo rm -q 'Tasks/Doing/BL-002-narrow.md' 2>&1 | Out-Null
-        git -C $repo commit -q -m 'BL-002 finished' 2>&1 | Out-Null
+        # BL-002 and BL-004 finish elsewhere; this lane already ran BL-003 this shift.
+        git -C $repo rm -q 'Tasks/Doing/BL-002-narrow.md' 'Tasks/Doing/BL-004-running.md' 2>&1 | Out-Null
+        git -C $repo commit -q -m 'BL-002 and BL-004 finished' 2>&1 | Out-Null
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $ranAlready = Invoke-Claim -Skip @('BL-003')
+        $third = Invoke-Claim -Skip @()
+        # The other task is finished elsewhere: only the unready one is left, with nothing in Doing.
+        git -C $repo rm -q 'Tasks/Doing/BL-003-other.md' 2>&1 | Out-Null
+        git -C $repo commit -q -m 'BL-003 finished' 2>&1 | Out-Null
         git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
         $second = Invoke-Claim -Skip @()
         $traced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'BL-001 unready' })
         $cases = @(
-            ,@('a claim passes over an unready task and takes the next', 'BL-002', "$($first.Id)")
+            ,@('a claim passes over an unready task held back by Doing and takes the next', 'BL-002', "$($first.Id)")
+            ,@('with only tasks this lane ran left besides the unready one, the lane ends', 'none', $(if ($ranAlready.Wait) { 'wait' } elseif ($ranAlready.None) { 'none' } else { "claimed $($ranAlready.Id)" }))
+            ,@('the end says which task this lane already ran', 'True', "$($ranAlready.Why -match 'already ran this shift \(BL-003\)')")
+            ,@('a fresh claim takes the task behind the unready one', 'BL-003', "$($third.Id)")
             ,@('the unready task stays in Backlog', 'Backlog', (Get-TaskState 'BL-001'))
             ,@('with only unready tasks ready the lane waits, not ends', 'wait', $(if ($second.Wait) { 'wait' } elseif ($second.None) { 'none' } else { "claimed $($second.Id)" }))
             ,@('the wait says why', 'True', "$($second.Why -match 'only unready tasks are ready \(BL-001\)')")

@@ -32,10 +32,10 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    public async Task ResolveHttpsOriginAsync_WithARecord_ReportsTheHttpsLinesBeforeTheAAndAaaaLines()
+    public async Task ResolveHttpsOriginAsync_WithARecord_ReportsTheHttpsLinesAndNoneForTheDecodedAAndAaaaAnswers()
     {
         var trace = new RecordingTransferEvents();
-        var resolver = new DohDnsResolver(AnsweringAllThree(), DohUrl, trace, DescribeExitCode);
+        var resolver = new DohDnsResolver(AnsweringAllThree(aaaaFirst: false), DohUrl, trace, DescribeExitCode);
         Diagnostics.Arrange("origin", "https://foo.example.com/ with an HTTPS record holding alpn h2 and ech");
 
         _ = await resolver.ResolveHttpsOriginAsync("foo.example.com", 443, CancellationToken.None);
@@ -47,10 +47,9 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
                 "[DNS] [HTTPS] record: 1 . alpn=h2",
                 "[DNS] [HTTPS] record: 1 . alpn=h2 ech=<6 bytes>",
                 "[DoH] DoH request complete, 0 to go",
-                "[DNS] hostname: foo.example.com",
             };
-        string[] actualLines = [.. trace.Info.Take(expectedLines.Length)];
-        Diagnostics.Diff("first trace lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
+        string[] actualLines = [.. trace.Info];
+        Diagnostics.Diff("trace lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
         CollectionAssert.AreEqual(expectedLines, actualLines);
     }
 
@@ -58,7 +57,7 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
     public async Task ResolveHttpsOriginAsync_WithSubTransferEvents_WritesTheHttpsSubTransferFirstOnConnectionOne()
     {
         var trace = new RecordingTransferEvents();
-        var resolver = new DohDnsResolver(AnsweringAllThree(), DohUrl, trace, DescribeExitCode) { SubTransferEvents = trace };
+        var resolver = new DohDnsResolver(AnsweringAllThree(aaaaFirst: true), DohUrl, trace, DescribeExitCode) { SubTransferEvents = trace };
         Diagnostics.Arrange("events", "one sink for the sub-transfer lines and the trace lines");
 
         _ = await resolver.ResolveHttpsOriginAsync("foo.example.com", 443, CancellationToken.None);
@@ -76,12 +75,11 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
                 "using HTTP/1.x",
                 "upload completely sent off: 33 bytes",
                 "Connection #2 to host 127.0.0.1:41444 left intact",
-                "a DoH request is completed, 1 to go",
+                "DoH request complete, 1 to go",
                 "using HTTP/1.x",
                 "upload completely sent off: 33 bytes",
                 "Connection #3 to host 127.0.0.1:41444 left intact",
-                "a DoH request is completed, 0 to go",
-                "[DNS] hostname: foo.example.com",
+                "DoH request complete, 0 to go",
             };
         string[] actualLines = [.. trace.Info.Take(expectedLines.Length)];
         Diagnostics.Diff("first lines", string.Join("\n", expectedLines), string.Join("\n", actualLines));
@@ -199,14 +197,65 @@ public sealed class DohDnsResolverHttpsRecordTraceTests
         Assert.AreEqual("1 a.test.", text);
     }
 
-    private static FakeConnector AnsweringAllThree()
+    [TestMethod]
+    [DataRow(true, false, DisplayName = "doh")]
+    [DataRow(true, true, DisplayName = "dns,doh")]
+    [DataRow(false, false, DisplayName = "dns")]
+    public async Task ResolveHttpsRecordAsync_UnderAGate_WritesOnlyTheLinesItTurnsOn(bool dohLines, bool dnsLines)
+    {
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add(Ok(HttpsAnswer(AlpnAndEchRecord)));
+        var trace = new RecordingTransferEvents();
+        var resolver = new DohDnsResolver(connector, DohUrl, trace, DescribeExitCode) { HttpsRecordTrace = new(dohLines, dnsLines) };
+
+        _ = await resolver.ResolveHttpsRecordAsync("foo.example.com", 443, CancellationToken.None);
+
+        WriteTrace(trace.Info);
+        string[] dns = ["[DNS] [HTTPS] got 1 records", "[DNS] [HTTPS] record: 1 . alpn=h2", "[DNS] [HTTPS] record: 1 . alpn=h2 ech=<6 bytes>"];
+        string[] expected = [.. dnsLines ? dns : [], .. dohLines ? ["[DoH] DoH request complete, 0 to go"] : Array.Empty<string>()];
+        AssertLines(expected, [.. trace.Info]);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP/1.1 500 Internal Server Error", "500", DisplayName = "500")]
+    [DataRow("HTTP/1.1 199 Early", "199", DisplayName = "199")]
+    [DataRow("HTTP/1.1", "0", DisplayName = "no status")]
+    [DataRow("HTTP/1.1 abc", "0", DisplayName = "not a number")]
+    public async Task ResolveHttpsRecordAsync_AStatusOutside2xx_ReportsTheStatusAndGivesNoRecord(string statusLine, string status)
+    {
+        var answer = HttpsAnswer(AlpnAndEchRecord);
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add([.. Encoding.Latin1.GetBytes($"{statusLine}\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer]);
+        var trace = new RecordingTransferEvents();
+
+        var record = await new DohDnsResolver(connector, DohUrl, trace, DescribeExitCode).ResolveHttpsRecordAsync("foo.example.com", 443, CancellationToken.None);
+
+        WriteTrace(trace.Info);
+        Assert.IsNull(record);
+        AssertLines([$"[DoH] [DoH] [HTTPS] error: HTTP status {status}"], [.. trace.Info]);
+    }
+
+    [TestMethod]
+    public async Task ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord()
+    {
+        var answer = HttpsAnswer(AlpnAndEchRecord);
+        var connector = new FakeConnector();
+        connector.BytesToRead.Add([.. Encoding.Latin1.GetBytes($"HTTP/1.1 299 OK\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer]);
+
+        var record = await new DohDnsResolver(connector, DohUrl, new RecordingTransferEvents(), DescribeExitCode).ResolveHttpsRecordAsync("foo.example.com", 443, CancellationToken.None);
+
+        Assert.IsNotNull(record);
+    }
+    // Traced, the AAAA query's sub-transfer runs before the A query's (BL-2973); untraced, A's connects first.
+    private static FakeConnector AnsweringAllThree(bool aaaaFirst)
     {
         var queryA = Convert.FromHexString("000001000001000000000000" + FooExampleCom + "00010001");
         var queryAaaa = Convert.FromHexString("000001000001000000000000" + FooExampleCom + "001C0001");
         var connector = new FakeConnector();
         connector.BytesToRead.Add(Ok(HttpsAnswer(AlpnAndEchRecord)));
-        connector.BytesToRead.Add(Ok(DnsTestReplies.Answer(queryA, [IPAddress.Loopback])));
-        connector.BytesToRead.Add(Ok(DnsTestReplies.Answer(queryAaaa, [IPAddress.IPv6Loopback])));
+        byte[] answerA = Ok(DnsTestReplies.Answer(queryA, [IPAddress.Loopback]));
+        byte[] answerAaaa = Ok(DnsTestReplies.Answer(queryAaaa, [IPAddress.IPv6Loopback]));
+        connector.BytesToRead.AddRange(aaaaFirst ? [answerAaaa, answerA] : [answerA, answerAaaa]);
         return connector;
     }
 

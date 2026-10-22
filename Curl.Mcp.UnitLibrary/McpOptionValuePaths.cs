@@ -62,6 +62,7 @@ internal static class McpOptionValuePaths
         return [new(WithoutSlashBeforeDrive(Uri.UnescapeDataString(path)))];
     }
 
+    /// <summary>The path of a <c>file://</c> URL's authority and path: the path alone for an empty, <c>localhost</c> or <c>127.0.0.1</c> host, otherwise <c>//host/path</c>.</summary>
     private static string PathAfterHost(string authorityAndPath)
     {
         int slash = authorityAndPath.IndexOf('/', StringComparison.Ordinal);
@@ -95,6 +96,7 @@ internal static class McpOptionValuePaths
             ["url"] = UrlPaths,
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
+    /// <summary>The paths of a <see cref="McpOptionPathUse.ValueEmbedded" /> option's value: its reader above, or, for the proxy options with no reader, a Unix socket proxy URL.</summary>
     private static IReadOnlyList<McpValuePath> EmbeddedPaths(string longName, string value) =>
         EmbeddedPathReaders.TryGetValue(longName, out Func<string, IReadOnlyList<McpValuePath>>? readPaths)
             ? readPaths(value)
@@ -114,6 +116,7 @@ internal static class McpOptionValuePaths
         return separator >= 0 && value[separator] == '@' ? FilePath(value[(separator + 1)..]) : [];
     }
 
+    /// <summary>The one path <paramref name="path" /> names, or none for <c>-</c>, which curl reads or writes as a standard stream.</summary>
     private static IReadOnlyList<McpValuePath> FilePath(string path) => path == StandardStream ? [] : [new(path)];
 
     /// <summary>
@@ -136,6 +139,7 @@ internal static class McpOptionValuePaths
         return paths;
     }
 
+    /// <summary>Adds the comma-separated files <paramref name="text" /> names when it starts with <c>@</c> or <c>&lt;</c>.</summary>
     private static void AddFormFiles(List<McpValuePath> paths, string text)
     {
         if (!text.StartsWith('@') && !text.StartsWith('<'))
@@ -161,6 +165,7 @@ internal static class McpOptionValuePaths
         return semicolon < 0 ? text : text[..semicolon];
     }
 
+    /// <summary>The text after the opening <c>"</c> up to the next unescaped <c>"</c>, a backslash taking the character after it literally.</summary>
     private static string QuotedFormWord(string text)
     {
         System.Text.StringBuilder word = new();
@@ -260,6 +265,7 @@ internal static class McpOptionValuePaths
         return FilePath(value);
     }
 
+    /// <summary>Whether <paramref name="value" /> holds <c>#</c> followed by a digit, curl's <c>#1</c> reference to a URL glob.</summary>
     private static bool HasGlobReference(string value)
     {
         for (int index = value.IndexOf('#', StringComparison.Ordinal); index >= 0; index = value.IndexOf('#', index + 1))

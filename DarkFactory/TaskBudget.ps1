@@ -48,13 +48,37 @@ function Get-UsageCostUsd {
     return $weighted * $script:RunPriceBaseUsdPerMillion[$family] / 1e6
 }
 
+function Read-SharedLogLines {
+    # The lines of a log another process may still hold open for writing, read with shared
+    # access and retried briefly on IOException; a log that stays locked reads as no lines (BL-3061).
+    param([string]$Path)
+    for ($try = 1; $try -le 5; $try++) {
+        try {
+            $stream = [System.IO.FileStream]::new($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+            try {
+                $reader = [System.IO.StreamReader]::new($stream)
+                $lines = [System.Collections.Generic.List[string]]::new()
+                while ($null -ne ($line = $reader.ReadLine())) { $lines.Add($line) }
+                return , $lines.ToArray()
+            }
+            finally { $stream.Dispose() }
+        }
+        catch [System.IO.IOException] {
+            if ($try -lt 5) { Start-Sleep -Milliseconds 200 }
+        }
+        catch { break }
+    }
+    Write-Verbose "Could not read $Path; its cost is not counted."
+    return , @()
+}
+
 function Get-LogEstimatedCostUsd {
     # A run log's cost in US dollars estimated from the usage of its assistant messages.
     # stream-json repeats a message's id on each of its content blocks, with the output count
     # growing, so each id counts once with its largest count of each kind.
     param([string]$Path)
     $byId = @{}
-    foreach ($line in [System.IO.File]::ReadLines($Path)) {
+    foreach ($line in (Read-SharedLogLines $Path)) {
         if (-not $line.StartsWith('{"type":"assistant"')) { continue }
         $evt = try { $line | ConvertFrom-Json } catch { $null }
         $message = if ($evt) { $evt.message } else { $null }
@@ -91,15 +115,49 @@ function Get-TaskSpentUsd {
     # counting only logs written in the last -Hours (AF-0095): a requeued task's next run
     # gets the rest of one cap, while a task parked days ago starts afresh.
     param([string]$Dir, [string]$Id, [double]$Hours = 24)
-    if (-not (Test-Path $Dir)) { return 0.0 }
+    $spent = 0.0
+    foreach ($run in @(Get-TaskRunSpends $Dir $Id $Hours)) { $spent += $run.Usd }
+    return $spent
+}
+
+function Get-TaskRunSpends {
+    # Each of a task's task and resumed runs logged in the last -Hours: Time (the log's last
+    # write, when it leaves the window -Hours later) and Usd. Get-TaskSpentUsd sums them.
+    param([string]$Dir, [string]$Id, [double]$Hours = 24)
+    if (-not (Test-Path $Dir)) { return @() }
     $since = (Get-Date).AddHours(-$Hours)
     $pattern = '^' + [regex]::Escape($Id) + '-\d{8}-\d{6}(-L\d+)?(-resumed)?\.jsonl$'
-    $spent = 0.0
+    $runs = @()
     foreach ($log in @(Get-ChildItem $Dir -Filter "$Id-*.jsonl" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern -and $_.LastWriteTime -ge $since })) {
         $cost = Get-RunLogCost $log.FullName
-        if ($cost) { $spent += $cost.Usd }
+        if ($cost) { $runs += [pscustomobject]@{ Time = $log.LastWriteTime; Usd = $cost.Usd } }
     }
-    return $spent
+    return $runs
+}
+
+function Get-CapResetTime {
+    # When a task's cost cap frees: the time its oldest runs leave the -Hours window so that
+    # what is left no longer spends the cap (Test-TaskCapSpent), or $null when the cap is not
+    # spent now. -Runs are Get-TaskRunSpends objects. Pure, so -TestTaskBudget proves it.
+    param([object[]]$Runs, [double]$Cap, [double]$Hours = 24)
+    $sorted = @($Runs | Sort-Object Time)
+    $left = 0.0
+    foreach ($run in $sorted) { $left += $run.Usd }
+    if (-not (Test-TaskCapSpent $Cap $left)) { return $null }
+    foreach ($run in $sorted) {
+        $left -= $run.Usd
+        if (-not (Test-TaskCapSpent $Cap $left)) { return ([datetime]$run.Time).AddHours($Hours) }
+    }
+    return $null
+}
+
+function Get-CapFreesAt {
+    # The earliest time any of the cost-capped tasks -Ids has its cap free, or $null (BL-3090).
+    param([string[]]$Ids)
+    $cap = Get-RunBudgetUsd $TaskBudgetUsd @(Get-RecentRunCosts $LogDir)
+    $times = @($Ids | ForEach-Object { Get-CapResetTime @(Get-TaskRunSpends $LogDir $_) $cap } | Where-Object { $_ } | Sort-Object)
+    if ($times.Count) { return $times[0] }
+    return $null
 }
 
 function Close-UnfinishedRunLogs {
@@ -201,6 +259,13 @@ if ($TestTaskBudget) {
     # one blocked because a run stopped at the cap stays Blocked (BL-2117).
     $refused = '2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see x'
     $stopped = '2026-10-11: Doing -> Blocked. Stewart: dark factory stopped at its 3.2 US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task; see x'
+    # The cap frees when the oldest runs leave the day (BL-3090).
+    $t0 = [datetime]'2026-10-22 01:00'
+    $twoRuns = @([pscustomobject]@{ Time = $t0.AddHours(2); Usd = 1.5 }, [pscustomobject]@{ Time = $t0; Usd = 1.5 })
+    $cases += ,@('two runs in the day free the cap when the oldest leaves it', '2026-10-23 01:00', ((Get-CapResetTime $twoRuns 3.5).ToString('yyyy-MM-dd HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)))
+    $cases += ,@('three runs free the cap only when enough leave', '2026-10-23 03:00', ((Get-CapResetTime ($twoRuns + [pscustomobject]@{ Time = $t0.AddHours(4); Usd = 2.0 }) 3.5).ToString('yyyy-MM-dd HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)))
+    $cases += ,@('a task not capped has no cap reset time', 'True', "$($null -eq (Get-CapResetTime @([pscustomobject]@{ Time = $t0; Usd = 1.0 }) 3.5))")
+    $cases += ,@('a task with no runs has no cap reset time', 'True', "$($null -eq (Get-CapResetTime @() 3.5))")
     $cases += ,@('a refused task is requeued once its last day leaves 1 dollar', 'True,True', "$((Test-CapBlockRequeueDue $refused 2.10 0), (Test-CapBlockRequeueDue $refused 2.10 1.10) -join ',')")
     $cases += ,@('a refused task stays Blocked while its cap is still spent', 'False', "$(Test-CapBlockRequeueDue $refused 2.10 1.16)")
     $cases += ,@('a run that stopped at the cap is never requeued', 'False,False', "$((Test-CapBlockRequeueDue $stopped 3.2 0), (Test-CapBlockRequeueDue $stopped 0 0) -join ',')")
@@ -227,6 +292,16 @@ if ($TestTaskBudget) {
     $cases += ,@('a result of 0 with no usage costs 0', '0,False', ((Get-RunLogCost (Join-Path $dir 'BL-12-20261003-100000-L1.jsonl')) | ForEach-Object { "$($_.Usd),$($_.Estimated)" }))
     $cases += ,@('a killed run counts toward its task spend', '6.16', ((Get-TaskSpentUsd $dir 'BL-7').ToString('0.00', $usd)))
     $cases += ,@('a killed run counts toward the recent costs', '6.16', (((@(Get-RecentRunCosts $dir -Count 100) | Sort-Object -Descending) | Where-Object { $_ -gt 6.1 -and $_ -lt 6.2 } | Select-Object -First 1).ToString('0.00', $usd)))
+    # A log a running claude still holds open for writing is read (BL-3061).
+    $lockedPath = Join-Path $dir 'BL-13-20261003-100000-L1.jsonl'
+    $writer = [System.IO.FileStream]::new($lockedPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
+    $bytes = [Text.Encoding]::UTF8.GetBytes($usageA + "`n"); $writer.Write($bytes, 0, $bytes.Length); $writer.Flush()
+    $cases += ,@('a log held open for writing costs what it costs once closed', '6.16', ((Get-LogEstimatedCostUsd $lockedPath).ToString('0.00', $usd)))
+    $writer.Dispose()
+    $writer = [System.IO.FileStream]::new($lockedPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    $cases += ,@('a log locked exclusively costs 0 and never throws', '0', "$(Get-LogEstimatedCostUsd $lockedPath)")
+    $writer.Dispose()
+    $cases += ,@('a log released after being locked costs its usage', '6.16', ((Get-LogEstimatedCostUsd $lockedPath).ToString('0.00', $usd)))
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {

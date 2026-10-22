@@ -4,7 +4,7 @@ title: Decode DoH answers as curl 8.22.0 does: NXDOMAIN, CNAME data skipped, TTL
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2970]
+depends-on: [BL-3011, BL-3012]
 touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DnsMessageFailureText.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs]
 requirement: none
 created: 2026-10-21

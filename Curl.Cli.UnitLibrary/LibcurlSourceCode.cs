@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// The C source file <c>--libcurl &lt;file&gt;</c> writes after the transfers, as curl 8.21.0 writes it: a
+/// The C source file <c>--libcurl &lt;file&gt;</c> writes after the transfers, as curl 8.22.0 writes it: a
 /// header comment, <c>#include &lt;curl/curl.h&gt;</c>, a <c>main</c> that declares and fills the
 /// <c>curl_slist</c> and <c>curl_mime</c> variables and calls <c>curl_easy_init</c>, then for each transfer
 /// the <c>curl_easy_setopt</c> lines and the list of options that cannot be written as source, and
@@ -24,7 +24,10 @@ namespace Curl.Cli;
 /// as a zero timeout, is not written, as curl does not write it. The proxy, TLS and authentication options'
 /// lines (BL-654) are in <c>LibcurlSourceCode.ProxyTlsAndAuthentication.cs</c>, the transfer, redirect, speed and socket options' lines (BL-1106) in <c>LibcurlSourceCode.TransferOptions.cs</c>, the FTP, SSH, TFTP, telnet, mail, verbose, rate-limit and protocol options' lines (BL-1174) in <c>LibcurlSourceCode.ProtocolOptions.cs</c>, and
 /// the lines that need the transfer's files - <c>-T</c>, <c>--etag-compare</c>, <c>-C -</c> and the SSH
-/// known-hosts file (BL-1177) - in <c>LibcurlSourceCode.TransferFiles.cs</c>.
+/// known-hosts file (BL-1177) - in <c>LibcurlSourceCode.TransferFiles.cs</c>. A transfer's lines come in
+/// the order of curl 8.22.0's <c>src/config2setopts.c</c> (BL-2966, measured 2026-10-21): the URL, the
+/// proxy, the credentials and headers, the transfer settings, the scheme's lines, SSH and TLS, DNS and
+/// network, mail and SASL, then the rest.
 /// </remarks>
 public static partial class LibcurlSourceCode
 {
@@ -115,7 +118,7 @@ public static partial class LibcurlSourceCode
     /// Builds the source file for the transfers performed, in the order they were performed, with what the
     /// console learnt about each transfer's files. A transfer whose <c>CURLOPT_SSH_KNOWNHOSTS</c> curl's tool
     /// fails to set (<see cref="LibcurlTransfer.SshKnownHostsFileMissing" />) ends the transfers there, without
-    /// its list of options or <c>curl_easy_perform</c>, as curl 8.21.0 ends them with exit 2.
+    /// its list of options or <c>curl_easy_perform</c>, as curl 8.22.0 ends them with exit 2.
     /// </summary>
     /// <param name="transfers">Each transfer and its facts.</param>
     /// <returns>The source text, every line ending in <c>\n</c>.</returns>
@@ -154,7 +157,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// Quotes <paramref name="value" /> as a C string literal the way curl 8.21.0 does: its UTF-8 bytes,
+    /// Quotes <paramref name="value" /> as a C string literal the way curl 8.22.0 does: its UTF-8 bytes,
     /// quoted as <see cref="QuoteCBytes" /> quotes them.
     /// </summary>
     /// <param name="value">The string.</param>
@@ -167,7 +170,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// Quotes <paramref name="bytes" /> as a C string literal the way curl 8.21.0 does: cut at
+    /// Quotes <paramref name="bytes" /> as a C string literal the way curl 8.22.0 does: cut at
     /// <see cref="LongestQuotedString" /> with <c>...</c> added, <c>\n</c>, <c>\r</c>, <c>\t</c>, <c>\\</c>,
     /// <c>\"</c> and <c>\?</c> escaped, and any other byte outside printable ASCII as <c>\x</c> and two
     /// lowercase hex digits, or as <c>\</c> and three octal digits when a hex digit follows it, so a C
@@ -209,34 +212,58 @@ public static partial class LibcurlSourceCode
         AddIf(lines, options.Trace != TraceKind.None, SetoptOn("CURLOPT_VERBOSE"));
         lines.AddRange([BufferSizeLine(options), Setopt("CURLOPT_URL", QuoteCString(QueryUrl.Append(UploadUrlOf(transfer), options)))]);
         AddIf(lines, options.Silent || options.ProgressMeterOff, SetoptOn("CURLOPT_NOPROGRESS"));
-        AddIf(lines, options.NoBody, SetoptOn("CURLOPT_NOBODY"));
-        lines.AddRange(BearerAndProxyLines(options));
-        AddIf(lines, options.FailMode == HttpFailMode.Fail, SetoptOn("CURLOPT_FAILONERROR"));
-        lines.AddRange(TransferModeLines(options, transfer.UploadFile is not null));
+        lines.AddRange(ProxyLines(options));
+        lines.AddRange(CredentialAndHeaderLines(transfer, variables));
+        lines.AddRange(TransferSettingLines(transfer, variables));
+        lines.AddRange(SchemeLines(options, scheme, variables));
+        lines.AddRange(SshLines(transfer, scheme));
+        lines.AddRange(TlsLines(options));
+        lines.AddRange(DnsAndNetworkLines(options, variables));
+        lines.AddRange(MailAndSaslLines(options, variables));
+        lines.AddRange(MiscellaneousLines(options, variables));
+        AddIf(lines, transfer.UploadFileSize > 0, () => Setopt("CURLOPT_INFILESIZE_LARGE", $"(curl_off_t){transfer.UploadFileSize}"));
+        return lines;
+    }
+
+    /// <summary>
+    /// The lines of curl 8.22.0's <c>credentials_and_headers_setopts</c>, after the proxy's: the
+    /// <c>--oauth2-bearer</c> token, netrc and <c>--login-options</c>, <c>-u</c>, the authentication schemes,
+    /// the headers, <c>-e</c>, <c>-A</c> and the private key's password.
+    /// </summary>
+    private static List<string> CredentialAndHeaderLines(LibcurlTransfer transfer, LibcurlSourceVariables variables)
+    {
+        CommandLineOptions options = transfer.Options;
+        List<string> lines = [];
+        AddStringIf(lines, "CURLOPT_XOAUTH2_BEARER", options.BearerToken);
         lines.AddRange(NetrcLines(options));
         AddIf(lines, options.Credentials is not null, () => Setopt("CURLOPT_USERPWD", QuoteCString($"{options.Credentials!.UserName}:{options.Credentials.Password}")));
-        AddStringIf(lines, "CURLOPT_RANGE", options.Range);
-        AddIf(lines, options.MaxTime > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_TIMEOUT_MS", options.MaxTime!.Value));
-        lines.AddRange(RequestBodyLines(options, variables));
-        AddIf(lines, options.FormEscape, SetoptOn("CURLOPT_MIME_OPTIONS"));
         lines.AddRange(HttpAuthLines(options));
         AddStringListIf(lines, "CURLOPT_HTTPHEADER", [.. HttpHeaderLines(options), .. transfer.IfNoneMatchHeaders], variables);
         AddStringIf(lines, "CURLOPT_REFERER", options.Referer);
         lines.Add(Setopt("CURLOPT_USERAGENT", QuoteCString(options.UserAgent ?? DefaultUserAgent)));
-        lines.AddRange(SchemeLines(options, scheme, variables));
+        AddStringIf(lines, "CURLOPT_KEYPASSWD", options.Passphrase ?? SplitCertificate(options.ClientCertificate).Password);
+        return lines;
+    }
+
+    /// <summary>
+    /// The lines of curl 8.22.0's <c>transfer_setopts</c>, after the headers: <c>-I</c>, <c>-f</c>, the
+    /// transfer mode, <c>-r</c>, <c>-m</c>, the request body, the speed and resume options, the path, file
+    /// time, quote and condition options, then <c>-X</c>.
+    /// </summary>
+    private static List<string> TransferSettingLines(LibcurlTransfer transfer, LibcurlSourceVariables variables)
+    {
+        CommandLineOptions options = transfer.Options;
+        List<string> lines = [];
+        AddIf(lines, options.NoBody, SetoptOn("CURLOPT_NOBODY"));
+        AddIf(lines, options.FailMode == HttpFailMode.Fail, SetoptOn("CURLOPT_FAILONERROR"));
+        lines.AddRange(TransferModeLines(options, transfer.UploadFile is not null));
+        AddStringIf(lines, "CURLOPT_RANGE", options.Range);
+        AddIf(lines, options.MaxTime > TimeSpan.Zero, () => SetoptMilliseconds("CURLOPT_TIMEOUT_MS", options.MaxTime!.Value));
+        lines.AddRange(RequestBodyLines(options, variables));
+        AddIf(lines, options.FormEscape, SetoptOn("CURLOPT_MIME_OPTIONS"));
         lines.AddRange(SpeedAndResumeLines(options, ResumeOffsetOf(transfer)));
-        lines.AddRange(TlsLines(transfer, scheme));
         lines.AddRange(PathFileTimeAndConditionLines(options, variables));
-        lines.AddRange(RequestAndConnectionLines(options, variables));
-        lines.AddRange(SocksAndServiceLines(options));
-        lines.AddRange(SocketLines(options));
-        lines.AddRange(MailFileModeAndProtocolLines(options, variables));
-        AddStringListIf(lines, "CURLOPT_RESOLVE", options.ResolveEntries, variables);
-        AddStringListIf(lines, "CURLOPT_CONNECT_TO", options.ConnectToEntries, variables);
-        lines.AddRange(DelegationAndSaslLines(options));
-        lines.AddRange(UnixSocketAndUrlLines(options));
-        lines.AddRange(UploadFlagLines(options));
-        AddIf(lines, transfer.UploadFileSize > 0, () => Setopt("CURLOPT_INFILESIZE_LARGE", $"(curl_off_t){transfer.UploadFileSize}"));
+        AddStringIf(lines, "CURLOPT_CUSTOMREQUEST", options.RequestMethod);
         return lines;
     }
 
@@ -349,7 +376,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The <c>curl_mime_filename</c> argument curl 8.21.0 writes for <paramref name="part" />, or
+    /// The <c>curl_mime_filename</c> argument curl 8.22.0 writes for <paramref name="part" />, or
     /// <see langword="null" /> for none: <c>&lt;file</c> clears the name <c>curl_mime_filedata</c> set, as
     /// <c>NULL</c>, and drops any <c>;filename=</c>; <c>&lt;-</c> writes none; <c>@-</c> is named <c>-</c>
     /// unless <c>;filename=</c> names it; any other part writes its <c>;filename=</c>.
@@ -365,8 +392,9 @@ public static partial class LibcurlSourceCode
     private static string? QuotedOrNull(string? text) => text is null ? null : QuoteCString(text);
 
     /// <summary>
-    /// The lines curl 8.21.0 writes for the scheme: for HTTP the redirect, <c>--compressed</c> and cookie
-    /// options and the redirect limit, which it writes for no other scheme; for FTP the passive-IP skip.
+    /// The lines curl 8.22.0 writes for the scheme: for HTTP the redirect, <c>--compressed</c> and cookie
+    /// options and the redirect limit, which it writes for no other scheme; for FTP its options, after
+    /// the <c>-Q</c> lists.
     /// </summary>
     private static List<string> SchemeLines(CommandLineOptions options, string scheme, LibcurlSourceVariables variables) => scheme switch
     {
@@ -397,7 +425,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// The scheme curl 8.21.0's tool finds for <paramref name="url" />, lowercase: its own, the
+    /// The scheme curl 8.22.0's tool finds for <paramref name="url" />, lowercase: its own, the
     /// <c>--proto-default</c> one or the guessed one; empty for a URL holding a space or control
     /// character, which curl's URL parser refuses, so it sets none of the scheme's options.
     /// </summary>

@@ -173,8 +173,16 @@
     process runs the review beside it, so nothing waits for it; lanes claim what it files.
     With nothing ready, it runs first, and the next shift starts if it filed work. The
     review never holds or undoes the merge: CI is the merge gate (ADR-0710). It is skipped
-    when the plugin is not installed, and after its trial: it runs for
-    $ShiftReviewTrialShifts shifts (2), then stops until Stewart decides.
+    when the plugin is not installed.
+
+    A -Continuous shift that ends with nothing claimable (only cost-capped or interactive-only
+    tasks, or none) does not exit: it shows what waits on Stewart once, then every
+    -IdlePollMinutes (default 5, 1 to 60) pulls the shift branch and looks for a claimable
+    task, writing a heartbeat with phase idle and step polling that the board page shows.
+    When one is claimable it starts the next shift by the same hand-over as above; at the
+    -Hours deadline, or once -StopAtUsage or -StopAtWeeklyUsage says no shift may start, it
+    stops polling and ends as a shift without -Continuous does: the alarm when something
+    waits on Stewart, else it closes (ADR-0758).
 
     A commit that only changes the board and is pushed on its own - a claim, requeue,
     park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
@@ -197,7 +205,14 @@
     "Fix CI failure <test> on Linux and macOS", "Fix flaky CI test <test> that failed once
     on Linux" or "Fix CI build error CS1002 in X.cs on macOS" - naming the platforms, the
     run and its link, the first failing commit and the error message, with `touches` set to
-    the test project and its library. It files nothing while a Backlog, Doing or Blocked
+    the test project and its library. A failed job step that names no test (BL-3028) gets
+    the files its `::error file=` lines name and the files declaring each member "outside a
+    gate", or else Measure-CodeQuality.ps1 for a quality step and Curl.slnx for any other;
+    no CI task is filed with empty touches, which no lane would take. When the newest run is
+    green and its commit contains the filing of a Backlog "Fix CI failure", "Fix CI build" or
+    "Fix flaky CI test" task, the watch moves that task to Deferred, "already fixed, CI green
+    on <sha>", pushed the same way (ADR-0756); a task in Doing is left to its lane.
+    It files nothing while a Backlog, Doing or Blocked
     task names the test, or when a finished task names it and the failing run predates that
     task's last commit. The task is committed in a detached worktree,
     <repo>.lanes\ci-watch, and pushed straight to the shift's branch, so lanes claim it on
@@ -332,7 +347,7 @@
 
     Every runner keeps a heartbeat file, <repo>.logs\lanes-<stamp>\lane-<n>.heartbeat.json
     (the single runner is lane 0): one lane object of ADR-0129's status.json schema 1 -
-    the task it holds, its title, the phase (starting, claim, run, integrate, wait, tokens,
+    the task it holds, its title, the phase (starting, claim, run, integrate, wait, tokens, idle,
     finished), the last tool step and when the task started. It is rewritten on every phase
     change, on each new tool step and at least every 60 seconds during a run or a wait,
     through a temporary file and a rename, so a reader never sees half of one. Lanes never
@@ -517,6 +532,9 @@ param(
     [switch]$Wake,
     # With lanes: when a shift ends and the board still has ready work, start the next one.
     [switch]$Continuous,
+    # With -Continuous: how often, in minutes, a shift that ended with nothing claimable looks
+    # at the board again, starting the next shift once a task is claimable.
+    [ValidateRange(1, 60)][int]$IdlePollMinutes = 5,
     # Stop claiming new tasks once this share of the 5-hour usage window is used, so the
     # tasks already running finish, integrate and push before the tokens run out. The next
     # shift waits for a fresh 5-hour window. 1 means never stop early.

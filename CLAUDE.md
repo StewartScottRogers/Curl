@@ -294,7 +294,7 @@ Curl/
 ├── Curl.Networking.IntegrationTests/ ← its Integration tests, just before the library
 ├── Curl.Networking.UnitLibrary/
 ├── Curl.Networking.UnitTests/
-├── ...                           ← 93 projects, one flat alphabetical run
+├── ...                           ← 98 projects, one flat alphabetical run
 ├── Documentation/                ← shared project (docs and planning)
 ├── Tasks/                        ← shared project (task board)
 ├── Audit/                        ← shared project (the audit office; never written by the factory)
@@ -307,8 +307,9 @@ Curl/
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
-- Four projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executable
-  `Curl.Console` (no `.UnitLibrary` suffix, because it is not a library), the two
+- Five projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executables
+  `Curl.Console` and `Curl.Config` (the `curl-config` executable, ADR-0712; no `.UnitLibrary`
+  suffix, because they are not libraries), the two
   programming interfaces `Curl.Api` and `Libcurl` (ADR-0506), and the MCP server host
   `Curl.Mcp` (ADR-0548). `Libcurl` also has no `Curl.` prefix, matching upstream's library
   name. `Curl.Api`, `Libcurl` and `Curl.Mcp` are held to the four quality gates like a
@@ -317,9 +318,9 @@ Curl/
   `Libcurl.UnitTests` tests `Libcurl`.
 - Names sort so each `.UnitTests` lands directly after the library it tests, and each
   `.IntegrationTests` directly before it (for `Curl.Console`, directly before
-  `Curl.Console.UnitTests`). Keep it that way. `Libcurl` and `Libcurl.UnitTests` sort after
-  every `Curl.*` project; in `Curl.slnx`, `Curl.Api`, `Curl.Api.UnitLibrary` and
-  `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
+  `Curl.Console.UnitTests`). Keep it that way. In `Curl.slnx` the order of projects is set
+  by their solution folders (ADR-0731), not by name: a project sits with its tests in the
+  folder for its area, and the folders follow one another in the file.
 
 In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
 under one folder for its group (ADR-0731):

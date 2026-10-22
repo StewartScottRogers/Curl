@@ -3,8 +3,9 @@
 Phase 1. The entry point, published native ahead-of-time as a single file so it
 drops onto PATH as `curl.exe`.
 
-This is the only project without a `.UnitLibrary` suffix, because it is an
-executable rather than a library.
+This project has no `.UnitLibrary` suffix, because it is an executable rather than
+a library. `Curl.Api`, `Curl.Config`, `Curl.Mcp` and `Libcurl` lack the suffix too,
+as the root `CLAUDE.md` lists.
 
 It is also the only project that references every library: composing the services
 is its job. It references `Libcurl`, not `Curl.Engine.UnitLibrary`: the engine comes to it

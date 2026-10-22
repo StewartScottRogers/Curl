@@ -41,6 +41,10 @@ internal sealed class StandardOutputFailureDeferringStream(Stream inner) : Strea
     /// </summary>
     internal const int StdioBufferSize = 4096;
 
+    /// <summary>
+    /// The bytes writes have offered since standard output failed, the write that failed included:
+    /// what curl's stdio buffer would hold. Reaching <see cref="StdioBufferSize" /> makes writes throw.
+    /// </summary>
     private long bytesOfferedSinceFailure;
 
     /// <summary>

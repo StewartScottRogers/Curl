@@ -79,6 +79,7 @@ internal static class EasyTransferOptionSetters
 
     private static CurlCode SetRange(ref EasyOptions o, object? v) => Set(ref o, t => t with { Range = (string?)v });
 
+    /// <summary><c>CURLOPT_RESUME_FROM</c> and <c>_LARGE</c>: -1 or more; below -1 is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetResumeFrom(ref EasyOptions o, object? v) => SetFrom(ref o, v, -1, (t, offset) => t with { ResumeFrom = offset });
 
     private static CurlCode SetCustomRequest(ref EasyOptions o, object? v) => Set(ref o, t => t with { CustomRequest = (string?)v });
@@ -106,6 +107,7 @@ internal static class EasyTransferOptionSetters
     /// <summary><c>CURLOPT_TIMEVALUE</c> and <c>_LARGE</c>: any <c>time_t</c>, before 1970 included.</summary>
     private static CurlCode SetTimeValue(ref EasyOptions o, object? v) => Set(ref o, t => t with { TimeValue = NumberOf(v) });
 
+    /// <summary><c>CURLOPT_INFILESIZE</c> and <c>_LARGE</c>: -1 (unknown) or more; below -1 is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetInFileSize(ref EasyOptions o, object? v) => SetFrom(ref o, v, -1, (t, size) => t with { InFileSize = size });
 
     private static CurlCode SetMaxFileSize(ref EasyOptions o, object? v) => SetFrom(ref o, v, 0, (t, size) => t with { MaxFileSize = size });
@@ -137,6 +139,7 @@ internal static class EasyTransferOptionSetters
     private static CurlCode SetUploadBufferSize(ref EasyOptions o, object? v) =>
         Set(ref o, t => t with { UploadBufferSize = Math.Clamp(NumberOf(v), LeastUploadBufferSize, MostUploadBufferSize) });
 
+    /// <summary>Replaces the handle's <see cref="EasyTransferOptions"/> with the copy <paramref name="change"/> returns; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Set(ref EasyOptions options, Func<EasyTransferOptions, EasyTransferOptions> change)
     {
         options = options with { Transfer = change(options.Transfer) };
@@ -158,6 +161,7 @@ internal static class EasyTransferOptionSetters
         return number < least || number > most ? CurlCode.BadFunctionArgument : Set(ref options, t => change(t, number));
     }
 
+    /// <summary>Whether a <c>CURLOT_LONG</c> on/off value is on: any value but 0, as in libcurl.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 
     private static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);

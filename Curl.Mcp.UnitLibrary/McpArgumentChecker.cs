@@ -58,6 +58,7 @@ public sealed class McpArgumentChecker
         return CheckArguments(new ArgumentCursor(arguments), 0);
     }
 
+    /// <summary>Checks every argument the cursor still holds; <paramref name="configDepth" /> is how many <c>-K</c> files deep this array is (0 for the tool's own).</summary>
     private McpArgumentCheck CheckArguments(ArgumentCursor cursor, int configDepth)
     {
         while (cursor.TryTake(out string argument))
@@ -74,6 +75,7 @@ public sealed class McpArgumentChecker
         return McpArgumentCheck.Allowed;
     }
 
+    /// <summary>Checks one argument before options have ended: <c>--</c> ends them, <c>--name</c> is a long option, <c>-letters</c> a bundle, anything else (a lone <c>-</c> included) a URL.</summary>
     private McpArgumentCheck CheckArgument(string argument, ArgumentCursor cursor, int configDepth)
     {
         if (argument == EndOfOptions)
@@ -126,6 +128,11 @@ public sealed class McpArgumentChecker
             : Unknown(written);
     }
 
+    /// <summary>
+    /// Checks a long option that has a row: a subject option (<c>--help</c>) takes its subject and names
+    /// no path, a flag goes to <see cref="CheckFlag" />, and a value option takes the attached value
+    /// (<c>--name=value</c>) or else the next argument. A missing value is allowed: curl itself rejects it.
+    /// </summary>
     private McpArgumentCheck CheckLongRow(string written, CommandLineOption row, string? attachedValue, ArgumentCursor cursor, int configDepth, bool expanded)
     {
         if (row.TakesSubject)
@@ -207,6 +214,10 @@ public sealed class McpArgumentChecker
             : McpArgumentCheck.Allowed;
     }
 
+    /// <summary>
+    /// Checks the value of an option. <paramref name="expanded" /> is set for <c>--expand-</c>, whose
+    /// <c>{{variable}}</c> references curl substitutes before use, so a path holding one is refused.
+    /// </summary>
     private McpArgumentCheck CheckValue(string written, string longName, string value, int configDepth, bool expanded)
     {
         McpOptionPathUse use = McpOptionPathTable.Classifications[longName];
@@ -275,6 +286,7 @@ public sealed class McpArgumentChecker
             : McpArgumentCheck.Allowed;
     }
 
+    /// <summary>Refuses on the first path that is uncheckable or outside the root; the refusal names the option as <paramref name="written" />.</summary>
     private McpArgumentCheck CheckPaths(string written, IReadOnlyList<McpValuePath> paths)
     {
         foreach (McpValuePath path in paths)
@@ -322,6 +334,7 @@ public sealed class McpArgumentChecker
             : CheckConfigLines(value, McpConfigFileSyntax.ReadLines(text), configDepth + 1);
     }
 
+    /// <summary>Reads a file the root already allowed; <see langword="null" /> with the reason in <paramref name="failure" /> when it cannot be read.</summary>
     private static string? ReadCheckedFile(string resolvedPath, out string failure)
     {
         failure = string.Empty;
@@ -336,6 +349,7 @@ public sealed class McpArgumentChecker
         }
     }
 
+    /// <summary>Checks each line of a <c>-K</c> file in order; a refusal's reason is prefixed with the file and the 1-based line.</summary>
     private McpArgumentCheck CheckConfigLines(string file, IReadOnlyList<KeyValuePair<string, string?>> lines, int configDepth)
     {
         for (int line = 0; line < lines.Count; line++)
@@ -365,6 +379,7 @@ public sealed class McpArgumentChecker
         return option.StartsWith('-') ? CheckShortBundle(option, cursor, configDepth) : CheckLong(EndOfOptions + option, cursor, configDepth);
     }
 
+    /// <summary>The refusal for an option with no row in the classified table; failing closed means a new curl option is refused until classified.</summary>
     private static McpArgumentCheck Unknown(string written) =>
         McpArgumentCheck.Refused(written, written, $"{written} is not an option this server knows, so it cannot tell whether it uses a local path.");
 
@@ -373,8 +388,10 @@ public sealed class McpArgumentChecker
     {
         private int next;
 
+        /// <summary>Whether a <c>--</c> argument has been seen, so every later argument is a URL.</summary>
         public bool OptionsEnded { get; set; }
 
+        /// <summary>Takes the next argument; <see langword="false" /> when none is left.</summary>
         public bool TryTake(out string argument)
         {
             string? taken = TakeOrNull();
@@ -382,8 +399,10 @@ public sealed class McpArgumentChecker
             return taken is not null;
         }
 
+        /// <summary>Takes the next argument, a <see langword="null" /> element as an empty one; <see langword="null" /> when none is left.</summary>
         public string? TakeOrNull() => next < arguments.Count ? arguments[next++] ?? string.Empty : null;
 
+        /// <summary>Skips the next argument, the option's separate value or subject, unless the option carried it attached.</summary>
         public void TakeUnless(bool valueAttached)
         {
             if (!valueAttached)

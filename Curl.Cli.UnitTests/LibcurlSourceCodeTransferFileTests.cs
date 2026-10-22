@@ -5,7 +5,7 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins the <c>--libcurl</c> lines <see cref="LibcurlSourceCode" /> writes from what the console learns about a
 /// transfer's files - <c>-T</c>, <c>--etag-compare</c>, <c>-C -</c> and the SSH known-hosts file - against
-/// curl 8.21.0 (mingw, Schannel), measured on 2026-10-02 with <c>Record-CurlExchange.ps1</c> and
+/// curl 8.21.0 (mingw, Schannel), measured on 2026-10-02 and reordered to curl 8.22.0 (config2setopts.c order) with <c>Record-CurlExchange.ps1</c> and
 /// <c>--libcurl - -s</c> (BL-1177 Notes).
 /// </summary>
 [TestClass]
@@ -33,7 +33,7 @@ public sealed class LibcurlSourceCodeTransferFileTests
     [DataRow("HTTP://127.0.0.1:1/a/../d/", "http://127.0.0.1:1/d/up.txt")]
     public void Generate_UploadFile_AppendsItsNameWritesUploadAndEndsWithItsSize(string url, string written)
     {
-        string expected = Buffer + $"  curl_easy_setopt(curl, CURLOPT_URL, \"{written}\");\n" + NoProgress + Upload + Agent + MaxRedirs + After + InFileSize;
+        string expected = Buffer + $"  curl_easy_setopt(curl, CURLOPT_URL, \"{written}\");\n" + NoProgress + Agent + Upload + MaxRedirs + After + InFileSize;
         LibcurlTransfer transfer = new(Parse("-T|up.txt|" + url), url) { UploadFile = "up.txt", UploadFileSize = 5 };
 
         string actual = SetoptLinesFor(transfer);
@@ -47,7 +47,7 @@ public sealed class LibcurlSourceCodeTransferFileTests
     [DataRow(0L)]
     public void Generate_UploadFileWithoutASize_WritesNoSize(long? size)
     {
-        string expected = Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/up.txt\");\n" + NoProgress + Upload + Agent + MaxRedirs + After;
+        string expected = Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/up.txt\");\n" + NoProgress + Agent + Upload + MaxRedirs + After;
         Diagnostics.Arrange("upload file size", size?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null");
         LibcurlTransfer transfer = new(Parse("-T|up.txt|" + HttpUrl), HttpUrl) { UploadFile = "up.txt", UploadFileSize = size };
 
@@ -60,7 +60,7 @@ public sealed class LibcurlSourceCodeTransferFileTests
     [TestMethod]
     public void Generate_UploadFromStandardInput_KeepsTheUrlAsGiven()
     {
-        string expected = Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"HTTP://127.0.0.1:1/a/../d/\");\n" + NoProgress + Upload + Agent + MaxRedirs + After;
+        string expected = Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"HTTP://127.0.0.1:1/a/../d/\");\n" + NoProgress + Agent + Upload + MaxRedirs + After;
         LibcurlTransfer transfer = new(Parse("-T|-|HTTP://127.0.0.1:1/a/../d/"), "HTTP://127.0.0.1:1/a/../d/") { UploadFile = "-" };
 
         string actual = SetoptLinesFor(transfer);
@@ -82,16 +82,17 @@ public sealed class LibcurlSourceCodeTransferFileTests
     }
 
     [TestMethod]
-    public void Generate_UploadWithOtherOptions_WritesUploadAfterFailOnErrorAndBeforeAppend()
+    public void Generate_UploadWithOtherOptions_WritesUploadAfterTheUserAgentAndFailOnErrorAndBeforeAppend()
     {
         string expected =
             Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/up.txt\");\n" + NoProgress
             + "  curl_easy_setopt(curl, CURLOPT_PROXY, \"http://127.0.0.1:2\");\n"
+            + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"a:b\");\n"
+            + Agent
             + "  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);\n"
             + Upload
             + "  curl_easy_setopt(curl, CURLOPT_APPEND, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_USERPWD, \"a:b\");\n"
-            + Agent + MaxRedirs + After + InFileSize;
+            + MaxRedirs + After + InFileSize;
         LibcurlTransfer transfer = new(Parse("-T|up.txt|-f|-u|a:b|-x|http://127.0.0.1:2|-a|" + HttpUrl), HttpUrl) { UploadFile = "up.txt", UploadFileSize = 5 };
 
         string actual = SetoptLinesFor(transfer);
@@ -104,7 +105,7 @@ public sealed class LibcurlSourceCodeTransferFileTests
     public void Generate_UploadOnImapWithTheLastOptions_EndsWithTheSize()
     {
         string expected =
-            Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"imap://127.0.0.1:1/INBOX\");\n" + NoProgress + Upload + Agent + After
+            Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"imap://127.0.0.1:1/INBOX\");\n" + NoProgress + Agent + Upload + After
             + "  curl_easy_setopt(curl, CURLOPT_RESOLVE, slist1);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS, 5L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_DISALLOW_USERNAME_IN_URL, 1L);\n"
@@ -155,8 +156,8 @@ public sealed class LibcurlSourceCodeTransferFileTests
     public void Generate_ResumeFromTheOutputFile_WritesItsSize()
     {
         string expected =
-            Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n" + NoProgress + Agent + MaxRedirs
-            + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)7);\n" + After;
+            Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/\");\n" + NoProgress + Agent
+            + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)7);\n" + MaxRedirs + After;
         LibcurlTransfer transfer = new(Parse("-C|-|-o|out.bin|" + HttpUrl), HttpUrl) { OutputFileSize = 7 };
 
         string actual = SetoptLinesFor(transfer);
@@ -184,8 +185,8 @@ public sealed class LibcurlSourceCodeTransferFileTests
     public void Generate_ResumeAnUpload_WritesMinusOne()
     {
         string expected =
-            Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/up.txt\");\n" + NoProgress + Upload + Agent + MaxRedirs
-            + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)-1);\n" + After + InFileSize;
+            Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"http://127.0.0.1:1/up.txt\");\n" + NoProgress + Agent + Upload
+            + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)-1);\n" + MaxRedirs + After + InFileSize;
         LibcurlTransfer transfer = new(Parse("-C|-|-T|up.txt|" + HttpUrl), HttpUrl) { UploadFile = "up.txt", UploadFileSize = 5 };
 
         string actual = SetoptLinesFor(transfer);
@@ -249,7 +250,7 @@ public sealed class LibcurlSourceCodeTransferFileTests
 
         string expectedEnd =
             "  result = curl_easy_perform(curl);\n\n"
-            + Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"sftp://127.0.0.1:1/up.txt\");\n" + NoProgress + Upload + Agent
+            + Buffer + "  curl_easy_setopt(curl, CURLOPT_URL, \"sftp://127.0.0.1:1/up.txt\");\n" + NoProgress + Agent + Upload
             + "  curl_easy_setopt(curl, CURLOPT_SSH_PRIVATE_KEYFILE, \"k\");\n"
             + "  curl_easy_cleanup(curl);\n  curl = NULL;\n\n  return (int)result;\n}\n/**** End of sample code ****/\n";
         Diagnostics.Assert("source ends with", true, source.EndsWith(expectedEnd, StringComparison.Ordinal));

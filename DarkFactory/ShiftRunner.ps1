@@ -13,7 +13,7 @@ if ($Lane) {
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
-    if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
+    if (Wait-ForCleanTree) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
     $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { -not (Test-InteractiveOnlyTask $_.FullName) })
     if ($stuck.Count) { Stop-ShiftStart "task already in Doing: $($stuck[0].Name)"; exit 1 }
 }
@@ -189,11 +189,17 @@ while ($true) {
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
             elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
-        $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
-        Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
-        git -C $Root add -A Tasks 2>&1 | Out-Null
-        git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
-        if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
+        # A task stopped by its cost cap is split by one bounded run (BL-3091), which defers or
+        # blocks it itself; one already offered for a split today is blocked as before.
+        $capped = $capWhy -or (-not $run.TimedOut -and (Test-BudgetSpent))
+        $split = if ($capped) { Invoke-TaskSplit $id $why } else { 'skipped' }
+        if ($split -eq 'skipped') {
+            $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
+            Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
+            git -C $Root add -A Tasks 2>&1 | Out-Null
+            git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
+            if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
+        }
         $state = Get-TaskState $id
     }
     Save-StrayChanges $id

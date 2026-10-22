@@ -18,7 +18,9 @@ namespace Libcurl.Share;
 /// </remarks>
 public sealed class CurlShare
 {
+    /// <summary>The engine's share handle every option and cleanup goes through.</summary>
     private readonly IShareHandle handle;
+    /// <summary>1 once <see cref="Cleanup"/> has freed the handle, read with <see cref="Volatile"/>; 0 until then.</summary>
     private int cleanedUp;
 
     /// <summary>Wraps the engine's share <paramref name="handle"/>.</summary>
@@ -93,6 +95,7 @@ public sealed class CurlShare
         return code;
     }
 
+    /// <summary>Reads a <c>CURLSHOPT_SHARE</c> or <c>CURLSHOPT_UNSHARE</c> value; <see langword="false"/> when it is not a data kind from cookie to HSTS, which libcurl answers <c>CURLSHE_BAD_OPTION</c>.</summary>
     private static bool TryReadLockData(object? value, out CurlLockData data)
     {
         data = value switch
@@ -105,6 +108,7 @@ public sealed class CurlShare
         return data is >= CurlLockData.Cookie and <= CurlLockData.Hsts;
     }
 
+    /// <summary><c>CURLSHOPT_SHARE</c> or <c>CURLSHOPT_UNSHARE</c>: starts or stops sharing the data kind in <paramref name="value"/>.</summary>
     private CurlShareCode SetLockData(CurlShareOption option, object? value)
     {
         if (!TryReadLockData(value, out var data))
@@ -115,14 +119,17 @@ public sealed class CurlShare
         return option == CurlShareOption.Share ? handle.Share(data) : handle.Unshare(data);
     }
 
+    /// <summary><c>CURLSHOPT_LOCKFUNC</c>: hands the engine the callback; <see langword="null"/> removes it, any other type is <see cref="CurlShareCode.BadOption"/>.</summary>
     private CurlShareCode SetLockFunction(object? value) => value is null or ShareLockCallback
         ? handle.SetLockCallback((ShareLockCallback?)value)
         : CurlShareCode.BadOption;
 
+    /// <summary><c>CURLSHOPT_UNLOCKFUNC</c>: hands the engine the callback; <see langword="null"/> removes it, any other type is <see cref="CurlShareCode.BadOption"/>.</summary>
     private CurlShareCode SetUnlockFunction(object? value) => value is null or ShareUnlockCallback
         ? handle.SetUnlockCallback((ShareUnlockCallback?)value)
         : CurlShareCode.BadOption;
 
+    /// <summary><c>CURLSHOPT_USERDATA</c>: keeps the value in <see cref="UserData"/>; the engine never sees it.</summary>
     private CurlShareCode SetUserData(object? value)
     {
         UserData = value;

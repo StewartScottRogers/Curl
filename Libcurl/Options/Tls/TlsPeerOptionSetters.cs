@@ -16,16 +16,22 @@ internal sealed class TlsPeerOptionSetters(
     Func<EasyTlsOptions, TlsPeerOptions> read,
     Func<EasyTlsOptions, TlsPeerOptions, EasyTlsOptions> write)
 {
+    /// <summary>The bits of <c>CURLOPT_SSLVERSION</c> that hold the minimum version; the high half holds the maximum.</summary>
     private const long SslVersionMask = 0xffff;
 
+    /// <summary>The bits of <c>CURLOPT_SSLVERSION</c> that hold the maximum version (<c>CURL_SSLVERSION_MAX_*</c>).</summary>
     private const long SslVersionMaximumMask = 0xffff0000;
 
+    /// <summary>The first minimum-version value past <c>CURL_SSLVERSION_TLSv1_3</c>; it and above are <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private const long FirstUnknownSslVersion = (long)SslVersion.Tls13 + 1;
 
+    /// <summary>The first maximum-version value past <c>CURL_SSLVERSION_MAX_TLSv1_3</c>, already shifted into the high half.</summary>
     private const long FirstUnknownSslVersionMaximum = ((long)SslVersion.Tls13 + 1) << 16;
 
+    /// <summary>The <c>CURLSSLOPT_*</c> bits libcurl keeps from <c>CURLOPT_SSL_OPTIONS</c>; the rest are dropped.</summary>
     private const long SslOptionsMask = 0xff;
 
+    /// <summary>The two low bits of <c>CURLOPT_SSL_VERIFYHOST</c> that turn host verification on when either is set.</summary>
     private const long VerifyHostBits = 3;
 
     /// <summary>The setters that write <see cref="EasyTlsOptions.Origin"/>.</summary>
@@ -130,6 +136,7 @@ internal sealed class TlsPeerOptionSetters(
     /// <returns>The number.</returns>
     internal static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);
 
+    /// <summary>Replaces this peer's TLS options with what <paramref name="change"/> returns for them, leaving the other peer's alone; always <see cref="CurlCode.Ok"/>.</summary>
     private CurlCode Peer(ref EasyOptions options, Func<TlsPeerOptions, TlsPeerOptions> change)
     {
         options = options with { Tls = write(options.Tls, change(read(options.Tls))) };

@@ -91,6 +91,15 @@ public sealed class EasyInfoReadersLongsTests
         Assert.AreEqual(expected, Read(new TransferInfo(), info));
     }
 
+    [TestMethod]
+    [DataRow(1L << 30)]
+    [DataRow(1L << 31)]
+    [DataRow(1L << 32)]
+    public void GetInfo_ProtocolOfAWsWssOrMqttsTransfer_IsZeroAsCurlProtoMaskLeavesIt(long protocol)
+    {
+        Assert.AreEqual(0L, Read(new TransferInfo { Protocol = protocol }, CurlInfo.Protocol));
+    }
+
     private static object? Read(TransferInfo reported, CurlInfo info)
     {
         using var easy = new CurlEasy(new FakeEasyTransfer { Info = reported }, EasyOptionDispatch.Default);

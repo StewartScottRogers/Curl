@@ -37,6 +37,7 @@ public sealed class McpResponseHeaderCollector
         return line.Length;
     }
 
+    /// <summary>Folds an obsolete line-folded continuation into the last header's value, joined by one space; a continuation with no header before it is dropped.</summary>
     private void ContinueLastHeader(string text)
     {
         if (headers.Count > 0)
@@ -46,6 +47,7 @@ public sealed class McpResponseHeaderCollector
         }
     }
 
+    /// <summary>Adds <c>Name: value</c>; a line with no colon, or a colon first (the blank line included), is skipped.</summary>
     private void AddHeader(string text)
     {
         int colon = text.IndexOf(':', StringComparison.Ordinal);

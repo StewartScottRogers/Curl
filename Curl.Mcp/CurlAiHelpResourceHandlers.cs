@@ -33,6 +33,7 @@ internal static class CurlAiHelpResourceHandlers
     /// <exception cref="McpProtocolException">No resource has the URI; its code is <see cref="McpErrorCode.ResourceNotFound" />.</exception>
     internal static ValueTask<ReadResourceResult> ReadAsync(RequestContext<ReadResourceRequestParams> request, CancellationToken cancellationToken)
     {
+        // A request without parameters names no resource, so it falls through to the not-found error.
         string uri = request.Params?.Uri ?? string.Empty;
         McpAiHelpResource resource = McpAiHelpResourceCatalogue.Find(uri)
             ?? throw new McpProtocolException($"Resource not found: '{uri}'.", McpErrorCode.ResourceNotFound);

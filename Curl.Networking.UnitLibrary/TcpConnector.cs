@@ -1136,7 +1136,7 @@ public sealed partial class TcpConnector(
     private void ReportLookUpFailed(ITransferEvents events, ConnectDestination destination, string message)
     {
         events.ReportInfo(message);
-        if (dnsResolver is not DohDnsResolver)
+        if (KindOfResolver is not DohDnsResolver)
         {
             events.ReportInfo(message);
         }
@@ -1192,7 +1192,7 @@ public sealed partial class TcpConnector(
     /// keep nothing.
     /// </summary>
     private bool CachesFailedLookUp(DnsLookupFailure failure) =>
-        dnsResolver is DnsServerResolver && failure != DnsLookupFailure.BadConfiguration;
+        KindOfResolver is DnsServerResolver && failure != DnsLookupFailure.BadConfiguration;
 
     /// <summary>
     /// Writes a resolve's answer to the diagnostic log: the addresses and elapsed milliseconds at
@@ -1226,7 +1226,7 @@ public sealed partial class TcpConnector(
             var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
             _httpsRecordsResolved[DnsCacheKey(host, port)] = true;
             ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
-            return new DnsResolution(addresses, DnsLookupFailure.None);
+            return new DnsResolution(dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Shuffle(addresses) : addresses, DnsLookupFailure.None);
         }
 
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason
@@ -1234,9 +1234,12 @@ public sealed partial class TcpConnector(
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
     }
 
+    // The resolver the look-ups reach, seen through a DNS shuffle wrapper: the kind decides the DoH, DNS-server and HTTPS-RR behaviour.
+    private IDnsResolver KindOfResolver => dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Inner : dnsResolver;
+
     // The resolver that asks a direct connect's https:// origin for its HTTPS record, or null.
     private IHttpsOriginDnsResolver? HttpsOriginResolverFor(ConnectTarget target) =>
-        dnsResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target)
+        KindOfResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target)
             ? httpsOriginResolver
             : null;
 

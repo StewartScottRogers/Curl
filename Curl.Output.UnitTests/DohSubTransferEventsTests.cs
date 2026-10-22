@@ -9,7 +9,7 @@ namespace Curl.Output;
 /// <summary>
 /// Pins <see cref="DohSubTransferEvents" /> against curl 8.21.0's DoH sub-transfer lines (BL-1157
 /// Notes, BL-1180): every <c>* </c> line a <see cref="VerboseTransferEventWriter" /> would write for
-/// an event gets <c>[DNS] </c> after the <c>* </c>, the head, data and TLS byte lines stay as they are,
+/// an event gets curl 8.22.0s <c>[DoH] </c> after the <c>* </c>, the head, data and TLS byte lines stay as they are,
 /// and the DNS filter's creation line keeps its one prefix.
 /// </summary>
 [TestClass]
@@ -30,7 +30,7 @@ public sealed class DohSubTransferEventsTests
         ReportEveryEvent(new VerboseTransferEventWriter(direct, writesDataLines: true, tlsBackend));
         ReportEveryEvent(new DohSubTransferEvents(new VerboseTransferEventWriter(prefixed, writesDataLines: true, tlsBackend), tlsBackend));
 
-        string[] expected = [.. Lines(direct).Select(line => line.StartsWith("* ", StringComparison.Ordinal) ? "* [DNS] " + line[2..] : line)];
+        string[] expected = [.. Lines(direct).Select(line => line.StartsWith("* ", StringComparison.Ordinal) ? "* [DoH] " + line[2..] : line)];
         string[] actual = Lines(prefixed);
         diagnostics.Act("prefixed lines", string.Join(" | ", actual));
         diagnostics.Diff("prefixed lines", string.Join("\n", expected), string.Join("\n", actual));
@@ -51,8 +51,8 @@ public sealed class DohSubTransferEventsTests
 
         string[] lines = Lines(output);
         diagnostics.Act("lines", string.Join(" | ", lines));
-        diagnostics.Assert("contains SNI line", true, lines.Contains("* [DNS] schannel: using IP address, SNI is not supported by OS."));
-        Assert.Contains("* [DNS] schannel: using IP address, SNI is not supported by OS.", lines);
+        diagnostics.Assert("contains SNI line", true, lines.Contains("* [DoH] schannel: using IP address, SNI is not supported by OS."));
+        Assert.Contains("* [DoH] schannel: using IP address, SNI is not supported by OS.", lines);
     }
 
     [TestMethod]
@@ -66,7 +66,7 @@ public sealed class DohSubTransferEventsTests
         events.ReportInfo("[DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3");
         events.ReportInfo("[DNS] added");
 
-        string[] expected = ["* [DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3", "* [DNS] [DNS] added"];
+        string[] expected = ["* [DNS] created DNS filter for 127.0.0.1:47112, transport=3, queries=3", "* [DoH] [DNS] added"];
         string[] actual = Lines(output);
         diagnostics.Act("lines", string.Join(" | ", actual));
         diagnostics.Diff("lines", string.Join("\n", expected), string.Join("\n", actual));

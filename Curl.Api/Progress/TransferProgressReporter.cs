@@ -15,7 +15,9 @@ namespace Curl.Api;
 /// <param name="next">The transfer-info callback asked after each report.</param>
 internal sealed class TransferProgressReporter(IEasyTransfer easy, IProgress<CurlTransferProgress> progress, TransferInfoCallback next)
 {
+    /// <summary>Set by <see cref="End"/>; read on the engine thread, written from the perform task.</summary>
     private volatile bool _ended;
+    /// <summary>Set once a report threw; every later call then answers abort.</summary>
     private volatile bool _failed;
 
     /// <summary>The <c>CURLOPT_XFERINFOFUNCTION</c>: reports, then answers <see cref="TransferCancellation.Abort"/> if a report threw, else what the next callback answers.</summary>
@@ -47,6 +49,8 @@ internal sealed class TransferProgressReporter(IEasyTransfer easy, IProgress<Cur
         : uploadNow > 0 ? CurlTransferPhase.Uploading
         : CurlTransferPhase.Connecting;
 
+    /// <summary>Gives the progress sink one report; a sink that throws must not unwind through the engine, so the failure is returned instead.</summary>
+    /// <returns><see langword="true"/> when the report was delivered; <see langword="false"/> when the sink threw.</returns>
     private bool TryReport(long downloadTotal, long downloadNow, long uploadTotal, long uploadNow)
     {
         try

@@ -242,6 +242,10 @@ public sealed partial class CurlEasy : IDisposable, IAsyncDisposable
         allocations.FreeAll();
     }
 
+    /// <summary>Performs the transfer, then fills the <c>CURLOPT_ERRORBUFFER</c> buffer the options held when it started, as libcurl does once a transfer ends.</summary>
+    /// <param name="live">The live transfer.</param>
+    /// <param name="cancellationToken">Stops the transfer.</param>
+    /// <returns>The engine's result for the transfer.</returns>
     private static async ValueTask<CurlCode> PerformFillingErrorBufferAsync(IEasyTransfer live, CancellationToken cancellationToken)
     {
         var buffer = live.Options.Behaviour.ErrorBuffer;
@@ -294,6 +298,8 @@ public sealed partial class CurlEasy : IDisposable, IAsyncDisposable
         return live;
     }
 
+    /// <summary>Counts a string option's <c>strdup</c> through the handle's <c>curl_global_init_mem</c> callbacks, as libcurl copies each string it is given; other values do nothing.</summary>
+    /// <param name="value">The value a successful <see cref="SetOption"/> took.</param>
     private void StrdupString(object? value)
     {
         if (value is string text)
@@ -302,6 +308,9 @@ public sealed partial class CurlEasy : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>The engine's transfer, refusing a handle that has been cleaned up.</summary>
+    /// <returns>The transfer.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     private IEasyTransfer LiveTransfer()
     {
         ObjectDisposedException.ThrowIf(IsCleanedUp, this);

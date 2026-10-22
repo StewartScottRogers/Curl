@@ -18,11 +18,18 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
     /// <summary>The longest one wait in <see cref="IMultiTransfer.PollAsync"/> lasts before the loop performs again.</summary>
     public static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(1);
 
+    // Guards _changes, _looping and _disposed. _running and _multi's handle calls belong to the loop alone.
     private readonly Lock _gate = new();
+
+    // Add, remove and abort requests from other threads; the loop applies them so the multi handle has one caller.
     private readonly Queue<Action<IMultiTransfer>> _changes = new();
+
+    // Each transfer on the multi handle and the source of the result its caller awaits.
     private readonly Dictionary<IEasyTransfer, TaskCompletionSource<CurlCode>> _running = [];
     private IMultiTransfer? _multi;
     private Task _loop = Task.CompletedTask;
+
+    // True from the moment the loop is started until ApplyChanges finds nothing queued and nothing running.
     private bool _looping;
     private bool _disposed;
 
@@ -77,6 +84,8 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         }
     }
 
+    /// <summary>Queues a change for the loop unless the driver is disposed.</summary>
+    /// <returns>Whether the change was queued.</returns>
     private bool TryEnqueue(Action<IMultiTransfer> change)
     {
         lock (_gate)
@@ -106,6 +115,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         _loop = Task.Run(RunLoopAsync);
     }
 
+    /// <summary>The driver loop: applies queued changes, then performs and polls, until no change is queued and no transfer runs.</summary>
     private async Task RunLoopAsync()
     {
         while (ApplyChanges())
@@ -116,6 +126,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
             }
             catch (Exception exception)
             {
+                // A failed perform or poll cannot be pinned on one transfer, so none can safely go on.
                 FailAll(_multi!, exception);
             }
         }
@@ -141,6 +152,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         }
     }
 
+    /// <summary>One turn of the loop: <c>curl_multi_perform</c>, finishing each transfer curl reports done, then waiting for activity while any transfer runs.</summary>
     private async Task MoveTransfersOnAsync(IMultiTransfer multi)
     {
         (CurlMultiCode performed, _) = await multi.PerformAsync(CancellationToken.None).ConfigureAwait(false);
@@ -150,6 +162,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
             Finish(multi, message.Transfer, message.Result);
         }
 
+        // The wait ends early on Wakeup (a new or cancelled transfer) or socket activity; with nothing running there is nothing to wait for.
         if (_running.Count > 0)
         {
             (CurlMultiCode polled, _) = await multi.PollAsync(Memory<CurlWaitSocket>.Empty, PollTimeout, CancellationToken.None).ConfigureAwait(false);
@@ -157,6 +170,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         }
     }
 
+    /// <summary>Adds a transfer to the multi handle and tracks it; a refused add ends the transfer's task with an <see cref="InvalidOperationException"/>.</summary>
     private void Start(IMultiTransfer multi, IEasyTransfer easy, TaskCompletionSource<CurlCode> done)
     {
         CurlMultiCode added = multi.Add(easy);
@@ -179,6 +193,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         }
     }
 
+    /// <summary>Ends every running transfer with <see cref="CurlCode.AbortedByCallback"/>; the dispose path.</summary>
     private void FinishAll(IMultiTransfer multi)
     {
         foreach (IEasyTransfer easy in _running.Keys.ToArray())
@@ -198,6 +213,9 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         }
     }
 
+    /// <summary>Throws the exception <c>MultiFailure</c> builds unless <paramref name="code"/> is <see cref="CurlMultiCode.Ok"/>.</summary>
+    /// <param name="code">The multi call's answer.</param>
+    /// <param name="call">The libcurl function that answered, named in the message.</param>
     private static void ThrowIfFailed(CurlMultiCode code, string call)
     {
         if (code != CurlMultiCode.Ok)
@@ -206,6 +224,7 @@ internal sealed class MultiTransferDriver(Func<IMultiTransfer> createMulti) : IA
         }
     }
 
+    /// <summary>The exception for a multi call that did not answer <c>CURLM_OK</c>.</summary>
     private static InvalidOperationException MultiFailure(CurlMultiCode code, string call) =>
         new($"{call} answered {code}.");
 }

@@ -48,6 +48,7 @@ internal sealed class InProcessCurlCommandRunner : ICurlCommandRunner
             new UdpDatagramConnector(dnsResolver, TimeProvider.System));
     }
 
+    /// <summary>Whether <paramref name="directory" /> is the process's current directory, ignoring a trailing separator; compared ordinally.</summary>
     private static bool IsCurrentDirectory(string directory) =>
         string.Equals(
             Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)),

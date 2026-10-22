@@ -34,6 +34,7 @@ public static class CurlErrorText
         "Unrecoverable error in select/poll",
     ];
 
+    // Indexed by code, in CURLSHcode order.
     private static readonly string[] ShareTexts =
     [
         "No error",
@@ -44,6 +45,7 @@ public static class CurlErrorText
         "Feature not enabled in this library",
     ];
 
+    // Indexed by code, in CURLUcode order.
     private static readonly string[] UrlTexts =
     [
         "No error",
@@ -135,6 +137,7 @@ public static class CurlErrorText
     /// <returns>The text for the code.</returns>
     public static string Header(CurlHeaderCode code) => TextAt(HeaderTexts, (int)code, UnknownHeaderCodeText);
 
+    // The text at index, or unknownCodeText for an index outside the table (a code upstream does not define).
     private static string TextAt(string[] texts, int index, string unknownCodeText) =>
         (uint)index < (uint)texts.Length ? texts[index] : unknownCodeText;
 }

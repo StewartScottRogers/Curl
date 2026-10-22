@@ -38,7 +38,11 @@ public enum DnsMessageFailure
     /// <summary>An answer record's class is not IN.</summary>
     UnexpectedClass,
 
-    /// <summary>The answer holds no address and no CNAME.</summary>
+    /// <summary>
+    /// curl's "no content" code. <see cref="DnsAnswerDecoder" /> returns it only for an HTTPS query's
+    /// answer with no answer record, which the HTTPS trace reports as "No such name" (BL-2954); an A
+    /// or AAAA answer with no address decodes, as in curl 8.22.0 (BL-2970).
+    /// </summary>
     NoContent,
 
     /// <summary>The message ID is not 0, the ID every DoH query is sent with (RFC 8484 section 4.1).</summary>
