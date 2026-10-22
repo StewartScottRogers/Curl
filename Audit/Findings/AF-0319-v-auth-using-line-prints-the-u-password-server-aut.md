@@ -3,8 +3,8 @@ id: AF-0319
 title: -v auth-using line prints the -u password: 'Server auth using Basic with user 'u' password 'secret'' where curl prints only the user
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs:AuthUsing:stderr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -nologo | Out-Null; $r=(Get-Location).Path;
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
