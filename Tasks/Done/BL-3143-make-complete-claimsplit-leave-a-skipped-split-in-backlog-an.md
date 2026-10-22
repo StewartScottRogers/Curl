@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3143 — Make Complete-ClaimSplit leave a skipped split in Backlog and abort a failed rebase
 
@@ -41,15 +41,18 @@ The split is lost and the task waits on Stewart for nothing. Even with one lane,
 
 ## Acceptance criteria
 
-- [ ] `Complete-ClaimSplit` returns `''` and leaves the task in Backlog (no move, no commit, no push) when the split result is `'skipped'`. It still blocks on `'failed'`.
-- [ ] When the pull before the block push fails, `Complete-ClaimSplit` runs `git rebase --abort`, so the lane checkout is left with no rebase in progress.
-- [ ] `Complete-ClaimSplit` traces "blocked" only when the task is in `Blocked` after the move.
-- [ ] `RunDarkFactory.ps1 -TestClaimDuplicates` (or the self-test that covers `Complete-ClaimSplit`) has a case for `'skipped'` that leaves the task in Backlog, and a case for a refused pull that checks the rebase was aborted. Both pass.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `Complete-ClaimSplit` returns `''` and leaves the task in Backlog (no move, no commit, no push) when the split result is `'skipped'`. It still blocks on `'failed'`.
+- [x] When the pull before the block push fails, `Complete-ClaimSplit` runs `git rebase --abort`, so the lane checkout is left with no rebase in progress.
+- [x] `Complete-ClaimSplit` traces "blocked" only when the task is in `Blocked` after the move.
+- [x] `RunDarkFactory.ps1 -TestClaimDuplicates` (or the self-test that covers `Complete-ClaimSplit`) has a case for `'skipped'` that leaves the task in Backlog, and a case for a refused pull that checks the rebase was aborted. Both pass.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Direct change in Claim.ps1: skipped now returns empty and leaves Backlog alone; failed blocks only if the task is in Blocked after the move; a failed pull runs rebase --abort. Self-test -TestClaimDuplicates has two new cases (all 9 pass). Build clean, fast tests green.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 275209c1 3f47980c 72ca8f20 383635a2 a0b49a29.
+- 2026-10-22: Doing -> Done. Complete-ClaimSplit leaves a skipped split in Backlog and aborts a failed rebase
