@@ -40,3 +40,4 @@ What is left, all in this task:
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: cb9752a7 96fe7f29 785e37e5 8b4aeea1.
