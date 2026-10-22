@@ -36,3 +36,4 @@ Left in this task: write `Curl.Conformance.UnitTests/UpstreamManagenScriptTests.
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: a60d5da2 970b5eb6 fe717512 a9c88fc5.
