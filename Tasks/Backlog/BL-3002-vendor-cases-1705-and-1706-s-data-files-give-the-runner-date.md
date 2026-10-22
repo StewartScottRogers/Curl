@@ -1,5 +1,5 @@
 ---
-id: BL-3001
+id: BL-3002
 title: Vendor cases 1705 and 1706's data files, give the runner %DATE and %VERNUM, and put both cases on the ratchet
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-21
 completed:
 ---
-# BL-3001 — Vendor cases 1705 and 1706's data files, give the runner %DATE and %VERNUM, and put both cases on the ratchet
+# BL-3002 — Vendor cases 1705 and 1706's data files, give the runner %DATE and %VERNUM, and put both cases on the ratchet
 
 ## Goal
 
