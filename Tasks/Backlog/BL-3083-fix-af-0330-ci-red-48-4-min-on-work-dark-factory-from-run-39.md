@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
+lane: no
 requirement: none
 created: 2026-10-22
 completed:
@@ -41,15 +42,18 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 09:54:28 (65f5286ec, the lane prompts' rule that the quality script runs for every production change), shows no red spell over 30 minutes from a quality-gate failure.
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - 2026-10-22: BL-2998 (Done 2026-10-21) fixed the red quality gate (WriteBytesAsync split) and run 39696631298 went green. The reproduction reads a past audit log copy through audit-office tools a lane may not run; that spell is history and cannot change, and no code change is left in DarkFactory/CiWatch.ps1. Only a later process re-audit can close AF-0330.
 
+- 2026-10-22 (interactive): Cause found: the lanes skipped Measure-CodeQuality.ps1 (BL-2856's run: "not run: the library change adds ... no branch"; BL-3022's run left coverage to BL-3023), so a member outside the gate reached CI. BL-2998 fixed only the member. Fixed by 65f5286ec (09:54:28): both lane prompts now say the script runs for every production change, however small. Baseline before it, 2026-10-22 02:44:38 to 09:50: no red spell, ciRedMinutes 0. Left in Backlog: no window after the fix yet; run the measurement again once a shift has run on 65f5286ec.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-22: Doing -> Blocked. Stewart: reproduction reads a past audit log so it cannot change; fix already shipped via BL-2998 - close AF-0330 at the next process re-audit and drop this task?
+- 2026-10-22: Blocked -> Backlog. Criterion 1 reworded to the live-window measurement (process findings about past behaviour are measured on logs written after the fix)

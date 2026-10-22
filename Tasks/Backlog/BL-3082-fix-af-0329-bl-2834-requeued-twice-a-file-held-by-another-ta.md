@@ -42,7 +42,7 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] The process measurement (`Audit/Tools/Measure-FactoryProcess.ps1 -LogRoot Z:\repos\Curl.logs` with a `-CiRunsJson` built by `gh run list --workflow CI --branch work/dark-factory` (the audit run's own command), counting only lane-trace lines and CI runs at or after the window start), run over the live logs since 2026-10-22 09:54:28 (65f5286ec, rule 11 in both lane prompts), shows no task requeued twice and no REQUEUE whose reason is waiting for CI.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -50,6 +50,8 @@ The finding closes only when a later re-audit by the process auditor confirms th
 - Interactive only: criterion 1 runs a script under the office path a lane may not read. Remove lane: no once an interactive session has run the reproduction (rule 11 in DarkFactory/Prompts.ps1 is already in the tree, build and fast tests green) and ticked criterion 1.
 
 - Requeue.ps1 only moves Blocked tasks back; the two requeues were lane decisions, so the fix is rule 11 in both prompt copies of DarkFactory/Prompts.ps1 (added to touches; no other Doing task holds it). The reproduction script is in an office path a lane may not read, so the re-audit checks criterion 1.
+
+- 2026-10-22 (interactive): Rule 11 had never reached the tree (BL-3082's run left it in stash e1e97e72, now obsolete); 65f5286ec (09:54:28) adds it to both prompt copies. Baseline before it, whole of 2026-10-22 to 09:30: 7 REQUEUE lines, none waiting for CI, no task requeued twice. Left in Backlog: no window after the fix yet; run the measurement again once a shift has run on 65f5286ec.
 
 ## Log
 
