@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/DnsAnswer.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.AnswerRecord.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.CanonicalName.cs, Curl.Networking.UnitLibrary/DnsMessageFailure.cs, Curl.Networking.UnitLibrary/DnsServerQuery.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DohTraceLines.ExchangeFailures.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs, Curl.Networking.UnitTests/DohDnsResolverSubTransferTests.cs, Curl.Networking.UnitTests/NetworkingAdversarialTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.ExchangeFailures.cs, Curl.Engine.UnitTests/EngineCompositionDohSubTransferTraceTests.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-22
 ---
 # BL-3011 — Land the DoH decoder change: CNAME data skipped, no NoContent, curl 8.22.0's A and AAAA error lines, with their Networking and Engine tests
 
@@ -28,10 +28,10 @@ What is left, all in this task:
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests` pins that `DnsAnswerDecoder.Decode` gives `None` for unit1650's self-pointing CNAME row (46 bytes, `\x07\x03any\xc0\x27\x00`) and for an answer with no record.
-- [ ] `DohDnsResolverTraceTests` (its three partial files) pins `[DoH] [DoH] [A] error decoding response: No such name` for an NXDOMAIN answer and the other decode-failure lines, and no test still expects `CNAME:` entries or `FormatAddress`.
-- [ ] The two Engine test files named above expect the 8.22.0 lines and pass.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Networking.UnitTests` and `Curl.Engine.UnitTests`.
+- [x] `Curl.Networking.UnitTests` pins that `DnsAnswerDecoder.Decode` gives `None` for unit1650's self-pointing CNAME row (46 bytes, `\x07\x03any\xc0\x27\x00`) and for an answer with no record.
+- [x] `DohDnsResolverTraceTests` (its three partial files) pins `[DoH] [DoH] [A] error decoding response: No such name` for an NXDOMAIN answer and the other decode-failure lines, and no test still expects `CNAME:` entries or `FormatAddress`.
+- [x] The two Engine test files named above expect the 8.22.0 lines and pass.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Networking.UnitTests` and `Curl.Engine.UnitTests`.
 
 ## Notes
 
@@ -43,3 +43,4 @@ What is left, all in this task:
 - 2026-10-21: Backlog -> Doing. Criteria at claim: cb9752a7 96fe7f29 785e37e5 8b4aeea1.
 - 2026-10-21: Doing -> Backlog. Lane 1 could not integrate: push kept being refused. The work is on branch factory/BL-3011-lane-1-20261021-203534; start with git cherry-pick --no-commit factory/BL-3011-lane-1-20261021-203534 and fix it.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: cb9752a7 96fe7f29 785e37e5 8b4aeea1.
+- 2026-10-22: Doing -> Done. Landed interactively: cherry-picked lane 1's work onto BL-3027's split DnsAnswerReader files; build clean, Networking 3353 and Engine 2221 fast tests pass.
