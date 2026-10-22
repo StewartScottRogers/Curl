@@ -32,6 +32,7 @@ internal sealed partial class CurlMcpJsonContext : JsonSerializerContext
     /// </summary>
     internal static JsonSerializerOptions ToolOptions => toolOptions.Value;
 
+    /// <summary>The lazily built, thread-safe holder behind <see cref="ToolOptions" />.</summary>
     private static readonly Lazy<JsonSerializerOptions> toolOptions = new(() => new(McpJsonUtilities.DefaultOptions)
     {
         TypeInfoResolver = JsonTypeInfoResolver.Combine(Default, McpJsonUtilities.DefaultOptions.TypeInfoResolver),
