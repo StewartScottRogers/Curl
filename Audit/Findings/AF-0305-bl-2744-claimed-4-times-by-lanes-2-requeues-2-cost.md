@@ -3,8 +3,8 @@ id: AF-0305
 title: BL-2744 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks): a file outside its touches, a stash that did not apply, then claims refused by the cost cap
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: process:logs:BL-2744:redone-work
 reproduction: none
 task: BL-3064
@@ -13,9 +13,9 @@ found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0305 - BL-2744 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks): a file outside its touches, a stash that did not apply, then claims refused by the cost cap
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still shows BL-2744 claims=4, outcome blocked. The same cause recurs in this window: a file outside touches, a stash that did not apply, then cost-cap refusals. BL-2970 (064209-L1 13:03:22 REQUEUE 'Needs Curl.Engine.UnitTests... which BL-2921 in Doing touches'; 140711-L8 14:39:13 stash did not apply cleanly; cost-cap REQUEUEs at 14:44:43 and 17:43:14). BL-2925 (outside touches at 10:17:52, cost budget at 15:37:20, cost-cap BLOCKED at 17:52:01).
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Historical row unchanged (BL-2744 claims 4, blocked). In this window, file-outside-touches requeues were BL-2972 (once, 2 claims) and BL-3079 (once, 2 claims), both under the threshold. No stash failed to apply, and cost-cap refusals did not turn into repeated claims.
 
 ## Log
 
 - 2026-10-19: filed proposed.
 - 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

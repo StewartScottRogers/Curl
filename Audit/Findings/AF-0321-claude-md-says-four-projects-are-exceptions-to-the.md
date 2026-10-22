@@ -3,8 +3,8 @@ id: AF-0321
 title: CLAUDE.md says four projects are exceptions to the Curl.<Area>.UnitLibrary rule; Curl.Config is a fifth
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:CLAUDE.md:FourNamingExceptions:false-statement
 reproduction: none
 task: BL-3074
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0321 - CLAUDE.md says four projects are exceptions to the Curl.<Area>.UnitLibrary rule; Curl.Config is a fifth
 
@@ -42,7 +42,10 @@ Select-String -Path CLAUDE.md -Pattern 'Four projects are exceptions'; Get-Child
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: CLAUDE.md no longer says 'Four projects are exceptions'. It says five (Curl.Console, Curl.Config, Curl.Api, Libcurl, Curl.Mcp), which matches the five suffix-less projects the command lists.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0320
 title: ITlsProvider's remarks say the production implementation delegates to SslStream rather than implementing TLS; a second, hand-built production provider exists
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/ITlsProvider.cs:ITlsProvider:false-doc-comment
 reproduction: none
 task: BL-3073
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0320 - ITlsProvider's remarks say the production implementation delegates to SslStream rather than implementing TLS; a second, hand-built production provider exists
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Protocol.Abstractions.UnitLibrary/ITlsProvider.cs -Patt
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the reproduction: 'production implementation delegates' no longer appears in ITlsProvider.cs. The remarks now say 'Production has two providers: SslStreamTlsProvider ... and HandBuiltTlsProvider ...', which matches EngineComposition.Transports.cs:63 'new HandBuiltTlsProvider(...)'.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

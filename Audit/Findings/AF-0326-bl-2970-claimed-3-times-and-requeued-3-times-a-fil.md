@@ -3,8 +3,8 @@ id: AF-0326
 title: BL-2970 claimed 3 times and requeued 3 times: a file outside its touches, a stash that did not apply, then two cost-cap requeues, before it was deferred and split
 auditor: process
 severity: Medium
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: process:logs:BL-2970:redone-work
 reproduction: none
 task: BL-3079
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0326 - BL-2970 claimed 3 times and requeued 3 times: a file outside its touches, a stash that did not apply, then two cost-cap requeues, before it was deferred and split
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Historical BL-2970 row unchanged (claims 3). In this window, no task was claimed 3 or more times for a file outside its touches, a failed stash or cost-cap requeues. BL-2972 was requeued once for Curl.Networking.UnitLibrary/DohTr~ and finished on its second claim.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0330
 title: CI red 48.4 min on work/dark-factory from run 39691487971: Windows quality gate (coverage, complexity, CRAP) failed after BL-2856's push
 auditor: process
 severity: Low
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.
 key: process:logs:39691487971:ci-red
 reproduction: none
 task: BL-3083
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0330 - CI red 48.4 min on work/dark-factory from run 39691487971: Windows quality gate (coverage, complexity, CRAP) failed after BL-2856's push
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Historical spell from run 39691487971 is still 48.35 min. In this window, ciRedMinutes = 0 with no red spells; no quality-gate failure on work/dark-factory.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces.

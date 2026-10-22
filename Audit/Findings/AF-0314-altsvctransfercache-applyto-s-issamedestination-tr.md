@@ -3,8 +3,8 @@ id: AF-0314
 title: AltSvcTransferCache.ApplyTo's IsSameDestination: true can become false with no Curl.Engine.UnitTests test failing, so alt-svc entries to another host are no longer followed
 auditor: quality
 severity: High
-status: accepted
-reason:
+status: closed
+reason: Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:ApplyTo-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:144:true
 task: BL-3067
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: mechanical
+closed-by: 2026-10-22_1120.md
 ---
 # AF-0314 - AltSvcTransferCache.ApplyTo's IsSameDestination: true can become false with no Curl.Engine.UnitTests test failing, so alt-svc entries to another host are no longer followed
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1120.md | reproduces: no | Ran the -Site reproduction: resolvedLine 144, mutant '{ IsSameDestination: false }' killed (score 1). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1120.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
