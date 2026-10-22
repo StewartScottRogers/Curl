@@ -25,11 +25,21 @@ internal sealed record ConnectionPeer(string Scheme, string UserHostname, string
     /// <returns>The peer.</returns>
     internal static ConnectionPeer Create(string scheme, string userHostname, int port)
     {
-        string unbracketed = userHostname.StartsWith('[') && userHostname.EndsWith(']') ? userHostname[1..^1] : userHostname;
+        string unbracketed = WithoutBrackets(userHostname);
         int percent = unbracketed.IndexOf('%');
         string address = percent < 0 ? unbracketed : unbracketed[..percent];
-        return IPAddress.TryParse(address, out IPAddress? parsed) && parsed.AddressFamily == AddressFamily.InterNetworkV6
-            ? new ConnectionPeer(scheme, userHostname, address, port, true, percent < 0 ? null : unbracketed[(percent + 1)..])
+        return IsIpv6Address(address)
+            ? new ConnectionPeer(scheme, userHostname, address, port, true, ZoneIdAfter(unbracketed, percent))
             : new ConnectionPeer(scheme, userHostname, userHostname, port, false, null);
     }
+
+    /// <summary>Takes the brackets off a host written as <c>[...]</c>; any other host comes back as given.</summary>
+    private static string WithoutBrackets(string host) => host.StartsWith('[') && host.EndsWith(']') ? host[1..^1] : host;
+
+    /// <summary>Whether <paramref name="address" /> parses as an IPv6 address.</summary>
+    private static bool IsIpv6Address(string address) =>
+        IPAddress.TryParse(address, out IPAddress? parsed) && parsed.AddressFamily == AddressFamily.InterNetworkV6;
+
+    /// <summary>The zone id after the <c>%</c> at <paramref name="percent" />, or <see langword="null" /> when there is none.</summary>
+    private static string? ZoneIdAfter(string unbracketed, int percent) => percent < 0 ? null : unbracketed[(percent + 1)..];
 }
