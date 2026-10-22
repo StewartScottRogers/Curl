@@ -72,10 +72,6 @@ function Invoke-MergeToMaster {
 # The shift-end review (ADR-0710): how long it may run and what it may cost.
 $ShiftReviewMinutes = 45
 $ShiftReviewBudgetUsd = 15
-# A trial (Stewart, 2026-10-19): the review runs for this many shifts, counted by the
-# review-<stamp>.md reports in the log folder, then stops until Stewart decides whether to keep
-# it - he fears it takes too long and repeats what the audit office already does. 0 = no limit.
-$ShiftReviewTrialShifts = 2
 
 # What the review run is told. {BASE}, {HEAD}, {REPORT} and {BRANCH} are filled in.
 $ShiftReviewPrompt = @'
@@ -115,8 +111,6 @@ function Invoke-ShiftReview {
     # issue (ADR-0710). It never holds or undoes the merge. Returns a line for the trace.
     param([string]$Base, [string]$Head, [string]$Branch)
     if (-not "$(& claude plugin list 2>$null)".Contains('pr-review-toolkit')) { return 'review skipped: the pr-review-toolkit plugin is not installed' }
-    $trials = @(Get-ChildItem -LiteralPath $LogDir -File -Filter 'review-*.md' -ErrorAction SilentlyContinue).Count
-    if ($ShiftReviewTrialShifts -gt 0 -and $trials -ge $ShiftReviewTrialShifts) { return "review skipped: its $ShiftReviewTrialShifts-shift trial is over; Stewart decides whether to keep it (ADR-0710)" }
     $short = $Head.Substring(0, 7)
     $dir = Join-Path $LanesDir "review-$Stamp"
     if (-not (Invoke-Git @('worktree', 'add', '-q', '--detach', $dir, $Head))) { return "review skipped: no worktree at $short" }

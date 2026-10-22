@@ -173,8 +173,7 @@
     process runs the review beside it, so nothing waits for it; lanes claim what it files.
     With nothing ready, it runs first, and the next shift starts if it filed work. The
     review never holds or undoes the merge: CI is the merge gate (ADR-0710). It is skipped
-    when the plugin is not installed, and after its trial: it runs for
-    $ShiftReviewTrialShifts shifts (2), then stops until Stewart decides.
+    when the plugin is not installed.
 
     A commit that only changes the board and is pushed on its own - a claim, requeue,
     park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
