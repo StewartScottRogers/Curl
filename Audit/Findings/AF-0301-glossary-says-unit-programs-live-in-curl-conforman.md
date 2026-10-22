@@ -3,12 +3,12 @@ id: AF-0301
 title: Glossary says unit programs live in Curl.Conformance.UnitProgram.UnitLibrary and UnitPrograms.Ported; neither exists
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Wiki/Glossary.md:Unit-program:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2939
+tasks: BL-2939
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -44,6 +44,9 @@ IUnitProgram defined: False
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the reproduction: '33: glossary says it lives there', 'project exists: True', 'IUnitProgram defined: True'. Curl.Conformance.UnitProgram.UnitLibrary exists, and UnitPrograms.Ported is defined at Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.cs:34, so the glossary's statement is now true.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.

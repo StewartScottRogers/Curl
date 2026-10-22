@@ -44,6 +44,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 - 2026-10-18 | 2026-10-18_1905.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: resolved to line 744 in TryLookUpNetrcCredentials, ToolInputs is not null || Netrc == Ignored -> && survived. Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-10-19 | 2026-10-19_2134.md | not re-audited | Ran the -Site command: outcome site-missing (resolvedLine null). The member is now TryLookUpUrlAndNetrcCredentials (ManagedEasyTransfer.cs:764), which holds no || (the netrc-ignored test moved into TransferCredentialLookup), so the mutant could not be run. Not re-audited.
+- 2026-10-22 | 2026-10-22_0130.md | not re-audited | Ran the -Site reproduction: outcome site-missing (no mutant ran). TryLookUpNetrcCredentials no longer exists. It is now TryLookUpUrlAndNetrcCredentials (ManagedEasyTransfer.cs:764), which holds no || and hands the decision to TransferCredentialLookup.TryLookUp, so the site cannot be rerun. Not re-audited.
 
 ## Log
 
