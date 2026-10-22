@@ -1,5 +1,5 @@
 ---
-id: BL-3097
+id: BL-3100
 title: Stop Invoke-TaskSplit pushing a lane's unintegrated commits after a run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3097 — Stop Invoke-TaskSplit pushing a lane's unintegrated commits after a run
+# BL-3100 — Stop Invoke-TaskSplit pushing a lane's unintegrated commits after a run
 
 ## Goal
 

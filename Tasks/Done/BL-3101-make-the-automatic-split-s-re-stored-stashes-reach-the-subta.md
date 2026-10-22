@@ -1,5 +1,5 @@
 ---
-id: BL-3095
+id: BL-3101
 title: Make the automatic split's re-stored stashes reach the subtasks
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed: 2026-10-22
 ---
-# BL-3095 — Make the automatic split's re-stored stashes reach the subtasks
+# BL-3101 — Make the automatic split's re-stored stashes reach the subtasks
 
 ## Goal
 
