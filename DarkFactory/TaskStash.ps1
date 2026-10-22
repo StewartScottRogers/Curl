@@ -8,6 +8,17 @@ function Save-StrayChanges {
     Write-Trace $Id 'stash' "uncommitted work kept: git stash list" 'Yellow'
 }
 
+function Find-StashIndex {
+    # The index of the stash list entry whose hash is -Sha, -1 for none.
+    param([string]$Sha, [string]$Repo = $Root)
+    $index = 0
+    foreach ($line in @(git -C $Repo stash list --format='%H' 2>$null)) {
+        if ($line -eq $Sha) { return $index }
+        $index++
+    }
+    return -1
+}
+
 function Restore-TaskStash {
     # A task that went back to Backlog with work in progress left it in the shared stash
     # list as "darkfactory <id> <stamp>" (Save-StrayChanges). A lane's run may not run
@@ -15,7 +26,8 @@ function Restore-TaskStash {
     # the third's stash; AF-0099: BL-1683's second claim began by hunting for the first's),
     # so the shift applies the newest such stash itself when the task
     # is claimed again. Returns the note put in front of the run's prompt, '' for none.
-    param([string]$Id, [string]$Repo = $Root)
+    # -BetweenLookupAndDrop runs after the applied stash's index is found and before it is dropped (a test hook).
+    param([string]$Id, [string]$Repo = $Root, [scriptblock]$BetweenLookupAndDrop = {})
     $sha = Get-TaskStashSha $Id $Repo
     if (-not $sha) { return '' }
     $applied = $false
@@ -33,10 +45,14 @@ function Restore-TaskStash {
         # is offered again on the next claim (AF-0327: BL-2968's third claim was told a
         # stash "did not apply cleanly" that its second claim had already applied and committed).
         # A run that goes back to Backlog stashes its work afresh, so dropping loses nothing.
-        $index = 0
-        foreach ($line in @(git -C $Repo stash list --format='%H' 2>$null)) {
-            if ($line -eq $sha) { git -C $Repo stash drop -q "stash@{$index}" 2>&1 | Out-Null; break }
-            $index++
+        # The list is shared with every lane, so the index can shift between the lookup and the
+        # drop (BL-3103): the drop checks the index still names the applied hash, else looks again.
+        $index = Find-StashIndex $sha $Repo
+        & $BetweenLookupAndDrop
+        if ($index -ge 0 -and "$(git -C $Repo rev-parse "stash@{$index}" 2>$null)".Trim() -ne $sha) { $index = Find-StashIndex $sha $Repo }
+        if ($index -ge 0) {
+            $dropOutput = git -C $Repo stash drop -q "stash@{$index}" 2>&1
+            if ($LASTEXITCODE -ne 0) { Write-Trace $Id 'stash' "dropping the applied stash $($sha.Substring(0, 8)) failed: $dropOutput" 'Red' }
         }
         Write-Trace $Id 'stash' "applied the earlier run's work from stash $($sha.Substring(0, 8))" 'Yellow'
         return @"
@@ -255,6 +271,16 @@ if ($TestTaskStash) {
         & $check 'a conflict leaves the worktree clean' "five - True" "$(& $read 'a.txt') $(& $read 'b.txt') $(-not (git -C $repo status --porcelain))"
         $sha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
         & $check 'the note gives the hash to read it by' 'True' "$($note.Contains("git diff $sha^1 $sha"))"
+        # Another lane stashes between the lookup and the drop (BL-3103): only the applied stash goes.
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null; git -C $repo stash clear
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'mine'
+        git -C $repo stash push -q -m 'darkfactory BL-5 20260104-000000' 2>&1 | Out-Null
+        $mine = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
+        $otherLane = { Set-Content -Path (Join-Path $repo 'a.txt') -Value 'theirs'; git -C $repo stash push -q -m 'darkfactory BL-6 20260104-000000' 2>&1 | Out-Null }
+        $null = Restore-TaskStash -Id 'BL-5' -Repo $repo -BetweenLookupAndDrop $otherLane
+        $left = @(git -C $repo stash list --format='%gs')
+        & $check 'a stash pushed before the drop survives, the applied one is dropped' '1 True' "$($left.Count) $($left[0] -match 'darkfactory BL-6' -and (Find-StashIndex $mine $repo) -eq -1)"
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null; git -C $repo stash clear
         # The split of a task over its cost cap (BL-3091), with every step injected.
         # Prompts.ps1 is loaded after this file; its last line marks a file finished, which this one is not.
         . (Join-Path $PSScriptRoot 'Prompts.ps1'); $AreaFileFinished = $false

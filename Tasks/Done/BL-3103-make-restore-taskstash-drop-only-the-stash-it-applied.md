@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3103 — Make Restore-TaskStash drop only the stash it applied
 
@@ -34,14 +34,17 @@ The drop's exit code is also ignored. A drop that fails without a trace brings b
 
 ## Acceptance criteria
 
-- [ ] Just before dropping, `Restore-TaskStash` checks that `git rev-parse stash@{$index}` still equals the applied hash. When it does not, it looks the index up again or skips the drop.
-- [ ] A failed drop is written to the trace.
-- [ ] A `-TestTaskStash` case pushes another stash between the lookup and the drop, for example through a hook the test can inject, and checks that the other stash survives.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] Just before dropping, `Restore-TaskStash` checks that `git rev-parse stash@{$index}` still equals the applied hash. When it does not, it looks the index up again or skips the drop.
+- [x] A failed drop is written to the trace.
+- [x] A `-TestTaskStash` case pushes another stash between the lookup and the drop, for example through a hook the test can inject, and checks that the other stash survives.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+- Added Find-StashIndex and a -BetweenLookupAndDrop test hook on Restore-TaskStash; the drop re-checks rev-parse stash@{i} against the applied hash, re-looks-up on mismatch, and traces a failed drop.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: e7b7d54c 51bae7b1 3243c4f5 95ad9451.
+- 2026-10-22: Doing -> Done. Restore-TaskStash drops only the stash it applied, re-checking the hash and tracing a failed drop
