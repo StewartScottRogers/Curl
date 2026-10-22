@@ -26,11 +26,13 @@ Found by the shift-end review of 2026-10-22 (code-reviewer, ADR-0710) in the dif
 
 ## Acceptance criteria
 
-- [ ] `$SplitForbidden` in `DarkFactory/Prompts.ps1` contains `'git stash store'`.
-- [ ] The `-TestTaskStash` (or prompts) self-test asserts that `git stash store` is in `$SplitForbidden`, and the self-test passes.
-- [ ] The split prompt no longer invites the run to store the stash itself (it says the shift stores it and the run runs no `git stash` subcommand).
+- [x] `$SplitForbidden` in `DarkFactory/Prompts.ps1` contains `'git stash store'`.
+- [x] The `-TestTaskStash` (or prompts) self-test asserts that `git stash store` is in `$SplitForbidden`, and the self-test passes.
+- [x] The split prompt no longer invites the run to store the stash itself (it says the shift stores it and the run runs no `git stash` subcommand).
 
 ## Notes
+
+The self-test asserts `git stash store` is in `$SplitForbidden`; the prompt no longer shows the hash.
 
 ## Log
 

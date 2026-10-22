@@ -341,6 +341,7 @@ if ($TestTaskStash) {
         & $check 'the code commits and pushes between Enter-Lock and Dispose' 'True' "$($text -match '(?s)\$lock = & \$EnterLock.*''commit''.*''push''.*\$lock\.Dispose\(\)')"
         & $check 'the prompt asks for a Notes line, not a git stash command' 'True' "$($runs[0].Contains('Continues the stashed work') -and -not $runs[0].Contains('git stash store'))"
         & $check 'the prompt names Deferred and depends-on repointing' 'True' "$($runs[0] -match 'move -To Deferred' -and $runs[0] -match 'Repoint depends-on')"
+        & $check 'the split run may never run git stash store' 'True' "$($SplitForbidden -contains 'git stash store')"
         $line = Get-TaskSplitArguments $SplitForbidden '--strict-mcp-config' 'err.txt'
         & $check 'the split run uses --model sonnet' 'True' "$($line.Contains('claude -p --model sonnet '))"
         $usd = if ($line -match '--max-budget-usd (\S+)') { [double]::Parse($Matches[1], [System.Globalization.CultureInfo]::InvariantCulture) } else { 99 }
