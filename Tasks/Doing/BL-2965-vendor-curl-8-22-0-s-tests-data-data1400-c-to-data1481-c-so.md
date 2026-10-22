@@ -35,3 +35,4 @@ Remove `lane: no` once a lane's permissions let it write under `Curl.Conformance
 
 - 2026-10-21: Created.
 - 2026-10-21: lane: no removed; PR #187 anchors the data deny at the project root (`/data/**`), so lanes can write under Curl.Conformance.UnitTests/UpstreamTestData/data/.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: a535a660 556903c9 29d34864 6ea6410d.
