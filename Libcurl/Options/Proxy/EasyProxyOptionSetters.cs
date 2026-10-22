@@ -85,13 +85,16 @@ internal static class EasyProxyOptionSetters
             : Set(ref options, p => p with { Socks5Authentication = (Socks5Authentication)methods });
     }
 
+    /// <summary>Replaces the proxy options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Set(ref EasyOptions options, Func<EasyProxyOptions, EasyProxyOptions> change)
     {
         options = options with { Proxy = change(options.Proxy) };
         return CurlCode.Ok;
     }
 
+    /// <summary>Whether the option's integer value is not 0, as libcurl treats an on/off option.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 
+    /// <summary>The option's integer value, whether it arrived as an <see cref="int"/>, a <see cref="long"/> or an enum.</summary>
     private static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);
 }

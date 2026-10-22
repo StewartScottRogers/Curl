@@ -111,6 +111,7 @@ public static class CurlEasyWebSocket
             : webSocket.StartFrameAsync(flags, frameLength, cancellationToken);
     }
 
+    /// <summary>The easy handle's WebSocket, or <see langword="null"/> when <paramref name="easy"/> is <see langword="null"/> or cleaned up, which each caller answers as a bad argument.</summary>
     private static IEasyWebSocket? LiveWebSocket(CurlEasy? easy) =>
         easy is null || easy.IsCleanedUp ? null : easy.Transfer.WebSocket;
 }
