@@ -37,3 +37,4 @@ Measure first what Curl prints today for bare `curl` (stderr bytes and exit code
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 63b98b66 e2aa702f cd7b69ab 3e377a02 9742157d.
