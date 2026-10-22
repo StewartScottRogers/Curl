@@ -9,7 +9,7 @@ touches: [Curl.Api/README.md, Curl.Api.UnitLibrary/README.md, Curl.Console/READM
 model: sonnet
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3059 — Align the Hosts' documentation: glossary terms and README cross-links
 
@@ -23,10 +23,10 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." The com
 
 ## Acceptance criteria
 
-- [ ] The six Host READMEs use the same Glossary.md term for the same concept, and each links to the others it relates to (Curl.Api to Curl.Api.UnitLibrary and Libcurl, Curl.Mcp to Curl.Mcp.UnitLibrary and Curl.Console, and so on) with links that resolve.
-- [ ] Any Glossary.md entry the Hosts need and lack is added, and no README or doc comment in the Hosts contradicts a glossary definition.
-- [ ] If a test reads or checks the README, it still passes; any code sample in it is exercised by that test where the project already does so.
-- [ ] No source file other than the README changes, and `dotnet build` of the project is clean with warnings as errors and the fast tests of Curl.Api.UnitTests, Curl.Mcp.UnitTests pass (`dotnet test Curl.Api.UnitTests, Curl.Mcp.UnitTests --filter "TestCategory!=Integration"`).
+- [x] The six Host READMEs use the same Glossary.md term for the same concept, and each links to the others it relates to (Curl.Api to Curl.Api.UnitLibrary and Libcurl, Curl.Mcp to Curl.Mcp.UnitLibrary and Curl.Console, and so on) with links that resolve.
+- [x] Any Glossary.md entry the Hosts need and lack is added, and no README or doc comment in the Hosts contradicts a glossary definition.
+- [x] If a test reads or checks the README, it still passes; any code sample in it is exercised by that test where the project already does so.
+- [x] No source file other than the README changes, and `dotnet build` of the project is clean with warnings as errors and the fast tests of Curl.Api.UnitTests, Curl.Mcp.UnitTests pass (`dotnet test Curl.Api.UnitTests, Curl.Mcp.UnitTests --filter "TestCategory!=Integration"`).
 
 ## Notes
 
@@ -34,3 +34,4 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." The com
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 70a5c288 b6354e0a 0e267b12 1f7e88de.
+- 2026-10-22: Doing -> Done. Host READMEs cross-linked, Glossary gains Host and drops stale planned wording; Api and Mcp tests green.
