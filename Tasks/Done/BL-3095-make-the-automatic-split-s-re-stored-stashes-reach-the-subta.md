@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1, DarkFactory/Prompts.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3095 — Make the automatic split's re-stored stashes reach the subtasks
 
@@ -37,15 +37,18 @@ A failed split has a related problem. It puts the board back as it was (`TaskSta
 
 ## Acceptance criteria
 
-- [ ] `Get-TaskStashSha` finds a stash written with `git stash store -m "darkfactory <id> <stamp>" <sha>`, as well as one written by `Save-StrayChanges` with `stash push`.
-- [ ] When one stash is meant for several subtasks, every subtask that continues the work can find it. One way: the shift stores it itself after the split run, once per new ID. Another: the subtasks record the hash and `Restore-TaskStash` falls back to it.
-- [ ] A failed split drops every stash entry it added, and only those.
-- [ ] `-TestTaskStash` has real-git cases that store a stash for two new IDs and restore each one, and a case that checks a failed split leaves the stash list as it was. These cases fail on the current code.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] `Get-TaskStashSha` finds a stash written with `git stash store -m "darkfactory <id> <stamp>" <sha>`, as well as one written by `Save-StrayChanges` with `stash push`.
+- [x] When one stash is meant for several subtasks, every subtask that continues the work can find it. One way: the shift stores it itself after the split run, once per new ID. Another: the subtasks record the hash and `Restore-TaskStash` falls back to it.
+- [x] A failed split drops every stash entry it added, and only those.
+- [x] `-TestTaskStash` has real-git cases that store a stash for two new IDs and restore each one, and a case that checks a failed split leaves the stash list as it was. These cases fail on the current code.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+Decision: the shift stores the stash itself (Copy-TaskStash) once per new task whose Notes say "Continues the stashed work of <id>"; each store is a commit-tree copy of the stash, because git stash store writes no entry for an already-stored hash. Get-TaskStashSha accepts both the push and the bare store subject. A failed split drops the copies it stored (Remove-TaskStashEntries). The split prompt no longer runs git stash.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 798f000e 28b53e68 194fd556 98d0b224 95ad9451.
+- 2026-10-22: Doing -> Done. Re-stored split stashes now reach every continuing subtask; failed split drops its stashes

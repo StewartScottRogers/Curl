@@ -407,8 +407,8 @@ $Forbidden = @(
 )
 # A lane's run also never touches the remote or the branch: the shift owns both.
 $LaneForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git stash')
-# The split run (Invoke-TaskSplit) may list stashes and store one by hash, nothing else of
-# git stash, and the shift commits and pushes what it changes.
+# The split run (Invoke-TaskSplit) is told to run no git stash subcommand (the shift stores
+# the stash itself), and the shift commits and pushes what it changes.
 $SplitForbidden = $Forbidden + @('git push', 'git pull', 'git fetch', 'git rebase', 'git checkout', 'git switch', 'git worktree', 'git commit',
     'git stash push', 'git stash save', 'git stash apply', 'git stash pop', 'git stash drop', 'git stash clear', 'git stash create', 'git stash branch')
 
@@ -425,9 +425,9 @@ Split it into smaller tasks, each sized for one run, exactly as an interactive s
 2. File each one with `powershell -NoProfile -ExecutionPolicy Bypass -File
    .claude/skills/task-board/task-board.ps1 new` (its depends-on carries {ID}'s, plus the
    earlier subtasks it needs), and say under its Notes that it was split from {ID}.
-3. For each new task that continues the stashed work, re-store that stash under the new ID by
-   its hash: `git stash store -m "darkfactory <new id> {STAMP}" {SHA}`. Use no other git
-   stash subcommand than store and list. Skip this step when there is no stash.
+3. For each new task that continues the stashed work, add the line "Continues the stashed work
+   of {ID}." under its Notes; the shift then stores the stash ({SHA}) under that task's ID
+   itself. Run no git stash subcommand. Skip this step when there is no stash.
 4. Move {ID} to Deferred with the board script's move -To Deferred and a -Reason naming the
    new task IDs.
 5. Repoint depends-on: every task outside Done whose depends-on names {ID} names the new
