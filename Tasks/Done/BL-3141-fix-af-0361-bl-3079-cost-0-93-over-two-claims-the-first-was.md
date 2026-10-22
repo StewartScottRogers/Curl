@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3141 — Fix AF-0361: BL-3079 cost $0.93 over two claims; the first was requeued because DarkFactory/TaskBudget.ps1 was held by another task
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-22: Cause: BL-3079 (touches DarkFactory/TaskBudget.ps1 and RunDarkFactory.ps1) was claimed, and in its first run (11 turns, $0.19) the lane found TaskBudget.ps1 was needed and BL-3090 in Doing already held it, so it requeued (BL-3079 Notes record this). The second claim (20 turns, $0.74) did the real work and finished. The first run stopped inside the first dozen turns, as the lane rules ask, and left no code stashed; the only way to avoid it was to know at claim time that the file was needed, but the original touches did not list it: the need showed only once the code was read, and BL-3090 started in the meantime. Unavoidable: $0.19 of reading is the cheapest the discovery could cost, and the cost was within a factor of the expected $0.81 (0.93 total). No change made; the finding closes at the first audit after Done (task-done-historical). The build and fast tests were not run: no file changed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0361 cost named: a file overlap found in a cheap first run, unavoidable, no waste to fix
