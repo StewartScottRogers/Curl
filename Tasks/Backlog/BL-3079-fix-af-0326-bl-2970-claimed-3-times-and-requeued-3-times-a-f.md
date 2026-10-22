@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [RunDarkFactory.ps1]
+touches: [RunDarkFactory.ps1, DarkFactory/TaskBudget.ps1]
 requirement: none
 created: 2026-10-22
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the process auditor confirms th
 
 ## Notes
 
+- 2026-10-22: Root causes already mitigated in part (touches widening rule, stash apply test, per-task spent cap). What is left: a requeued claim can get a cap as low as $1.02 (Get-RunBudgetUsd floors at $1 and Test-TaskCapSpent refuses only below $1), too small to do anything, so it requeues again (BL-2970 claims 2 and 3). Plan: raise that floor and refusal threshold in DarkFactory/TaskBudget.ps1 to a useful minimum (e.g. $2), update RunDarkFactory.ps1 docs and -TestTaskBudget. Added DarkFactory/TaskBudget.ps1 to touches; BL-3090 in Doing touches it, so requeued. The reproduction needs the audit office tools and logs, which a lane may not read, so its check is left to the re-audit.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Backlog. DarkFactory/TaskBudget.ps1 is held by BL-3090 in Doing; resume once BL-3090 is Done
