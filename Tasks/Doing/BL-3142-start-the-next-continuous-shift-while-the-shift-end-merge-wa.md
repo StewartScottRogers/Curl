@@ -34,3 +34,4 @@ Where to start: the end-of-shift sequence in `ShiftCoordinator.ps1` (Invoke-Merg
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 5fd3e226 2e7342fb 4c18bf29 9742157d.
