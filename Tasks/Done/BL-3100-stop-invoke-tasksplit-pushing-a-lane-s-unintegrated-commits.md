@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1, DarkFactory/ShiftRunner.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3100 — Stop Invoke-TaskSplit pushing a lane's unintegrated commits after a run
 
@@ -33,14 +33,17 @@ The push on the failure path (`TaskStash.ps1:176`) has the same problem. The exi
 
 ## Acceptance criteria
 
-- [ ] On the post-run path in a lane, `Invoke-TaskSplit` pushes neither the split commit nor the block commit. The single runner (`-not $Lane`) still pushes, as it did before.
-- [ ] A `-TestTaskStash` case with a push stub that accepts checks that no push is issued on a lane's post-run path. The case fails on the current code.
-- [ ] The comment at `TaskStash.ps1:163-165` and ADR-0759 still describe what the code does.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] On the post-run path in a lane, `Invoke-TaskSplit` pushes neither the split commit nor the block commit. The single runner (`-not $Lane`) still pushes, as it did before.
+- [x] A `-TestTaskStash` case with a push stub that accepts checks that no push is issued on a lane's post-run path. The case fails on the current code.
+- [x] The comment at `TaskStash.ps1:163-165` and ADR-0759 still describe what the code does.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 
 ## Notes
+
+Added -LeaveForIntegration to Invoke-TaskSplit; ShiftRunner passes it in a lane. ADR-0759 gained one sentence; touches unchanged.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: fe2306b6 dd817d75 bddde03b 95ad9451.
+- 2026-10-22: Doing -> Done. Invoke-TaskSplit pushes nothing in a lane after a run

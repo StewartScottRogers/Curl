@@ -192,7 +192,7 @@ while ($true) {
         # A task stopped by its cost cap is split by one bounded run (BL-3091), which defers or
         # blocks it itself; one already offered for a split today is blocked as before.
         $capped = $capWhy -or (-not $run.TimedOut -and (Test-BudgetSpent))
-        $split = if ($capped) { Invoke-TaskSplit $id $why } else { 'skipped' }
+        $split = if ($capped) { Invoke-TaskSplit $id $why -LeaveForIntegration:([bool]$Lane) } else { 'skipped' }
         if ($split -eq 'skipped') {
             $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
             Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null

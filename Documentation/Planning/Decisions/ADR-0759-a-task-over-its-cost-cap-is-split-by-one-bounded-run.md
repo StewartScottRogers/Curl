@@ -31,7 +31,7 @@ every task depending on them was stalled.
   and commits that under the lock.
 - From a claim (checkout just synced) a refused push pulls with rebase and pushes again; after a
   task's run the lane may hold its own commits, which only integration may push, so there the
-  split commit is left for the shift's integration.
+  split commit is left for the shift's integration; neither it nor a failed split's block commit is pushed there (BL-3100).
 
 ## Why
 
