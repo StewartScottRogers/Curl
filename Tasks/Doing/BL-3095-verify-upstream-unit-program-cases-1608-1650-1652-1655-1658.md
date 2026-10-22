@@ -33,3 +33,4 @@ Split from BL-2847. Run order: this first, then BL-3096 checks CI.
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 08c8fe91 6f3a4d7b c0723528.
