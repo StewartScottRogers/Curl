@@ -1,4 +1,4 @@
-﻿---
+---
 id: BL-2972
 title: Fail a DoH query on a non-2xx status as curl 8.22.0 does: [DoH] [A] error: HTTP status N
 priority: Normal
@@ -30,3 +30,4 @@ Split from BL-2970 (ADR-0738). Measured 2026-10-21 with the local curl 8.22.0 (S
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a401cbb2 2a446683.
