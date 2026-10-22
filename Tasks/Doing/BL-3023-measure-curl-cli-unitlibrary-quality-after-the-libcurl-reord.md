@@ -37,3 +37,4 @@ Split from BL-2966. Run `powershell -NoProfile -File Measure-CodeQuality.ps1 -Li
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f1c8149c 809c786e 48b212cd.
 - 2026-10-21: Doing -> Backlog. Waits for BL-3021: CI's quality job is red only on the ManualPages members BL-3021 is covering; LibcurlSourceCode* passes every gate and the build and test jobs pass on all three OSes
+- 2026-10-22: Backlog -> Doing. Criteria at claim: f1c8149c 809c786e 48b212cd.
