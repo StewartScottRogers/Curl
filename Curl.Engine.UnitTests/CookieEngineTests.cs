@@ -1,7 +1,10 @@
 using System.Text;
 
 using Curl.Api.Options.Http;
+using Curl.Cli;
+using Curl.Console;
 using Curl.Cookies;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -160,6 +163,85 @@ public sealed class CookieEngineTests
 
         Diagnostics.Assert("too long", expected, tooLong);
         Assert.AreEqual(expected, tooLong);
+    }
+
+    [TestMethod]
+    [DataRow(NetscapeCookieFile.LongestLine, "\n", true, DisplayName = "4998 characters, LF")]
+    [DataRow(NetscapeCookieFile.LongestLine + 1, "\n", false, DisplayName = "4999 characters, LF")]
+    [DataRow(NetscapeCookieFile.LongestLine, "\r\n", false, DisplayName = "4998 and a CR, CR LF")]
+    [DataRow(NetscapeCookieFile.LongestLine + 1, "", false, DisplayName = "4999 characters, last line")]
+    public async Task LoadCookieFilesAsync_FileWithALongLine_TellsWhetherItWasTooLong(int length, string lineEnd, bool expected)
+    {
+        // curl 8.22.0 fails the transfer with exit 100 past 4998 characters, a CR counted (BL-2916, BL-2971).
+        ReadOnlyFileSystem fileSystem = new();
+        fileSystem.ExistingContent["jar.txt"] = Encoding.Latin1.GetBytes(LongCookieLine(length) + lineEnd);
+        Diagnostics.Arrange("first line length, line end", $"{length}, {lineEnd.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal)}");
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { CookieFiles = ["jar.txt"] })!;
+
+        bool loaded = await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("loaded", loaded);
+
+        Diagnostics.Assert("loaded", expected, loaded);
+        Assert.AreEqual(expected, loaded);
+    }
+
+    [TestMethod]
+    public async Task LoadCookieFilesAsync_StandardInputWithA4999CharacterLine_ReturnsFalseAndReadsNoLaterFile()
+    {
+        ReadOnlyFileSystem fileSystem = new();
+        using MemoryStream standardInput = new(Encoding.Latin1.GetBytes(LongCookieLine(NetscapeCookieFile.LongestLine + 1) + "\n"));
+        Diagnostics.Arrange("command line", $"-b - -b later.txt {Url}");
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { CookieFiles = ["-", "later.txt"] })!;
+
+        bool loaded = await cookies.LoadCookieFilesAsync(fileSystem, standardInput, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("loaded", loaded);
+
+        Diagnostics.Assert("loaded", false, loaded);
+        Assert.IsFalse(loaded);
+    }
+
+    [TestMethod]
+    public async Task LoadCookieFilesAsync_SecondCallAfterALineTooLong_LoadsNothingAndReturnsTrue()
+    {
+        ReadOnlyFileSystem fileSystem = new();
+        fileSystem.ExistingContent["jar.txt"] = Encoding.Latin1.GetBytes(LongCookieLine(NetscapeCookieFile.LongestLine + 1) + "\n");
+        Diagnostics.Arrange("command line", $"-b jar.txt {Url}");
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { CookieFiles = ["jar.txt"] })!;
+
+        bool first = await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
+        bool second = await cookies.LoadCookieFilesAsync(fileSystem, Stream.Null, Now, NoTransferEvents.Instance);
+        Diagnostics.Act("first, second", $"{first}, {second}");
+
+        Diagnostics.Assert("first, second", "False, True", $"{first}, {second}");
+        Assert.IsFalse(first);
+        Assert.IsTrue(second);
+    }
+
+    [TestMethod]
+    [DataRow(NetscapeCookieFile.LongestLine, null, DisplayName = "4998 characters goes ahead")]
+    [DataRow(NetscapeCookieFile.LongestLine + 1, CurlExitCode.TooLarge, DisplayName = "4999 characters fails with 100")]
+    public async Task TransferPerformerLoadCookieFilesAsync_FileWithALongLine_FailsTheTransferPast4998Characters(int length, CurlExitCode? expected)
+    {
+        ReadOnlyFileSystem fileSystem = new();
+        fileSystem.ExistingContent["jar.txt"] = Encoding.Latin1.GetBytes(LongCookieLine(length) + "\n");
+        Diagnostics.Arrange("first line length", length);
+        CookieEngine cookies = CookieEngine.FromHttpOptions(new EasyHttpOptions { CookieFiles = ["jar.txt"] })!;
+        EngineTransferSettings settings = EasyOptionsFromCommandLine.TransferSettingsOf(CommandLineParser.Parse(["-b", "jar.txt", Url], _ => true).Options!);
+
+        TransferResult? failure = await new TransferPerformer(TimeProvider.System, code => $"text of {(int)code}")
+            .LoadCookieFilesAsync(cookies, settings, Url, fileSystem, Stream.Null, NoTransferEvents.Instance);
+        Diagnostics.Act("failure", failure is null ? "<null>" : $"{(int)failure.ExitCode} {failure.ErrorMessage}");
+
+        Diagnostics.Assert("exit code", expected?.ToString() ?? "<null>", failure?.ExitCode.ToString() ?? "<null>");
+        Assert.AreEqual(expected, failure?.ExitCode);
+        Assert.AreEqual(expected is null ? null : "text of 100", failure?.ErrorMessage);
+    }
+
+    /// <summary>A Netscape cookie line <paramref name="length" /> characters long, before its line end.</summary>
+    private static string LongCookieLine(int length)
+    {
+        const string Start = "127.0.0.1\tFALSE\t/\tFALSE\t0\tname\t";
+        return Start + new string('v', length - Start.Length);
     }
 
     private sealed class ReadOnlyFileSystem : IFileSystem

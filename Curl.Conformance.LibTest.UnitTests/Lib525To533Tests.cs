@@ -1,4 +1,5 @@
 using Curl.Api.Codes;
+using Curl.Api.Options;
 using Libcurl.Global;
 
 namespace Curl.Conformance.LibTest.UnitTests;
@@ -13,13 +14,28 @@ public sealed class Lib525Tests
     {
         string file = Path.GetTempFileName();
         await File.WriteAllTextAsync(file, "Moooooooooooo\n");
-        var run = new PortRun(new FakeCurlEngine(), testNumber, "ftp://x/path/525", file);
+        var engine = new FakeCurlEngine();
+        EasyOptions? seen = null;
+        byte[] buffer = new byte[64];
+        long read = -1;
+        engine.Multi.Performing = () =>
+        {
+            seen = engine.Multi.Added!.Options;
+            read = seen.Callbacks.Read!(buffer);
+        };
+        var run = new PortRun(engine, testNumber, "ftp://x/path/525", file);
 
         LibTestResult result = await new Lib525(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         File.Delete(file);
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual("lib525", new Lib525(TimeProvider.System).ProgramName);
+        Assert.AreEqual("ftp://x/path/525", seen!.Network.Url);
+        Assert.IsTrue(seen.Transfer.Upload);
+        Assert.AreEqual(14L, seen.Transfer.InFileSize);
+        Assert.AreEqual("-", seen.Protocols.Ftp.ActiveAddress);
+        Assert.AreEqual(14L, read);
+        Assert.AreEqual("Moooooooooooo\n", System.Text.Encoding.ASCII.GetString(buffer, 0, (int)read));
     }
 
     [TestMethod]

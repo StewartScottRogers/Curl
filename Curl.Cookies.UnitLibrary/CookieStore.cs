@@ -240,8 +240,12 @@ public sealed class CookieStore : ICookieStore
     /// <param name="reader">The file's text, one character per byte.</param>
     /// <param name="discardSessionCookies"><see langword="true"/> for <c>-j</c> (<c>--junk-session-cookies</c>).</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
+    /// <returns>
+    /// <see langword="false"/> when a line was longer than <see cref="NetscapeCookieFile.LongestLine"/>, as
+    /// <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset, ITransferEvents)"/> returns.
+    /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> is <see langword="null"/>.</exception>
-    public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now) =>
+    public bool LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now) =>
         LoadCookieFile(reader, discardSessionCookies, now, NoTransferEvents.Instance);
 
     /// <summary>
@@ -253,11 +257,17 @@ public sealed class CookieStore : ICookieStore
     /// <param name="discardSessionCookies"><see langword="true"/> for <c>-j</c> (<c>--junk-session-cookies</c>).</param>
     /// <param name="now">The time that decides which loaded cookies have expired.</param>
     /// <param name="events">Where the refusal lines are reported.</param>
+    /// <returns>
+    /// <see langword="false"/> when the reading ended at a line longer than <see cref="NetscapeCookieFile.LongestLine"/>,
+    /// curl 8.22.0's <c>CURLE_TOO_LARGE</c>, which ends its transfer with exit 100 (the cookies before that line are
+    /// still loaded); otherwise <see langword="true"/>.
+    /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
-    public void LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events)
+    public bool LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events)
     {
         List<Cookie> accepted = [];
-        foreach (Cookie cookie in NetscapeCookieFile.Read(reader, now, events).Where(cookie => !discardSessionCookies || !cookie.IsSessionCookie))
+        IReadOnlyList<Cookie> read = NetscapeCookieFile.Read(reader, now, events, out bool isLineTooLong);
+        foreach (Cookie cookie in read.Where(cookie => !discardSessionCookies || !cookie.IsSessionCookie))
         {
             if (IsSetOnPublicSuffix(cookie))
             {
@@ -278,14 +288,20 @@ public sealed class CookieStore : ICookieStore
 
             RemoveExpired(now);
         }
+
+        return !isLineTooLong;
     }
 
     /// <summary>
     /// Loads the cookie file at <paramref name="path"/> with <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset)"/>, reading its bytes
     /// as Latin-1. A file that cannot be opened loads nothing and is not an error, as in curl.
     /// </summary>
+    /// <returns>
+    /// <see langword="false"/> when a line was longer than <see cref="NetscapeCookieFile.LongestLine"/>, curl's
+    /// <c>CURLE_TOO_LARGE</c>; <see langword="true"/> otherwise, a file that cannot be opened included.
+    /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/> or <paramref name="path"/> is <see langword="null"/>.</exception>
-    public Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, CancellationToken cancellationToken) =>
+    public Task<bool> LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, CancellationToken cancellationToken) =>
         LoadCookieFileAsync(fileSystem, path, discardSessionCookies, now, NoTransferEvents.Instance, cancellationToken);
 
     /// <summary>
@@ -299,8 +315,12 @@ public sealed class CookieStore : ICookieStore
     /// on Linux and macOS <c>WARNING: cookie filename points to a directory: "&lt;path&gt;"</c> for a directory and
     /// the first line for any other failure (BL-1393).
     /// </summary>
+    /// <returns>
+    /// <see langword="false"/> when a line was longer than <see cref="NetscapeCookieFile.LongestLine"/>, curl's
+    /// <c>CURLE_TOO_LARGE</c>; <see langword="true"/> otherwise, a file that cannot be opened included.
+    /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="fileSystem"/>, <paramref name="path"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
-    public async Task LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events, CancellationToken cancellationToken)
+    public async Task<bool> LoadCookieFileAsync(IFileSystem fileSystem, string path, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(path);
@@ -310,7 +330,7 @@ public sealed class CookieStore : ICookieStore
         if (!opened.IsOpen)
         {
             events.ReportInfo(DescribeCookieFileOpenFailure(path, opened.Status, OperatingSystem.IsWindows()));
-            return;
+            return true;
         }
 
         string text;
@@ -320,7 +340,7 @@ public sealed class CookieStore : ICookieStore
         }
 
         using StringReader textReader = new(text);
-        LoadCookieFile(textReader, discardSessionCookies, now, events);
+        return LoadCookieFile(textReader, discardSessionCookies, now, events);
     }
 
     /// <summary>
@@ -630,12 +650,15 @@ public sealed class CookieStore : ICookieStore
         cookies.RemoveAll(cookie => !cookie.IsSessionCookie && cookie.ExpiresUnixSeconds < nowUnixSeconds);
     }
 
-    /// <summary>curl's domain test in <c>Curl_cookie_getlist</c>; a cookie without a domain goes to every host.</summary>
+    /// <summary>
+    /// curl's domain test in <c>Curl_cookie_getlist</c>; a cookie without a domain goes to every host, and a host that
+    /// is an IP address gets only a cookie whose domain is that address, even one that includes subdomains (upstream test8).
+    /// </summary>
     private static bool DomainMatches(Cookie cookie, string host) =>
         cookie.Domain switch
         {
             null => true,
-            string domain when cookie.IncludesSubdomains => CookieOrigin.IsDomainOrSubdomain(domain, host),
+            string domain when cookie.IncludesSubdomains && !IsIpAddressLiteral(host) => CookieOrigin.IsDomainOrSubdomain(domain, host),
             string domain => string.Equals(domain, host, StringComparison.OrdinalIgnoreCase),
         };
 

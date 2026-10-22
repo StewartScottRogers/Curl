@@ -59,7 +59,7 @@ public sealed partial class TcpConnector
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
+            return MultiplexedConnectResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError);
         }
 
         var connectLimit = ConnectTimeoutOrDefault(connectTimeout);

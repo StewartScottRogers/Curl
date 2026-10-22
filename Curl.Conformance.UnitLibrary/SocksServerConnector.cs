@@ -29,6 +29,16 @@ public sealed class SocksServerConnector(UpstreamTestCase testCase, IConnector b
     /// <summary>The port of upstream's SOCKS server, <c>%SOCKSPORT</c>.</summary>
     public const int SocksPort = 8994;
 
+    /// <summary>The name of upstream's SOCKS5 server on a Unix socket, <c>socks5unix</c>, which this emulation also stands in for.</summary>
+    public const string UnixSocketServer = "socks5unix";
+
+    /// <summary>
+    /// The value of <c>%SOCKSUNIXPATH</c>, the Unix socket upstream's <c>socks5unix</c> server listens on: absolute, as
+    /// <c>runtests.pl</c> makes it, since curl reads <c>localhost%SOCKSUNIXPATH</c> as a host and a path. Nothing
+    /// listens on it: a dial to it reaches this emulation in memory, as a dial to <see cref="SocksPort"/> does.
+    /// </summary>
+    public const string SocksUnixPath = "/log/server/socks5.sock";
+
     private readonly SocksServerConfiguration configuration = SocksServerConfiguration.Read(testCase);
 
     private readonly StringBuilder connectLog = new();
@@ -49,12 +59,16 @@ public sealed class SocksServerConnector(UpstreamTestCase testCase, IConnector b
         }
     }
 
-    /// <summary>Opens an in-memory connection to the SOCKS emulation when <paramref name="target"/>'s port is <see cref="SocksPort"/>, otherwise a connection to the wrapped server.</summary>
+    /// <summary>
+    /// Opens an in-memory connection to the SOCKS emulation when <paramref name="target"/>'s port is <see cref="SocksPort"/>
+    /// or its host is <see cref="SocksUnixPath"/> (a Unix socket dial, <see cref="UpstreamCaseRunner.HttpUnixSocketTarget"/>),
+    /// otherwise a connection to the wrapped server.
+    /// </summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the wrapped server.</param>
     /// <returns>The connection's result.</returns>
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
-        target.Port == SocksPort
+        target.Port == SocksPort || target.Host == SocksUnixPath
             ? ValueTask.FromResult(ConnectResult.Connected(new SocksServerConnection(configuration, backend, LogConnect)
             {
                 RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, SocksPort),

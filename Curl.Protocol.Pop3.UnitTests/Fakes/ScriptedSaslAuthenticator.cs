@@ -21,6 +21,9 @@ public sealed class ScriptedSaslAuthenticator(params (string Mechanism, string[]
     /// <summary>Gets every challenge an exchange was asked to answer, as Latin-1 text.</summary>
     public List<string> Challenges { get; } = [];
 
+    /// <summary>Gets what each exchange reports as <see cref="ISaslExchange.SendsLastAnswerAsEmptyLine" />.</summary>
+    public bool SendsLastAnswerAsEmptyLine { get; init; }
+
     /// <inheritdoc />
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms)
     {
@@ -44,6 +47,8 @@ public sealed class ScriptedSaslAuthenticator(params (string Mechanism, string[]
         private int answersGiven;
 
         public string Mechanism => mechanism;
+
+        public bool SendsLastAnswerAsEmptyLine => owner.SendsLastAnswerAsEmptyLine;
 
         public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) => ValueTask.FromResult<byte[]?>(messages[0]);
 

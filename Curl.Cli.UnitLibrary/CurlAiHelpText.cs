@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// most-used options. A category name in any case gives a <c>#</c> heading for the category and a
 /// <c>##</c> section for each of its options; <c>all</c> gives every category that way, then the exit
 /// codes and the <c>--write-out</c> variables. Each option section is built from the rows of
-/// <see cref="CurlHelpTable"/> (plus Curl's own <c>--ai-help</c>, <c>--log-level</c> and <c>--log-file</c>), <see cref="CurlOptionAliasTable"/>,
+/// <see cref="CurlHelpTable"/> (plus Curl's own <c>--log-level</c> and <c>--log-file</c>), <see cref="CurlOptionAliasTable"/>,
 /// <see cref="CommandLineOptionTable"/> and the option's section of <see cref="CurlManual"/>, so it agrees
 /// with <c>--help</c> and <c>--manual</c>. The Markdown is not wrapped to any width and every line ends in
 /// <c>\n</c> alone, so it is the same bytes on every platform.
@@ -25,12 +25,11 @@ public static class CurlAiHelpText
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) have no QUIC library.";
 
     /// <summary>
-    /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own options, which
-    /// <see cref="CurlHelpTable"/> must not gain so <c>--help</c> stays byte-identical to curl 8.22.0.
+    /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own diagnostic-log
+    /// options. <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
     /// </summary>
     private static readonly CurlHelpEntry[] CurlOnlyEntries =
     [
-        new("    --ai-help [category]", "Markdown help for AI agents; name a category or all for more", CurlHelpCategories.Curl),
         new("    --log-level <level>", "Curl's own diagnostic log, not curl's -v: none (the default), error, warning, info or verbose, to standard error or the --log-file", CurlHelpCategories.Curl),
         new("    --log-file <file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise", CurlHelpCategories.Curl),
     ];

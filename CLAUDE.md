@@ -128,14 +128,32 @@ an ADR that decides a feature stays out.
 ## Dark factory
 `RunDarkFactory.cmd` works the board unattended: each ready task goes to a headless
 `/task-run`, and anything that needs Stewart ends in `Blocked` with an alarm at the end
-of the shift. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
+of the shift. Its code is `RunDarkFactory.ps1` (the help, the parameters and a loader) and
+one file per area under `DarkFactory/` (claims, integration, CI watch, lane pacing and so
+on), which the loader dot-sources in a fixed order (BL-2988); a factory task names the area
+files it changes in `touches`. `-Lanes N` runs N tasks at once, each in its own git worktree beside the
 checkout (`<repo>.lanes\lane-<n>`); the board never gives two lanes tasks whose
 `touches` overlap, and each lane rebases, rebuilds, tests and pushes its own work, one
-lane at a time. `-Lanes Auto` sizes the shift itself, adding or retiring one lane at a
-time to the measured burn rate, the board's parallel capacity and the machine's cap, so
+lane at a time. Under that integrate lock a lane builds the whole solution but runs only the
+fast tests of the test projects its commits can affect (all of them when a shared build
+file or a `.csproj` changes), and it resolves a rebase conflict with the lock released;
+CI still runs every test on Windows, Linux and macOS (BL-2967, ADR-0743). `-Lanes Auto` sizes the shift itself to the measured burn rate, the board's parallel
+capacity and the machine's cap - straight up to its unpaced lanes, then one lane at a
+time above them, and straight down when a limit falls - so
 it suits whichever Claude plan is in use. Running out of tokens is not a stall: the shift announces it with the
 reset time, waits (the wait does not count against `-Hours`), warns a minute before the
 new session and reruns the cut-off task. See the script's header for the details.
+
+Work runs as parallel as it can (Stewart, 2026-10-21: "always function in a highly
+parallel fashion"). `-Lanes Auto` adds its first `-UnpacedLanes` (3) lanes without
+reading the burn rate; a task's `touches` names files or narrow subfolders, never a whole
+project it only adds to; new cases, stand-ins and handlers go in one file each that
+registers itself, not in a central switch or test class; and a file many tasks touch is
+split as its own High task rather than waited on (`task-board.ps1 hotspots`). A
+registration table that tasks only add lines to is kept one entry per line, marked
+`merge=union` in `.gitattributes` and listed in `Tasks/SharedListFiles.txt`, so tasks
+that each add to it do not count as overlapping. An
+interactive session sends independent steps as parallel tool calls or subagents.
 
 When Claude starts a shift it always passes `-NewTab`, e.g.
 `RunDarkFactory.cmd -NewTab -Lanes Auto -Continuous`; `-Continuous` makes a shift that
@@ -145,9 +163,14 @@ out: once 85% of the 5-hour window (`-StopAtUsage`) or 97% of the weekly window
 nothing new, finish what they hold and push; the next shift waits for a fresh 5-hour
 window, or for the weekly reset when the week is used up, with a notice rather than the
 alarm. `-Lanes Auto` paces lanes to the 5-hour window only; `-WeeklyPace` also spreads
-the weekly budget evenly to its reset (ADR-0130, BL-806). The factory picks the Claude
+the weekly budget evenly to its reset (ADR-0130, BL-806). Lane runs load
+`DarkFactory/LaneRules.md` in place of this file, with no user-level settings, plugins or
+MCP servers and a `-MaxRunTurns` turn cap, so a rule a lane needs goes in both files
+(BL-3001). The factory picks the Claude
 model per task - a task's front-matter `model:` wins, else opus for security, crypto,
-feature, protocol, retried and CI-fix work and sonnet for the rest - and `-Model` forces
+feature, protocol, retried and CI-fix work and sonnet for the rest, a routine feature
+task (an upstream unit program port, a harness stand-in and the like, naming no hard
+work) included - and `-Model` forces
 one model for every task (BL-1705). Inside herdr (`HERDR_ENV=1`) that opens the shift
 and each of its lanes as herdr tabs in the current workspace; outside herdr, as console
 windows. Never start one with `Start-Process` or a bare background command: Stewart
@@ -298,8 +321,25 @@ Curl/
   every `Curl.*` project; in `Curl.slnx`, `Curl.Api`, `Curl.Api.UnitLibrary` and
   `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
 
-In `Curl.slnx`, projects are listed as one flat run with no solution folders around
-them. The `Solution Items` and `Scripts` solution folders hold loose files only.
+In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
+under one folder for its group (ADR-0731):
+
+- `/Hosts/`: Api, Curl (the `Curl.Console` projects, which build `curl.exe`), Libcurl,
+  Mcp - the ways Curl is used.
+- `/CommandLine/`: Cli, Config, Output.
+- `/Transfer/`: Cookies, Core, Engine, Networking.
+- `/Wire/`: Http2, Http3, Quic, Zstandard - framing and encoding below the protocols.
+- `/Security/`: Authentication, Cryptography, HttpMessageSignatures, Kerberos, Ntlm, Tls.
+- `/Protocols/<Name>/`: each `Curl.Protocol.<Name>.*`, and `Curl.Protocol.Abstractions.*`
+  in `/Protocols/Abstractions/`.
+- `/Conformance/<Part>/`: each `Curl.Conformance.<Part>.*`, and the harness itself
+  (`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`.
+- `/Shared/`: the shared projects (Audit, Claude, Documentation, Gap, Tasks).
+
+A new area goes in the group it belongs to, in a folder named for the area. Solution
+folders change only the solution file; the
+directories on disk stay flat. The `Solution Items` and `Scripts` solution folders hold
+loose files only.
 
 Each project folder may contain its own `CLAUDE.md` with project-specific rules; follow it when working in that folder.
 

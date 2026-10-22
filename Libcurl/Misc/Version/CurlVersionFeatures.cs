@@ -43,10 +43,10 @@ public enum CurlVersionFeatures
     /// <summary><c>CURL_VERSION_SSPI</c>: built against Windows SSPI (<c>SSPI</c>).</summary>
     Sspi = 1 << 11,
 
-    /// <summary><c>CURL_VERSION_CONV</c>: character conversions (<c>CharConv</c>).</summary>
+    /// <summary><c>CURL_VERSION_CONV</c>: character conversions (deprecated; never set).</summary>
     Conv = 1 << 12,
 
-    /// <summary><c>CURL_VERSION_CURLDEBUG</c>: debug memory tracking (<c>TrackMemory</c>).</summary>
+    /// <summary><c>CURL_VERSION_CURLDEBUG</c>: debug memory tracking (deprecated; set with <c>Debug</c> since 8.19.0).</summary>
     CurlDebug = 1 << 13,
 
     /// <summary><c>CURL_VERSION_TLSAUTH_SRP</c>: TLS-SRP authentication (<c>TLS-SRP</c>).</summary>

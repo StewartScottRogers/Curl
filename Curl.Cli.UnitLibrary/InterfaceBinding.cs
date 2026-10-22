@@ -39,6 +39,7 @@ public sealed class InterfaceBinding
     /// <summary>
     /// <see langword="true"/> when libcurl refuses the value when curl sets it, before any connection: an empty
     /// name after <c>if!</c> or <c>host!</c>, an <c>ifhost!</c> value with no second <c>!</c> or nothing after it,
+    /// an empty value (<c>Curl_parse_interface</c> refuses it, upstream unit1663),
     /// or a name longer than 254 characters with no prefix or after <c>if!</c>. curl 8.21.0 then fails the transfer with exit 43 and
     /// <c>curl: (43) setopt 0x274e got bad argument</c> (measured on Windows, 2026-09-28, BL-599 Notes); the
     /// parser accepts the value, as curl's does. The name parts are left <see langword="null"/>.
@@ -46,7 +47,7 @@ public sealed class InterfaceBinding
     public bool IsMalformed { get; }
 
     /// <summary>Splits a <c>--interface</c> value by its prefix.</summary>
-    /// <param name="value">The value as given; curl refuses an empty one as blank before this is reached.</param>
+    /// <param name="value">The value as given; curl refuses an empty one as blank before this is reached, and one given here is malformed.</param>
     /// <returns>The binding the value names.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is <see langword="null"/>.</exception>
     public static InterfaceBinding Parse(string value)
@@ -68,7 +69,7 @@ public sealed class InterfaceBinding
             return ParseInterfaceAndHost(value);
         }
 
-        return value.Length <= MaximumNameLength ? new(value, value, null, null, false) : Malformed(value);
+        return value.Length is > 0 and <= MaximumNameLength ? new(value, value, null, null, false) : Malformed(value);
     }
 
     /// <summary>Reads <c>if!name</c>: the name must be 1 to 254 characters.</summary>

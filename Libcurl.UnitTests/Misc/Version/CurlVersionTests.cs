@@ -178,8 +178,7 @@ public sealed class CurlVersionTests
     [DataRow("alt-svc", CurlVersionFeatures.AltSvc)]
     [DataRow("AsynchDNS", CurlVersionFeatures.AsynchDns)]
     [DataRow("brotli", CurlVersionFeatures.Brotli)]
-    [DataRow("CharConv", CurlVersionFeatures.Conv)]
-    [DataRow("Debug", CurlVersionFeatures.Debug)]
+    [DataRow("Debug", CurlVersionFeatures.Debug | CurlVersionFeatures.CurlDebug)]
     [DataRow("gsasl", CurlVersionFeatures.Gsasl)]
     [DataRow("GSS-API", CurlVersionFeatures.GssApi)]
     [DataRow("HSTS", CurlVersionFeatures.Hsts)]
@@ -200,7 +199,6 @@ public sealed class CurlVersionTests
     [DataRow("SSPI", CurlVersionFeatures.Sspi)]
     [DataRow("threadsafe", CurlVersionFeatures.ThreadSafe)]
     [DataRow("TLS-SRP", CurlVersionFeatures.TlsAuthSrp)]
-    [DataRow("TrackMemory", CurlVersionFeatures.CurlDebug)]
     [DataRow("Unicode", CurlVersionFeatures.Unicode)]
     [DataRow("UnixSockets", CurlVersionFeatures.UnixSockets)]
     [DataRow("zstd", CurlVersionFeatures.Zstd)]
@@ -213,11 +211,28 @@ public sealed class CurlVersionTests
     [DataRow("ECH")]
     [DataRow("HTTPSRR")]
     [DataRow("SSLS-EXPORT")]
+    [DataRow("CharConv")]
+    [DataRow("TrackMemory")]
     [DataRow("ssl")]
     [DataRow("")]
     public void FeatureBit_FeatureWithoutABitOrUnknownName_AnswersNone(string name)
     {
         Assert.AreEqual(CurlVersionFeatures.None, CurlVersion.FeatureBit(name));
+    }
+
+    // curl 8.22.0's lib/version.c lists these names; CharConv (gone in 7.82.0) and TrackMemory (8.19.0) it does not.
+    [TestMethod]
+    public void FeatureNames_Always_AreVersionCsFeatureNames()
+    {
+        string[] expected =
+        [
+            "alt-svc", "AppleSecTrust", "AsynchDNS", "asyn-rr", "brotli", "Debug", "ECH", "gsasl", "GSS-API", "HSTS",
+            "HTTP2", "HTTP3", "HTTPS-proxy", "HTTPSIG", "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz",
+            "MultiSSL", "NativeCA", "NTLM", "NTLM_WB", "proxy-HTTP3", "PSL", "SPNEGO", "SSL", "SSLS-EXPORT", "SSPI",
+            "threadsafe", "TLS-SRP", "Unicode", "UnixSockets", "zstd",
+        ];
+
+        CollectionAssert.AreEquivalent(expected, CurlVersion.FeatureNames.ToArray());
     }
 
     [TestMethod]

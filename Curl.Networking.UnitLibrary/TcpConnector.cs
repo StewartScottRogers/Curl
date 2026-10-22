@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -205,11 +206,26 @@ public sealed partial class TcpConnector(
     private readonly ConnectToMappings _connectToMappings = connectToMappings ?? ConnectToMappings.None;
     private readonly DnsCache _dnsCache = dnsCache ?? new DnsCache();
 
+    // The host:port keys an IHttpsOriginDnsResolver has answered an HTTPS-RR resolve for: curl 8.22.0
+    // caches that answer as an entry of its own, beside the addresses (ADR-0727's BL-2986 amendment).
+    private readonly ConcurrentDictionary<string, bool> _httpsRecordsResolved = new(StringComparer.Ordinal);
+
     /// <summary>
     /// Gets the DNS cache this connector answers from and adds to: the <c>dnsCache</c> it was
     /// given, or one of its own.
     /// </summary>
     public DnsCache DnsCache => _dnsCache;
+
+    /// <summary>
+    /// Gets a value indicating whether a <c>--resolve</c> entry's addresses are shuffled with
+    /// <see cref="DnsAddressShuffle" /> as <see cref="LoadResolveEntries" /> puts them in the DNS cache, for
+    /// <c>CURLOPT_DNS_SHUFFLE_ADDRESSES</c>, as curl 8.22.0's <c>dnsc_entry_assign_addr</c> shuffles every
+    /// address entry (BL-2977). The <c>Added H:P:A to DNS cache</c> line keeps the entry as written.
+    /// </summary>
+    public bool ShufflesResolveEntryAddresses { get; init; }
+
+    // Gives a random index below its argument for ShufflesResolveEntryAddresses; tests pin it.
+    internal Func<int, int> ResolveEntryShuffleRandomBelow { get; init; } = DnsAddressShuffle.CryptographicRandomBelow;
 
     /// <summary>
     /// Gets a value indicating whether a direct connect writes the <c>[DNS]</c> lines curl 8.21.0
@@ -575,7 +591,7 @@ public sealed partial class TcpConnector(
             : DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return ConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError);
+            return ConnectResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError);
         }
 
         var result = await ConnectWithinTimeoutAsync(target, destination, started, connectLimit, cancellationToken).ConfigureAwait(false);
@@ -649,7 +665,7 @@ public sealed partial class TcpConnector(
         var destination = DestinationOf(target);
         if ((_resolveOverrides.ParseError ?? destination.ParseError) is { } parseError)
         {
-            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(CurlExitCode.SetoptOptionSyntax, parseError)));
+            return ValueTask.FromResult<(QuicDialRequest?, MultiplexedConnectResult?)>((null, MultiplexedConnectResult.Failed(_resolveOverrides.ParseFailureCodeWith(destination), parseError)));
         }
 
         if (OnionAddress.IsRefused(destination.Host))
@@ -1040,7 +1056,10 @@ public sealed partial class TcpConnector(
             events.ReportInfo($"RESOLVE {entry.Host}:{entry.Port} - old addresses discarded");
         }
 
-        _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, entry.Addresses));
+        IReadOnlyList<IPAddress> addresses = ShufflesResolveEntryAddresses
+            ? DnsAddressShuffle.Shuffle(entry.Addresses, ResolveEntryShuffleRandomBelow)
+            : entry.Addresses;
+        _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, addresses));
         events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
         if (entry.Host == AnyHost)
         {
@@ -1133,12 +1152,13 @@ public sealed partial class TcpConnector(
         var cacheKey = DnsCacheKey(host, port);
         if ((_dnsCache.Find(cacheKey) ?? _dnsCache.Find(DnsCacheKey(AnyHost, port))) is { } cached)
         {
+            ReportCachedHttpsRecord(host, port, cacheKey, target);
             var fromCache = AnswerFromCache(host, cached, target.Events);
             LogResolution(log, host, port, fromCache, fromCache: true, resolveStarted);
             return (new DnsResolution(fromCache, DnsLookupFailure.None), true);
         }
 
-        var (addresses, failure) = await LookUpAsync(host, target.Events, cancellationToken).ConfigureAwait(false);
+        var (addresses, failure) = await LookUpAsync(host, port, target, cancellationToken).ConfigureAwait(false);
         var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
         CacheLookUp(new DnsCacheEntry(host, port, answered), cacheKey, failure, target.Events);
         var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
@@ -1191,17 +1211,55 @@ public sealed partial class TcpConnector(
         }
     }
 
-    /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>
     /// <summary>
     /// Asks the resolver, with its failure reason when it gives one, with <see cref="ResolverEvents" />
-    /// pointed at <paramref name="events" /> for the look-up.
+    /// pointed at the target's events for the look-up. A direct connect's <c>https://</c> origin is
+    /// asked of an <see cref="IHttpsOriginDnsResolver" /> with its port, so the DoH resolver sends the
+    /// HTTPS query first, as curl 8.22.0's HTTPSRR build does (ADR-0727, BL-2920), and reports its
+    /// <c>HTTPS-RR</c> line before the addresses' <c>Host ... was resolved.</c> (BL-2980).
     /// </summary>
-    private async ValueTask<DnsResolution> LookUpAsync(string host, ITransferEvents events, CancellationToken cancellationToken)
+    private async ValueTask<DnsResolution> LookUpAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken)
     {
-        ResolverEvents?.Current = events;
+        ResolverEvents?.Current = target.Events;
+        if (HttpsOriginResolverFor(target) is { } httpsOriginResolver)
+        {
+            var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
+            _httpsRecordsResolved[DnsCacheKey(host, port)] = true;
+            ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
+            return new DnsResolution(addresses, DnsLookupFailure.None);
+        }
+
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason
             ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
+    }
+
+    // The resolver that asks a direct connect's https:// origin for its HTTPS record, or null.
+    private IHttpsOriginDnsResolver? HttpsOriginResolverFor(ConnectTarget target) =>
+        dnsResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target)
+            ? httpsOriginResolver
+            : null;
+
+    // curl 8.22.0's HTTPS resolve filter sits above the address one (cf-dns.c), so its report comes
+    // first; like the address report it names no IP address literal (ADR-0727's BL-2980 amendment).
+    private static void ReportHttpsRecord(string host, int port, ServiceBindingRecord? record, ITransferEvents events)
+    {
+        if (!IPAddress.TryParse(host.Trim('[', ']'), out _))
+        {
+            events.ReportInfo(HttpsRecordReportLine.Format(host, port, record));
+        }
+    }
+
+    // A connect whose addresses the DNS cache answers finds its HTTPS-RR answer cached too, when an
+    // earlier resolve asked it: curl 8.22.0's HTTPS resolve filter, above the address one, writes its
+    // own `found in DNS cache` line and then its report (ADR-0727's BL-2986 amendment).
+    private void ReportCachedHttpsRecord(string host, int port, string cacheKey, ConnectTarget target)
+    {
+        if (HttpsOriginResolverFor(target) is { } httpsOriginResolver && _httpsRecordsResolved.ContainsKey(cacheKey))
+        {
+            target.Events.ReportInfo($"Hostname {host} was found in DNS cache");
+            ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
+        }
     }
 
     private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)
@@ -1274,11 +1332,15 @@ public sealed partial class TcpConnector(
         CancellationToken cancellationToken)
     {
         var (firstHop, headOutput, started) = route;
-        var (addresses, failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
-        if (addresses.Count == 0)
+        IReadOnlyList<IPAddress> addresses = [];
+        if (firstHop.UnixSocketPath is null)
         {
-            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", firstHop.Host, firstHop.Port, failure);
-            return ConnectResult.Failed(exitCode, message);
+            (addresses, var failure) = await ResolveWithFailureReasonAsync(firstHop.Host, firstHop.Port, target, cancellationToken).ConfigureAwait(false);
+            if (addresses.Count == 0)
+            {
+                var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveProxy, "proxy", firstHop.Host, firstHop.Port, failure);
+                return ConnectResult.Failed(exitCode, message);
+            }
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -1348,7 +1410,9 @@ public sealed partial class TcpConnector(
     {
         var (target, destination, proxy, started, nameResolved, _, _) = tunnel;
         var firstHop = FirstHopTo(proxy);
-        var (dialed, lastDialError, lastBindFailure) = await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
+        var (dialed, lastDialError, lastBindFailure) = firstHop.UnixSocketPath is { } socketPath
+            ? await DialProxyUnixSocketAsync(socketPath, firstHop.Host, target, cancellationToken).ConfigureAwait(false)
+            : await DialFirstReachableAsync(addresses, firstHop.Port, firstHop.Host, target, cancellationToken).ConfigureAwait(false);
         if (dialed is null)
         {
             return (ProxyDialFailure(tunnel, firstHop, lastDialError, lastBindFailure), null);
@@ -1641,13 +1705,21 @@ public sealed partial class TcpConnector(
 
         // curl 8.21.0 names the destination as given, not the address SOCKS4 or SOCKS5 sent for it,
         // and the proxy by the address it dialled (measured for every kind and --preproxy, BL-1038).
-        // A SOCKS hop is always dialled over TCP, so both end points are known.
-        var local = dialed.LocalEndPoint!;
-        var via = dialed.RemoteEndPoint!;
-        target.Events.ReportInfo(
-            $"Opened SOCKS connection from {local.Address} port {local.Port} to {destination.Host} port {destination.Port} (via {via.Address} port {via.Port})");
+        target.Events.ReportInfo(SocksOpenedLine(dialed, destination));
         log.TunnelEstablished(socks, destination.Host, destination.Port, statusCode: 0);
         return null;
+    }
+
+    /// <summary>
+    /// curl's <c>Opened SOCKS connection from ... (via ...)</c> line. A hop dialled over TCP names
+    /// both end points; one over a Unix domain socket (BL-2955) has none, so it names no local
+    /// address on port 0 and the socket's path on port 0, as curl's <c>ipquad</c> reads a Unix socket.
+    /// </summary>
+    private static string SocksOpenedLine(DialedSocket dialed, ConnectDestination destination)
+    {
+        var (localAddress, localPort) = dialed.LocalEndPoint is { } local ? (local.Address.ToString(), local.Port) : (string.Empty, 0);
+        var (viaAddress, viaPort) = dialed.RemoteEndPoint is { } via ? (via.Address.ToString(), via.Port) : (dialed.UnixSocketRemoteIp, 0);
+        return $"Opened SOCKS connection from {localAddress} port {localPort} to {destination.Host} port {destination.Port} (via {viaAddress} port {viaPort})";
     }
 
     /// <summary>
@@ -2321,6 +2393,32 @@ public sealed partial class TcpConnector(
         return dialed is null
             ? (null, lastError, lastBindFailure)
             : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true, TracesTcpFilter = trace?.TracesTcp == true }, SocketError.Success, null);
+    }
+
+    /// <summary>
+    /// Dials the Unix domain socket a SOCKS proxy at <c>localhost</c> names in its path
+    /// (<see cref="ProxyEndpoint.UnixSocketPath" />, BL-2955) in place of resolving and dialling its
+    /// host and port, writing <c>Trying &lt;name&gt;:0...</c> as a <c>--unix-socket</c> dial does; a
+    /// refused dial gives its <see cref="SocketError" />, which the caller turns into exit 7.
+    /// </summary>
+    private async ValueTask<(DialedSocket? Dialed, SocketError LastError, LocalBindFailure? LastBindFailure)> DialProxyUnixSocketAsync(
+        string socketPath,
+        string hostName,
+        ConnectTarget target,
+        CancellationToken cancellationToken)
+    {
+        var unixSocket = new UnixSocketAddress(socketPath, IsAbstract: false);
+        var name = unixSocket.RemoteIpText;
+        target.Events.ReportInfo($"  Trying {name}:0...");
+        try
+        {
+            var connection = await tcpDialer.DialUnixSocketAsync(unixSocket, cancellationToken).ConfigureAwait(false);
+            return (new DialedSocket(connection, null, hostName, null, name), SocketError.Success, null);
+        }
+        catch (SocketException exception)
+        {
+            return (null, exception.SocketErrorCode, null);
+        }
     }
 
     /// <summary>

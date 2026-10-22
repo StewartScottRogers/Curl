@@ -18,7 +18,7 @@ public sealed partial class SwsHttpServerConnectorTests
         for (int index = 0; index < Get.Length - 1; index++)
         {
             await WriteAsync(connection, Get[index..(index + 1)]);
-            Assert.AreEqual(string.Empty, await ReadAllAsync(connection), $"reply after {index + 1} bytes");
+            Assert.IsTrue(await ReadWaitsAsync(connection), $"the read waits after {index + 1} bytes");
         }
 
         await WriteAsync(connection, Get[^1..]);
@@ -35,10 +35,10 @@ public sealed partial class SwsHttpServerConnectorTests
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
         IConnection connection = await ConnectAsync(server);
 
-        string reply = await ExchangeAsync(connection, CutShort);
+        bool readWaits = await WriteThenReadWaitsAsync(connection, CutShort);
         await connection.DisposeAsync();
 
-        Assert.AreEqual(string.Empty, Observe("reply", string.Empty, reply));
+        Assert.IsTrue(readWaits, "the read waits for the rest of the request");
         Assert.AreEqual(CutShort, Observe("recorded", CutShort, Text(server.ReceivedBytes)));
     }
 
@@ -57,7 +57,7 @@ public sealed partial class SwsHttpServerConnectorTests
             await connection.WriteAsync(chunk, CancellationToken.None);
         }
 
-        Assert.AreEqual(string.Empty, Observe("reply", string.Empty, await ReadAllAsync(connection)));
+        Assert.IsTrue(await ReadWaitsAsync(connection), "the read waits for the header line to end");
         Assert.AreEqual("GET /1234 HTTP/1.1\r\nX: ".Length + Length, ObserveValue("recorded length", "GET /1234 HTTP/1.1\r\nX: ".Length + Length, server.ReceivedBytes.Length));
     }
 
@@ -88,9 +88,7 @@ public sealed partial class SwsHttpServerConnectorTests
         SwsHttpServerConnector server = new(Case(Reply("data", "first\n")));
         IConnection connection = await ConnectAsync(server);
 
-        string reply = await ExchangeAsync(connection, request);
-
-        Diagnostics.Act("reply", reply);
+        Diagnostics.Act("read waits for more", await WriteThenReadWaitsAsync(connection, request));
         Assert.AreEqual(request, Observe("recorded", request, Text(server.ReceivedBytes)));
     }
 

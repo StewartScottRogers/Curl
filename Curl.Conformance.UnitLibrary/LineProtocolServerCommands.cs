@@ -195,9 +195,10 @@ internal sealed class LineProtocolServerCommands
 
     /// <summary>
     /// Reads reply text as ftpserver.pl's <c>eval "qq{...}"</c> does: <c>\r</c>, <c>\n</c> and
-    /// <c>\t</c> are control characters and a backslash before any other character stands for that
-    /// character, so <c>\r\n</c> splits a reply into lines and <c>\@</c> is <c>@</c>; a lone
-    /// backslash at the end stays.
+    /// <c>\t</c> are control characters, <c>\x</c> and up to two hex digits is the character with
+    /// that code (<c>\x00</c> a NUL byte, test2108), and a backslash before any other character
+    /// stands for that character, so <c>\r\n</c> splits a reply into lines and <c>\@</c> is
+    /// <c>@</c>; a lone backslash at the end stays.
     /// </summary>
     private static string PerlDoubleQuoted(string text)
     {
@@ -208,13 +209,29 @@ internal sealed class LineProtocolServerCommands
             if (character == '\\' && index + 1 < text.Length)
             {
                 index++;
-                character = PerlEscaped(text[index]);
+                character = text[index] == 'x' ? PerlHexEscaped(text, ref index) : PerlEscaped(text[index]);
             }
 
             value.Append(character);
         }
 
         return value.ToString();
+    }
+
+    /// <summary>
+    /// The character Perl's <c>\x</c> at <paramref name="index"/> stands for: the code of the up to
+    /// two hex digits after it (none is code 0), leaving <paramref name="index"/> on the last one read.
+    /// </summary>
+    private static char PerlHexEscaped(string text, ref int index)
+    {
+        int code = 0;
+        for (int digits = 0; digits < 2 && index + 1 < text.Length && char.IsAsciiHexDigit(text[index + 1]); digits++)
+        {
+            index++;
+            code = (code * 16) + Convert.ToInt32(text[index].ToString(), 16);
+        }
+
+        return (char)code;
     }
 
     /// <summary>The character a backslash before <paramref name="escaped"/> stands for in a Perl double-quoted string.</summary>

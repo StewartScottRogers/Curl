@@ -25,7 +25,7 @@ description: Rules and tooling for Curl's task board — the Tasks shared projec
 | `depends-on` | `[BL-###, …]` | Tasks that must be in `Done` or its archive before this one can start. |
 | `touches` | `[path, …]` | Every project folder, folder or file the task will change, e.g. `[Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]`. Two tasks whose `touches` overlap never run at the same time. Empty or `*` means it may change anything, so it runs alone. |
 | `lane` | `yes`, `no` (optional; absent means `yes`) | `no` means interactive only (as does any audit path in `touches`): `next` never offers the task and `capacity` never counts it, so no dark factory lane claims it. An interactive session still runs it by naming it, `/task-run BL-###`, and `move -To Doing` accepts it. Written by `new -NoLane`, on the line after `touches`. |
-| `model` | `haiku`, `sonnet`, `opus` (optional; absent means the factory's rule chooses) | The Claude model a dark factory run of the task uses; read by `RunDarkFactory.ps1`, not by this script. It wins over the factory's rule (opus for security and crypto libraries, `feature` and `protocol` pipelines, retried tasks and High CI-fix tasks, sonnet for the rest; the rule never picks haiku), and only `-Model` other than `auto` overrides it. Any other value is ignored with a trace warning. Added by hand, on the line after `touches` (BL-1705). |
+| `model` | `haiku`, `sonnet`, `opus` (optional; absent means the factory's rule chooses) | The Claude model a dark factory run of the task uses; read by the dark factory (`DarkFactory/ModelChoice.ps1`), not by this script. It wins over the factory's rule (opus for security and crypto libraries, `feature` and `protocol` pipelines, retried tasks and High CI-fix tasks, sonnet for the rest; the rule never picks haiku), and only `-Model` other than `auto` overrides it. Any other value is ignored with a trace warning. Added by hand, on the line after `touches` (BL-1705). |
 | `requirement` | requirement ID or `none` | From `Documentation/Product/Requirements.md`. |
 | `created` | `yyyy-MM-dd` | Set by the script. |
 | `completed` | `yyyy-MM-dd` | Set by the script when the task moves to `Done`. |
@@ -54,7 +54,7 @@ appends to it, so hand-written entries go there too, never above it.
   "Works correctly" is not a criterion.
 - **Dependencies are explicit** and never circular.
 - **`touches` is exact and small.** It is what lets dark factory lanes run tasks in
-  parallel. Name the project folders the task changes, not the whole solution; list a
+  parallel. Name files or narrow subfolders, never a whole project folder when the task only adds files in one area, and give sibling tasks in a new project disjoint subfolders (Stewart, 2026-10-21: always run highly parallel); design new code so each case or handler is its own self-registering file, not a branch in a shared file; list a
   shared file (`Curl.slnx`, `Directory.Build.props`, `Documentation/Product/Requirements.md`)
   by path when the task edits it. A task that changes a shared contract
   (`Curl.Protocol.Abstractions.UnitLibrary`) touches it and so runs apart from every

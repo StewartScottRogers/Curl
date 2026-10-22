@@ -13,15 +13,28 @@ namespace Curl.Conformance;
 /// </summary>
 /// <remarks>
 /// Like stunnel as upstream's <c>servers.pm</c> starts it, the server offers no ALPN protocol,
-/// so curl speaks HTTP/1.1, the only version sws reads, and asks for no client certificate.
+/// so curl speaks HTTP/1.1, the only version sws reads, and asks for no client certificate,
+/// unless it is given a <see cref="TlsClientCertificateVerifier"/>: then, as upstream's
+/// <c>https-mtls</c> stunnel on <see cref="HttpsMtlsPort"/>, it demands one and the handshake
+/// fails without one the verifier's authority signed (BL-2859).
 /// </remarks>
 /// <param name="sws">The sws emulation behind the TLS layer.</param>
 /// <param name="certificate">The server certificate, with its private key; see <see cref="LoadCertificate"/>.</param>
-/// <param name="backend">The server every connection not to <see cref="HttpsPort"/> reaches.</param>
-public sealed class HttpsServerConnector(SwsHttpServerConnector sws, X509Certificate2 certificate, IConnector backend) : IConnector
+/// <param name="backend">The server every connection not to <paramref name="port"/> reaches.</param>
+/// <param name="port">The port this server answers: <see cref="HttpsPort"/>, or <see cref="HttpsMtlsPort"/> for the mTLS server.</param>
+/// <param name="clientCertificateVerifier">Demands, verifies and records the client certificate; <see langword="null"/> asks for none.</param>
+public sealed class HttpsServerConnector(
+    SwsHttpServerConnector sws,
+    X509Certificate2 certificate,
+    IConnector backend,
+    int port = HttpsServerConnector.HttpsPort,
+    TlsClientCertificateVerifier? clientCertificateVerifier = null) : IConnector
 {
     /// <summary>The port of the HTTPS server, <c>%HTTPSPORT</c>.</summary>
-    public const int HttpsPort = 8989;
+    public const int HttpsPort = 18989;
+
+    /// <summary>The port of the HTTPS server that demands a client certificate, <c>%HTTPS-MTLSPORT</c>; servers.pm picks a free port, and no other stand-in uses this one.</summary>
+    public const int HttpsMtlsPort = 9021;
 
     /// <summary>
     /// The certificate file upstream's stunnel presents when a case's <c>&lt;server&gt;</c> line
@@ -29,7 +42,10 @@ public sealed class HttpsServerConnector(SwsHttpServerConnector sws, X509Certifi
     /// </summary>
     public const string DefaultCertificateFile = "test-localhost.pem";
 
-    private readonly TlsServerOptions options = new(certificate, [], false);
+    private readonly TlsServerOptions options = new(certificate, [], clientCertificateVerifier is not null)
+    {
+        ClientCertificateVerifier = clientCertificateVerifier,
+    };
 
     /// <summary>
     /// Loads a server certificate and its key from a PEM file such as the
@@ -46,14 +62,14 @@ public sealed class HttpsServerConnector(SwsHttpServerConnector sws, X509Certifi
         return X509CertificateLoader.LoadPkcs12(ephemeral.Export(X509ContentType.Pkcs12), password: null);
     }
 
-    /// <summary>Opens a TLS connection to the sws emulation on <see cref="HttpsPort"/>; any other on the wrapped connector.</summary>
+    /// <summary>Opens a TLS connection to the sws emulation on this server's port; any other on the wrapped connector.</summary>
     /// <param name="target">The host and port to connect to.</param>
     /// <param name="cancellationToken">Passed to the server connected to.</param>
     /// <returns>The connected result.</returns>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(target);
-        if (target.Port != HttpsPort)
+        if (target.Port != port)
         {
             return await backend.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         }

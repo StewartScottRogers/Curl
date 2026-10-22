@@ -287,6 +287,7 @@ namespace Curl.Console;
 /// </para>
 /// </remarks>
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
+/// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>
 /// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -320,7 +321,8 @@ internal sealed class CurlCommandRunner(
     TransferPerformer? transferPerformer = null,
     bool parsesAsQuicBuild = false,
     ICurlEngine? curlEngine = null,
-    Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null)
+    Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null,
+    DebugWriteOutStandIn? debugWriteOut = null)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -462,7 +464,10 @@ internal sealed class CurlCommandRunner(
         writeOutFileOpener ?? new RefusingWriteOutFileOpener(),
         writesLineFeedAsCrLf: false,
         writeOutTimeDialect,
-        timeProvider ?? TimeProvider.System);
+        DebugWriteOutStandIn.OrNone(debugWriteOut).ClockOr(timeProvider ?? TimeProvider.System));
+
+    /// <summary>What <c>-w</c> prints in place of the measured values under curl's debug-build test variables (ADR-0732, BL-2909).</summary>
+    private readonly DebugWriteOutStandIn debugWriteOut = DebugWriteOutStandIn.OrNone(debugWriteOut);
 
     /// <summary>
     /// The result of a transfer whose write to standard output failed. It is compared by
@@ -2243,7 +2248,11 @@ internal sealed class CurlCommandRunner(
 
         dispatch.LoadResolveEntries(eventsBeforeConnecting);
         TraceTransferStart(options, eventsBeforeConnecting);
-        await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false);
+        if (await transferPerformer.LoadCookieFilesAsync(dispatch.Cookies, EasyOptionsFromCommandLine.TransferSettingsOf(options), transferUrl, fileSystem, standardInput, eventsBeforeConnecting).ConfigureAwait(false) is { } cookieFileFailure)
+        {
+            return (cookieFileFailure, givenUrl, transferUrl);
+        }
+
         EasyHttpOptions http = EasyOptionsFromCommandLine.HttpOf(options);
         await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
         transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
@@ -2778,10 +2787,11 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = Running.EasyWriteOutInfo is { } easyInfo && easyInfo.Describes(result)
             ? easyInfo.Info
             : ReportWriteOutInfo(options, transfer, transferUrl, result, connectionId);
-        return new(info, result, givenUrl, transfer.UrlNumber)
+        return new(debugWriteOut.Apply(info), result, givenUrl, transfer.UrlNumber)
         {
             OutputFileName = Running.OutputFileName,
             RetryCount = Running.RetryCount,
+            LibraryVersion = debugWriteOut.LibraryVersionOr(TransferWriteOutVariables.FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())),
         };
     }
 
@@ -3590,16 +3600,17 @@ internal sealed class CurlCommandRunner(
         {
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
+            TerminalBinaryOutputRefusingStream? terminalGuard = TerminalBinaryOutputGuardOf(options);
             TransferAttemptPieces attempt = new(
                 url,
                 transferOptions,
                 () => new EngineToolTransferOutputs(
-                    RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, Running.GatedStandardOutput)) : Stream.Null),
+                    RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, GuardedStandardOutput(terminalGuard))) : Stream.Null),
                     headerOutput,
                     BodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null),
-                _ => AttemptInputsOf(range, options.ResumeFrom, formBody, upload, proxy));
+                _ => AttemptInputsOf(options, range, options.ResumeFrom, formBody, upload, proxy));
             TransferResult result = toStandardOutput
-                ? await TransferToStandardOutputAsync(follower, options, attempt).ConfigureAwait(false)
+                ? await TransferToStandardOutputAsync(follower, options, attempt, terminalGuard).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null).ConfigureAwait(false);
 
             return await WriteProgressAndAbandonedRetryWarningAsync(options, result, options.ResumeFrom, toStandardOutput)
@@ -4419,7 +4430,7 @@ internal sealed class CurlCommandRunner(
                         url,
                         transferOptions,
                         () => new EngineToolTransferOutputs(RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)), headerOutput, watchHeaderOutput),
-                        attemptResumeFrom => AttemptInputsOf(range, attemptResumeFrom, formBody, upload, proxy)),
+                        attemptResumeFrom => AttemptInputsOf(options, range, attemptResumeFrom, formBody, upload, proxy)),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
@@ -4479,7 +4490,13 @@ internal sealed class CurlCommandRunner(
     /// <param name="follower">Performs the transfer with the handler for its scheme, following redirects under <c>-L</c>.</param>
     /// <param name="options">The accepted command line, whose redirect options the follower applies.</param>
     /// <param name="attempt">What each attempt, whose output is standard output, is built from.</param>
+    /// <param name="terminalGuard">
+    /// The guard the body is written through when standard output is a terminal and <c>--output -</c> was not
+    /// given (<see cref="TerminalBinaryOutputGuardOf" />), or <see langword="null" />.
+    /// </param>
     /// <returns>
+    /// <see cref="TerminalBinaryOutputRefusal" />, after <see cref="TerminalBinaryOutputRefusingStream.RefusalWarning" />
+    /// unless <c>-s</c>, when <paramref name="terminalGuard" /> refused binary bytes;
     /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
     /// output failed, which is curl's failed flush at the end of the transfer; otherwise the
     /// handler's result, including its own write failure when curl's stdio buffer would have
@@ -4488,33 +4505,82 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> TransferToStandardOutputAsync(
         RedirectFollower follower,
         CommandLineOptions options,
-        TransferAttemptPieces attempt)
+        TransferAttemptPieces attempt,
+        TerminalBinaryOutputRefusingStream? terminalGuard)
     {
         RunningTransferState state = Running;
         state.StandardOutput.ClearWriteFailure();
         TransferResult result = await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null)
             .ConfigureAwait(false);
         await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
+        if (terminalGuard is { HasRefused: true })
+        {
+            await WriteWarningUnlessSilentAsync(options, TerminalBinaryOutputRefusingStream.RefusalWarning).ConfigureAwait(false);
+            return TerminalBinaryOutputRefusal;
+        }
 
         return result.IsSuccess && state.StandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
     }
 
     /// <summary>
+    /// The result of a transfer whose binary body <see cref="TerminalBinaryOutputRefusingStream" /> refused:
+    /// exit 23 with no error text, as curl 8.22.0's <c>tool_write_cb</c> marks the write error synthetic once it
+    /// has warned, so no <c>curl: (23)</c> line follows.
+    /// </summary>
+    private static readonly TransferResult TerminalBinaryOutputRefusal = new(CurlExitCode.WriteError, 0);
+
+    /// <summary>
+    /// The guard a body written to standard output goes through, as curl 8.22.0's <c>tool_write_cb</c> checks it:
+    /// only when standard output is a terminal and the option group did not give <c>--output -</c>.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns>A guard over the running transfer's standard output, or <see langword="null" /> for none.</returns>
+    private TerminalBinaryOutputRefusingStream? TerminalBinaryOutputGuardOf(CommandLineOptions options) =>
+        standardOutputIsTerminal && !options.UrlOutputs.Any(output => output.FileName == UrlTransfer.StandardOutputFileName)
+            ? new TerminalBinaryOutputRefusingStream(Running.GatedStandardOutput)
+            : null;
+
+    /// <summary>The stream a body to standard output is written through: <paramref name="terminalGuard" />, or the running transfer's standard output when there is none.</summary>
+    /// <param name="terminalGuard">The guard <see cref="TerminalBinaryOutputGuardOf" /> gave, or <see langword="null" />.</param>
+    /// <returns>The stream.</returns>
+    private Stream GuardedStandardOutput(TerminalBinaryOutputRefusingStream? terminalGuard) =>
+        terminalGuard ?? Running.GatedStandardOutput;
+
+    /// <summary>
     /// The pieces of one attempt the runner chose before connecting: the proxy and the running transfer's looked-up
     /// credentials, SSH options, <c>If-None-Match</c> lines and alt-svc cache, beside the range, offset, form body
-    /// and upload given.
+    /// and upload given, each read at the <c>--limit-rate</c> (<see cref="SendRateLimited(CommandLineOptions, Stream?)" />).
     /// </summary>
+    /// <param name="options">The accepted command line.</param>
     /// <param name="range">The parsed <c>-r</c> range, or <see langword="null" />.</param>
     /// <param name="resumeFrom">The <c>-C</c> offset the attempt resumes from, or <see langword="null" />.</param>
     /// <param name="formBody">The <c>-F</c> body, or <see langword="null" />.</param>
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" />.</param>
     /// <param name="proxy">The proxy chosen, or <see langword="null" /> to connect directly.</param>
     /// <returns>The pieces.</returns>
-    private EngineToolTransferInputs AttemptInputsOf(ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
+    private EngineToolTransferInputs AttemptInputsOf(CommandLineOptions options, ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
     {
         RunningTransferState state = Running;
-        return new(proxy, state.LookedUpCredentials, state.Ssh, state.IfNoneMatchHeaders, range, resumeFrom, formBody, upload, state.AltSvc);
+        HttpRequestBody? sentFormBody = formBody is StreamBody streamBody
+            ? streamBody with { Content = SendRateLimited(options, streamBody.Content) }
+            : formBody;
+        return new(proxy, state.LookedUpCredentials, state.Ssh, state.IfNoneMatchHeaders, range, resumeFrom, sentFormBody, SendRateLimited(options, upload), state.AltSvc);
     }
+
+    /// <summary>
+    /// Holds the reads of <paramref name="upload" /> at the <c>--limit-rate</c> with a
+    /// <see cref="RateLimitedUploadStream" /> on the runner's clock, as curl 8.22.0 sends a request body
+    /// no faster than it (<c>CURLOPT_MAX_SEND_SPEED_LARGE</c>, AF-0300, ADR-0745); a rate of zero, like
+    /// no rate, sets no limit.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="upload">The <c>-T</c> or <c>-F</c> source, or <see langword="null" /> for none.</param>
+    /// <returns>The limited stream, or <paramref name="upload" /> when there is no limit or no upload.</returns>
+    [return: NotNullIfNotNull(nameof(upload))]
+    private Stream? SendRateLimited(CommandLineOptions options, Stream? upload) =>
+        upload is not null && options.LimitRate is > 0 and long bytesPerSecond
+            ? new RateLimitedUploadStream(upload, bytesPerSecond, timeProvider)
+            : upload;
 
     /// <summary>
     /// Performs one transfer through <paramref name="follower" />, run again by

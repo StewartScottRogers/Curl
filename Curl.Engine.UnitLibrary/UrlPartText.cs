@@ -141,29 +141,81 @@ internal static class UrlPartText
     /// <param name="text">The text.</param>
     /// <param name="query">Whether the text is a query, where a space is <c>+</c> from the start.</param>
     /// <returns>The encoded text.</returns>
-    public static string Encode(string text, bool query)
+    public static string Encode(string text, bool query) =>
+        UrlEncodeString(text, relative: true, query ? UrlEncodeQuery.Yes : UrlEncodeQuery.NotYet);
+
+    /// <summary>
+    /// Encodes as curl 8.22.0's <c>urlencode_str</c> does: unless <paramref name="relative" />, the
+    /// text up to the first <c>/</c> or <c>?</c> after its <c>//</c> as it is; then a byte below 0x20 or
+    /// from 0x7f up as <c>%XX</c>, a <c>%XX</c> escape with a lower-case digit upper cased, and a space
+    /// as <c>%20</c>, or as <c>+</c> where <paramref name="query" /> says.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <param name="relative">Whether the text is a part or a relative reference, with no scheme and host to keep.</param>
+    /// <param name="query">Where a space is <c>+</c>.</param>
+    /// <returns>The encoded text.</returns>
+    public static string UrlEncodeString(string text, bool relative, UrlEncodeQuery query)
     {
-        StringBuilder encoded = new();
-        bool beforeQuery = !query;
-        foreach (byte value in UrlByteText.ToBytes(text))
+        byte[] bytes = UrlByteText.ToBytes(text);
+        int start = relative ? 0 : HostEnd(bytes);
+        StringBuilder encoded = new(UrlByteText.ToText(bytes.AsSpan(0, start)));
+        for (int index = start; index < bytes.Length; index++)
         {
-            if (value == Space)
-            {
-                encoded.Append(beforeQuery ? "%20" : "+");
-            }
-            else if (value < Space || value >= Delete)
-            {
-                AppendHex(encoded, value);
-            }
-            else
-            {
-                encoded.Append((char)value);
-                beforeQuery &= value != '?';
-            }
+            index += AppendEncodedByte(encoded, bytes, index, ref query);
         }
 
         return encoded.ToString();
     }
+
+    /// <summary>Appends the byte at <paramref name="index" /> as <c>urlencode_str</c> writes it.</summary>
+    /// <returns>How many bytes after it were written too: 2 for an upper-cased escape, else 0.</returns>
+    private static int AppendEncodedByte(StringBuilder encoded, byte[] bytes, int index, ref UrlEncodeQuery query)
+    {
+        byte value = bytes[index];
+        if (value == Space)
+        {
+            encoded.Append(SpaceText(query));
+            return 0;
+        }
+
+        if (value < Space || value >= Delete)
+        {
+            AppendHex(encoded, value);
+            return 0;
+        }
+
+        if (IsLowerCaseEscape(bytes, index))
+        {
+            AppendHex(encoded, (byte)System.Convert.ToInt32(Encoding.ASCII.GetString(bytes, index + 1, 2), 16));
+            return 2;
+        }
+
+        encoded.Append((char)value);
+        query = QueryAfter(value, query);
+        return 0;
+    }
+
+    /// <summary>Upstream's <c>find_host_sep</c>: the index of the first <c>/</c> or <c>?</c> after the <c>//</c>, else the end.</summary>
+    private static int HostEnd(byte[] bytes)
+    {
+        int slashes = bytes.AsSpan().IndexOf("//"u8);
+        int host = slashes < 0 ? 0 : slashes + 2;
+        int end = bytes.AsSpan(host).IndexOfAny((byte)'/', (byte)'?');
+        return end < 0 ? bytes.Length : host + end;
+    }
+
+    private static string SpaceText(UrlEncodeQuery query) => query == UrlEncodeQuery.Yes ? "+" : "%20";
+
+    /// <summary>The query state after <paramref name="value" />: a <c>?</c> turns <see cref="UrlEncodeQuery.NotYet" /> into <see cref="UrlEncodeQuery.Yes" />.</summary>
+    private static UrlEncodeQuery QueryAfter(byte value, UrlEncodeQuery query) =>
+        value == '?' && query == UrlEncodeQuery.NotYet ? UrlEncodeQuery.Yes : query;
+
+    private static bool IsLowerCaseEscape(byte[] bytes, int index) =>
+        bytes[index] == '%'
+        && index + 2 < bytes.Length
+        && char.IsAsciiHexDigit((char)bytes[index + 1])
+        && char.IsAsciiHexDigit((char)bytes[index + 2])
+        && (char.IsAsciiLetterLower((char)bytes[index + 1]) || char.IsAsciiLetterLower((char)bytes[index + 2]));
 
     private static void AppendHex(StringBuilder text, byte value) =>
         text.Append('%').Append(HexDigits[value >> 4]).Append(HexDigits[value & 0xf]);

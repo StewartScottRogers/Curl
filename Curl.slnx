@@ -31,6 +31,37 @@
     <File Path="Update-PublicSuffixList.ps1" />
     <File Path="RunDarkFactory.ps1" />
     <File Path="RunDarkFactory.cmd" />
+    <File Path="DarkFactory/AffectedTests.ps1" />
+    <File Path="DarkFactory/Alarm.ps1" />
+    <File Path="DarkFactory/AudioOff.ps1" />
+    <File Path="DarkFactory/AuditCadence.ps1" />
+    <File Path="DarkFactory/AutoLanes.ps1" />
+    <File Path="DarkFactory/AutoLanesState.ps1" />
+    <File Path="DarkFactory/CiWatch.ps1" />
+    <File Path="DarkFactory/Claim.ps1" />
+    <File Path="DarkFactory/Heartbeat.ps1" />
+    <File Path="DarkFactory/HerdrTabs.ps1" />
+    <File Path="DarkFactory/Integrate.ps1" />
+    <File Path="DarkFactory/LaneState.ps1" />
+    <File Path="DarkFactory/MachineProbe.ps1" />
+    <File Path="DarkFactory/ModelChoice.ps1" />
+    <File Path="DarkFactory/OutOfTokens.ps1" />
+    <File Path="DarkFactory/Park.ps1" />
+    <File Path="DarkFactory/Prompts.ps1" />
+    <File Path="DarkFactory/Requeue.ps1" />
+    <File Path="DarkFactory/Restart.ps1" />
+    <File Path="DarkFactory/Setup.ps1" />
+    <File Path="DarkFactory/ShiftBranch.ps1" />
+    <File Path="DarkFactory/ShiftCoordinator.ps1" />
+    <File Path="DarkFactory/ShiftEnd.ps1" />
+    <File Path="DarkFactory/ShiftRunner.ps1" />
+    <File Path="DarkFactory/ShiftStart.ps1" />
+    <File Path="DarkFactory/TaskBudget.ps1" />
+    <File Path="DarkFactory/TaskIds.ps1" />
+    <File Path="DarkFactory/TaskRun.ps1" />
+    <File Path="DarkFactory/TaskStash.ps1" />
+    <File Path="DarkFactory/ToolLabels.ps1" />
+    <File Path="DarkFactory/Usage.ps1" />
     <File Path=".github/gource/Directory.Build.props" />
     <File Path=".github/gource/Directory.Build.targets" />
     <File Path=".github/gource/Directory.Packages.props" />
@@ -47,104 +78,219 @@
     <File Path="install.ps1" />
     <File Path="install.sh" />
   </Folder>
-  <Project Path="Curl.Api/Curl.Api.csproj" />
-  <Project Path="Curl.Api.UnitLibrary/Curl.Api.UnitLibrary.csproj" />
-  <Project Path="Curl.Api.UnitTests/Curl.Api.UnitTests.csproj" />
-  <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
-  <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
-  <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
-  <Project Path="Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj" />
-  <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.Http2Server.UnitTests/Curl.Conformance.Http2Server.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.Http3Server.UnitTests/Curl.Conformance.Http3Server.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.LibTest.UnitLibrary/Curl.Conformance.LibTest.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.LibTest.UnitTests/Curl.Conformance.LibTest.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.SshServer.UnitTests/Curl.Conformance.SshServer.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
-  <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />
-  <Project Path="Curl.Console.UnitTests/Curl.Console.UnitTests.csproj" />
-  <Project Path="Curl.Console/Curl.Console.csproj" />
-  <Project Path="Curl.Cookies.UnitLibrary/Curl.Cookies.UnitLibrary.csproj" />
-  <Project Path="Curl.Cookies.UnitTests/Curl.Cookies.UnitTests.csproj" />
-  <Project Path="Curl.Core.IntegrationTests/Curl.Core.IntegrationTests.csproj" />
-  <Project Path="Curl.Core.UnitLibrary/Curl.Core.UnitLibrary.csproj" />
-  <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
-  <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
-  <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
-  <Project Path="Curl.Engine.IntegrationTests/Curl.Engine.IntegrationTests.csproj" />
-  <Project Path="Curl.Engine.UnitLibrary/Curl.Engine.UnitLibrary.csproj" />
-  <Project Path="Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj" />
-  <Project Path="Curl.Http2.UnitLibrary/Curl.Http2.UnitLibrary.csproj" />
-  <Project Path="Curl.Http2.UnitTests/Curl.Http2.UnitTests.csproj" />
-  <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
-  <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
-  <Project Path="Curl.HttpMessageSignatures.UnitLibrary/Curl.HttpMessageSignatures.UnitLibrary.csproj" />
-  <Project Path="Curl.HttpMessageSignatures.UnitTests/Curl.HttpMessageSignatures.UnitTests.csproj" />
-  <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
-  <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
-  <Project Path="Curl.Mcp.IntegrationTests/Curl.Mcp.IntegrationTests.csproj" />
-  <Project Path="Curl.Mcp/Curl.Mcp.csproj" />
-  <Project Path="Curl.Mcp.UnitLibrary/Curl.Mcp.UnitLibrary.csproj" />
-  <Project Path="Curl.Mcp.UnitTests/Curl.Mcp.UnitTests.csproj" />
-  <Project Path="Curl.Networking.IntegrationTests/Curl.Networking.IntegrationTests.csproj" />
-  <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
-  <Project Path="Curl.Networking.UnitTests/Curl.Networking.UnitTests.csproj" />
-  <Project Path="Curl.Ntlm.UnitLibrary/Curl.Ntlm.UnitLibrary.csproj" />
-  <Project Path="Curl.Ntlm.UnitTests/Curl.Ntlm.UnitTests.csproj" />
-  <Project Path="Curl.Output.UnitLibrary/Curl.Output.UnitLibrary.csproj" />
-  <Project Path="Curl.Output.UnitTests/Curl.Output.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Abstractions.UnitTests/Curl.Protocol.Abstractions.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Dict.UnitLibrary/Curl.Protocol.Dict.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Dict.UnitTests/Curl.Protocol.Dict.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.File.UnitLibrary/Curl.Protocol.File.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.File.UnitTests/Curl.Protocol.File.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Ftp.UnitLibrary/Curl.Protocol.Ftp.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Ftp.UnitTests/Curl.Protocol.Ftp.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Gopher.UnitLibrary/Curl.Protocol.Gopher.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Gopher.UnitTests/Curl.Protocol.Gopher.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Http.UnitLibrary/Curl.Protocol.Http.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Http.UnitTests/Curl.Protocol.Http.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Imap.UnitLibrary/Curl.Protocol.Imap.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Imap.UnitTests/Curl.Protocol.Imap.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Ldap.UnitLibrary/Curl.Protocol.Ldap.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Ldap.UnitTests/Curl.Protocol.Ldap.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Mqtt.UnitLibrary/Curl.Protocol.Mqtt.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Mqtt.UnitTests/Curl.Protocol.Mqtt.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Pop3.UnitLibrary/Curl.Protocol.Pop3.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Pop3.UnitTests/Curl.Protocol.Pop3.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Rtsp.UnitLibrary/Curl.Protocol.Rtsp.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Rtsp.UnitTests/Curl.Protocol.Rtsp.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Smb.UnitLibrary/Curl.Protocol.Smb.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Smb.UnitTests/Curl.Protocol.Smb.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Smtp.UnitLibrary/Curl.Protocol.Smtp.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Smtp.UnitTests/Curl.Protocol.Smtp.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj" />
-  <Project Path="Curl.Protocol.Ssh.UnitLibrary/Curl.Protocol.Ssh.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Ssh.UnitTests/Curl.Protocol.Ssh.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Telnet.UnitLibrary/Curl.Protocol.Telnet.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Telnet.UnitTests/Curl.Protocol.Telnet.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Tftp.UnitLibrary/Curl.Protocol.Tftp.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Tftp.UnitTests/Curl.Protocol.Tftp.UnitTests.csproj" />
-  <Project Path="Curl.Protocol.Ws.UnitLibrary/Curl.Protocol.Ws.UnitLibrary.csproj" />
-  <Project Path="Curl.Protocol.Ws.UnitTests/Curl.Protocol.Ws.UnitTests.csproj" />
-  <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
-  <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
-  <Project Path="Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj" />
-  <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
-  <Project Path="Curl.Zstandard.UnitLibrary/Curl.Zstandard.UnitLibrary.csproj" />
-  <Project Path="Curl.Zstandard.UnitTests/Curl.Zstandard.UnitTests.csproj" />
 
-  <Project Path="Documentation/Documentation.shproj" />
-  <Project Path=".claude/Claude.shproj" />
-  <Project Path="Libcurl/Libcurl.csproj" />
-  <Project Path="Libcurl.UnitTests/Libcurl.UnitTests.csproj" />
-  <Project Path="Tasks/Tasks.shproj" />
-  <Project Path="Audit/Audit.shproj" />
-  <Project Path="Gap/Gap.shproj" />
+  <!--
+    Each Curl.Conformance.<Part>.* project sits in /Conformance/<Part>/ with its tests, the
+    harness itself (Curl.Conformance.UnitLibrary) in /Conformance/Harness/, and each
+    Curl.Protocol.<Name>.* project in /Protocols/<Name>/ (ADR-0731). Every other area sits
+    with its tests in /<Group>/<Area>/: Hosts, CommandLine, Transfer, Wire and Security.
+  -->
+  <Folder Name="/Conformance/" />
+  <Folder Name="/Conformance/Harness/">
+    <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/Http2Server/">
+    <Project Path="Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.Http2Server.UnitTests/Curl.Conformance.Http2Server.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/Http3Server/">
+    <Project Path="Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.Http3Server.UnitTests/Curl.Conformance.Http3Server.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/LibTest/">
+    <Project Path="Curl.Conformance.LibTest.UnitLibrary/Curl.Conformance.LibTest.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.LibTest.UnitTests/Curl.Conformance.LibTest.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/SshServer/">
+    <Project Path="Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.SshServer.UnitTests/Curl.Conformance.SshServer.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/UnitProgram/">
+    <Project Path="Curl.Conformance.UnitProgram.UnitLibrary/Curl.Conformance.UnitProgram.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.UnitProgram.UnitTests/Curl.Conformance.UnitProgram.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/" />
+  <Folder Name="/Protocols/Abstractions/">
+    <Project Path="Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Abstractions.UnitTests/Curl.Protocol.Abstractions.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Dict/">
+    <Project Path="Curl.Protocol.Dict.UnitLibrary/Curl.Protocol.Dict.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Dict.UnitTests/Curl.Protocol.Dict.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/File/">
+    <Project Path="Curl.Protocol.File.UnitLibrary/Curl.Protocol.File.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.File.UnitTests/Curl.Protocol.File.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Ftp/">
+    <Project Path="Curl.Protocol.Ftp.UnitLibrary/Curl.Protocol.Ftp.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Ftp.UnitTests/Curl.Protocol.Ftp.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Gopher/">
+    <Project Path="Curl.Protocol.Gopher.UnitLibrary/Curl.Protocol.Gopher.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Gopher.UnitTests/Curl.Protocol.Gopher.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Http/">
+    <Project Path="Curl.Protocol.Http.UnitLibrary/Curl.Protocol.Http.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Http.UnitTests/Curl.Protocol.Http.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Imap/">
+    <Project Path="Curl.Protocol.Imap.UnitLibrary/Curl.Protocol.Imap.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Imap.UnitTests/Curl.Protocol.Imap.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Ldap/">
+    <Project Path="Curl.Protocol.Ldap.UnitLibrary/Curl.Protocol.Ldap.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Ldap.UnitTests/Curl.Protocol.Ldap.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Mqtt/">
+    <Project Path="Curl.Protocol.Mqtt.UnitLibrary/Curl.Protocol.Mqtt.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Mqtt.UnitTests/Curl.Protocol.Mqtt.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Pop3/">
+    <Project Path="Curl.Protocol.Pop3.UnitLibrary/Curl.Protocol.Pop3.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Pop3.UnitTests/Curl.Protocol.Pop3.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Rtsp/">
+    <Project Path="Curl.Protocol.Rtsp.UnitLibrary/Curl.Protocol.Rtsp.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Rtsp.UnitTests/Curl.Protocol.Rtsp.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Smb/">
+    <Project Path="Curl.Protocol.Smb.UnitLibrary/Curl.Protocol.Smb.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Smb.UnitTests/Curl.Protocol.Smb.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Smtp/">
+    <Project Path="Curl.Protocol.Smtp.UnitLibrary/Curl.Protocol.Smtp.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Smtp.UnitTests/Curl.Protocol.Smtp.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Ssh/">
+    <Project Path="Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj" />
+    <Project Path="Curl.Protocol.Ssh.UnitLibrary/Curl.Protocol.Ssh.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Ssh.UnitTests/Curl.Protocol.Ssh.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Telnet/">
+    <Project Path="Curl.Protocol.Telnet.UnitLibrary/Curl.Protocol.Telnet.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Telnet.UnitTests/Curl.Protocol.Telnet.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Tftp/">
+    <Project Path="Curl.Protocol.Tftp.UnitLibrary/Curl.Protocol.Tftp.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Tftp.UnitTests/Curl.Protocol.Tftp.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Protocols/Ws/">
+    <Project Path="Curl.Protocol.Ws.UnitLibrary/Curl.Protocol.Ws.UnitLibrary.csproj" />
+    <Project Path="Curl.Protocol.Ws.UnitTests/Curl.Protocol.Ws.UnitTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Hosts/" />
+  <Folder Name="/Hosts/Api/">
+    <Project Path="Curl.Api/Curl.Api.csproj" />
+    <Project Path="Curl.Api.UnitLibrary/Curl.Api.UnitLibrary.csproj" />
+    <Project Path="Curl.Api.UnitTests/Curl.Api.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Hosts/Curl/">
+    <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />
+    <Project Path="Curl.Console.UnitTests/Curl.Console.UnitTests.csproj" />
+    <Project Path="Curl.Console/Curl.Console.csproj" />
+  </Folder>
+  <Folder Name="/Hosts/Libcurl/">
+    <Project Path="Libcurl/Libcurl.csproj" />
+    <Project Path="Libcurl.UnitTests/Libcurl.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Hosts/Mcp/">
+    <Project Path="Curl.Mcp.IntegrationTests/Curl.Mcp.IntegrationTests.csproj" />
+    <Project Path="Curl.Mcp/Curl.Mcp.csproj" />
+    <Project Path="Curl.Mcp.UnitLibrary/Curl.Mcp.UnitLibrary.csproj" />
+    <Project Path="Curl.Mcp.UnitTests/Curl.Mcp.UnitTests.csproj" />
+  </Folder>
+
+  <Folder Name="/CommandLine/" />
+  <Folder Name="/CommandLine/Cli/">
+    <Project Path="Curl.Cli.IntegrationTests/Curl.Cli.IntegrationTests.csproj" />
+    <Project Path="Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj" />
+    <Project Path="Curl.Cli.UnitTests/Curl.Cli.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/CommandLine/Config/">
+    <Project Path="Curl.Config/Curl.Config.csproj" />
+    <Project Path="Curl.Config.UnitLibrary/Curl.Config.UnitLibrary.csproj" />
+    <Project Path="Curl.Config.UnitTests/Curl.Config.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/CommandLine/Output/">
+    <Project Path="Curl.Output.UnitLibrary/Curl.Output.UnitLibrary.csproj" />
+    <Project Path="Curl.Output.UnitTests/Curl.Output.UnitTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Transfer/" />
+  <Folder Name="/Transfer/Cookies/">
+    <Project Path="Curl.Cookies.UnitLibrary/Curl.Cookies.UnitLibrary.csproj" />
+    <Project Path="Curl.Cookies.UnitTests/Curl.Cookies.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Transfer/Core/">
+    <Project Path="Curl.Core.IntegrationTests/Curl.Core.IntegrationTests.csproj" />
+    <Project Path="Curl.Core.UnitLibrary/Curl.Core.UnitLibrary.csproj" />
+    <Project Path="Curl.Core.UnitTests/Curl.Core.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Transfer/Engine/">
+    <Project Path="Curl.Engine.IntegrationTests/Curl.Engine.IntegrationTests.csproj" />
+    <Project Path="Curl.Engine.UnitLibrary/Curl.Engine.UnitLibrary.csproj" />
+    <Project Path="Curl.Engine.UnitTests/Curl.Engine.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Transfer/Networking/">
+    <Project Path="Curl.Networking.IntegrationTests/Curl.Networking.IntegrationTests.csproj" />
+    <Project Path="Curl.Networking.UnitLibrary/Curl.Networking.UnitLibrary.csproj" />
+    <Project Path="Curl.Networking.UnitTests/Curl.Networking.UnitTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Wire/" />
+  <Folder Name="/Wire/Http2/">
+    <Project Path="Curl.Http2.UnitLibrary/Curl.Http2.UnitLibrary.csproj" />
+    <Project Path="Curl.Http2.UnitTests/Curl.Http2.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Wire/Http3/">
+    <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
+    <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Wire/Quic/">
+    <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
+    <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Wire/Zstandard/">
+    <Project Path="Curl.Zstandard.UnitLibrary/Curl.Zstandard.UnitLibrary.csproj" />
+    <Project Path="Curl.Zstandard.UnitTests/Curl.Zstandard.UnitTests.csproj" />
+  </Folder>
+
+  <Folder Name="/Security/" />
+  <Folder Name="/Security/Authentication/">
+    <Project Path="Curl.Authentication.UnitLibrary/Curl.Authentication.UnitLibrary.csproj" />
+    <Project Path="Curl.Authentication.UnitTests/Curl.Authentication.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Security/Cryptography/">
+    <Project Path="Curl.Cryptography.UnitLibrary/Curl.Cryptography.UnitLibrary.csproj" />
+    <Project Path="Curl.Cryptography.UnitTests/Curl.Cryptography.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Security/HttpMessageSignatures/">
+    <Project Path="Curl.HttpMessageSignatures.UnitLibrary/Curl.HttpMessageSignatures.UnitLibrary.csproj" />
+    <Project Path="Curl.HttpMessageSignatures.UnitTests/Curl.HttpMessageSignatures.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Security/Kerberos/">
+    <Project Path="Curl.Kerberos.UnitLibrary/Curl.Kerberos.UnitLibrary.csproj" />
+    <Project Path="Curl.Kerberos.UnitTests/Curl.Kerberos.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Security/Ntlm/">
+    <Project Path="Curl.Ntlm.UnitLibrary/Curl.Ntlm.UnitLibrary.csproj" />
+    <Project Path="Curl.Ntlm.UnitTests/Curl.Ntlm.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Security/Tls/">
+    <Project Path="Curl.Tls.UnitLibrary/Curl.Tls.UnitLibrary.csproj" />
+    <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
+  </Folder>
+
+  <!-- The shared projects sit together in /Shared/ (ADR-0731). -->
+  <Folder Name="/Shared/">
+    <Project Path="Audit/Audit.shproj" />
+    <Project Path=".claude/Claude.shproj" />
+    <Project Path="Documentation/Documentation.shproj" />
+    <Project Path="Gap/Gap.shproj" />
+    <Project Path="Tasks/Tasks.shproj" />
+  </Folder>
 
 </Solution>

@@ -7,7 +7,9 @@ namespace Curl.Conformance;
 /// connection lines (BL-2641): <c>$_ = '' if(($_ !~ /A/) and ($_ !~ /B/))</c>. Each term is
 /// <c>($_ !~ /PATTERN/)</c> or <c>($_ =~ /PATTERN/)</c>, the terms joined by <c>and</c>; a line
 /// every term holds for is emptied, as Perl's assignment empties <c>$_</c>, and any other line is
-/// left as it is. The patterns are run as .NET regular expressions, with no <c>eval</c>.
+/// left as it is. The <c>--libcurl</c> cases' one-term form <c>$_ = '' if /PATTERN/</c> (test1400,
+/// with <c>\/</c> for a slash in the pattern, test1404) is read the same way (BL-2862). The
+/// patterns are run as .NET regular expressions, with no <c>eval</c>.
 /// </summary>
 internal sealed class UpstreamPerlConditionalEmptying : IUpstreamPerlLineEdit
 {
@@ -23,6 +25,11 @@ internal sealed class UpstreamPerlConditionalEmptying : IUpstreamPerlLineEdit
         RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture,
         UpstreamRegex.MatchTimeout);
 
+    private static readonly Regex BareMatchForm = new(
+        @"^\$_ = ''\s*if\s*/(?<pattern>(?:\\.|[^/\\])*)/;?$",
+        RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture,
+        UpstreamRegex.MatchTimeout);
+
     private readonly (Regex Pattern, bool MustMatch)[] terms;
 
     private UpstreamPerlConditionalEmptying((Regex Pattern, bool MustMatch)[] terms) => this.terms = terms;
@@ -32,14 +39,25 @@ internal sealed class UpstreamPerlConditionalEmptying : IUpstreamPerlLineEdit
     /// <returns>The edit, or <see langword="null"/> when the line has another form or one of its patterns does not compile.</returns>
     public static UpstreamPerlConditionalEmptying? Parse(string line)
     {
-        Match form = ProgramForm.Match(line.Trim());
-        if (!form.Success)
+        string code = line.Trim();
+        Match bareMatch = BareMatchForm.Match(code);
+        if (bareMatch.Success)
         {
-            return null;
+            return Create([(bareMatch.Groups["pattern"].Value, true)]);
         }
 
-        var parsed = TermForm.Matches(form.Groups["terms"].Value)
-            .Select(term => (Pattern: UpstreamRegex.TryCreate(term.Groups["pattern"].Value, RegexOptions.CultureInvariant), MustMatch: term.Groups["operator"].Value == "=~"))
+        Match form = ProgramForm.Match(code);
+        return form.Success
+            ? Create(TermForm.Matches(form.Groups["terms"].Value)
+                .Select(term => (term.Groups["pattern"].Value, term.Groups["operator"].Value == "=~"))
+                .ToArray())
+            : null;
+    }
+
+    private static UpstreamPerlConditionalEmptying? Create((string Pattern, bool MustMatch)[] written)
+    {
+        var parsed = written
+            .Select(term => (Pattern: UpstreamRegex.TryCreate(term.Pattern, RegexOptions.CultureInvariant), term.MustMatch))
             .ToArray();
         return parsed.Any(term => term.Pattern is null)
             ? null

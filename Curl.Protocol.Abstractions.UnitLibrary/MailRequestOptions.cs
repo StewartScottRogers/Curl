@@ -88,4 +88,12 @@ public sealed record MailRequestOptions
     /// scheme's default (<c>smtp</c>, <c>pop</c> or <c>imap</c>).
     /// </summary>
     public string? ServiceName { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether an SMTP handler sends the host part of a <c>--mail-from</c>,
+    /// <c>--mail-rcpt</c> or <c>--mail-auth</c> address as written rather than as an IDNA A-label,
+    /// as curl does in a build without IDN support. Only a run-time feature mask hiding IDN sets it
+    /// (ADR-0746, BL-2983), never the shipped curl tool or <c>Libcurl</c>.
+    /// </summary>
+    public bool SendsMailboxHostAsWritten { get; init; }
 }

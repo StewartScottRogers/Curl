@@ -47,6 +47,31 @@ internal sealed record SftpDownloadPart(long Offset, long? Length)
         return resume > 0 ? Within(ByteRange.FromOffset(resume), known) : Asked(range, rangeText, known);
     }
 
+    /// <summary>
+    /// curl 8.22.0's <c>Curl_ssh_range</c> on its own, for the port of upstream's
+    /// <c>unit2605</c> (BL-2905): reads <paramref name="rangeText" /> as an SFTP <c>-r</c>
+    /// range of a file of <paramref name="fileSize" /> bytes.
+    /// </summary>
+    /// <param name="rangeText">The range: <c>a-b</c>, <c>-n</c> or <c>a-</c>, blanks allowed only around the dash.</param>
+    /// <param name="fileSize">The size of the file.</param>
+    /// <returns>
+    /// curl's code, <see cref="CurlExitCode.Ok" /> or <see cref="CurlExitCode.RangeError" />,
+    /// and the first byte and the byte count the range selects, both 0 unless the code is
+    /// <see cref="CurlExitCode.Ok" />.
+    /// </returns>
+    internal static (CurlExitCode Result, long Start, long Size) ReadRange(string rangeText, long fileSize)
+    {
+        try
+        {
+            SftpDownloadPart part = WithinText(rangeText, fileSize);
+            return (CurlExitCode.Ok, part.Offset, part.Length.GetValueOrDefault());
+        }
+        catch (SshTransferException failure)
+        {
+            return (failure.ExitCode, 0, 0);
+        }
+    }
+
     // The -r range when the command line read it, else its text, else the whole file.
     private static SftpDownloadPart Asked(ByteRange? range, string? rangeText, long size)
     {

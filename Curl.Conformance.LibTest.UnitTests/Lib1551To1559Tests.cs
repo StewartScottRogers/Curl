@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
@@ -194,6 +195,22 @@ public sealed class Lib1551To1559Tests
         LibTestResult result = await new Lib1553(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)LibTestErrorCodes.Multi, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task Lib1553_TracesSentDataAsTextWithTheTimeAndNoHex()
+    {
+        var time = new ManualTimeProvider(new DateTimeOffset(2026, 10, 16, 14, 5, 6, TimeSpan.Zero));
+        time.Advance(TimeSpan.FromMicroseconds(123456));
+        var engine = new FakeCurlEngine { CreatingMime = () => new FakeMimeBuilder() };
+        engine.Multi.PerformResult = (CurlMultiCode.Ok, 1);
+        var run = new PortRun(engine, 1553, "imap://x/1553");
+        await new Lib1553(time).RunAsync(run.Context, CancellationToken.None);
+        EasyOptions seen = ((IEasyTransfer)engine.Multi.Added!).Options;
+
+        _ = seen.Callbacks.Debug!(CurlInfoType.DataOut, "ok"u8);
+
+        Assert.AreEqual("14:05:06.123456 => Send data, 2 bytes (0x2)\n0000: ok\n", run.Error.ToString());
     }
 
     [TestMethod]

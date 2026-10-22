@@ -294,4 +294,35 @@ public sealed class DeferredOutputFileStreamTests
         Diagnostics.Assert("result is the handler's", true, ReferenceEquals(handlerResult, result));
         Assert.AreSame(handlerResult, result);
     }
+
+    [TestMethod]
+    public async Task CompleteAsync_NothingWrittenAfterA304_LeavesTheFileUnopened()
+    {
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
+        TransferResult handlerResult = TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 304 } };
+        Diagnostics.Arrange("response code", 304);
+
+        TransferResult result = await stream.CompleteAsync(handlerResult);
+        Diagnostics.Act("file opened", fileSystem.Written.ContainsKey("a.txt"));
+
+        Diagnostics.Assert("file opened", false, fileSystem.Written.ContainsKey("a.txt"));
+        Assert.IsFalse(fileSystem.Written.ContainsKey("a.txt"));
+        Assert.IsFalse(stream.CreatedEmptyAfterTransfer);
+        Assert.AreSame(handlerResult, result);
+    }
+
+    [TestMethod]
+    public async Task CompleteAsync_NothingWrittenAfterA204_CreatesTheEmptyFile()
+    {
+        using DeferredOutputFileStream stream = new(fileSystem, "a.txt", FileWriteMode.Truncate);
+        TransferResult handlerResult = TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 204 } };
+        Diagnostics.Arrange("response code", 204);
+
+        await stream.CompleteAsync(handlerResult);
+        Diagnostics.Act("file opened", fileSystem.Written.ContainsKey("a.txt"));
+
+        Diagnostics.Assert("file opened", true, fileSystem.Written.ContainsKey("a.txt"));
+        Assert.IsTrue(fileSystem.Written.ContainsKey("a.txt"));
+        Assert.IsTrue(stream.CreatedEmptyAfterTransfer);
+    }
 }

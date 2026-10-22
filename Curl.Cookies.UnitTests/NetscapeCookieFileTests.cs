@@ -317,6 +317,59 @@ public sealed class NetscapeCookieFileTests
         Assert.AreEqual(expectedNames, actualNames);
     }
 
+    /// <summary>
+    /// Measured on curl 8.22.0 (mingw, Schannel) on 2026-10-21 (BL-2916): <c>curl -s -b cf.txt http://127.0.0.1:&lt;port&gt;/</c>
+    /// sent both cookies for a 4998-character line, a carriage return counted, and for a last line of 4998 characters
+    /// without a line feed; one character more and curl sent no request and exited 100, <c>A value or data field grew
+    /// larger than allowed</c>.
+    /// </summary>
+    [TestMethod]
+    [DataRow(4998, "\n", false, DisplayName = "4998 characters then LF")]
+    [DataRow(4999, "\n", true, DisplayName = "4999 characters then LF")]
+    [DataRow(4998, "\r\n", false, DisplayName = "4998 characters, CR counted, then LF")]
+    [DataRow(4999, "\r\n", true, DisplayName = "4999 characters, CR counted, then LF")]
+    [DataRow(4998, "", false, DisplayName = "4998 characters, last line without LF")]
+    [DataRow(4999, "", true, DisplayName = "4999 characters, last line without LF")]
+    public void Read_LineLength_ReportsALineTooLongPastTheLimit(int lengthBeforeLineFeed, string lineEnd, bool expectedTooLong)
+    {
+        int carriageReturns = lineEnd.Length > 1 ? 1 : 0;
+        string file = "127.0.0.1\tFALSE\t/\tFALSE\t0\tbefore\t1\n"
+            + CookieLineOfLength("len", lengthBeforeLineFeed - carriageReturns) + lineEnd;
+        Diagnostics.Arrange("line length before the line feed", lengthBeforeLineFeed);
+        Diagnostics.ArrangeText("line ending", lineEnd);
+
+        IReadOnlyList<Cookie> cookies = NetscapeCookieFile.Read(new StringReader(file), Now, NoTransferEvents.Instance, out bool isLineTooLong);
+
+        Diagnostics.ActCookies("cookies read", cookies);
+        Diagnostics.Assert("line too long", expectedTooLong, isLineTooLong);
+        Diagnostics.Assert("cookies read", expectedTooLong ? 1 : 2, cookies.Count);
+        Assert.AreEqual(expectedTooLong, isLineTooLong);
+        Assert.HasCount(expectedTooLong ? 1 : 2, cookies);
+    }
+
+    /// <summary>
+    /// Measured on curl 8.22.0 (mingw, Schannel) on 2026-10-21 (BL-2916): curl opens a <c>-b</c> file in binary
+    /// mode, so a <c>^Z</c> neither ends the file nor is dropped. A line that is only <c>^Z</c> is skipped, and a
+    /// cookie holding one in its value is refused as a control character; every other cookie is sent.
+    /// </summary>
+    [TestMethod]
+    [DataRow("127.0.0.1\tFALSE\t/\tFALSE\t0\ta\tv\n\u001A\n", "a after", DisplayName = "A line that is only ^Z")]
+    [DataRow("127.0.0.1\tFALSE\t/\tFALSE\t0\ta\tx\u001Ay\n", "after", DisplayName = "A ^Z inside the value")]
+    [DataRow("127.0.0.1\tFALSE\t/\tFALSE\t0\ta\tv\u001A\n", "after", DisplayName = "A ^Z before the line feed")]
+    public void Read_ControlZ_IsKeptAsAByte(string start, string expectedNames)
+    {
+        string file = start + "127.0.0.1\tFALSE\t/\tFALSE\t0\tafter\t1\n";
+        Diagnostics.ArrangeText("cookie file read in", file.Replace("\u001A", "^Z", StringComparison.Ordinal));
+
+        IReadOnlyList<Cookie> cookies = NetscapeCookieFile.Read(new StringReader(file), Now, NoTransferEvents.Instance, out bool isLineTooLong);
+        string actualNames = string.Join(' ', cookies.Select(cookie => cookie.Name));
+
+        Diagnostics.ActCookies("cookies read", cookies);
+        Diagnostics.AssertText("names of the cookies read, in file order", expectedNames, actualNames);
+        Assert.AreEqual(expectedNames, actualNames);
+        Assert.IsFalse(isLineTooLong);
+    }
+
     [TestMethod]
     public void Read_EmptyText_ReadsNothing()
     {

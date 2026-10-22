@@ -49,9 +49,27 @@ public sealed class UpstreamPerlConditionalEmptyingTests
         Assert.AreEqual(expected, actual);
     }
 
+    // The --libcurl cases' one-term form (BL-2862): test1400's, and test1404's with escaped slashes.
+    [TestMethod]
+    [DataRow("$_ = '' if /CURLOPT_SSL_VERIFYPEER/", "  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);\n", "")]
+    [DataRow("$_ = '' if /CURLOPT_SSL_VERIFYPEER/", "  curl_easy_setopt(curl, CURLOPT_URL, \"x\");\n", "  curl_easy_setopt(curl, CURLOPT_URL, \"x\");\n")]
+    [DataRow(@"$_ = '' if /\/\* ""value"" \*\//", "  /* \"value\" */\n", "")]
+    [DataRow(@"$_ = '' if /\/\* ""value"" \*\//", "  \"value\"\n", "  \"value\"\n")]
+    public void Apply_BareMatchLine_EmptiesTheLinesThePatternMatches(string code, string line, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("code", code);
+
+        string? actual = IUpstreamPerlLineEdit.Parse(code)?.Apply(line);
+
+        diagnostics.Act("applied", actual);
+        Assert.AreEqual(expected, actual);
+    }
+
     [TestMethod]
     [DataRow("$_ = ''")]
-    [DataRow("$_ = '' if /CURLOPT_SSL_VERIFYPEER/")]
+    [DataRow("$_ = '' if /(/")]
+    [DataRow("$_ = '' if /a/b/")]
     [DataRow("$_ = '' if(($_ !~ /a/) or ($_ !~ /b/))")]
     [DataRow("$_ = '' if((($_ !~ /a/) and ($_ !~ /b/)) || ($_ =~ /c/))")]
     [DataRow("$_ = '' if(($_ !~ /(/))")]

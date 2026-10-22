@@ -41,6 +41,12 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
     /// </summary>
     public const int MaxFileLineLength = 4093;
 
+    /// <summary>
+    /// The most entries the cache holds, libcurl 8.22.0's <c>MAX_ALTSVC_ENTRIES</c>: adding one to a full
+    /// cache, from the file or from a header, first removes the oldest, as <c>altsvc_append</c> does.
+    /// </summary>
+    public const int MaxEntries = 5000;
+
     private static readonly long LatestExpiry = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
 
     private readonly List<AltSvcEntry> entries = [];
@@ -70,7 +76,7 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
             AltSvcEntry? entry = AltSvcFileLineParser.Parse(line);
             if (entry is not null && entry.Expires.ToUnixTimeSeconds() >= now)
             {
-                entries.Add(entry);
+                Append(entry);
             }
         }
     }
@@ -257,8 +263,19 @@ public sealed class AltSvcCache(TimeProvider timeProvider, IDiagnosticLog? diagn
 
     private void Add(AltSvcEntry entry)
     {
-        entries.Add(entry);
+        Append(entry);
         log.Stored(entry);
+    }
+
+    /// <summary>Adds <paramref name="entry" /> last, first removing the oldest entry when the cache holds <see cref="MaxEntries" />.</summary>
+    private void Append(AltSvcEntry entry)
+    {
+        if (entries.Count >= MaxEntries)
+        {
+            entries.RemoveAt(0);
+        }
+
+        entries.Add(entry);
     }
 
     private long NowSeconds() => timeProvider.GetUtcNow().ToUnixTimeSeconds();

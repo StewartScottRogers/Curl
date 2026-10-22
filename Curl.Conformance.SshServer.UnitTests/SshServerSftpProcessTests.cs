@@ -189,6 +189,36 @@ public sealed class SshServerSftpProcessTests
     }
 
     [TestMethod]
+    public void Answer_SetStatPermissionsWithoutOwnerWrite_MakesTheFileReadOnlyUntilWriteIsGivenBack()
+    {
+        using TemporaryFolder folder = new();
+        string file = folder.Write("f", "x");
+        using SshServerSftpProcess process = new("u");
+
+        // Size, owner and permissions 0444, as curl's "chmod 444" quote sends them after a STAT.
+        uint readOnly = StatusOf(process.Answer(Request(SetStat, file, 0x07u, 0u, 1u, 0u, 0u, 0x124u)));
+        string readOnlyLine = SshServerSftpProcess.LongName(file, "f", "u", DateTime.UtcNow);
+        uint writable = StatusOf(process.Answer(Request(SetStat, file, 0x04u, 0x1A4u)));
+
+        Assert.AreEqual(0u, readOnly);
+        Assert.AreEqual(0u, writable);
+        StringAssert.StartsWith(readOnlyLine, "-r--r--r--");
+        Assert.IsFalse(File.GetAttributes(file).HasFlag(FileAttributes.ReadOnly));
+    }
+
+    [TestMethod]
+    public void Answer_SetStatPermissionsOfADirectory_LeavesItWritable()
+    {
+        using TemporaryFolder folder = new();
+        using SshServerSftpProcess process = new("u");
+
+        uint status = StatusOf(process.Answer(Request(SetStat, folder.Path, 0x04u, 0x16Du)));
+
+        Assert.AreEqual(0u, status);
+        Assert.IsFalse(File.GetAttributes(folder.Path).HasFlag(FileAttributes.ReadOnly));
+    }
+
+    [TestMethod]
     public void Answer_SetStatOfAPathOrHandle_IsOk()
     {
         using TemporaryFolder folder = new();
@@ -320,9 +350,30 @@ public sealed class SshServerSftpProcessTests
         string recent = SshServerSftpProcess.LongName(file, "f", "curltest", modified.AddDays(1));
         string old = SshServerSftpProcess.LongName(folder.Path, "d", "me", modified.AddYears(1));
 
-        Assert.AreEqual("-rw-r--r--   1 curltest curltest        3  Mar 4 05:06 f", recent);
+        Assert.AreEqual("-rw-r--r--   1 curltest curltest        3 Mar  4 05:06 f", recent);
         StringAssert.StartsWith(old, "drwxr-xr-x   1 me       me              0 ");
         StringAssert.EndsWith(old, " d");
+    }
+
+    [TestMethod]
+    public void LongName_ReadOnlyOldFile_ShowsReadOnlyModeAndOpenSshYearDate()
+    {
+        using TemporaryFolder folder = new();
+        string file = folder.Write("rofile.txt", "");
+        DateTime modified = new(2001, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(file, modified);
+        File.SetAttributes(file, FileAttributes.ReadOnly);
+
+        try
+        {
+            string line = SshServerSftpProcess.LongName(file, "rofile.txt", "curltest", modified.AddYears(5));
+
+            Assert.AreEqual("-r--r--r--   1 curltest curltest        0 Jan  1  2001 rofile.txt", line);
+        }
+        finally
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
     }
 
     [TestMethod]

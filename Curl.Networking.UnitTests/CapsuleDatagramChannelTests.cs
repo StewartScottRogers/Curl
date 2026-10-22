@@ -61,19 +61,12 @@ public sealed class CapsuleDatagramChannelTests
     }
 
     [TestMethod]
-    public async Task ReceiveAsync_SkipsOtherCapsulesAndOtherContexts_AndReturnsTheDatagramFromTheProxy()
+    public async Task ReceiveAsync_ADatagramCapsule_ReturnsTheDatagramFromTheProxy()
     {
-        byte[] stream =
-        [
-            0x40, 0x41, 0x02, 0xAA, 0xBB, // capsule type 0x41, two bytes
-            0x00, 0x00, // a DATAGRAM capsule with no context ID
-            0x00, 0x03, 0x02, 0xCC, 0xDD, // context ID 2
-            0x00, 0x03, 0x00, 0x07, 0x08, // the datagram 07 08
-        ];
+        byte[] stream = [0x00, 0x03, 0x00, 0x07, 0x08];
         await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(stream), Proxy);
         var buffer = new byte[16];
         Diagnostics.Arrange("proxy", Proxy);
-        Diagnostics.Arrange("buffer length", buffer.Length);
         Diagnostics.Bytes("stream", stream);
 
         var received = await channel.ReceiveAsync(buffer, CancellationToken.None);
@@ -92,32 +85,99 @@ public sealed class CapsuleDatagramChannelTests
     }
 
     [TestMethod]
-    public async Task ReceiveAsync_ADatagramLongerThanTheBuffer_IsCutToItAndTheRestSkipped()
+    [DataRow(new byte[] { 0x40, 0x41, 0x02, 0xAA, 0xBB }, DisplayName = "another capsule type")]
+    [DataRow(new byte[] { 0x00, 0x03, 0x02, 0xCC, 0xDD }, DisplayName = "another context ID")]
+    [DataRow(new byte[] { 0x00, 0x00, 0x00 }, DisplayName = "capsule length 0")]
+    public async Task ReceiveAsync_ACapsuleCurlRejects_FailsWithConnectionAborted(byte[] stream)
     {
-        var datagram = CapsuleDatagramChannel.BuildCapsule([1, 2, 3, 4, 5]);
-        var connection = new ScriptedConnection([.. datagram, .. CapsuleDatagramChannel.BuildCapsule([9])]);
+        await using var channel = new CapsuleDatagramChannel(new ScriptedConnection([.. stream, .. CapsuleDatagramChannel.BuildCapsule([9])]), Proxy);
+        Diagnostics.Bytes("stream", stream);
+
+        var exception = await Assert.ThrowsExactlyAsync<SocketException>(() => channel.ReceiveAsync(new byte[8], CancellationToken.None).AsTask());
+        Diagnostics.Act("socket error code", exception.SocketErrorCode);
+
+        Diagnostics.Assert("socket error code", SocketError.ConnectionAborted, exception.SocketErrorCode);
+        Assert.AreEqual(SocketError.ConnectionAborted, exception.SocketErrorCode);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_ADatagramLongerThanTheBuffer_FailsAndIsDiscarded()
+    {
+        var connection = new ScriptedConnection([.. CapsuleDatagramChannel.BuildCapsule([1, 2, 3, 4, 5]), .. CapsuleDatagramChannel.BuildCapsule([9])]);
         await using var channel = new CapsuleDatagramChannel(connection, Proxy);
         var buffer = new byte[2];
         Diagnostics.Arrange("first datagram length", 5);
-        Diagnostics.Arrange("second datagram length", 1);
         Diagnostics.Arrange("buffer length", buffer.Length);
 
-        var first = await channel.ReceiveAsync(buffer, CancellationToken.None);
-        var firstBytes = buffer.ToArray();
+        var exception = await Assert.ThrowsExactlyAsync<SocketException>(() => channel.ReceiveAsync(buffer, CancellationToken.None).AsTask());
         var second = await channel.ReceiveAsync(buffer, CancellationToken.None);
-        Diagnostics.Act("first length", first.Length);
+        Diagnostics.Act("socket error code", exception.SocketErrorCode);
         Diagnostics.Act("second length", second.Length);
-        Diagnostics.Bytes("first bytes", firstBytes);
 
-        Diagnostics.Assert("first length", 2, first.Length);
-        Assert.AreEqual(2, first.Length);
-        var expectedFirst = new byte[] { 1, 2 };
-        Diagnostics.Diff("first bytes", expectedFirst, firstBytes);
-        CollectionAssert.AreEqual(expectedFirst, firstBytes);
+        Diagnostics.Assert("socket error code", SocketError.ConnectionAborted, exception.SocketErrorCode);
+        Assert.AreEqual(SocketError.ConnectionAborted, exception.SocketErrorCode);
         Diagnostics.Assert("second length", 1, second.Length);
         Assert.AreEqual(1, second.Length);
         Diagnostics.Assert("second first byte", 9, buffer[0]);
         Assert.AreEqual(9, buffer[0]);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_AnEmptyBuffer_ThrowsArgumentException()
+    {
+        await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(CapsuleDatagramChannel.BuildCapsule([9])), Proxy);
+
+        var exception = await Assert.ThrowsExactlyAsync<ArgumentException>(() => channel.ReceiveAsync(Memory<byte>.Empty, CancellationToken.None).AsTask());
+        Diagnostics.Act("parameter name", exception.ParamName);
+
+        Diagnostics.Assert("parameter name", "buffer", exception.ParamName);
+        Assert.AreEqual("buffer", exception.ParamName);
+    }
+
+    [TestMethod]
+    public async Task ReceiveAsync_ADatagramLongerThanTheFirstReceiveBuffer_ReturnsItWhole()
+    {
+        var datagram = new byte[10000];
+        datagram[^1] = 0x5A;
+        await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(CapsuleDatagramChannel.BuildCapsule(datagram)), Proxy);
+        var buffer = new byte[datagram.Length];
+        Diagnostics.Arrange("datagram length", datagram.Length);
+
+        var received = await channel.ReceiveAsync(buffer, CancellationToken.None);
+        Diagnostics.Act("received length", received.Length);
+
+        Diagnostics.Assert("received length", datagram.Length, received.Length);
+        Assert.AreEqual(datagram.Length, received.Length);
+        Diagnostics.Assert("last byte", 0x5A, buffer[^1]);
+        Assert.AreEqual(0x5A, buffer[^1]);
+    }
+
+    [TestMethod]
+    public void DecodeDatagram_ALengthPastIntMaxValue_IsMalformedAndConsumesNothing()
+    {
+        byte[] received = [0x00, 0xC0, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+        var status = CapsuleDatagramChannel.DecodeDatagram(received, new byte[8], out var consumed, out var payloadLength);
+        Diagnostics.Act("status", status);
+        Diagnostics.Act("consumed", consumed);
+
+        Diagnostics.Assert("status", CapsuleDatagramChannel.DecodeStatus.Malformed, status);
+        Assert.AreEqual(CapsuleDatagramChannel.DecodeStatus.Malformed, status);
+        Assert.AreEqual(0, consumed);
+        Assert.AreEqual(0, payloadLength);
+    }
+
+    [TestMethod]
+    [DataRow(new byte[] { 0x00, 0x40 }, DisplayName = "length cut short")]
+    [DataRow(new byte[] { 0x00, 0x02 }, DisplayName = "context ID not yet received")]
+    public void DecodeDatagram_AHeaderNotAllReceived_NeedsMoreBytesAndConsumesNothing(byte[] received)
+    {
+        var status = CapsuleDatagramChannel.DecodeDatagram(received, new byte[8], out var consumed, out _);
+        Diagnostics.Act("status", status);
+
+        Diagnostics.Assert("status", CapsuleDatagramChannel.DecodeStatus.NeedMoreBytes, status);
+        Assert.AreEqual(CapsuleDatagramChannel.DecodeStatus.NeedMoreBytes, status);
+        Assert.AreEqual(0, consumed);
     }
 
     [TestMethod]
@@ -136,24 +196,6 @@ public sealed class CapsuleDatagramChannelTests
         Assert.AreEqual(SocketError.ConnectionReset, exception.SocketErrorCode);
     }
 
-    [TestMethod]
-    public async Task ReceiveAsync_ASkippedCapsuleLongerThanTheSkipBuffer_IsSkippedWhole()
-    {
-        byte[] large = [0x41, 0x00, 0x52, 0x08, .. new byte[0x1208], .. CapsuleDatagramChannel.BuildCapsule([6])];
-        await using var channel = new CapsuleDatagramChannel(new ScriptedConnection(large), Proxy);
-        var buffer = new byte[4];
-        Diagnostics.Arrange("stream length", large.Length);
-        Diagnostics.Arrange("skipped capsule payload length", 0x1208);
-
-        var received = await channel.ReceiveAsync(buffer, CancellationToken.None);
-        Diagnostics.Act("received length", received.Length);
-        Diagnostics.Act("first buffer byte", buffer[0]);
-
-        Diagnostics.Assert("received length", 1, received.Length);
-        Assert.AreEqual(1, received.Length);
-        Diagnostics.Assert("first buffer byte", 6, buffer[0]);
-        Assert.AreEqual(6, buffer[0]);
-    }
 
     [TestMethod]
     public async Task LocalEndPoint_IsTheConnections()

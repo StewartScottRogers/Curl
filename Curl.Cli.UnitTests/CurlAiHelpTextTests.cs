@@ -111,7 +111,7 @@ public sealed class CurlAiHelpTextTests
     [DataRow("max-time", "- Repeat: yes, the last one given is used")]
     [DataRow("output", "- Repeat: once per URL: give it once for each URL on the command line")]
     [DataRow("ai-help", "- Repeat: not stated; see the description")]
-    [DataRow("ai-help", "- Argument: `[category]`")]
+    [DataRow("ai-help", "- Argument: `<category>`")]
     [DataRow("verbose", "- Short form: `-v`")]
     [DataRow("verbose", "- Argument: none")]
     [DataRow("cacert", "- Environment: with neither `--cacert` nor `--capath` given and the certificate checked, `CURL_CA_BUNDLE` names the CA file; without it, `SSL_CERT_DIR` names the CA folder and `SSL_CERT_FILE` the CA file. Read on Linux and macOS; on Windows none of the three is read, as curl's Schannel build reads none.")]

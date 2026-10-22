@@ -1,7 +1,7 @@
 namespace Curl.Networking;
 
 /// <summary>
-/// The text curl 8.21.0 prints for a <see cref="DnsMessageFailure" /> in its
+/// The text curl 8.21.0 (and, for <see cref="DnsMessageFailure.NxDomain" />, curl 8.22.0) prints for a <see cref="DnsMessageFailure" /> in its
 /// <c>DoH: &lt;text&gt; type A for &lt;host&gt;</c> trace lines (<c>doh_strerror</c>).
 /// </summary>
 public static class DnsMessageFailureText
@@ -22,6 +22,7 @@ public static class DnsMessageFailureText
         "No content",
         "Bad ID",
         "Name too long",
+        "No such name",
     ];
 
     /// <summary>

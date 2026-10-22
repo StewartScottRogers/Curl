@@ -6,7 +6,8 @@ namespace Curl.Conformance;
 /// How <see cref="TlsServerStream"/> serves TLS, in the terms upstream's test servers configure
 /// stunnel with: the certificate it presents (<c>cert =</c>), the ALPN protocols it offers, and
 /// whether it asks the client for a certificate (stunnel's <c>verify</c>). Like stunnel at
-/// <c>verify = 0</c>, it accepts any client certificate it is sent, valid or not.
+/// <c>verify = 0</c>, it accepts any client certificate it is sent, valid or not, unless
+/// <see cref="ClientCertificateVerifier"/> is set, as stunnel at <c>verify = 2</c>.
 /// </summary>
 /// <param name="Certificate">The server certificate, with its private key, loaded by the caller from PEM or PKCS#12.</param>
 /// <param name="ApplicationProtocols">The ALPN protocol names offered, such as <c>h2</c> and <c>http/1.1</c>; empty for no ALPN, as stunnel does by default.</param>
@@ -14,4 +15,12 @@ namespace Curl.Conformance;
 public sealed record TlsServerOptions(
     X509Certificate2 Certificate,
     IReadOnlyList<string> ApplicationProtocols,
-    bool RequestClientCertificate);
+    bool RequestClientCertificate)
+{
+    /// <summary>
+    /// Gets the verifier that records the client's certificate and fails the handshake without one the
+    /// test CA signed, as upstream's <c>https-mtls</c> stunnel does; <see langword="null"/> accepts any.
+    /// Set it only with <see cref="RequestClientCertificate"/>.
+    /// </summary>
+    public TlsClientCertificateVerifier? ClientCertificateVerifier { get; init; }
+}

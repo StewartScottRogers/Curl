@@ -1,0 +1,398 @@
+# Lanes' git and lock helpers, renumbering duplicate task IDs, claiming a task, and
+# -TestClaimDuplicates. Dot-sourced by RunDarkFactory.ps1 in its order; see the loader
+# there.
+
+# ---------------------------------------------------------------------------- lanes
+
+function Invoke-Git {
+    # git in this checkout; returns $true when it exited 0. Output goes to the trace only
+    # on failure, so a quiet lane stays quiet.
+    param([string[]]$GitArgs)
+    $out = & git -C $Root @GitArgs 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $last = ($out | ForEach-Object { "$_" } | Where-Object { $_.Trim() } | Select-Object -Last 1)
+        Write-Trace '-' 'git' "FAIL git $($GitArgs[0]): $(Get-Short "$last" 60)" 'DarkYellow'
+        return $false
+    }
+    return $true
+}
+
+function Enter-Lock {
+    # Claims and integrations take turns across every lane. Holding the file open with no
+    # sharing is the lock; the operating system releases it if the lane dies.
+    New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+    while ($true) {
+        try { return [IO.File]::Open($LockFile, 'OpenOrCreate', 'ReadWrite', 'None') }
+        catch { Write-HeartbeatIfDue; Start-Sleep -Seconds 3 }
+    }
+}
+
+function Test-RemoteReachable {
+    # Whether origin answers at all, so a failed fetch or push can be told apart: refused by
+    # a remote that answers (another lane pushed first) or never heard (GitHub out of reach).
+    & git -C $Root ls-remote -q origin "refs/heads/$Branch" 2>&1 | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Wait-RemoteReachable {
+    # Waits for origin to answer, up to -Minutes, polling every -PollSeconds. An outage at
+    # GitHub is no reason to park finished work, or to trace a claim that was never refused
+    # as a lost race: on 2026-09-30 a few minutes of "unable to access" parked BL-892, which
+    # was finished, and another lane did it again (AF-0025, BL-1281). Returns $true once
+    # origin answers, $false when it never did.
+    param([string]$Id = '-', [int]$Minutes = 60, [int]$PollSeconds = 30)
+    if (Test-RemoteReachable) { return $true }
+    Write-Trace $Id 'offline' "origin out of reach; waiting up to $Minutes min for it" 'DarkYellow'
+    $deadline = (Get-Date).AddMinutes($Minutes)
+    while ((Get-Date) -lt $deadline) {
+        Write-HeartbeatIfDue
+        Start-Sleep -Seconds $PollSeconds
+        if (Test-RemoteReachable) { Write-Trace $Id 'online' 'origin answers again'; return $true }
+    }
+    return $false
+}
+
+function Sync-Lane {
+    # Puts this lane's checkout exactly on the shared branch as it is on the remote.
+    Save-StrayChanges 'sync'
+    if (-not (Invoke-Git @('fetch', '-q', 'origin', $Branch))) { return $false }
+    if (-not (Invoke-Git @('checkout', '-q', '-B', "factory/lane-$Lane", "origin/$Branch"))) { return $false }
+    return (Invoke-Git @('reset', '-q', '--hard', "origin/$Branch"))
+}
+
+function Test-Rebasing {
+    foreach ($dir in 'rebase-merge', 'rebase-apply') {
+        $path = (& git -C $Root rev-parse --git-path $dir).Trim()
+        if (-not [IO.Path]::IsPathRooted($path)) { $path = Join-Path $Root $path }
+        if (Test-Path $path) { return $true }
+    }
+    return $false
+}
+
+function Get-DoingCount { return @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue).Count }
+
+function Get-DuplicateIdSince {
+    # The commit to hand `dedupe -Since` so that the first of the live tasks sharing <Id> to
+    # appear keeps it: the parent of the commit that added the newest of them. $null when
+    # no commit of this checkout added any of them.
+    param([string]$Id)
+    $added = @()
+    foreach ($file in Get-ChildItem (Join-Path $Root 'Tasks') -Directory | Where-Object { $_.Name -ne 'Done' } | ForEach-Object { Get-ChildItem $_.FullName -Filter "$Id-*.md" }) {
+        $first = @(& git -C $Root log --diff-filter=A --format=%H -- "Tasks/*/$($file.Name)" 2>$null | Where-Object { $_ }) | Select-Object -Last 1
+        if ($first) { $added += $first }
+    }
+    if (-not $added.Count) { return $null }
+    $newest = @(& git -C $Root rev-list --topo-order HEAD 2>$null | Where-Object { $added -contains $_ })[0]
+    $parent = (& git -C $Root rev-parse --verify -q "$newest^" 2>$null)
+    if ($LASTEXITCODE -ne 0) { return $null }
+    return "$parent".Trim()
+}
+
+function Invoke-RenumberDuplicates {
+    # Two live tasks share <Id>: renumber the later ones, commit and push the renumbering.
+    # True when it was pushed, so the claim can go on; false when it could not be.
+    param([string]$Id)
+    $since = Get-DuplicateIdSince $Id
+    if (-not $since) { Write-Trace $Id 'renum' "$Id names several tasks but no commit says which came first" 'Yellow'; return $false }
+    $renumbered = @((Invoke-Board @('dedupe', '-Since', $since)) | Where-Object { $_ -match '->' })
+    if (-not $renumbered.Count) { return $false }
+    Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+    Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber duplicate task IDs`n`n$($renumbered -join "`n")", '-m', $SkipCiNote) | Out-Null
+    foreach ($line in $renumbered) { Write-Trace $Id 'renum' "renumbered duplicate task IDs $($line -replace '\s{2,}.*$', '')" 'DarkYellow' }
+    return (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))
+}
+
+# ---------------------------------------------------------------------------- readiness
+
+# The pre-claim check (BL-3001): a script-only look at a task's file that keeps a lane from
+# claiming a task whose run could only come back without Done or keep the other lanes
+# idle. Measured on the 227 lane runs of 2026-10-19 to 2026-10-21: 34 runs ended Blocked
+# or requeued ($64 of $328); most of them for reasons no task file shows (a dependency or a
+# held file found mid-run), so only two rules are kept, each with no past Done run against it.
+
+# A feature or protocol task whose title names this many upstream case numbers or more is
+# too big for one run: BL-2834, BL-2844, BL-2845, BL-2846 and BL-2847 (10 to 12 cases,
+# porting or standing in per case) each came back without Done from its first run, three
+# of them split for size, at $1.20 to $2.54 a run; of the 9-case tasks, BL-2835 and BL-2842
+# were Done in one run and BL-2843 was split, so 9 is the edge and 10 the limit.
+$UnreadyTitleCaseLimit = 10
+
+function Get-TitleCaseCount {
+    # How many distinct upstream case numbers (two to four digits) a task title names, after
+    # dropping task, decision and finding IDs (BL-2843, ADR-0723, AF-0304), versions (8.22.0)
+    # and dates, so a title's own references never count as cases.
+    param([string]$Title)
+    $plain = $Title -replace '\b[A-Z]{2,4}-\d+', ' ' -replace '\d+(\.\d+)+', ' ' -replace '\b\d{4}-\d\d-\d\d\b', ' '
+    return @([regex]::Matches($plain, '(?<![\w.])\d{2,4}(?![\w.])') | ForEach-Object { [int]$_.Value } | Select-Object -Unique).Count
+}
+
+function Get-TaskTextUnreadyWhy {
+    # Why a task file's text says a lane must not claim it yet, or '' when it may. Two rules:
+    # - touches empty, missing or '*': the board runs it alone, so every other lane idles
+    #   for its whole run (BL-2917 and BL-2998 each held capacity at 1).
+    # - a feature or protocol task whose title names $UnreadyTitleCaseLimit or more upstream
+    #   cases, unless its title starts with a verb that does one thing to all of them (List,
+    #   Record, Report, Check, Mark, Exclude: BL-2826, BL-2849, BL-2858 and BL-2861 named 10
+    #   to 18 and were Done) or a lane already handed it back once (that run split it or
+    #   filed what it waits on, and what is left fits a run: BL-2844, BL-2845 and BL-2846
+    #   were Done on their next claim).
+    # Not rules, because the data showed no signal: whole project folders in touches (26 Done
+    # tasks named one), many touches or criteria, and a task requeued before.
+    param([string]$Text)
+    $touches = if ($Text -match '(?m)^touches:[ \t]*(.*)$') { @(($Matches[1].Trim().Trim('[', ']') -split ',') | ForEach-Object { $_.Trim() } | Where-Object { $_ }) } else { @() }
+    if (-not $touches.Count -or $touches -contains '*') {
+        return 'its touches are empty or *, so it would run alone and idle every other lane; name the folders and files it changes'
+    }
+    $pipeline = if ($Text -match '(?m)^pipeline:[ \t]*(\S+)') { $Matches[1] } else { '' }
+    $title = if ($Text -match '(?m)^title:[ \t]*(.+)$') { $Matches[1].Trim().Trim('"', "'") } else { '' }
+    if ($pipeline -notin 'feature', 'protocol') { return '' }
+    if ($title -match '^(List|Record|Report|Check|Mark|Exclude)\b') { return '' }
+    $log = if ($Text -match '(?s)\n## Log\b(.*)$') { $Matches[1] } else { '' }
+    if ($log -match 'Doing -> Backlog') { return '' }
+    $cases = Get-TitleCaseCount $title
+    if ($cases -lt $UnreadyTitleCaseLimit) { return '' }
+    return "its title names $cases upstream cases, more than one run finishes (at most $($UnreadyTitleCaseLimit - 1)); split it"
+}
+
+function Get-TaskUnreadyWhy {
+    # Get-TaskTextUnreadyWhy for the live task <Id>; '' when no file names it.
+    param([string]$Id)
+    $file = Get-ChildItem (Join-Path $Root 'Tasks') -Directory | Where-Object { $_.Name -ne 'Done' } |
+        ForEach-Object { Get-ChildItem $_.FullName -Filter "$Id-*.md" } | Select-Object -First 1
+    if (-not $file) { return '' }
+    return (Get-TaskTextUnreadyWhy ([IO.File]::ReadAllText($file.FullName)))
+}
+
+# Tasks a lane of this shift passed over as unready, one "BL-###<TAB>why" a line in
+# <repo>.logs\lanes-<stamp>\unready.txt, so each is traced once a shift rather than at every
+# claim, and a planner or the shift end can list what to fix. Written under the claim lock.
+function Get-ShiftUnreadyPath { return (Join-Path (Join-Path $LogDir "lanes-$Stamp") 'unready.txt') }
+
+function Get-ShiftUnready {
+    $path = Get-ShiftUnreadyPath
+    if (-not (Test-Path $path)) { return @() }
+    return @(Get-Content $path | Where-Object { "$_".Trim() })
+}
+
+function Add-ShiftUnready {
+    # Records <Id> as unready this shift; $true the first time, $false when it already was.
+    param([string]$Id, [string]$Why)
+    if (@(Get-ShiftUnready | Where-Object { $_ -match "^$Id`t" }).Count) { return $false }
+    $path = Get-ShiftUnreadyPath
+    New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+    Add-Content -Path $path -Value "$Id`t$Why" -Encoding ASCII
+    return $true
+}
+
+function Invoke-Claim {
+    # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
+    # overlaps work in progress (or nothing is ready but other lanes may unlock more, or the
+    # only ready tasks are unready for a lane), or @{ None = $true } when the board has
+    # nothing left for this shift.
+    param([string[]]$Skip, [switch]$CiFixOnly)
+    $lock = Enter-Lock
+    try {
+        foreach ($attempt in 1..5) {
+            if (-not (Wait-RemoteReachable)) { return @{ Wait = $true; Why = 'origin out of reach' } }
+            if (-not (Sync-Lane)) { Start-Sleep -Seconds 10; continue }
+            $requeued = @(Invoke-Requeue)
+            if ($requeued.Count) {
+                Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+                Invoke-Git @('commit', '-q', '-m', "chore(tasks): requeue $($requeued -join ', ') - blockers Done", '-m', $SkipCiNote) | Out-Null
+                if (-not (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch"))) { continue }
+            }
+            # A task whose runs of the last day already spent its cost cap is left in Backlog
+            # rather than claimed only to be Blocked at once, which cost BL-2788 two claims
+            # that could only block (AF-0304); the next claim offers it once the window passes.
+            # A task the pre-claim check finds unready is passed over the same way, traced once
+            # a shift (BL-3001).
+            # Only bare task IDs go to -Skip: anything else garbles the argument list.
+            $skipNow = @($Skip | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^BL-\d+$' })
+            $unready = @()
+            do {
+                $boardArgs = @('next')
+                if ($skipNow.Count) { $boardArgs += @('-Skip', ($skipNow -join ',')) }
+                $next = (Invoke-Board $boardArgs) -join "`n"
+                $id = Get-NextTaskId $next
+                # A task offered again although it is in the skip list would loop here for ever
+                # while this lane holds the lock, and every other lane waits on it (shift
+                # 20261021-175054: lane 6 offered BL-2970 752 times in 80 minutes). Wait instead.
+                if ($id -and ($skipNow -contains $id)) {
+                    Write-Trace $id 'claim' "next offered it again although -Skip named it ($($skipNow -join ',')); waiting" 'DarkYellow'
+                    return @{ Wait = $true; Why = "next kept offering skipped $id" }
+                }
+                $overCap = [bool]($id -and (Get-TaskCapSpentWhy $id))
+                if ($overCap) { Write-Trace $id 'cost cap' 'its runs of the last day already spent its cost cap; not claimed' 'Yellow'; $skipNow += $id }
+                $unreadyWhy = if ($id -and -not $overCap) { Get-TaskUnreadyWhy $id } else { '' }
+                if ($unreadyWhy) {
+                    if (Add-ShiftUnready $id $unreadyWhy) { Write-Trace $id 'unready' "not claimed: $unreadyWhy" 'Yellow' }
+                    $skipNow += $id
+                    $unready += $id
+                }
+            } while ($overCap -or $unreadyWhy)
+            if (-not $id) {
+                if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
+                # Only unready tasks are ready: wait rather than end the lane, or -Continuous
+                # would start shift after shift that each pass them over.
+                if ($unready.Count) { return @{ Wait = $true; Why = (Get-Short "only unready tasks are ready ($($unready -join ', ')); see unready.txt" 80) } }
+                return @{ None = $true }
+            }
+            # With the usage stop on, only a CI fix is claimed (AF-0308); any other task waits.
+            if ($CiFixOnly -and -not (Test-CiFixTitle (Get-TaskTitle $id))) { return @{ None = $true } }
+            $moved = (Invoke-Board @('move', '-Id', $id, '-To', 'Doing')) -join ' '
+            if ((Get-TaskState $id) -ne 'Doing') {
+                # The board refuses an ID that names two live tasks, and no claim can win
+                # until they are renumbered (BL-2014); any other refusal is reported as it is.
+                if ($moved -match 'names \d+ tasks' -and (Invoke-RenumberDuplicates $id)) { continue }
+                $refusal = Get-Short $moved 100
+                Write-Trace $id 'refused' "the board would not move it to Doing: $refusal" 'DarkYellow'
+                continue
+            }
+            Invoke-Git @('add', '-A', 'Tasks') | Out-Null
+            Invoke-Git @('commit', '-q', '-m', "chore(tasks): claim $id on dark factory lane $Lane", '-m', $SkipCiNote) | Out-Null
+            if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return @{ Id = $id } }
+            # Only a claim that was pushed is traced as 'claim', so the log counts claims
+            # truly; a refused push is 'race', and an unheard one is no race at all.
+            if (Test-RemoteReachable) { Write-Trace $id 'race' 'another lane pushed first; picking again' 'DarkYellow' }
+            $lostRace = $true
+        }
+        $why = if ($lostRace) { 'claim kept losing races' } else { 'claim kept being refused by the board or origin' }
+        return @{ Wait = $true; Why = $why }
+    } finally { $lock.Dispose() }
+}
+
+if ($TestClaimDuplicates) {
+    # Two lanes filed BL-001 at the same time: the board refuses to move either, so a claim
+    # must renumber the later one and carry on, rather than retry and call it a lost race.
+    $temp = Join-Path ([IO.Path]::GetTempPath()) "df-claim-dup-$PID"
+    $origin = Join-Path $temp 'origin.git'
+    $repo = Join-Path $temp 'lane-9'
+    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    git init -q --bare -b work $origin 2>&1 | Out-Null
+    git clone -q $origin $repo 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    git -C $repo checkout -q -b work 2>&1 | Out-Null
+    foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $repo "Tasks\$state\.gitkeep") -Value '' }
+    $file = {
+        param($Slug)
+        Set-Content -Path (Join-Path $repo "Tasks\Backlog\BL-001-$Slug.md") -Encoding UTF8 -Value @(
+            '---', 'id: BL-001', "title: $Slug", 'priority: Normal', 'assignee: Claude', 'pipeline: direct',
+            'depends-on: []', "touches: [$Slug]", 'requirement: none', 'created: 2026-10-01', 'completed:', '---',
+            "# BL-001 - $Slug", '', '## Goal', '', '## Context', '', '## Acceptance criteria', '', '- [ ] Claimed.', '', '## Notes', '', '## Log', '', '- 2026-10-01: Created.')
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m "file $Slug" 2>&1 | Out-Null
+    }
+    & $file 'first'
+    & $file 'second'
+    git -C $repo push -q origin work 2>&1 | Out-Null
+    $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
+    $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
+    $env:CLAUDE_PROJECT_DIR = $repo
+    $failed = 0
+    try {
+        $claim = Invoke-Claim -Skip @()
+        git -C $repo fetch -q origin work 2>&1 | Out-Null
+        $shared = @(git -C $repo ls-tree -r --name-only origin/work Tasks) | Where-Object { $_ -match 'BL-\d+-' }
+        $ids = @($shared | ForEach-Object { if ($_ -match '(BL-\d+)-') { $Matches[1] } })
+        $cases = @(
+            ,@('a duplicate ID is renumbered and the claim goes on', 'claimed', $(if ($claim.Id) { 'claimed' } else { "waited: $($claim.Why)" }))
+            ,@('no ID is left naming two tasks on the shared branch', '2 tasks, 2 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
+            ,@('the first task to be filed keeps its ID', 'True', "$(@($shared | Where-Object { $_ -match 'BL-001-first' }).Count -eq 1)")
+            ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
+        )
+        foreach ($case in $cases) {
+            if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+            else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+        }
+    } finally {
+        Remove-Item -Recurse -Force -Path $temp -ErrorAction SilentlyContinue
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
+if ($TestTaskReadiness) {
+    # The pre-claim check (BL-3001): each rule on a task file's text, then on a throwaway
+    # repository that a claim passes over an unready task, traces it once a shift, and
+    # waits rather than ends when only unready tasks are ready.
+    $taskText = {
+        param([string]$Title, $Touches = '[Curl.Cli.UnitLibrary/Foo.cs]', [string]$Pipeline = 'feature', [string[]]$Log = @('- 2026-10-01: Created.'))
+        $front = @('---', 'id: BL-001', "title: $Title", 'priority: Normal', 'assignee: Claude', "pipeline: $Pipeline", 'depends-on: []')
+        if ($null -ne $Touches) { $front += "touches: $Touches" }
+        return (@($front) + @('requirement: none', 'created: 2026-10-01', 'completed:', '---', "# BL-001 - $Title", '', '## Goal', '', '## Context', '',
+            '## Acceptance criteria', '', '- [ ] Claimed.', '', '## Notes', '', '## Log', '') + @($Log)) -join "`n"
+    }
+    $nine = 'Port upstream unit programs: cases 1394, 1397, 1651, 1656, 1657, 1666, 1667, 1676 and 3205'
+    $ten = 'Port upstream unit programs: cases 1395, 1396, 1398, 1399, 1600, 1601, 1602, 1603, 1606 and 1607'
+    $requeued = @('- 2026-10-01: Created.', '- 2026-10-02: Backlog -> Doing. Criteria at claim: 1.', '- 2026-10-02: Doing -> Backlog. Split for size: waits on BL-002.')
+    $ruleCases = @(
+        ,@('a narrow task with few cases is ready', '', (& $taskText 'Make upstream case 1454 pass'))
+        ,@('touches: [] is unready', 'touches', (& $taskText 'Fix a thing' '[]'))
+        ,@('touches: [*] is unready', 'touches', (& $taskText 'Fix a thing' '[*]'))
+        ,@('no touches line is unready', 'touches', (& $taskText 'Fix a thing' $null))
+        ,@('whole project folders in touches are ready', '', (& $taskText 'Fix a thing' '[Curl.Engine.UnitLibrary, Curl.Engine.UnitTests]'))
+        ,@('a feature title naming 10 cases is unready', 'names 10 upstream cases', (& $taskText $ten))
+        ,@('a protocol title naming 10 cases is unready', 'names 10 upstream cases', (& $taskText $ten -Pipeline 'protocol'))
+        ,@('a feature title naming 9 cases is ready', '', (& $taskText $nine))
+        ,@('a direct task naming 10 cases is ready', '', (& $taskText $ten -Pipeline 'direct'))
+        ,@('a docs task naming 10 cases is ready', '', (& $taskText $ten -Pipeline 'docs'))
+        ,@('a List title naming 10 cases is ready', '', (& $taskText ($ten -replace '^Port upstream unit programs', 'List the upstream cases')))
+        ,@('a Report title naming 10 cases is ready', '', (& $taskText ($ten -replace '^Port upstream unit programs', 'Report the feature so upstream')))
+        ,@('10 cases after a lane handed it back once is ready', '', (& $taskText $ten -Log $requeued))
+        ,@('IDs, versions and dates in a title are not cases', '', (& $taskText 'Port cases 1394, 1397 (BL-2843, BL-2844, ADR-0723, AF-0304, GF-0012) to curl 8.22.0 as of 2026-10-21 and 8.21.1 with 1651, 1656, 1657, 1666, 1667'))
+    )
+    $failed = 0
+    foreach ($case in $ruleCases) {
+        $why = Get-TaskTextUnreadyWhy $case[2]
+        $ok = if ($case[1]) { $why -match [regex]::Escape($case[1]) } else { $why -eq '' }
+        if ($ok) { Write-Host "PASS $($case[0]): '$why'" -ForegroundColor Green }
+        else { Write-Host "FAIL $($case[0]): expected '$($case[1])', got '$why'" -ForegroundColor Red; $failed++ }
+    }
+
+    # A High task with empty touches would be offered first; the claim must take the Normal one.
+    $temp = Join-Path ([IO.Path]::GetTempPath()) "df-claim-ready-$PID"
+    $origin = Join-Path $temp 'origin.git'
+    $repo = Join-Path $temp 'lane-9'
+    New-Item -ItemType Directory -Force -Path $temp | Out-Null
+    git init -q --bare -b work $origin 2>&1 | Out-Null
+    git clone -q $origin $repo 2>&1 | Out-Null
+    git -C $repo config user.name t; git -C $repo config user.email t@t
+    git -C $repo checkout -q -b work 2>&1 | Out-Null
+    foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $repo "Tasks\$state\.gitkeep") -Value '' }
+    Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-001-anything.md') -Encoding UTF8 -Value ((& $taskText 'Change anything' '[]') -replace 'priority: Normal', 'priority: High')
+    Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-002-narrow.md') -Encoding UTF8 -Value ((& $taskText 'Change one file') -replace 'BL-001', 'BL-002')
+    git -C $repo add -A 2>&1 | Out-Null
+    git -C $repo commit -q -m 'file two tasks' 2>&1 | Out-Null
+    git -C $repo push -q origin work 2>&1 | Out-Null
+    $script:Root = $repo; $script:Branch = 'work'; $script:Lane = 9; $script:Stamp = 'test'
+    $script:LanesDir = $temp; $script:LockFile = Join-Path $temp 'integrate.lock'; $script:LogDir = Join-Path $temp 'logs'
+    $script:TraceFile = Join-Path $LogDir 'trace.log'
+    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+    $env:CLAUDE_PROJECT_DIR = $repo
+    try {
+        $first = Invoke-Claim -Skip @()
+        # The narrow task is finished elsewhere: only the unready one is left, with nothing in Doing.
+        git -C $repo rm -q 'Tasks/Doing/BL-002-narrow.md' 2>&1 | Out-Null
+        git -C $repo commit -q -m 'BL-002 finished' 2>&1 | Out-Null
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $second = Invoke-Claim -Skip @()
+        $traced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'BL-001 unready' })
+        $cases = @(
+            ,@('a claim passes over an unready task and takes the next', 'BL-002', "$($first.Id)")
+            ,@('the unready task stays in Backlog', 'Backlog', (Get-TaskState 'BL-001'))
+            ,@('with only unready tasks ready the lane waits, not ends', 'wait', $(if ($second.Wait) { 'wait' } elseif ($second.None) { 'none' } else { "claimed $($second.Id)" }))
+            ,@('the wait says why', 'True', "$($second.Why -match 'only unready tasks are ready \(BL-001\)')")
+            ,@('the unready task is traced once a shift, not at every claim', '1', "$($traced.Count)")
+            ,@('unready.txt lists it once with its reason', '1 touches', "$(@(Get-ShiftUnready).Count) $(if ((Get-ShiftUnready) -match 'touches are empty') { 'touches' })")
+        )
+        foreach ($case in $cases) {
+            if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+            else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+        }
+    } finally {
+        Remove-Item -Recurse -Force -Path $temp -ErrorAction SilentlyContinue
+    }
+    exit $(if ($failed) { 1 } else { 0 })
+}
+
+# This file ran to its end; RunDarkFactory.ps1 goes on to the next one.
+$AreaFileFinished = $true

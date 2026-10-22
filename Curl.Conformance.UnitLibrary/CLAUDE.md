@@ -96,8 +96,8 @@ opened tunnel) and TLS are Curl's real code; the `sws` stand-in only answers the
 1456, 3028, 3201, 3202, 3220) pass through it.
 A read before the client's first write waits for that write, as sws blocks reading the
 request (a telnet `-T` session reads while its upload is on its way; BL-1853), and a read while
-an `Expect: 100-continue` request still owes its body waits for the client's next write, since
-sws never answers 100 (test1070). Under `skip: N`, bytes past the request's end are dropped
+the bytes written hold an unfinished request (an `Expect: 100-continue` body still owed, test1070;
+a request sent in pieces, test1548) waits for the client's next write, as sws blocks reading it. Under `skip: N`, bytes past the request's end are dropped
 unrecorded, as sws's stored request ends there. Otherwise a
 read with no reply waiting returns 0, because in memory nothing else can arrive.
 
@@ -117,11 +117,11 @@ read with no reply waiting returns 0, because in memory nothing else can arrive.
 
 `%HTTP6PORT` is 8991 (`UpstreamCaseRunner.Http6Port`, BL-1903) and `%HOST6IP` is `[::1]`: upstream's `http-ipv6` server is the same `sws` emulation, all in memory, so no case needs IPv6 from the machine, and screening lets `http-ipv6` cases run. A connection whose target is an IPv6 address has `::1` at both ends (`SwsHttpServerConnector`), so a `--haproxy-protocol` line reads `PROXY TCP6 ::1 ::1` (test1456), and the conformance tests' resolver answers `ip6-localhost` with `::1`, as the `%RESOLVE` precheck says it does (test241). The 8 cases this opened (240, 241, 242, 263, 1324, 1408, 1456, 3202) pass; the other `http-ipv6` cases skip for another reason (a `<tool>`, a feature, a precheck). `%CLIENT6IP` is `[::1]` and `%CLIENT6IP-NB` `::1`, and upstream's `ftp-ipv6` and `gopher-ipv6` servers are the FTP and Gopher stand-ins on `%FTP6PORT` 9011 (`FtpServerConnector.Ftp6Port`) and `%GOPHER6PORT` 9012 (`GopherServerConnector.Gopher6Port`), in memory too (BL-2227; servers.pm picks free ports, and these two no other stand-in uses). `LoopbackAddress` gives every in-memory connection to an IPv6 address `::1` at both ends, the line-protocol stand-ins included, so curl's `-P -` sends `EPRT |2|::1|...`; ftpserver.pl answers `EPSV` the same on IPv6. Screening lets `ftp-ipv6` (with ftpserver.pl's `<servercmd>` set and `<verify><upload>`) and `gopher-ipv6` cases run: 252, 253, 254, 255, 1046, 1048, 1050 and 1203 pass (1046 and 1048 with `--interface ::1`, which the in-memory dial accepts), test1083's `if(...) {print ...} else {exec '%RESOLVE ...'}` precheck runs (`UpstreamPerlOneLiner`, BL-2242), and test2086 skips for its `<tool>`.
 
-`GopherServerConnector` (BL-2175) emulates upstream's Gopher server, `sws --gopher`, on port 9008, the runner's `%GOPHERPORT`, outside every other stand-in but the Gophers, dict, telnet, SSH and https-proxy ones, and passes every other connection on. A `GopherServerConnection` reads one selector line up to its CRLF (however the writes split it), records those bytes for `<verify><protocol>` (after the tftpd dump; bytes past the CRLF are dropped), answers with `<data>`, or `<dataN>` when the number after the selector's last slash (past any non-digits, as sws's `strtol` reads it) is over 10000, sent as written with no headers, and closes. Screening lets `gopher` cases run: 1200, 1201 and 1202 pass, 1609 fails on a Curl difference (BL-2185: Curl sends `/sel\r\n` where curl rejects the CR LF with exit 3), and 5028 skips for the Debug feature.
+`GopherServerConnector` (BL-2175) emulates upstream's Gopher server, `sws --gopher`, on port 9008, the runner's `%GOPHERPORT`, outside every other stand-in but the Gophers, dict, telnet, SSH and https-proxy ones, and passes every other connection on. A `GopherServerConnection` reads one selector line up to its CRLF (however the writes split it), records those bytes for `<verify><protocol>` (after the tftpd dump; bytes past the CRLF are dropped), answers with `<data>`, or `<dataN>` when the number after the selector's last slash (past any non-digits, as sws's `strtol` reads it) is over 10000, sent as written with no headers, and closes. Screening lets `gopher` cases run: 1200, 1201 and 1202 pass, 1609 fails on a Curl difference (BL-2185: Curl sends `/sel\r\n` where curl rejects the CR LF with exit 3), and 5028 passes with the small-sends stand-in (BL-2832).
 
 `%HTTP2PORT` is 9009 (`UpstreamCaseRunner.Http2Port`, BL-2175), so no case skips for it. The stand-in for upstream's `nghttpx` h2c front lives in `Curl.Conformance.Http2Server.UnitLibrary` (ADR-0491), which references this library, so the runner reaches it through `UpstreamHttp2Server` (BL-2230), a record the caller builds (`new UpstreamHttp2Server(UpstreamHttp2ServerFactory.Create)`) and passes as `UpstreamCaseRunner`'s optional `http2Server`, as it does `UpstreamSshServer`. Given one, `InFrontOf` puts a fresh h2c server, relaying each stream to the case's `sws` emulation as HTTP/1.1 (so the relayed requests land in its `ReceivedBytes`), on 9009 in front of every stand-in but the https-proxy one, and screening lets a case naming the `http/2` server run; without one screening skips it and a connection to 9009 reaches the `sws` emulation like any other port. `%H2CVER` is `h2c` (`UpstreamCaseRunner.H2cVersion`), as `runtests.pl` sets it. `UpstreamCurlPlatform` reports `http/2` and `h2c` on Linux and macOS only, since Curl's Windows build matches curl's Schannel build, which has no `HTTP2` and refuses `--http2` (ADR-0495): on Windows 358, 471, 1700, 1702, 1800 and 1801 are `SkippedOnThisPlatform`, and they are measured on Linux and macOS. `%HTTP2TLSPORT` is 9018 (`UpstreamCaseRunner.Http2TlsPort`, BL-2245, ADR-0496) and, like the other stunnel-fronted ports, has a value only with a certificate directory: given an `UpstreamHttp2Server` with its optional `CreateTlsServer` (`new UpstreamHttp2Server(UpstreamHttp2ServerFactory.Create, UpstreamHttp2ServerFactory.CreateTls)`), `InFrontOf` puts nghttpx's TLS front there, presenting `%CERTDIR/certs/test-localhost.pem` with ALPN `h2`, loaded only for a case naming the `http/2` server. On Windows 2400-2404 and 2406 are `SkippedOnThisPlatform` for `http/2`; on Linux and macOS 2403 passes (measured on Windows emulating that build, BL-2264) and 2404 skips for its `<tool>` (`lib2404`). The conformance tests report `Debug` to a case whose command names `%HTTP2TLSPORT` (2400, 2401, 2406 use nothing debug-only) and to an `alt-svc` case setting `CURL_ALTSVC_HTTP` (358, 359), which Curl honours behind `CreateRunner(honoursAltSvcHttpVariable: true)`; `FindFeatureOfAnotherPlatform` counts such a stand-in feature, one no platform reports, as met on every platform, so these listed cases are `SkippedOnThisPlatform` on Windows (ADR-0497, BL-2263); test2407 skips first for its `<tool>`.
 
-`%HTTP3PORT` is 9019 (`UpstreamCaseRunner.Http3Port`, BL-2261, ADR-0498) and has a value only when the caller names a certificate directory and gives an `UpstreamHttp3Server`, the record through which the runner reaches the nghttpx-h3 stand-in in `Curl.Conformance.Http3Server.UnitLibrary` (which references this library), passed as `UpstreamCaseRunner`'s optional `http3Server`. Its `CreateServer` takes the case's `sws` emulation and `%CERTDIR/certs/test-localhost.pem`; the conformance tests build it with `UpstreamHttp3ServerFactory.Create` and TLS settings signing with the certificate's P-256 key. Given one, the platform reports `nghttpx-h3` (`UpstreamCaseRunner.Http3ServerFeature`), screening lets a case naming the `http/3` server run, for such a case `InFrontOf` puts a fresh stand-in on datagram port 9019 in front of the dnsd and tftpd stand-ins (so the relayed HTTP/1.1 requests land in the `sws` emulation's `ReceivedBytes`), and `RefusingTcpOnHttp3Port` refuses a TCP connection to 9019, so `--http3`'s race of TCP against QUIC settles on QUIC. `UpstreamCurlPlatform` reports `http/3` on no platform, since Curl refuses `--http3` and `--http3-only` on every reference build, none of which has a QUIC library (ADR-0540): 2500 to 2503 skip for `Curl lacks the feature http/3` everywhere, as `runtests.pl` skips them for the reference curl, and are off `PassingUpstreamCases.txt` (BL-2370, GF-0094). The stand-in stays for a caller whose platform adds `http/3` with `WithFeatures`.
+`%HTTP3PORT` is 9019 (`UpstreamCaseRunner.Http3Port`, BL-2261, ADR-0498) and has a value only when the caller names a certificate directory and gives an `UpstreamHttp3Server`, the record through which the runner reaches the nghttpx-h3 stand-in in `Curl.Conformance.Http3Server.UnitLibrary` (which references this library), passed as `UpstreamCaseRunner`'s optional `http3Server`. Its `CreateServer` takes the case's `sws` emulation and `%CERTDIR/certs/test-localhost.pem`; the conformance tests build it with `UpstreamHttp3ServerFactory.Create` and TLS settings signing with the certificate's P-256 key. Given one, the platform reports `nghttpx-h3` (`UpstreamCaseRunner.Http3ServerFeature`), screening lets a case naming the `http/3` server run, for such a case `InFrontOf` puts a fresh stand-in on datagram port 9019 in front of the dnsd and tftpd stand-ins (so the relayed HTTP/1.1 requests land in the `sws` emulation's `ReceivedBytes`), and `RefusingTcpOnHttp3Port` refuses a TCP connection to 9019, so `--http3`'s race of TCP against QUIC settles on QUIC. `UpstreamCurlPlatform` reports `http/3` on no platform, since Curl refuses `--http3` and `--http3-only` on every reference build, none of which has a QUIC library (ADR-0540): the conformance tests add `http/3` (and `Debug`) with `WithFeatures` only for a case naming the `http/3` server (ADR-0720, BL-2838), so 2500 to 2503 run over the stand-in and are on `PassingUpstreamCases.txt`, held on Linux and macOS and `Inconclusive` on Windows, where the Schannel build's revocation check fails on the test CA.
 
 `LineProtocolServerConnector` is the shared core of the line-protocol stand-ins for upstream's
 `tests/ftpserver.pl` (BL-1895), the base that the FTP, SMTP, IMAP and POP3 stand-ins of
@@ -138,7 +138,7 @@ than one server, the runner puts their dumps back into the order the writes happ
 servers all append to one `server.input` (test2002 and test2003 interleave HTTP, FTP and TFTP, with
 FTP's `QUIT` at exit last); with one server the dumps follow each other as described below.
 `LineProtocolServerCommands` reads `<servercmd>`'s `REPLY <command> <text>` lines (and
-`REPLYLF`, whose text ends in a bare LF, test891) for the responders to look up by command name, reading the text as ftpserver.pl's `eval "qq{...}"` does (`\r`, `\n` and `\t` are control characters, `\@` is `@`), so one `REPLY` can send several lines. `FtpControlChannelResponder` (BL-1920) is the FTP
+`REPLYLF`, whose text ends in a bare LF, test891) for the responders to look up by command name, reading the text as ftpserver.pl's `eval "qq{...}"` does (`\r`, `\n` and `\t` are control characters, `\x` and up to two hex digits is the character with that code, so test2108's `\x00` sends a NUL byte, `\@` is `@`), so one `REPLY` can send several lines. `FtpControlChannelResponder` (BL-1920) is the FTP
 control channel's responder: the `220` curl banner (or `REPLY welcome`), a `REPLY` line's text,
 else ftpserver.pl's display text, `PWD` as `CWD` moved it, `500 <command> is not dealt with!`
 otherwise, and `500 Unrecognized command` with a close for a line that is not a three- or
@@ -165,7 +165,7 @@ test4001's `--ech` client exits 101 there as on Windows and Linux; any other fir
 back to `SslStream` through `ReplayedPrefixStream`. `ShutdownAsync` sends close_notify on either.
 
 `HttpsServerConnector` (BL-1912) stands in for upstream's HTTPS server, `sws` behind stunnel, on
-port 8989, the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
+port 18989 (five digits, as upstream's are), the runner's `%HTTPSPORT`, which has a value only when the caller names a certificate
 directory: a `TlsServerConnection` runs `TlsServerStream` over an `InMemoryDuplexStream` pair with
 the certificate the case's `<server>` line `https [file]` names from `%CERTDIR/certs/`
 (`test-localhost.pem` when none, loaded by `LoadCertificate`), offers no ALPN and asks for no client
@@ -269,6 +269,17 @@ wherever the harness's log directory is. Nothing listens on it: upstream's `http
 the connector chain at `%HTTPPORT` through `UpstreamCaseRunner.HttpUnixSocketTarget` (BL-2271, the one
 public way to dial it, for the gap office's tool too), so it reaches `SwsHttpServerConnector` through `TcpConnector`'s own
 Unix-socket code. Screening lets `http-unix` cases run: 1435 and 1436 pass.
+`%SOCKSUNIXPATH` is `/log/server/socks5.sock` (`SocksServerConnector.SocksUnixPath`, BL-2859), absolute as
+`runtests.pl` makes it, since curl reads `localhost%SOCKSUNIXPATH` as a host and a path. Upstream's `socks5unix`
+server is the socksd emulation: `SocksServerConnector` answers a dial whose host is that path, which the dialer's
+`HttpUnixSocketTarget` makes, as it answers `%SOCKSPORT`. Screening lets `socks5unix` cases run: 1467, 1468 and
+1470 are listed, `SkippedOnThisPlatform` on Windows (`!win32`) and passing as the Unix build.
+`%HTTPS-MTLSPORT` is 9021 (`HttpsServerConnector.HttpsMtlsPort`), with a value only when the caller names a
+certificate directory: `UpstreamHttpsMtlsFront` puts an `HttpsServerConnector` there for a case naming
+`https-mtls`, presenting `test-localhost.pem` and, through a `TlsClientCertificateVerifier` over
+`%CERTDIR/certs/test-ca.crt` (`TlsServerOptions.ClientCertificateVerifier`), demanding a client certificate the
+test CA signed, as stunnel at `verify = 2` does: the handshake fails without one, and every certificate presented
+is recorded in `ReceivedCertificates`. 2088 and 2089 are listed and run only on Linux and macOS (`!Schannel`).
 A `<client><stdout>` part is accepted and never compared, since `runtests.pl` at `curl-8_22_0` reads
 stdout only from `<verify>` (BL-2221): 210 passes, and 211 and 212 differ (Curl retries a refused
 `EPSV` or `EPRT` on the reused connection; BL-2236).
@@ -344,8 +355,12 @@ makes the listed folder (`asubdir`, `plainfile.txt` and `emptyfile.txt` last wri
 946728000, the read-only `rofile.txt` 978264000), and `postprocess` removes it (Perl's `die`
 exit code when it will not go), then exits 1 unless a named file was last written at a given
 time, or rewrites a listing into test613.pl's canonical form sorted from its 57th character.
-Screening skips a case whose postcheck runs test1013.pl or test1022.pl, naming the
-`../curl-config` they compare with, which Curl does not ship. The runner runs a precheck or
+`UpstreamTest1013Script` and `UpstreamTest1022Script` (BL-2854, ADR-0712) emulate
+`tests/libtest/test1013.pl` and `test1022.pl`, which compare `curl --version`'s protocols,
+features, version and numeric version with `../curl-config`: `UpstreamCurlConfig` stands in for
+that script with the answers of Curl's own `curl-config` (`Curl.Config.UnitLibrary`, over
+libcurl's `curl_version_info`), and `UpstreamCurlConfigScriptLine` carries out case 1014's
+`> FILE` redirect; 1013, 1014, 1022 and 1023 pass. The runner runs a precheck or
 postcheck whose every line is a `%PERL -e` one-liner `UpstreamPerlOneLiner` interprets (`%PERL` is
 `perl`, `$^O` is the platform's `OperatingSystemName`; BL-1933): a precheck that prints skips the
 case with its first line, one that exits non-zero with `precheck command error`, and a postcheck
@@ -357,8 +372,8 @@ only, the names `localhost` (both) and `ip6-localhost` (IPv6) resolve, and anyth
 with that line; `%HOST6IP` is `[::1]`, which lets test1085 run. A `%PERL` check line goes through `UpstreamPerlCheckLine` (BL-1894), which
 runs a `-e` one-liner with `UpstreamPerlOneLiner` and a line whose program is `test610.pl` or
 `test613.pl`, in whatever folder (`perl ./libtest/test613.pl ...`), with `UpstreamTest610Script`
-or `UpstreamTest613Script`; test1013.pl and test1022.pl, which compare with `../curl-config`, are
-not emulated. Any other check line skips the case, naming it. The result is an
+or `UpstreamTest613Script`, and a line whose program is `test1013.pl` or `test1022.pl` with
+`UpstreamTest1013Script` or `UpstreamTest1022Script`. Any other check line skips the case, naming it. The result is an
 `UpstreamCaseOutcome` (passed, failed or skipped, with its detail), which
 `UpstreamCaseRatchet.Judge` turns into the `UpstreamCaseVerdict` a test row reports, given
 whether the case is on the passing list. Before any other screening the runner asks
@@ -366,6 +381,8 @@ whether the case is on the passing list. Before any other screening the runner a
 another platform's Curl (`UpstreamCurlPlatform.All`) and not this one's; such a case is
 `UpstreamCaseOutcome.SkippedOnThisPlatform`, which the ratchet reports `Inconclusive` even when
 it is listed (ADR-0488, BL-2176).
+
+Each stand-in that wraps, or adds variables or features beside, the runner's plain servers (BL-2884) is an `UpstreamStandInFront` in a file of its own (`UpstreamHttpsFront`, `UpstreamFtpsFront`, `UpstreamMailTlsFront`, `UpstreamMqttsFront`, `UpstreamGophersFront`, `UpstreamHttp2Front`, `UpstreamHttpsProxyFront`, `UpstreamSshFront`, `UpstreamHttp3Front`, and outermost `UpstreamSmallSendsFront`, which splits every connection's writes into `CURL_SMALLREQSEND` and `CURL_SMALLSENDS` pieces for a case setting them, as the debug build sends them; ADR-0721): it names its `UpstreamStandInStage` in the chain, adds its `%NAME` variables and features, wraps the connector built so far, and writes or reads back its own files. `UpstreamStandInFronts.Create` is the one registration table, so a new stand-in is a new file plus a line there; `UpstreamCaseRunner` keeps only the shared code.
 
 The stand-in for upstream's test `sshd` is not here but in its own library,
 `Curl.Conformance.SshServer.UnitLibrary` (ADR-0456, BL-1934, BL-1935), because it reuses
@@ -396,10 +413,10 @@ run's `<verify><upload>` bytes (screening records `<verify><upload>` for `scp` a
 607, 628, 629, 630, 631 and 656 pass, and so do the SCP transfers 601, 603, 605, 617, 619, 621, 623,
 641, 665 and 3022 and the SFTP transfers and quote commands 600, 602, 604, 608, 609, 611, 612, 615,
 616, 618, 620, 622, 624, 625, 626, 627, 633 to 640, 642, 664, 1583, 2007 and 3021, and 632 and 1459,
-whose `<features>` name `sftp`, which `UpstreamCurlPlatform` lists with `scp` (BL-2240). 610 and 2004 pass (BL-2219); 614 and 1446
-are measured and differ. The runner reads the upload after the case's `<postcheck>`, as
-`runtests.pl` does, because 624 and 625 upload into a folder and the postcheck moves the file to
-`%LOGDIR/upload.%TESTNUMBER` (BL-1955).
+whose `<features>` name `sftp`, which `UpstreamCurlPlatform` lists with `scp` (BL-2240). 610 and 2004 pass (BL-2219), and 613, 614 and 1446 (BL-2855). The runner reads the upload and the
+`--output` file after the case's `<postcheck>`, as `runtests.pl` does, because 624 and 625 upload
+into a folder and the postcheck moves the file to `%LOGDIR/upload.%TESTNUMBER` (BL-1955), and
+test613.pl's postprocess rewrites 613's and 614's listing into its canonical form (BL-2855).
 
 A case whose `<client><tool>` names a libtest program (`lib%TESTNUMBER` or `libNNN`,
 `UpstreamCaseScreening.LibTestProgramName`) runs its ported `ILibTest` in place of curl (BL-2556,
@@ -409,8 +426,12 @@ references) and makes the `Libcurl` engine each run gets from its `UpstreamCurlI
 program gets the command's words alone as its arguments (no `--output`, `--include` or trace), the
 invocation's stdout and a line-feed-only stderr writer, runs under the same time limit, and is judged
 as a curl run is, except that `<reply><data>` is compared with the program's stdout, since `runner.pm`
-at `curl-8_22_0` sets a tool run's `$CURLOUT` to its stdout file (BL-2560; test500's shape). A lib case with no `<client><command>` (test501, test509) runs its program with no arguments, as runtests.pl runs a tool with an empty command (BL-2589; test501 passes). Around the program the runner writes on its stderr the lines curl 8.22.0's `tests/libtest/first.c` `main()` writes: `URL: <first argument>` before it, only when the command has a word, and `Test ended with result <exit code>` after it (BL-2649; test1549 passes). A lib case whose program is not ported skips with `libtest program not ported`; any
-other tool (`unitNNNN`, `toolNNNN`) with `the harness does not act on <client><tool>`. Until BL-2558
+at `curl-8_22_0` sets a tool run's `$CURLOUT` to its stdout file (BL-2560; test500's shape). A lib or unit case with no `<client><command>` (test501, test509, test1658) runs its program with the one argument `-`, as `runner.pm` at `curl-8_22_0` puts "something silly" in a missing command (BL-2589, BL-2924; test501 and test1658 pass). Around the program the runner writes on its stderr the lines curl 8.22.0's `tests/libtest/first.c` `main()` writes: `URL: <first argument>` before it, only when the program has an argument (so `URL: -` for a case with no command), and `Test ended with result <exit code>` after it (BL-2649; test1549 passes). A lib case whose program is not ported skips with `libtest program not ported`. A case with the `unittest` feature runs
+the unit program its `<tool>` names (or `unit<testnumber>` with none) from the runner's optional
+`UnitPrograms` (`Curl.Conformance.UnitProgram.UnitLibrary`; BL-2841, ADR-0711); the platform reports
+`unittest`, `Debug` and `TrackMemory` to such a case only when its program is ported, and an unported one
+skips with `Curl has no port of <program>`. A `unitNNNN` or `toolNNNN` tool in a case without the
+`unittest` feature skips with `the harness does not act on <client><tool>`. Until BL-2558
 gives the ratchet a real engine, it passes no `UpstreamLibTests`, so every lib case skips as not ported.
 
 What it is to hold in full, per ADR-0013 decision 2:
@@ -422,7 +443,7 @@ What it is to hold in full, per ADR-0013 decision 2:
 - the comparison of a case's results against its `<verify>` section.
 
 This library references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Tls.UnitLibrary`
-(for the TLS 1.3 stand-in, ADR-0522) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
+(for the TLS 1.3 stand-in, ADR-0522), `Curl.Config.UnitLibrary` (for `curl-config`'s answers, ADR-0712), `Libcurl` (whose tables script interpretations read where upstream's libcurl table checks read `curl.h` and `version.c`; BL-2990) and no protocol library. It never opens a socket: every connection goes to an in-memory server. It is
 held to the same quality gates as every other `.UnitLibrary` (100% line and branch
 coverage, complexity at most 10, CRAP at most 30) and is AOT-compatible like every
 production project.

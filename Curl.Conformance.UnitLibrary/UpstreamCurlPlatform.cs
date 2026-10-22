@@ -18,13 +18,16 @@ namespace Curl.Conformance;
 /// <c>NTLM</c>, <c>Kerberos</c> and <c>SPNEGO</c>; the tool features a curl build has unless it
 /// disables them (<c>cookies</c>, <c>proxy</c>, <c>Mime</c>, <c>manual</c>, <c>DoH</c>,
 /// <c>digest</c>, <c>aws</c>, <c>netrc</c>, <c>verbose-strings</c>, <c>large-time</c>,
-/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c> and <c>httpsig</c>); <c>headers-api</c>, since
+/// <c>large-size</c>, <c>sha512-256</c>, <c>SSLpinning</c>, <c>httpsig</c> and <c>--libcurl</c>, since Curl
+/// writes the C program <c>--libcurl</c> names (BL-2862)); <c>headers-api</c>, since
 /// Curl writes <c>-w %header{name}</c> and <c>%{header_json}</c>, which curl writes only with libcurl's
 /// headers API (BL-2264); <c>form-api</c>, since <c>Libcurl</c>, which runs the ported libtest
 /// programs, has <c>CURLOPT_HTTPPOST</c> (BL-2593); <c>wakeup</c>, since that <c>Libcurl</c> has <c>curl_multi_wakeup</c> (BL-2661, ADR-0690);
 /// <c>threadsafe</c>, which Curl's <c>Features:</c> line and <c>curl_version_info</c> name, and
 /// <c>threaded-resolver</c>, which <c>runtests.pl</c> derives from <c>AsynchDNS</c> without <c>c-ares</c>
-/// (ADR-0695, BL-2700); <c>large_file</c>;
+/// (ADR-0695, BL-2700); <c>codeset-utf8</c>, which <c>runtests.pl</c> derives from a UTF-8 locale on
+/// the machine running the tests: Curl reads URLs, mail addresses and <c>-w</c> text as UTF-8 whatever
+/// the locale, so the harness stands in for a UTF-8 locale on every platform (BL-2861); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
 /// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
@@ -37,49 +40,36 @@ namespace Curl.Conformance;
 /// These stay off, so the cases that need them are skipped rather than counted as failures:
 /// libcurl's build and API features, which a command-line tool does not have (<c>Debug</c>,
 /// <c>TrackMemory</c>, <c>unittest</c>,
-/// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>,
-/// <c>--libcurl</c>); the other protocols the harness has no server for; features
-/// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>,
-/// <c>ssl-sessions</c>, <c>c-ares</c>); and <c>codeset-utf8</c>, which depends on the
-/// locale of the machine running the tests.
+/// <c>shuffle-dns</c>, <c>override-dns</c>, <c>getrlimit</c>); the other protocols the harness has no server for; features
+/// absent from Curl's <c>curl -V</c> (<c>SSPI</c>, <c>Unicode</c>, <c>MultiSSL</c>, <c>c-ares</c>), and
+/// <c>ssl-sessions</c> on Windows, where the Schannel build has no <c>SSLS-EXPORT</c>; off Windows
+/// <c>runtests.pl</c> derives <c>ssl-sessions</c> from <c>SSLS-EXPORT</c>, and so does this list (ADR-0737, BL-2858).
 /// </para>
 /// </remarks>
 public sealed class UpstreamCurlPlatform
 {
-    private static readonly string[] CommonFeatures =
-    [
-        "dict", "file", "ftp", "gopher", "gophers", "http", "https", "imap", "ipfs", "mqtt", "mqtts", "pop3", "scp", "sftp", "smtp", "telnet", "tftp", "ws", "wss",
-        "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
-        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
-        "UnixSockets", "zstd",
-        "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
-        "large-time", "large-size", "sha512-256", "SSLpinning",
-        "large_file", "local-http", "httpsig", "headers-api", "form-api", "wakeup",
-        "threadsafe", "threaded-resolver",
-    ];
-
     private UpstreamCurlPlatform(IEnumerable<string> platformFeatures, string nullDevice, string operatingSystemName)
     {
-        Features = CommonFeatures.Concat(platformFeatures).ToHashSet(StringComparer.Ordinal);
+        Features = UpstreamPlatformFeatureTable.Common.Concat(platformFeatures).ToHashSet(StringComparer.Ordinal);
         NullDevice = nullDevice;
         OperatingSystemName = operatingSystemName;
     }
 
-    private UpstreamCurlPlatform(UpstreamCurlPlatform basis, IEnumerable<string> extraFeatures)
+    private UpstreamCurlPlatform(UpstreamCurlPlatform basis, IEnumerable<string> extraFeatures, IEnumerable<string> hiddenFeatures)
     {
-        Features = basis.Features.Concat(extraFeatures).ToHashSet(StringComparer.Ordinal);
+        Features = basis.Features.Concat(extraFeatures).Except(hiddenFeatures, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
         NullDevice = basis.NullDevice;
         OperatingSystemName = basis.OperatingSystemName;
     }
 
     /// <summary>Windows, where Curl matches curl's Schannel build.</summary>
-    public static UpstreamCurlPlatform Windows { get; } = new(["win32", "Schannel"], "NUL", "MSWin32");
+    public static UpstreamCurlPlatform Windows { get; } = new(UpstreamPlatformFeatureTable.Windows, "NUL", "MSWin32");
 
     /// <summary>Linux, where Curl matches curl's OpenSSL build.</summary>
-    public static UpstreamCurlPlatform Unix { get; } = new(["OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"], "/dev/null", "linux");
+    public static UpstreamCurlPlatform Unix { get; } = new(UpstreamPlatformFeatureTable.Unix, "/dev/null", "linux");
 
     /// <summary>macOS, where Curl matches curl's OpenSSL build as on Linux; only Perl's name for it differs.</summary>
-    public static UpstreamCurlPlatform MacOS { get; } = new(["OpenSSL", "SSLS-EXPORT", "xattr", "http/2", "h2c"], "/dev/null", "darwin");
+    public static UpstreamCurlPlatform MacOS { get; } = new(UpstreamPlatformFeatureTable.Unix, "/dev/null", "darwin");
 
     /// <summary>Every platform Curl's conformance run stands for: Windows, Linux and macOS.</summary>
     public static IReadOnlyList<UpstreamCurlPlatform> All { get; } = [Windows, Unix, MacOS];
@@ -96,7 +86,20 @@ public sealed class UpstreamCurlPlatform
     public UpstreamCurlPlatform WithFeatures(IEnumerable<string> extraFeatures)
     {
         ArgumentNullException.ThrowIfNull(extraFeatures);
-        return new UpstreamCurlPlatform(this, extraFeatures);
+        return new UpstreamCurlPlatform(this, extraFeatures, []);
+    }
+
+    /// <summary>
+    /// Returns this platform without some features, for a case run with Curl's feature mask hiding them, as
+    /// upstream's suite runs a case naming <c>!proxy</c> on a build without proxy support (ADR-0746, BL-2856);
+    /// this platform is unchanged.
+    /// </summary>
+    /// <param name="hiddenFeatures">The features to take off, spelled as upstream spells them.</param>
+    /// <returns>A platform with this one's features but <paramref name="hiddenFeatures"/>, null device and operating system name.</returns>
+    public UpstreamCurlPlatform WithoutFeatures(IEnumerable<string> hiddenFeatures)
+    {
+        ArgumentNullException.ThrowIfNull(hiddenFeatures);
+        return new UpstreamCurlPlatform(this, [], hiddenFeatures);
     }
 
     /// <summary>The value of <c>%DEV_NULL</c>.</summary>

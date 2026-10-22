@@ -115,8 +115,8 @@ internal sealed class SmtpMailTransaction(
     private string MailCommand(MailRequestOptions mail, long? size)
     {
         string? auth = extensions.Authenticated ? mail.Auth : null;
-        return "MAIL FROM:" + SmtpMailbox.Bracketed(mail.From, commandLineText)
-            + (auth is null ? string.Empty : " AUTH=" + SmtpMailbox.Bracketed(auth, commandLineText))
+        return "MAIL FROM:" + SmtpMailbox.Bracketed(mail.From, commandLineText, mail.SendsMailboxHostAsWritten)
+            + (auth is null ? string.Empty : " AUTH=" + SmtpMailbox.Bracketed(auth, commandLineText, mail.SendsMailboxHostAsWritten))
             + SizeParameter(size)
             + (extensions.SmtpUtf8Advertised && NeedsSmtpUtf8(mail, auth) ? " SMTPUTF8" : string.Empty);
     }
@@ -185,7 +185,7 @@ internal sealed class SmtpMailTransaction(
                 return AddressRefused();
             }
 
-            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient, commandLineText), "RCPT").ConfigureAwait(false);
+            SmtpReply reply = await ExchangeAsync("RCPT TO:" + SmtpMailbox.Bracketed(recipient, commandLineText, mail.SendsMailboxHostAsWritten), "RCPT").ConfigureAwait(false);
             if (reply.IsCompletion)
             {
                 anyAccepted = true;

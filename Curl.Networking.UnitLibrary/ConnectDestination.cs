@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Networking;
 
 /// <summary>
@@ -15,4 +17,13 @@ namespace Curl.Networking;
 /// <see langword="null" />. When it is set, <paramref name="Host" />, <paramref name="Port" />
 /// and <paramref name="IsMapped" /> carry no meaning.
 /// </param>
-public sealed record ConnectDestination(string Host, int Port, bool IsMapped, string? ParseError);
+public sealed record ConnectDestination(string Host, int Port, bool IsMapped, string? ParseError)
+{
+    /// <summary>
+    /// Gets the exit code that goes with <see cref="ParseError" />: exit 49
+    /// (<see cref="CurlExitCode.SetoptOptionSyntax" />) for a destination that does not parse,
+    /// exit 4 (<see cref="CurlExitCode.NotBuiltIn" />) for an IPv6 literal while IPv6 is hidden
+    /// (curl 8.22.0 <c>parse_connect_to_host_port</c> without <c>USE_IPV6</c>).
+    /// </summary>
+    public CurlExitCode ParseErrorCode { get; init; } = CurlExitCode.SetoptOptionSyntax;
+}

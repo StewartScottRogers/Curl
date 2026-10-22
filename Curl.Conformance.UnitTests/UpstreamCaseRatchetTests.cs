@@ -138,6 +138,38 @@ public sealed class UpstreamCaseRatchetTests
         Assert.AreEqual("test7 is on PassingUpstreamCases.txt and runs only on another platform: why", verdict.Message);
     }
 
+    // BL-2828: test2072's precheck prints this on MSWin32, so on Windows it is listed yet cannot run.
+    [TestMethod]
+    public void Judge_ListedSkipByAPrecheckRefusingThisPlatform_IsInconclusive()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("case, outcome, listed", "2072, Skipped(Test requires a Unix system), true");
+
+        UpstreamCaseVerdict verdict = UpstreamCaseRatchet.Judge(2072, UpstreamCaseOutcome.Skipped("Test requires a Unix system"), isListed: true);
+
+        diagnostics.Act("verdict", $"{verdict.Kind}: {verdict.Message}");
+        diagnostics.Assert("verdict kind", UpstreamCaseVerdictKind.Inconclusive, verdict.Kind);
+        diagnostics.Diff("verdict message", "test2072 is on PassingUpstreamCases.txt and runs only on another platform: Test requires a Unix system", verdict.Message);
+        Assert.AreEqual(UpstreamCaseVerdictKind.Inconclusive, verdict.Kind);
+        Assert.AreEqual("test2072 is on PassingUpstreamCases.txt and runs only on another platform: Test requires a Unix system", verdict.Message);
+    }
+
+    // Off Windows the same precheck prints nothing, so the case runs and its outcome is judged as any listed case's.
+    [TestMethod]
+    public void Judge_ListedCaseWhosePrecheckLetsItRun_IsJudgedByItsRun()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("case, outcomes, listed", "2072, Passed and Failed(diff), true");
+
+        UpstreamCaseVerdict passed = UpstreamCaseRatchet.Judge(2072, UpstreamCaseOutcome.Passed, isListed: true);
+        UpstreamCaseVerdict failed = UpstreamCaseRatchet.Judge(2072, UpstreamCaseOutcome.Failed("diff"), isListed: true);
+
+        diagnostics.Act("verdicts", $"{passed.Kind}, {failed.Kind}");
+        diagnostics.Assert("verdict kinds", "Pass, Fail", $"{passed.Kind}, {failed.Kind}");
+        Assert.AreEqual(UpstreamCaseVerdictKind.Pass, passed.Kind);
+        Assert.AreEqual(UpstreamCaseVerdictKind.Fail, failed.Kind);
+    }
+
     [TestMethod]
     public void Judge_UnlistedSkipOnThisPlatformOnly_IsInconclusiveWithTheReason()
     {

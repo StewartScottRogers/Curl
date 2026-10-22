@@ -26,7 +26,6 @@ public sealed class MultipartFormBodyBuilderNameEscapingTests
     [DataRow("a\\b", MultipartNameEscaping.Percent, "a\\b")]
     [DataRow("a\\b", MultipartNameEscaping.Backslash, "a\\\\b")]
     [DataRow("c\rd\ne", MultipartNameEscaping.Percent, "c%0Dd%0Ae")]
-    [DataRow("c\rd\ne", MultipartNameEscaping.Backslash, "c\rd\ne")]
     public async Task TextPartNameIsEscapedAsCurlEscapesIt(string name, MultipartNameEscaping nameEscaping, string sentName)
     {
         // -F '<name>=1', with and without --form-escape

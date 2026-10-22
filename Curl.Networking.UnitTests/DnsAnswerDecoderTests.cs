@@ -193,11 +193,37 @@ public sealed class DnsAnswerDecoderTests
     }
 
     [TestMethod]
-    [DataRow("8183", DisplayName = "NXDOMAIN")]
-    [DataRow("8182", DisplayName = "SERVFAIL")]
-    public void Decode_ANonZeroRcode_FailsWithBadRcode(string flags)
+    public void Decode_AnNxdomainRcode_FailsWithNxDomain()
     {
-        // Measured: an RCODE 3 answer is "DoH: Bad RCODE type A for example.test" (ADR-0152).
+        // curl 8.22.0's doh_resp_decode returns DOH_DNS_NXDOMAIN for RCODE 3 (unit1650's response row 3, BL-2969).
+        var message = Message(Header("8183", 1, 0) + QuestionA);
+
+        var answer = Decode(message, DnsRecordType.A);
+
+        Diagnostics.Assert("failure", DnsMessageFailure.NxDomain, answer.Failure);
+        Assert.AreEqual(DnsMessageFailure.NxDomain, answer.Failure);
+    }
+
+    [TestMethod]
+    public void Decode_AnAnswerTtlAboveOneDay_IsCappedAtOneDay()
+    {
+        // curl 8.22.0 caps each answer TTL at MAX_DNS_TTL, 86400, before taking the smallest
+        // (unit1650's response row 13, TTL 0x00ffff37, BL-2969).
+        var message = Message(Header("8180", 1, 1) + QuestionA + "C00C00010001" + "00FFFF37" + "00047F000001");
+
+        var answer = Decode(message, DnsRecordType.A);
+
+        Diagnostics.Assert("failure", DnsMessageFailure.None, answer.Failure);
+        Diagnostics.Assert("TTL seconds", 86400u, answer.TimeToLiveSeconds);
+        Assert.AreEqual(DnsMessageFailure.None, answer.Failure);
+        Assert.AreEqual(86400u, answer.TimeToLiveSeconds);
+    }
+
+    [TestMethod]
+    [DataRow("8182", DisplayName = "SERVFAIL")]
+    [DataRow("8185", DisplayName = "REFUSED")]
+    public void Decode_ANonZeroRcodeOtherThanNxdomain_FailsWithBadRcode(string flags)
+    {
         Diagnostics.Arrange("flags", flags);
         var message = Message(Header(flags, 1, 0) + QuestionA);
 

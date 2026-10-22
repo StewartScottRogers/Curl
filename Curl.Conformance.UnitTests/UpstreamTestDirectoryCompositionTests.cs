@@ -21,6 +21,9 @@ public sealed class UpstreamTestDirectoryCompositionTests
     [DataRow("file:%FILE_PWD/%LOGDIR/test%TESTNUMBER.txt", "file:%FILE_PWD%LOGDIR/test%TESTNUMBER.txt")]
     [DataRow("file://localhost/%FILE_PWD/%LOGDIR/x", "file://localhost/%FILE_PWD%LOGDIR/x")]
     [DataRow("file://%FILE_PWD/", "file://%FILE_PWD/")]
+    [DataRow("-F \"fileupload=@-;filename=%DEV_NULL;type=text/x-null\"", "-F \"fileupload=@-;filename=/dev/null;type=text/x-null\"")]
+    [DataRow("name=\"fileupload\"; filename=\"%DEV_NULL\"%CR", "name=\"fileupload\"; filename=\"/dev/null\"%CR")]
+    [DataRow("-o%DEV_NULL", "-o%DEV_NULL")]
     public void Rewrite_Line_ComposesOnlyWhatRuntestsWorkingDirectoryNames(string written, string expected)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

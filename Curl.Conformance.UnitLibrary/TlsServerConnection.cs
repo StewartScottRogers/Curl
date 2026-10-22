@@ -84,7 +84,8 @@ internal sealed class TlsServerConnection : IConnection
         while ((read = await tls.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
         {
             await server.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-            while ((read = await server.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            // A read of an unfinished request waits for the client's next record, which only this loop delivers.
+            while (!server.AwaitsRequestBytes && (read = await server.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
             {
                 await tls.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             }

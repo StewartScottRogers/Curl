@@ -363,6 +363,7 @@ internal sealed class HttpResponseHeadReader
     {
         HttpResponseHead read = builder.Build(statusLine, []);
         HttpResponseHead head = new(statusLine, [.. heldHeaders.Select(held => held.Header)], read.HeadBytes, ReadOnlyMemory<byte>.Empty);
+        failure.HeadBytesBeforeFailure = builder.HeadBytesWithPendingHeader();
         Refusal = FindRefusalOrTooMany(head) ?? throw failure;
         heldHeaderLines.Clear();
         heldHeaderInfoLine = null;
@@ -439,8 +440,12 @@ internal sealed class HttpResponseHeadReader
         LineReported(bytes);
     }
 
-    private static HttpTransferException EmptyReply() =>
-        new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
+    /// <summary>
+    /// Fails a reply the peer closed before a final head, carrying the 1xx heads read before it,
+    /// which curl 8.22.0 has already written to <c>-i</c>'s output (upstream test158, BL-2867).
+    /// </summary>
+    private HttpTransferException EmptyReply() =>
+        new(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply) { HeadBytesBeforeFailure = builder.HeadBytesSoFar() };
 
     /// <summary>
     /// Gives the head of an HTTP/0.9 response <see cref="AcceptsHttp09" /> accepts, its bytes

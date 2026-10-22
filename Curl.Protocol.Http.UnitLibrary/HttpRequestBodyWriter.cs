@@ -162,6 +162,15 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     internal bool KeepsSendingOnError { get; init; }
 
+    /// <summary>
+    /// Gets the most bytes a second a body of bytes is sent at (<c>--limit-rate</c>), or
+    /// <see langword="null" /> to send it unpaced; a stream body is never paced here (BL-2957).
+    /// </summary>
+    internal long? SendBytesPerSecond { get; init; }
+
+    /// <summary>Gets the clock <see cref="SendBytesPerSecond" /> paces the body on.</summary>
+    internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
+
     /// <summary>What a read gives when it was left pending because a status of 300 or above came first.</summary>
     private const int ReadLeftPending = -1;
 
@@ -205,6 +214,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     private bool readerReported;
 
     private bool tracing;
+
+    /// <summary>
+    /// Whether the last read of a stream body did not complete at once, so the writer waited on its
+    /// upload source as curl waits with the socket polled for reading (<see cref="ReceiveFailureOrAsync" />).
+    /// </summary>
+    private bool waitedOnSource;
 
     /// <summary>
     /// Writes <paramref name="body" /> and flushes the connection, then, when the connection is
@@ -356,15 +371,54 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// </summary>
     private async ValueTask WriteBytesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
     {
+        if (SendBytesPerSecond is { } rate)
+        {
+            await WriteBytesAtRateAsync(content, rate, isChunked, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (EarlyResponseWatch is null && !tracing)
         {
             await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
             return;
         }
 
+        await WriteBytesInPiecesAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Writes a body of bytes in the pieces curl's upload buffer holds, reporting each read,
+    /// until they are all sent or one is cut short.
+    /// </summary>
+    private async ValueTask WriteBytesInPiecesAsync(ReadOnlyMemory<byte> content, bool isChunked, CancellationToken cancellationToken)
+    {
         while (BytesWritten < content.Length && !CutShort)
         {
             int room = NextReadRoom(isChunked);
+            int length = (int)Math.Min(room, content.Length - BytesWritten);
+            ReportBufferRead(room, length, BytesWritten + length == content.Length, isChunked);
+            await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Writes a body of bytes no faster than <paramref name="rate" /> bytes a second: pieces of at
+    /// most <paramref name="rate" /> bytes, each after the wait on <see cref="TimeProvider" /> that
+    /// keeps the bytes sent before it within the rate, as curl's <c>CURLOPT_MAX_SEND_SPEED_LARGE</c>
+    /// pauses the send (BL-2957).
+    /// </summary>
+    private async ValueTask WriteBytesAtRateAsync(ReadOnlyMemory<byte> content, long rate, bool isChunked, CancellationToken cancellationToken)
+    {
+        long start = TimeProvider.GetTimestamp();
+        while (BytesWritten < content.Length && !CutShort)
+        {
+            TimeSpan due = TimeSpan.FromSeconds((double)BytesWritten / rate) - TimeProvider.GetElapsedTime(start);
+            if (due > TimeSpan.Zero)
+            {
+                await Task.Delay(due, TimeProvider, cancellationToken).ConfigureAwait(false);
+            }
+
+            int room = (int)Math.Min(NextReadRoom(isChunked), rate);
             int length = (int)Math.Min(room, content.Length - BytesWritten);
             ReportBufferRead(room, length, BytesWritten + length == content.Length, isChunked);
             await WritePieceAsync(content.Slice((int)BytesWritten, length), isChunked, cancellationToken).ConfigureAwait(false);
@@ -447,10 +501,42 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// Writes what <see cref="heldBack" /> holds, now that a read has given more, then the piece
     /// that read gave.
     /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The connection failed the write (exit 55), or, after a read the writer had to wait for, the
+    /// connection reports a failure of its own when read (exit 56, <see cref="ReceiveFailureOrAsync" />).
+    /// </exception>
     private async ValueTask WriteReadPieceAsync(ReadOnlyMemory<byte> piece, bool isChunked, CancellationToken cancellationToken)
     {
-        await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
-        await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
+            await WritePieceAsync(piece, isChunked, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpTransferException failed) when (waitedOnSource && failed.ExitCode == CurlExitCode.SendError)
+        {
+            throw await ReceiveFailureOrAsync(failed, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Reads the connection after a write that failed once the writer had waited on its upload
+    /// source, and gives exit 56 with <c>Recv failure: </c> and the read's words when the read fails
+    /// too: while curl 8.22.0 waits for upload data it polls the socket for reading only, and reads
+    /// before it writes, so a peer that answered and reset meanwhile is met by <c>recv</c>, not
+    /// <c>send</c> (BL-2956, ADR-0040 keeps a full-speed failed write at exit 55). A read that gives
+    /// bytes or the end of the stream keeps <paramref name="sendFailure" />.
+    /// </summary>
+    private async ValueTask<HttpTransferException> ReceiveFailureOrAsync(HttpTransferException sendFailure, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await connection.ReadAsync(new byte[1], cancellationToken).ConfigureAwait(false);
+            return sendFailure;
+        }
+        catch (IOException failure)
+        {
+            return new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailure(failure));
+        }
     }
 
     /// <summary>
@@ -635,11 +721,14 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
 
         if (EarlyResponseRead is not { } watch || !racesPendingReads)
         {
-            return stream.ReadAsync(buffer, cancellationToken);
+            ValueTask<int> plainRead = stream.ReadAsync(buffer, cancellationToken);
+            waitedOnSource = !plainRead.IsCompleted;
+            return plainRead;
         }
 
         CancellationTokenSource reading = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         ValueTask<int> read = stream.ReadAsync(buffer, reading.Token);
+        waitedOnSource = !read.IsCompleted;
         if (read.IsCompleted)
         {
             reading.Dispose();

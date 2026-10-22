@@ -141,6 +141,18 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow("%ag")]
+    [DataRow("%ga")]
+    public void Set_TextPartWithAnEscapeOfOnlyOneHexDigit_LeavesItsCaseAsItIs(string value)
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://example.com/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Fragment, value, CurlUrlFlags.None));
+
+        Assert.AreEqual(value, GetOk(url, CurlUrlPart.Fragment));
+    }
+
+    [TestMethod]
     public void Set_PathWithMixedCaseEscapes_GivesThemUpperCasedInTheUrl()
     {
         using ManagedCurlUrlHandle url = Parsed("https://host/");
@@ -169,6 +181,14 @@ public sealed partial class ManagedCurlUrlHandleTests
         using ManagedCurlUrlHandle url = Parsed(text, CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
 
         Assert.AreEqual(expected, GetOk(url, part));
+    }
+
+    [TestMethod]
+    public void Set_UrlWithQuestionMarkInFragmentUnderUrlEncode_EncodesEverySpaceAsPercentTwenty()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://h/p#a?b c", CurlUrlFlags.UrlEncode | CurlUrlFlags.AllowSpace);
+
+        Assert.AreEqual("a?b%20c", GetOk(url, CurlUrlPart.Fragment));
     }
 
     [TestMethod]

@@ -1,3 +1,5 @@
+using Curl.Engine;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -79,24 +81,13 @@ internal static class OutputFileExtendedAttributes
     }
 
     /// <summary>
-    /// Removes the user name and password from <paramref name="url" />'s authority, as curl's
-    /// <c>stripcredentials</c> does by clearing both parts of its parsed URL.
+    /// Removes the user name and password from <paramref name="url" /> with curl's
+    /// <c>stripcredentials</c> (<see cref="OriginUrlCredentials.Strip" />).
     /// </summary>
-    /// <param name="url">A URL of the form <c>scheme://authority/path</c>.</param>
-    /// <returns>The URL with everything up to the authority's last <c>@</c> removed from it.</returns>
-    internal static string WithoutCredentials(string url)
-    {
-        const string SchemeEnd = "://";
-        int authorityStart = url.IndexOf(SchemeEnd, StringComparison.Ordinal);
-        if (authorityStart < 0)
-        {
-            return url;
-        }
-
-        authorityStart += SchemeEnd.Length;
-        int authorityEnd = url.IndexOfAny(['/', '?', '#'], authorityStart);
-        int authorityLength = (authorityEnd < 0 ? url.Length : authorityEnd) - authorityStart;
-        int at = url.LastIndexOf('@', authorityStart + authorityLength - 1, authorityLength);
-        return at < 0 ? url : url[..authorityStart] + url[(at + 1)..];
-    }
+    /// <param name="url">The URL as <c>%{url_effective}</c> normalises it, credentials and all.</param>
+    /// <returns>
+    /// The URL without credentials, or <paramref name="url" /> as it is when the URL API rejects it,
+    /// which a URL that was transferred never is.
+    /// </returns>
+    internal static string WithoutCredentials(string url) => OriginUrlCredentials.Strip(url) ?? url;
 }

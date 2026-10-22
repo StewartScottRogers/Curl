@@ -29,6 +29,21 @@ public sealed class ProxyEndpointTests
         Assert.AreEqual("proxy.example", proxy.Host);
         Assert.AreEqual(3128, proxy.Port);
         Assert.AreSame(credential, proxy.Credential);
+        Assert.IsNull(proxy.UnixSocketPath);
+    }
+
+    [TestMethod]
+    public void UnixSocketPath_WhenSet_IsKeptByWithAndCountsInEquality()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        var proxy = new ProxyEndpoint(ProxyKind.Socks5Hostname, "localhost", 1080, null) { UnixSocketPath = "/some/path" };
+
+        var withCredential = proxy with { Credential = new NetworkCredential("u", "p") };
+        diagnostics.Act("unix socket path", withCredential.UnixSocketPath);
+
+        diagnostics.Assert("unix socket path", "/some/path", withCredential.UnixSocketPath);
+        Assert.AreEqual("/some/path", withCredential.UnixSocketPath);
+        Assert.AreNotEqual(new ProxyEndpoint(ProxyKind.Socks5Hostname, "localhost", 1080, null), proxy);
     }
 
     [TestMethod]

@@ -62,10 +62,36 @@ no existing caller.
 ## Consequences
 
 - An additive departure from drop-in behaviour: `curl --ai-help` succeeds here and fails
-  with exit 2 in real curl. Nothing else changes; `--help` and `--manual` stay byte for byte.
+  with exit 2 in real curl. Nothing else changes; `--manual` stays byte for byte, and `--help` is curl's except for the lines naming `--ai-help` (see the 2026-10-21 amendment).
 - Every task that adds or changes an option keeps `--ai-help` right; the unit test enforces
   the listing, the shared tables keep the wording.
 - How a repeat behaves is read from the sentences curl's manual generator writes for each
   option ("can be used several times", "the last set value is used", "has no extra
   effect", "associated with a single URL"); an option whose section has none says "not
   stated; see the description".
+
+## Amendment, 2026-10-21: `--help` names `--ai-help` (BL-2985)
+
+Stewart, 2026-10-21: "Lets make sure that Curl --help also list the option --aihelp even though it is
+not part of the original curl implementation. I need the aihelp to be discoverable."
+
+`--help` is no longer byte for byte curl's in three additive places, so an AI agent that runs the
+usual `curl --help` finds the Markdown help:
+
+- `curl --help` ends with one line after curl's own last line:
+  `Use "--ai-help" for Markdown help written for AI agents (Curl only)`. Every other line is curl's.
+- `curl --help all` and `curl --help curl` list `--ai-help <category>`, described as
+  `Markdown help for AI agents (Curl only)`, in its alphabetical place after
+  `--abstract-unix-socket`, padded like the table's other rows. `--ai-help`'s own section in
+  `--ai-help curl` and `--ai-help all` comes from that same row.
+- `curl --help --ai-help` (and `curl --help ai-help`, which curl would answer with its
+  unknown-category page) prints a short section in the manual's layout, since curl's manual
+  has none for this option.
+
+"(Curl only)" is in both lines so a reader comparing with curl's help sees why they differ.
+`--manual` is unchanged. The upstream cases that check `--help` (1461 to 1464) still pass: the
+conformance harness removes exactly these Curl-only lines from a run's stdout before comparing it
+(`UpstreamCurlOnlyHelpLines`), and an unexpected extra line still fails the comparison.
+
+Decided by Claude under Stewart's delegation (the wording and placement), at Stewart's request (the
+departure itself).

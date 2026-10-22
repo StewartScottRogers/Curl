@@ -6,7 +6,7 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <summary>
 /// Downloads one file over SFTP as curl 8.21.0 does through libssh2 1.11.1 (ADR-0220):
 /// starts the SFTP session, sends <c>REALPATH .</c> for the home directory, opens the
-/// URL's path for reading, asks its size with <c>STAT</c>, reads it - or the part of it
+/// URL's path for reading, asks its size and modification time with <c>STAT</c>, reads it - or the part of it
 /// <c>-r</c> or <c>-C</c> asks for (ADR-0253) - with reads kept in
 /// flight, writes each answer's bytes to the output as it arrives and reports progress,
 /// closes the handle, and closes the channel with <c>EOF</c> and <c>CLOSE</c>, as measured.
@@ -86,9 +86,10 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 }
 
                 Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
-                long? size = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-                    () => session.StatSizeAsync(path, cancellationToken)).ConfigureAwait(false);
+                (long? size, long? modifyTime) = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                    () => session.StatSizeAndModifyTimeAsync(path, cancellationToken)).ConfigureAwait(false);
                 TransferResult result = await CopyPartOfKnownSizeAsync(session, handle, size, new SftpRangeRequest(range, rangeText), resumeFrom, maxFileSize, output, progress, cancellationToken).ConfigureAwait(false);
+                result = result with { SourceLastWriteUnixSeconds = modifyTime };
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
                 Trace.EndSftpDonePhase();

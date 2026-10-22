@@ -148,7 +148,8 @@ public sealed record HttpRequestOptions
     /// <summary>
     /// Gets a value indicating whether the easy handle's previous transfer ended with Digest still
     /// marked available, its <see cref="TransferReport.DigestStaysAvailable" />, as libcurl 8.22.0
-    /// keeps <c>authhost.avail</c> on the easy handle (upstream test2030, BL-2820);
+    /// keeps <c>authhost.avail</c> on the easy handle (upstream test2027, BL-2820, for a Digest challenge
+    /// and test2030, BL-2823, for an NTLM one; ADR-0709);
     /// <see langword="false" /> for the handle's first transfer and after <c>curl_easy_reset</c>.
     /// </summary>
     public bool DigestStaysAvailable { get; init; }
@@ -351,4 +352,15 @@ public sealed record HttpRequestOptions
     /// store decides whether a plain <c>http</c> origin's header is learned (ADR-0494).
     /// </summary>
     public IHstsStore? HstsStore { get; init; }
+
+    /// <summary>
+    /// Gets the most bytes a second a body of bytes (<c>-d</c>, <c>--data*</c>, <c>--json</c>) is
+    /// sent at (<c>--limit-rate</c>, libcurl's <c>CURLOPT_MAX_SEND_SPEED_LARGE</c>), or
+    /// <see langword="null" />, the default, to send it at once.
+    /// </summary>
+    /// <remarks>
+    /// A stream body (<c>-T</c>, <c>-F</c>) is held to the rate by the stream the caller hands over,
+    /// so the handler limits only a body of bytes (BL-2957).
+    /// </remarks>
+    public long? SendBytesPerSecond { get; init; }
 }

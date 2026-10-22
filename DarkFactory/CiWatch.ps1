@@ -1,0 +1,766 @@
+# The CI watch (BL-987): reading the shift branch's CI runs, filing a task for each new
+# failure, filing split tasks for hotspots, and -TestCiWatch. Dot-sourced by
+# RunDarkFactory.ps1 in its order; see the loader there.
+
+# ---------------------------------------------------------------------------- CI watch
+
+# Lanes test only on Windows, so a Linux- or macOS-only break used to sit unnoticed until
+# the shift-end merge refused it (BL-987). The coordinator reads every finished CI run on
+# the shift's branch and files a High task for each new failure. Runs are cached by id;
+# Settled holds "<key>|<run id>" pairs already filed or found covered, so each is decided once.
+$CiWatchDir = Join-Path $LanesDir 'ci-watch'
+# Settled maps each pair to what became of it ("filed BL-###", "covered by a task"); Logged
+# holds the last line traced for each run, so a run is traced again only when that changes.
+$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+# The shift's branch once the coordinator knows it, so a wait for tokens keeps watching CI.
+$script:CiWatchBranch = ''
+# How many finished runs the flaky and regression verdicts look back over, and how long a
+# failure seen on one platform in only the newest run waits for the next run to confirm it.
+$CiWindowRuns = 6
+$CiConfirmMinutes = 5
+
+function Get-CiPlatform {
+    # "Build and test (ubuntu-latest)" -> Linux; the platform's name, or the job's when unknown.
+    param([string]$Job)
+    if ($Job -match 'ubuntu|linux') { return 'Linux' }
+    if ($Job -match 'macos') { return 'macOS' }
+    if ($Job -match 'windows') { return 'Windows' }
+    return $Job
+}
+
+function Get-CiFailures {
+    # What `gh run view <id> --log-failed` says failed: one object per failing test ("Failed
+    # <TestName> [..]") or, when the build broke, per compiler error ("error CS1002 in X.cs"),
+    # with the platforms it failed on, its test project (or the project that did not build)
+    # and the first line of its error message.
+    param([string[]]$Log)
+    $found = [ordered]@{}
+    $current = @{}
+    $awaitingMessage = @{}
+    foreach ($raw in $Log) {
+        $parts = "$raw" -split "`t", 3
+        if ($parts.Count -lt 3) { continue }
+        $job = $parts[0]
+        $text = $parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', ''
+        $platform = Get-CiPlatform $job
+        $item = $null
+        if ($text -match '^\s+Failed\s+(\S+)\s') {
+            $item = [pscustomobject]@{ Key = $Matches[1]; Kind = 'test'; Platforms = @(); Project = ''; Message = '' }
+        } elseif ($text -match '(?:^|\s)(?:[^\s(]*[/\\])?([^\s/\\(]+)\(\d+,\d+\):\s+error\s+(\w+):\s*(.*?)(?:\s+\[(?:[^\]]*[/\\])?([^\]/\\]+)\.\w+proj\])?\s*$') {
+            $item = [pscustomobject]@{ Key = "error $($Matches[2]) in $($Matches[1])"; Kind = 'build'; Platforms = @(); Project = "$($Matches[4])"; Message = $Matches[3] }
+        } elseif ($text -match '^Audit guard: (\S+) changed on ') {
+            # The audit guard (BL-998) found the factory's own change to an audit path or a guard.
+            $item = [pscustomobject]@{ Key = "audit guard $($Matches[1])"; Kind = 'audit'; Platforms = @(); Project = ''; Message = $text.Trim() }
+        }
+        if ($item) {
+            if (-not $found.Contains($item.Key)) { $found[$item.Key] = $item }
+            $entry = $found[$item.Key]
+            if ($entry.Platforms -notcontains $platform) { $entry.Platforms += $platform }
+            if ($item.Kind -eq 'test') { $current[$job] = $entry; $awaitingMessage[$job] = $false }
+            continue
+        }
+        $entry = $current[$job]
+        if (-not $entry) { continue }
+        if ($text -match '^\s+Error Message:') { $awaitingMessage[$job] = $true; continue }
+        if ($awaitingMessage[$job] -and $text.Trim()) {
+            if (-not $entry.Message) { $entry.Message = $text.Trim() }
+            $awaitingMessage[$job] = $false
+            continue
+        }
+        # A stack-trace frame under a test project's folder, either suffix: *.UnitTests or *.IntegrationTests.
+        if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.(?:UnitTests|IntegrationTests))[/\\]') { $entry.Project = $Matches[1] }
+        if ($text -match '^Failed!\s.*-\s+([\w.]+)\.dll') {
+            if (-not $entry.Project) { $entry.Project = $Matches[1] }
+            $current[$job] = $null
+        }
+    }
+    # A run that failed with no test, compiler error or audit-guard line in its log (a crashed
+    # test host, a timeout, a job step that broke) is still red: file it by the job and step
+    # the log names, so the spell does not stay open unfiled (AF-0171). That holds for every
+    # failed job, not only when the whole run names nothing: a Linux test failure beside a
+    # failed Quality-gates job left the quality failure unfiled for 301 minutes (AF-0150).
+    $unknownOnly = -not $found.Count
+    $namedJobs = @{}
+    foreach ($item in $found.Values) {
+        foreach ($platform in $item.Platforms) { $namedJobs[$platform] = $true }
+    }
+    foreach ($raw in $Log) {
+        $parts = "$raw" -split "`t", 3
+        if ($parts.Count -lt 3 -or -not $parts[0].Trim()) { continue }
+        # gh prints UNKNOWN STEP where it cannot tie a line to a job. Such lines file the run only
+        # when nothing else in it is named, so a run that names no test is never dropped (AF-0178).
+        if ($parts[0] -eq 'UNKNOWN STEP') {
+            if (-not $unknownOnly) { continue }
+            $parts = @('unknown job', $parts[1], $parts[2])
+        }
+        if ($namedJobs.ContainsKey((Get-CiPlatform $parts[0].Trim()))) { continue }
+        $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
+        $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
+        if (-not $found.Contains($key)) {
+            $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
+        }
+        # The quality gate annotates each member outside a gate ("X is outside a gate: ..."). Those
+        # lines are the message, not the step's echoed script (AF-0244: BL-2466 read the script
+        # line and never named CurlMulti.SetOption, so the real gap waited for a Normal task).
+        if ($text -match '(?:^|\s)(?:##\[error\])?(\S.* is outside a gate: .*)$') {
+            if (-not $found[$key].PSObject.Properties['GateMembers']) { $found[$key] | Add-Member -NotePropertyName GateMembers -NotePropertyValue @() }
+            if (@($found[$key].GateMembers).Count -lt 5) { $found[$key].GateMembers += $Matches[1].Trim() }
+            $found[$key].Message = (@($found[$key].GateMembers) -join '; ')
+        } elseif (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
+    }
+    return @($found.Values)
+}
+
+function Get-CiVerdicts {
+    # Which failures to file, from -Runs: the finished CI runs, newest first, each with Id,
+    # Sha, FinishedAt and Failures (Get-CiFailures; empty for a green run). A failure is a
+    # regression when it fails in the newest run and either broke the build, failed on two
+    # platforms, failed in the run before too, or has waited -ConfirmMinutes for another run;
+    # it is flaky when it failed once and a run on each side of that one passed it, or failed
+    # in the newest run after passing in the one before. Anything else waits or is already fixed.
+    param([object[]]$Runs, [datetime]$Now = (Get-Date), [int]$ConfirmMinutes = $CiConfirmMinutes)
+    $Runs = @($Runs)
+    $verdicts = @()
+    $keys = @($Runs | ForEach-Object { @($_.Failures) } | Where-Object { $_ } | ForEach-Object { $_.Key } | Select-Object -Unique)
+    foreach ($key in $keys) {
+        $failing = @(0..($Runs.Count - 1) | Where-Object { @($Runs[$_].Failures | Where-Object { $_.Key -ceq $key }).Count })
+        $at = $failing[0]
+        $failure = @($Runs[$at].Failures | Where-Object { $_.Key -ceq $key })[0]
+        $verdict = ''
+        if ($at -eq 0) {
+            if ($failure.Kind -in 'build', 'audit' -or @($failure.Platforms).Count -ge 2 -or $failing -contains 1) { $verdict = 'regression' }
+            elseif ($failing.Count -gt 1) { $verdict = 'flaky' }
+            elseif (($Now - $Runs[0].FinishedAt).TotalMinutes -ge $ConfirmMinutes) { $verdict = 'regression' }
+        } elseif ($failing.Count -eq 1 -and $at -lt $Runs.Count - 1) { $verdict = 'flaky' }
+        if (-not $verdict) { continue }
+        # A regression's first failing commit is the oldest run of its unbroken red streak.
+        $first = 0
+        $platforms = @($failure.Platforms)
+        if ($verdict -eq 'regression') {
+            while ($failing -contains ($first + 1)) {
+                $first++
+                $platforms += @(@($Runs[$first].Failures | Where-Object { $_.Key -ceq $key })[0].Platforms)
+            }
+        } else { $first = $at }
+        $verdicts += [pscustomobject]@{
+            Key = $key; Kind = $failure.Kind; Verdict = $verdict; RunId = $Runs[$at].Id; FirstSha = $Runs[$first].Sha
+            Platforms = @($platforms | Select-Object -Unique | Sort-Object); Project = $failure.Project; Message = $failure.Message
+        }
+    }
+    return $verdicts
+}
+
+function Get-CiTaskTitle {
+    # The task's title; each names the test or error exactly, which is how a later run finds it.
+    param($Verdict)
+    $on = ($Verdict.Platforms -join ' and ')
+    if ($Verdict.Kind -eq 'audit') { return "Revert the dark factory's change to $(Get-CiAuditPath $Verdict.Key)" }
+    if ($Verdict.Kind -eq 'build') { return "Fix CI build $($Verdict.Key) on $on" }
+    if ($Verdict.Verdict -eq 'flaky') { return "Fix flaky CI test $($Verdict.Key) that failed once on $on" }
+    return "Fix CI failure $($Verdict.Key) on $on"
+}
+
+function Get-CiAuditPath {
+    # The path an audit-guard failure's key names: "audit guard Audit/x.md" -> Audit/x.md.
+    param([string]$Key)
+    return ($Key -replace '^audit guard ', '')
+}
+
+function Get-CiTaskNewArgs {
+    # The task-board.ps1 new arguments that file -Verdict. An audit-guard failure is filed
+    # -NoLane: a lane cannot touch the path (BL-997) and the board lets a factory process file
+    # an audit-path task only that way (BL-996).
+    param($Verdict, [string[]]$Touches)
+    if ($Verdict.Kind -eq 'audit') {
+        return @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'direct',
+            '-Touches', (Get-CiAuditPath $Verdict.Key), '-NoLane')
+    }
+    $newArgs = @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'feature')
+    if (@($Touches).Count) { $newArgs += @('-Touches', (@($Touches) -join ',')) }
+    return $newArgs
+}
+
+function Get-CiTouches {
+    # The test project and the library it tests, or for a build error the project that did not
+    # build and its twin, as far as they exist in -Repo. Empty when the project is unknown.
+    # Both test-project suffixes map to their library: X.UnitTests and X.IntegrationTests each
+    # give X.UnitLibrary and X (the latter for Curl.Console).
+    param([string]$Project, [string]$Repo)
+    if (-not $Project) { return @() }
+    $pair = @($Project)
+    if ($Project -match '^(.+)\.(?:UnitTests|IntegrationTests)$') { $pair += @("$($Matches[1]).UnitLibrary", $Matches[1]) }
+    elseif ($Project -match '^(.+)\.UnitLibrary$') { $pair += "$($Matches[1]).UnitTests" }
+    else { $pair += "$Project.UnitTests" }
+    return @($pair | Where-Object { Test-Path (Join-Path $Repo $_) -PathType Container })
+}
+
+function Set-CiTaskBody {
+    # Fills the new task file's Goal, Context and Acceptance criteria.
+    param([string]$Path, $Verdict, [string]$RunUrl)
+    if ($Verdict.Kind -eq 'audit') { Set-CiAuditTaskBody -Path $Path -Verdict $Verdict -RunUrl $RunUrl; return }
+    $on = $Verdict.Platforms -join ' and '
+    $what = if ($Verdict.Kind -eq 'build') { "the build ($($Verdict.Key))" } else { "``$($Verdict.Key)``" }
+    $goal = if ($Verdict.Verdict -eq 'flaky') {
+        "$what passes on every run on Windows, Linux and macOS; it failed once on $on in the ``CI`` workflow and passed on the runs either side."
+    } else { "$what passes on Windows, Linux and macOS, so the ``CI`` workflow on the shift's branch is green again." }
+    $message = if ($Verdict.Message) { $Verdict.Message } else { '(no error message in the log)' }
+    $first = if ($Verdict.FirstSha) { "First failing commit: $($Verdict.FirstSha.Substring(0, [math]::Min(8, $Verdict.FirstSha.Length)))." } else { 'First failing commit: not found.' }
+    $context = @(
+        "Filed by the dark factory's CI watch (BL-987). $what failed on $on in CI run $($Verdict.RunId) ($RunUrl). $first"
+        ''
+        "    $message"
+        ''
+        "Lanes test only on Windows, so reproduce with ``gh run view $($Verdict.RunId) --log-failed`` and fix it platform-neutrally (CLAUDE.md, ""Tests pass on Windows, Linux and macOS"")."
+    ) -join "`n"
+    $criteria = if ($Verdict.Verdict -eq 'flaky') {
+        "- [ ] What made $what fail intermittently is named under Notes and removed.`n- [ ] $what passes locally, and in the ``CI`` workflow on Windows, Linux and macOS for the commit that lands the fix."
+    } else { "- [ ] $what passes locally, and the ``CI`` workflow passes on Windows, Linux and macOS for the commit that lands the fix." }
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Set-CiAuditTaskBody {
+    # Fills an audit-guard task's Goal, Context and Acceptance criteria. The Context names the
+    # watch's key, "audit guard <path>", which is how a later run finds the task.
+    param([string]$Path, $Verdict, [string]$RunUrl)
+    $target = Get-CiAuditPath $Verdict.Key
+    $first = if ($Verdict.FirstSha) { "First failing commit: $($Verdict.FirstSha.Substring(0, [math]::Min(8, $Verdict.FirstSha.Length)))." } else { 'First failing commit: not found.' }
+    $goal = "The ``audit-guard`` job passes on work/dark-factory again: ``$target`` there matches master, or its change reaches master through the audit branch."
+    $context = @(
+        "Filed by the dark factory's CI watch (BL-999) for $($Verdict.Key): the ``audit-guard`` job failed in CI run $($Verdict.RunId) ($RunUrl). $first"
+        ''
+        "    $($Verdict.Message)"
+        ''
+        "Audit paths and their guards change only through the audit branch (ADR-0267). Interactive only: a dark factory lane cannot touch ``$target`` (BL-997). Red CI blocks the shift-end merge until this is fixed. Decide whether the change was wanted: if not, restore master's copy on work/dark-factory (``git checkout origin/master -- $target``); if it was, land it on master through the audit branch's pull request, then merge master into work/dark-factory."
+    ) -join "`n"
+    $criteria = "- [ ] The ``audit-guard`` job passes on work/dark-factory for the commit that lands the fix."
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Test-CiFailureCovered {
+    # Whether a task already covers -Key failing in the run on -Sha: a live task (Backlog, Doing,
+    # Blocked) names it, or a finished one does whose last commit that run did not yet contain,
+    # so the failure predates its fix. Read in the -Repo worktree.
+    param([string]$Key, [string]$Sha, [string]$Repo)
+    $tasks = Join-Path $Repo 'Tasks'
+    foreach ($file in @(Get-ChildItem $tasks -Recurse -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+        # The whole name only: a task for Parse_Empty does not cover Parse_Empty_Throws.
+        if (-not (Select-String -LiteralPath $file.FullName -Pattern "(?<![\w.])$([regex]::Escape($Key))(?![\w])" -CaseSensitive -Quiet)) { continue }
+        $state = (Split-Path (Split-Path $file.FullName -Parent) -Leaf)
+        if ($state -in 'Backlog', 'Doing', 'Blocked') { return $true }
+        $relative = $file.FullName.Substring($Repo.TrimEnd('\', '/').Length + 1)
+        $last = "$(git -C $Repo log -1 --format=%H -- $relative 2>$null)".Trim()
+        if (-not $last) { continue }
+        git -C $Repo merge-base --is-ancestor $last $Sha 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) { return $true }
+    }
+    return $false
+}
+
+function Send-CiWhisper {
+    # Has the whisper hook announce a filed task, as it would for a Claude session's
+    # task-board.ps1 new, without waiting for the speech.
+    param([string]$Line)
+    $hook = Join-Path $Root '.claude\hooks\whisper-milestone.ps1'
+    if (-not (Test-Path $hook)) { return }
+    try {
+        $stdinFile = Join-Path $LogDir "ci-whisper-$Stamp-$([guid]::NewGuid().ToString('N').Substring(0, 8)).json"
+        $json = [pscustomobject]@{ cwd = $Root; tool_input = @{ command = 'task-board.ps1 new' }; tool_response = @{ stdout = $Line } } | ConvertTo-Json -Compress
+        [IO.File]::WriteAllText($stdinFile, $json, (New-Object Text.UTF8Encoding $false))
+        Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$hook`"") `
+            -RedirectStandardInput $stdinFile -WindowStyle Hidden | Out-Null
+    } catch { }
+}
+
+function Get-CiRuns {
+    # The newest finished CI runs on -Branch that passed or failed (cancelled ones prove
+    # nothing), newest first, each with its failures; a failed run whose log names no
+    # failure, or cannot be read, is left out and traced (Write-CiRunLine). $null when gh
+    # cannot list them. -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first
+    # returns `gh run list`'s JSON, the second a run's `--log-failed` lines, $null if unreadable.
+    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog)
+    # No --jq: Windows PowerShell strips the double quotes a jq filter needs from a native
+    # command's arguments. Its ConvertFrom-Json turns "[]" into one empty element, hence the
+    # databaseId filter.
+    if (-not $ListRuns) {
+        $ListRuns = {
+            param([string]$Branch)
+            $json = (gh run list --workflow CI --branch $Branch --limit 30 --json databaseId,status,conclusion,headSha,updatedAt 2>$null) -join "`n"
+            if ($LASTEXITCODE -ne 0) { return $null }
+            return $json
+        }
+    }
+    if (-not $ReadLog) {
+        $ReadLog = {
+            param([string]$Id)
+            $log = @(gh run view $Id --log-failed 2>$null | ForEach-Object { "$_" })
+            if ($LASTEXITCODE -ne 0) { return $null }
+            return , $log
+        }
+    }
+    $json = & $ListRuns $Branch
+    if ($null -eq $json) { Write-CiRunLine -Key 'list' -Line "cannot list the CI runs on $Branch with gh"; return $null }
+    try { $listed = @($json | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.databaseId }) }
+    catch { Write-CiRunLine -Key 'list' -Line "cannot read gh's list of CI runs on $Branch"; return $null }
+    $runs = @()
+    foreach ($listedRun in $listed) {
+        if ($runs.Count -ge $CiWindowRuns) { break }
+        if ($listedRun.status -ne 'completed' -or $listedRun.conclusion -notin 'success', 'failure') { continue }
+        $id = "$($listedRun.databaseId)"; $conclusion = $listedRun.conclusion; $sha = "$($listedRun.headSha)"
+        $on = $sha.Substring(0, [math]::Min(8, $sha.Length))
+        $finished = if ($listedRun.updatedAt -is [datetime]) { $listedRun.updatedAt.ToLocalTime() }
+            else { [datetime]::Parse("$($listedRun.updatedAt)", [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal).ToLocalTime() }
+        if ($conclusion -eq 'failure' -and -not $script:CiWatch.Failures.ContainsKey($id)) {
+            $log = & $ReadLog $id
+            if ($null -eq $log) { Write-CiRunLine -RunId $id -Line "failure on ${on}: cannot read its log with gh run view --log-failed; trying again next heartbeat"; continue }
+            $named = @(Get-CiFailures $log)
+            # A failed run whose --log-failed is empty is still red: file it by the run (AF-0178).
+            if (-not $named.Count) {
+                $named = @([pscustomobject]@{ Key = 'job unknown job step unknown step'; Kind = 'job'; Platforms = @('unknown job'); Project = ''; Message = 'the run failed and gh run view --log-failed printed no line' })
+            }
+            $script:CiWatch.Failures[$id] = $named
+        }
+        # Assigned apart from the if: an if statement's output is unrolled, so one failure came
+        # back as a bare object, and Windows PowerShell gives a bare object no Count - a run
+        # with a single failing test looked like one with none and was dropped (BL-1031).
+        $failures = @()
+        if ($conclusion -eq 'failure') { $failures = @($script:CiWatch.Failures[$id]) }
+        if ($conclusion -eq 'failure' -and -not $failures.Count) {
+            Write-CiRunLine -RunId $id -Line "failure on ${on}: its log names no failing test or build error; nothing to file"
+            continue
+        }
+        $runs += [pscustomobject]@{ Id = $id; Sha = $sha; FinishedAt = $finished; Failures = $failures }
+    }
+    return , $runs
+}
+
+function Write-CiRunLine {
+    # Traces what the watch made of one run: the first time it examines it, and again whenever
+    # that changes (waiting, then filed), not on every heartbeat that finds the same.
+    # -Key, without -RunId, names what is traced when it is not a run, such as gh's run list.
+    param([string]$RunId, [string]$Line, [string]$Key = $RunId)
+    if ($script:CiWatch.Logged[$Key] -ceq $Line) { return }
+    $script:CiWatch.Logged[$Key] = $Line
+    $text = if ($RunId) { "run $RunId $Line" } else { $Line }
+    Write-Trace '-' 'ci' $text 'DarkGray'
+}
+
+function Get-CiRunOutcome {
+    # One line on what the watch did with -Run, one of -Runs (newest first): nothing for a
+    # green run; for a red one, each failure and whether it was filed (-Settled holds
+    # "<key>|<run id>" -> "filed BL-###" or "covered by a task"), is filed with a newer run,
+    # waits for a run to confirm it, or has passed since.
+    param($Run, [object[]]$Runs, [object[]]$Verdicts, [hashtable]$Settled, [int]$ConfirmMinutes = $CiConfirmMinutes)
+    $on = "$($Run.Sha)".Substring(0, [math]::Min(8, "$($Run.Sha)".Length))
+    $failures = @($Run.Failures | Where-Object { $_ })
+    if (-not $failures.Count) { return "success on ${on}: nothing to file" }
+    $said = foreach ($failure in $failures) {
+        $verdict = @($Verdicts | Where-Object { $_ -and $_.Key -ceq $failure.Key })[0]
+        $what = if ($verdict -and $verdict.RunId -ne $Run.Id) { "filed with run $($verdict.RunId)" }
+            elseif ($verdict -and $Settled.ContainsKey("$($failure.Key)|$($Run.Id)")) { "$($verdict.Verdict), $($Settled["$($failure.Key)|$($Run.Id)"])" }
+            elseif ($verdict) { "$($verdict.Verdict), not filed yet" }
+            elseif (@($Runs)[0].Id -eq $Run.Id) { "on $($failure.Platforms -join '+') only, waiting for the next run or $($Run.FinishedAt.AddMinutes($ConfirmMinutes).ToString('HH:mm')) to confirm it" }
+            else { 'passed since, not filed' }
+        "$($failure.Key) $what"
+    }
+    return "failure on ${on}: $(@($said) -join '; ')"
+}
+
+function Invoke-CiWatch {
+    # Once a heartbeat (-HeartbeatMinutes, 3 when publishing is off): reads the finished CI
+    # runs on -Branch and files one High task per new failing test or build error, in the
+    # ci-watch worktree at origin/-Branch, pushed straight to -Branch, and traces what it made
+    # of each run (Write-CiRunLine). Never stops the shift.
+    # -Final: the shift's last look, after the merge has waited for CI on its last commit. It
+    # runs whatever the heartbeat, and files a failure seen on one platform in only the newest
+    # run at once rather than waiting for a run this shift will not be there to read (BL-1031).
+    param([string]$Branch, [switch]$Final)
+    if ($script:CiWatch.Off) { return }
+    $every = if ($HeartbeatMinutes -gt 0) { $HeartbeatMinutes } else { 3 }
+    if (-not $Final -and ((Get-Date) - $script:CiWatch.CheckedAt).TotalMinutes -lt $every) { return }
+    $script:CiWatch.CheckedAt = Get-Date
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        $script:CiWatch.Off = $true
+        Write-Trace '-' 'ci' 'CI watch off: gh is not installed' 'DarkYellow'
+        return
+    }
+    $runs = Get-CiRuns -Branch $Branch
+    if ($null -eq $runs) { return }
+    $confirm = if ($Final) { 0 } else { $CiConfirmMinutes }
+    $all = @(Get-CiVerdicts -Runs $runs -ConfirmMinutes $confirm)
+    $verdicts = @($all | Where-Object { -not $script:CiWatch.Settled.ContainsKey("$($_.Key)|$($_.RunId)") })
+    if ($verdicts.Count) { New-CiFailureTasks -Branch $Branch -Runs $runs -Verdicts $verdicts }
+    foreach ($run in $runs) {
+        Write-CiRunLine -RunId $run.Id -Line (Get-CiRunOutcome -Run $run -Runs $runs -Verdicts $all -Settled $script:CiWatch.Settled -ConfirmMinutes $confirm)
+    }
+}
+
+function New-CiFailureTasks {
+    # Files one High task per -Verdicts entry not already covered by a task, in the ci-watch
+    # worktree at origin/-Branch, and pushes them straight to -Branch; up to three tries when
+    # the push races a lane. Records each in $script:CiWatch.Settled.
+    param([string]$Branch, [object[]]$Runs, [object[]]$Verdicts)
+    $saved = $env:CLAUDE_PROJECT_DIR
+    try {
+        foreach ($attempt in 1..3) {
+            git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+            if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
+                New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+                git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null
+            }
+            git -C $CiWatchDir checkout -q -f --detach "origin/$Branch" 2>&1 | Out-Null
+            git -C $CiWatchDir clean -q -fd -- Tasks 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'ci' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return }
+            $env:CLAUDE_PROJECT_DIR = $CiWatchDir
+            $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
+            $filed = @()
+            foreach ($verdict in $verdicts) {
+                $sha = @($runs | Where-Object { $_.Id -eq $verdict.RunId })[0].Sha
+                if (Test-CiFailureCovered -Key $verdict.Key -Sha $sha -Repo $CiWatchDir) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = 'covered by a task'; continue }
+                $touches = @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir)
+                $newArgs = Get-CiTaskNewArgs -Verdict $verdict -Touches $touches
+                $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+                if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file $($verdict.Key): $(Get-Short $out 60)" 'DarkYellow'; continue }
+                $id = $Matches[1]; $line = $Matches[0]
+                $url = "https://github.com/$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null)/actions/runs/$($verdict.RunId)"
+                Set-CiTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Verdict $verdict -RunUrl $url
+                $filed += [pscustomobject]@{ Id = $id; Line = $line; Verdict = $verdict }
+                if ($verdict.Kind -eq 'audit') { $script:CiWatch.AuditTasks["$id"] = Get-CiTaskTitle $verdict }
+            }
+            if (-not $filed.Count) { return }
+            git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
+            git -C $CiWatchDir commit -q -m "chore(tasks): file $(($filed | ForEach-Object { $_.Id }) -join ', ') for CI failures" -m "Filed by the dark factory's CI watch (BL-987)." -m $SkipCiNote 2>&1 | Out-Null
+            git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { continue }
+            foreach ($task in $filed) {
+                $script:CiWatch.Settled["$($task.Verdict.Key)|$($task.Verdict.RunId)"] = "filed $($task.Id)"
+                Write-Trace $task.Id 'ci' "filed: $($task.Verdict.Verdict) $($task.Verdict.Key) on $($task.Verdict.Platforms -join '+'), run $($task.Verdict.RunId)" 'Yellow'
+                Send-CiWhisper $task.Line
+            }
+            return
+        }
+        Write-Trace '-' 'ci' "could not push the CI failure tasks to $Branch; trying again next heartbeat" 'DarkYellow'
+    } catch {
+        Write-Trace '-' 'ci' "CI watch failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
+    } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+}
+
+function Get-LiveTaskTitles {
+    # The titles of the live tasks (Backlog, Doing, Blocked) in the -Repo worktree.
+    param([string]$Repo)
+    $titles = @()
+    foreach ($state in 'Backlog', 'Doing', 'Blocked') {
+        foreach ($file in @(Get-ChildItem (Join-Path $Repo "Tasks\$state") -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+            $line = @(Get-Content -LiteralPath $file.FullName -TotalCount 6 | Where-Object { $_ -match '^title:\s*' })[0]
+            if ($line) { $titles += ($line -replace '^title:\s*', '').Trim() }
+        }
+    }
+    return $titles
+}
+
+function Set-SplitTaskBody {
+    # Fills a split task's Goal, Context and Acceptance criteria from -Hotspot (Path, Count, Ids).
+    param([string]$Path, $Hotspot, [int]$Waiting)
+    $ids = $Hotspot.Ids -join ', '
+    $goal = "``$($Hotspot.Path)`` no longer serialises the tasks that touch it: each unit it holds lives in its own file, so those tasks can run in parallel lanes."
+    $context = @(
+        "Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the board's capacity was the binding limit on -Lanes Auto two steps running while $Waiting ready task(s) could not start because of overlapping touches."
+        ''
+        "``task-board.ps1 hotspots`` counts $($Hotspot.Count) unfinished lane-eligible tasks touching ``$($Hotspot.Path)``: $ids. Tasks that touch the same file never run side by side, so they wait for one another."
+    ) -join "`n"
+    $criteria = @(
+        "- [ ] The per-case or per-stand-in content of ``$($Hotspot.Path)`` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file."
+        "- [ ] After the waiting tasks' ``touches`` ($ids) are narrowed to their own files by editing their front matter, ``task-board.ps1 hotspots`` counts fewer than $SplitHotspotMinimum tasks for ``$($Hotspot.Path)``."
+        '- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.'
+    ) -join "`n"
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
+    $text = $text -replace '<!-- Why this matters.*?-->', $context.Replace('$', '$$')
+    $text = $text.Replace('- [ ] <!-- A statement someone else can check from the repository without asking a question. -->', $criteria)
+    [IO.File]::WriteAllText($Path, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Invoke-SplitHotspotFiling {
+    # Called by an Auto step once the board's capacity has bound two steps running: when a
+    # ready task waits on overlapping touches, asks task-board.ps1 hotspots for the files
+    # that hold them back and files at most one High task to split the top one no live task
+    # names (Select-SplitHotspot), in the ci-watch worktree at origin/-Branch, pushed straight
+    # to -Branch like the CI-failure tasks; up to three tries when the push races a lane.
+    param([string]$Branch)
+    $saved = $env:CLAUDE_PROJECT_DIR
+    try {
+        foreach ($attempt in 1..3) {
+            git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+            if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
+                New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+                git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null
+            }
+            git -C $CiWatchDir checkout -q -f --detach "origin/$Branch" 2>&1 | Out-Null
+            git -C $CiWatchDir clean -q -fd -- Tasks 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'split' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return }
+            $env:CLAUDE_PROJECT_DIR = $CiWatchDir
+            $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
+            $status = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board status 2>&1 | ForEach-Object { "$_" })
+            $capacityLine = (@(& powershell -NoProfile -ExecutionPolicy Bypass -File $board capacity 2>&1 | ForEach-Object { "$_" }) -join "`n")
+            $waiting = Get-OverlapWaitingCount -StatusLines $status -CapacityLine $capacityLine
+            if (-not (Test-SplitHotspotDue -CapacityStreak $script:Auto.CapacityStreak -Waiting $waiting)) { return }
+            $lines = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board hotspots 2>&1 | ForEach-Object { "$_" })
+            $exit = $LASTEXITCODE
+            $choice = Select-SplitHotspot -Lines $lines -ExitCode $exit -LiveTitles (Get-LiveTaskTitles $CiWatchDir) -Filed $script:Auto.SplitFiled
+            if ($choice.Action -ne 'file') { Write-Trace '-' 'split' $choice.Reason 'DarkGray'; return }
+            $newArgs = @('new', '-Title', (Get-SplitTaskTitle $choice.Path), '-Priority', 'High', '-Pipeline', 'feature', '-Touches', $choice.Path)
+            $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+            if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'split' "cannot file a split task for $($choice.Path): $(Get-Short $out 60)" 'DarkYellow'; return }
+            $id = $Matches[1]; $line = $Matches[0]
+            Set-SplitTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Hotspot $choice -Waiting $waiting
+            git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
+            git -C $CiWatchDir commit -q -m "chore(tasks): file $id to split $($choice.Path)" -m "Filed by the dark factory's coordinator: $($choice.Reason)." -m $SkipCiNote 2>&1 | Out-Null
+            git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { continue }
+            $script:Auto.SplitFiled = @(@($script:Auto.SplitFiled) + $choice.Path)
+            Write-Trace $id 'split' "filed: $($choice.Reason)" 'Yellow'
+            Send-CiWhisper $line
+            return
+        }
+        Write-Trace '-' 'split' "could not push the split task to $Branch; trying again next step" 'DarkYellow'
+    } catch {
+        Write-Trace '-' 'split' "split filing failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
+    } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+}
+
+function Remove-CiWatch {
+    # Deletes the ci-watch worktree at shift end.
+    if (-not (Test-Path $CiWatchDir)) { return }
+    git -C $Root worktree remove --force $CiWatchDir 2>&1 | Out-Null
+    git -C $Root worktree prune 2>&1 | Out-Null
+}
+
+if ($TestCiWatch) {
+    $check = {
+        param([string]$Name, [string]$Expected, [string]$Got)
+        if ($Expected -ceq $Got) { Write-Host "PASS ${Name}: $Got" -ForegroundColor Green }
+        else { Write-Host "FAIL ${Name}: expected $Expected, got $Got" -ForegroundColor Red; $script:ciTestFailed++ }
+    }
+    $script:ciTestFailed = 0
+    $t = "`t"
+    $log = @(
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:04.3646946Z Passed!  - Failed:     0, Passed:   257 - Curl.Zstandard.UnitTests.dll (net10.0)"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.0746696Z   Failed FromComponents_ZeroCoefficient_Throws [54 ms]"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.0765938Z   Error Message:"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.0856851Z    Assertion failed. Expected exception of exact type CryptographicException but caught OpenSslCryptographicException."
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.1238521Z                      at Curl.Protocol.Ssh.Keys.RsaSshPrivateKey.FromPkcs1(ReadOnlySpan``1 der) in /home/runner/work/Curl/Curl/Curl.Protocol.Ssh.UnitLibrary/Keys/RsaSshPrivateKey.cs"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:06.1352234Z                      at Curl.Protocol.Ssh.Keys.RsaSshPrivateKeyTests.<>c.b__5_0() in /home/runner/work/Curl/Curl/Curl.Protocol.Ssh.UnitTests/Keys/RsaSshPrivateKeyTests.cs:line 90"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-09-29T22:10:07.6024310Z Failed!  - Failed:     1, Passed:   873, Skipped:     0, Total:   874, Duration: 16 s - Curl.Protocol.Ssh.UnitTests.dll (net10.0)"
+        "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:05.3235560Z   Failed FromComponents_ZeroCoefficient_Throws [73 ms]"
+        "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:05.3240640Z   Error Message:"
+        "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:05.3240641Z    Assertion failed. Expected exception of exact type CryptographicException but caught AppleCFErrorCryptographicException."
+        "Build and test (macos-latest)${t}Fast tests${t}2026-09-29T22:10:07.6442400Z Failed!  - Failed:     1, Passed:   873 - Curl.Protocol.Ssh.UnitTests.dll (net10.0)")
+    $parsed = @(Get-CiFailures $log)
+    & $check 'test failure parsed' 'FromComponents_ZeroCoefficient_Throws|test|Linux,macOS|Curl.Protocol.Ssh.UnitTests|Assertion failed. Expected exception of exact type CryptographicException but caught OpenSslCryptographicException.' `
+        (($parsed | ForEach-Object { "$($_.Key)|$($_.Kind)|$($_.Platforms -join ',')|$($_.Project)|$($_.Message)" }) -join ';')
+    $buildLog = @(
+        "Build and test (macos-latest)${t}Build${t}2026-09-29T22:00:00.0000000Z /Users/runner/work/Curl/Curl/Curl.Cli.UnitLibrary/Options/Parser.cs(12,5): error CS1002: ; expected [/Users/runner/work/Curl/Curl/Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj]"
+        "Build and test (macos-latest)${t}Build${t}2026-09-29T22:00:01.0000000Z /Users/runner/work/Curl/Curl/Curl.Cli.UnitLibrary/Options/Parser.cs(12,5): error CS1002: ; expected [/Users/runner/work/Curl/Curl/Curl.Cli.UnitLibrary/Curl.Cli.UnitLibrary.csproj]")
+    & $check 'build error parsed' 'error CS1002 in Parser.cs|build|macOS|Curl.Cli.UnitLibrary|; expected' `
+        ((@(Get-CiFailures $buildLog) | ForEach-Object { "$($_.Key)|$($_.Kind)|$($_.Platforms -join ',')|$($_.Project)|$($_.Message)" }) -join ';')
+    $now = [datetime]'2026-09-29T23:00:00'
+    $f = { param([string]$Key, [string[]]$On, [string]$Kind = 'test') [pscustomobject]@{ Key = $Key; Kind = $Kind; Platforms = $On; Project = 'Curl.X.UnitTests'; Message = 'm' } }
+    $run = { param([string]$Id, [int]$MinutesAgo, [object[]]$Failures) [pscustomobject]@{ Id = $Id; Sha = "sha$Id"; FinishedAt = $now.AddMinutes(-$MinutesAgo); Failures = @($Failures) } }
+    $show = { param($Verdicts) (@($Verdicts | Where-Object { $_ }) | ForEach-Object { "$($_.Verdict) $($_.Key) run $($_.RunId) from $($_.FirstSha) on $($_.Platforms -join '+')" }) -join '; ' }
+    & $check 'two platforms: regression at once' 'regression A run 9 from sha9 on Linux+macOS' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux', 'macOS'))), (& $run 8 20 @()))))
+    & $check 'one platform, newest only: waits' '' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 20 @()))))
+    & $check 'one platform, unconfirmed for 5 min: regression' 'regression A run 9 from sha9 on Linux' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 31 @(& $f A @('Linux'))), (& $run 8 40 @()))))
+    & $check 'two runs in a row: regression from the first' 'regression A run 9 from sha8 on Linux+macOS' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 9 @(& $f A @('macOS'))), (& $run 7 20 @()))))
+    & $check 'failed once between passes: flaky' 'flaky A run 8 from sha8 on Linux' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @()), (& $run 8 9 @(& $f A @('Linux'))), (& $run 7 20 @()))))
+    & $check 'failed again after passing: flaky' 'flaky A run 9 from sha9 on Linux' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f A @('Linux'))), (& $run 8 9 @()), (& $run 7 20 @(& $f A @('Linux'))))))
+    & $check 'fixed regression: nothing' '' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @()), (& $run 8 9 @(& $f A @('Linux'))), (& $run 7 20 @(& $f A @('Linux'))))))
+    & $check 'build error: regression at once' 'regression error CS1002 in X.cs run 9 from sha9 on Linux' `
+        (& $show (Get-CiVerdicts -Now $now -Runs @((& $run 9 2 @(& $f 'error CS1002 in X.cs' @('Linux') 'build')))))
+    & $check 'flaky title' 'Fix flaky CI test A that failed once on Linux' (Get-CiTaskTitle ([pscustomobject]@{ Key = 'A'; Kind = 'test'; Verdict = 'flaky'; Platforms = @('Linux') }))
+    & $check 'CI fix title is claimable past the usage stop' 'True True False' ("$(Test-CiFixTitle 'Fix CI failure A on Linux') $(Test-CiFixTitle 'Fix flaky CI test A') $(Test-CiFixTitle 'Add --foo option')")
+    & $check 'touches' 'Curl.Protocol.Ssh.UnitTests,Curl.Protocol.Ssh.UnitLibrary' ((Get-CiTouches -Project 'Curl.Protocol.Ssh.UnitTests' -Repo $Root) -join ',')
+    & $check 'integration touches' 'Curl.Networking.IntegrationTests,Curl.Networking.UnitLibrary' ((Get-CiTouches -Project 'Curl.Networking.IntegrationTests' -Repo $Root) -join ',')
+    & $check 'console integration touches' 'Curl.Console.IntegrationTests,Curl.Console' ((Get-CiTouches -Project 'Curl.Console.IntegrationTests' -Repo $Root) -join ',')
+    $integrationLog = @(
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000000Z   Failed Connect_Loopback_Succeeds [12 ms]"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000001Z   Error Message:"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000002Z    Assert.AreEqual failed."
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000003Z      at Curl.Networking.TcpDialerTests.Connect_Loopback_Succeeds() in /home/runner/work/Curl/Curl/Curl.Networking.IntegrationTests/TcpDialerTests.cs:line 12"
+        "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000004Z Failed!  - Failed:     1, Passed:     3 - SomethingElse.dll (net10.0)")
+    & $check 'integration test failure parsed' 'Connect_Loopback_Succeeds|Curl.Networking.IntegrationTests' `
+        ((@(Get-CiFailures $integrationLog) | ForEach-Object { "$($_.Key)|$($_.Project)" }) -join ';')
+    $body = Join-Path ([IO.Path]::GetTempPath()) "df-ci-body-$PID.md"
+    Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $body
+    Set-CiTaskBody -Path $body -RunUrl 'https://github.com/o/r/actions/runs/9' -Verdict ([pscustomobject]@{
+        Key = 'A_Throws'; Kind = 'test'; Verdict = 'regression'; RunId = '9'; FirstSha = '0729839c0000'; Platforms = @('Linux', 'macOS'); Message = 'costs $5' })
+    $text = [IO.File]::ReadAllText($body)
+    Remove-Item $body -ErrorAction SilentlyContinue
+    $seen = @()
+    $seen += $(if ($text -match '<!--') { 'placeholder left' } else { 'no placeholder' })
+    if ($text -match 'CI run 9 \(https') { $seen += 'run 9' }
+    if ($text -match 'First failing commit: 0729839c\.') { $seen += '0729839c' }
+    if ($text.Contains('costs $5')) { $seen += '$5' }
+    if ($text.Contains('- [ ] `A_Throws` passes locally')) { $seen += 'criteria' }
+    & $check 'task body filled' 'no placeholder; run 9; 0729839c; $5; criteria' ($seen -join '; ')
+    # Covered: a live task names the test; a Done one does for a run older than its last commit.
+    $repo = Join-Path ([IO.Path]::GetTempPath()) "df-ci-covered-$PID"
+    foreach ($state in 'Backlog', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $repo "Tasks\$state") | Out-Null }
+    $commit = { param([string]$Message) git -C $repo add -A 2>&1 | Out-Null; git -C $repo -c user.name=t -c user.email=t@t commit -q --allow-empty -m $Message 2>&1 | Out-Null; "$(git -C $repo rev-parse HEAD)".Trim() }
+    git -C $repo init -q -b work 2>&1 | Out-Null
+    Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-001-fix-ci-failure-a.md') -Value 'title: Fix CI failure A_Throws on Linux'
+    $oldRun = & $commit 'file BL-001'
+    $live = Test-CiFailureCovered -Key 'A_Throws' -Sha $oldRun -Repo $repo
+    $prefix = Test-CiFailureCovered -Key 'A' -Sha $oldRun -Repo $repo
+    Move-Item (Join-Path $repo 'Tasks\Backlog\BL-001-fix-ci-failure-a.md') (Join-Path $repo 'Tasks\Done\')
+    & $commit 'BL-001 Done' | Out-Null
+    $newRun = & $commit 'a later push'
+    $stale = Test-CiFailureCovered -Key 'A_Throws' -Sha $oldRun -Repo $repo
+    $again = Test-CiFailureCovered -Key 'A_Throws' -Sha $newRun -Repo $repo
+    Remove-Item -Recurse -Force -Path $repo -ErrorAction SilentlyContinue
+    & $check 'covered' 'live True; other name False; before the fix True; after the fix False' "live $live; other name $prefix; before the fix $stale; after the fix $again"
+    # BL-1031, the live path: gh's run list and --log-failed lines, recorded from runs
+    # 36674691490 (two TcpDialerTests failures on Linux) and 36690174792 (one on macOS).
+    $traced = New-Object Collections.Generic.List[string]
+    function Write-Trace { param($Id, $Kind, $Text, $Color) $traced.Add($Text) }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $ubuntu = "Build and test (ubuntu-latest)${t}Fast tests${t}"
+    $macos = "Build and test (macos-latest)${t}UNKNOWN STEP${t}"
+    $recorded = @{
+        '36674691490' = @(
+            "${ubuntu}2026-09-30T05:46:09.4012066Z   Skipped ConnectAsync_WithAnAbstractSocketOnWindows_FailsAsCurlsInvalidArguments"
+            "${ubuntu}2026-09-30T05:46:09.4101921Z   Failed BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed [12 ms]"
+            "${ubuntu}2026-09-30T05:46:09.4131550Z   Error Message:"
+            "${ubuntu}2026-09-30T05:46:09.4161939Z    Assertion failed. Expected exception of exact type LocalBindException but no exception was thrown."
+            "${ubuntu}2026-09-30T05:46:09.4211716Z   Stack Trace:"
+            "${ubuntu}2026-09-30T05:46:09.4242317Z      at Curl.Networking.TcpDialerTests.BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed() in /home/runner/work/Curl/Curl/Curl.Networking.UnitTests/TcpDialerTests.cs:line 231"
+            "${ubuntu}2026-09-30T05:46:09.4331989Z   Failed BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext [22 ms]"
+            "${ubuntu}2026-09-30T05:46:09.4332652Z   Error Message:"
+            "${ubuntu}2026-09-30T05:46:09.4333071Z    Assertion failed. Expected values to be equal."
+            "${ubuntu}2026-09-30T05:46:09.4382540Z   Stack Trace:"
+            "${ubuntu}2026-09-30T05:46:09.4412190Z      at Curl.Networking.TcpDialerTests.BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext() in /home/runner/work/Curl/Curl/Curl.Networking.UnitTests/TcpDialerTests.cs:line 219"
+            "${ubuntu}2026-09-30T05:46:09.4992460Z Passed!  - Failed:     0, Passed:    98, Skipped:     0, Total:    98, Duration: 531 ms - Curl.Protocol.Mqtt.UnitTests.dll (net10.0)"
+            "${ubuntu}2026-09-30T05:46:17.9032566Z Failed!  - Failed:     2, Passed:  1666, Skipped:    16, Total:  1684, Duration: 35 s - Curl.Networking.UnitTests.dll (net10.0)")
+        '36690174792' = @(
+            "${macos}2026-09-30T08:34:39.6519410Z   Failed BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext [9 ms]"
+            "${macos}2026-09-30T08:34:39.6519420Z   Error Message:"
+            "${macos}2026-09-30T08:34:39.6519430Z    Test method Curl.Networking.TcpDialerTests.BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext threw exception:"
+            "${macos}2026-09-30T08:34:44.7941160Z Failed!  - Failed:     1, Passed:  1651, Skipped:    32, Total:  1684, Duration: 25 s - Curl.Networking.UnitTests.dll (net10.0)")
+        '36671448420' = @("${ubuntu}2026-09-30T05:05:00.0000000Z ##[error]Process completed with exit code 1.")
+    }
+    $readLog = { param([string]$Id) if ($Id -eq '99') { return $null } return , @($recorded[$Id]) }
+    $listed = { param([string]$Branch) $script:ciListJson }
+    $script:ciListJson = '[{"conclusion":"failure","databaseId":36674691490,"headSha":"d0621052bba101113a0187570196267f13bc6b74","status":"completed","updatedAt":"2026-09-30T05:47:43Z"},{"conclusion":"success","databaseId":36668685198,"headSha":"7c9833f44d160cdb92e3bf3c9fda81b9cc9a0e5d","status":"completed","updatedAt":"2026-09-30T04:28:52Z"}]'
+    $replay = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
+    $replayAt = $replay[0].FinishedAt
+    & $check 'replay 36674691490: new, waits to confirm' '' (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(4) -Runs $replay))
+    & $check 'replay 36674691490: a task per failing test once confirmed' `
+        'regression BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed run 36674691490 from d0621052bba101113a0187570196267f13bc6b74 on Linux; regression BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext run 36674691490 from d0621052bba101113a0187570196267f13bc6b74 on Linux' `
+        (& $show (Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay))
+    & $check 'replay 36674691490: the final look files at once' '2' "$(@(Get-CiVerdicts -Now $replayAt.AddMinutes(5) -Runs $replay -ConfirmMinutes 0).Count)"
+    # The case that failed live: a run with one failing test was dropped as if it had none.
+    $script:ciListJson = '[{"conclusion":"failure","databaseId":36690174792,"headSha":"b86b15dfc80d1dea7a5733c9b73fd263a17533b3","status":"completed","updatedAt":"2026-09-30T08:35:42Z"},{"conclusion":"cancelled","databaseId":1,"headSha":"x","status":"completed","updatedAt":"2026-09-30T08:31:26Z"},{"conclusion":"failure","databaseId":36671448420,"headSha":"bfd523f47edea0e8d7826a657606353aa2b6b462","status":"completed","updatedAt":"2026-09-30T05:05:30Z"},{"conclusion":"failure","databaseId":99,"headSha":"9999999999","status":"completed","updatedAt":"2026-09-30T05:00:00Z"},{"conclusion":"success","databaseId":36689969747,"headSha":"c4083da8fbe96c97b45499a41bab397f52fadce4","status":"completed","updatedAt":"2026-09-30T08:33:40Z"}]'
+    $single = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
+    & $check 'one failing test keeps its run; a nameless failure is kept by its job and step' '36690174792 1 macOS; 36671448420 1 Linux; 36689969747 0 ' `
+        (($single | ForEach-Object { "$($_.Id) $(@($_.Failures).Count) $(@($_.Failures | ForEach-Object { $_.Platforms }) -join '+')" }) -join '; ')
+    & $check 'unreadable failures traced' 'run 99 failure on 99999999: cannot read its log with gh run view --log-failed; trying again next heartbeat' `
+        ((@($traced) | Sort-Object) -join '|')
+    $nameless = @(Get-CiFailures @("${ubuntu}2026-09-30T05:05:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a failure naming no test is filed by its job and step (AF-0171)' 'job Build and test (ubuntu-latest) step Fast tests|job|Linux|##[error]Process completed with exit code 1.' `
+        "$($nameless[0].Key)|$($nameless[0].Kind)|$($nameless[0].Platforms -join '+')|$($nameless[0].Message)"
+    $mixed = @(Get-CiFailures @(
+        "${ubuntu}2026-10-11T22:12:00.0000000Z   Failed test303 [5 ms]"
+        "${ubuntu}2026-10-11T22:12:01.0000000Z Failed!  - Failed:     1, Passed:     9 - Curl.Cli.UnitTests.dll (net10.0)"
+        "quality${t}Measure code quality${t}2026-10-11T22:13:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a red job beside a named test failure is filed too (AF-0150)' 'test303|test; job quality step Measure code quality|job' `
+        (($mixed | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join '; ')
+    $gate = @(Get-CiFailures @(
+        "quality${t}Measure coverage${t}2026-10-16T09:02:13.0000000Z the step script echoed first"
+        "quality${t}Measure coverage${t}2026-10-16T09:02:14.0000000Z ##[error]CurlMulti.SetOption is outside a gate: branch 87.5%"
+        "quality${t}Measure coverage${t}2026-10-16T09:02:15.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a quality-gate failure names the members outside a gate (AF-0244)' 'CurlMulti.SetOption is outside a gate: branch 87.5%' "$($gate[0].Message)"
+    $unknownJob = @(Get-CiFailures @("UNKNOWN STEP${t}Measure code quality${t}2026-10-11T23:15:00.0000000Z ##[error]Process completed with exit code 1."))
+    & $check 'a failure whose job gh cannot name is still filed (AF-0178)' 'job unknown job step Measure code quality|job' `
+        "$($unknownJob[0].Key)|$($unknownJob[0].Kind)"
+    & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $emptyRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":901,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() })
+    & $check 'a failed run with an empty log is filed by the run (AF-0178)' '1|job unknown job step unknown step' `
+        "$($emptyRuns.Count)|$($emptyRuns[0].Failures[0].Key)"
+    $traced.Clear()
+    $script:ciListJson = $null
+    $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
+    $second = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
+    & $check 'gh cannot list: no runs, traced once' 'True True; cannot list the CI runs on work with gh' "$($null -eq $first) $($null -eq $second); $($traced -join '|')"
+    # What a coordinator log line says for each run it examined, and that it says it once.
+    $verdicts = @(Get-CiVerdicts -Now $replayAt.AddMinutes(31) -Runs $replay)
+    $waiting = Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts @() -Settled @{} -ConfirmMinutes 5
+    & $check 'outcome: waiting' "failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext on Linux only, waiting for the next run or $($replayAt.AddMinutes(5).ToString('HH:mm')) to confirm it" $waiting
+    $settled = @{ 'BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed|36674691490' = 'filed BL-1040'; 'BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext|36674691490' = 'covered by a task' }
+    & $check 'outcome: filed and covered' 'failure on d0621052: BindLocalEnd_WhenEveryPortIsInUse_ThrowsInterfaceFailed regression, filed BL-1040; BindLocalEnd_WhenTheFirstPortIsInUse_BindsTheNext regression, covered by a task' `
+        (Get-CiRunOutcome -Run $replay[0] -Runs $replay -Verdicts $verdicts -Settled $settled)
+    & $check 'outcome: green run' 'success on 7c9833f4: nothing to file' (Get-CiRunOutcome -Run $replay[1] -Runs $replay -Verdicts $verdicts -Settled $settled)
+    & $check 'outcome: not filed yet, older run, passed since' 'failure on sha8: A regression, not filed yet; failure on sha8: A filed with run 9; failure on sha8: A passed since, not filed' `
+        ((@(
+            Get-CiRunOutcome -Run (& $run 8 9 @(& $f A @('Linux'))) -Runs @((& $run 8 9 @())) -Verdicts @([pscustomobject]@{ Key = 'A'; Verdict = 'regression'; RunId = '8' }) -Settled @{}
+            Get-CiRunOutcome -Run (& $run 8 9 @(& $f A @('Linux'))) -Runs @((& $run 9 2 @())) -Verdicts @([pscustomobject]@{ Key = 'A'; Verdict = 'regression'; RunId = '9' }) -Settled @{}
+            Get-CiRunOutcome -Run (& $run 8 9 @(& $f A @('Linux'))) -Runs @((& $run 9 2 @())) -Verdicts @() -Settled @{})) -join '; ')
+    $traced.Clear()
+    Write-CiRunLine -RunId '7' -Line 'success on sha7: nothing to file'
+    Write-CiRunLine -RunId '7' -Line 'success on sha7: nothing to file'
+    Write-CiRunLine -RunId '8' -Line 'failure on sha8: A waiting'
+    Write-CiRunLine -RunId '8' -Line 'failure on sha8: A regression, filed BL-1'
+    & $check 'a run is traced once per outcome' 'run 7 success on sha7: nothing to file|run 8 failure on sha8: A waiting|run 8 failure on sha8: A regression, filed BL-1' ($traced -join '|')
+    # BL-999: the audit guard's failure line files one interactive-only task, once.
+    $auditLog = @("audit-guard${t}Run guard${t}2026-09-29T10:00:00.0000000Z Audit guard: Audit/Findings/x.md changed on work/dark-factory since its merge base with master")
+    $audit = @(Get-CiFailures $auditLog)
+    & $check 'audit guard line parsed' 'audit guard Audit/Findings/x.md|audit' (($audit | ForEach-Object { "$($_.Key)|$($_.Kind)" }) -join ';')
+    $auditVerdicts = @(Get-CiVerdicts -Now $now -Runs @((& $run 9 2 $audit)))
+    & $check 'audit guard: one red run files it' 'regression audit guard Audit/Findings/x.md run 9 from sha9 on audit-guard' (& $show $auditVerdicts)
+    & $check 'audit guard title' "Revert the dark factory's change to Audit/Findings/x.md" (Get-CiTaskTitle $auditVerdicts[0])
+    $board = Join-Path ([IO.Path]::GetTempPath()) "df-ci-audit-$PID"
+    foreach ($state in 'Backlog', 'Doing', 'Blocked', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $board "Tasks\$state") | Out-Null }
+    $savedDir = $env:CLAUDE_PROJECT_DIR; $savedLane = $env:CURL_DARK_FACTORY_LANE
+    try {
+        $env:CLAUDE_PROJECT_DIR = $board
+        $env:CURL_DARK_FACTORY_LANE = '0'
+        $boardScript = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
+        $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $boardScript @(Get-CiTaskNewArgs -Verdict $auditVerdicts[0] -Touches @()) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $filedPath = if ($out -match '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Join-Path $board $Matches[2] } else { '' }
+        & $check 'audit task filed with CURL_DARK_FACTORY_LANE=0' 'filed' $(if ($filedPath -and (Test-Path $filedPath)) { 'filed' } else { "not filed: $out" })
+        if ($filedPath -and (Test-Path $filedPath)) {
+            Set-CiTaskBody -Path $filedPath -Verdict $auditVerdicts[0] -RunUrl 'https://github.com/o/r/actions/runs/9'
+            $text = [IO.File]::ReadAllText($filedPath)
+            $fields = @(
+                $(if ($text -match '(?m)^lane: no\s*$') { 'lane: no' })
+                $(if ($text -match '(?m)^priority: High\s*$') { 'High' })
+                $(if ($text -match '(?m)^touches: \[Audit/Findings/x\.md\]\s*$') { 'touches: [Audit/Findings/x.md]' })
+                $(if ($text -notmatch '<!--') { 'no placeholder' })) -join '; '
+            & $check 'audit task fields' 'lane: no; High; touches: [Audit/Findings/x.md]; no placeholder' $fields
+            & $check 'audit guard: a second run files nothing' 'True' "$(Test-CiFailureCovered -Key $auditVerdicts[0].Key -Sha 'sha10' -Repo $board)"
+        }
+    } finally {
+        $env:CLAUDE_PROJECT_DIR = $savedDir; $env:CURL_DARK_FACTORY_LANE = $savedLane
+        Remove-Item -Recurse -Force -Path $board -ErrorAction SilentlyContinue
+    }
+    $script:CiWatch.AuditTasks = @{ 'BL-2001' = "Revert the dark factory's change to Audit/Findings/x.md" }
+    & $check 'end report names an open audit task' "BL-2001 AUDIT    needs an interactive session: Revert the dark factory's change to Audit/Findings/x.md" `
+        ((@(Get-OpenAuditTaskLines) | Where-Object { $_ -like 'BL-2001 *' }) -join '|')
+    exit $(if ($script:ciTestFailed) { 1 } else { 0 })
+}
+
+# This file ran to its end; RunDarkFactory.ps1 goes on to the next one.
+$AreaFileFinished = $true

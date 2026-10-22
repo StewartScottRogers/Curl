@@ -10,12 +10,44 @@ namespace Curl.Cli;
 /// case. A subject starting with <c>-</c> asks for one option's manual section instead, which
 /// <see cref="CurlOptionManualSection"/> prints. The option columns depend on the terminal width curl's
 /// <c>get_terminal_columns</c> gives (79 when nothing sets one). The lines carry no line terminator; the
-/// console layer chooses the newline (CRLF on Windows, as the mingw reference writes).
+/// console layer chooses the newline (CRLF on Windows, as the mingw reference writes). Two things are
+/// Curl's own, so AI agents find <c>--ai-help</c> (BL-2985, ADR-0224): the usage page ends with
+/// <see cref="AiHelpUsageLine"/>, and the subject <c>ai-help</c> prints <see cref="AiHelpSectionLines"/>.
 /// </summary>
 public static class CurlHelpText
 {
     /// <summary>The terminal width curl uses when neither <c>COLUMNS</c> nor a console gives one.</summary>
     public const int DefaultColumns = 79;
+
+    /// <summary>
+    /// The line Curl adds after curl's last usage line so an AI agent finds <c>--ai-help</c> (BL-2985,
+    /// ADR-0224); curl prints no such line.
+    /// </summary>
+    public const string AiHelpUsageLine = "Use \"--ai-help\" for Markdown help written for AI agents (Curl only)";
+
+    /// <summary>The option text of <c>--ai-help</c>'s row in <c>--help all</c> and <c>--help curl</c>, Curl's own row.</summary>
+    public const string AiHelpOption = "    --ai-help <category>";
+
+    /// <summary>The description of <c>--ai-help</c>'s row in <c>--help all</c> and <c>--help curl</c>.</summary>
+    public const string AiHelpDescription = "Markdown help for AI agents (Curl only)";
+
+    /// <summary>
+    /// What <c>--help --ai-help</c> and <c>--help ai-help</c> print, in the shape of a <see cref="CurlManual"/>
+    /// option section, which curl's manual has none of for this Curl-only option.
+    /// </summary>
+    public static IReadOnlyList<string> AiHelpSectionLines { get; } =
+    [
+        "    --ai-help <category>",
+        "           (Curl only) Print Markdown help written for AI agents on standard",
+        "           output. With no category it prints a short index: the categories",
+        "           and the most-used options. Name a category for its options in",
+        "           full, or \"all\" for every option, the exit codes and the",
+        "           --write-out variables. --help is the same help written for people.",
+        string.Empty,
+        "           Example:",
+        "            curl --ai-help http",
+        string.Empty,
+    ];
 
     /// <summary>The categories <c>--help category</c> lists, in its order, each with its name and one-line description.</summary>
     internal static readonly (string Name, string Description, CurlHelpCategories Category)[] Categories =
@@ -93,6 +125,17 @@ public static class CurlHelpText
             return CategoryListText();
         }
 
+        if (subject.Equals("ai-help", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Concat(AiHelpSectionLines.Select(line => line + "\n"));
+        }
+
+        return CategoryText(subject, columns);
+    }
+
+    /// <summary>The named category's heading and options, or the unknown-category page when none has the name.</summary>
+    private static string CategoryText(string subject, int columns)
+    {
         foreach ((string name, string description, CurlHelpCategories category) in Categories)
         {
             if (subject.Equals(name, StringComparison.OrdinalIgnoreCase))
@@ -113,7 +156,8 @@ public static class CurlHelpText
             + "Use \"--help category\" to get an overview of all categories, which are:\n"
             + CategoryNamesText(columns)
             + "Use \"--help all\" to list all options\n"
-            + "Use \"--help [option]\" to view documentation for a given option\n";
+            + "Use \"--help [option]\" to view documentation for a given option\n"
+            + AiHelpUsageLine + "\n";
         return text.Split('\n')[..^1];
     }
 

@@ -3,34 +3,117 @@ using System.Text;
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Removes <c>.</c> and <c>..</c> segments from a URL path as curl 8.21.0's
+/// Removes <c>.</c> and <c>..</c> segments from a URL path as curl 8.22.0's
 /// <c>dedotdotify</c> does, following RFC 3986 section 5.2.4, with <c>%2e</c> or
 /// <c>%2E</c> counted as a dot.
 /// </summary>
 internal static class CurlUrlDotSegments
 {
-    /// <summary>Returns <paramref name="path" /> with its dot segments removed.</summary>
-    /// <remarks>
-    /// The path of a parsed URL always starts with a slash or, for <c>file</c>, a drive
-    /// letter, so rules A and D, which remove a leading <c>./</c> or <c>../</c>, never apply
-    /// and are not implemented.
-    /// </remarks>
-    public static string Remove(string path)
+    /// <summary>Returns <paramref name="path" /> with its dot segments removed, or <paramref name="path" /> itself when it has none.</summary>
+    public static string Remove(string path) => Dedotdotify(path) ?? path;
+
+    /// <summary>
+    /// curl 8.22.0's <c>dedotdotify</c>, row for row: <see langword="null" /> when
+    /// <paramref name="input" /> has no dot segment to remove (<c>needs_dedotdot</c>),
+    /// else the input with a leading <c>./</c> or <c>../</c>, a whole <c>.</c> or <c>..</c>,
+    /// and every <c>/./</c> and <c>/../</c> removed (rules A to E).
+    /// </summary>
+    public static string? Dedotdotify(string input)
     {
-        var output = new StringBuilder(path.Length);
-        int index = 0;
-        while (index < path.Length)
+        if (!NeedsDedotdot(input))
         {
-            if (path[index] == '/' && TryRemoveSegment(path, output, ref index))
+            return null;
+        }
+
+        int index = SkipLeadingDotSegment(input);
+        var output = new StringBuilder(input.Length);
+        while (index < input.Length)
+        {
+            if (input[index] == '/' && TryRemoveSegment(input, output, ref index))
             {
                 continue;
             }
 
-            output.Append(path[index]);
+            output.Append(input[index]);
             index++;
         }
 
         return output.ToString();
+    }
+
+    /// <summary>
+    /// <c>needs_dedotdot</c>: whether <paramref name="path" /> holds a <c>.</c> or <c>..</c>
+    /// followed by a slash or the end; a path shorter than two characters never does.
+    /// </summary>
+    private static bool NeedsDedotdot(string path)
+    {
+        if (path.Length < 2)
+        {
+            return false;
+        }
+
+        int index = 0;
+        while (index < path.Length)
+        {
+            int dot = DotLength(path, index);
+            if (dot == 0)
+            {
+                index++;
+                continue;
+            }
+
+            index += dot;
+            if (EndsDotSegment(path, index))
+            {
+                return true;
+            }
+
+            index += DotLength(path, index);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="index" />, just after a dot, ends a <c>.</c> segment or, after
+    /// one more dot, a <c>..</c> segment.
+    /// </summary>
+    private static bool EndsDotSegment(string path, int index)
+    {
+        if (EndsSegment(path, index))
+        {
+            return true;
+        }
+
+        int secondDot = DotLength(path, index);
+
+        return secondDot > 0 && EndsSegment(path, index + secondDot);
+    }
+
+    /// <summary>
+    /// Rules A and D: returns the index after a leading <c>./</c> or <c>../</c>, the length of
+    /// the path when it is <c>.</c> or <c>..</c> alone, else 0.
+    /// </summary>
+    private static int SkipLeadingDotSegment(string path)
+    {
+        int afterDot = DotLength(path, 0);
+        if (afterDot == 0)
+        {
+            return 0;
+        }
+
+        if (EndsSegment(path, afterDot))
+        {
+            return Math.Min(afterDot + 1, path.Length);
+        }
+
+        int afterSecondDot = afterDot + DotLength(path, afterDot);
+        if (afterSecondDot == afterDot || !EndsSegment(path, afterSecondDot))
+        {
+            return 0;
+        }
+
+        return Math.Min(afterSecondDot + 1, path.Length);
     }
 
     /// <summary>

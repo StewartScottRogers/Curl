@@ -43,10 +43,16 @@ public static class UpstreamCaseRatchet
         };
     }
 
-    // A listed case skipped only because another platform's Curl has the features it needs is held
-    // to the list there, not here (ADR-0488); any other skip of a listed case is a regression.
+    // The lines upstream's prechecks print to refuse the platform Perl's $^O names: test2072's prints
+    // "Test requires a Unix system" on MSWin32, so the case runs on another platform's Curl, as one
+    // needing a feature only that Curl has does (BL-2828).
+    private static readonly HashSet<string> OtherPlatformPrecheckSkips = new(StringComparer.Ordinal) { "Test requires a Unix system" };
+
+    // A listed case skipped only because another platform's Curl has the features it needs, or
+    // because its precheck refuses this platform, is held to the list there, not here (ADR-0488);
+    // any other skip of a listed case is a regression.
     private static UpstreamCaseVerdict JudgeSkip(int testNumber, UpstreamCaseOutcome outcome, bool isListed) =>
-        (isListed, outcome.RunsOnlyOnAnotherPlatform) switch
+        (isListed, outcome.RunsOnlyOnAnotherPlatform || OtherPlatformPrecheckSkips.Contains(outcome.Detail)) switch
         {
             (true, true) => new(UpstreamCaseVerdictKind.Inconclusive, $"test{testNumber} is on {PassingListFileName} and runs only on another platform: {outcome.Detail}"),
             (true, false) => new(UpstreamCaseVerdictKind.Fail, $"test{testNumber} is on {PassingListFileName} and is now skipped: {outcome.Detail}"),

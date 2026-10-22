@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography.X509Certificates;
 using Curl.Conformance.LibTest;
+using Curl.Conformance.UnitProgram;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -34,7 +35,7 @@ namespace Curl.Conformance;
 /// they name by its path, relative to the working directory when not absolute, as nothing when it
 /// is not there. <c>%HOSTIP</c> and <c>%CLIENTIP</c> are <c>127.0.0.1</c>, <c>%HTTPPORT</c> is
 /// <see cref="HttpPort"/>, <c>%HOST6IP</c> and <c>%CLIENT6IP</c> are <c>[::1]</c>, <c>%CLIENT6IP-NB</c> is <c>::1</c>, <c>%HTTP6PORT</c> is <see cref="Http6Port"/>, <c>%FTP6PORT</c> is <see cref="Ftp6Port"/>, <c>%GOPHER6PORT</c> is <see cref="Gopher6Port"/>, <c>%RESOLVE</c> is the name
-/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%HTTP3PORT</c> is <see cref="Http3Port"/> when the caller names a certificate directory and gives an <see cref="UpstreamHttp3Server"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
+/// <see cref="UpstreamResolveCheck"/> emulates in a precheck, <c>%PROXYPORT</c> is <see cref="ProxyPort"/>, <c>%FTPPORT</c> is <see cref="FtpPort"/>, <c>%SMTPPORT</c> is <see cref="SmtpPort"/>, <c>%IMAPPORT</c> is <see cref="ImapPort"/>, <c>%POP3PORT</c> is <see cref="Pop3Port"/>, <c>%SOCKSPORT</c> is <see cref="SocksPort"/>, <c>%MQTTPORT</c> is <see cref="MqttPort"/>, <c>%TFTPPORT</c> is <see cref="TftpPort"/>,<c>%RTSPPORT</c> is <see cref="RtspPort"/>, <c>%HTTPSPORT</c>, <c>%SMTPSPORT</c>, <c>%IMAPSPORT</c>, <c>%POP3SPORT</c>, <c>%FTPSPORT</c>, <c>%HTTPSPROXYPORT</c>, <c>%MQTTSPORT</c>, <c>%GOPHERSPORT</c> and <c>%HTTP2TLSPORT</c> are <see cref="HttpsPort"/>, <see cref="SmtpsPort"/>, <see cref="ImapsPort"/>, <see cref="Pop3sPort"/>, <see cref="FtpsPort"/>, <see cref="HttpsProxyPort"/>, <see cref="MqttsPort"/>, <see cref="GophersPort"/> and <see cref="Http2TlsPort"/> when a certificate directory is named, <c>%GOPHERPORT</c> is <see cref="GopherPort"/>, <c>%DICTPORT</c> is <see cref="DictPort"/>, <c>%TELNETPORT</c> is <see cref="TelnetPort"/>, <c>%DNSPORT</c> is <see cref="DnsPort"/>, <c>%HTTP2PORT</c> is <see cref="Http2Port"/>, <c>%H2CVER</c> is <see cref="H2cVersion"/>, <c>%HTTP3PORT</c> is <see cref="Http3Port"/> when the caller names a certificate directory and gives an <see cref="UpstreamHttp3Server"/>, <c>%NOLISTENPORT</c> is <see cref="NoListenPort"/>, a port that refuses every connection, <c>%HTTPUNIXPATH</c> is <see cref="HttpUnixPath"/>, <c>%SOCKSUNIXPATH</c> is <see cref="SocksServerConnector.SocksUnixPath"/>, <c>%HTTPS-MTLSPORT</c> is <see cref="HttpsServerConnector.HttpsMtlsPort"/> when a certificate directory is named, <c>%FTPTIME2</c> is <c>8</c> (the seconds upstream gives FTP time-out cases on a host whose FTP server checks in under a second), and <c>%VERSION</c> is <see cref="CurlVersion"/>. Every other variable
 /// is unknown, so a case that uses one is skipped.
 /// </para>
 /// </remarks>
@@ -71,6 +72,20 @@ namespace Curl.Conformance;
 /// or trace before them, as <c>runtests.pl</c> runs a tool, and is judged as a curl case is; one whose program is
 /// not ported is skipped as <see cref="UpstreamCaseScreening.LibTestNotPorted"/>.
 /// </param>
+/// <param name="perlCommandScripts">
+/// The C# interpretations of the Perl scripts a <c>&lt;command type="perl"&gt;</c> runs, keyed by the script's file
+/// name (<c>test1707.pl</c>, <see cref="UpstreamCaseScreening.PerlScriptName"/>; BL-2863), or <see langword="null"/>
+/// for none, so every such case is skipped as <c>the harness does not run a perl command</c>. A registered one runs
+/// in place of curl, given an invocation whose arguments are the command's words after the script (with
+/// <c>%CURL</c> as <see cref="CurlProgram"/>) and the case's stdout and stderr, and the delegate that runs curl in
+/// process, which it calls with an invocation of its own for each <c>%CURL</c> run; its exit code is the run's.
+/// </param>
+/// <param name="unitPrograms">
+/// The ported unit programs (BL-2841, ADR-0711), or <see langword="null"/> for none. A case with the <c>unittest</c>
+/// feature whose program (<see cref="UpstreamCaseScreening.UnitProgramName"/>) is in the table runs it in place of curl,
+/// as a libtest program runs, its failure count the exit code, and is judged as a curl case is; one whose program is not
+/// there is skipped as <see cref="UpstreamCaseScreening.UnitProgramNotPorted"/>.
+/// </param>
 public sealed class UpstreamCaseRunner(
     Func<UpstreamCurlInvocation, Task<int>> runCurl,
     UpstreamCurlPlatform platform,
@@ -79,10 +94,14 @@ public sealed class UpstreamCaseRunner(
     UpstreamSshServer? sshServer = null,
     UpstreamHttp2Server? http2Server = null,
     UpstreamHttp3Server? http3Server = null,
-    UpstreamLibTests? libTests = null)
+    UpstreamLibTests? libTests = null,
+    IReadOnlyDictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>>? perlCommandScripts = null,
+    UnitPrograms? unitPrograms = null)
 {
-    // runtests.pl reports nghttpx-h3 when it finds the nghttpx that serves HTTP/3, which the stand-in replaces.
-    private readonly UpstreamCurlPlatform platform = http3Server is null ? platform : platform.WithFeatures([Http3ServerFeature]);
+    // Every stand-in front, each in a file of its own; the platform reports the features the fronts stand in for.
+    private readonly UpstreamStandInFronts fronts = UpstreamStandInFronts.Create(sshServer, http2Server, http3Server);
+
+    private readonly UpstreamCurlPlatform platform = UpstreamStandInFronts.Create(sshServer, http2Server, http3Server).WithFeatures(platform);
 
     /// <summary>The value of <c>%HTTPPORT</c>; every connection reaches the emulation whatever its port.</summary>
     public const string HttpPort = "8990";
@@ -121,11 +140,14 @@ public sealed class UpstreamCaseRunner(
     /// </summary>
     public const string RtspPort = "8996";
 
+    /// <summary>The value of <c>%SMBPORT</c>: connections to this port reach the smbserver.py emulation, <see cref="SmbServerConnector"/>, which writes no protocol dump (BL-2860).</summary>
+    public const string SmbPort = "9020";
+
     /// <summary>The value of <c>%TFTPPORT</c>: datagrams to this port reach the tftpd emulation, <see cref="TftpServerConnector"/>, whose request dump follows the mqttd emulation's for <c>&lt;verify&gt;&lt;protocol&gt;</c>.</summary>
     public const string TftpPort = "9003";
 
     /// <summary>The value of <c>%HTTPSPORT</c> when the caller names a certificate directory: connections to this port reach the sws emulation through TLS, <see cref="HttpsServerConnector"/>, presenting the certificate the case's <c>https</c> server line names from <c>%CERTDIR/certs/</c>.</summary>
-    public const string HttpsPort = "8989";
+    public const string HttpsPort = "18989";
 
     /// <summary>The value of <c>%SMTPSPORT</c> when the caller names a certificate directory: connections to this port reach the SMTP server through TLS, <see cref="MailTlsServerConnector"/>, presenting <c>%CERTDIR/certs/test-localhost.pem</c>.</summary>
     public const string SmtpsPort = "9000";
@@ -207,7 +229,8 @@ public sealed class UpstreamCaseRunner(
     /// <summary>
     /// The in-memory dial a <c>--unix-socket</c> connection to <paramref name="unixSocketPath"/> makes: the path as
     /// the host and <see cref="HttpPort"/> as the port, since a Unix socket has none, so a dial to
-    /// <see cref="HttpUnixPath"/> reaches the sws emulation, as upstream's <c>http-unix</c> server is sws. The
+    /// <see cref="HttpUnixPath"/> reaches the sws emulation, as upstream's <c>http-unix</c> server is sws, and a dial to
+    /// <see cref="SocksServerConnector.SocksUnixPath"/> reaches the socksd emulation, which answers that host. The
     /// conformance tests' dialer and the gap office's tool both dial with it (BL-2271).
     /// </summary>
     /// <param name="unixSocketPath">The Unix socket path curl dials.</param>
@@ -227,6 +250,12 @@ public sealed class UpstreamCaseRunner(
     /// <c>libNNN</c> in process (BL-2634), and screening skips a case whose program is not ported.
     /// </summary>
     public const string LibTestsProgram = "./libtest/libtests";
+
+    /// <summary>
+    /// The value of <c>%CURL</c>, <c>runtests.pl</c>'s path to the curl under test. No program stands behind it: a
+    /// registered Perl script interpretation that meets this word runs curl in process instead (BL-2863).
+    /// </summary>
+    public const string CurlProgram = "curl";
 
     private const string HostAddress = "127.0.0.1";
 
@@ -281,9 +310,7 @@ public sealed class UpstreamCaseRunner(
         string logDirectoryVariable = logDirectory.Replace('\\', '/');
         Dictionary<string, string> variables = Variables(testNumber, logDirectoryVariable);
         AddDirectoryVariables(variables, testsDirectory, certificateDirectory, sourceDirectory);
-        AddTlsPorts(variables, certificateDirectory);
-        AddHttp3Port(variables, certificateDirectory);
-        AddSshVariables(variables);
+        fronts.AddVariables(variables, certificateDirectory);
 
         UpstreamTestFileExpansion expansion = UpstreamTestFileExpander.Expand(UpstreamTestDirectoryComposition.Rewrite(testFile.Span), variables, platform.Features, ReadIncludedFile, timeProvider);
         UpstreamTestCaseParseResult parsed = expansion.Parse();
@@ -292,24 +319,28 @@ public sealed class UpstreamCaseRunner(
             return UpstreamCaseOutcome.Skipped(parsed.Failure.Message);
         }
 
-        return Screen(expansion, parsed.TestCase, logDirectory)
+        return Screen(expansion, parsed.TestCase, testNumber, logDirectory)
             ?? await RunScreenedAsync(parsed.TestCase, testNumber, logDirectoryVariable, certificateDirectory).ConfigureAwait(false);
     }
 
     // The skip outcome of a case the harness cannot run here, or null when it can run: first a
     // case only another platform's Curl has the features for (ADR-0488), then every other reason.
-    private UpstreamCaseOutcome? Screen(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, string logDirectory)
+    // A ported unit program meets its case's unittest, Debug and TrackMemory features (ADR-0711).
+    private UpstreamCaseOutcome? Screen(UpstreamTestFileExpansion expansion, UpstreamTestCase testCase, int testNumber, string logDirectory)
     {
-        if (UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, platform.Features) is { } otherPlatformReason)
+        IReadOnlySet<string> features = UpstreamCaseScreening.CaseFeatures(testCase, testNumber, platform.Features, IsPortedUnitProgram);
+        if (UpstreamCaseScreening.FindFeatureOfAnotherPlatform(testCase, features) is { } otherPlatformReason)
         {
             return UpstreamCaseOutcome.SkippedOnThisPlatform(otherPlatformReason);
         }
 
-        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, platform.Features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null)
+        return (UpstreamCaseScreening.FindSkipReason(expansion, testCase, features, emulatesHttp2: http2Server is not null, emulatesHttp3: http3Server is not null, isPortedLibTest: program => libTests?.Programs.Find(program) is not null, interpretsPerlScript: script => perlCommandScripts?.ContainsKey(script) == true, isPortedUnitProgram: IsPortedUnitProgram, testNumber: testNumber)
                 ?? UpstreamCaseScreening.FindFileOutsideLogDirectory(testCase, logDirectory)) is { } reason
             ? UpstreamCaseOutcome.Skipped(reason)
             : null;
     }
+
+    private bool IsPortedUnitProgram(string program) => unitPrograms?.Find(program) is not null;
 
     private static void RefuseBlanks(string logDirectory, string? testsDirectory, string? certificateDirectory, string? sourceDirectory)
     {
@@ -343,65 +374,6 @@ public sealed class UpstreamCaseRunner(
         }
     }
 
-    // Upstream's stunnel-fronted servers present a certificate from %CERTDIR/certs/, so their ports have a value only with it.
-    private static void AddTlsPorts(Dictionary<string, string> variables, string? certificateDirectory)
-    {
-        if (certificateDirectory is not null)
-        {
-            variables["HTTPSPORT"] = HttpsPort;
-            variables["SMTPSPORT"] = SmtpsPort;
-            variables["IMAPSPORT"] = ImapsPort;
-            variables["POP3SPORT"] = Pop3sPort;
-            variables["FTPSPORT"] = FtpsPort;
-            variables["HTTPSPROXYPORT"] = HttpsProxyPort;
-            variables["MQTTSPORT"] = MqttsPort;
-            variables["GOPHERSPORT"] = GophersPort;
-            variables["HTTP2TLSPORT"] = Http2TlsPort;
-        }
-    }
-
-    // nghttpx-h3 presents a certificate from %CERTDIR/certs/, so its port has a value only with it and the stand-in.
-    private void AddHttp3Port(Dictionary<string, string> variables, string? certificateDirectory)
-    {
-        if (http3Server is not null && certificateDirectory is not null)
-        {
-            variables["HTTP3PORT"] = Http3Port;
-        }
-    }
-
-    private void AddSshVariables(Dictionary<string, string> variables)
-    {
-        if (sshServer is not null)
-        {
-            variables["SSHPORT"] = UpstreamSshServer.SshPort.ToString(CultureInfo.InvariantCulture);
-            variables["USER"] = sshServer.User;
-            variables["SFTP_PWD"] = string.Empty;
-            variables["SCP_PWD"] = string.Empty;
-            variables["SSHSRVMD5"] = sshServer.HostKeyMd5;
-            variables["SSHSRVSHA256"] = sshServer.HostKeySha256;
-            variables["SSHKEYALGO"] = sshServer.HostKeyAlgorithm;
-        }
-    }
-
-    // sshserver.pl writes the client's key pair into the server's log folder before the case runs.
-    // Upstream's sshd runs the real scp and sftp-server, which write an upload where the URL names it; the SCP and SFTP
-    // cases name %LOGDIR/upload.%TESTNUMBER, the file runtests.pl compares with <verify><upload>.
-    private byte[] SshUpload(string logDirectory, int testNumber)
-    {
-        string upload = $"{logDirectory}/upload.{testNumber.ToString(CultureInfo.InvariantCulture)}";
-        return sshServer is not null && File.Exists(upload) ? File.ReadAllBytes(upload) : [];
-    }
-
-    private void WriteSshClientKeyFiles(string logDirectory)
-    {
-        if (sshServer is not null)
-        {
-            Directory.CreateDirectory($"{logDirectory}/server");
-            File.WriteAllBytes($"{logDirectory}/server/curl_client_key", sshServer.ClientPrivateKeyFile.ToArray());
-            File.WriteAllBytes($"{logDirectory}/server/curl_client_key.pub", sshServer.ClientPublicKeyFile.ToArray());
-        }
-    }
-
     private Dictionary<string, string> Variables(int testNumber, string logDirectory) =>
         new(StringComparer.Ordinal)
         {
@@ -428,6 +400,7 @@ public sealed class UpstreamCaseRunner(
             ["PERL"] = UpstreamPerlOneLiner.Program,
             ["RESOLVE"] = UpstreamResolveCheck.Program,
             ["LIBTESTS"] = LibTestsProgram,
+            ["CURL"] = CurlProgram,
             ["HOST6IP"] = Host6Address,
             ["HTTP6PORT"] = Http6Port,
             ["FTP6PORT"] = Ftp6Port,
@@ -441,6 +414,7 @@ public sealed class UpstreamCaseRunner(
             ["HTTP2PORT"] = Http2Port,
             ["H2CVER"] = H2cVersion,
             ["HTTPUNIXPATH"] = HttpUnixPath,
+            ["SOCKSUNIXPATH"] = SocksServerConnector.SocksUnixPath,
         };
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory, string? certificateDirectory)
@@ -451,10 +425,13 @@ public sealed class UpstreamCaseRunner(
         }
 
         string outputFile = $"{logDirectory}/curl{testNumber.ToString(CultureInfo.InvariantCulture)}.out";
-        WriteSshClientKeyFiles(logDirectory);
+        fronts.PrepareLogDirectory(logDirectory);
         WriteClientFiles(testCase);
         ILibTest? libTest = FindLibTest(testCase);
-        List<string> arguments = ProgramArguments(testCase, libTest, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
+        IUnitProgram? unitProgram = FindUnitProgram(testCase, testNumber);
+        bool runsTool = libTest is not null || unitProgram is not null;
+        Func<UpstreamCurlInvocation, Task<int>>? perlScript = FindPerlScript(testCase);
+        List<string> arguments = ProgramArguments(testCase, runsTool, perlScript is not null, outputFile, $"{logDirectory}/trace{testNumber.ToString(CultureInfo.InvariantCulture)}");
 
         // On the real clock the server's waits make a case take seconds that a loaded machine
         // stretches past the time limit (test1677's writedelay: 5.5 seconds, BL-1355); with no
@@ -469,23 +446,22 @@ public sealed class UpstreamCaseRunner(
         MemoryStream standardOutput = new();
         MemoryStream standardError = new();
         MemoryStream standardInput = new(StandardInput(testCase));
-        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(HttpsServer(testCase, server, certificateDirectory)), serverClock);
+        UpstreamStandInContext standIns = new(testCase, certificateDirectory, server);
+        FtpServerConnector ftp = new(testCase, new NoListenPortConnector(fronts.Wrap(UpstreamStandInStage.Sws, server, standIns)), serverClock);
         SmtpServerConnector smtp = new(testCase, ftp);
         ImapServerConnector imap = new(testCase, smtp);
         Pop3ServerConnector pop3 = new(testCase, imap);
-        SocksServerConnector socks = new(testCase, MailTlsServer(testCase, FtpsServer(testCase, pop3, certificateDirectory), certificateDirectory));
+        SocksServerConnector socks = new(testCase, fronts.Wrap(UpstreamStandInStage.Pop3, pop3, standIns));
         MqttServerConnector mqtt = new(testCase, socks);
-        IConnector mqtts = TlsFrontServer(testCase, MqttsServerConnector.EmulatedServers, certificateDirectory, mqtt, certificate => new MqttsServerConnector(certificate, mqtt));
-        RtspServerConnector rtsp = new(testCase, mqtts);
+        RtspServerConnector rtsp = new(testCase, fronts.Wrap(UpstreamStandInStage.Mqtt, mqtt, standIns));
         GopherServerConnector gopher = new(testCase, rtsp);
-        IConnector gophers = TlsFrontServer(testCase, GophersServerConnector.EmulatedServers, certificateDirectory, gopher, certificate => new GophersServerConnector(certificate, gopher));
-        TelnetServerConnector telnet = new(new DictServerConnector(gophers));
-        IConnector servers = HttpsProxyServer(testCase, Http2Server(testCase, NothingOnHttp3TcpPort(SshServer(telnet)), server, certificateDirectory), certificateDirectory);
+        TelnetServerConnector telnet = new(new DictServerConnector(fronts.Wrap(UpstreamStandInStage.Gopher, gopher, standIns)));
+        IConnector servers = fronts.Wrap(UpstreamStandInStage.Outermost, telnet, standIns);
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, Http3Server(testCase, dns, server, certificateDirectory), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
-        (int exitCode, string? failure) = await RunCurlAsync(ProgramRun(libTest, testNumber, invocation), server).ConfigureAwait(false);
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, fronts.WrapDatagram(dns, standIns), EnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
+        (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, unitProgram, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {
             return UpstreamCaseOutcome.Failed(failure);
@@ -494,7 +470,7 @@ public sealed class UpstreamCaseRunner(
         byte[] standardOutputBytes = RedirectStandardOutput(testCase, standardOutput.ToArray());
         File.WriteAllBytes($"{logDirectory}/stdout{testNumber}", standardOutputBytes);
         File.WriteAllBytes($"{logDirectory}/stderr{testNumber}", standardError.ToArray());
-        // Read before the postcheck, as before: only the SSH upload is read after it.
+        // Read before the postcheck, as before: only the uploads and the --output file are read after it.
         // Upstream's servers all append to one server.input, so a case that reaches several
         // (test2002, test2003) sees their lines in the order curl sent them.
         byte[] receivedBytes = UpstreamProtocolDump.Merge(
@@ -510,16 +486,16 @@ public sealed class UpstreamCaseRunner(
             (rtsp.ReceivedBytes, rtsp.ReceivedDump),
         ]);
         // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
-        byte[] replyDataBytes = libTest is null ? ReadOutputFile(outputFile) : standardOutputBytes;
-        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, replyDataBytes)
+        // The --output file is read after the postcheck too: test613.pl rewrites the listing 613 and 614 compare (BL-2855).
+        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, runsTool ? standardOutputBytes : ReadOutputFile(outputFile))
         {
-            ReplyDataName = libTest is null ? "the --output file" : "the program's stdout",
+            ReplyDataName = runsTool ? "the program's stdout" : "the --output file",
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
             LogDirectory = logDirectory,
             SocksLog = System.Text.Encoding.Latin1.GetBytes(socks.ConnectLog),
             DnsLog = dns.QueryLog,
             // A case reaches one uploading server, so at most one of these holds an upload.
-            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. SshUpload(logDirectory, testNumber)],
+            UploadedBytes = [.. smtp.UploadedMessage.Span, .. imap.UploadedMessage.Span, .. tftp.UploadedBytes.Span, .. ftp.UploadedBytes.Span, .. fronts.UploadedBytes(logDirectory, testNumber)],
         });
     }
 
@@ -540,8 +516,8 @@ public sealed class UpstreamCaseRunner(
     // runtests.pl sets each NAME=value line of every <client><setenv> part (getpart joins parts of one
     // name, as test433 has two) for the run, an empty value as an
     // empty variable, and unsets a NAME with no '='. The run's environment holds nothing else, so
-    // nothing is left to restore after it.
-    private static Dictionary<string, string> EnvironmentVariables(UpstreamTestCase testCase)
+    // nothing is left to restore after it. UpstreamSmallSendsFront reads it too.
+    internal static Dictionary<string, string> EnvironmentVariables(UpstreamTestCase testCase)
     {
         Dictionary<string, string> variables = new(StringComparer.Ordinal);
         foreach (string line in testCase.FindAll("client", "setenv").SelectMany(UpstreamTestPartBodies.Lines))
@@ -555,58 +531,6 @@ public sealed class UpstreamCaseRunner(
 
         return variables;
     }
-
-    // A case naming the https server (`https` or `https <certificate file>`) reaches it on %HTTPSPORT, which has a value only with a certificate directory.
-    private static IConnector HttpsServer(UpstreamTestCase testCase, SwsHttpServerConnector server, string? certificateDirectory) =>
-        UpstreamCaseScreening.HttpsCertificateFile(testCase) is { } certificateFile && certificateDirectory is not null
-            ? new HttpsServerConnector(server, HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", certificateFile)), server)
-            : server;
-
-    // A case naming an implicit-TLS mail server (smtps, imaps or pop3s) reaches it on its port, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector MailTlsServer(UpstreamTestCase testCase, IConnector mail, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(MailTlsServerConnector.EmulatedServers).Any()
-            ? new MailTlsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), mail)
-            : mail;
-
-    // A case naming the ftps server reaches it on %FTPSPORT, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector FtpsServer(UpstreamTestCase testCase, IConnector ftp, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(FtpsServerConnector.EmulatedServers).Any()
-            ? new FtpsServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), ftp)
-            : ftp;
-
-    // A case naming the mqtts or gophers server reaches it on its port, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector TlsFrontServer(UpstreamTestCase testCase, IReadOnlyList<string> emulatedServers, string? certificateDirectory, IConnector plain, Func<X509Certificate2, IConnector> createFront) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Intersect(emulatedServers).Any()
-            ? createFront(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)))
-            : plain;
-
-    // A case naming the https-proxy server reaches it on %HTTPSPROXYPORT, which has a value only with a certificate directory; stunnel presents test-localhost.pem.
-    private static IConnector HttpsProxyServer(UpstreamTestCase testCase, IConnector servers, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains(HttpsProxyServerConnector.EmulatedServer)
-            ? new HttpsProxyServerConnector(HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)), servers)
-            : servers;
-
-    private IConnector SshServer(IConnector otherPorts) => sshServer?.InFrontOf(otherPorts) ?? otherPorts;
-
-    // nghttpx relays each stream to sws as HTTP/1.1, so the relayed requests land in the sws emulation's ReceivedBytes.
-    // Its TLS front on %HTTP2TLSPORT presents test-localhost.pem, loaded only for a case naming the http/2 server when a certificate directory is named (BL-2245).
-    private IConnector Http2Server(UpstreamTestCase testCase, IConnector otherPorts, SwsHttpServerConnector sws, string? certificateDirectory) =>
-        http2Server?.InFrontOf(otherPorts, sws, Http2TlsCertificate(testCase, certificateDirectory)) ?? otherPorts;
-
-    private static X509Certificate2? Http2TlsCertificate(UpstreamTestCase testCase, string? certificateDirectory) =>
-        certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/2")
-            ? HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile))
-            : null;
-
-    // nghttpx-h3 relays each request to sws as HTTP/1.1, so the relayed requests land in the sws emulation's ReceivedBytes.
-    // It presents test-localhost.pem, loaded only for a case naming the http/3 server when a certificate directory is named (BL-2261).
-    // nghttpx-h3 takes only datagrams on %HTTP3PORT, so --http3's TCP leg is refused there and the race settles on QUIC (ADR-0498).
-    private IConnector NothingOnHttp3TcpPort(IConnector otherPorts) => http3Server is null ? otherPorts : UpstreamHttp3Server.RefusingTcpOnHttp3Port(otherPorts);
-
-    private IDatagramConnector Http3Server(UpstreamTestCase testCase, IDatagramConnector otherPorts, SwsHttpServerConnector sws, string? certificateDirectory) =>
-        http3Server is not null && certificateDirectory is not null && UpstreamTestPartBodies.Lines(testCase.Find("client", "server")).Contains("http/3")
-            ? http3Server.InFrontOf(otherPorts, sws, HttpsServerConnector.LoadCertificate(Path.Combine(certificateDirectory, "certs", HttpsServerConnector.DefaultCertificateFile)))
-            : otherPorts;
 
     private static readonly int[] TunnelledPorts = [Pop3ServerConnector.Pop3Port, ImapServerConnector.ImapPort, SmtpServerConnector.SmtpPort, FtpServerConnector.FtpPort, FtpServerConnector.PassivePort, HttpsServerConnector.HttpsPort];
 
@@ -688,37 +612,73 @@ public sealed class UpstreamCaseRunner(
     private ILibTest? FindLibTest(UpstreamTestCase testCase) =>
         UpstreamCaseScreening.LibTestProgramName(testCase) is { } program ? libTests!.Programs.Find(program) : null;
 
-    // runtests.pl runs a libtest program with the command's words alone after its name: no --output, --include or trace.
-    private static List<string> ProgramArguments(UpstreamTestCase testCase, ILibTest? libTest, string outputFile, string traceFile) =>
-        libTest is null
-            ? Arguments(testCase, outputFile, traceFile)
-            : [.. UpstreamCommandLineSplitter.Split(UpstreamTestPartBodies.Text(testCase.Find("client", "command"))).Arguments];
+    // Screening let a <command type="perl"> case through only when its script has an interpretation, so perlCommandScripts is given then.
+    private Func<UpstreamCurlInvocation, Task<int>>? FindPerlScript(UpstreamTestCase testCase) =>
+        UpstreamCaseScreening.PerlScriptName(testCase) is { } script
+            ? invocation => perlCommandScripts![script](invocation, runCurl)
+            : null;
 
-    private Func<Task<int>> ProgramRun(ILibTest? libTest, int testNumber, UpstreamCurlInvocation invocation) =>
-        libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);
+    // Screening let a unittest case through only when its unit program is ported, so unitPrograms is given then.
+    private IUnitProgram? FindUnitProgram(UpstreamTestCase testCase, int testNumber) =>
+        UpstreamCaseScreening.UnitProgramName(testCase, testNumber) is { } program ? unitPrograms!.Find(program) : null;
+
+    // runtests.pl runs a libtest or unit program with the command's words alone after its name: no --output, --include or trace;
+    // perl gets the words after the script's name. A case with no <command> gets runner.pm's "something silly", "-" (test1658).
+    private static List<string> ProgramArguments(UpstreamTestCase testCase, bool runsTool, bool runsPerlScript, string outputFile, string traceFile) =>
+        !runsTool && !runsPerlScript
+            ? Arguments(testCase, outputFile, traceFile)
+            : [.. UpstreamCommandLineSplitter.Split(testCase.Find("client", "command") is { } command ? UpstreamTestPartBodies.Text(command) : "-").Arguments.Skip(runsPerlScript ? 1 : 0)];
+
+    private Func<Task<int>> ProgramRun(ILibTest? libTest, IUnitProgram? unitProgram, int testNumber, UpstreamCurlInvocation invocation)
+    {
+        if (unitProgram is not null)
+        {
+            return () => RunUnitProgramAsync(unitProgram, testNumber, invocation);
+        }
+
+        return libTest is null ? () => runCurl(invocation) : () => RunLibTestAsync(libTest, testNumber, invocation);
+    }
 
     // The program runs in place of curl, on the same invocation: its engine reaches the case's servers through
-    // the invocation's connectors, and its stdout and stderr are the run's. Around it go the lines curl 8.22.0's
-    // tests/libtest/first.c main() writes on stderr: "URL: <url>" when a URL follows the program's name, before the
-    // test, and "Test ended with result <N>" after it (BL-2649; test1549).
-    private async Task<int> RunLibTestAsync(ILibTest libTest, int testNumber, UpstreamCurlInvocation invocation)
+    // the invocation's connectors, and its stdout and stderr are the run's.
+    private Task<int> RunLibTestAsync(ILibTest libTest, int testNumber, UpstreamCurlInvocation invocation) =>
+        RunToolAsync(invocation, async standardError =>
+        {
+            LibTestContext context = new(testNumber, invocation.Arguments)
+            {
+                Engine = libTests!.CreateEngine(invocation),
+                StandardOutput = invocation.StandardOutput,
+                StandardError = standardError,
+            };
+            return (await libTest.RunAsync(context, CancellationToken.None).ConfigureAwait(false)).ExitCode;
+        });
+
+    // A unit program runs from the same first.c main() in curl 8.22.0's tests/units bundle, its failure count the exit code.
+    private static Task<int> RunUnitProgramAsync(IUnitProgram unitProgram, int testNumber, UpstreamCurlInvocation invocation) =>
+        RunToolAsync(invocation, async standardError =>
+        {
+            UnitProgramContext context = new(testNumber, invocation.Arguments)
+            {
+                StandardOutput = invocation.StandardOutput,
+                StandardError = standardError,
+            };
+            return (await unitProgram.RunAsync(context, CancellationToken.None).ConfigureAwait(false)).ExitCode;
+        });
+
+    // Around the program go the lines curl 8.22.0's tests/libtest/first.c main() writes on stderr: "URL: <url>" when a
+    // URL follows the program's name, before the test, and "Test ended with result <N>" after it (BL-2649; test1549).
+    private static async Task<int> RunToolAsync(UpstreamCurlInvocation invocation, Func<TextWriter, Task<int>> runProgram)
     {
         // Line feeds alone, as curl's own stderr in the harness, so a case's <stderr> compares the same on every platform.
         await using StreamWriter standardError = new(invocation.StandardError, leaveOpen: true) { AutoFlush = true, NewLine = "\n" };
-        LibTestContext context = new(testNumber, invocation.Arguments)
-        {
-            Engine = libTests!.CreateEngine(invocation),
-            StandardOutput = invocation.StandardOutput,
-            StandardError = standardError,
-        };
         if (invocation.Arguments.Count > 0)
         {
             await standardError.WriteLineAsync($"URL: {invocation.Arguments[0]}").ConfigureAwait(false);
         }
 
-        LibTestResult result = await libTest.RunAsync(context, CancellationToken.None).ConfigureAwait(false);
-        await standardError.WriteLineAsync($"Test ended with result {result.ExitCode.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
-        return result.ExitCode;
+        int exitCode = await runProgram(standardError).ConfigureAwait(false);
+        await standardError.WriteLineAsync($"Test ended with result {exitCode.ToString(CultureInfo.InvariantCulture)}").ConfigureAwait(false);
+        return exitCode;
     }
 
     private static List<string> Arguments(UpstreamTestCase testCase, string outputFile, string traceFile)
@@ -761,7 +721,7 @@ public sealed class UpstreamCaseRunner(
     {
         foreach (UpstreamTestSection part in ClientFileParts.SelectMany(name => testCase.FindAll("client", name)))
         {
-            string path = part.GetAttribute("name")!;
+            string path = UpstreamUtf8Words.AsSystemText(part.GetAttribute("name")!);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, ClientBytes(part));
         }

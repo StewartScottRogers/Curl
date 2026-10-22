@@ -1,0 +1,471 @@
+# The lane coordinator: a shift of more than one lane (or -Lanes Auto) starts, sizes,
+# watches and restarts its lanes, then ends the shift. Dot-sourced by RunDarkFactory.ps1 in
+# its order; see the loader there.
+
+if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
+    try { $Host.UI.RawUI.WindowTitle = "Dark factory - $(if ($AutoLanes) { 'auto' } else { $LaneCount }) lanes" } catch { }
+    if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
+    $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
+    if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
+    if (Get-Dirty) { Stop-ShiftStart 'working tree not clean; commit or stash first'; exit 1 }
+    git -C $Root fetch -q origin $branch
+    $syncRefusal = Sync-CheckoutWithOrigin -Repo $Root -Branch $branch
+    if ($syncRefusal) { Stop-ShiftStart $syncRefusal; exit 1 }
+    # Tasks in Doing are only allowed when a previous shift's lane holds each of them and that
+    # lane is dead - a shift stopped mid-task, or killed while waiting for tokens. Those lanes
+    # are adopted: their worktrees are left as they are and they resume the task. An orphan,
+    # held by no lane, is settled by Get-OrphanAction (BL-1071). An interactive-only task
+    # (lane: no) in Doing is an interactive session's, so it is left alone (BL-2069).
+    $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { -not (Test-InteractiveOnlyTask $_.FullName) } | ForEach-Object { Get-TaskIdFromFileName $_.Name })
+    $adopt = @{}
+    if ($stuck.Count) {
+        $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
+        if ($previous) {
+            $prevStamp = $previous.Name.Substring(6)
+            foreach ($n in 1..16) {
+                $held = Get-LaneState $n 'task' $prevStamp
+                if (-not $held -or $stuck -notcontains $held) { continue }
+                if ((Get-LaneState $n 'pid' $prevStamp) -and (Test-LaneAlive $n $prevStamp)) { Stop-ShiftStart "lane $n of shift $prevStamp is still running $held"; exit 1 }
+                $adopt[$n] = $held
+            }
+        }
+        $orphans = @($stuck | Where-Object { $adopt.Values -notcontains $_ })
+        if ($orphans.Count) {
+            $dirty = @(1..16 | Where-Object { -not $adopt.ContainsKey($_) -and (Test-WorktreeDirty (Join-Path $LanesDir "lane-$_")) })
+            $returned = @()
+            foreach ($id in $orphans) {
+                $action = Get-OrphanAction -Id $id -ParkedBranches (Get-ParkedBranches $id) -DirtyLanes $dirty
+                if ($action.Action -eq 'refuse') { Stop-ShiftStart $action.Why; exit 1 }
+                if ($action.Action -eq 'adopt') {
+                    $adopt[$action.Lane] = $id
+                    $dirty = @($dirty | Where-Object { $_ -ne $action.Lane })
+                    Write-Trace $id 'adopt' "held by no lane; lane $($action.Lane)'s worktree has uncommitted work, so that lane resumes it" 'Yellow'
+                    continue
+                }
+                Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Returned from Doing at shift start: no lane held it and no lane worktree had uncommitted work. The work is on branch $($action.Branch); start with git cherry-pick --no-commit $($action.Branch) and fix it.") | Out-Null
+                if ((Get-TaskState $id) -ne 'Backlog') { Stop-ShiftStart "$id is in Doing and held by no lane, and moving it to Backlog failed"; exit 1 }
+                $returned += $id
+                Write-Trace $id 'requeue' "held by no lane; back to Backlog, work on $($action.Branch)" 'Yellow'
+            }
+            if ($returned.Count) {
+                git -C $Root add -A Tasks 2>&1 | Out-Null
+                git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" -m $SkipCiNote 2>&1 | Out-Null
+                git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    git -C $Root reset -q --hard "origin/$branch" 2>&1 | Out-Null
+                    Stop-ShiftStart "$($returned -join ', ') in Doing and held by no lane; returning them to Backlog could not be pushed to origin/$branch"; exit 1
+                }
+            }
+        }
+        if (@($adopt.Keys | Where-Object { $_ -gt $LaneCount }).Count) { $LaneCount = [int]($adopt.Keys | Measure-Object -Maximum).Maximum }
+    }
+
+    function Get-ShiftCapacity {
+        # The board's capacity on origin/<branch>, read in the auto-board worktree; the
+        # coordinator's own checkout is not pulled. -Fallback when it cannot be read, traced once.
+        param([int]$Fallback)
+        git -C $Root fetch -q origin $branch 2>&1 | Out-Null
+        $board = Get-BoardCapacity -Ref "origin/$branch"
+        if ($null -ne $board.Capacity) { return $board.Capacity }
+        if (-not $script:Auto.CapacityTraced) {
+            $script:Auto.CapacityTraced = $true
+            Write-Trace '-' 'lanes' "cannot read the board's capacity ($($board.Why)); using $Fallback" 'Yellow'
+        }
+        return $Fallback
+    }
+
+    if ($AutoLanes) {
+        # Sized before any lane starts: the machine cap, probed now while nothing builds if
+        # machine-lanes.json no longer describes this PC, then the start count from the last
+        # Auto shift, capped by the ceilings. Adopted lanes raise it, as with a fixed count.
+        $machine = Get-MachineCap -Probe
+        $script:Auto.MachineCap = $machine.Cap
+        Write-Trace '-' 'lanes' $machine.Text 'Cyan'
+        $script:Auto.Saved = Read-JsonFile $AutoLanesFile
+        $start = Get-AutoStartCount -Saved $script:Auto.Saved -Capacity (Get-ShiftCapacity -Fallback $MaxLanes) -MachineCap $machine.Cap
+        $why = $start.Why
+        if ($LaneCount -gt $start.Count) { $why = "lane $LaneCount adopted from the previous shift" }
+        $LaneCount = [math]::Max($LaneCount, $start.Count)
+        Write-Trace '-' 'lanes' "lanes auto: starting at $LaneCount ($why)" 'Cyan'
+        Set-AutoLanesStatus -Lanes $LaneCount -Target $null -Binding 'no burn rate' -Reason "lanes auto: starting at $LaneCount ($why)"
+    } elseif ($LaneCount -gt 1) {
+        # A fixed count starts no more lanes than the board can run at once (BL-1384, AF-0041),
+        # so lanes do not open the shift polling "every ready task overlaps one in Doing";
+        # capacity steps add the rest, one every 5 minutes, as the capacity rises.
+        $adoptedMax = if ($adopt.Count) { [int]($adopt.Keys | Measure-Object -Maximum).Maximum } else { 0 }
+        $start = Get-FixedStartCount -Requested ([int]$Lanes) -Capacity (Get-ShiftCapacity -Fallback ([int]$Lanes)) -Adopted $adoptedMax
+        $LaneCount = $start.Count
+        Write-Trace '-' 'lanes' "lanes: starting at $LaneCount ($($start.Why))" 'Cyan'
+    }
+
+    # The previous shift stopped claiming work near the end of its session; this one starts
+    # on a fresh session, and the wait does not count against -Hours.
+    # Known from here, so the wait for a fresh session below keeps watching CI (BL-1031).
+    $script:CiWatchBranch = $branch
+    $weekly = Wait-ForFreshSession
+    if ($weekly) { Write-Trace '-' 'shift' $weekly 'Red'; Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons @($weekly); exit 2 }
+    $shiftEnd = (Get-Date).AddHours($Hours)
+
+    Set-OwnTabLabel ''
+    Write-Trace '-' 'shift' "start  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })  branch=$branch model=$Model until $($shiftEnd.ToString('HH:mm'))  $LaneMarkerTrace" 'Cyan'
+    New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $LogDir "lanes-$Stamp") | Out-Null
+    # A lane gets the time left in the shift, not a fresh -Hours: -Lanes Auto adds and
+    # restarts lanes mid-shift, and each must stop claiming when the shift's time is up.
+    $laneArgsFor = {
+        param([int]$N)
+        $hoursLeft = [Math]::Max(0.01, ($shiftEnd - (Get-Date)).TotalHours).ToString([System.Globalization.CultureInfo]::InvariantCulture)
+        @('-Lane', $N, '-Branch', $branch, '-Hours', $hoursLeft, '-MaxTasks', $MaxTasks,
+          '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-LogRoot', "`"$LogDir`"", '-ShiftStamp', $Stamp)
+    }
+    $procs = @()
+    $laneTabs = @{}
+    $summaries = Join-Path $LogDir "lanes-$Stamp"
+    # The lanes running now; scaling adds and retires lanes, so it changes size mid-shift.
+    $activeLanes = New-Object System.Collections.Generic.List[int]
+    # Every lane started this shift, retired ones included, for the end-of-shift report.
+    $startedLanes = New-Object System.Collections.Generic.List[int]
+    # Tabs already closed when their lane retired, so the shift end leaves them alone.
+    $closedTabs = @{}
+    # The non-SUMMARY lines of summaries a retired lane wrote before it was added again.
+    $retiredLines = @()
+
+    function Start-Lane {
+        # Starts lane $N in its worktree $LanesDir\lane-<n> and records its process or tab.
+        # An adopted lane, or a dead one restarted with -KeepWorktree, keeps its work in
+        # place; any other gets a clean factory/lane-<n> at origin/<branch>. Returns where
+        # it runs, e.g. "herdr tab 12" or "pid 4242".
+        param([int]$N, [string]$Label = 'starting', [switch]$KeepWorktree)
+        $dir = Join-Path $LanesDir "lane-$N"
+        if ($adopt.ContainsKey($N)) {
+            Set-Content -Path (Get-LaneStatePath $N 'task') -Value $adopt[$N] -Encoding ASCII
+            Write-Trace '-' 'lane' "lane $N adopts $($adopt[$N]) from the previous shift, work in place"
+            $adopt.Remove($N)
+        } elseif (-not $KeepWorktree) {
+            if (-not (Test-Path (Join-Path $dir '.git'))) {
+                git -C $Root worktree add -q --detach $dir "origin/$branch" 2>&1 | Out-Null
+            }
+            git -C $dir stash push -q --include-untracked -m "darkfactory lane-$N before $Stamp" 2>&1 | Out-Null
+            git -C $dir checkout -q -B "factory/lane-$N" "origin/$branch" 2>&1 | Out-Null
+            git -C $dir reset -q --hard "origin/$branch" 2>&1 | Out-Null
+        }
+        $started = Start-Detached -Label (Get-LaneTabLabel $N $Label) -Dir $dir -ScriptArgs (& $laneArgsFor $N)
+        $script:procs += $started
+        $laneTabs[$N] = $started.Tab
+        $closedTabs.Remove($N)
+        if (-not $startedLanes.Contains($N)) { $startedLanes.Add($N) }
+        if ($started.Tab) { return "herdr tab $($started.Tab)" }
+        return "pid $($started.Process.Id)"
+    }
+
+    function Add-Lane {
+        # Starts one more lane, the lowest free number up to 16, and returns it; $null when
+        # 16 are active. A lane that retired earlier this shift has its summary kept for the
+        # alarm and renamed out of the lane-*.txt set before it starts again.
+        $n = Get-LaneToAdd -Active @($activeLanes) -Max 16
+        if ($null -eq $n) { return $null }
+        $summary = Join-Path $summaries "lane-$n.txt"
+        if (Test-Path $summary) {
+            $script:retiredLines += @(Get-Content $summary | Where-Object { $_.Trim() -and $_ -notmatch '^SUMMARY ' })
+            Rename-Item -Path $summary -NewName "lane-$n.retired-$(Get-Date -Format 'HHmmss').log"
+        }
+        Remove-Item (Get-LaneStatePath $n 'retire') -ErrorAction SilentlyContinue
+        Remove-Item (Get-LaneStatePath $n 'pid') -ErrorAction SilentlyContinue
+        $where = Start-Lane -N $n
+        $activeLanes.Add($n)
+        Write-Trace '-' 'lane' "lane $n added ($where)"
+        return $n
+    }
+
+    function Request-LaneRetire {
+        # Asks the highest-numbered active lane not already retiring, an idle one first, to
+        # stop after its current task, and returns it; $null when every active lane is
+        # already retiring.
+        $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+        $n = Get-LaneToRetire -Active @($activeLanes) -Retiring $retiring -Idle @(Get-IdleLanes)
+        if ($null -eq $n) { return $null }
+        Set-Content -Path (Get-LaneStatePath $n 'retire') -Value (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') -Encoding ASCII
+        Write-Trace '-' 'lane' "lane $n asked to retire after its current task"
+        return $n
+    }
+
+    function Read-LaneSummary {
+        # Lane $N's summary: its SUMMARY line, and the stall lines after it.
+        param([int]$N)
+        $laneStalls = @()
+        $laneSummary = ''
+        foreach ($line in Get-Content (Join-Path $summaries "lane-$N.txt")) {
+            if ($line -match '^SUMMARY ') { $laneSummary = $line }
+            elseif ($line.Trim()) { $laneStalls += $line }
+        }
+        return [pscustomobject]@{ Summary = $laneSummary; Stalls = $laneStalls }
+    }
+
+    function Test-LaneSummaryClean {
+        # A lane that ended cleanly has nothing left to read in its tab. One that blocked a
+        # task or stalled keeps its tab for Stewart.
+        param($Report)
+        return [bool]($Report.Summary -and -not $Report.Stalls.Count -and $Report.Summary -notmatch 'blocked=[1-9]')
+    }
+
+    function Invoke-AutoLaneStep {
+        # One -Lanes Auto step (ADR-0130 items 2 to 5): sample the usage, meter the rates,
+        # and add one lane or retire straight down to the step's count, highest lane numbers
+        # first (BL-823). Below the unpaced floor it adds every lane up to it at once. Holds
+        # without asking while the tokens are low or the shift's time is up. -Capacity is the
+        # board's capacity when the caller has just read it. Then, when the board's capacity
+        # bound two steps running, it may file one split task (Invoke-SplitHotspotFiling).
+        param($Capacity = $null)
+        $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+        $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
+        $low = Get-UsageStop
+        $hold = if ($low) { "tokens low: $low" } elseif ((Get-Date) -gt $shiftEnd) { 'shift time up' } else { '' }
+        if ($hold) {
+            Write-Trace '-' 'lanes' "lanes $current held ($hold)" 'DarkGray'
+            Set-AutoLanesStatus -Lanes $current -Target $script:AutoLanesStatus.target -Binding $script:AutoLanesStatus.binding
+            return
+        }
+        $now = Get-Date
+        $reading = Get-UsageReading -ThisShift
+        if ($reading) {
+            $busy = @($activeLanes | Where-Object { (Test-LaneAlive $_) -and (Get-LaneState $_ 'task') }).Count
+            $script:Auto.Samples = @(@($script:Auto.Samples) + @(New-UsageSample -At $now -Reading $reading -ActiveLanes $busy) |
+                Where-Object { $_.At -ge $now.AddHours(-3) })
+        }
+        $capacity = if ($null -ne $Capacity) { [int]$Capacity } else { Get-ShiftCapacity -Fallback $current }
+        $step = Get-AutoLaneStep -Samples $script:Auto.Samples -Current $current -Capacity $capacity -MachineCap $script:Auto.MachineCap `
+            -Saved $script:Auto.Saved -PreviousLow $script:Auto.LastLow
+        $script:Auto.FiveHourRate = $step.FiveHourRate
+        $script:Auto.WeeklyRate = $step.WeeklyRate
+        $script:Auto.CapacityStreak = Get-CapacityStreak -Binding $step.Next.Binding -Previous ([int]$script:Auto.CapacityStreak)
+        if ($script:Auto.CapacityStreak -ge 2) { Invoke-SplitHotspotFiling -Branch $branch }
+        # A low step that retired a lane starts the count again; one that held arms the next.
+        $script:Auto.LastLow = [bool]($step.Next.Low -and -not $step.Next.Changed)
+        # status.json's autoLanes follows every step; the reason and time only a change.
+        $target = if ($step.Pace) { $step.Next.Desired } else { $null }
+        Set-AutoLanesStatus -Lanes $current -Target $target -Binding $step.Next.Binding
+        if (-not $step.Next.Changed) { Write-Trace '-' 'lanes' $step.Next.Reason 'DarkGray'; return }
+        Write-Trace '-' 'lanes' $step.Next.Reason 'Cyan'
+        if ($step.Next.Lanes -gt $current) {
+            # One lane above the unpaced floor; every lane up to the floor below it.
+            $added = 0
+            foreach ($i in 1..($step.Next.Lanes - $current)) {
+                if ($added) { Start-Sleep -Seconds 15 }
+                if ($null -eq (Add-Lane)) { break }
+                $added++
+            }
+            if (-not $added) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow'; return }
+            $script:LaneCount = $current + $added
+        } else {
+            # Request-LaneRetire traces each lane it asks; one that finds none left stops the run.
+            $retired = 0
+            foreach ($i in 1..($current - $step.Next.Lanes)) {
+                if ($null -eq (Request-LaneRetire)) { break }
+                $retired++
+            }
+            if (-not $retired) { Write-Trace '-' 'lanes' 'no lane to retire' 'Yellow'; return }
+            $script:LaneCount = $current - $retired
+        }
+        try { $Host.UI.RawUI.WindowTitle = "Dark factory - $($script:LaneCount) lanes (auto)" } catch { }
+        Set-AutoLanesStatus -Lanes $script:LaneCount -Target $target -Binding $step.Next.Binding -Reason $step.Next.Reason
+        Save-AutoLanes $script:LaneCount
+    }
+
+    function Get-IdleLanes {
+        # The active lanes holding no task: claiming, waiting on overlapping touches, or starting.
+        return @($activeLanes | Where-Object { -not (Get-LaneState $_ 'task') })
+    }
+
+    function Invoke-CapacityLaneStep {
+        # One capacity step of a fixed -Lanes N shift (BL-1374, AF-0032): idle lanes beyond
+        # the board's capacity retire, and lanes come back one a step, up to N, as it rises.
+        $retiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+        $current = @($activeLanes | Where-Object { $retiring -notcontains $_ }).Count
+        if ((Get-UsageStop) -or (Get-Date) -gt $shiftEnd) { return }
+        $capacity = Get-ShiftCapacity -Fallback $current
+        $idle = @(Get-IdleLanes | Where-Object { $retiring -notcontains $_ })
+        $step = Get-CapacityLaneCount -Current $current -Capacity $capacity -Requested $requestedLanes -Idle $idle.Count
+        if (-not $step.Changed) { return }
+        Write-Trace '-' 'lanes' $step.Reason 'Cyan'
+        if ($step.Lanes -gt $current) {
+            if ($null -eq (Add-Lane)) { Write-Trace '-' 'lanes' 'no lane to add' 'Yellow' }
+            return
+        }
+        foreach ($i in 1..($current - $step.Lanes)) { if ($null -eq (Request-LaneRetire)) { break } }
+    }
+
+    # The lane count a fixed shift asked for; capacity steps never go above it.
+    $requestedLanes = if ($AutoLanes) { $LaneCount } else { [math]::Max([int]$Lanes, $LaneCount) }
+    foreach ($n in 1..$LaneCount) {
+        $where = Start-Lane -N $n
+        $activeLanes.Add($n)
+        Write-Trace '-' 'lane' "lane $n started in $(Join-Path $LanesDir "lane-$n") ($where)"
+        Start-Sleep -Seconds 15
+    }
+    $restarts = @{}
+    # A lane is finished once it has written its summary. A herdr tab has no process to
+    # watch, so the summaries are the signal; a lane that dies without one is given up on
+    # after the shift's length plus one task's time limit and its overtime run (AF-0042).
+    $giveUp = $shiftEnd.AddMinutes($TaskMinutes + [math]::Max(30, [int]($TaskMinutes / 4)) + 30)
+    $tick = Get-Date
+    $nextAutoStep = (Get-Date).AddMinutes(15)
+    $nextRampCheck = (Get-Date).AddMinutes(2)
+    $nextCapacityStep = (Get-Date).AddMinutes(5)
+    while ((Get-Date) -lt $giveUp) {
+        # The coordinator announces the usage limit for every lane, and lanes waiting for a
+        # new session add that wait to their shift, so the coordinator waits longer too.
+        Update-LimitNotice
+        Invoke-LimitProbe
+        if (Test-WaitingForSession) { $giveUp = $giveUp.Add((Get-Date) - $tick) }
+        $tick = Get-Date
+        $finished = @(Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue |
+            ForEach-Object { [int]($_.BaseName -replace '^lane-', '') })
+        # A lane asked to retire that has written its summary is done: it leaves the active
+        # set, and its tab closes now if there is nothing in it to read.
+        foreach ($n in @($activeLanes)) {
+            if ($finished -notcontains $n -or -not (Test-Path (Get-LaneStatePath $n 'retire'))) { continue }
+            $activeLanes.Remove($n) | Out-Null
+            $report = Read-LaneSummary $n
+            Write-Trace '-' 'lane' "lane $n retired ($($report.Summary -replace '^SUMMARY ', ''))" 'Cyan'
+            if (Test-LaneSummaryClean $report) {
+                Close-HerdrTab $laneTabs[$n] "lane $n retired cleanly" (Get-LaneTabLabel $n)
+                $closedTabs[$n] = $true
+            }
+        }
+        if (Test-LanesFinished -Active @($activeLanes) -Finished $finished) { break }
+        # A lane whose process is gone without a summary died - killed, crashed, or closed.
+        # Start it again in the same worktree; it resumes the task it held. Five tries each.
+        foreach ($n in @($activeLanes)) {
+            if (Test-Path (Join-Path $summaries "lane-$n.txt")) { continue }
+            if (Test-LaneAlive $n) { continue }
+            if ($restarts[$n] -ge 5) { continue }
+            $restarts[$n] = 1 + [int]$restarts[$n]
+            Remove-Item (Get-LaneStatePath $n 'pid') -ErrorAction SilentlyContinue
+            $held = Get-LaneState $n 'task'
+            Close-HerdrTab $laneTabs[$n] "lane $n died; its restart gets a new tab"
+            Start-Lane -N $n -Label "restart $($restarts[$n])$(if ($held) { " $held" })" -KeepWorktree | Out-Null
+            Write-Trace '-' 'lane' "lane $n had died; restarted ($($restarts[$n]) of 5)$(if ($held) { ", resuming $held" })" 'Yellow'
+        }
+        # -Lanes Auto steps every 15 minutes, but never while the shift waits for tokens.
+        if ($AutoLanes -and (Get-Date) -ge $nextAutoStep -and -not (Test-WaitingForSession)) {
+            Invoke-AutoLaneStep
+            $nextAutoStep = (Get-Date).AddMinutes(15)
+            $nextRampCheck = (Get-Date).AddMinutes(2)
+        }
+        # Below the unpaced floor, the board's capacity is read every 2 minutes, and a step
+        # runs early when it would add lanes, so a finished task's freed capacity does not
+        # wait out the 15-minute interval (2026-10-21). Not while tokens are low or time is up.
+        if ($AutoLanes -and (Get-Date) -ge $nextRampCheck -and -not (Test-WaitingForSession)) {
+            $nextRampCheck = (Get-Date).AddMinutes(2)
+            $rampRetiring = @($activeLanes | Where-Object { Test-Path (Get-LaneStatePath $_ 'retire') })
+            $rampCurrent = @($activeLanes | Where-Object { $rampRetiring -notcontains $_ }).Count
+            $belowFloor = Test-UnpacedRampDue -Current $rampCurrent -Capacity $MaxLanes -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes
+            if ($belowFloor -and -not (Get-UsageStop) -and (Get-Date) -le $shiftEnd) {
+                $rampCapacity = Get-ShiftCapacity -Fallback $rampCurrent
+                if (Test-UnpacedRampDue -Current $rampCurrent -Capacity $rampCapacity -MachineCap $script:Auto.MachineCap -MaxLanes $MaxLanes) {
+                    Invoke-AutoLaneStep -Capacity $rampCapacity
+                    $nextAutoStep = (Get-Date).AddMinutes(15)
+                }
+            }
+        }
+        # A fixed count of lanes steps to the board's capacity every 5 minutes (BL-1374).
+        if (-not $AutoLanes -and $requestedLanes -gt 1 -and (Get-Date) -ge $nextCapacityStep -and -not (Test-WaitingForSession)) {
+            Invoke-CapacityLaneStep
+            $nextCapacityStep = (Get-Date).AddMinutes(5)
+        }
+        # The coordinator is the board branch's one writer for a lane shift.
+        Publish-BoardStatusIfDue -Branch $branch
+        # And the one that sees every CI run: it files a High task for each new failure.
+        Invoke-CiWatch -Branch $branch
+        $running =@($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
+        if ($running -eq 0) { break }
+        Start-Sleep -Seconds 5
+    }
+
+    # Something may have checked out another branch here during the shift; pulling into it
+    # would fast-forward the wrong branch.
+    $moved = Restore-ShiftBranch -Branch $branch
+    if ($moved) { Write-Trace '-' 'branch' "$moved; not pulling" 'Red' }
+    else { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
+    $stalls = @()
+    # Every lane started this shift reports, retired ones included. A lane that blocked a
+    # task or stalled keeps its tab for Stewart; so does a lane that never wrote a summary.
+    foreach ($file in Get-ChildItem $summaries -Filter 'lane-*.txt' -ErrorAction SilentlyContinue) {
+        $n = [int]($file.BaseName -replace '^lane-', '')
+        $report = Read-LaneSummary $n
+        if ($report.Summary) { Write-Trace '-' 'lane' ($report.Summary -replace '^SUMMARY ', '') 'Cyan' }
+        $stalls += $report.Stalls
+        if ($closedTabs.ContainsKey($n)) { continue }
+        if (Test-LaneSummaryClean $report) {
+            Close-HerdrTab $laneTabs[$n] "lane $n ended cleanly" (Get-LaneTabLabel $n)
+        }
+        elseif ($report.Summary -match 'blocked=[1-9]') { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'BLOCKED, read') }
+        else { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'STALLED, read') }
+    }
+    # Runs, tasks and US dollars per model across every lane of the shift (BL-1705).
+    Write-Trace '-' 'shift' (Get-ModelCostSummary $LogDir "^BL-\d+-$Stamp-L\d+[-.]") 'Cyan'
+    foreach ($n in @($startedLanes)) {
+        if (-not (Test-Path (Join-Path $summaries "lane-$n.txt"))) { Set-HerdrTabLabel $laneTabs[$n] (Get-LaneTabLabel $n 'no report, read') }
+    }
+    Publish-BoardStatus -Branch $branch -State 'ended'
+    Write-Trace '-' 'shift' "end  $LaneCount lanes$(if ($AutoLanes) { ' (auto)' })" 'Cyan'
+    if ($AutoLanes) { Save-AutoLanes $LaneCount }
+    # The audit office's cadence (BL-1022): say when an audit is due, and hold a milestone's
+    # merge until it has run. Other reasons do not hold the merge.
+    $auditCadence = Get-AuditCadence (Get-AuditDueFromMaster -Branch $branch)
+    if ($auditCadence.Line) { Show-AuditNotice $auditCadence.Line }
+    # What master held before the merge, so the shift-end review reads only what this shift merged.
+    git -C $Root fetch -q origin master 2>&1 | Out-Null
+    $masterBefore = "$(git -C $Root rev-parse origin/master 2>$null)".Trim()
+    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch }
+    Write-Trace '-' 'merge' $mergeLine 'Cyan'
+    # The shift-end review (ADR-0710) runs below: beside the next shift when one starts, or
+    # before deciding whether to start one when nothing is ready.
+    $review = $null
+    if ($mergeLine -match '^merged ([0-9a-f]{7,40}) ') {
+        $merged = "$(git -C $Root rev-parse --verify "$($Matches[1])^{commit}" 2>$null)".Trim()
+        if ($masterBefore -and $merged) { $review = @{ Base = $masterBefore; Head = $merged; Branch = $branch } }
+    }
+    # The merge waited for CI on the shift's last commit; a failure there finished after the
+    # loop above stopped watching, so file it now (BL-1031).
+    Invoke-CiWatch -Branch $branch -Final
+    Remove-CiWatch
+    # Those tasks were pushed from the ci-watch worktree; pull them here too, or the board
+    # below still says nothing is ready and -Continuous leaves them waiting for the next
+    # shift Stewart starts (AF-0090: three CI-fix tasks waited 5 hours).
+    if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
+    $reasons = @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)
+    # -Continuous: while the board still has ready work, the next shift starts itself, so
+    # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
+    $stillReady = (Invoke-Board @('next')) -join "`n"
+    # Nothing ready: the review runs now, and what it files can start the next shift.
+    if ($review -and -not ($Continuous -and (Get-NextTaskId $stillReady))) {
+        Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan'
+        $review = $null
+        if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
+        $stillReady = (Invoke-Board @('next')) -join "`n"
+    }
+    if ($Continuous -and (Get-NextTaskId $stillReady)) {
+        foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
+        # An Auto shift hands on Auto, not the count it ended at; the next one starts from
+        # the count auto-lanes.json saved.
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
+        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
+        if ($WeeklyPace) { $forward += '-WeeklyPace' }
+        if ($QuietAlarm) { $forward += '-QuietAlarm' }
+        $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
+        Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
+        # The review runs beside the next shift, which claims what it files (ADR-0710).
+        if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
+        # The next shift has its own tab; this one has only notes, and they are in the log.
+        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
+        exit 0
+    }
+    if ($reasons.Count -gt 0) { Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons $reasons; exit 2 }
+    try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }
+    Close-OwnHerdrTab 'shift complete with nothing waiting on Stewart'
+    exit 0
+}
+
+# This file ran to its end; RunDarkFactory.ps1 goes on to the next one.
+$AreaFileFinished = $true

@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Conformance.LibTest;
+using Curl.Conformance.UnitProgram;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -11,7 +12,7 @@ namespace Curl.Conformance;
 /// the failures it turns a hang or an exception into.
 /// </summary>
 [TestClass]
-public sealed class UpstreamCaseRunnerTests
+public sealed partial class UpstreamCaseRunnerTests
 {
     public TestContext TestContext { get; set; } = null!;
 
@@ -204,12 +205,12 @@ public sealed class UpstreamCaseRunnerTests
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
 
-        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%SOCKSUNIXPATH/\n</command>\n</client>\n</testcase>\n");
+        UpstreamCaseOutcome outcome = await RunAsync(runner, "<testcase>\n<client>\n<command>\nhttp://%HTTPTLS6PORT/\n</command>\n</client>\n</testcase>\n");
 
         diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
         Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
-        diagnostics.Assert("detail", "the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
-        Assert.AreEqual("the harness has no value for %SOCKSUNIXPATH", outcome.Detail);
+        diagnostics.Assert("detail", "the harness has no value for %HTTPTLS6PORT", outcome.Detail);
+        Assert.AreEqual("the harness has no value for %HTTPTLS6PORT", outcome.Detail);
     }
 
     [TestMethod]
@@ -806,6 +807,26 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    public async Task RunAsync_PostcheckRewritesTheOutputFile_ComparesReplyDataWithTheRewrite()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            File.WriteAllText(CommandArguments(invocation)[0], "rewritten\n");
+            List<string> arguments = [.. invocation.Arguments];
+            File.WriteAllText(arguments[arguments.IndexOf("--output") + 1], "raw listing\n");
+            return Task.FromResult(0);
+        });
+        string testFile = "<testcase>\n<reply>\n<data>\nrewritten\n</data>\n</reply>\n<client>\n<command>\n%LOGDIR/rewrite%TESTNUMBER\n</command>\n</client>\n"
+            + "<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl rm %LOGDIR/curl%TESTNUMBER.out move %LOGDIR/rewrite%TESTNUMBER %LOGDIR/curl%TESTNUMBER.out\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Http2CaseWithoutHttp2Server_IsSkippedForTheServer()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -1033,6 +1054,66 @@ public sealed class UpstreamCaseRunnerTests
     {
         public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
             ValueTask.FromResult(ConnectResult.Refused(name));
+    }
+
+    private const string PerlCurlCase =
+        "<testcase>\n<client>\n<server>\nnone\n</server>\n<command type=\"perl\">\n/src/tests/test1707.pl %CURL -h all\n</command>\n</client>\n"
+        + "<verify>\n<stdout>\ncurl help\n</stdout>\n</verify>\n</testcase>\n";
+
+    // A test-only interpretation of test1707.pl: runs %CURL in process with the words after it.
+    private static readonly Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>> CurlRunningScript =
+        (invocation, runCurl) => invocation.Arguments[0] == UpstreamCaseRunner.CurlProgram
+            ? runCurl(new UpstreamCurlInvocation([.. invocation.Arguments.Skip(1)], invocation.StandardOutput, invocation.StandardError, invocation.StandardInput, invocation.Connector, invocation.DatagramConnector))
+            : Task.FromResult(9);
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandHoldingCurlWithAnInterpretation_RunsTheInProcessCurl()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        List<string>? curlArguments = null;
+        UpstreamCaseRunner runner = new(
+            async invocation =>
+            {
+                curlArguments = [.. invocation.Arguments];
+                await invocation.StandardOutput.WriteAsync("curl help\n"u8.ToArray());
+                return 0;
+            },
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            perlCommandScripts: new Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>> { ["test1707.pl"] = CurlRunningScript });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, PerlCurlCase);
+
+        diagnostics.Assert("outcome kind", UpstreamCaseOutcomeKind.Passed, outcome.Kind);
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        diagnostics.Assert("curl's arguments", "-h all", string.Join(' ', curlArguments!));
+        CollectionAssert.AreEqual(new[] { "-h", "all" }, curlArguments);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandWithoutInterpretations_SkipsAsAPerlCommand()
+    {
+        UpstreamCaseOutcome outcome = await RunAsync(Runner(_ => Task.FromResult(0)), PerlCurlCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not run a perl command", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PerlCommandWhoseScriptIsNotRegistered_SkipsAsAPerlCommand()
+    {
+        UpstreamCaseRunner runner = new(
+            _ => Task.FromResult(0),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            perlCommandScripts: new Dictionary<string, Func<UpstreamCurlInvocation, Func<UpstreamCurlInvocation, Task<int>>, Task<int>>> { ["test971.pl"] = CurlRunningScript });
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, PerlCurlCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("the harness does not run a perl command", outcome.Detail);
     }
 
     // The case's own command: what follows the --trace-time runtests.pl ends its arguments with.
@@ -1286,6 +1367,37 @@ public sealed class UpstreamCaseRunnerTests
     }
 
     [TestMethod]
+    [DataRow(1467)]
+    [DataRow(1468)]
+    public async Task RunAsync_SocksUnixCase_RunsCurlWithTheSocksUnixPath(int testNumber)
+    {
+        string? commandLine = null;
+        UpstreamCaseRunner runner = Runner(invocation =>
+        {
+            commandLine = string.Join(' ', invocation.Arguments);
+            return Task.FromResult(0);
+        });
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreNotEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.Contains("localhost" + SocksServerConnector.SocksUnixPath, commandLine!);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HttpsMtlsCaseWithoutACertificateDirectory_SkipsForTheMtlsPort()
+    {
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test2088.curltest"));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.Contains("%HTTPS-MTLSPORT", outcome.Detail);
+    }
+
+    [TestMethod]
     public async Task HttpUnixSocketTarget_TheHttpUnixPath_ReachesTheSwsEmulationOnTheHttpPort()
     {
         SwsHttpServerConnector server = new(ParsedTestCase.From("<reply>\n<data>\nHTTP/1.1 200 OK\n\n</data>\n</reply>\n"));
@@ -1341,11 +1453,13 @@ public sealed class UpstreamCaseRunnerTests
         + "<command>\nhttp://%HOSTIP:%HTTPPORT/%TESTNUMBER %LOGDIR/ip%TESTNUMBER\n</command>\n</client>\n"
         + "<verify>\n<stdout>\nhello from lib5\n</stdout>\n<stderr>\nURL: http://%HOSTIP:%HTTPPORT/%TESTNUMBER\nstep failed\nTest ended with result 0\n</stderr>\n<errorcode>\n0\n</errorcode>\n</verify>\n</testcase>\n";
 
-    // first.c's main() writes "URL: <url>" only when a URL follows the program's name, and always "Test ended with result <N>".
+    // first.c's main() writes "URL: <url>" only when a URL follows the program's name, and always "Test ended with result <N>";
+    // runner.pm passes "-" for a case with no <command>, so first.c writes "URL: -" (test1658).
     [TestMethod]
     [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 0, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 0\n")]
     [DataRow("http://%HOSTIP:%HTTPPORT/%TESTNUMBER", 7, "URL: http://127.0.0.1:8990/5\nstep failed\nTest ended with result 7\n")]
-    [DataRow(null, 0, "step failed\nTest ended with result 0\n")]
+    [DataRow(null, 0, "URL: -\nstep failed\nTest ended with result 0\n")]
+    [DataRow(" ", 0, "step failed\nTest ended with result 0\n")]
     public async Task RunAsync_PortedLibCase_WritesFirstCsUrlAndResultLinesAroundTheProgramsStderr(string? command, int exitCode, string expectedStandardError)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
@@ -1517,6 +1631,73 @@ public sealed class UpstreamCaseRunnerTests
         }
     }
 
+    private const string UnitCase =
+        "<testcase>\n<client>\n<features>\nunittest\nDebug\n</features>\n<name>\nunit test\n</name>\n</client>\n"
+        + "<verify>\n<stdout>\nchecks run\n</stdout>\n</verify>\n</testcase>\n";
+
+    [TestMethod]
+    public async Task RunAsync_PortedUnitProgram_RunsInPlaceOfCurlAndItsStdoutAndExitCodeAreVerified()
+    {
+        SampleUnitProgram program = new("unit5", failures: 0);
+
+        UpstreamCaseOutcome outcome = await RunAsync(UnitRunner(program), UnitCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.AreEqual(5, program.Context!.TestNumber);
+        // runner.pm's "-" for a case with no <command>.
+        CollectionAssert.AreEqual(new[] { "-" }, program.Context.Arguments.ToArray());
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnitProgramWithFailedChecks_FailsTheCase()
+    {
+        UpstreamCaseOutcome outcome = await RunAsync(UnitRunner(new SampleUnitProgram("unit5", failures: 2)), UnitCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Failed, outcome.Kind);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnitProgramNotPorted_IsSkippedNamingIt()
+    {
+        UpstreamCaseOutcome outcome = await RunAsync(UnitRunner(new SampleUnitProgram("unit6", failures: 0)), UnitCase);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind);
+        Assert.AreEqual("Curl has no port of unit5", outcome.Detail);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnittestCaseWithNoUnitPrograms_IsSkippedNamingTheProgram()
+    {
+        UpstreamCaseRunner runner = new(_ => throw new AssertFailedException("curl must not run for a unit case"), UpstreamCurlPlatform.Unix, TimeProvider.System, TimeSpan.FromSeconds(10));
+
+        UpstreamCaseOutcome outcome = await RunAsync(runner, UnitCase);
+
+        Assert.AreEqual("Curl has no port of unit5", outcome.Detail);
+    }
+
+    private static UpstreamCaseRunner UnitRunner(IUnitProgram program) =>
+        new(
+            _ => throw new AssertFailedException("curl must not run for a unit case"),
+            UpstreamCurlPlatform.Unix,
+            TimeProvider.System,
+            TimeSpan.FromSeconds(10),
+            unitPrograms: new UnitPrograms([program]));
+
+    // A unit program that keeps its context, writes a line to stdout and returns its failure count.
+    private sealed class SampleUnitProgram(string programName, int failures) : IUnitProgram
+    {
+        public UnitProgramContext? Context { get; private set; }
+
+        public string ProgramName => programName;
+
+        public async Task<UnitProgramResult> RunAsync(UnitProgramContext context, CancellationToken cancellationToken)
+        {
+            Context = context;
+            await context.StandardOutput.WriteAsync("checks run\n"u8.ToArray(), cancellationToken);
+            return new UnitProgramResult(failures);
+        }
+    }
+
     private static UpstreamCaseRunner LibRunner(ILibTest program) =>
         new(
             _ => throw new AssertFailedException("curl must not run for a lib case"),
@@ -1578,6 +1759,14 @@ public sealed class UpstreamCaseRunnerTests
 
         Assert.AreEqual(expectedKind, outcome.Kind, outcome.Detail);
         Assert.AreEqual(expectedDetail, outcome.Detail ?? "");
+    }
+
+    [TestMethod]
+    public void HttpsPort_IsFiveDigitsAndMatchesTheConnectorPort()
+    {
+        // Upstream's runner picks ports above 9999; test2100's Content-Length: 47 assumes a five-digit %HTTPSPORT.
+        Assert.HasCount(5, UpstreamCaseRunner.HttpsPort);
+        Assert.AreEqual(UpstreamCaseRunner.HttpsPort, HttpsServerConnector.HttpsPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     [TestMethod]

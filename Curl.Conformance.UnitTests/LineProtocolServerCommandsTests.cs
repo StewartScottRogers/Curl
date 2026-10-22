@@ -62,6 +62,18 @@ public sealed class LineProtocolServerCommandsTests
         Assert.AreEqual(0, commands.Capabilities.Count);
     }
 
+    [TestMethod]
+    public void TryFindReply_HexEscape_IsTheCharacterWithThatCode()
+    {
+        // test2108: "REPLY PASS 230 logged\x00 in" answers PASS with a NUL byte, as Perl's qq reads \x00.
+        LineProtocolServerCommands commands = Read("REPLY PASS 230 logged\\x00 in\nREPLY USER a\\x41\\x4ab\\xg\\x\n");
+
+        Assert.IsTrue(commands.TryFindReply("PASS", out byte[] pass));
+        Assert.AreEqual("230 logged\0 in\r\n", Encoding.Latin1.GetString(pass));
+        Assert.IsTrue(commands.TryFindReply("USER", out byte[] user));
+        Assert.AreEqual("aAJb\0g\0\r\n", Encoding.Latin1.GetString(user));
+    }
+
     private static LineProtocolServerCommands Read(string serverCommands) =>
         LineProtocolServerCommands.Read(Encoding.Latin1.GetBytes(serverCommands));
 }

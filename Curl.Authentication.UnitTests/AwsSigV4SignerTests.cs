@@ -214,6 +214,42 @@ public sealed class AwsSigV4SignerTests
     }
 
     [TestMethod]
+    public void Sign_Upstream472NonAsciiPathForEs_EscapesThePercentEncodedPathAgainAndGivesTheCasesSignature()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("provider", "aws:amz:us-east-2:es");
+        diagnostics.Arrange("request", "GET /472/a=%E3%81%82 on fake.fake.fake:8000 at 19700101T000000Z, user user, password secret");
+
+        AwsSigV4SigningResult result = SignAt("19700101T000000Z", new AwsSigV4Request
+        {
+            SigV4Parameter = "aws:amz:us-east-2:es",
+            UserName = "user",
+            Password = "secret",
+            Method = "GET",
+            HostName = "fake.fake.fake",
+            HostHeaderValue = "fake.fake.fake:8000",
+            Path = "/472/a=%E3%81%82",
+            IsGetOrHead = true,
+        });
+
+        diagnostics.Act("header lines", string.Join(" | ", result.HeaderLines));
+        diagnostics.Act("canonical request", result.CanonicalRequest);
+        diagnostics.Assert("header line count", 2, result.HeaderLines.Count);
+        diagnostics.Diff(
+            "authorization",
+            "Authorization: AWS4-HMAC-SHA256 Credential=user/19700101/us-east-2/es/aws4_request, SignedHeaders=host;x-amz-date, Signature=b8783c8387a5249b084642126fe1f8e07e12a2847820fd5b6cd64b2047149da4",
+            result.HeaderLines[0]);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "Authorization: AWS4-HMAC-SHA256 Credential=user/19700101/us-east-2/es/aws4_request, SignedHeaders=host;x-amz-date, Signature=b8783c8387a5249b084642126fe1f8e07e12a2847820fd5b6cd64b2047149da4",
+                "X-Amz-Date: 19700101T000000Z",
+            },
+            result.HeaderLines.ToArray());
+        StringAssert.StartsWith(result.CanonicalRequest, "GET\n/472/a%3D%25E3%2581%2582\n\n", StringComparison.Ordinal);
+    }
+
+    [TestMethod]
     public void Sign_NoRegionOrServiceAndAnIpv4Host_TakesThemFromTheAddress()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

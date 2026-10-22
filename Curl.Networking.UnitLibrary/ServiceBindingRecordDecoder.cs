@@ -6,16 +6,20 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Decodes one HTTPS record's data (RFC 9460 section 2.2): the 2-byte SvcPriority, the
-/// uncompressed TargetName, then SvcParams as key, length and value until the data ends, the way
-/// curl 8.21.0's <c>doh_resp_decode_httpsrr</c> reads the first HTTPS record of a DoH answer
-/// (ADR-0312). The keys curl reads are kept: <c>alpn</c> (1), <c>no-default-alpn</c> (2),
-/// <c>port</c> (3), <c>ipv4hint</c> (4), <c>ech</c> (5) and <c>ipv6hint</c> (6); any other key,
-/// <c>mandatory</c> (0) included, is skipped. A malformed record is refused with a
-/// <see cref="ServiceBindingFailure" /> rather than read past its end.
+/// uncompressed TargetName, then SvcParams as key, length and value while 4 or more bytes remain
+/// (fewer trailing bytes are ignored), the way curl 8.22.0's <c>doh_resp_decode_httpsrr</c> reads
+/// the first HTTPS record of a DoH answer (ADR-0312, upstream unit1658). The keys curl reads are
+/// kept: whether there was a <c>mandatory</c> (0) list, whose keys curl ignores, <c>alpn</c> (1),
+/// <c>no-default-alpn</c> (2), <c>port</c> (3), <c>ipv4hint</c> (4),
+/// <c>ech</c> (5) and <c>ipv6hint</c> (6); any other key is
+/// skipped. Keys must rise strictly, as RFC 9460 requires and curl checks. A malformed record is
+/// refused with a <see cref="ServiceBindingFailure" /> rather than read past its end.
 /// </summary>
 public static class ServiceBindingRecordDecoder
 {
     private const int MaximumLabelLength = 63;
+    private const int ParameterHeaderLength = 4;
+    private const ushort MandatoryKey = 0;
     private const ushort AlpnKey = 1;
     private const ushort NoDefaultAlpnKey = 2;
     private const ushort PortKey = 3;
@@ -36,9 +40,10 @@ public static class ServiceBindingRecordDecoder
         var position = 2;
         var failure = ReadTargetName(recordData, ref position, out var targetName);
         var parameters = new ParameterSet();
-        while (failure == ServiceBindingFailure.None && position < recordData.Length)
+        var lowestNextKey = 0;
+        while (failure == ServiceBindingFailure.None && recordData.Length - position >= ParameterHeaderLength)
         {
-            failure = ReadParameter(recordData, ref position, parameters);
+            failure = ReadParameter(recordData, ref position, ref lowestNextKey, parameters);
         }
 
         return failure == ServiceBindingFailure.None
@@ -68,29 +73,48 @@ public static class ServiceBindingRecordDecoder
             position += length;
         }
 
-        if (labels.Count > 1)
-        {
-            targetName = string.Join('.', labels[..^1]);
-        }
-
-        return ServiceBindingFailure.None;
+        return JoinTargetName(labels, out targetName);
     }
 
-    private static ServiceBindingFailure ReadParameter(ReadOnlySpan<byte> data, ref int position, ParameterSet parameters)
+    /// <summary>Joins the labels, the root's empty one last, into the dotted target name and refuses one curl's junk scan refuses.</summary>
+    private static ServiceBindingFailure JoinTargetName(List<string> labels, out string targetName)
     {
-        if (data.Length - position < 4)
+        targetName = labels.Count > 1 ? string.Join('.', labels[..^1]) : ".";
+        return HasControlCharacter(targetName) ? ServiceBindingFailure.TargetNameHasControlCharacter : ServiceBindingFailure.None;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="targetName" />, up to its first NUL (where curl's C string ends),
+    /// holds a byte curl's <c>Curl_junkscan</c> refuses: a space, a control character or DEL.
+    /// </summary>
+    private static bool HasControlCharacter(string targetName)
+    {
+        var scanned = targetName.AsSpan();
+        var end = scanned.IndexOf('\0');
+        if (end >= 0)
         {
-            return ServiceBindingFailure.Truncated;
+            scanned = scanned[..end];
         }
 
+        return scanned.ContainsAnyInRange('\u0001', ' ') || scanned.Contains('\u007F');
+    }
+
+    private static ServiceBindingFailure ReadParameter(ReadOnlySpan<byte> data, ref int position, ref int lowestNextKey, ParameterSet parameters)
+    {
         var key = BinaryPrimitives.ReadUInt16BigEndian(data[position..]);
         var length = BinaryPrimitives.ReadUInt16BigEndian(data[(position + 2)..]);
-        position += 4;
+        position += ParameterHeaderLength;
+        if (key < lowestNextKey)
+        {
+            return ServiceBindingFailure.ParametersOutOfOrder;
+        }
+
         if (data.Length - position < length)
         {
             return ServiceBindingFailure.ParameterOverrun;
         }
 
+        lowestNextKey = key + 1;
         var value = data.Slice(position, length);
         position += length;
         return parameters.Store(key, value);
@@ -102,12 +126,14 @@ public static class ServiceBindingRecordDecoder
         private readonly List<string> _applicationProtocols = [];
         private readonly List<IPAddress> _ipv4Hints = [];
         private readonly List<IPAddress> _ipv6Hints = [];
+        private bool _hasMandatoryKeys;
         private bool _noDefaultApplicationProtocol;
         private ushort? _port;
         private byte[] _echConfigList = [];
 
         public ServiceBindingFailure Store(ushort key, ReadOnlySpan<byte> value) => key switch
         {
+            MandatoryKey => StoreMandatoryKeys(),
             AlpnKey => StoreApplicationProtocols(value),
             NoDefaultAlpnKey => StoreNoDefaultApplicationProtocol(value),
             PortKey => StorePort(value),
@@ -119,6 +145,7 @@ public static class ServiceBindingRecordDecoder
 
         public ServiceBindingRecord ToRecord(ushort priority, string targetName) => new(priority, targetName)
         {
+            HasMandatoryKeys = _hasMandatoryKeys,
             ApplicationProtocols = _applicationProtocols,
             NoDefaultApplicationProtocol = _noDefaultApplicationProtocol,
             Port = _port,
@@ -142,16 +169,24 @@ public static class ServiceBindingRecordDecoder
             return ServiceBindingFailure.None;
         }
 
+        // curl notes that the record had a mandatory list and ignores the keys it names.
+        private ServiceBindingFailure StoreMandatoryKeys()
+        {
+            _hasMandatoryKeys = true;
+            return ServiceBindingFailure.None;
+        }
+
         private ServiceBindingFailure StoreApplicationProtocols(ReadOnlySpan<byte> value)
         {
-            var failure = value.IsEmpty ? ServiceBindingFailure.BadParameterValue : ServiceBindingFailure.None;
+            // curl accepts an empty list and an empty identifier, and refuses only one that overruns the value.
+            var failure = ServiceBindingFailure.None;
             var offset = 0;
             while (failure == ServiceBindingFailure.None && offset < value.Length)
             {
                 int length = value[offset++];
-                if (length == 0 || value.Length - offset < length)
+                if (value.Length - offset < length)
                 {
-                    failure = ServiceBindingFailure.BadParameterValue;
+                    failure = ServiceBindingFailure.BadApplicationProtocolList;
                 }
                 else
                 {
@@ -182,6 +217,11 @@ public static class ServiceBindingRecordDecoder
 
         private ServiceBindingFailure StoreEchConfigList(ReadOnlySpan<byte> value)
         {
+            if (value.IsEmpty)
+            {
+                return ServiceBindingFailure.BadParameterValue;
+            }
+
             _echConfigList = value.ToArray();
             return ServiceBindingFailure.None;
         }

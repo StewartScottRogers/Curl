@@ -25,6 +25,20 @@ public sealed class ISaslExchangeTests
         Assert.IsNull(cancelReason);
     }
 
+    [TestMethod]
+    public void SendsLastAnswerAsEmptyLine_WhenNotOverridden_ReturnsFalse()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        ISaslExchange exchange = new MinimalSaslExchange();
+        diagnostics.Arrange("mechanism", exchange.Mechanism);
+
+        bool sendsEmptyLine = exchange.SendsLastAnswerAsEmptyLine;
+
+        diagnostics.Act("sends last answer as empty line", sendsEmptyLine);
+        diagnostics.Assert("sends last answer as empty line", false, sendsEmptyLine);
+        Assert.IsFalse(sendsEmptyLine);
+    }
+
     private sealed class MinimalSaslExchange : ISaslExchange
     {
         public string Mechanism => "PLAIN";

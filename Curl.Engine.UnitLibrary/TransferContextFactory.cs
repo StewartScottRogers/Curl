@@ -179,6 +179,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// The SSH options of an <c>scp</c> or <c>sftp</c> transfer (<see cref="SshOptionsMapping" />), with the
     /// known-hosts file the runner resolved; <see langword="null" /> for any other scheme.
     /// </param>
+    /// <param name="featureMask">
+    /// The features the run behaves as built without (ADR-0746), which <see cref="MailRequestOptionsMapping.FromCommandLine" />
+    /// reads; <see cref="EngineFeatureMask.None" />, the default, hides none.
+    /// </param>
     /// <returns>
     /// The context. Its <see cref="TransferContext.NoBody" /> is <c>-I</c>, its
     /// <see cref="TransferContext.ResumeUploadFromUnknownOffset" /> is <c>-C -</c> with a
@@ -214,7 +218,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         IReadOnlyList<string>? ifNoneMatchHeaders = null,
         AltSvcTransferCache? altSvc = null,
         StyledHeaderLines? bodyHeaderStyles = null,
-        SshOptions? ssh = null)
+        SshOptions? ssh = null,
+        EngineFeatureMask featureMask = EngineFeatureMask.None)
     {
         Stream? transferHeaderOutput = watchHeaderOutput is null
             ? HeaderOutputOf(behaviour, transfer, url, output, headerOutput, bodyHeaderStyles)
@@ -277,7 +282,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
                     ProxyTransferType = ProxyTransferModeType.Of(proxy, TunnelsThroughProxy(proxyOptions, network, url, proxy), transfer.ProxyTransferMode, transfer.TransferText),
                 },
                 altSvc),
-            Mail = MailRequestOptionsMapping.FromCommandLine(settings, transfer, protocol.Smtp, authentication, url.Scheme),
+            Mail = MailRequestOptionsMapping.FromCommandLine(settings, transfer, protocol.Smtp, authentication, url.Scheme, featureMask),
             Ssh = ssh,
             Progress = WatchedProgress(progress, lowSpeedWatchdog, maxTimeWatchdog),
             Events = EventsWritingConnectReplyHeads(proxyOptions, proxy, EventsOrNone(events), transferHeaderOutput),

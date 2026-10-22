@@ -9,7 +9,9 @@ Plan this into tasks: **$ARGUMENTS**
    the user and stop.
 3. Otherwise run
    `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 status`
-   and report:
+   and `capacity`. If the new tasks overlap in `touches` or are held back so they would
+   mostly run one at a time, have the planner rescope them (Stewart, 2026-10-21: always
+   run highly parallel). Report:
    - the planner's table of new tasks;
    - any questions or decisions it filed for Stewart;
    - which task `/task-run` will take first.

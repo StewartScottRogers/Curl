@@ -147,19 +147,83 @@ public sealed class ServiceBindingRecordDecoderTests
     }
 
     [TestMethod]
+    public void Decode_ARecordWithAMandatoryList_KeepsThatItHadOneAndIgnoresItsKeys()
+    {
+        // 1 . (mandatory=alpn alpn=h2)
+        var record = Decoded("000100" + "000000020001" + "00010003026832");
+
+        Diagnostics.Assert("has mandatory keys", true, record.HasMandatoryKeys);
+        Diagnostics.Assert("alpn", "h2", string.Join(", ", record.ApplicationProtocols));
+
+        Assert.IsTrue(record.HasMandatoryKeys);
+        CollectionAssert.AreEqual(new[] { "h2" }, record.ApplicationProtocols.ToArray());
+    }
+
+    [TestMethod]
+    public void Decode_ARecordWithoutAMandatoryList_HasNoMandatoryKeys()
+    {
+        var record = Decoded("000100" + "00010003026832");
+
+        Diagnostics.Assert("has mandatory keys", false, record.HasMandatoryKeys);
+
+        Assert.IsFalse(record.HasMandatoryKeys);
+    }
+
+    [TestMethod]
+    [DataRow("00010000010000", DisplayName = "empty alpn")]
+    [DataRow("0001000001000100", DisplayName = "empty alpn identifier")]
+    public void Decode_AnEmptyAlpnOrAlpnIdentifier_IsAcceptedAsCurlAcceptsIt(string hex)
+    {
+        // Upstream unit1658's "rname + blank alpn field" decodes, though RFC 9460 asks for one or more alpn-ids.
+        var record = Decoded(hex);
+
+        Diagnostics.Assert("alpn count", hex.Length > 14 ? 1 : 0, record.ApplicationProtocols.Count);
+
+        Assert.HasCount(hex.Length > 14 ? 1 : 0, record.ApplicationProtocols);
+    }
+
+    [TestMethod]
+    [DataRow("00", DisplayName = "one byte")]
+    [DataRow("0003", DisplayName = "a key without its length")]
+    [DataRow("000300", DisplayName = "three bytes")]
+    public void Decode_FewerThanAParameterHeaderLeft_IgnoresTheTrailingBytes(string trailing)
+    {
+        // curl reads SvcParams only while 4 or more bytes remain.
+        var record = Decoded("000100" + "000300020050" + trailing);
+
+        Diagnostics.Assert("port", 80, record.Port);
+
+        Assert.AreEqual((ushort)80, record.Port);
+    }
+
+    [TestMethod]
+    public void Decode_TargetWithAControlByteAfterANul_IsAcceptedAsCurlsCStringEndsAtTheNul()
+    {
+        var record = Decoded("000103610001" + "00");
+
+        Diagnostics.Assert("target", "a\0\u0001", record.TargetName);
+
+        Assert.AreEqual("a\0\u0001", record.TargetName);
+    }
+
+    [TestMethod]
     [DataRow("", ServiceBindingFailure.Truncated, DisplayName = "no data")]
     [DataRow("0001", ServiceBindingFailure.Truncated, DisplayName = "priority only")]
     [DataRow("000105", ServiceBindingFailure.BadTargetName, DisplayName = "label past the end")]
     [DataRow("000103666F6F", ServiceBindingFailure.BadTargetName, DisplayName = "name without its root")]
     [DataRow("0001C00C", ServiceBindingFailure.BadTargetName, DisplayName = "compressed name")]
-    [DataRow("0001000003", ServiceBindingFailure.Truncated, DisplayName = "key without its length")]
+    [DataRow("00010361016200", ServiceBindingFailure.TargetNameHasControlCharacter, DisplayName = "control byte in the target")]
+    [DataRow("00010361206200", ServiceBindingFailure.TargetNameHasControlCharacter, DisplayName = "space in the target")]
+    [DataRow("00010361627F00", ServiceBindingFailure.TargetNameHasControlCharacter, DisplayName = "DEL in the target")]
     [DataRow("00010000030004" + "0035", ServiceBindingFailure.ParameterOverrun, DisplayName = "value past the end")]
+    [DataRow("000100" + "00040004C0000201" + "00010003026832", ServiceBindingFailure.ParametersOutOfOrder, DisplayName = "keys out of order")]
+    [DataRow("000100" + "000300020050" + "000300020050", ServiceBindingFailure.ParametersOutOfOrder, DisplayName = "key repeated")]
+    [DataRow("000100" + "00040004C0000201" + "0001FFFF", ServiceBindingFailure.ParametersOutOfOrder, DisplayName = "key out of order and past the end")]
     [DataRow("00010000030001" + "35", ServiceBindingFailure.BadParameterValue, DisplayName = "one-byte port")]
-    [DataRow("00010000010000", ServiceBindingFailure.BadParameterValue, DisplayName = "empty alpn")]
-    [DataRow("0001000001000100", ServiceBindingFailure.BadParameterValue, DisplayName = "empty alpn identifier")]
-    [DataRow("000100000100020568", ServiceBindingFailure.BadParameterValue, DisplayName = "alpn identifier past its value")]
+    [DataRow("000100000100020568", ServiceBindingFailure.BadApplicationProtocolList, DisplayName = "alpn identifier past its value")]
     [DataRow("0001000002000100", ServiceBindingFailure.BadParameterValue, DisplayName = "no-default-alpn with a value")]
     [DataRow("0001000004000" + "3C00002", ServiceBindingFailure.BadParameterValue, DisplayName = "three-byte ipv4hint")]
+    [DataRow("00010000050000", ServiceBindingFailure.BadParameterValue, DisplayName = "empty ech")]
     [DataRow("00010000060000", ServiceBindingFailure.BadParameterValue, DisplayName = "empty ipv6hint")]
     public void Decode_AMalformedRecord_IsRefusedWithItsFailure(string hex, ServiceBindingFailure expected)
     {

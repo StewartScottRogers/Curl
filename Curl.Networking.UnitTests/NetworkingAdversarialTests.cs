@@ -107,12 +107,13 @@ public sealed class NetworkingAdversarialTests
         Assert.AreEqual(DnsMessageFailure.RdataLength, answer.Failure);
     }
 
-    // Family 1, boundaries: a TTL of 0 and of 2^32 - 1; the reported TTL never exceeds int.MaxValue.
+    // Family 1, boundaries: a TTL of 0, of 86400 and 86401 either side of curl 8.22.0's MAX_DNS_TTL cap, and of 2^32 - 1.
     [TestMethod]
     [DataRow("00000000", 0u)]
-    [DataRow("7FFFFFFF", (uint)int.MaxValue)]
-    [DataRow("FFFFFFFF", (uint)int.MaxValue)]
-    public void DnsAnswerDecode_TtlAtItsExtremes_ReportsTheSmallerOfItAndIntMaxValue(string ttl, uint expected)
+    [DataRow("00015180", 86400u)]
+    [DataRow("00015181", 86400u)]
+    [DataRow("FFFFFFFF", 86400u)]
+    public void DnsAnswerDecode_TtlAtItsExtremes_ReportsTheSmallerOfItAndOneDay(string ttl, uint expected)
     {
         var record = "C00C00010001" + ttl + "00047F000001";
 
@@ -259,13 +260,12 @@ public sealed class NetworkingAdversarialTests
         Assert.AreEqual(DnsMessageFailure.BadId, answer.Failure);
     }
 
-    // Family 3, invalid partitions: every non-zero response code, each its own partition of the low nibble.
+    // Family 3, invalid partitions: every non-zero response code but 3 (NXDOMAIN, its own failure in curl 8.22.0), each its own partition of the low nibble.
     [TestMethod]
     [DataRow(1)]
     [DataRow(2)]
-    [DataRow(3)]
     [DataRow(15)]
-    public void DnsAnswerDecode_NonZeroResponseCode_IsBadRcode(int rcode)
+    public void DnsAnswerDecode_NonZeroResponseCodeOtherThanNxdomain_IsBadRcode(int rcode)
     {
         var answer = DnsAnswerDecoder.Decode(Message("000081" + rcode.ToString("X2") + Header(1, 1)[8..] + QuestionA + AnswerA), DnsRecordType.A);
 
@@ -351,15 +351,14 @@ public sealed class NetworkingAdversarialTests
         Assert.AreEqual(expected, decoding.Failure);
     }
 
-    // Family 1, boundaries: ipv4hint and port values one byte off their sizes, and none at all.
+    // Family 1, boundaries: ipv4hint and port values one byte off their sizes, and none at all; an empty ech.
     [TestMethod]
     [DataRow("00040000")]
     [DataRow("0004000301020304")]
     [DataRow("000400050102030405")]
     [DataRow("0003000150")]
     [DataRow("00030003000050")]
-    [DataRow("00010000")]
-    [DataRow("0001000100")]
+    [DataRow("00050000")]
     [DataRow("000200015A")]
     public void ServiceBindingDecode_KnownParameterOfTheWrongShape_IsBadParameterValue(string parameter)
     {

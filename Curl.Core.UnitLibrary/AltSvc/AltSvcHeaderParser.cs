@@ -26,7 +26,9 @@ namespace Curl.Core.AltSvc;
 /// Parameter names are case-insensitive and blanks around names and values are trimmed; a
 /// value may be quoted and is read as the digits it starts with. <c>ma</c> sets the maximum
 /// age in seconds, <c>persist=1</c> the persist flag; no digits, or a number too big for a
-/// 64-bit integer, leaves the default; other names are ignored.
+/// 64-bit integer, leaves the default; other names are ignored. A quoted value that closes runs
+/// to its closing quote, so a <c>;</c> or <c>,</c> inside it, or a quote escaped with <c>\</c>,
+/// ends nothing (curl 8.22.0, upstream unit1654).
 /// </para>
 /// </remarks>
 public static class AltSvcHeaderParser
@@ -214,8 +216,10 @@ public static class AltSvcHeaderParser
     }
 
     /// <summary>
-    /// Reads one <c>name=value</c> up to the next <c>;</c>, <c>,</c> or the end; fails when
-    /// no <c>=</c> follows.
+    /// Reads one <c>name=value</c> up to the next <c>;</c>, <c>,</c> or the end, a quoted value
+    /// running to its closing quote first, a backslash escaping the character after it, as
+    /// curl 8.22.0's <c>curlx_str_quotedword</c> reads it (upstream unit1654); fails when no
+    /// <c>=</c> follows.
     /// </summary>
     private static bool TryReadParameter(string value, ref int position, out string name, out long? number)
     {
@@ -227,12 +231,41 @@ public static class AltSvcHeaderParser
             return false;
         }
 
-        int end = value.AsSpan(equals + 1).IndexOfAny(";,");
-        end = end < 0 ? value.Length : equals + 1 + end;
+        int valueEnd = UnquotedTextStart(value, SkipBlanks(value, equals + 1));
+        int end = value.AsSpan(valueEnd).IndexOfAny(";,");
+        end = end < 0 ? value.Length : valueEnd + end;
         name = value[position..equals];
         number = LeadingNumber(value.AsSpan(equals + 1, end - equals - 1).Trim(" \t"));
         position = end;
         return true;
+    }
+
+    /// <summary>
+    /// Where the text after a parameter value's quoted part starts: <paramref name="position" />
+    /// itself when no quote opens there or the quote never closes, as curl 8.21.0 was measured to
+    /// read <c>ma="3x</c>, and after the closing quote when one does.
+    /// </summary>
+    private static int UnquotedTextStart(string value, int position)
+    {
+        int start = position;
+        if (!TryReadChar(value, ref position, '"'))
+        {
+            return start;
+        }
+
+        position = QuotedTextEnd(value, position);
+        return TryReadChar(value, ref position, '"') ? position : start;
+    }
+
+    /// <summary>Where quoted text starting at <paramref name="position" /> ends: at its closing quote, or at the end of <paramref name="value" />; a backslash escapes the character after it.</summary>
+    private static int QuotedTextEnd(string value, int position)
+    {
+        while (position < value.Length && value[position] != '"')
+        {
+            position += value[position] == '\\' && position + 1 < value.Length ? 2 : 1;
+        }
+
+        return position;
     }
 
     private static bool IsNamed(string name, string expected) =>

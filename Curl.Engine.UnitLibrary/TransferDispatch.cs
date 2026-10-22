@@ -54,6 +54,12 @@ internal sealed class TransferDispatch(
     internal ProtocolDispatcher Dispatcher { get; } = dispatcher;
 
     /// <summary>
+    /// Gets the features the run behaves as built without (ADR-0746); <see cref="EngineFeatureMask.None" />,
+    /// the default, for the shipped tool.
+    /// </summary>
+    internal EngineFeatureMask FeatureMask { get; init; }
+
+    /// <summary>
     /// Gets the lines written to standard error before every URL's transfer unless <c>-s</c>
     /// is given; each without its line ending.
     /// </summary>

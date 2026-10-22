@@ -426,6 +426,104 @@ public sealed class NetrcFileTests
         diagnostics.Assert("exception type", nameof(ArgumentNullException), exception.GetType().Name);
     }
 
+    /// <summary>
+    /// Measured on curl 8.22.0 (mingw, Schannel) on 2026-10-21 (BL-2916): a 16383-byte comment line after an
+    /// entry for another host, which ends the matching entry, still makes the file a syntax error (exit 26), as
+    /// curl reads every line of the file before it parses one.
+    /// </summary>
+    [TestMethod]
+    public void Find_LongLineAfterAFinishedMatchingEntry_IsASyntaxError()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string text = "machine 127.0.0.1 login a password p\nmachine other login o password q\n#" + new string('x', 16382) + "\n";
+        diagnostics.Arrange("long line length", 16383);
+
+        NetrcLookupResult result = NetrcFile.Find(text, Host, userName: null);
+
+        AssertSyntaxError(diagnostics, result);
+    }
+
+    /// <summary>
+    /// Measured on curl 8.22.0 for Windows on 2026-10-21 (BL-2916): curl opens the netrc file in text mode, so the
+    /// C runtime ends it at the first <c>^Z</c>: a password cut by one is sent only up to it, and a password on a
+    /// line after one is never read.
+    /// </summary>
+    [TestMethod]
+    [DataRow("machine 127.0.0.1 login a password pa\u001Ass\n", "a", "pa", DisplayName = "A ^Z inside the password")]
+    [DataRow("machine 127.0.0.1 login a\n\u001A\npassword p\n", "a", null, DisplayName = "A ^Z line before the password")]
+    public void Find_InTextMode_ControlZEndsTheFile(string text, string expectedLogin, string? expectedPassword)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", text.Replace("\u001A", "^Z", StringComparison.Ordinal));
+
+        NetrcLookupResult result = NetrcFile.FindWithReadMode(text, Host, userName: null, readsInTextMode: true);
+
+        AssertFound(diagnostics, result, expectedLogin, expectedPassword);
+    }
+
+    /// <summary>
+    /// curl on Linux and macOS opens the file in binary mode, where <c>Curl_get_line</c> keeps every byte, so a
+    /// <c>^Z</c> is part of the password (read from curl 8.22.0's <c>lib/curl_get_line.c</c>; no such build to measure here).
+    /// </summary>
+    [TestMethod]
+    public void Find_InBinaryMode_ControlZIsKept()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", "machine 127.0.0.1 login a password pa^Zss");
+
+        NetrcLookupResult result = NetrcFile.FindWithReadMode("machine 127.0.0.1 login a password pa\u001Ass\n", Host, userName: null, readsInTextMode: false);
+
+        AssertFound(diagnostics, result, "a", "pa\u001Ass");
+    }
+
+    /// <summary>
+    /// Measured on curl 8.22.0 for Windows on 2026-10-21 (BL-2916): 16382 bytes then CR LF are read, as text mode
+    /// reads CR LF as one line feed, and 16383 bytes then CR LF are a syntax error. In binary mode the carriage
+    /// return counts, so 16382 bytes then CR LF already reach the limit.
+    /// </summary>
+    [TestMethod]
+    [DataRow(16382, true, false, DisplayName = "16382 bytes, text mode")]
+    [DataRow(16383, true, true, DisplayName = "16383 bytes, text mode")]
+    [DataRow(16382, false, true, DisplayName = "16382 bytes, binary mode")]
+    [DataRow(16381, false, false, DisplayName = "16381 bytes, binary mode")]
+    public void Find_LineEndingInCrLf_CountsTheCarriageReturnOnlyInBinaryMode(int length, bool readsInTextMode, bool isSyntaxError)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        string text = "#" + new string('x', length - 1) + "\r\nmachine 127.0.0.1 login a password p\r\n";
+        diagnostics.Arrange("line length before CR LF", length);
+        diagnostics.Arrange("text mode", readsInTextMode);
+
+        NetrcLookupResult result = NetrcFile.FindWithReadMode(text, Host, userName: null, readsInTextMode);
+
+        AssertFoundOrSyntaxError(diagnostics, result, isSyntaxError, "a", "p");
+    }
+
+    /// <summary>On Windows, <see cref="NetrcFile.Find(string, string, string?, IDiagnosticLog?)" /> reads in text mode: a <c>^Z</c> ends the file.</summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Find_OnWindows_ReadsInTextMode()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", "machine 127.0.0.1 login a password pa^Zss");
+
+        NetrcLookupResult result = NetrcFile.Find("machine 127.0.0.1 login a password pa\u001Ass\n", Host, userName: null);
+
+        AssertFound(diagnostics, result, "a", "pa");
+    }
+
+    /// <summary>On Linux and macOS, <see cref="NetrcFile.Find(string, string, string?, IDiagnosticLog?)" /> reads in binary mode: a <c>^Z</c> is kept.</summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Find_OffWindows_ReadsInBinaryMode()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("netrc text", "machine 127.0.0.1 login a password pa^Zss");
+
+        NetrcLookupResult result = NetrcFile.Find("machine 127.0.0.1 login a password pa\u001Ass\n", Host, userName: null);
+
+        AssertFound(diagnostics, result, "a", "pa\u001Ass");
+    }
+
     private static void AssertFound(TestDiagnostics diagnostics, NetrcLookupResult result, string? expectedLogin, string? expectedPassword)
     {
         diagnostics.Act("outcome", result.Outcome);

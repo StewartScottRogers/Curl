@@ -401,7 +401,7 @@ public sealed class DohDnsResolverTests
     [TestMethod]
     public async Task ResolveAsync_ThroughTcpConnector_WhenBothDohAnswersAreNxdomain_FailsWithExit6()
     {
-        // ADR-0152: RCODE 3 in both answers -> "DoH: Bad RCODE type A ...", exit 6.
+        // ADR-0152, ADR-0738: RCODE 3 in both answers -> "DoH: No such name type A ...", exit 6.
         var connector = Answering(
             Ok(DnsTestReplies.Answer(QueryFor(DnsRecordType.A), [IPAddress.Loopback], responseCode: 3)),
             Ok(DnsTestReplies.Answer(QueryFor(DnsRecordType.Aaaa), [IPv6Address], responseCode: 3)));

@@ -55,7 +55,7 @@ public sealed partial class SwsHttpServerConnectorTests
         IConnection http = await ConnectAsync(server);
 
         await ExchangeAsync(proxy, Get);
-        await ExchangeAsync(http, Get + "x");
+        await WriteAsync(http, Get + "x");
 
         Assert.AreEqual(Get, Text(server.ProxyReceivedBytes));
         Assert.AreEqual(Get + "x", Text(server.ReceivedBytes));
@@ -210,7 +210,7 @@ public sealed partial class SwsHttpServerConnectorTests
         IConnection connection = await ConnectAsync(server);
 
         await WriteAsync(connection, "POST /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\nab");
-        Assert.AreEqual(string.Empty, Observe("reply before the body is complete", string.Empty, await ReadAllAsync(connection)), "no reply before the body is complete");
+        Assert.IsTrue(await ReadWaitsAsync(connection), "the read waits for the rest of the body");
         await WriteAsync(connection, "cde");
 
         Assert.AreEqual("posted\n", Observe("reply", "posted\n", await ReadAllAsync(connection)));
@@ -249,9 +249,9 @@ public sealed partial class SwsHttpServerConnectorTests
         Diagnostics.Arrange("request", Request);
 
         await WriteAsync(connection, Request[..^9]);
-        Assert.AreEqual(string.Empty, Observe("reply before the last chunk", string.Empty, await ReadAllAsync(connection)), "no reply before the last chunk");
+        Assert.IsTrue(await ReadWaitsAsync(connection), "the read waits for the last chunk");
         await WriteAsync(connection, Request[^9..^2]);
-        Assert.AreEqual(string.Empty, Observe("reply before the empty line", string.Empty, await ReadAllAsync(connection)), "no reply before the empty line after the last chunk");
+        Assert.IsTrue(await ReadWaitsAsync(connection), "the read waits for the empty line after the last chunk");
         await WriteAsync(connection, Request[^2..]);
 
         Assert.AreEqual("posted\n", Observe("reply", "posted\n", await ReadAllAsync(connection)));
@@ -414,7 +414,7 @@ public sealed partial class SwsHttpServerConnectorTests
         IConnection connection = await ConnectAsync(server);
 
         Assert.AreEqual("denied\n", Observe("reply", "denied\n", await ExchangeAsync(connection, "PUT /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\n")), "the body is not waited for");
-        Assert.AreEqual(string.Empty, Observe("reply to body bytes", string.Empty, await ExchangeAsync(connection, "abc")), "body bytes start the next request");
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, "abc"), "body bytes start the next request, which is unfinished");
         Assert.AreEqual("second\n", Observe("reply to next request", "second\n", await ExchangeAsync(connection, "de /12340002 HTTP/1.1\r\n\r\n")), "the body bytes are read as the next request");
     }
 
@@ -428,7 +428,7 @@ public sealed partial class SwsHttpServerConnectorTests
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", "auth_required\n"))));
         string request = $"PUT /1234 HTTP/1.1\r\n{headers}Content-Length: {body.Length + 2}\r\n\r\n{body}";
 
-        Assert.AreEqual(string.Empty, Observe("reply before the body is complete", string.Empty, await ExchangeAsync(connection, request)), "no reply before the body is complete");
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, request), "the read waits for the rest of the body");
         Assert.AreEqual("posted\n", Observe("reply", "posted\n", await ExchangeAsync(connection, "ok")));
     }
 
@@ -438,7 +438,7 @@ public sealed partial class SwsHttpServerConnectorTests
         Diagnostics.Arrange("servercmd", "auth_required");
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", "auth_required\n"))));
 
-        Assert.AreEqual(string.Empty, Observe("reply to headers", string.Empty, await ExchangeAsync(connection, "POST /1234 HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n")));
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, "POST /1234 HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n"), "the read waits for the chunks");
         Assert.AreEqual("posted\n", Observe("reply to chunks", "posted\n", await ExchangeAsync(connection, "3\r\nabc\r\n0\r\n\r\n")));
     }
 
@@ -459,7 +459,7 @@ public sealed partial class SwsHttpServerConnectorTests
     {
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", "no-expect\n"))));
 
-        Assert.AreEqual(string.Empty, Observe("reply to headers", string.Empty, await ExchangeAsync(connection, "PUT /1234 HTTP/1.1\r\nContent-Length: 3\r\n\r\n")));
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, "PUT /1234 HTTP/1.1\r\nContent-Length: 3\r\n\r\n"), "the read waits for the body");
         Assert.AreEqual("posted\n", Observe("reply to body", "posted\n", await ExchangeAsync(connection, "abc")));
     }
 
@@ -475,6 +475,20 @@ public sealed partial class SwsHttpServerConnectorTests
 
         Assert.IsFalse(answeredBeforeTheBody, "sws never answers 100 Continue, so the read waits for the body");
         Assert.AreEqual("posted\n", Observe("reply to body", "posted\n", await read));
+    }
+
+    [TestMethod]
+    public async Task UnfinishedRequest_ReadBeforeItsEnd_WaitsForTheClientsNextWrite()
+    {
+        IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "answered\n"))));
+        await WriteAsync(connection, "GET /1234 HTTP/1.0\r\n");
+
+        Task<string> read = ReadOnceAsync(connection);
+        bool answeredBeforeTheEnd = read.IsCompleted;
+        await WriteAsync(connection, "\r\n");
+
+        Assert.IsFalse(answeredBeforeTheEnd, "sws never finds the request's end, so the read waits for the next write");
+        Assert.AreEqual("answered\n", Observe("reply", "answered\n", await read));
     }
 
     [TestMethod]
@@ -499,13 +513,20 @@ public sealed partial class SwsHttpServerConnectorTests
         Diagnostics.Arrange("body bytes read before the reply", bodyBytesRead);
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", serverCommands))));
 
-        string expectedFirst = bodyBytesRead == 0 ? "posted\n" : string.Empty;
-        Assert.AreEqual(expectedFirst, Observe("reply to headers", expectedFirst, await ExchangeAsync(connection, "POST /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\n")));
-        for (int read = 1; read <= bodyBytesRead; read++)
+        const string Headers = "POST /1234 HTTP/1.1\r\nContent-Length: 5\r\n\r\n";
+        if (bodyBytesRead == 0)
         {
-            string expectedAfter = read == bodyBytesRead ? "posted\n" : string.Empty;
-            Assert.AreEqual(expectedAfter, Observe($"reply after {read} body bytes", expectedAfter, await ExchangeAsync(connection, "x")), $"after {read} body bytes");
+            Assert.AreEqual("posted\n", Observe("reply to headers", "posted\n", await ExchangeAsync(connection, Headers)));
+            return;
         }
+
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, Headers), "the read waits after the headers");
+        for (int read = 1; read < bodyBytesRead; read++)
+        {
+            Assert.IsTrue(await WriteThenReadWaitsAsync(connection, "x"), $"the read waits after {read} body bytes");
+        }
+
+        Assert.AreEqual("posted\n", Observe("reply", "posted\n", await ExchangeAsync(connection, "x")), $"after {bodyBytesRead} body bytes");
     }
 
     [TestMethod]
@@ -516,7 +537,7 @@ public sealed partial class SwsHttpServerConnectorTests
         Diagnostics.Arrange("headers", headers);
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", "skip: 5\n"))));
 
-        Assert.AreEqual(string.Empty, Observe("reply", string.Empty, await ExchangeAsync(connection, $"POST /1234 HTTP/1.1\r\n{headers}\r\n" + new string('x', 100))));
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, $"POST /1234 HTTP/1.1\r\n{headers}\r\n" + new string('x', 100)), "the read waits: the request never ends");
     }
 
     [TestMethod]
@@ -1121,7 +1142,7 @@ public sealed partial class SwsHttpServerConnectorTests
         Diagnostics.Arrange("headers", headers);
         IConnection connection = await ConnectAsync(new SwsHttpServerConnector(Case(Reply("data", "posted\n"), Reply("servercmd", serverCommands))));
 
-        Assert.AreEqual(string.Empty, Observe("reply to headers", string.Empty, await ExchangeAsync(connection, $"POST /1234 HTTP/1.1\r\n{headers}Content-Length: 3\r\n\r\n")));
+        Assert.IsTrue(await WriteThenReadWaitsAsync(connection, $"POST /1234 HTTP/1.1\r\n{headers}Content-Length: 3\r\n\r\n"), "the read waits for the body");
         Assert.AreEqual("posted\n", Observe("reply to body", "posted\n", await ExchangeAsync(connection, "abc")));
     }
 
@@ -1303,6 +1324,28 @@ public sealed partial class SwsHttpServerConnectorTests
         byte[] buffer = new byte[bufferSize];
         int count = await connection.ReadAsync(buffer, cancellationToken);
         return Encoding.Latin1.GetString(buffer, 0, count);
+    }
+
+    // Whether a read is still waiting for the client's next write: sws blocks reading an unfinished
+    // request. The pending read is then cancelled, so the connection is left as it was.
+    private static async Task<bool> ReadWaitsAsync(IConnection connection)
+    {
+        using CancellationTokenSource cancellation = new();
+        Task<string> read = ReadOnceAsync(connection, cancellation.Token);
+        bool waits = !read.IsCompleted;
+        await cancellation.CancelAsync();
+        if (waits)
+        {
+            await Assert.ThrowsAsync<OperationCanceledException>(() => read);
+        }
+
+        return waits;
+    }
+
+    private static async Task<bool> WriteThenReadWaitsAsync(IConnection connection, string text)
+    {
+        await WriteAsync(connection, text);
+        return await ReadWaitsAsync(connection);
     }
 
     private static ValueTask WriteAsync(IConnection connection, string text) =>

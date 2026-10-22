@@ -95,6 +95,25 @@ internal static class MultipartPartHeaders
         && (contentType.Length == expected.Length || "\t\r\n ;".Contains(contentType[expected.Length], StringComparison.Ordinal));
 
     /// <summary>
+    /// Tells whether libcurl 8.22.0's <c>Curl_mime_prepare_headers</c> refuses
+    /// <paramref name="part" /> with <c>CURLE_BAD_FUNCTION_ARGUMENT</c> because a CR or LF in its
+    /// name or file name would split its <c>Content-Disposition</c> line: the mail strategy and
+    /// <c>--form-escape</c> quote with backslashes, which have no way to write a line break, while
+    /// curl's default form escaping writes one as <c>%0D</c> or <c>%0A</c> (upstream unit3227, BL-2907).
+    /// A part with its own <c>Content-Disposition</c> header gets none from curl, so is never refused.
+    /// </summary>
+    /// <param name="part">The part.</param>
+    /// <param name="nameEscaping">How the name and file name are escaped inside their quotes.</param>
+    /// <param name="forMail">Whether the part is in a mail message (<c>MIMESTRATEGY_MAIL</c>) rather than a form.</param>
+    /// <returns><see langword="true" /> when curl refuses the part.</returns>
+    internal static bool RefusesLineBreakInName(MultipartFormPart part, MultipartNameEscaping nameEscaping, bool forMail) =>
+        (forMail || nameEscaping == MultipartNameEscaping.Backslash)
+        && FindHeaderValue(part.Headers, ContentDispositionLabel) is null
+        && (HoldsLineBreak(part.Name) || HoldsLineBreak(FileNameOf(part)));
+
+    private static bool HoldsLineBreak(string? text) => text is not null && text.AsSpan().IndexOfAny('\r', '\n') >= 0;
+
+    /// <summary>
     /// Gets the transfer encoding a mail part without an encoder is labelled with: <c>8bit</c>
     /// for a part with a content type that is not a multipart, otherwise none.
     /// </summary>

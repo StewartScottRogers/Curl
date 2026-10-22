@@ -68,3 +68,8 @@ Curl.Conformance.UnitTests/PassingUpstreamCases.txt merge=union
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+# Registration tables listed in Tasks/SharedListFiles.txt: one entry per line, so tasks
+# that each add a line merge cleanly side by side.
+Curl.Conformance.UnitLibrary/Upstream*Features.cs merge=union
+Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs merge=union
+Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.*.cs merge=union

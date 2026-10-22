@@ -85,6 +85,19 @@ public sealed class HttpRequestOptionsMappingTests
     }
 
     [TestMethod]
+    [DataRow(0L, null)]
+    [DataRow(10L, 10L)]
+    public void Of_MaxSendSpeed_IsTheSendRateWhenPositive(long maxSendSpeed, long? expected)
+    {
+        Diagnostics.Arrange("max send speed", maxSendSpeed);
+
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions), new EasyHttpOptions(), new EasyBehaviourOptions(), new EasyTransferOptions { MaxSendSpeed = maxSendSpeed }, new EasyAuthenticationOptions());
+
+        Diagnostics.Assert("send rate", expected, mapped.SendBytesPerSecond);
+        Assert.AreEqual(expected, mapped.SendBytesPerSecond);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public void Of_KeepSendingOnError_IsCopiedFromTheBehaviourOptions(bool keepSendingOnError)

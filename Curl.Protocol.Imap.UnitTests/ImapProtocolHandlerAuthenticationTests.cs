@@ -106,6 +106,21 @@ public sealed class ImapProtocolHandlerAuthenticationTests
     }
 
     [TestMethod]
+    [DataRow(false, "=", DisplayName = "explicit empty response: LOGIN's empty password")]
+    [DataRow(true, "", DisplayName = "no message: DIGEST-MD5's answer to rspauth (upstream test823)")]
+    public async Task ExecuteAsync_EmptyAnswerToAChallenge_IsEqualsOrAnEmptyLineAsTheExchangeSays(bool sendsEmptyLine, string line)
+    {
+        var sasl = new FakeSaslAuthenticator("LOGIN", Latin1("u"), Array.Empty<byte>()) { SendsLastAnswerAsEmptyLine = sendsEmptyLine };
+        string expected = Capability + "A002 AUTHENTICATE LOGIN\r\ndQ==\r\n" + line + "\r\nA003 LIST \"\" *\r\nA004 LOGOUT\r\n";
+
+        ImapRun run = await RunAsync(
+            Greeting + Caps("AUTH=LOGIN") + "+ VXNlcm5hbWU6\r\n+ UGFzc3dvcmQ6\r\nA002 OK Authenticated\r\n" + ListReply("A003") + LogoutReply("A004"), sasl);
+
+        DiffSent(run, expected);
+        Assert.AreEqual(expected, run.Sent);
+    }
+
+    [TestMethod]
     [DataRow("+ !!notbase64\r\n", DisplayName = "not base64")]
     [DataRow("+\r\n", DisplayName = "+ and its CR")]
     [DataRow("+ \t\r\n", DisplayName = "blanks only")]

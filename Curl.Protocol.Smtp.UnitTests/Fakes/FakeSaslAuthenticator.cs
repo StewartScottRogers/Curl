@@ -23,6 +23,9 @@ public sealed class FakeSaslAuthenticator(string? mechanism, byte[]? initialResp
     /// <summary>Gets every challenge handed to the exchange, in order.</summary>
     public List<byte[]> Challenges { get; } = [];
 
+    /// <summary>Gets what each exchange reports as <see cref="ISaslExchange.SendsLastAnswerAsEmptyLine" />.</summary>
+    public bool SendsLastAnswerAsEmptyLine { get; init; }
+
     /// <inheritdoc />
     public string? ChooseMechanism(SaslRequest request, IReadOnlyList<string> offeredMechanisms)
     {
@@ -38,6 +41,8 @@ public sealed class FakeSaslAuthenticator(string? mechanism, byte[]? initialResp
         private int answersGiven;
 
         public string Mechanism => mechanism;
+
+        public bool SendsLastAnswerAsEmptyLine => owner.SendsLastAnswerAsEmptyLine;
 
         public ValueTask<byte[]?> GetInitialResponseAsync(CancellationToken cancellationToken) => ValueTask.FromResult(owner.scriptedInitialResponse);
 

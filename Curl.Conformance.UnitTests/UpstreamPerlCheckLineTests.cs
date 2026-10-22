@@ -11,7 +11,9 @@ public sealed class UpstreamPerlCheckLineTests
     [DataRow("perl -e \"print 'Test requires a Unix system' if($^O eq 'MSWin32');\"", true)]
     [DataRow("perl /tests/libtest/test610.pl mkdir /log/test610.dir", true)]
     [DataRow("perl /tests/libtest/test613.pl prepare /log/test1445.dir", true)]
-    [DataRow("perl /tests/libtest/test1013.pl ../curl-config /log/stdout1014 features", false)]
+    [DataRow("perl /tests/libtest/test1013.pl ../curl-config /log/stdout1014 features", true)]
+    [DataRow("perl /tests/libtest/test1022.pl ../curl-config /log/stdout1023 vernum", true)]
+    [DataRow("perl /tests/libtest/test1035.pl x", false)]
     [DataRow("resolve --ipv6 ip6-localhost", false)]
     public void Interprets_TellsAnEmulatedPerlLineFromAnyOther(string line, bool expected)
     {
@@ -39,7 +41,7 @@ public sealed class UpstreamPerlCheckLineTests
     }
 
     [TestMethod]
-    [DataRow("perl /tests/libtest/test1022.pl ../curl-config /log/stdout1023 vernum")]
+    [DataRow("perl /tests/libtest/test1035.pl x")]
     [DataRow("resolve --ipv6 ip6-localhost")]
     public void RunLine_LineTheHarnessDoesNotEmulate_IsNotRun(string line)
     {

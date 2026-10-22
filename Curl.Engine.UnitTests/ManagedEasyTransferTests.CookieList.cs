@@ -149,6 +149,54 @@ public sealed partial class ManagedEasyTransferTests
         Assert.HasCount(3, easy.Info.CookieList);
     }
 
+    [TestMethod]
+    public async Task PerformAsync_CookieFileWithA4999CharacterLine_AnswersTooLargeAndSendsNothing()
+    {
+        MemoryFileSystem files = new() { Files = { ["long.txt"] = Encoding.Latin1.GetBytes(LongCookieLine(4999) + "\n") } };
+        (ScriptedConnector connector, IEasyTransfer easy) = CookieListEasy(NoCookies, new EasyHttpOptions { CookieFiles = ["long.txt"] }, files, Stream.Null);
+        await using IEasyTransfer disposed = easy;
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.TooLarge, code);
+        Assert.IsEmpty(connector.Written);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_CookieListReloadOfAFileWithA4999CharacterLine_AnswersTooLargeAndSendsNothing()
+    {
+        MemoryFileSystem files = new() { Files = { ["long.txt"] = Encoding.Latin1.GetBytes(LongCookieLine(4999) + "\n") } };
+        EasyHttpOptions http = new() { CookieFiles = ["long.txt"], CookieList = ["RELOAD"] };
+        (ScriptedConnector connector, IEasyTransfer easy) = CookieListEasy(NoCookies, http, files, Stream.Null);
+        await using IEasyTransfer disposed = easy;
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.TooLarge, code);
+        Assert.IsEmpty(connector.Written);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_CookieFileWithA4998CharacterLine_LoadsItAndSendsTheCookie()
+    {
+        string line = LongCookieLine(4998);
+        MemoryFileSystem files = new() { Files = { ["long.txt"] = Encoding.Latin1.GetBytes(line + "\n") } };
+        (ScriptedConnector connector, IEasyTransfer easy) = CookieListEasy(NoCookies, new EasyHttpOptions { CookieFiles = ["long.txt"] }, files, Stream.Null);
+        await using IEasyTransfer disposed = easy;
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        StringAssert.Contains(Encoding.Latin1.GetString(connector.Written), $"Cookie: long={line[(line.LastIndexOf('\t') + 1)..]}\r\n");
+    }
+
+    /// <summary>A Netscape cookie line for example.com, <paramref name="length" /> characters long before its line feed.</summary>
+    private static string LongCookieLine(int length)
+    {
+        const string Start = "example.com\tFALSE\t/\tFALSE\t0\tlong\t";
+        return Start + new string('v', length - Start.Length);
+    }
+
     private static (ScriptedConnector Connector, IEasyTransfer Easy) CookieListEasy(string response, EasyHttpOptions http) =>
         CookieListEasy(response, http, new MemoryFileSystem(), Stream.Null);
 

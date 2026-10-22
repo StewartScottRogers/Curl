@@ -11,39 +11,53 @@ namespace Libcurl.Misc.Version;
 /// </summary>
 public static class CurlVersion
 {
-    // lib/version.c's features table: each feature name and the CURL_VERSION_* bit it sets.
+    // curl 8.22.0's lib/version.c features table: each feature name and the CURL_VERSION_* bits it sets.
+    // "Debug" sets CURLDEBUG too (the same bit as DEBUG since 8.19.0), and CharConv and TrackMemory are gone.
     private static readonly FrozenDictionary<string, CurlVersionFeatures> FeatureBits = new Dictionary<string, CurlVersionFeatures>(StringComparer.Ordinal)
     {
         ["alt-svc"] = CurlVersionFeatures.AltSvc,
+        ["AppleSecTrust"] = CurlVersionFeatures.None,
         ["AsynchDNS"] = CurlVersionFeatures.AsynchDns,
+        ["asyn-rr"] = CurlVersionFeatures.None,
         ["brotli"] = CurlVersionFeatures.Brotli,
-        ["CharConv"] = CurlVersionFeatures.Conv,
-        ["Debug"] = CurlVersionFeatures.Debug,
+        ["Debug"] = CurlVersionFeatures.Debug | CurlVersionFeatures.CurlDebug,
+        ["ECH"] = CurlVersionFeatures.None,
         ["gsasl"] = CurlVersionFeatures.Gsasl,
         ["GSS-API"] = CurlVersionFeatures.GssApi,
         ["HSTS"] = CurlVersionFeatures.Hsts,
         ["HTTP2"] = CurlVersionFeatures.Http2,
         ["HTTP3"] = CurlVersionFeatures.Http3,
         ["HTTPS-proxy"] = CurlVersionFeatures.HttpsProxy,
+        ["HTTPSIG"] = CurlVersionFeatures.None,
+        ["HTTPSRR"] = CurlVersionFeatures.None,
         ["IDN"] = CurlVersionFeatures.Idn,
         ["IPv6"] = CurlVersionFeatures.IPv6,
         ["Kerberos"] = CurlVersionFeatures.Kerberos5,
         ["Largefile"] = CurlVersionFeatures.LargeFile,
         ["libz"] = CurlVersionFeatures.Libz,
         ["MultiSSL"] = CurlVersionFeatures.MultiSsl,
+        ["NativeCA"] = CurlVersionFeatures.None,
         ["NTLM"] = CurlVersionFeatures.Ntlm,
         ["NTLM_WB"] = CurlVersionFeatures.NtlmWinbind,
+        ["proxy-HTTP3"] = CurlVersionFeatures.None,
         ["PSL"] = CurlVersionFeatures.Psl,
         ["SPNEGO"] = CurlVersionFeatures.Spnego,
         ["SSL"] = CurlVersionFeatures.Ssl,
+        ["SSLS-EXPORT"] = CurlVersionFeatures.None,
         ["SSPI"] = CurlVersionFeatures.Sspi,
         ["threadsafe"] = CurlVersionFeatures.ThreadSafe,
         ["TLS-SRP"] = CurlVersionFeatures.TlsAuthSrp,
-        ["TrackMemory"] = CurlVersionFeatures.CurlDebug,
         ["Unicode"] = CurlVersionFeatures.Unicode,
         ["UnixSockets"] = CurlVersionFeatures.UnixSockets,
         ["zstd"] = CurlVersionFeatures.Zstd,
     }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Every feature name curl 8.22.0's <c>lib/version.c</c> features table lists, with a bit or without one
+    /// (<c>ECH</c>, <c>HTTPSRR</c>, <c>SSLS-EXPORT</c> and the like), in no particular order. Upstream's
+    /// <c>test1177.pl</c> checks these against <c>curl_version_info.3</c>.
+    /// </summary>
+    public static IReadOnlyCollection<string> FeatureNames => FeatureBits.Keys;
 
     /// <summary>
     /// <c>curl_version</c>: <c>libcurl/</c> and the engine's version, then a space and its TLS

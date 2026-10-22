@@ -1052,6 +1052,21 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Gives the first request of a redirect hop the plan it goes out with on a pooled connection
+    /// that the transfer's earlier hop's NTLM handshake authenticated
+    /// (<see cref="HttpRequestOptions.AuthSchemePicked" /> NTLM): without the Type 1 message and
+    /// with the body a probe held back (<see cref="HttpRequestPlan.WithoutNtlmType1Probe" />), as
+    /// curl 8.22.0's <c>Curl_output_ntlm</c> sends nothing once the connection's NTLM state is past
+    /// Type 3 (upstream test1100, BL-3003); <paramref name="plan" /> itself otherwise. A new
+    /// connection, and the next transfer of an easy handle, start the handshake again with Type 1
+    /// (upstream test2025, test2028 and test2031).
+    /// </summary>
+    private static HttpRequestPlan OnNtlmAuthenticatedConnection(HttpRequestPlan plan, ConnectResult connect, TransferReport? earlier) =>
+        earlier is null && connect.IsReused && plan.Options.RedirectsFollowed > 0 && plan.Options.AuthSchemePicked == HttpAuthSchemes.Ntlm
+            ? plan.WithoutNtlmType1Probe()
+            : plan;
+
+    /// <summary>
     /// Hands an HTTP/2 session to its connection to hold (BL-817), and gives it back when the
     /// connection holds none, so the handler sends its closing GOAWAY itself; gives
     /// <see langword="null" /> for any other session, or none.
@@ -1101,7 +1116,8 @@ public sealed class HttpProtocolHandler(
         TransferReport? earlier,
         IHttpStreamSession? streams)
     {
-        HttpRequestPlan first = streams is null ? plan : plan.ForHttp2OrHttp3();
+        HttpRequestPlan unprobed = OnNtlmAuthenticatedConnection(plan, connect, earlier);
+        HttpRequestPlan first = streams is null ? unprobed : unprobed.ForHttp2OrHttp3();
         HttpAttemptOutcome outcome = await ExchangeAsync(first, connect, connection, earlier, newConnection: !connect.IsReused, streams).ConfigureAwait(false);
         Http2Session? upgradedSession = outcome.UpgradedSession;
         streams ??= upgradedSession;
@@ -1307,6 +1323,7 @@ public sealed class HttpProtocolHandler(
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
+            ReportNtlmConnectionClosure(plan, actedOn);
             HttpFailMode fail = FailModeOf(plan, retry, actedOn);
             ThrowIfFailing(fail, HttpFailMode.Fail, actedOn);
             bool discardsBody = DiscardsBody(options, retry, actedOn, exchange.RedirectUrl);
@@ -1420,6 +1437,8 @@ public sealed class HttpProtocolHandler(
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
             EarlyResponseRead = responseConnection as HttpEarlyResponseConnection,
             KeepsSendingOnError = plan.Options.KeepSendingOnError,
+            SendBytesPerSecond = plan.Options.SendBytesPerSecond,
+            TimeProvider = plan.Context.TimeProvider,
             TracesReaders = TracesReadersOf(requestStream),
         };
     }
@@ -2709,6 +2728,11 @@ public sealed class HttpProtocolHandler(
     /// <exception cref="HttpTransferException">The authenticator fails the transfer (<see cref="HttpAuthenticationFailedException" />) while Negotiate is picked.</exception>
     private async ValueTask<HttpRequestPlan?> RetryWithAuthorizationAsync(HttpRequestPlan plan, HttpResponseHead head, CancellationToken cancellationToken)
     {
+        if (ClosesWhileNegotiatingNtlm(plan, head))
+        {
+            return null;
+        }
+
         HttpInfoLineRecorder retryLines = new();
         bool picksNegotiate = HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge);
         HttpAuthRequest request = picksNegotiate ? plan.AuthRequest : plan.AuthRequest with { Events = retryLines };
@@ -2730,6 +2754,52 @@ public sealed class HttpProtocolHandler(
 
         return plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan)).HoldingDigestNonceAfter(head);
     }
+
+    /// <summary>
+    /// Decides whether a 401 to a request sent with an NTLM Type 1 message carries the Type 2
+    /// challenge on a connection it does not keep alive, as an HTTP/1.0 server or
+    /// <c>Connection: close</c> ends it: curl 8.22.0's <c>lib/http.c</c> then writes
+    /// <see cref="NtlmConnectionClosureLine" /> before the head's empty line and sets
+    /// <c>authproblem</c>, so the 401 ends the transfer without the Type 3 message, which would
+    /// have to go on a new connection the handshake never reached (measured, upstream test159, BL-3006).
+    /// </summary>
+    private static bool ClosesWhileNegotiatingNtlm(HttpRequestPlan plan, HttpResponseHead head)
+    {
+        HttpRequestOptions options = plan.Options;
+        return head.StatusLine.StatusCode == 401
+            && IsNtlmType1(plan.Authorization)
+            && ValuesOf(head, "WWW-Authenticate").Any(IsNtlmType2Challenge)
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
+    }
+
+    /// <summary>
+    /// Reports <see cref="NtlmConnectionClosureLine" /> for a 401 <see cref="ClosesWhileNegotiatingNtlm" />
+    /// accepts, after the head's last header and before its empty line, as curl 8.22.0 writes it
+    /// (measured, BL-3006).
+    /// </summary>
+    private static void ReportNtlmConnectionClosure(HttpRequestPlan plan, HttpResponseHead head)
+    {
+        if (ClosesWhileNegotiatingNtlm(plan, head))
+        {
+            plan.Context.Events.ReportInfo(NtlmConnectionClosureLine);
+        }
+    }
+
+    /// <summary>
+    /// Decides whether a <c>WWW-Authenticate</c> value is an NTLM challenge that carries a
+    /// message, <c>NTLM</c> and a token, rather than the bare <c>NTLM</c> that offers the scheme.
+    /// </summary>
+    private static bool IsNtlmType2Challenge(string challenge)
+    {
+        string trimmed = challenge.Trim();
+        return trimmed.Length > 5 && trimmed.StartsWith("NTLM ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The line curl 8.22.0 writes before a 401's empty line when the connection closes with an
+    /// NTLM Type 2 challenge (<see cref="ClosesWhileNegotiatingNtlm" />, measured, BL-3006).
+    /// </summary>
+    private const string NtlmConnectionClosureLine = "Connection closure while negotiating auth (HTTP 1.0?)";
 
     /// <summary>
     /// Decides whether <paramref name="challenges" /> offer Digest, whose nonce curl 8.22.0 stores
@@ -3421,6 +3491,17 @@ public sealed class HttpProtocolHandler(
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan WithProbedBody() =>
             With(ProbedFraming!, WithoutNtlmType1(Authorization), SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, WithoutNtlmType1(ProxyAuthorization), ProxyAuthorizationAnswersChallenge, endsProbe: true);
+
+        /// <summary>
+        /// Makes the same request without the NTLM Type 1 <c>Authorization</c> value it carries,
+        /// with the body a probe held back for it, for a connection NTLM already authenticated
+        /// (BL-3003); this plan itself when its value is no Type 1.
+        /// </summary>
+        /// <returns>The request's plan on the authenticated connection.</returns>
+        public HttpRequestPlan WithoutNtlmType1Probe() =>
+            IsNtlmType1(Authorization)
+                ? With(ProbedFraming ?? Framing, authorization: null, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, ProxyAuthorization, ProxyAuthorizationAnswersChallenge, endsProbe: true)
+                : this;
 
         private static string? WithoutNtlmType1(string? value) => IsNtlmType1(value) ? null : value;
 

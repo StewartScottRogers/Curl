@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitLibrary" />
+    <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
     <InternalsVisibleTo Include="Curl.Conformance.SshServer.UnitTests" />
     <InternalsVisibleTo Include="Curl.Protocol.Ssh.IntegrationTests" />
     <InternalsVisibleTo Include="Curl.Protocol.Ssh.UnitTests" />

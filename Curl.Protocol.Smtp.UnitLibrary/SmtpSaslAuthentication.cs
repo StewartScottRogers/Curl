@@ -144,6 +144,11 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
 
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
+    // An answer to a challenge: as Encode, except that an exchange whose empty answer is curl's
+    // "no message" (DIGEST-MD5's answer to rspauth) sends an empty line, as curl does.
+    private static string EncodeAnswer(ISaslExchange exchange, byte[] answer) =>
+        answer.Length == 0 && exchange.SendsLastAnswerAsEmptyLine ? string.Empty : Encode(answer);
+
     /// <summary>
     /// Encodes an initial response sent on its own line after a <c>334</c>: empty when the
     /// response is, as curl 8.22.0 sends it (upstream test943), otherwise base64.
@@ -396,7 +401,7 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             return await CancelOrRefuseAsync(exchange).ConfigureAwait(false);
         }
 
-        await channel.SendAsync(Encode(response), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+        await channel.SendAsync(EncodeAnswer(exchange, response), SmtpDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         return null;
     }
 

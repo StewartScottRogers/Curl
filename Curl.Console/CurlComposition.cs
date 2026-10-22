@@ -249,6 +249,44 @@ internal static class CurlComposition
     /// <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540). Tests and the conformance
     /// harness turn it on to reach the hand-built HTTP/3 (BL-2260, BL-2332).
     /// </param>
+    /// <param name="extendedAttributeWriter">
+    /// Sets the <c>--xattr</c> attributes; <see langword="null" /> for a run that sets none. The conformance harness
+    /// passes one that prints them as curl's debug build does under <c>CURL_FAKE_XATTR</c> (BL-2833).
+    /// </param>
+    /// <param name="honoursDebugWriteOutVariables">
+    /// Whether <c>CURL_TIME</c>, <c>CURL_DEBUG_SIZE</c> and <c>CURL_VERSION</c> change what <c>-w</c> prints
+    /// (<see cref="DebugWriteOutStandIn" />), as in curl's debug build; off by default, as in curl's release
+    /// build, and turned on by the conformance harness (ADR-0732, BL-2909).
+    /// </param>
+    /// <param name="webSocketRandomSource">
+    /// Where the WebSocket handler draws each <c>Sec-WebSocket-Key</c> and frame mask from; <see langword="null" />, the
+    /// default, for <see cref="SystemWebSocketRandomSource" />. The conformance harness passes the debug build's forced
+    /// <c>CURL_ENTROPY</c> sequence (ADR-0735, BL-2910).
+    /// </param>
+    /// <param name="fileSystem">
+    /// Opens the <c>-T</c> files and the other files the runner reads and writes; <see langword="null" />, the default,
+    /// for <see cref="PhysicalFileSystem" />. The conformance harness passes one that cuts an upload to the debug build's
+    /// <c>CURL_UPLOAD_SIZE</c> (ADR-0735, BL-2910).
+    /// </param>
+    /// <param name="securityContexts">
+    /// Makes the NTLM, Negotiate and Kerberos contexts every option group's handlers and CONNECT proxy run on;
+    /// <see langword="null" />, the default, for <see cref="CreateDialingSecurityContextFactory" />. The conformance
+    /// harness passes its stand-in for the debug build's stub GSS-API under <c>CURL_STUB_GSS_CREDS</c> (BL-2836).
+    /// </param>
+    /// <param name="featureMask">
+    /// The features the run behaves as built without; <see cref="EngineFeatureMask.None" />, the default, hides none. Under
+    /// <see cref="EngineFeatureMask.Proxy" /> an option group with <c>-x</c> writes <see cref="ProxySupportDisabledLine" />
+    /// before each transfer and the transfer ends with exit 4, as a curl built without proxy support does (ADR-0746, BL-2984).
+    /// </param>
+    /// <param name="standardOutputIsTerminal">
+    /// Whether the run treats standard output as a terminal; <see langword="false" />, the default. The conformance
+    /// harness passes <see langword="true" /> for a case setting the debug build's <c>CURL_ISATTY</c> (BL-2908).
+    /// </param>
+    /// <param name="digestRandomBytes">
+    /// Where Digest and DIGEST-MD5 draw their client nonce's bytes from; <see langword="null" />, the default, for
+    /// <see cref="System.Security.Cryptography.RandomNumberGenerator" />. The conformance harness passes the debug build's
+    /// forced <c>CURL_ENTROPY</c> sequence (ADR-0751, BL-2834).
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -269,15 +307,23 @@ internal static class CurlComposition
         bool honoursHstsHttpVariable = false,
         bool honoursAltSvcHttpVariable = false,
         bool? parsesAsWindowsBuild = null,
-        bool parsesAsQuicBuild = false)
+        bool parsesAsQuicBuild = false,
+        IExtendedAttributeWriter? extendedAttributeWriter = null,
+        bool honoursDebugWriteOutVariables = false,
+        IWebSocketRandomSource? webSocketRandomSource = null,
+        IFileSystem? fileSystem = null,
+        ISecurityContextFactory? securityContexts = null,
+        EngineFeatureMask featureMask = EngineFeatureMask.None,
+        bool standardOutputIsTerminal = false,
+        Func<int, byte[]>? digestRandomBytes = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock)),
-            new PhysicalFileSystem(),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes)),
+            RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
             standardError,
@@ -285,6 +331,7 @@ internal static class CurlComposition
             OperatingSystem.IsWindows(),
             terminalColumns: TerminalColumns.Resolve(environment(TerminalColumns.ColumnsVariableName), () => null),
             writesProgressMeter: writesProgressMeter,
+            standardOutputIsTerminal: standardOutputIsTerminal,
             writeOutFileOpener: writeOutFileOpener,
             writeOutTimeDialect: WriteOutTimeDialectFor(OperatingSystem.IsWindows()),
             outputPaths: new PhysicalOutputPaths(),
@@ -292,16 +339,47 @@ internal static class CurlComposition
             readEnvironmentVariable: readEnvironmentVariable,
             runConnectionCache: runConnections,
             lateBoundDiagnosticLog: runLog,
-            hstsClock: honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null,
+            hstsClock: HonouredHstsClockOf(honoursHstsTimeVariable, environment),
             hstsLearnsOverHttp: LearnsHstsOverHttp(honoursHstsHttpVariable, environment),
             altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            extendedAttributeWriter: extendedAttributeWriter,
+            debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment));
+    }
+
+    /// <summary>The HSTS clock a <c>CURL_TIME</c> fixes (<see cref="HstsClockOf" />) when the seam is on; <see langword="null" />, for the real clock, when it is off.</summary>
+    /// <param name="honoursHstsTimeVariable">Whether the seam is on.</param>
+    /// <param name="environment">Reads the run's environment.</param>
+    /// <returns>The fixed clock, or <see langword="null" />.</returns>
+    private static FixedWallClock? HonouredHstsClockOf(bool honoursHstsTimeVariable, Func<string, string?> environment) =>
+        honoursHstsTimeVariable ? HstsClockOf(environment(HstsTimeVariableName)) : null;
+
+    /// <summary>The file system the dialing runner opens its files through: <paramref name="fileSystem" />, or <see cref="PhysicalFileSystem" /> when none was given.</summary>
+    /// <param name="fileSystem">The file system the caller gave, or <see langword="null" />.</param>
+    /// <returns>The run's file system.</returns>
+    private static IFileSystem RunFileSystemOf(IFileSystem? fileSystem) => fileSystem ?? new PhysicalFileSystem();
+
+    /// <summary>
+    /// The resolver of one option group of the dialing runner: with <c>--doh-url</c>, a DoH resolver whose POSTs dial
+    /// through <paramref name="tcpDialer" /> and whose DoH server name resolves through <paramref name="dnsResolver" />,
+    /// so the conformance harness's in-memory servers answer them (BL-2928); otherwise <paramref name="dnsResolver" />.
+    /// </summary>
+    /// <param name="options">The option group, whose DoH URL, DoH TLS options, IP version and trace components pick the resolver.</param>
+    /// <param name="tcpDialer">Opens the DoH server connections.</param>
+    /// <param name="dnsResolver">The resolver the runner was given.</param>
+    /// <returns>The resolver.</returns>
+    internal static IDnsResolver DialingDohResolverOf(CommandLineOptions options, ITcpDialer tcpDialer, IDnsResolver dnsResolver)
+    {
+        EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
+        return network.DohUrl is { } dohUrl
+            ? CreateDohResolver(dohUrl, CreateDohConnector(EasyOptionsFromCommandLine.TraceComponentsOf(options), EasyOptionsFromCommandLine.TlsOf(options), tcpDialer, TimeProvider.System, dnsResolver), AddressFamilyOf(network), easyErrorText: EasyErrorText)
+            : dnsResolver;
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -318,6 +396,10 @@ internal static class CurlComposition
     /// <param name="readEnvironmentVariable">Reads the proxy environment variables and <c>SSLKEYLOGFILE</c>, which the target's and the HTTPS proxy's TLS options carry (BL-2716).</param>
     /// <param name="ftpListener">Listens for FTP's active-mode data connections, or <see langword="null" /> for a <see cref="TcpConnectionListener" />.</param>
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> and the <c>--httpsig-*</c> options sign with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
+    /// <param name="webSocketRandomSource">Where the WebSocket handler draws its keys and masks from; <see cref="SystemWebSocketRandomSource" /> when <see langword="null" />.</param>
+    /// <param name="givenSecurityContexts">Makes the group's NTLM, Negotiate and Kerberos contexts; <see cref="CreateDialingSecurityContextFactory" /> when <see langword="null" />.</param>
+    /// <param name="featureMask">The features the run behaves as built without, which the dispatch carries.</param>
+    /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from; <see cref="System.Security.Cryptography.RandomNumberGenerator" /> when <see langword="null" />.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -330,7 +412,11 @@ internal static class CurlComposition
         bool usesHandBuiltNtlm,
         Func<string, string?> readEnvironmentVariable,
         IConnectionListener? ftpListener,
-        TimeProvider? signingClock)
+        TimeProvider? signingClock,
+        IWebSocketRandomSource? webSocketRandomSource,
+        ISecurityContextFactory? givenSecurityContexts,
+        EngineFeatureMask featureMask,
+        Func<int, byte[]>? digestRandomBytes)
     {
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         EasyTlsOptions tls = EasyOptionsFromCommandLine.TlsOf(options);
@@ -345,18 +431,39 @@ internal static class CurlComposition
         EngineTraceComponents traces = EasyOptionsFromCommandLine.TraceComponentsOf(options);
         EngineToolOptions tool = EasyOptionsFromCommandLine.ToolOptionsOf(options);
         QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, datagramConnector);
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts);
-        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections);
-        ISecurityContextFactory securityContexts = CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts, featureMask: featureMask);
+        PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections, featureMask);
+        ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
-            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener)),
-            [],
+            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener, webSocketRandomSource: webSocketRandomSource, digestRandomBytes: digestRandomBytes)),
+            ProxyDisabledLinesOf(featureMask, proxy),
             cookies,
             new ProxySelector(readEnvironmentVariable),
             poolingConnector,
-            tcpConnector.LoadResolveEntries);
+            tcpConnector.LoadResolveEntries)
+        {
+            FeatureMask = featureMask,
+        };
     }
+
+    /// <summary>
+    /// What curl 8.22.0's <c>src/tool_operate.c</c> writes when setting <c>CURLOPT_PROXY</c> fails in a
+    /// build without proxy support, before it returns <c>CURLE_NOT_BUILT_IN</c> as a synthetic error
+    /// (upstream test375).
+    /// </summary>
+    internal const string ProxySupportDisabledLine = "curl: proxy support is disabled in this libcurl";
+
+    /// <summary>
+    /// The lines an option group writes before each transfer for the features <paramref name="featureMask" />
+    /// hides: <see cref="ProxySupportDisabledLine" /> when it hides <see cref="EngineFeatureMask.Proxy" /> and
+    /// the group sets a proxy, else none.
+    /// </summary>
+    /// <param name="featureMask">The features the run behaves as built without.</param>
+    /// <param name="proxy">The group's proxy options.</param>
+    /// <returns>The lines.</returns>
+    private static string[] ProxyDisabledLinesOf(EngineFeatureMask featureMask, EasyProxyOptions proxy) =>
+        featureMask.HasFlag(EngineFeatureMask.Proxy) && proxy.Proxy is not null ? [ProxySupportDisabledLine] : [];
 
     /// <summary>
     /// The connector an option group of a runner over fake connectors connects through:

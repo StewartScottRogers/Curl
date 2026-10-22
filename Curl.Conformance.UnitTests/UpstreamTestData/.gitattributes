@@ -2,3 +2,6 @@ test*.curltest -text
 COPYING -text
 certs/* -text
 data/* -text
+docs/** -text
+src/* -text
+include/** -text

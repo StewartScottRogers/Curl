@@ -35,7 +35,10 @@ namespace Curl.Console;
 /// message, which is what curl 8.21.0 prints under <c>-sS</c> (measured 2026-09-26).
 /// A result with <see cref="TransferResult.TimeConditionUnmet" /> set is the exception: it
 /// creates no file and leaves an existing one untouched, as curl 8.21.0 does for an unmet
-/// <c>-z</c>/<c>--time-cond</c>.
+/// <c>-z</c>/<c>--time-cond</c>. So is any HTTP <c>304</c>, with or without a condition
+/// (<c>--etag-compare</c>, a hand-written <c>If-None-Match</c>): curl 8.22.0 leaves the file
+/// absent or untouched, while a bodiless <c>204</c> still creates it empty (measured
+/// 2026-10-19, upstream test 1566, BL-2868).
 /// </para>
 /// <para>
 /// Either failed open also sets <see cref="OpenFailureWarning" />, the warning curl prints
@@ -59,6 +62,11 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         UnixFileMode.UserRead | UnixFileMode.UserWrite
         | UnixFileMode.GroupRead | UnixFileMode.GroupWrite
         | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+
+    /// <summary>
+    /// HTTP <c>304 Not Modified</c>, after which no empty file is created.
+    /// </summary>
+    private const int NotModified = 304;
 
     /// <summary>
     /// The highest number <c>--no-clobber</c> puts after a taken name: curl 8.21.0 tries
@@ -234,13 +242,20 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             return WriteFailure(length);
         }
 
-        bool createsEmptyFile = file is null && result.IsSuccess && !result.TimeConditionUnmet;
+        bool createsEmptyFile = file is null && CreatesEmptyFileAfter(result);
         CreatedEmptyAfterTransfer = createsEmptyFile;
 
         return createsEmptyFile && await TryOpenAsync(CancellationToken.None).ConfigureAwait(false) is null
             ? new TransferResult(CurlExitCode.WriteError, 0)
             : result;
     }
+
+    /// <summary>
+    /// Whether a transfer that wrote nothing creates the file empty: only a success that no
+    /// unmet time condition skipped and that was not answered <c>304</c>.
+    /// </summary>
+    private static bool CreatesEmptyFileAfter(TransferResult result) =>
+        result.IsSuccess && !result.TimeConditionUnmet && result.Report?.ResponseCode != NotModified;
 
     /// <summary>
     /// Settles an attempt <c>--retry</c> is about to run again, as curl 8.21.0 reports each attempt

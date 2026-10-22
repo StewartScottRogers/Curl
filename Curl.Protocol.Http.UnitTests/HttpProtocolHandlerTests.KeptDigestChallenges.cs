@@ -153,6 +153,46 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(expected, result.Report!.DigestStaysAvailable);
     }
 
+    /// <summary>
+    /// Libcurl 8.22.0's <c>Curl_input_ntlm</c> matches the scheme case-insensitively and skips blanks, so a lowercase or
+    /// blank-padded bare <c>ntlm</c> challenge to an NTLM answer is a refused handshake too (BL-2825).
+    /// </summary>
+    [TestMethod]
+    [DataRow("WWW-Authenticate: ntlm\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"5\"\r\n", DisplayName = "lowercase")]
+    [DataRow("WWW-Authenticate:   NTLM   \r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"5\"\r\n", DisplayName = "blank-padded")]
+    [DataRow("WWW-Authenticate:\t nTlM \t\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"5\"\r\n", DisplayName = "mixed case and blank-padded")]
+    public async Task ExecuteAsync_401ToAnNtlmAnswerWithUnusualBareNtlm_DigestStaysAvailable(string challenges)
+    {
+        const string ntlmChallenge = "HTTP/1.1 401 NTLM\r\nWWW-Authenticate: NTLM\r\nContent-Length: 0\r\n\r\n";
+        TurnTakingConnection connection = new(65536, ntlmChallenge, "HTTP/1.1 401 Wrong\r\n" + challenges + "Content-Length: 0\r\n\r\n");
+        Diagnostics.Arrange("second 401's challenges", challenges);
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator("NTLM TlRMTVNTUAABAAAA")).ExecuteAsync(KeptChallengesContext([], HttpAuthSchemes.Ntlm, credentials: true));
+
+        WriteResult(result);
+        StringAssert.Contains(connection.Written, "Authorization: NTLM TlRMTVNTUAABAAAA\r\n");
+        Assert.IsTrue(result.Report!.DigestStaysAvailable);
+    }
+
+    /// <summary>
+    /// A bare <c>NTLM</c> challenge refuses nothing when the request carried no NTLM answer, so a Digest challenge beside
+    /// it leaves Digest unmarked, with or without a kept Digest nonce that is not stale (BL-2825).
+    /// </summary>
+    [TestMethod]
+    [DataRow(false, DisplayName = "no kept Digest nonce")]
+    [DataRow(true, DisplayName = "kept Digest nonce held")]
+    public async Task ExecuteAsync_401WithBareNtlmToARequestWithoutAnNtlmAnswer_DigestDoesNotStayAvailable(bool kept)
+    {
+        TurnTakingConnection connection = new(65536, "HTTP/1.1 401 Wrong\r\nWWW-Authenticate: NTLM\r\nWWW-Authenticate: Digest realm=\"r\", nonce=\"5\", stale=true\r\nContent-Length: 0\r\n\r\n");
+        Diagnostics.Arrange("kept", kept.ToString());
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new RepeatingAuthenticator(null)).ExecuteAsync(KeptChallengesContext(kept ? [KeptChallenge] : [], HttpAuthSchemes.Digest, credentials: true));
+
+        WriteResult(result);
+        StringAssert.DoesNotMatch(connection.Written, new System.Text.RegularExpressions.Regex("Authorization: NTLM"));
+        Assert.IsFalse(result.Report!.DigestStaysAvailable);
+    }
+
     private static TransferContext KeptChallengesContext(string[] kept, HttpAuthSchemes allowed, bool credentials, bool digestStaysAvailable = false) => new()
     {
         Url = CurlUrl.Parse(AuthUrl),

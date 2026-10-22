@@ -76,7 +76,18 @@ internal static class HttpUrlText
     /// (BL-330 Notes).
     /// </summary>
     internal static string HostHeaderAuthority(CurlUrl url) =>
-        url.Scheme is "http" or "https" ? HostAndPort(url) : string.Create(CultureInfo.InvariantCulture, $"{url.Host}:{url.Port}");
+        url.Scheme is "http" or "https" ? WireHostAndPort(url) : string.Create(CultureInfo.InvariantCulture, $"{WireHost(url)}:{url.Port}");
+
+    /// <summary>
+    /// Gives <see cref="HostAndPort" /> with a host name that is not ASCII in its punycode form,
+    /// <see cref="CurlUrl.IdnHost" />: the authority the <c>Host</c> line and a forward proxy's
+    /// absolute-form target carry, as curl sends <c>Host: xn--4cab6c.se</c> for <c>åäö.se</c>
+    /// (upstream tests 165 and 1448, BL-2861).
+    /// </summary>
+    internal static string WireHostAndPort(CurlUrl url) =>
+        url.IsDefaultPort ? WireHost(url) : string.Create(CultureInfo.InvariantCulture, $"{WireHost(url)}:{url.Port}");
+
+    private static string WireHost(CurlUrl url) => Ascii.IsValid(url.Host) ? url.Host : url.IdnHost;
 
     /// <summary>
     /// Gives the scheme, <c>://</c>, the user information with its <c>@</c> when the URL has

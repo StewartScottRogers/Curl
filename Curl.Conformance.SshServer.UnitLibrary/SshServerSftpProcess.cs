@@ -14,8 +14,9 @@ namespace Curl.Conformance.SshServer;
 /// <c>REALPATH</c> and <c>RENAME</c>, each in the order it arrives; anything else is
 /// <c>SSH_FX_OP_UNSUPPORTED</c>. A missing file or folder is <c>SSH_FX_NO_SUCH_FILE</c>, a refused
 /// one <c>SSH_FX_PERMISSION_DENIED</c> and any other failure <c>SSH_FX_FAILURE</c>, as
-/// <c>sftp-server</c> maps <c>errno</c> for version 3. <c>SETSTAT</c> changes nothing: the
-/// stand-in's files carry no Unix owner or mode on Windows.
+/// <c>sftp-server</c> maps <c>errno</c> for version 3. <c>SETSTAT</c> changes only whether a file
+/// is read-only, from the owner's write bit of the permissions it carries: the stand-in's files
+/// carry no Unix owner or full mode on Windows, and a read-only file is listed <c>-r--r--r--</c>.
 /// </summary>
 internal sealed class SshServerSftpProcess : IDisposable
 {
@@ -48,6 +49,10 @@ internal sealed class SshServerSftpProcess : IDisposable
     private const uint AttributeFlags = 0x0F;
     private const uint DirectoryPermissions = 0x41ED;
     private const uint FilePermissions = 0x81A4;
+    private const uint AttributeSize = 0x01;
+    private const uint AttributeOwner = 0x02;
+    private const uint AttributePermissions = 0x04;
+    private const uint OwnerWrite = 0x80;
 
     // sftp-server reads at most this much for one READ.
     private const int MaximumReadLength = 256 * 1024;
@@ -181,12 +186,17 @@ internal sealed class SshServerSftpProcess : IDisposable
         bool isDirectory = Directory.Exists(path);
         long size = isDirectory ? 0 : new FileInfo(path).Length;
         DateTime modified = File.GetLastWriteTimeUtc(path);
-        string time = Math.Abs((now - modified).TotalDays) < 182
-            ? modified.ToString("MMM d HH:mm", CultureInfo.InvariantCulture)
-            : modified.ToString("MMM d  yyyy", CultureInfo.InvariantCulture);
+        // OpenSSH's ls_file writes the date with strftime's "%b %e %H:%M", or "%b %e  %Y" for an old entry.
+        string clock = Math.Abs((now - modified).TotalDays) < 182
+            ? modified.ToString("HH:mm", CultureInfo.InvariantCulture)
+            : modified.ToString(" yyyy", CultureInfo.InvariantCulture);
+        string month = modified.ToString("MMM", CultureInfo.InvariantCulture);
         string padded = owner.PadRight(8);
-        return string.Create(CultureInfo.InvariantCulture, $"{(isDirectory ? "drwxr-xr-x" : "-rw-r--r--")}   1 {padded} {padded} {size,8} {time,12} {name}");
+        return string.Create(CultureInfo.InvariantCulture, $"{Mode(path, isDirectory)}   1 {padded} {padded} {size,8} {month} {modified.Day,2} {clock} {name}");
     }
+
+    private static string Mode(string path, bool isDirectory) =>
+        isDirectory ? "drwxr-xr-x" : File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly) ? "-r--r--r--" : "-rw-r--r--";
 
     private static async ValueTask<byte[]?> ReadPacketAsync(SshServerChannelInput input, CancellationToken cancellationToken)
     {
@@ -320,14 +330,39 @@ internal sealed class SshServerSftpProcess : IDisposable
 
     private byte[] StatHandle(SshWireReader request) => AttributesBody(OpenedFile(request).Name);
 
-    private byte[] SetStatPath(SshWireReader request) => SetStat(LocalPath(request.ReadString()));
+    private byte[] SetStatPath(SshWireReader request) => SetStat(LocalPath(request.ReadString()), request);
 
-    private byte[] SetStatHandle(SshWireReader request) => SetStat(OpenedFile(request).Name);
+    private byte[] SetStatHandle(SshWireReader request) => SetStat(OpenedFile(request).Name, request);
 
-    private static byte[] SetStat(string path)
+    private static byte[] SetStat(string path, SshWireReader request)
     {
         WriteAttributes(new SshWireWriter(), path);
+        if (RequestedPermissions(request) is { } permissions && File.Exists(path))
+        {
+            FileAttributes attributes = File.GetAttributes(path);
+            File.SetAttributes(path, (permissions & OwnerWrite) == 0 ? attributes | FileAttributes.ReadOnly : attributes & ~FileAttributes.ReadOnly);
+        }
+
         return StatusBody(Ok);
+    }
+
+    // The permissions a SETSTAT's attributes carry, past its size and owner when present.
+    private static uint? RequestedPermissions(SshWireReader request)
+    {
+        uint flags = request.ReadUInt32();
+        if ((flags & AttributeSize) != 0)
+        {
+            request.ReadUInt32();
+            request.ReadUInt32();
+        }
+
+        if ((flags & AttributeOwner) != 0)
+        {
+            request.ReadUInt32();
+            request.ReadUInt32();
+        }
+
+        return (flags & AttributePermissions) != 0 ? request.ReadUInt32() : null;
     }
 
     private byte[] OpenDirectory(SshWireReader request)

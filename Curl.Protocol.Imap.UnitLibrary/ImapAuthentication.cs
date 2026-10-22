@@ -244,6 +244,11 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
 
     private static string Encode(byte[] message) => message.Length == 0 ? "=" : Convert.ToBase64String(message);
 
+    // An answer to a challenge: as Encode, except that an exchange whose empty answer is curl's
+    // "no message" (DIGEST-MD5's answer to rspauth) sends an empty line (upstream test823).
+    private static string EncodeAnswer(ISaslExchange exchange, byte[] answer) =>
+        answer.Length == 0 && exchange.SendsLastAnswerAsEmptyLine ? string.Empty : Encode(answer);
+
     /// <summary>
     /// Encodes an initial response sent on its own line after a <c>+</c>: empty when the
     /// response is, as curl 8.22.0 sends <c>AUTH=EXTERNAL</c>'s empty user name (upstream
@@ -412,7 +417,7 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
             return await RefuseOrCancelAsync(exchange).ConfigureAwait(false);
         }
 
-        await channel.SendLineAsync(Encode(answer), ImapDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
+        await channel.SendLineAsync(EncodeAnswer(exchange, answer), ImapDiagnosticLogLines.SaslResponseNotLogged).ConfigureAwait(false);
         return null;
     }
 

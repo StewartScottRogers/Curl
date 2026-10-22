@@ -20,7 +20,8 @@ namespace Curl.Conformance;
 /// <c>&lt;data&gt;</c> says <c>nocheck</c> or both are empty and it does not say <c>sendzero</c>;
 /// <c>&lt;socks&gt;</c> against what the socksd emulation logged, as written; <c>&lt;dns&gt;</c>
 /// against the dnsd emulation's query lines, both sorted, the logged ones kept only where its <c>host</c> pattern matches;
-/// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output;
+/// <c>&lt;stdout&gt;</c> and <c>&lt;stderr&gt;</c> with <c>&lt;stripfile&gt;</c> run on the output,
+/// stdout first losing Curl's own <c>--ai-help</c> help lines (<see cref="UpstreamCurlOnlyHelpLines"/>);
 /// each <c>&lt;file&gt;</c> to <c>&lt;file4&gt;</c> against the named file with the matching
 /// <c>&lt;stripfileN&gt;</c>; <c>&lt;notexists&gt;</c>; and last the exit code against
 /// <c>&lt;errorcode&gt;</c>, any one of its comma-separated codes, 0 when absent.
@@ -61,7 +62,7 @@ internal static class UpstreamCaseVerification
             () => CompareSocks(testCase, run.SocksLog),
             () => CompareDns(testCase, run.DnsLog),
             () => CompareReplyData(testCase, run),
-            () => CompareOutput(testCase, "stdout", "stripfile", run.StandardOutput),
+            () => CompareOutput(testCase, "stdout", "stripfile", UpstreamCurlOnlyHelpLines.Remove(run.StandardOutput)),
             () => CompareStandardError(testCase, run),
             .. FileSuffixes.Select<string, Func<string?>>(suffix => () => CompareFile(testCase, suffix)),
             () => CheckNotExists(testCase),
@@ -175,7 +176,7 @@ internal static class UpstreamCaseVerification
             return null;
         }
 
-        string path = part.GetAttribute("name")!;
+        string path = UpstreamUtf8Words.AsSystemText(part.GetAttribute("name")!);
         byte[] actual = File.Exists(path) ? File.ReadAllBytes(path) : [];
         return UpstreamFirstDifference.Describe(
             $"<verify><file{suffix}> ({path})",

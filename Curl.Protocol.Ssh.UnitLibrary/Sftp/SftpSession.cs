@@ -404,11 +404,28 @@ internal sealed class SftpSession
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The size as a signed number, or <see langword="null" /> when the server gave none, gave 0, answered with a status or sent attributes cut short.</returns>
     /// <exception cref="InvalidDataException">The answer is malformed.</exception>
-    internal async ValueTask<long?> StatSizeAsync(byte[] path, CancellationToken cancellationToken)
+    internal async ValueTask<long?> StatSizeAsync(byte[] path, CancellationToken cancellationToken) =>
+        (await StatSizeAndModifyTimeAsync(path, cancellationToken).ConfigureAwait(false)).Size;
+
+    /// <summary>
+    /// Sends <c>SSH_FXP_STAT</c> for <paramref name="path" /> and reads the size, as
+    /// <see cref="StatSizeAsync" /> does, and the modification time from the answer - the
+    /// time curl's <c>-R</c> stamps the saved file with (BL-2871).
+    /// </summary>
+    /// <param name="path">The path.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>
+    /// The size as <see cref="StatSizeAsync" /> returns it, and the modification time in
+    /// seconds since the epoch, or <see langword="null" /> when the attributes carry no
+    /// <c>SSH_FILEXFER_ATTR_ACMODTIME</c>, the server answered with a status or the
+    /// attributes are cut short before it.
+    /// </returns>
+    /// <exception cref="InvalidDataException">The answer is malformed.</exception>
+    internal async ValueTask<(long? Size, long? ModifyTime)> StatSizeAndModifyTimeAsync(byte[] path, CancellationToken cancellationToken)
     {
         uint id = await SendRequestAsync(SftpPacketType.Stat, fields => fields.WriteString(path), cancellationToken).ConfigureAwait(false);
         (byte type, SshWireReader answer) = await ReadAnswerAsync(id, cancellationToken).ConfigureAwait(false);
-        return type == SftpPacketType.Attributes ? ReadSize(answer) : null;
+        return type == SftpPacketType.Attributes ? ReadSizeAndModifyTime(answer) : (null, null);
     }
 
     /// <summary>
@@ -617,18 +634,35 @@ internal sealed class SftpSession
         }
     }
 
-    private static long? ReadSize(SshWireReader attributes)
+    // Attributes cut short keep what was read before the cut.
+    private static (long? Size, long? ModifyTime) ReadSizeAndModifyTime(SshWireReader attributes)
     {
+        long? size = null;
         try
         {
-            bool hasSize = (attributes.ReadUInt32() & AttributeSize) != 0;
-            long size = hasSize ? (long)(((ulong)attributes.ReadUInt32() << 32) | attributes.ReadUInt32()) : 0;
-            return size != 0 ? size : null;
+            uint flags = attributes.ReadUInt32();
+            long read = (flags & AttributeSize) != 0 ? (long)(((ulong)attributes.ReadUInt32() << 32) | attributes.ReadUInt32()) : 0;
+            size = read != 0 ? read : null;
+            return (size, ReadModifyTime(attributes, flags));
         }
         catch (InvalidDataException)
         {
+            return (size, null);
+        }
+    }
+
+    // libssh2 keeps mtime as an unsigned 32-bit number, so it never reads negative.
+    private static long? ReadModifyTime(SshWireReader attributes, uint flags)
+    {
+        SkipWhenFlagged(attributes, flags, AttributeUserAndGroup, 8);
+        SkipWhenFlagged(attributes, flags, AttributePermissions, 4);
+        if ((flags & AttributeAccessAndModifyTimes) == 0)
+        {
             return null;
         }
+
+        attributes.ReadUInt32();
+        return attributes.ReadUInt32();
     }
 
     // The attributes answering the request numbered id, or empty ones and the status.

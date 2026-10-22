@@ -67,7 +67,7 @@ public sealed class TlsSessionCache
     /// Returns curl's peer key for a TLS connection: <c>host:port</c>, then
     /// <c>:NO-VRFY-PEER</c> and <c>:NO-VRFY-HOST</c> under <c>-k</c>, <c>:VRFY-STATUS</c> under
     /// <c>--cert-status</c>, <c>:CA-</c> and the full path of a <c>--cacert</c> file when the peer
-    /// is verified, and <c>:IMPL-Curl:G</c>.
+    /// is verified, the client certificate's part (<see cref="MutualTlsPart" />), and <c>:IMPL-Curl:G</c>.
     /// </summary>
     /// <param name="host">The host name the connection was made to.</param>
     /// <param name="port">The port it was made to.</param>
@@ -80,8 +80,30 @@ public sealed class TlsSessionCache
         key.Append(options.Insecure ? ":NO-VRFY-PEER:NO-VRFY-HOST" : string.Empty);
         key.Append(options.RequireCertificateStatus ? ":VRFY-STATUS" : string.Empty);
         key.Append(!options.Insecure && options.CaCertificateFile is { } caFile ? $":CA-{Path.GetFullPath(caFile)}" : string.Empty);
+        key.Append(MutualTlsPart(options));
         return key.Append(":IMPL-Curl:G").ToString();
     }
+
+    /// <summary>
+    /// Returns the peer key's client certificate part as curl 8.22.0's <c>cf_ssl_peer_key_add_mtls</c>
+    /// writes it: <c>:CCERT-</c> and the full path of <c>--cert</c>, <c>:KEY-</c> and the full path of
+    /// <c>--key</c>, <c>:CT-</c> and <c>--cert-type</c> upper-cased and <c>:KT-</c> and <c>--key-type</c>
+    /// upper-cased, each only when set and not empty. The pass phrase is never part of it (upstream
+    /// test3304).
+    /// </summary>
+    /// <param name="options">The connection's TLS options.</param>
+    /// <returns>The part, empty without a client certificate setting.</returns>
+    private static string MutualTlsPart(TlsClientOptions options) =>
+        PathPart("CCERT", options.ClientCertificate)
+        + PathPart("KEY", options.PrivateKey)
+        + TypePart("CT", options.CertificateType)
+        + TypePart("KT", options.PrivateKeyType);
+
+    private static string PathPart(string label, string? path) =>
+        string.IsNullOrEmpty(path) ? string.Empty : $":{label}-{Path.GetFullPath(path)}";
+
+    private static string TypePart(string label, string? type) =>
+        string.IsNullOrEmpty(type) ? string.Empty : $":{label}-{type.ToUpperInvariant()}";
 
     /// <summary>
     /// Reads a session file's text into the cache as curl's <c>tool_ssls_load</c> does, and

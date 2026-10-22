@@ -330,3 +330,45 @@ with a default of 9 lanes." `-MaxLanes` now defaults to 9, so a default `-Lanes 
 shift starts at `min(capacity, machineCap, 9)` and paces down from there as before. The
 board's capacity and the probed machine cap still bind first when lower. A fixed count is
 still `-Lanes 9`.
+
+## Amendment 2026-10-21: the first three lanes run unpaced
+
+Stewart: "Lets not check token use for new lanes until after we are running more than 3
+lanes", and, asked where pacing takes over, "3". `-UnpacedLanes` (default 3) sets the floor
+the pace works above: `desired = max(min(pace, ceiling), min(UnpacedLanes, ceiling))`.
+
+- Below three lanes each step adds one lane, burn rate or not, and traces
+  "lanes 1 -> 2 (up to 3 lanes run unpaced)".
+- The pace decides only the lanes above three, and a low pace retires straight down to
+  three, never below.
+- The board's capacity, the machine cap and `-MaxLanes` still cap the count, and a ceiling
+  below three still retires lanes at once. `-StopAtUsage` and `-StopAtWeeklyUsage` still
+  end claims, so the unpaced lanes cannot run the windows dry.
+- `-UnpacedLanes 1` is the behaviour before this amendment.
+
+## Amendment 2026-10-21 (later): straight to the floor, and split tasks for shared files
+
+Decided by Claude under Stewart's delegation, toward his standing goal (2026-10-21) that the
+dark factory always runs as parallel as the board allows.
+
+- **Straight to the unpaced floor.** Below `min(-UnpacedLanes, ceiling)` a step adds every
+  lane up to that floor at once ("lanes 1 -> 3 (up to 3 lanes run unpaced)"), instead of
+  one lane per 15-minute step; this replaces "below three lanes each step adds one lane"
+  above. The unpaced lanes never read the meter, so it needs no samples at those counts.
+  At or above the floor, scaling up stays at one lane per step.
+- **A 2-minute look below the floor.** While lanes are below the floor, the coordinator
+  reads the board's capacity every 2 minutes (`Test-UnpacedRampDue`) and runs the step
+  early when it would add lanes, so capacity freed by a finished task is used within about
+  2 minutes rather than at the next 15-minute step.
+- **Split tasks for hotspots.** When the binding limit is `capacity` two steps running
+  (`Get-CapacityStreak`) and at least one ready lane-eligible task cannot start because of
+  overlapping touches (`Get-OverlapWaitingCount`: the `status` lines marked ready, less the
+  `capacity` line's "<n> more can start"), the coordinator runs `task-board.ps1 hotspots`.
+  For the top hotspot whose file name no live (Backlog, Doing, Blocked) task's title names,
+  and that it has not filed this shift (`Select-SplitHotspot`), it files one High task,
+  "Split <path> so tasks touching it can run in parallel", touching that path, and pushes it
+  from the ci-watch worktree exactly as the CI watch pushes its tasks (BL-987). At most one
+  a step. A board without the `hotspots` command (nonzero exit or an unknown-command error)
+  is traced as "hotspots unavailable" and skipped. Why a task and not an automatic split:
+  how a file is divided into self-registering units is design work a lane does with tests,
+  and only the coordinator sees that a file is what holds lanes back.

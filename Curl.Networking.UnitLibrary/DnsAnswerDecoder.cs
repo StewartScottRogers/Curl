@@ -6,7 +6,9 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Decodes the DNS answer a DNS-over-HTTPS server returns (RFC 1035 section 4, RFC 3596) the way
-/// curl 8.21.0's <c>doh_resp_decode</c> does: ID 0 and RCODE 0 are required; each answer record
+/// curl 8.21.0's <c>doh_resp_decode</c> does: ID 0 and RCODE 0 are required, though RCODE 3 is
+/// <see cref="DnsMessageFailure.NxDomain" /> and each answer TTL is capped at 86400 seconds
+/// (<c>MAX_DNS_TTL</c>) before the smallest is taken, as in curl 8.22.0 (BL-2969); each answer record
 /// must be the type asked for, a CNAME or a DNAME, of class IN; A and AAAA data are stored, CNAME
 /// targets are followed through compression pointers, and DNAME records and the authority and
 /// additional sections are skipped; every byte must be accounted for, and an answer with no
@@ -48,6 +50,7 @@ public static class DnsAnswerDecoder
         private const int MaximumCanonicalNames = 4;
         private const int MaximumHttpsRecords = 4;
         private const int MaximumNameSteps = 128;
+        private const uint MaximumTimeToLiveSeconds = 86400;
 
         private int _index = HeaderLength;
         private ushort _recordType;
@@ -94,7 +97,12 @@ public static class DnsAnswerDecoder
                 return DnsMessageFailure.BadId;
             }
 
-            return (message[3] & 0x0F) != 0 ? DnsMessageFailure.BadRcode : DnsMessageFailure.None;
+            return (message[3] & 0x0F) switch
+            {
+                0 => DnsMessageFailure.None,
+                3 => DnsMessageFailure.NxDomain,
+                _ => DnsMessageFailure.BadRcode,
+            };
         }
 
         private DnsMessageFailure CheckEnd()
@@ -170,7 +178,8 @@ public static class DnsAnswerDecoder
                 return DnsMessageFailure.OutOfRange;
             }
 
-            TimeToLiveSeconds = Math.Min(TimeToLiveSeconds, BinaryPrimitives.ReadUInt32BigEndian(message.AsSpan(_index)));
+            var timeToLive = Math.Min(BinaryPrimitives.ReadUInt32BigEndian(message.AsSpan(_index)), MaximumTimeToLiveSeconds);
+            TimeToLiveSeconds = Math.Min(TimeToLiveSeconds, timeToLive);
             _index += 4;
             return DnsMessageFailure.None;
         }

@@ -193,6 +193,18 @@ internal sealed class SshTransferException(CurlExitCode exitCode, string message
         new(CurlExitCode.QuoteError, message);
 
     /// <summary>
+    /// Creates the failure curl 8.22.0's <c>sftp_quote</c> reports for a <c>-Q</c> argument
+    /// <c>Curl_get_pathname</c> refuses: curl's message with that function's code, exit 21
+    /// for a malformed argument and exit 100 for a path of 65535 bytes or more, measured
+    /// 2026-10-21 (BL-2918).
+    /// </summary>
+    /// <param name="exitCode"><c>Curl_get_pathname</c>'s code.</param>
+    /// <param name="message">curl's message.</param>
+    /// <returns>The exception.</returns>
+    internal static SshTransferException SftpQuoteFailed(CurlExitCode exitCode, string message) =>
+        new(exitCode, message);
+
+    /// <summary>
     /// Creates the failure curl 8.21.0 reports when an SFTP download's range, or its
     /// <c>-C</c> offset, starts beyond the file: exit 33 and <c>Offset (N) was beyond file
     /// size (S)</c>, measured 2026-09-29 for <c>-r 11-</c>, <c>-r 20-30</c> and <c>-C 11</c>

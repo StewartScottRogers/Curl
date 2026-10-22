@@ -20,7 +20,8 @@ namespace Curl.Conformance;
 /// Once the server has closed its side, reads drain the replies already sent and then return
 /// 0, and writes are accepted and dropped unrecorded, as a socket write into a closed
 /// connection can succeed without the server ever reading it. A read before the client's
-/// first write waits for that write, as sws blocks reading the request. After it, a read
+/// first write waits for that write, as sws blocks reading the request, and so does a read
+/// while the bytes written hold an unfinished request. Otherwise a read
 /// with no reply waiting returns 0: in memory the client is the only writer, so nothing else could arrive;
 /// except after <c>idle</c>, where it waits until cancelled, after <c>stream</c>, where it
 /// reads the streamed text without end, and on an upgraded connection, where it waits for the
@@ -117,6 +118,9 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     /// <summary>Whether the server still reads requests on the connection: false once a reply closed it or it started streaming or carrying upgraded traffic.</summary>
     public bool ReadsRequests => readsRequests;
+
+    /// <summary>Whether a read would now wait for the client's next write: no reply is waiting and the bytes written hold an unfinished request.</summary>
+    public bool AwaitsRequestBytes => readsRequests && pendingSends.Count == 0 && unservedRequestBytes.Count > 0;
 
     public EndPoint? RemoteEndPoint { get; init; }
 
@@ -238,9 +242,10 @@ internal sealed class SwsHttpServerConnection : IConnection
 
     // sws blocks reading the request before it answers or closes, so a read before the client has
     // written anything - a telnet session reads while its -T upload is still on its way - waits for
-    // the first write, then reads as if it came after it (BL-1853). sws never answers 100 Continue,
-    // so a read while an Expect: 100-continue request still owes its body waits for the client's
-    // next write - the body curl sends once its wait for 100 ends - as sws blocks reading it (test1070).
+    // the first write, then reads as if it came after it (BL-1853). Every complete request is served
+    // on write, so bytes still unserved are a request sws is reading: a read then waits for the
+    // client's next write, as sws blocks reading it - the body curl sends once its wait for an
+    // Expect: 100-continue answer ends (test1070), or the rest of a request sent in pieces (test1548).
     private async ValueTask<int> ReadWithNothingSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         if (!firstWrite.Task.IsCompleted)
@@ -249,7 +254,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             return await ReadAsync(buffer, cancellationToken);
         }
 
-        if (readsRequests && SwsHttpRequestFraming.AwaitsExpectedBody(unservedRequestBytes.ToArray()))
+        if (readsRequests && unservedRequestBytes.Count > 0)
         {
             await nextWrite.Task.WaitAsync(cancellationToken);
             return await ReadAsync(buffer, cancellationToken);
