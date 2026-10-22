@@ -7,9 +7,10 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Reads the HTTP/1.1 response a DNS-over-HTTPS server sends to one POST and returns its body
-/// as curl 8.21.0 takes it (measured, BL-641): the status code and <c>Content-Type</c> are not
-/// looked at, so a <c>500</c> or a <c>text/plain</c> answer is decoded all the same (only the HTTPS
-/// query reads the status <see cref="ReadResponseAsync" /> hands on, BL-2979); the body is
+/// as curl takes it (measured, BL-641): the reader does not look at <c>Content-Type</c>, so a
+/// <c>text/plain</c> answer is decoded all the same, and hands the status code on through
+/// <see cref="ReadResponseAsync" />, outside 200-299 of which the resolver fails the query as
+/// curl 8.22.0 does (BL-2979, BL-2972); the body is
 /// framed by <c>Content-Length</c> or chunked transfer coding; and a body framed by neither (and
 /// so delimited by the close), cut short, or longer than curl's 3000-byte DoH buffer is a
 /// receive failure.

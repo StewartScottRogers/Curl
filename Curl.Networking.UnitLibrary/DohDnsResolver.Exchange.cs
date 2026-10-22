@@ -24,7 +24,9 @@ public sealed partial class DohDnsResolver
             }
 
             events.ReportInfo(FormattableString.Invariant($"Connection #{connectionNumber} to host {_dohServer.Host}:{_dohServer.Port} left intact"));
-            return new DohQueryResult(recordType, CurlExitCode.Ok, DecodeAnswer(response.Body, recordType)) { StatusCode = response.StatusCode };
+            // curl 8.22.0's doh_probe_done fails a status outside 200-299 without decoding the body (BL-2972).
+            var result = new DohQueryResult(recordType, CurlExitCode.Ok, null) { StatusCode = response.StatusCode };
+            return result.HasSuccessStatus ? result with { Answer = DecodeAnswer(response.Body, recordType) } : result;
         }
     }
 
