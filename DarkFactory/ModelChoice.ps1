@@ -10,10 +10,71 @@ $OpusLibraries = 'Curl.Cryptography', 'Curl.Tls', 'Curl.Quic', 'Curl.Kerberos', 
 $OpusLibraryPattern = '^(' + (($OpusLibraries | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')(\.(UnitLibrary|UnitTests|IntegrationTests))?([\\/].*)?$'
 $script:ModelChoice = @{ Id = ''; Model = ''; Why = '' }
 
+# Routine feature work (BL-3001): a feature task whose title starts with one of these runs on
+# sonnet, unless its title or touches name hard work below. Each kind follows a written
+# recipe - port an upstream unit program, stand in for a debug variable, interpret an upstream
+# .pl check, list cases on the ratchet, split or move a file, add the assertion an audit mutant
+# showed missing. "Make upstream case N pass" is not here: finding why Curl differs is
+# diagnosis, and those runs came back on opus too. Key: the kind the lane log names.
+$RoutineFeatureTitles = [ordered]@{
+    'upstream unit program port'          = '^Port upstream unit programs?\b'
+    'harness stand-in'                    = '^(Stand in for\b|Add (an? |the )?([\w./-]+ ){0,4}stand-ins?\b)'
+    'upstream test script interpretation' = '^Interpret upstream test\d+\.pl\b'
+    'upstream case bookkeeping'           = '^(Run|Check|List)\b.*\bupstream\b.*\bcases? \d'
+    'harness feature report'              = '^Report the [\w./-]+ feature to the harness\b'
+    'file split for parallel lanes'       = '^Split \S+ so tasks touching it can run in parallel\b'
+    'code move for unit-program ports'    = '^Move \S+ .*\binto (a library|Curl\.\S+)'
+    'test-strength audit fix'             = '^Fix AF-\d+: .*(\bcan become\b.*\bwith no test failing\b|\bhas no assertion\b|\bchecks only\b|\bnever checks\b)'
+}
+# Hard work that keeps a feature task on opus whatever its title: its title or a touches entry
+# names one of these (whole words, any case). Key: the marker the lane log names.
+$HardWorkMarkers = [ordered]@{
+    'security'    = '\b(security|secure|secrets?|credentials?|passwords?|vulnerab\w*)\b'
+    'crypto'      = '\b(crypto\w*|encrypt\w*|decrypt\w*|cipher\w*|hash\w*|HMAC|SHA-?\d*|MD[45]|signing|signatures?)\b'
+    'TLS'         = '\b(TLS|SSL|mTLS|https-mtls|X\.?509|ASN\.1|DER|certs?|certificates?)\b'
+    'QUIC'        = '\bQUIC\b'
+    'HTTP/2'      = '\b(HTTP/2|h2|nghttp2|HPACK)\b'
+    'HTTP/3'      = '\b(HTTP/3|h3|QPACK)\b'
+    'SSH'         = '\b(SSH|SFTP|SCP)\b'
+    'Kerberos'    = '\b(Kerberos|GSS-?API|SPNEGO|Negotiate)\b'
+    'NTLM'        = '\bNTLM\b'
+    'DoH'         = '\b(DoH|HTTPS-RR|DNS)\b'
+    'concurrency' = '\b(concurren\w*|race|races|racing|thread\w*|deadlock\w*|lock-free)\b'
+    'framing'     = '\b(fram(e|es|ing)|capsules?|WebSocket|pipelin\w*)\b'
+}
+
+function Get-HardWorkMarker {
+    # The first hard-work marker any of -Text names, or '' when none does.
+    param([string[]]$Text = @())
+    $joined = $Text -join "`n"
+    foreach ($name in $HardWorkMarkers.Keys) { if ($joined -match $HardWorkMarkers[$name]) { return $name } }
+    return ''
+}
+
+function Get-RoutineFeatureKind {
+    # The routine feature kind a task title starts with, or '' when it starts with none.
+    param([string]$Title)
+    foreach ($kind in $RoutineFeatureTitles.Keys) { if ($Title -match $RoutineFeatureTitles[$kind]) { return $kind } }
+    return ''
+}
+
+function Get-FeatureModelChoice {
+    # A feature task's model: sonnet when its title is routine and it names no hard work, opus
+    # otherwise. Why: "routine feature: <kind>", "feature pipeline, names <marker>" for a
+    # routine title the marker overrules, or "feature pipeline".
+    param([string]$Title, [string[]]$Touches = @())
+    $kind = Get-RoutineFeatureKind $Title
+    if (-not $kind) { return [pscustomobject]@{ Model = 'opus'; Why = 'feature pipeline' } }
+    $marker = Get-HardWorkMarker (@($Title) + $Touches)
+    if ($marker) { return [pscustomobject]@{ Model = 'opus'; Why = "feature pipeline, names $marker" } }
+    return [pscustomobject]@{ Model = 'sonnet'; Why = "routine feature: $kind" }
+}
+
 function Get-ModelChoice {
     # The model a task runs on and why: a forced -Model, else the task's own model:, else
-    # opus for security, crypto, feature, protocol, retried and CI-fix work and sonnet for
-    # the rest. The rule never picks haiku. Warning names an ignored model: value.
+    # opus for security, crypto, protocol, retried and CI-fix work and for feature work that
+    # is not routine (Get-FeatureModelChoice), and sonnet for the rest. The rule never picks
+    # haiku. Warning names an ignored model: value.
     param([string]$Forced, [string]$TaskModel = '', [string]$Pipeline = '', [string]$Priority = '',
         [string[]]$Touches = @(), [string]$Title = '', [switch]$Retried)
     if ($Forced -and $Forced -ne 'auto') { return [pscustomobject]@{ Model = $Forced; Why = '-Model forces it'; Warning = '' } }
@@ -24,11 +85,15 @@ function Get-ModelChoice {
     }
     $library = @($Touches | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match $OpusLibraryPattern }) | Select-Object -First 1
     $why = if ($library) { "touches $library" }
-        elseif ($Pipeline -in 'feature', 'protocol') { "$Pipeline pipeline" }
+        elseif ($Pipeline -eq 'protocol') { 'protocol pipeline' }
         elseif ($Retried) { 'retry after a run that came back' }
         elseif ($Priority -eq 'High' -and $Title -match '^Fix (CI failure|flaky CI test)') { 'CI failure fix' }
         else { '' }
     if ($why) { return [pscustomobject]@{ Model = 'opus'; Why = $why; Warning = $warning } }
+    if ($Pipeline -eq 'feature') {
+        $feature = Get-FeatureModelChoice -Title $Title -Touches $Touches
+        return [pscustomobject]@{ Model = $feature.Model; Why = $feature.Why; Warning = $warning }
+    }
     $why = if ($Pipeline) { "$Pipeline pipeline" } else { 'no pipeline' }
     return [pscustomobject]@{ Model = 'sonnet'; Why = $why; Warning = $warning }
 }
@@ -119,8 +184,45 @@ if ($TestModelChoice) {
         ,@('a direct diagnostic-output task', 'sonnet', (Get-CaseModel -Title 'Print the lane diagnostics in the trace' -Touches 'RunDarkFactory.ps1'))
         ,@('a Normal ordinary direct task', 'sonnet', (Get-CaseModel))
         ,@('a lookalike library is not a crypto library', 'sonnet', (Get-CaseModel -Touches 'Curl.TlsSettings.UnitLibrary'))
+        ,@('a feature task with no routine title', 'opus: feature pipeline', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Reach a SOCKS proxy over a Unix domain socket')))
+        ,@('a routine feature title names its kind', 'sonnet: routine feature: upstream unit program port', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 1304 (netrc parsing) over NetrcFile')))
+        ,@('a routine title overruled by a hard marker names it', 'opus: feature pipeline, names DoH', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 1658: DoH HTTPS resource record decoding')))
+        ,@('a hard marker in touches keeps a routine title on opus', 'opus: feature pipeline, names framing', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 9999' -Touches 'Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Headers.Capsule.cs')))
+        ,@('a routine feature title on a retried task', 'opus: retry after a run that came back', (Format-Choice (Get-ModelChoice -Forced 'auto' -Pipeline 'feature' -Title 'Port upstream unit program 1304' -Retried)))
+        ,@('a routine feature title touching a crypto library', 'opus', (Get-CaseModel -Pipeline 'feature' -Title 'Port upstream unit program 1610' -Touches 'Curl.Cryptography.UnitTests'))
+        ,@('model: opus wins over a routine feature title', 'opus', (Get-CaseModel -TaskModel 'opus' -Pipeline 'feature' -Title 'Port upstream unit program 1304'))
+        ,@('-Model opus wins over a routine feature title', 'opus', (Get-CaseModel -Forced 'opus' -Pipeline 'feature' -Title 'Port upstream unit program 1304'))
+        ,@('a routine title on the protocol pipeline stays opus', 'opus', (Get-CaseModel -Pipeline 'protocol' -Title 'Port upstream unit program 1304'))
+        ,@('an invalid model: on a routine feature falls back to sonnet', 'sonnet (warned)', (Get-CaseModel -TaskModel 'gpt' -Pipeline 'feature' -Title 'Port upstream unit program 1304'))
+        ,@('the hard-work marker of a plain title is none', '', (Get-HardWorkMarker 'Port upstream unit program 1304 (netrc parsing)'))
+        ,@('a word containing a marker is not the marker', '', (Get-HardWorkMarker 'Move stripcredentials into a library; Curl.TlsSettings.UnitLibrary; shared frameworks'))
         ,@('-Model defaults to auto without CLAUDE_MODEL', 'auto', $(if ($env:CLAUDE_MODEL) { 'auto' } else { $Model }))
         ,@('probes use sonnet under auto', 'sonnet', $(if ($Model -eq 'auto') { $ProbeModel } else { 'sonnet' })))
+    # Feature titles from the board (BL-3001): routine ones run on sonnet, hard ones on opus.
+    $routineTitles = @(
+        'Port upstream unit programs 1660 and 1674 (HSTS parse, check, load, save and the 10000-entry cap) over HstsCache'
+        'Stand in for CURL_FAKE_XATTR so upstream cases 644, 687 and 688 run'
+        'Add an SMB server stand-in so upstream cases 1451 and 1850 run'
+        'Interpret upstream test1177.pl in C# over Libcurl''s CurlVersionFeatures and curl_version_info.3 so case 1177 runs'
+        'List the Linux-only upstream cases 307, 1517, 1582, 1587, 2072 and 3207 on the ratchet'
+        'Report the codeset-utf8 feature to the harness so upstream cases 165, 955 to 958 run'
+        'Split Curl.Engine.UnitLibrary/EngineComposition.cs so tasks touching it can run in parallel'
+        'Move create_dir_hierarchy (OutputFileDirectories) into a library the unit-program ports reach, for tool1720'
+        'Fix AF-0291: Sample_Create_BuildsAClientOverTheManagedEngineWithoutSendingAnything has no assertion'
+        'Fix AF-0297: UpperCasedEscapes'' && can become || with no test failing, upper-casing escapes that are not two hex digits')
+    $hardTitles = @(
+        'Port upstream unit programs for hashes, encodings and signing: cases 1302, 1600 and 1601'
+        'Port upstream unit program unit1651 (x509 parsing) over PeerCertificateText'
+        'Port upstream unit program 3400 (capsule protocol encode and decode) over CapsuleDatagramChannel'
+        'Stand in for the GSS-API stub (CURL_STUB_GSS_CREDS) so upstream cases 2056, 2057 and 2094 run'
+        'Add stand-ins for the https-mtls and socks5unix servers so upstream cases 2088 and 2089 run'
+        'Run the HTTP/3 upstream cases 2500, 2501, 2502 and 2503 through the HTTP/3 stand-in'
+        'Fix AF-0296: TransferSettingsOf''s ShowError: false can become true with no test failing, so an SSH transfer writes an error line'
+        'Make upstream case 1548 pass: TELNET reading stdin with -m 1 ends with exit 28'
+        'Run a <command type="perl"> upstream case through a registered C# script interpretation'
+        'Fix AF-0300: --limit-rate does not limit the upload: a -F POST at --limit-rate 10 exits 0 where curl exits 56')
+    foreach ($title in $routineTitles) { $cases += ,@("routine feature: $title", 'sonnet', (Get-CaseModel -Pipeline 'feature' -Title $title)) }
+    foreach ($title in $hardTitles) { $cases += ,@("hard feature: $title", 'opus', (Get-CaseModel -Pipeline 'feature' -Title $title)) }
     foreach ($library in $OpusLibraries) {
         $cases += ,@("touches $library.UnitLibrary", 'opus', (Get-CaseModel -Touches 'Curl.Cli.UnitLibrary', "$library.UnitLibrary"))
         $cases += ,@("touches $library.UnitTests", 'opus', (Get-CaseModel -Touches "$library.UnitTests"))
