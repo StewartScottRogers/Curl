@@ -3,8 +3,8 @@ id: AF-0361
 title: BL-3079 cost $0.93 over two claims; the first was requeued because DarkFactory/TaskBudget.ps1 was held by another task
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3079:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
