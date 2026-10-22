@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy, Curl.Conformance.UnitProgram.UnitTests/Dns/Easy, Curl.Core.UnitLibrary/ConnectionPeer.cs, Curl.Core.UnitTests/ConnectionPeerTests.cs, Curl.Engine.UnitLibrary/DebugCallbackTransferEvents.cs, Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs, Libcurl.UnitTests/Info/Longs/EasyInfoReadersLongsTests.cs, Libcurl/Libcurl.csproj]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3014 — Land the ported unit programs 1652, 2413, 3219 and 3302 with their Core, Engine and Libcurl fixes: fix the unit2413 ipv6 row and commit
 
@@ -24,16 +24,18 @@ Left in this task: one failing row of `Unit2413_PeerWrongInOneField_...` (the `i
 
 ## Acceptance criteria
 
-- [ ] The four programs are in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy/`, each doc comment naming the C rows it matches, registered in `UnitPrograms.Dns.cs`, with tests in `Curl.Conformance.UnitProgram.UnitTests/Dns/Easy/`.
-- [ ] `UnitProgramsDnsEasyTests` passes in full, including the `ipv6=1` row of the 2413 test.
-- [ ] Where a port found Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (`DebugCallbackTransferEventsTests`, `ConnectionPeerTests`, `EasyInfoReadersLongsTests`).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Core.UnitTests`, `Curl.Engine.UnitTests`, `Libcurl.UnitTests` and `Curl.Conformance.UnitProgram.UnitTests`.
+- [x] The four programs are in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy/`, each doc comment naming the C rows it matches, registered in `UnitPrograms.Dns.cs`, with tests in `Curl.Conformance.UnitProgram.UnitTests/Dns/Easy/`.
+- [x] `UnitProgramsDnsEasyTests` passes in full, including the `ipv6=1` row of the 2413 test.
+- [x] Where a port found Curl wrong, the fix has a focused unit test in the fixed library's own `.UnitTests` project (`DebugCallbackTransferEventsTests`, `ConnectionPeerTests`, `EasyInfoReadersLongsTests`).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Core.UnitTests`, `Curl.Engine.UnitTests`, `Libcurl.UnitTests` and `Curl.Conformance.UnitProgram.UnitTests`.
 
 ## Notes
 
 - 2026-10-21: Split from BL-2925. The stash was re-stored under this task's ID (same commit 68641186c695a9c21837e1359a855737f82e4505) so the shift applies it on the first claim.
+- 2026-10-21: The `ipv6=1` row expected 5 failures; the stand-in keeps the host text whole and marks every host IPv6, so only peer3 (`::1`) holds and six rows fail, matching the C helper's order of checks. The port was right; the expected count was 6.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: d4cfaded 2ef82892 f6a8a38a 4789c509.
+- 2026-10-21: Doing -> Done. Four unit programs land with their Core, Engine and Libcurl fixes; all four test projects green
