@@ -34,3 +34,4 @@ Today neither project is packable: no `PackageId`, and nothing in `.github/workf
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: d9a79bfc b3c6cdd8 65484c2c 9742157d.
