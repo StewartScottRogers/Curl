@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3137 — Fix AF-0357: BL-3062 cost $1.72, 6.4 times the median
 
@@ -41,12 +41,21 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-22, lane 2. Cause: BL-3062 is a `feature`-pipeline port (architect, test, implement, verify,
+  review stages, plus a Measure-CodeQuality run) on one claim: 39 turns, each re-reading a growing
+  context, so cache_read of 3.1M tokens is the cost; output was only 17.7k. Its own Notes show one
+  claim, no requeue, no rework and the task landed Done with all gates green. The run's log is not in
+  this checkout and the audit paths are closed to a lane, so this rests on the task's Notes and the
+  finding's figures. Unavoidable: cost scales with turns on a pipeline that the cap ($3.93-class)
+  already allows; no defect in RunDarkFactory.ps1 is implicated, so no change is made.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named: 39-turn feature pipeline cache rereads on one claim; unavoidable, no change needed
