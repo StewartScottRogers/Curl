@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3139 — Fix AF-0359: BL-3090 cost $1.28, 4.7 times the median
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (AF-0359): the run log `logs/BL-3090-20261022-062551-L5.jsonl` is not in any lane checkout, so cost was read from the figures here and from BL-3090 itself. BL-3090 was a `feature` task that changed six DarkFactory scripts (TaskIds, TaskBudget, Claim, AutoLanesState, ShiftCoordinator, AutoLanes), added self-test cases to 3 switches, an ADR and 8 criteria, and re-ran 23 `-Test*` switches: 32 turns, 1.62M cache-read tokens (about 50k re-read per turn), 22k output tokens. Cost scales with turns times accumulated context, and one claim finished it with no requeue or rework. Its median ratio (4.7x) comes from the median being small tasks. Recorded as unavoidable; no change to RunDarkFactory.ps1 is warranted (same finding shape as AF-0358, BL-3138).
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named: BL-3090 was a 32-turn six-script feature change; unavoidable, no fix needed
