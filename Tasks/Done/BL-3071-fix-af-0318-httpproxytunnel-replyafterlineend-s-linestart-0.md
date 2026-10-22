@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3071 — Fix AF-0318: HttpProxyTunnel.ReplyAfterLineEnd's lineStart == 0 can become != 0 with no test failing, so a CONNECT reply whose first line is not HTTP/ no longer fails at once with exit 43
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+The survivor: the existing test sent two non-HTTP lines, so the mutant still failed on the second. Added ReadReplyAsync_WhenOnlyTheFirstLineIsNotHttp_FailsAtOnceWithInvalidResponseHeader (garbage then a blank line, or a stall). The audit guard bars a lane from Invoke-MutationTest.ps1, so the mutant (== to !=) was applied by hand: the 3 new cases failed, then the code was restored and the suite passed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. A non-HTTP first CONNECT reply line is pinned to fail at once with exit 43; the == to != mutant now fails the new test
