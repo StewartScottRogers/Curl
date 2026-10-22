@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/ManagedMultiTransferTests.Timers.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3068 — Fix AF-0315: ManagedMultiTransfer.RemainingMilliseconds' || can become && with no test failing, so curl_multi_timeout answers 0 instead of -1 for running transfers with no timeout
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added the Timers test file to touches (tests live there). No production change: two tests pin GetTimeout = -1 for a held-pending transfer with a timeout and a finished-reported transfer with a timeout.
+- The guard refuses lanes the mutation tool, so the reproduction was done by hand: with line 831 mutated to `entry.Done && entry.Perform is null || ...` both new tests fail (mutant killed); restored, all pass. A re-audit should confirm.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Two tests kill the RemainingMilliseconds || mutant (hand-checked)
