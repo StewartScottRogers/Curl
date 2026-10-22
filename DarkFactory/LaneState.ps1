@@ -179,6 +179,23 @@ if ($TestHeartbeat) {
             ,@('usage over the stop threshold stops', 'stop', (& $poll $now 'session tokens 86% used, reset 04:00' 'BL-3011' @()))
             ,@('only cost-capped tasks waits', 'wait', (& $poll $now '' '' @('BL-2969')))
         )
+        # The same poll during the shift-end merge's CI wait (BL-3142): CI stays pending, a task
+        # is claimable at the second poll, and the next shift starts once while the wait goes
+        # on to its own end. gh, git, Get-Date and Start-Sleep are stubbed with a fake clock.
+        $script:fakeNow = [datetime]'2026-10-22 14:20'
+        $script:polls = 0
+        $script:started = 0
+        function gh { '[{"status":"in_progress","conclusion":null}]' }
+        function git { '' }
+        function Get-Date { param($Format) $script:fakeNow }
+        function Start-Sleep { param($Seconds) $script:fakeNow = $script:fakeNow.AddSeconds($Seconds) }
+        try {
+            $onPoll = { $script:polls++; if ($script:polls -eq 2) { $script:started++ } }
+            $wait = Wait-MergeCiRun -Branch 'factory/test' -Head ('a' * 40) -OnPoll $onPoll -PollMinutes 5
+        } finally { Remove-Item function:gh, function:git, function:Get-Date, function:Start-Sleep }
+        $cases += ,@('a pending merge wait polls the board every poll interval', '11', "$($script:polls)")
+        $cases += ,@('the next shift starts once, at the second poll', '1', "$($script:started)")
+        $cases += ,@('the merge wait still ends with its own line', 'not merged: CI did not finish on aaaaaaa within 60 min', "$($wait.Failure)")
         $failed = 0
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }

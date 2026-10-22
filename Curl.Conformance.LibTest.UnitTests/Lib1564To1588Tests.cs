@@ -1,6 +1,7 @@
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Api.Options.Authentication;
 using Curl.Api.Options.Http;
 using Libcurl.Global;
 using Libcurl.Options;
@@ -391,11 +392,14 @@ public sealed class Lib1564To1588Tests
     [TestMethod]
     public async Task Lib1582_PerformsWithNegotiateAndAnswersItsCode()
     {
-        var engine = new FakeCurlEngine { PerformResult = CurlCode.LoginDenied };
+        EasyAuthenticationOptions? performed = null;
+        var engine = new FakeCurlEngine { Performing = o => { performed = o.Authentication; return CurlCode.LoginDenied; } };
         var run = new PortRun(engine, 1582, "https://x/");
 
         LibTestResult result = await new Lib1582().RunAsync(run.Context, CancellationToken.None);
 
+        Assert.AreEqual(HttpAuthenticationMethods.Negotiate, performed?.HttpAuthentication);
+        Assert.AreEqual(":", performed?.UserPassword);
         Assert.AreEqual((int)CurlCode.LoginDenied, result.ExitCode);
     }
 

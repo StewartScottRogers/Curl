@@ -260,6 +260,7 @@ public sealed class Lib1649To1906Tests
 
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual(string.Empty, run.Error.ToString());
+        Assert.AreEqual(Lib1900.SecondHstsFile, engine.CreatedEasies[0].Options.Http.Hsts);
     }
 
     [TestMethod]

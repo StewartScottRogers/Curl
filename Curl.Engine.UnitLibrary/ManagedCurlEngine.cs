@@ -315,7 +315,9 @@ public sealed class ManagedCurlEngine : ICurlEngine
 
     private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
-        EngineToolOptions tool = new(Parallel: false, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
+        // One transfer at a time, so --parallel-immediate has nothing to decide: both flags share one value.
+        const bool RunsParallel = false;
+        EngineToolOptions tool = new(Parallel: RunsParallel, ParallelImmediate: RunsParallel, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
         return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing);
     }
 }

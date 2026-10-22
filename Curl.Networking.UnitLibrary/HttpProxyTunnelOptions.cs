@@ -22,8 +22,8 @@ namespace Curl.Networking;
 public sealed record HttpProxyTunnelOptions(string? UserAgent, Encoding CredentialEncoding)
 {
     /// <summary>
-    /// Gets the options curl 8.21.0 uses when no option changes them: <c>User-Agent:
-    /// curl/8.21.0</c> and UTF-8 credentials.
+    /// Gets the options curl 8.22.0 uses when no option changes them: <c>User-Agent:
+    /// curl/8.22.0</c> and UTF-8 credentials.
     /// </summary>
     public static HttpProxyTunnelOptions Default { get; } = new("curl/8.22.0", Encoding.UTF8);
 

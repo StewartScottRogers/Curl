@@ -46,3 +46,13 @@ when the cap freed.
   shift, as before.
 - Each look costs one `git pull` and a few `task-board.ps1 next` calls. No Claude tokens are
   spent while idle.
+
+## Amendment (BL-3142): the poll also runs during the merge wait
+
+The shift-end merge waits up to `$MergeCiWaitMinutes` for CI before the idle poll is reached,
+so work filed meanwhile waited unclaimed (shift 20261022-140915: 25 tasks, about 11 minutes
+of CI wait turned into 21 minutes idle). Under `-Continuous` the same poll now also runs every
+`-IdlePollMinutes` during that wait (`Wait-MergeCiRun`, `-OnPoll`). When a task is claimable,
+the coordinator starts the next shift through the one hand-over (`$startNextShift -Beside`),
+exactly once, then lets the merge finish and runs the review beside the next shift, as ADR-0710
+does. Decided by Claude under Stewart's delegation.

@@ -345,6 +345,28 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
+    public async Task ConnectMultiplexedAsync_ThroughAnHttpProxyWithAZeroConnectTimeout_RunsQuicInTheTunnelWithoutATimeout()
+    {
+        // --connect-timeout 0 means no timeout (AF-0342): the tunnelled dial carries none, so
+        // the QUIC handshake runs instead of timing out before it starts.
+        var proxy = new CapsuleQuicProxyConnection(UpgradeReply, Server());
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("connect timeout", "0 ms, meaning none");
+
+        var result = await ConnectMultiplexedAsync(
+            TunnelConnector(_ => proxy, connectTimeout: TimeSpan.Zero),
+            TunnelTarget(events));
+
+        Diagnostics.Act("capsules received", proxy.CapsulesReceived);
+        ActEvents(events);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        await using var connection = result.Connection!;
+        Assert.AreEqual("h3", connection.ApplicationProtocol);
+        Assert.IsGreaterThan(0, proxy.CapsulesReceived);
+    }
+
+    [TestMethod]
     public async Task ConnectMultiplexedAsync_ThroughASocksProxy_DialsQuicDirectly()
     {
         var opener = new QuicServerChannelOpener { ServerFor = _ => Server() };

@@ -439,10 +439,42 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # merge until it has run. Other reasons do not hold the merge.
     $auditCadence = Get-AuditCadence (Get-AuditDueFromMaster -Branch $branch)
     if ($auditCadence.Line) { Show-AuditNotice $auditCadence.Line }
+    # The one hand-over to the next shift, used when work is still ready, when the idle
+    # poll below finds some and when the same poll, run during the merge's CI wait, does
+    # (-Beside: this coordinator stays to finish the merge, so it neither reviews nor closes
+    # its tab yet). -Why says which.
+    $startNextShift = {
+        param([string]$Why, [switch]$Beside)
+        # An Auto shift hands on Auto, not the count it ended at; the next one starts from
+        # the count auto-lanes.json saved.
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-IdlePollMinutes', $IdlePollMinutes, '-Continuous', '-ShiftBranch', $branch)
+        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
+        if ($WeeklyPace) { $forward += '-WeeklyPace' }
+        if ($QuietAlarm) { $forward += '-QuietAlarm' }
+        $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
+        Write-Trace '-' 'shift' "$Why; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
+        # The review runs beside the next shift, which claims what it files (ADR-0710).
+        if ($Beside) { $handOver.Tab = $next.Tab; return }
+        if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
+        # The next shift has its own tab; this one has only notes, and they are in the log.
+        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
+    }
     # What master held before the merge, so the shift-end review reads only what this shift merged.
     git -C $Root fetch -q origin master 2>&1 | Out-Null
     $masterBefore = "$(git -C $Root rev-parse origin/master 2>$null)".Trim()
-    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch }
+    # Under -Continuous the merge's CI wait polls the board like the idle poll below (BL-3142):
+    # a task claimable during the wait starts the next shift beside the merge, once.
+    $handOver = @{ Done = $false }
+    $pollDuringMerge = if ($Continuous) {
+        {
+            if ($handOver.Done) { return }
+            if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
+            $claimable = Get-ClaimableTaskId
+            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped
+            if ($poll.Action -eq 'start') { $handOver.Done = $true; & $startNextShift "$($poll.Why) during the merge's CI wait" -Beside }
+        }
+    }
+    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes }
     Write-Trace '-' 'merge' $mergeLine 'Cyan'
     # The shift-end review (ADR-0710) runs below: beside the next shift when one starts, or
     # before deciding whether to start one when nothing is ready.
@@ -455,6 +487,13 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # loop above stopped watching, so file it now (BL-1031).
     Invoke-CiWatch -Branch $branch -Final
     Remove-CiWatch
+    # The next shift started during the merge's CI wait: only the review and the tab are left.
+    if ($handOver.Done) {
+        foreach ($r in @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
+        if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
+        if ($handOver.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
+        exit 0
+    }
     # Those tasks were pushed from the ci-watch worktree; pull them here too, or the board
     # below still says nothing is ready and -Continuous leaves them waiting for the next
     # shift Stewart starts (AF-0090: three CI-fix tasks waited 5 hours).
@@ -475,29 +514,13 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $capFreesAt = if (-not $stillReady.Id -and $stillReady.Capped.Count) { Get-CapFreesAt $stillReady.Capped } else { $null }
     $end = Get-ShiftEndDecision -Continuous ([bool]$Continuous) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped -CapFreesAt $capFreesAt
     if ($end.Trace) { Write-Trace '-' 'shift' $end.Trace 'Yellow' }
-    # The one hand-over to the next shift, used when work is still ready and when the idle
-    # poll below finds some. -Why says which.
-    $startNextShift = {
-        param([string]$Why)
-        # An Auto shift hands on Auto, not the count it ended at; the next one starts from
-        # the count auto-lanes.json saved.
-        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-IdlePollMinutes', $IdlePollMinutes, '-Continuous', '-ShiftBranch', $branch)
-        if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
-        if ($WeeklyPace) { $forward += '-WeeklyPace' }
-        if ($QuietAlarm) { $forward += '-QuietAlarm' }
-        $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
-        Write-Trace '-' 'shift' "$Why; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
-        # The review runs beside the next shift, which claims what it files (ADR-0710).
-        if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
-        # The next shift has its own tab; this one has only notes, and they are in the log.
-        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
-    }
     if ($end.Continue) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         & $startNextShift 'work is still ready'
         exit 0
     }
-    # -Continuous with nothing claimable: poll the board every -IdlePollMinutes and start the
+    # -Continuous with nothing claimable: poll the board every -IdlePollMinutes (the merge's CI wait
+    # above polls it the same way, BL-3142) and start the
     # next shift once something is claimable, until the -Hours deadline or a usage limit
     # stops it (BL-3092, ADR-0758). What waits on Stewart is shown once now; the alarm that
     # waits for a key rings only when polling stops, so it never holds the poll.

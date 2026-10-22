@@ -54,10 +54,15 @@ internal sealed class FakeCurlEngine : ICurlEngine
     /// <summary>The headers every easy transfer answers the header API from; without them, the header API throws.</summary>
     public ITransferHeaders? Headers { get; init; }
 
+    /// <summary>Every easy transfer <see cref="CreateEasy"/> has made, in order.</summary>
+    public List<IEasyTransfer> CreatedEasies { get; } = [];
+
     public IEasyTransfer CreateEasy()
     {
         CreatingEasy?.Invoke();
-        return new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket, Disposing = () => DisposedEasyCount++ };
+        var easy = new FakeEasyTransfer(PerformResult, Info, Performing) { Importing = Importing, Informing = Informing, ConnectOnly = ConnectOnly, Pauses = Pauses, TransferHeaders = Headers, WebSocketConnection = WebSocket, Disposing = () => DisposedEasyCount++ };
+        CreatedEasies.Add(easy);
+        return easy;
     }
 
     public FakeMultiTransfer Multi { get; } = new();

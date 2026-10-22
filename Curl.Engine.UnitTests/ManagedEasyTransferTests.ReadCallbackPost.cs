@@ -41,6 +41,20 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_PostWithAPostFieldSizeOfZeroAndAReadCallback_PostsWithContentLengthZeroNotChunked()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
+
+        CurlCode code = await PerformReadCallbackPostAsync(easy, new EasyHttpOptions { Post = true, PostFieldSize = 0 }, new EasyTransferOptions());
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        StringAssert.Contains(written, "Content-Length: 0\r\n");
+        Assert.IsFalse(written.Contains("Transfer-Encoding", StringComparison.OrdinalIgnoreCase), written);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PostUnderUploadWithAReadCallback_UploadsWithPut()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
