@@ -3,7 +3,7 @@ id: AF-0318
 title: HttpProxyTunnel.ReplyAfterLineEnd's lineStart == 0 can become != 0 with no test failing, so a CONNECT reply whose first line is not HTTP/ no longer fails at once with exit 43
 auditor: quality
 severity: High
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:ReplyAfterLineEnd-eq:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/HttpProxyTunnel.cs:221:==
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

@@ -3,7 +3,7 @@ id: AF-0331
 title: CI red 46.0 min from run 39718635967 (Windows quality gate after BL-3022). Its fix task BL-3026 was filed with empty touches, so no lane would claim it, and lane 1 idled about 230 min on it
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:39718635967:ci-red
 reproduction: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

@@ -3,7 +3,7 @@ id: AF-0335
 title: BL-2924 cost $5.56, 3.1 times the median, in one 83-turn run plus a rebase-conflict resolve
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-2924:cost-outlier
 reproduction: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

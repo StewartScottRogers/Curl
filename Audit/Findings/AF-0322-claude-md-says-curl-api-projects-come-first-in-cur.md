@@ -3,7 +3,7 @@ id: AF-0322
 title: CLAUDE.md says Curl.Api projects come first in Curl.slnx and Libcurl sorts after every Curl.* project; the slnx groups by folder and does neither
 auditor: truthfulness
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: truthfulness:CLAUDE.md:SlnxApiFirstOrder:false-statement
 reproduction: none
@@ -45,3 +45,4 @@ Select-String -Path CLAUDE.md -Pattern 'come first, before'; $p = Select-String 
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

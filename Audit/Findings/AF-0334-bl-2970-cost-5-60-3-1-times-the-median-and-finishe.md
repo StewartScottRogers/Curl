@@ -3,7 +3,7 @@ id: AF-0334
 title: BL-2970 cost $5.60, 3.1 times the median, and finished nothing itself: it was deferred and split
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-2970:cost-outlier
 reproduction: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

@@ -3,7 +3,7 @@ id: AF-0327
 title: BL-2968 claimed 3 times and requeued twice: it waited on BL-2975, then its criteria were rewritten, and its stash failed to apply on the third claim
 auditor: process
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-2968:redone-work
 reproduction: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

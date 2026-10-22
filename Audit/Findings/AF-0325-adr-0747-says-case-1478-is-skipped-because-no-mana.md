@@ -3,7 +3,7 @@ id: AF-0325
 title: ADR-0747 says case 1478 is skipped because no managen interpretation is registered; one is now registered
 auditor: truthfulness
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: truthfulness:Documentation/Planning/Decisions/ADR-0747-upstream-case-1478-stays-off-the-ratchet.md:Case1478Skip:stale-adr
 reproduction: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0747-*.md -Pattern 'no 
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

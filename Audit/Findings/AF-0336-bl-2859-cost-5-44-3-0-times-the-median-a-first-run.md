@@ -3,7 +3,7 @@ id: AF-0336
 title: BL-2859 cost $5.44, 3.0 times the median: a first run requeued on a dependency, then a 79-turn second run
 auditor: process
 severity: Low
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-2859:cost-outlier
 reproduction: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

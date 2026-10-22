@@ -3,7 +3,7 @@ id: AF-0321
 title: CLAUDE.md says four projects are exceptions to the Curl.<Area>.UnitLibrary rule; Curl.Config is a fifth
 auditor: truthfulness
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: truthfulness:CLAUDE.md:FourNamingExceptions:false-statement
 reproduction: none
@@ -45,3 +45,4 @@ Select-String -Path CLAUDE.md -Pattern 'Four projects are exceptions'; Get-Child
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

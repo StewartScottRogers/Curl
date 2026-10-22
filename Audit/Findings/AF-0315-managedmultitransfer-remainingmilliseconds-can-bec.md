@@ -3,7 +3,7 @@ id: AF-0315
 title: ManagedMultiTransfer.RemainingMilliseconds' || can become && with no test failing, so curl_multi_timeout answers 0 instead of -1 for running transfers with no timeout
 auditor: quality
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs:RemainingMilliseconds-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs:831:||
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

@@ -3,7 +3,7 @@ id: AF-0314
 title: AltSvcTransferCache.ApplyTo's IsSameDestination: true can become false with no Curl.Engine.UnitTests test failing, so alt-svc entries to another host are no longer followed
 auditor: quality
 severity: High
-status: proposed
+status: accepted
 reason:
 key: quality:Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:ApplyTo-true:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/AltSvcTransferCache.cs:144:true
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.

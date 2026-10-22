@@ -3,7 +3,7 @@ id: AF-0326
 title: BL-2970 claimed 3 times and requeued 3 times: a file outside its touches, a stash that did not apply, then two cost-cap requeues, before it was deferred and split
 auditor: process
 severity: Medium
-status: proposed
+status: accepted
 reason:
 key: process:logs:BL-2970:redone-work
 reproduction: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
