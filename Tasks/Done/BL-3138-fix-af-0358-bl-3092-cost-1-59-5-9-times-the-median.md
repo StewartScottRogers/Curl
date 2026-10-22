@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3138 — Fix AF-0358: BL-3092 cost $1.59, 5.9 times the median
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-22, lane 2. Cause: BL-3092 changed four DarkFactory PowerShell files (idle poll, heartbeat, hand-over scriptblock, self-test) on one claim, no requeue, no rework: 46 turns each re-reading a growing context, so cache_read of 2.77M tokens is the cost; output was only 24k. It was done directly (no subagent stages) and landed Done with every gate green. Unavoidable: cost scales with turns on a multi-file change with many -Test switches to run; no defect in RunDarkFactory.ps1 is implicated, so no change is made. The run log is not in this checkout, so this rests on the task Notes and the finding figures.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0358 cost is cache rereads of one 46-turn multi-file change; unavoidable, no fix needed
