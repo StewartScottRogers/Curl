@@ -3,8 +3,8 @@ id: AF-0320
 title: ITlsProvider's remarks say the production implementation delegates to SslStream rather than implementing TLS; a second, hand-built production provider exists
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Protocol.Abstractions.UnitLibrary/ITlsProvider.cs:ITlsProvider:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Abstractions.UnitLibrary/ITlsProvider.cs -Patt
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
