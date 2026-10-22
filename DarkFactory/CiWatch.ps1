@@ -632,6 +632,19 @@ function Invoke-SplitHotspotFiling {
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
 }
 
+function Invoke-MergeEndCiWatch {
+    # The watch at the end of a shift's merge. After a hand-over during the merge's CI wait
+    # (BL-3144) the next shift already uses the one shared ci-watch worktree and files the
+    # branch's CI failures from it, so this shift neither checks it out, cleans it nor removes
+    # it: that would delete task files the next shift wrote and has not pushed. Returns whether
+    # it ran.
+    param([string]$Branch, [bool]$HandedOver)
+    if ($HandedOver) { return $false }
+    Invoke-CiWatch -Branch $Branch -Final
+    Remove-CiWatch
+    return $true
+}
+
 function Remove-CiWatch {
     # Deletes the ci-watch worktree at shift end.
     if (-not (Test-Path $CiWatchDir)) { return }
@@ -909,6 +922,12 @@ if ($TestCiWatch) {
         $script:Root = $savedRoot; $script:CiWatchDir = $savedWatchDir; $script:LanesDir = $savedLanesDir; $env:CLAUDE_PROJECT_DIR = $savedDir; $env:CURL_DARK_FACTORY_LANE = $savedLane
         Remove-Item -Recurse -Force -Path $ciTemp -ErrorAction SilentlyContinue
     }
+    # BL-3144: a shift handed over during the merge's CI wait leaves the next shift's ci-watch worktree alone.
+    $ciMarker = Join-Path ([IO.Path]::GetTempPath()) "df-ci-handover-$PID"
+    New-Item -ItemType Directory -Force -Path $ciMarker | Out-Null
+    $savedWatchDir2 = $CiWatchDir; $script:CiWatchDir = $ciMarker
+    try { & $check 'a handed-over shift runs no final watch and removes no worktree' 'False,True' ((Invoke-MergeEndCiWatch -Branch 'none' -HandedOver $true), (Test-Path $ciMarker) -join ',') }
+    finally { $script:CiWatchDir = $savedWatchDir2; Remove-Item -Recurse -Force -Path $ciMarker -ErrorAction SilentlyContinue }
     $script:CiWatch.AuditTasks = @{ 'BL-2001' = "Revert the dark factory's change to Audit/Findings/x.md" }
     & $check 'end report names an open audit task' "BL-2001 AUDIT    needs an interactive session: Revert the dark factory's change to Audit/Findings/x.md" `
         ((@(Get-OpenAuditTaskLines) | Where-Object { $_ -like 'BL-2001 *' }) -join '|')

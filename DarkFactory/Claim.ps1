@@ -186,21 +186,32 @@ function Add-ShiftUnready {
 
 function Complete-ClaimSplit {
     # Acts on what Invoke-TaskSplit returned for a capped task the claim offered, as ShiftRunner.ps1
-    # does, under the integrate lock. A result the caller must block ('skipped', 'failed') moves
-    # the task to Blocked with a "Stewart:" reason, then commits and pushes. 'reset-failed' left the
+    # does, under the integrate lock. 'failed' moves the task to Blocked with a "Stewart:" reason,
+    # then commits and pushes; a refused pull is followed by 'git rebase --abort'. 'skipped' leaves
+    # the task in Backlog (another lane's split holds today's marker). 'reset-failed' left the
     # split commit in place: it is pushed (valid, so origin sees the new IDs its stash copies
     # carry), else the stash copies stored under those IDs are dropped, since origin never saw
     # them. Returns 'blocked', 'pushed', 'stash-dropped' or '' for any other result.
     param(
         [string]$Id, [string]$Why, [string]$SplitResult,
         [scriptblock]$Git = { param([string[]]$GitArgs) Invoke-Git $GitArgs })
-    if (Test-TaskSplitLeavesBlockToCaller $SplitResult) {
+    # 'skipped' means another lane already offered the task for a split today: the task is still in
+    # Backlog, where every lane sees it, so it stays there rather than going to Stewart.
+    if ($SplitResult -eq 'failed') {
         $lock = Enter-Lock
         try {
             Invoke-Board @('move', '-Id', $Id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $Why; the automatic split returned '$SplitResult'") | Out-Null
+            if ((Get-TaskState $Id) -ne 'Blocked') {
+                Write-Trace $Id 'split' "the split returned '$SplitResult'; the task did not move to Blocked" 'Red'
+                return ''
+            }
             & $Git @('add', '-A', 'Tasks') | Out-Null
             & $Git @('commit', '-q', '-m', "chore(tasks): block $Id - automatic split returned '$SplitResult'", '-m', $SkipCiNote) | Out-Null
-            $pushed = (& $Git @('push', '-q', 'origin', "HEAD:$Branch")) -or ((& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) -and (& $Git @('push', '-q', 'origin', "HEAD:$Branch")))
+            $pushed = [bool](& $Git @('push', '-q', 'origin', "HEAD:$Branch"))
+            if (-not $pushed) {
+                if (& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) { $pushed = [bool](& $Git @('push', '-q', 'origin', "HEAD:$Branch")) }
+                else { & $Git @('rebase', '--abort') | Out-Null }
+            }
             Write-Trace $Id 'split' "the split returned '$SplitResult'; blocked$(if (-not $pushed) { ', but the push was refused' })" 'Red'
         } finally { $lock.Dispose() }
         return 'blocked'
@@ -375,11 +386,19 @@ if ($TestClaimDuplicates) {
         git -C $repo stash push -q -m 'darkfactory BL-777 20260101-000000' 2>&1 | Out-Null
         git -C $repo commit -q --allow-empty -m 'chore(tasks): split BL-011 into BL-777 - over its cost cap' 2>&1 | Out-Null
         $dropped = Complete-ClaimSplit 'BL-011' 'over its cost cap' 'reset-failed' -Git $dropGit
+        $headBefore = "$(git -C $repo rev-parse HEAD)"
+        $skipped = Complete-ClaimSplit 'BL-009' 'over its cost cap' 'skipped' -Git $dropGit
+        $skippedInBacklog = [bool](Get-ChildItem (Join-Path $repo 'Tasks\Backlog') -Filter 'BL-009-*.md') -and "$(git -C $repo rev-parse HEAD)" -eq $headBefore
+        $gitCalls = [System.Collections.Generic.List[string]]::new()
+        $refusedGit = { param([string[]]$GitArgs) $gitCalls.Add($GitArgs[0]); if ($GitArgs[0] -in 'push', 'pull', 'rebase') { $false } else { Invoke-Git $GitArgs } }
+        $refused = Complete-ClaimSplit 'BL-009' 'over its cost cap' 'failed' -Git $refusedGit
         $trace = @(Get-Content $TraceFile -ErrorAction SilentlyContinue)
         git -C $repo fetch -q origin work 2>&1 | Out-Null
         $blockedFile = @(git -C $repo show origin/work:Tasks/Blocked/BL-010-splitfails.md 2>&1) -join "`n"
         $cases = @(
             ,@('a split that returned failed leaves the task Blocked with a Stewart reason on the shared branch', 'True', "$($blockedFile -match 'Stewart: dark factory over its cost cap; the automatic split returned .failed.')")
+            ,@('a split that was skipped leaves the task in Backlog with no commit', "True ''", "$skippedInBacklog '$skipped'")
+            ,@('a refused pull aborts the rebase and the block is traced as refused', 'blocked push pull rebase True', "$refused $($gitCalls | Where-Object { $_ -in 'push', 'pull', 'rebase' }) $(@($trace | Where-Object { $_ -match 'BL-009.*blocked, but the push was refused' }).Count -eq 1)")
             ,@('a split that returned reset-failed is pushed and traced', 'True', "$(@($trace | Where-Object { $_ -match 'BL-011.*could not be reset, so it was pushed' }).Count -eq 1)")
             ,@('an unpushable reset-failed split drops its stash copies and says so', 'stash-dropped 0 True', "$dropped $(@(git -C $repo stash list).Count) $(@($trace | Where-Object { $_ -match 'dropped the stash copies of BL-777' }).Count -eq 1)")
             ,@('a duplicate ID is renumbered and the claim goes on', 'claimed', $(if ($claim.Id) { 'claimed' } else { "waited: $($claim.Why)" }))

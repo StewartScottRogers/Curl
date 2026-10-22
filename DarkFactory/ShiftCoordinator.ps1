@@ -485,8 +485,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     }
     # The merge waited for CI on the shift's last commit; a failure there finished after the
     # loop above stopped watching, so file it now (BL-1031).
-    Invoke-CiWatch -Branch $branch -Final
-    Remove-CiWatch
+    Invoke-MergeEndCiWatch -Branch $branch -HandedOver $handOver.Done | Out-Null
     # The next shift started during the merge's CI wait: only the review and the tab are left.
     if ($handOver.Done) {
         foreach ($r in @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
