@@ -107,11 +107,17 @@ function Copy-TaskStash {
 }
 
 function Remove-TaskStashEntries {
-    # Drops the stash list entries whose hash is in -Shas, and no others.
-    param([string[]]$Shas, [string]$Repo = $Root)
-    $hashes = @(git -C $Repo stash list --format='%H' 2>$null)
-    for ($i = $hashes.Count - 1; $i -ge 0; $i--) {
-        if ($Shas -contains $hashes[$i]) { git -C $Repo stash drop -q "stash@{$i}" 2>&1 | Out-Null }
+    # Drops the stash list entries whose hash is in -Shas, and no others. The list is shared with
+    # every lane, so an index can shift at any moment (BL-3105): each drop looks the index up afresh
+    # and checks it still names the hash, else looks again. -BetweenLookupAndDrop is a test hook.
+    param([string[]]$Shas, [string]$Repo = $Root, [scriptblock]$BetweenLookupAndDrop = {}, [string]$Id = 'split')
+    foreach ($sha in $Shas) {
+        $index = Find-StashIndex $sha $Repo
+        & $BetweenLookupAndDrop
+        if ($index -ge 0 -and "$(git -C $Repo rev-parse "stash@{$index}" 2>$null)".Trim() -ne $sha) { $index = Find-StashIndex $sha $Repo }
+        if ($index -lt 0) { continue }
+        $dropOutput = git -C $Repo stash drop -q "stash@{$index}" 2>&1
+        if ($LASTEXITCODE -ne 0) { Write-Trace $Id 'stash' "dropping stash $($sha.Substring(0, 8)) failed: $dropOutput" 'Red' }
     }
 }
 
@@ -280,6 +286,18 @@ if ($TestTaskStash) {
         $null = Restore-TaskStash -Id 'BL-5' -Repo $repo -BetweenLookupAndDrop $otherLane
         $left = @(git -C $repo stash list --format='%gs')
         & $check 'a stash pushed before the drop survives, the applied one is dropped' '1 True' "$($left.Count) $($left[0] -match 'darkfactory BL-6' -and (Find-StashIndex $mine $repo) -eq -1)"
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null; git -C $repo stash clear
+        # Another lane stashes between the lookup and the drop (BL-3105): only the listed hashes go.
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'one'
+        git -C $repo stash push -q -m 'darkfactory BL-9 20260105-000000' 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'two'
+        git -C $repo stash push -q -m 'darkfactory BL-9 20260105-000001' 2>&1 | Out-Null
+        $listed = @(git -C $repo stash list --format='%H')
+        $pushed = $false
+        $otherLane2 = { if ($pushed) { return }; $script:pushed = $true; Set-Content -Path (Join-Path $repo 'a.txt') -Value 'theirs'; git -C $repo stash push -q -m 'darkfactory BL-10 20260105-000000' 2>&1 | Out-Null }
+        Remove-TaskStashEntries $listed $repo -BetweenLookupAndDrop $otherLane2
+        $left = @(git -C $repo stash list --format='%gs')
+        & $check 'a stash pushed between lookup and drop survives, the listed ones are gone' '1 True' "$($left.Count) $($left[0] -match 'darkfactory BL-10')"
         git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null; git -C $repo stash clear
         # The split of a task over its cost cap (BL-3091), with every step injected.
         # Prompts.ps1 is loaded after this file; its last line marks a file finished, which this one is not.

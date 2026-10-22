@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3105 — Make Remove-TaskStashEntries drop by hash so a failed split never drops another lane's stash
 
@@ -24,13 +24,14 @@ Found by the shift-end review (ADR-0710) of 1c1f9cb05...ea67815c6, by silent-fai
 
 ## Acceptance criteria
 
-- [ ] `Remove-TaskStashEntries` finds each hash's index afresh (`Find-StashIndex`) and checks with `git rev-parse stash@{<i>}` that it still names that hash immediately before each drop, looking again when it does not.
-- [ ] A failed `git stash drop` is traced in red with git's message, not sent to `Out-Null`.
-- [ ] A `-TestTaskStash` case with real git pushes another stash between the lookup and the drop (an injected hook, as BL-3103's `-BetweenLookupAndDrop` does) and proves the other stash survives and only the listed hashes are gone.
-- [ ] `RunDarkFactory.ps1 -TestTaskStash` passes.
+- [x] `Remove-TaskStashEntries` finds each hash's index afresh (`Find-StashIndex`) and checks with `git rev-parse stash@{<i>}` that it still names that hash immediately before each drop, looking again when it does not.
+- [x] A failed `git stash drop` is traced in red with git's message, not sent to `Out-Null`.
+- [x] A `-TestTaskStash` case with real git pushes another stash between the lookup and the drop (an injected hook, as BL-3103's `-BetweenLookupAndDrop` does) and proves the other stash survives and only the listed hashes are gone.
+- [x] `RunDarkFactory.ps1 -TestTaskStash` passes.
 ## Notes
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 86040f37 5946f3c8 f32dbf2b 95ad9451.
+- 2026-10-22: Doing -> Done. Remove-TaskStashEntries looks each hash up afresh and verifies before dropping; -TestTaskStash passes
