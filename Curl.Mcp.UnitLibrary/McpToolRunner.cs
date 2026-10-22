@@ -38,6 +38,10 @@ public sealed class McpToolRunner(McpResponseCap cap)
         return ToResult(output, cancellationToken);
     }
 
+    /// <summary>
+    /// Builds the result of a run that returned; a cancellation that arrived while curl was finishing
+    /// still wins. A nonzero exit code gives the tool error and drops the output.
+    /// </summary>
     private McpToolResult ToResult(McpCurlRunOutput output, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)

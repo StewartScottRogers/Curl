@@ -24,6 +24,7 @@ internal static class McpConfigFileSyntax
             .Select(ReadLine)
             .ToList();
 
+    /// <summary>Splits one non-comment line into its option and parameter; a line starting with <c>-</c> ends its option only at blank, so <c>-o=x</c> keeps the <c>=</c> in the option.</summary>
     private static KeyValuePair<string, string?> ReadLine(string line)
     {
         bool dashed = line.StartsWith('-');
@@ -50,6 +51,7 @@ internal static class McpConfigFileSyntax
 
     private static bool IsSeparator(char character) => character is '=' or ':';
 
+    /// <summary>The parameter at the start of <paramref name="text" />: the quoted form, or text to the first white space; <see langword="null" /> when empty.</summary>
     private static string? ReadParameter(string text)
     {
         if (text.StartsWith('"'))
@@ -62,6 +64,7 @@ internal static class McpConfigFileSyntax
         return parameter.Length == 0 ? null : parameter;
     }
 
+    /// <summary>The text between the opening <c>"</c> of <paramref name="quoted" /> and the next unescaped <c>"</c>, with <c>\t</c>, <c>\n</c>, <c>\r</c> and <c>\v</c> resolved and any other escaped character taken as itself.</summary>
     private static string Unescape(string quoted)
     {
         StringBuilder parameter = new();

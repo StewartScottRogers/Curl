@@ -103,6 +103,7 @@ public static class McpOptionPathTable
         return Classifications.TryGetValue(longName, out use);
     }
 
+    /// <summary>Merges the name lists above into one case-sensitive lookup; a name listed twice throws, so a duplicate classification is caught at start-up.</summary>
     private static FrozenDictionary<string, McpOptionPathUse> BuildClassifications() =>
         new (string[] Names, McpOptionPathUse Use)[]
         {

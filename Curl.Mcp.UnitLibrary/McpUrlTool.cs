@@ -52,6 +52,7 @@ public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle)
             }
         }
 
+        // The URL parsed and every part was read, so rebuilding the whole URL has no failure to report.
         handle.Get(CurlUrlPart.Url, urlFlags, out string? whole);
         return new McpParseUrlToolResult(whole, McpUrlParts.FromValues(values), null);
     }
@@ -86,8 +87,10 @@ public sealed class McpUrlTool(Func<ICurlUrlHandle> createHandle)
             : McpBuildUrlToolResult.Failed(McpToolFailure.UrlRefused("url", code));
     }
 
+    /// <summary>Whether <paramref name="code" /> is one of the <c>CURLUE_NO_*</c> codes, which say a part is absent rather than that anything failed.</summary>
     private static bool IsNotSet(CurlUrlCode code) => code is >= CurlUrlCode.NoScheme and <= CurlUrlCode.NoZoneId;
 
+    /// <summary>Combines the named flags into one <see cref="CurlUrlFlags" />; <see langword="false" /> with an invalid-request error naming the first unknown one.</summary>
     private static bool TryReadFlags(IReadOnlyList<string>? names, out CurlUrlFlags flags, [NotNullWhen(false)] out McpToolFailure? failure)
     {
         flags = CurlUrlFlags.None;
