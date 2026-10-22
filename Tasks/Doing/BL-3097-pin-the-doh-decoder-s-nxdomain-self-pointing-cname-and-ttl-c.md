@@ -32,3 +32,4 @@ Decoder half of BL-2969 (ADR-0738). The code landed in 8677cc087 (NXDOMAIN, TTL 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 6a0f1245 af2d943f.
