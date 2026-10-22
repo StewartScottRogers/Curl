@@ -206,13 +206,21 @@ function Invoke-Claim {
             # that could only block (AF-0304); the next claim offers it once the window passes.
             # A task the pre-claim check finds unready is passed over the same way, traced once
             # a shift (BL-3001).
-            $skipNow = @($Skip)
+            # Only bare task IDs go to -Skip: anything else garbles the argument list.
+            $skipNow = @($Skip | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^BL-\d+$' })
             $unready = @()
             do {
                 $boardArgs = @('next')
                 if ($skipNow.Count) { $boardArgs += @('-Skip', ($skipNow -join ',')) }
                 $next = (Invoke-Board $boardArgs) -join "`n"
                 $id = Get-NextTaskId $next
+                # A task offered again although it is in the skip list would loop here for ever
+                # while this lane holds the lock, and every other lane waits on it (shift
+                # 20261021-175054: lane 6 offered BL-2970 752 times in 80 minutes). Wait instead.
+                if ($id -and ($skipNow -contains $id)) {
+                    Write-Trace $id 'claim' "next offered it again although -Skip named it ($($skipNow -join ',')); waiting" 'DarkYellow'
+                    return @{ Wait = $true; Why = "next kept offering skipped $id" }
+                }
                 $overCap = [bool]($id -and (Get-TaskCapSpentWhy $id))
                 if ($overCap) { Write-Trace $id 'cost cap' 'its runs of the last day already spent its cost cap; not claimed' 'Yellow'; $skipNow += $id }
                 $unreadyWhy = if ($id -and -not $overCap) { Get-TaskUnreadyWhy $id } else { '' }
