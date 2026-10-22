@@ -1,7 +1,7 @@
 # Libcurl
 
 The libcurl-faithful programming interface to Curl (ADR-0506): named `Libcurl`, with no `Curl.`
-prefix, to match upstream's library name. A naming exception, with `Curl.Console` and `Curl.Api`.
+prefix, to match upstream's library name. A naming exception, with `Curl.Api`, `Curl.Config`, `Curl.Console` and `Curl.Mcp`.
 Root namespace `Libcurl`; each area is a folder and namespace (`Libcurl/Global` is `Libcurl.Global`),
 with its tests in the same folder of `Libcurl.UnitTests`.
 

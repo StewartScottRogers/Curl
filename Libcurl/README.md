@@ -2,7 +2,7 @@
 
 The libcurl-faithful programming interface to Curl (ADR-0506): the libcurl C API shaped for C#.
 It is named `Libcurl`, without the `Curl.` prefix, to match upstream's library name; with
-`Curl.Console` and `Curl.Api` it is a naming exception. The root namespace is `Libcurl`, and each
+`Curl.Api`, `Curl.Config`, `Curl.Console` and `Curl.Mcp` it is a naming exception. The root namespace is `Libcurl`, and each
 area below is a folder and a namespace (`Libcurl/Global` is `Libcurl.Global`).
 
 `Libcurl` does no transfers itself. Every handle wraps an engine interface from
