@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3011]
-touches: [Curl.Networking.UnitLibrary/DnsAnswerDecoder.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs]
+touches: [Curl.Networking.UnitLibrary/DnsAnswerReader.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.AnswerRecord.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.CanonicalName.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.Name.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohTraceLines.AnswerDecoding.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.AnswerDecoding.cs, Curl.Networking.UnitTests/DnsAnswerDecoderTests.cs]
 requirement: none
 created: 2026-10-21
 completed:
