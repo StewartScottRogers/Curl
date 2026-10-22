@@ -37,3 +37,4 @@ Depends on BL-3092 (shares `ShiftCoordinator.ps1`) and BL-3091 (shares `ShiftRun
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: eb6f06bd 81817d88 0fbe131c 8f7f27e9 7193fd91.
