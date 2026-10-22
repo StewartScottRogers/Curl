@@ -322,9 +322,11 @@ Curl/
   `Curl.Api.UnitTests` come first, before `Curl.Authentication.UnitLibrary`.
 
 In `Curl.slnx`, projects are listed as one flat run with no solution folders around
-them, except the protocols: each `Curl.Protocol.<Name>.*` project sits with its tests in
-the `/Protocols/<Name>/` solution folder, `Curl.Protocol.Abstractions.*` in
-`/Protocols/Abstractions/` (ADR-0731). Solution folders change only the solution file; the
+them, except the protocols and the conformance projects: each `Curl.Protocol.<Name>.*`
+project sits with its tests in the `/Protocols/<Name>/` solution folder,
+`Curl.Protocol.Abstractions.*` in `/Protocols/Abstractions/`, each
+`Curl.Conformance.<Part>.*` project in `/Conformance/<Part>/`, and the harness itself
+(`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/` (ADR-0731). Solution folders change only the solution file; the
 directories on disk stay flat. The `Solution Items` and `Scripts` solution folders hold
 loose files only.
 

@@ -80,9 +80,36 @@
   </Folder>
 
   <!--
-    Each Curl.Protocol.<Name>.* project sits in /Protocols/<Name>/ with its tests (ADR-0731);
-    every other project stays in the flat run below.
+    Each Curl.Conformance.<Part>.* project sits in /Conformance/<Part>/ with its tests, the
+    harness itself (Curl.Conformance.UnitLibrary) in /Conformance/Harness/, and each
+    Curl.Protocol.<Name>.* project in /Protocols/<Name>/ (ADR-0731); every other project
+    stays in the flat run below.
   -->
+  <Folder Name="/Conformance/" />
+  <Folder Name="/Conformance/Harness/">
+    <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/Http2Server/">
+    <Project Path="Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.Http2Server.UnitTests/Curl.Conformance.Http2Server.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/Http3Server/">
+    <Project Path="Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.Http3Server.UnitTests/Curl.Conformance.Http3Server.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/LibTest/">
+    <Project Path="Curl.Conformance.LibTest.UnitLibrary/Curl.Conformance.LibTest.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.LibTest.UnitTests/Curl.Conformance.LibTest.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/SshServer/">
+    <Project Path="Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.SshServer.UnitTests/Curl.Conformance.SshServer.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Conformance/UnitProgram/">
+    <Project Path="Curl.Conformance.UnitProgram.UnitLibrary/Curl.Conformance.UnitProgram.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.UnitProgram.UnitTests/Curl.Conformance.UnitProgram.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Protocols/" />
   <Folder Name="/Protocols/Abstractions/">
     <Project Path="Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj" />
@@ -165,18 +192,6 @@
   <Project Path="Curl.Config/Curl.Config.csproj" />
   <Project Path="Curl.Config.UnitLibrary/Curl.Config.UnitLibrary.csproj" />
   <Project Path="Curl.Config.UnitTests/Curl.Config.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.Http2Server.UnitLibrary/Curl.Conformance.Http2Server.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.Http2Server.UnitTests/Curl.Conformance.Http2Server.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.Http3Server.UnitLibrary/Curl.Conformance.Http3Server.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.Http3Server.UnitTests/Curl.Conformance.Http3Server.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.LibTest.UnitLibrary/Curl.Conformance.LibTest.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.LibTest.UnitTests/Curl.Conformance.LibTest.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.SshServer.UnitLibrary/Curl.Conformance.SshServer.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.SshServer.UnitTests/Curl.Conformance.SshServer.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
-  <Project Path="Curl.Conformance.UnitProgram.UnitLibrary/Curl.Conformance.UnitProgram.UnitLibrary.csproj" />
-  <Project Path="Curl.Conformance.UnitProgram.UnitTests/Curl.Conformance.UnitProgram.UnitTests.csproj" />
   <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />
   <Project Path="Curl.Console.UnitTests/Curl.Console.UnitTests.csproj" />
   <Project Path="Curl.Console/Curl.Console.csproj" />

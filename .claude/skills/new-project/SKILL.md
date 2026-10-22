@@ -19,7 +19,9 @@ There is no `src/` and no `tests/` — do not create them.
 5. Add both to the solution with no solution folder, so they stay in the flat run:
    `dotnet sln Curl.slnx add Curl.<Area>.UnitLibrary Curl.<Area>.UnitTests`.
    A protocol goes in its own folder under `Protocols` instead (ADR-0731):
-   `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.UnitLibrary Curl.Protocol.<Name>.UnitTests`
+   `dotnet sln Curl.slnx add --solution-folder Protocols/<Name> Curl.Protocol.<Name>.UnitLibrary Curl.Protocol.<Name>.UnitTests`.
+   A conformance part goes in its folder under `Conformance` the same way:
+   `dotnet sln Curl.slnx add --solution-folder Conformance/<Part> Curl.Conformance.<Part>.UnitLibrary Curl.Conformance.<Part>.UnitTests`
 6. Reference production from test:
    `dotnet add Curl.<Area>.UnitTests reference Curl.<Area>.UnitLibrary`
 7. For a protocol library, also reference the contracts, and nothing else horizontal:

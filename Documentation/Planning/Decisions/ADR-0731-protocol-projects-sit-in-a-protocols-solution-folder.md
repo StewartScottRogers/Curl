@@ -31,3 +31,12 @@ Protocol folder for each protocol under it."
   (the `new-project` skill says so).
 - `CLAUDE.md`'s rule that projects are "one flat run with no solution folders around them" now
   excepts the protocols.
+
+## Amendment, 2026-10-21: conformance projects (BL-3007)
+
+Stewart asked the same day: "Can we create a solution folder and put all the conformance projects
+in it", and chose one subfolder per part, as for the protocols. `Curl.slnx` has a `/Conformance/`
+folder with `/Conformance/<Part>/` for each `Curl.Conformance.<Part>.*` group (Http2Server,
+Http3Server, LibTest, SshServer, UnitProgram), each with its library and tests. The harness itself,
+`Curl.Conformance.UnitLibrary` and `Curl.Conformance.UnitTests`, has no part in its name, so it sits
+in `/Conformance/Harness/`, named for what it is. As before, only the solution file changes.
