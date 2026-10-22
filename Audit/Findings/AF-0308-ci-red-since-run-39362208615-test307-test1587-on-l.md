@@ -3,12 +3,12 @@ id: AF-0308
 title: CI red since run 39362208615 (test307, test1587 on Linux and macOS) and still red at log copy; fix tasks sat 43 min unclaimed because the weekly window was used up
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:39362208615:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2946
+tasks: BL-2946
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -48,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.

@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
 key: process:logs:BL-2850:unfinished-run
 reproduction: none
-task: none
-tasks:
+task: BL-2951
+tasks: BL-2951
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
-- 2026-10-22: proposed -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.

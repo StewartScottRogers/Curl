@@ -3,12 +3,12 @@ id: AF-0301
 title: Glossary says unit programs live in Curl.Conformance.UnitProgram.UnitLibrary and UnitPrograms.Ported; neither exists
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Wiki/Glossary.md:Unit-program:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-2939
+tasks: BL-2939
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -49,3 +49,4 @@ IUnitProgram defined: False
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.

@@ -3,12 +3,12 @@ id: AF-0304
 title: BL-2788 claimed 4 times by lanes (2 requeues, 2 cost-cap blocks); its first run's 19 minutes of work sat in a stash that did not apply cleanly
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2788:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-2942
+tasks: BL-2942
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -47,3 +47,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.

@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib525To533Tests.cs:RunAsync_UploadsTheFile_InEitherCleanupOrder:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-2931
+tasks: BL-2931
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -47,4 +47,5 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib525To533Tests.cs -Patt
 ## Log
 
 - 2026-10-19: filed proposed.
-- 2026-10-22: proposed -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.

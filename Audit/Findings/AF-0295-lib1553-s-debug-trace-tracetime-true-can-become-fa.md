@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1553.cs:TestAsync-true:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1553.cs:72:true
-task: none
-tasks:
+task: BL-2933
+tasks: BL-2933
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -47,4 +47,5 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-19: filed proposed.
-- 2026-10-22: proposed -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

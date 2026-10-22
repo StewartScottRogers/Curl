@@ -3,19 +3,19 @@ id: AF-0307
 title: CI red 45.5 min on work/dark-factory from run 39226925458 (SslsImportThenExport_OnTheManagedEngineOffWindows...)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Stewart closed it on 2026-10-21: he accepts the 45.5 min red spell as inherent (about 21 min of CI on the fix plus a busy overlapping lane) rather than have High CI-fix tasks pre-empt a running lane; BL-2945 recorded the decision.
 key: process:logs:39226925458:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-2945
+tasks: BL-2945
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-21
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0307 - CI red 45.5 min on work/dark-factory from run 39226925458 (SslsImportThenExport_OnTheManagedEngineOffWindows...)
 
@@ -48,3 +48,5 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-21: accepted -> closed. Stewart accepts the red spell as inherent; no lane pre-emption.
