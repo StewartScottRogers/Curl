@@ -4,11 +4,11 @@ title: Vendor cases 1705 and 1706's data files, give the runner %DATE and %VERNU
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2881]
+depends-on: [BL-3018]
 touches: [Curl.Conformance.UnitTests/UpstreamTestData/Update-UpstreamTestData.ps1, Curl.Conformance.UnitTests/UpstreamTestData/data, Curl.Conformance.UnitTests/UpstreamTestDataTests.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3002 — Vendor cases 1705 and 1706's data files, give the runner %DATE and %VERNUM, and put both cases on the ratchet
 
@@ -26,12 +26,19 @@ Split from BL-2881 (2026-10-21), which builds the generator (`Curl.Cli.UnitLibra
 
 ## Acceptance criteria
 
-- [ ] `$env:CURL_UPSTREAM_CASE='1705'` and `'1706'` each end `Passed` on Windows, and both are on `PassingUpstreamCases.txt`.
-- [ ] `UpstreamCaseRunner` gives `%DATE` and `%VERNUM` values, with unit tests.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `$env:CURL_UPSTREAM_CASE='1705'` and `'1706'` each end `Passed` on Windows, and both are on `PassingUpstreamCases.txt`.
+- [x] `UpstreamCaseRunner` gives `%DATE` and `%VERNUM` values, with unit tests.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- The ten data files were fetched from curl-8_22_0 tests/data and added to Update-UpstreamTestData.ps1's one-by-one list (`$managenFiles`).
+- `%DATE` is the UTC date of the runner's start time (captured once from its TimeProvider, to the second, as runtests.pl takes its start time) and `%VERNUM` is `CurlVersion` (8.22.0). Default taken: `SOURCE_DATE_EPOCH` goes only into a perl command script's environment, not every curl run's, because only a script reads it and the setenv tests pin a curl run's environment exactly; a case's own setenv wins.
+- `%SRCDIR/../include` already resolves to the vendored UpstreamTestData/include, since %SRCDIR is UpstreamTestData; no mapping needed.
+- Measured: 1705 and 1706 pass on Windows; build clean; fast tests green; Measure-CodeQuality for Curl.Conformance.UnitLibrary reports 0 failing members.
 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 294eb782 69030254 c5f8cef6.
+- 2026-10-21: Doing -> Done. Cases 1705 and 1706 run through managen and pass, on the ratchet; the runner gives %DATE, %VERNUM and SOURCE_DATE_EPOCH

@@ -110,6 +110,19 @@ public sealed class DebugCallbackTransferEventsTests
     }
 
     [TestMethod]
+    public void ReportInfo_LineOfMoreThan2045Bytes_IsCutTo2043BytesEndingInDots()
+    {
+        List<(CurlInfoType Type, string Data)> calls = [];
+        ITransferEvents events = new DebugCallbackTransferEvents(Recording(calls), TlsBackend.Schannel);
+
+        events.ReportInfo(new string('A', 2045));
+        events.ReportInfo(new string('B', 2046));
+
+        Assert.AreEqual(new string('A', 2045) + "\n", calls[0].Data);
+        Assert.AreEqual(new string('B', 2043) + "...\n", calls[1].Data);
+    }
+
+    [TestMethod]
     public void TlsData_Schannel_GivesNothing()
     {
         List<(CurlInfoType Type, string Data)> calls = [];

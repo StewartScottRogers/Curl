@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/UpstreamConformanceTests.FixedEntropyStandIn.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.cs, Curl.Conformance.UnitTests/UpstreamConformanceTests.DebugStandIns.cs, Curl.Authentication.UnitLibrary/DigestClientNonce.cs, Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitLibrary/SaslAuthenticator.cs, Curl.Authentication.UnitTests/DigestClientNonceTests.cs, Curl.Ntlm.UnitLibrary, Curl.Ntlm.UnitTests, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.Authentication.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTests.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionDigestClientNonceTests.cs]
 requirement: none
 created: 2026-10-19
-completed:
+completed: 2026-10-21
 ---
 # BL-2834 — Stand in for the debug build's fixed entropy in Digest, NTLM and DIGEST-MD5 so upstream cases 159, 823, 832, 835, 869, 878, 881, 907, 934, 937, 1100 and 1647 run
 
@@ -35,7 +35,7 @@ If a case still differs after the stand-in, record its first difference in Notes
 - [x] Each of the twelve cases ends `Passed` with `$env:CURL_UPSTREAM_CASE='<n>'` on Windows and is on `PassingUpstreamCases.txt`, or its first difference is in Notes and a follow-up task is filed.
 - [x] A new ADR, "Decided by Claude under Stewart's delegation", records the stand-in in the style of ADR-0678.
 - [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and each changed library keeps 100% line and branch coverage and complexity at most 10.
-- [ ] After the push, `CI` is green on Linux and macOS for the commit.
+- [x] After the push, `CI` is green on Linux and macOS for the commit.
 
 ## Notes
 
@@ -71,3 +71,5 @@ If a case still differs after the stand-in, record its first difference in Notes
 - 2026-10-21: touches narrowed from the whole Curl.Authentication.UnitLibrary and .UnitTests to the four files that hold the Digest and SASL cnonce seam (DigestClientNonce, DigestAuthenticator, SaslAuthenticator and DigestClientNonceTests), per lane 5's Notes that the seam already exists there; if another Authentication file must change, add it in the same commit.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
 - 2026-10-21: Doing -> Backlog. Code committed; only the CI-on-Linux-and-macOS criterion is left, checkable once the shift pushes
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 2a064a5d 50019839 7f573e82 d86cdfca dd1cc079 620ebead.
+- 2026-10-21: Doing -> Done. Digest, SASL and NTLM entropy stand-in landed; CI green on all platforms

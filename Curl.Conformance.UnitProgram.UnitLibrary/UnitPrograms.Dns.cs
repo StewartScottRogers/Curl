@@ -1,3 +1,4 @@
+using Curl.Conformance.UnitProgram.Dns.Easy;
 using Curl.Conformance.UnitProgram.Dns.HttpsRecord;
 using Curl.Conformance.UnitProgram.Dns.Shuffle;
 using Curl.Conformance.UnitProgram.Dns.Tls;
@@ -13,5 +14,9 @@ public sealed partial class UnitPrograms
         new Unit3303MutualTlsConnectionReuse(),
         new Unit3304TlsSessionPeerKey(),
         new Unit1608DnsShuffle(),
+        new Unit1652InfoLineTruncation(),
+        new Unit2413ConnectionPeer(),
+        new Unit3219ProtocolMask(),
+        new Unit3302GssApiDelegation(),
     ];
 }

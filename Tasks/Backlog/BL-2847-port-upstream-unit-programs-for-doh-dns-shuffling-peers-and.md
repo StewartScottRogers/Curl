@@ -4,7 +4,7 @@ title: Port upstream unit programs for DoH, DNS shuffling, peers and TLS setting
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2886, BL-2922, BL-2923, BL-2924, BL-2925, BL-2921]
+depends-on: [BL-2886, BL-2922, BL-2923, BL-2924, BL-3014, BL-3015, BL-3016, BL-3017, BL-2921]
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns, Curl.Conformance.UnitProgram.UnitTests/Dns]
 requirement: none
 created: 2026-10-19

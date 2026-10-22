@@ -6,8 +6,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Cli;
 
 /// <summary>
-/// The <c>curl_easy_setopt</c> lines curl 8.21.0 (Schannel) writes for the proxy, TLS and authentication
-/// options, measured 2026-10-01 (BL-654 Notes, ADR-0326).
+/// The <c>curl_easy_setopt</c> lines curl 8.22.0 (Schannel) writes for the proxy, TLS and authentication
+/// options, measured 2026-10-01 (BL-654 Notes, ADR-0326), in the order BL-2966 measured on 2026-10-21.
 /// </summary>
 public static partial class LibcurlSourceCode
 {
@@ -80,13 +80,12 @@ public static partial class LibcurlSourceCode
     }.ToFrozenDictionary();
 
     /// <summary>
-    /// The lines after <c>CURLOPT_NOBODY</c> and before <c>CURLOPT_FAILONERROR</c>: the <c>--oauth2-bearer</c>
-    /// token and the proxy options.
+    /// The lines of curl 8.22.0's <c>proxy_setopts</c>, right after <c>CURLOPT_NOPROGRESS</c>: the proxy
+    /// options, ending with the proxy's private key password.
     /// </summary>
-    private static List<string> BearerAndProxyLines(CommandLineOptions options)
+    private static List<string> ProxyLines(CommandLineOptions options)
     {
         List<string> lines = [];
-        AddIf(lines, options.BearerToken is not null, () => Setopt("CURLOPT_XOAUTH2_BEARER", QuoteCString(options.BearerToken!)));
         AddIf(lines, options.Proxy is not null, () => Setopt("CURLOPT_PROXY", QuoteCString(options.Proxy!.Address)));
         AddIf(lines, options.Proxy is not null && ProxyTypeNames.ContainsKey(options.Proxy.KindWithoutScheme), () => Setopt("CURLOPT_PROXYTYPE", $"(long){ProxyTypeNames[options.Proxy!.KindWithoutScheme]}"));
         AddIf(lines, options.ProxyCredentials is not null, () => Setopt("CURLOPT_PROXYUSERPWD", QuoteCString($"{options.ProxyCredentials!.UserName}:{options.ProxyCredentials.Password}")));
@@ -98,22 +97,22 @@ public static partial class LibcurlSourceCode
         AddStringIf(lines, "CURLOPT_PROXY_SERVICE_NAME", options.ProxyServiceName);
         AddIf(lines, options.HaproxyProtocol, SetoptOn("CURLOPT_HAPROXYPROTOCOL"));
         AddStringIf(lines, "CURLOPT_HAPROXY_CLIENT_IP", options.HaproxyClientIp);
+        AddStringIf(lines, "CURLOPT_PROXY_KEYPASSWD", options.ProxyPassphrase ?? SplitCertificate(options.ProxyClientCertificate).Password);
         return lines;
     }
 
-    /// <summary>The netrc and <c>--login-options</c> lines, after <c>CURLOPT_FAILONERROR</c> and before <c>CURLOPT_USERPWD</c>.</summary>
+    /// <summary>The netrc and <c>--login-options</c> lines, after <c>CURLOPT_XOAUTH2_BEARER</c> and before <c>CURLOPT_USERPWD</c>.</summary>
     private static List<string> NetrcLines(CommandLineOptions options)
     {
         List<string> lines = [];
         AddIf(lines, options.NetrcUse != NetrcUse.Ignored, () => Setopt("CURLOPT_NETRC", options.NetrcUse == NetrcUse.Optional ? "(long)CURL_NETRC_OPTIONAL" : "(long)CURL_NETRC_REQUIRED"));
         AddStringIf(lines, "CURLOPT_NETRC_FILE", options.NetrcFile);
-        AddIf(lines, options.UseAscii, SetoptOn("CURLOPT_TRANSFERTEXT"));
         AddStringIf(lines, "CURLOPT_LOGIN_OPTIONS", options.LoginOptions);
         return lines;
     }
 
     /// <summary>
-    /// The <c>CURLOPT_HTTPAUTH</c> line, written after the request body whenever an authentication option
+    /// The <c>CURLOPT_HTTPAUTH</c> line, written after <c>CURLOPT_USERPWD</c> whenever an authentication option
     /// gave curl's tool a scheme: <c>--anyauth</c> starts from <c>CURLAUTH_ANY</c> and a later <c>--no-</c>
     /// scheme takes its bit out, <c>--oauth2-bearer</c> adds Bearer (64) and <c>--aws-sigv4</c> AWS (128).
     /// </summary>
@@ -126,16 +125,15 @@ public static partial class LibcurlSourceCode
         return bits == 0 ? [] : [SetoptBitmask("CURLOPT_HTTPAUTH", bits, AuthNames)];
     }
 
-    /// <summary>The TLS lines for the server and the proxy, written after the scheme's lines in curl's order.</summary>
-    private static List<string> TlsLines(LibcurlTransfer transfer, string scheme)
+    /// <summary>
+    /// The lines of curl 8.22.0's <c>ssl_ca_setopts</c> and <c>ssl_setopts</c> for the server and the proxy,
+    /// written for every scheme after the SSH lines.
+    /// </summary>
+    private static List<string> TlsLines(CommandLineOptions options)
     {
-        CommandLineOptions options = transfer.Options;
-        (string? certificate, string? certificatePassword) = SplitCertificate(options.ClientCertificate);
-        (string? proxyCertificate, string? proxyCertificatePassword) = SplitCertificate(options.ProxyClientCertificate);
+        string? certificate = SplitCertificate(options.ClientCertificate).Certificate;
+        string? proxyCertificate = SplitCertificate(options.ProxyClientCertificate).Certificate;
         List<string> lines = [];
-        AddStringIf(lines, "CURLOPT_KEYPASSWD", options.Passphrase ?? certificatePassword);
-        AddStringIf(lines, "CURLOPT_PROXY_KEYPASSWD", options.ProxyPassphrase ?? proxyCertificatePassword);
-        lines.AddRange(SshLines(transfer, scheme));
         AddStringIf(lines, "CURLOPT_CAINFO", options.CaCertificateFile);
         AddStringIf(lines, "CURLOPT_PROXY_CAINFO", options.ProxyCaCertificateFile);
         AddStringIf(lines, "CURLOPT_PINNEDPUBLICKEY", options.PinnedPublicKey);
@@ -195,7 +193,7 @@ public static partial class LibcurlSourceCode
         return lines;
     }
 
-    /// <summary>The SOCKS5 and <c>--service-name</c> lines, after <c>CURLOPT_IPRESOLVE</c> and before <c>CURLOPT_TCP_KEEPALIVE</c>.</summary>
+    /// <summary>The SOCKS5 and <c>--service-name</c> lines, after <c>CURLOPT_IPRESOLVE</c> and before <c>CURLOPT_IGNORE_CONTENT_LENGTH</c>.</summary>
     private static List<string> SocksAndServiceLines(CommandLineOptions options)
     {
         List<string> lines = [];
@@ -206,11 +204,17 @@ public static partial class LibcurlSourceCode
         return lines;
     }
 
-    /// <summary>The GSS-API delegation and SASL lines, the last of a transfer's lines.</summary>
-    private static List<string> DelegationAndSaslLines(CommandLineOptions options)
+    /// <summary>The <c>--delegation</c> line, which curl 8.22.0's <c>misc_setopts</c> writes twice.</summary>
+    private static List<string> DelegationLines(CommandLineOptions options) =>
+        options.GssApiDelegation == GssApiDelegation.None ? [] : [Setopt("CURLOPT_GSSAPI_DELEGATION", $"{(int)options.GssApiDelegation}L")];
+
+    /// <summary>
+    /// The <c>--mail-auth</c>, <c>--sasl-authzid</c> and <c>--sasl-ir</c> lines, which curl 8.22.0 writes both
+    /// in <c>mail_and_sasl_setopts</c> and again in <c>misc_setopts</c>.
+    /// </summary>
+    private static List<string> MailAuthAndSaslLines(CommandLineOptions options)
     {
         List<string> lines = [];
-        AddIf(lines, options.GssApiDelegation != GssApiDelegation.None, () => Setopt("CURLOPT_GSSAPI_DELEGATION", $"{(int)options.GssApiDelegation}L"));
         AddStringIf(lines, "CURLOPT_MAIL_AUTH", options.MailAuth);
         AddStringIf(lines, "CURLOPT_SASL_AUTHZID", options.SaslAuthorizationIdentity);
         AddIf(lines, options.SaslInitialResponse, SetoptOn("CURLOPT_SASL_IR"));
@@ -218,7 +222,7 @@ public static partial class LibcurlSourceCode
     }
 
     /// <summary>
-    /// <see langword="true"/> when curl 8.21.0 writes <c>CURLOPT_HEADEROPT</c> for an HTTP transfer: through a
+    /// <see langword="true"/> when curl 8.22.0 writes <c>CURLOPT_HEADEROPT</c> for an HTTP transfer: through a
     /// proxy, to an <c>https</c> URL or through a <c>-p</c> tunnel.
     /// </summary>
     private static bool SeparatesProxyHeaders(CommandLineOptions options, string scheme) =>
@@ -265,7 +269,7 @@ public static partial class LibcurlSourceCode
         file is not null && file.StartsWith(PkcsElevenPrefix, StringComparison.OrdinalIgnoreCase) ? "ENG" : null;
 
     /// <summary>
-    /// Splits <c>-E</c>'s <c>certificate[:password]</c> as curl 8.21.0's Windows tool does: a <c>pkcs11:</c>
+    /// Splits <c>-E</c>'s <c>certificate[:password]</c> as curl 8.22.0's Windows tool does: a <c>pkcs11:</c>
     /// value is not split; <c>\:</c> is a colon and <c>\\</c> a backslash; a colon after a drive letter and
     /// before <c>\</c> or <c>/</c> is part of the name; the first other colon ends the name, and an empty
     /// password is no password.

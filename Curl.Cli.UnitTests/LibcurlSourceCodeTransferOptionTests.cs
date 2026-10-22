@@ -4,7 +4,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins the <c>curl_easy_setopt</c> lines <see cref="LibcurlSourceCode" /> writes for the transfer, redirect,
-/// speed, time-condition and socket options against curl 8.21.0 (mingw, Schannel), measured on 2026-10-02
+/// speed, time-condition and socket options against curl 8.21.0 (mingw, Schannel), measured on 2026-10-02 and reordered to curl 8.22.0 (config2setopts.c order)
 /// with <c>Record-CurlExchange.ps1 -NoServer</c> and <c>--libcurl - -s</c> (BL-1106 Notes). Each row is one
 /// measured command line; the transfer's lines are compared byte for byte.
 /// </summary>
@@ -35,12 +35,12 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("--request-target|*", Start + "  curl_easy_setopt(curl, CURLOPT_REQUEST_TARGET, \"*\");\n" + Agent + MaxRedirs + After)]
-    [DataRow("-l", Start + "  curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1L);\n" + Agent + MaxRedirs + After)]
-    [DataRow("-a", Start + "  curl_easy_setopt(curl, CURLOPT_APPEND, 1L);\n" + Agent + MaxRedirs + After)]
-    [DataRow("-B", Start + "  curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);\n" + Agent + MaxRedirs + After)]
-    [DataRow("-r|0-5", Start + "  curl_easy_setopt(curl, CURLOPT_RANGE, \"0-5\");\n" + Agent + MaxRedirs + After)]
-    [DataRow("--form-escape", Start + "  curl_easy_setopt(curl, CURLOPT_MIME_OPTIONS, 1L);\n" + Agent + MaxRedirs + After)]
+    [DataRow("--request-target|*", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_REQUEST_TARGET, \"*\");\n" + MaxRedirs + After)]
+    [DataRow("-l", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1L);\n" + MaxRedirs + After)]
+    [DataRow("-a", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_APPEND, 1L);\n" + MaxRedirs + After)]
+    [DataRow("-B", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);\n" + MaxRedirs + After)]
+    [DataRow("-r|0-5", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_RANGE, \"0-5\");\n" + MaxRedirs + After)]
+    [DataRow("--form-escape", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_MIME_OPTIONS, 1L);\n" + MaxRedirs + After)]
     [DataRow("--disallow-username-in-url", Before + After + "  curl_easy_setopt(curl, CURLOPT_DISALLOW_USERNAME_IN_URL, 1L);\n")]
     [DataRow("--alt-svc|a.txt", Before + "  curl_easy_setopt(curl, CURLOPT_ALTSVC, \"a.txt\");\n" + After)]
     [DataRow("--hsts|h.txt", Before + "  curl_easy_setopt(curl, CURLOPT_HSTS, \"h.txt\");\n" + After)]
@@ -58,19 +58,19 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     [DataRow("--keepalive-time|30", Before + After + "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 30L);\n  curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 30L);\n")]
     [DataRow("--keepalive-cnt|5", Before + After + "  curl_easy_setopt(curl, CURLOPT_TCP_KEEPCNT, 5L);\n")]
     [DataRow("--keepalive-time|0|--keepalive-cnt|0", Before + After)]
-    [DataRow("-C|5", Before + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n" + After)]
+    [DataRow("-C|5", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n" + MaxRedirs + After)]
     [DataRow("-C|-", Before + After)]
     [DataRow("--max-filesize|100", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)100);\n" + KeepAlive)]
     [DataRow("--happy-eyeballs-timeout-ms|300", Before + After + "  curl_easy_setopt(curl, CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS, 300L);\n")]
     [DataRow("--expect100-timeout|2", Before + "  curl_easy_setopt(curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 2000L);\n" + After)]
     [DataRow("--max-redirs|50|--max-filesize|0|--expect100-timeout|0|--happy-eyeballs-timeout-ms|0", Before + After)]
-    [DataRow("-Y|100", Before + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 100L);\n  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);\n" + After)]
-    [DataRow("-y|20", Before + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 20L);\n" + After)]
-    [DataRow("-Y|5|-y|0", Before + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 5L);\n" + After)]
-    [DataRow("-Y|0|-y|9", Before + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 9L);\n" + After)]
-    [DataRow("-y|0", Before + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n" + After)]
-    [DataRow("-z|20200101", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n" + KeepAlive)]
-    [DataRow("-z|-20200101", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFUNMODSINCE);\n  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n" + KeepAlive)]
+    [DataRow("-Y|100", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 100L);\n  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);\n" + MaxRedirs + After)]
+    [DataRow("-y|20", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 20L);\n" + MaxRedirs + After)]
+    [DataRow("-Y|5|-y|0", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 5L);\n" + MaxRedirs + After)]
+    [DataRow("-Y|0|-y|9", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 9L);\n" + MaxRedirs + After)]
+    [DataRow("-y|0", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n" + MaxRedirs + After)]
+    [DataRow("-z|20200101", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n" + MaxRedirs + Tls + KeepAlive)]
+    [DataRow("-z|-20200101", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFUNMODSINCE);\n  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n" + MaxRedirs + Tls + KeepAlive)]
     [DataRow("-j", Before + "  curl_easy_setopt(curl, CURLOPT_COOKIESESSION, 1L);\n" + After)]
     [DataRow("--follow", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 2L);\n" + MaxRedirs + After)]
     [DataRow("-L|--follow", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 2L);\n" + MaxRedirs + After)]
@@ -83,12 +83,12 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     [DataRow("--post301|--post303", Before + "  curl_easy_setopt(curl, CURLOPT_POSTREDIR, 5L);\n" + After)]
     [DataRow("--tr-encoding", Before + "  curl_easy_setopt(curl, CURLOPT_TRANSFER_ENCODING, 1L);\n" + After)]
     [DataRow("--ignore-content-length", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_IGNORE_CONTENT_LENGTH, 1L);\n" + KeepAlive)]
-    [DataRow("--path-as-is", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);\n" + KeepAlive)]
+    [DataRow("--path-as-is", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);\n" + MaxRedirs + Tls + KeepAlive)]
     [DataRow("--http0.9", Before + "  curl_easy_setopt(curl, CURLOPT_HTTP09_ALLOWED, 1L);\n" + After)]
     [DataRow("--http1.0", Before + "  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_1_0);\n" + After)]
     [DataRow("-0", Before + "  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_1_0);\n" + After)]
     [DataRow("--http1.1", Before + "  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_1_1);\n" + After)]
-    [DataRow("--crlf", Before + Tls + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n" + KeepAlive)]
+    [DataRow("--crlf", Start + Agent + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n" + MaxRedirs + Tls + KeepAlive)]
     [DataRow("-w|x", Before + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n" + After)]
     [DataRow("-w|%{http_code}", Before + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n" + After)]
     public void Generate_TransferOption_WritesCurlsLines(string arguments, string transfer)
@@ -103,8 +103,9 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     public void Generate_CertificateInfoWithCaAndClientCertificate_SitsBetweenThem()
     {
         string expected =
-            Before
+            Start + Agent
             + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n"
+            + MaxRedirs
             + "  curl_easy_setopt(curl, CURLOPT_CAINFO, \"up.txt\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_SSLCERT, \"c.pem\");\n"
@@ -117,15 +118,16 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     }
 
     [TestMethod]
-    public void Generate_TransferTextAmongTheNetrcLines_SitsBeforeTheLoginOptions()
+    public void Generate_TransferTextAmongTheNetrcLines_SitsAfterTheUserAgent()
     {
         string expected =
             Start
             + "  curl_easy_setopt(curl, CURLOPT_NETRC, (long)CURL_NETRC_REQUIRED);\n"
             + "  curl_easy_setopt(curl, CURLOPT_NETRC_FILE, \"up.txt\");\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_LOGIN_OPTIONS, \"x\");\n"
-            + Agent + MaxRedirs + After;
+            + Agent
+            + "  curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 1L);\n"
+            + MaxRedirs + After;
 
         string actual = TransferLinesFor("-B|--login-options|x|-n|--netrc-file|up.txt|" + HttpUrl);
 
@@ -155,16 +157,17 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     }
 
     [TestMethod]
-    public void Generate_SpeedResumeAndConditionOnFtp_FollowThePassiveIpLine()
+    public void Generate_SpeedResumeAndConditionOnFtp_PrecedeThePassiveIpLine()
     {
         string expected =
-            FtpStart + Agent + PassiveIp
+            FtpStart + Agent
             + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 20L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)5);\n"
-            + Tls
             + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFUNMODSINCE);\n"
             + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
+            + PassiveIp
+            + Tls
             + KeepAlive
             + "  curl_easy_setopt(curl, CURLOPT_ABSTRACT_UNIX_SOCKET, \"s\");\n";
 
@@ -179,6 +182,7 @@ public sealed class LibcurlSourceCodeTransferOptionTests
     {
         string expected =
             Start
+            + Agent
             + "  curl_easy_setopt(curl, CURLOPT_REQUEST_TARGET, \"*\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, 1L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_APPEND, 1L);\n"
@@ -190,7 +194,12 @@ public sealed class LibcurlSourceCodeTransferOptionTests
             + "  curl_mime_name(part1, \"a\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime1);\n"
             + "  curl_easy_setopt(curl, CURLOPT_MIME_OPTIONS, 1L);\n"
-            + Agent
+            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 100L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 20L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n"
+            + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
             + "  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 2L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, (long)CURL_HTTP_VERSION_1_1);\n"
@@ -201,14 +210,8 @@ public sealed class LibcurlSourceCodeTransferOptionTests
             + "  curl_easy_setopt(curl, CURLOPT_HSTS, \"h.txt\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_EXPECT_100_TIMEOUT_MS, 2000L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_COOKIESESSION, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 100L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 20L);\n"
             + "  curl_easy_setopt(curl, CURLOPT_CERTINFO, 1L);\n"
             + Tls
-            + "  curl_easy_setopt(curl, CURLOPT_PATH_AS_IS, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_CRLF, 1L);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TIMECONDITION, (long)CURL_TIMECOND_IFMODSINCE);\n"
-            + "  curl_easy_setopt(curl, CURLOPT_TIMEVALUE_LARGE, (curl_off_t)1577836800);\n"
             + "  curl_easy_setopt(curl, CURLOPT_INTERFACE, \"lo\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_DOH_URL, \"https://d/q\");\n"
             + "  curl_easy_setopt(curl, CURLOPT_MAXFILESIZE_LARGE, (curl_off_t)100);\n"
