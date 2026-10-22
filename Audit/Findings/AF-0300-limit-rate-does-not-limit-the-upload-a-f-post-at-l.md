@@ -3,19 +3,19 @@ id: AF-0300
 title: --limit-rate does not limit the upload: a -F POST at --limit-rate 10 sends its whole body at once and exits 0 where curl exits 56
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
 key: conformance:--limit-rate:upload-not-throttled:exit-code
 reproduction: none
-task: none
-tasks:
+task: BL-2938
+tasks: BL-2938
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_0130.md
 ---
 # AF-0300 - --limit-rate does not limit the upload: a -F POST at --limit-rate 10 sends its whole body at once and exits 0 where curl exits 56
 
@@ -42,6 +42,10 @@ dotnet build Curl.Console -c Release -nologo | Out-Null; $r=(Get-Location).Path;
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the reproduction's exchange commands with output in the scratch folder. I skipped its dotnet build step so it would not run alongside the load tool's publish; the Release binary it used was built from this tree by the differential run minutes earlier. Output: 'curl exit 56 request 213 bytes' / 'candidate exit 56 request 213 bytes'. Curl now gives the same exit code and request bytes as curl 8.22.0 (Schannel) for --form f=@f.txt --limit-rate 10.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.

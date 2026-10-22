@@ -3,12 +3,12 @@ id: AF-0306
 title: CI red 50.4 min on work/dark-factory from run 39210403935 (Perform_AfterAPerformWhoseDigestAnswerWasRefused_SendsTheKeptNonceTwice...)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:39210403935:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-3065
+tasks: BL-2944, BL-3065
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction gives spell 39210403935: 50.38 min. This window has the same mechanism, a lane push turning CI red for over 30 minutes before a fix landed. Spell 39691487971 lasted 48.35 min (2026-10-21T23:21:56Z to 2026-10-22T00:10:17Z) after commit 01deb2980; the Windows quality gate was fixed by BL-2998. Spell 39718635967 lasted 46.02 min after d6d35bf61.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.

@@ -3,19 +3,19 @@ id: AF-0299
 title: The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:TunnelRequest-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:1311:true
-task: none
-tasks:
+task: BL-2937
+tasks: BL-2937
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: mechanical
+closed-by: 2026-10-22_0130.md
 ---
 # AF-0299 - The proxy redial's answersChallenge = true can become false with no test failing, so the reconnect after a closed 407 acts as a first request
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the -Site reproduction: the site moved; resolved within TunnelRequest to line 1376, mutant Curl.Networking.UnitLibrary/TcpConnector.cs:1376:true killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

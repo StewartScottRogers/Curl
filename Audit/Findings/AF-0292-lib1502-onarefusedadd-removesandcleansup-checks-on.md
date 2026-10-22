@@ -3,19 +3,19 @@ id: AF-0292
 title: Lib1502_OnARefusedAdd_RemovesAndCleansUp checks only the exit code, neither the removal nor the clean-up
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs:Lib1502_OnARefusedAdd_RemovesAndCleansUp:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-2930
+tasks: BL-2930
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_0130.md
 ---
 # AF-0292 - Lib1502_OnARefusedAdd_RemovesAndCleansUp checks only the exit code, neither the removal nor the clean-up
 
@@ -42,6 +42,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1485To1511Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: no | Ran the Select-String reproduction (Lib1485To1511Tests.cs:292-301). Besides the exit code, the test now asserts Assert.AreEqual(1, engine.Multi.Removals, "the refused handle is removed from the multi handle") and Assert.AreEqual(2, engine.DisposedEasyCount, "the original and the duplicated easy handle are both cleaned up").
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_0130.md: the reproduction no longer reproduces.

@@ -3,12 +3,12 @@ id: AF-0309
 title: BL-2787 cost $4.85, 3.4 times the median task cost of $1.42
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2787:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2947
+tasks: BL-2947
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still lists BL-2787 at 4.8482 as the top cost. By mechanism, this window has 5 tasks over 3 times the median cost of $1.8006: BL-2845 7.4985, BL-2938 5.7798, BL-2970 5.602, BL-2924 5.5624, BL-2859 5.4413. BL-2924's single 83-turn run cost $5.06, the same single-long-run cause as BL-2787.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.

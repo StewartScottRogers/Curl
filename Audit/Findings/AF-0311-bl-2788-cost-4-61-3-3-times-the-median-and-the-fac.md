@@ -3,12 +3,12 @@ id: AF-0311
 title: BL-2788 cost $4.61, 3.3 times the median, and the factory never finished it
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-2788:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-2949
+tasks: BL-2949
 found: 2026-10-19
 found-at: 1b3c70b1436b2d499099c5c6dd7bb119e11f5631
 scorecard: 2026-10-19_2134.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_0130.md | reproduces: yes | The original reproduction still gives BL-2788 claims=4, costUsd=4.6076, outcome=blocked. The same cause recurs in this window: a cost outlier the factory never finished. BL-2970 cost $5.60 (3.1 times the median of $1.80) over 3 runs and ended requeued, then Deferred and split into BL-3011 to BL-3013.
+
 ## Log
 
 - 2026-10-19: filed proposed.
+- 2026-10-21: proposed -> accepted.
