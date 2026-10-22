@@ -42,3 +42,4 @@ Found by the shift-end review of the shift merged at 5a29b06be. The code-reviewe
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 1291aedf b2135200 5ee32986 a0b49a29.
