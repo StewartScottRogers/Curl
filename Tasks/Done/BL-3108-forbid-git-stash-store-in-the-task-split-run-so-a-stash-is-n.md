@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Prompts.ps1, DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3108 — Forbid git stash store in the task-split run so a stash is never stored twice
 
@@ -38,3 +38,4 @@ The self-test asserts `git stash store` is in `$SplitForbidden`; the prompt no l
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 7bda0dc5 3d76c338 88c44122.
+- 2026-10-22: Doing -> Done. split run forbids git stash store; self-test asserts it
