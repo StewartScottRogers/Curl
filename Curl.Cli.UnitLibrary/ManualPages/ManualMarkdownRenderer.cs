@@ -13,7 +13,7 @@ namespace Curl.Cli.ManualPages;
 /// <param name="manpage">Whether the page is nroff.</param>
 /// <param name="fileName">The document's name, for messages.</param>
 /// <param name="line">The line before the body; 1 means a top-level page, not an option.</param>
-internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool manpage, string fileName, int line)
+public sealed class ManualMarkdownRenderer(ManualPageContext context, bool manpage, string fileName, int line)
 {
     private const RegexOptions Options = RegexOptions.CultureInvariant;
 
@@ -33,6 +33,7 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
     /// <returns>The description lines, or one line holding a failed check's code.</returns>
     public List<string> Render(IEnumerable<string> lines)
     {
+        ArgumentNullException.ThrowIfNull(lines);
         foreach (string text in lines)
         {
             lineNumber++;
@@ -48,20 +49,29 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
             throw Exit($"{fileName}:{lineNumber}:1:ERROR: trailing blank line\n", 3);
         }
 
-        AddIf(manpage && quote != 0, ".fi\n");
-        AddIf(manpage && tableMode, ".RE\n.IP\n");
+        CloseOpenBlocks();
         return description;
+    }
+
+    private void CloseOpenBlocks()
+    {
+        if (manpage)
+        {
+            AddIf(quote != 0, ".fi\n");
+            AddIf(tableMode, ".RE\n.IP\n");
+        }
     }
 
     private int? RenderLine(string text)
     {
-        if (Regex.Match(text, @"^\.(SH|BR|IP|B)", Options) is { Success: true } nroff)
+        Match nroff = Regex.Match(text, @"^\.(SH|BR|IP|B)", Options);
+        if (nroff.Success)
         {
             context.Error.Append($"{fileName}:{lineNumber}:1:ERROR: nroff instruction in input: \".{nroff.Groups[1].Value}\"\n");
             return 4;
         }
 
-        if (Regex.IsMatch(text, "^ *<!--", Options) || (!start && Regex.IsMatch(text, @"^[\r\n]*\z", Options)))
+        if (IsSkipped(text))
         {
             return null;
         }
@@ -73,33 +83,54 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
             return null;
         }
 
-        string? body = QuoteLine(text);
+        return HeaderOrTextLine(text, QuoteLine(text));
+    }
+
+    // A comment, or a blank line before the first text.
+    private bool IsSkipped(string text) =>
+        Regex.IsMatch(text, "^ *<!--", Options) || (!start && Regex.IsMatch(text, @"^[\r\n]*\z", Options));
+
+    private int? HeaderOrTextLine(string text, string? body)
+    {
         if (body is null)
         {
             return null;
         }
 
-        return HeaderLine(text) is { } handled ? NullWhenZero(handled) : TextLine(body);
+        int? handled = HeaderLine(text);
+        return handled is null ? TextLine(body) : NullWhenZero(handled.Value);
     }
 
     private string? QuoteLine(string text)
     {
-        if (Regex.Match(text, "^    (.*)", Options) is { Success: true } indented)
+        Match indented = Regex.Match(text, "^    (.*)", Options);
+        if (indented.Success)
         {
             OpenQuoteIf(quote == 0);
             quote = 1;
             return indented.Groups[1].Value + "\n";
         }
 
-        if (text.StartsWith("```", StringComparison.Ordinal) || text.StartsWith("~~~", StringComparison.Ordinal))
+        if (IsFence(text))
         {
             FenceLine();
             return null;
         }
 
-        AddIf(manpage && quote == 1, ".fi\n");
-        quote = quote == 1 ? 0 : quote;
+        CloseIndentedQuote();
         return text;
+    }
+
+    private static bool IsFence(string text) =>
+        text.StartsWith("```", StringComparison.Ordinal) || text.StartsWith("~~~", StringComparison.Ordinal);
+
+    private void CloseIndentedQuote()
+    {
+        if (quote == 1)
+        {
+            AddIf(manpage, ".fi\n");
+            quote = 0;
+        }
     }
 
     private void FenceLine()
@@ -128,11 +159,10 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
     // null: not a header; 0: handled; otherwise the code a failed check returns.
     private int? HeaderLine(string text)
     {
-        if (Regex.Match(text, "^# (.*)", Options) is { Success: true } title)
+        Match title = Regex.Match(text, "^# (.*)", Options);
+        if (title.Success)
         {
-            header = true;
-            blankLines += top ? 0 : 1;
-            AddIf(top, manpage ? $".SH {title.Groups[1].Value}\n" : $"[0]{title.Groups[1].Value}\n");
+            Title(title.Groups[1].Value);
             return 0;
         }
 
@@ -141,7 +171,8 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
             throw Exit($"{fileName}:{lineNumber}:1:ERROR: ### header is not supported\n", 3);
         }
 
-        if (Regex.Match(text, "^## (.*)", Options) is { Success: true } item)
+        Match item = Regex.Match(text, "^## (.*)", Options);
+        if (item.Success)
         {
             SubHeader(item.Groups[1].Value);
             return 0;
@@ -156,9 +187,17 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
         return NroffBlock(text);
     }
 
+    private void Title(string title)
+    {
+        header = true;
+        blankLines += top ? 0 : 1;
+        AddIf(top, manpage ? $".SH {title}\n" : $"[0]{title}\n");
+    }
+
     private int? NroffBlock(string text)
     {
-        if (Regex.Match(text, @"^\.(IP|RS|RE)", Options) is { Success: true } block)
+        Match block = Regex.Match(text, @"^\.(IP|RS|RE)", Options);
+        if (block.Success)
         {
             context.Error.Append($"{fileName}:{lineNumber}:1:ERROR: {block.Groups[1].Value} detected, use ##-style\n");
             return 3;
@@ -169,19 +208,37 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
 
     private void SubHeader(string title)
     {
-        string word = Regex.Replace(title, "[\"'](.*)[\"']\\z", "$1", Options).Replace("`", "", StringComparison.Ordinal);
+        WarnUnescapedInItem(title);
+        string word = ItemWord(title);
+        level = 1;
+        OpenTable();
+        description.AddRange(manpage ? [$".IP {word}\n"] : ["\n", $"[1]{word}\n"]);
+        header = true;
+    }
+
+    private void WarnUnescapedInItem(string title)
+    {
         string nonTick = Regex.Replace(title, "`[^`]*`", "", Options);
         if (Regex.IsMatch(nonTick, @"[^\\][<>]", Options))
         {
             context.Error.Append($"{fileName}:{lineNumber}:1:WARN: un-escaped < or > used: {nonTick}\n");
         }
+    }
 
-        word = manpage && word.Contains(' ', StringComparison.Ordinal) ? $"\"{word}\"" : word;
-        level = 1;
-        AddIf(!top && !tableMode && manpage, ".RS\n");
-        tableMode = tableMode || !top;
-        description.AddRange(manpage ? [$".IP {word}\n"] : ["\n", $"[1]{word}\n"]);
-        header = true;
+    private string ItemWord(string title)
+    {
+        string word = Regex.Replace(title, "[\"'](.*)[\"']\\z", "$1", Options).Replace("`", "", StringComparison.Ordinal);
+        return manpage && word.Contains(' ', StringComparison.Ordinal) ? $"\"{word}\"" : word;
+    }
+
+    // An option's first item opens its table; a top-level page's items are not in one.
+    private void OpenTable()
+    {
+        if (!top && !tableMode)
+        {
+            AddIf(manpage, ".RS\n");
+            tableMode = true;
+        }
     }
 
     private void EndTable()
@@ -206,24 +263,35 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
         string text = body.Replace("`%DATE`", context.Date, StringComparison.Ordinal)
             .Replace("`%VERSION`", context.Version, StringComparison.Ordinal)
             .Replace("`%GLOBALS`", context.Globals, StringComparison.Ordinal);
-        if (((quote == 0 ? CheckPlainText(text) : null) ?? CheckAddedIn(text.Replace('`', '"'))) is { } code)
+        if (CheckText(text) is { } code)
         {
             return code;
         }
 
+        AddText(text);
+        return null;
+    }
+
+    private int? CheckText(string text) =>
+        (quote == 0 ? CheckPlainText(text) : null) ?? CheckAddedIn(text.Replace('`', '"'));
+
+    private void AddText(string text)
+    {
         text = RemoveOldAddedIn(text.Replace('`', '"'));
         text = Regex.Replace(text, @"\\([><])", "$1", Options);
         text = Regex.Replace(manpage ? NroffText(text) : AsciiText(text), "[ \t]+\\z", "", Options);
         AddIf(blankLines != 0 && !header, "\n");
         blankLines = 0;
-        description.Add(manpage ? text : $"[{1 + level}{(quote != 0 ? "q" : "")}]{text}");
+        description.Add(manpage ? text : AsciiLine(text));
         header = false;
-        return null;
     }
+
+    private string AsciiLine(string text) => $"[{1 + level}{(quote != 0 ? "q" : "")}]{text}";
 
     private int? CheckPlainText(string text)
     {
-        if (Regex.Match(text, "^(.*)  ", Options) is { Success: true } twoSpaces)
+        Match twoSpaces = Regex.Match(text, "^(.*)  ", Options);
+        if (twoSpaces.Success)
         {
             context.Error.Append($"{fileName}:{lineNumber}:{twoSpaces.Groups[1].Length}:ERROR: 2 spaces detected\n");
             return 3;
@@ -241,7 +309,8 @@ internal sealed class ManualMarkdownRenderer(ManualPageContext context, bool man
 
     private int? CheckAddedIn(string text)
     {
-        if (Regex.Match(text, @"\(added in(.*)", Options | RegexOptions.IgnoreCase) is { Success: true } added && added.Groups[1].Length < 2)
+        Match added = Regex.Match(text, @"\(added in(.*)", Options | RegexOptions.IgnoreCase);
+        if (added.Success && added.Groups[1].Length < 2)
         {
             context.Error.Append($"{fileName}:{lineNumber}:1:ERROR: broken up added-in line:\n{fileName}:{lineNumber}:1:ERROR: {text}");
             return 3;

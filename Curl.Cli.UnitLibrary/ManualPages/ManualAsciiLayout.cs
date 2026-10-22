@@ -8,7 +8,7 @@ namespace Curl.Cli.ManualPages;
 /// column width, indented four columns a level with tabs for every eight.
 /// </summary>
 /// <param name="context">The run.</param>
-internal sealed class ManualAsciiLayout(ManualPageContext context)
+public sealed class ManualAsciiLayout(ManualPageContext context)
 {
     private const int Indent = 4;
 
@@ -18,6 +18,7 @@ internal sealed class ManualAsciiLayout(ManualPageContext context)
     /// <param name="description">The lines.</param>
     public void PrintDescription(bool manpage, int baseLevel, IEnumerable<string> description)
     {
+        ArgumentNullException.ThrowIfNull(description);
         if (manpage)
         {
             context.Output.AppendJoin("", description);
@@ -52,6 +53,7 @@ internal sealed class ManualAsciiLayout(ManualPageContext context)
     /// <param name="words">The words, joined by one space.</param>
     public void LastLine(int level, IReadOnlyList<string> words)
     {
+        ArgumentNullException.ThrowIfNull(words);
         Match leading = Regex.Match(words[0], "^( +)", RegexOptions.CultureInvariant);
         PrefixLine((level * Indent) + leading.Length);
         context.Output.Append(words[0][leading.Length..]);
