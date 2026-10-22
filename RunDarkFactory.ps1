@@ -175,6 +175,15 @@
     review never holds or undoes the merge: CI is the merge gate (ADR-0710). It is skipped
     when the plugin is not installed.
 
+    A -Continuous shift that ends with nothing claimable (only cost-capped or interactive-only
+    tasks, or none) does not exit: it shows what waits on Stewart once, then every
+    -IdlePollMinutes (default 5, 1 to 60) pulls the shift branch and looks for a claimable
+    task, writing a heartbeat with phase idle and step polling that the board page shows.
+    When one is claimable it starts the next shift by the same hand-over as above; at the
+    -Hours deadline, or once -StopAtUsage or -StopAtWeeklyUsage says no shift may start, it
+    stops polling and ends as a shift without -Continuous does: the alarm when something
+    waits on Stewart, else it closes (ADR-0758).
+
     A commit that only changes the board and is pushed on its own - a claim, requeue,
     park, return or CI-watch filing - says [skip ci], so it starts no CI run and cancels
     none: with lanes claiming every minute or two, every run was once cancelled for two
@@ -338,7 +347,7 @@
 
     Every runner keeps a heartbeat file, <repo>.logs\lanes-<stamp>\lane-<n>.heartbeat.json
     (the single runner is lane 0): one lane object of ADR-0129's status.json schema 1 -
-    the task it holds, its title, the phase (starting, claim, run, integrate, wait, tokens,
+    the task it holds, its title, the phase (starting, claim, run, integrate, wait, tokens, idle,
     finished), the last tool step and when the task started. It is rewritten on every phase
     change, on each new tool step and at least every 60 seconds during a run or a wait,
     through a temporary file and a rename, so a reader never sees half of one. Lanes never
@@ -523,6 +532,9 @@ param(
     [switch]$Wake,
     # With lanes: when a shift ends and the board still has ready work, start the next one.
     [switch]$Continuous,
+    # With -Continuous: how often, in minutes, a shift that ended with nothing claimable looks
+    # at the board again, starting the next shift once a task is claimable.
+    [ValidateRange(1, 60)][int]$IdlePollMinutes = 5,
     # Stop claiming new tasks once this share of the 5-hour usage window is used, so the
     # tasks already running finish, integrate and push before the tokens run out. The next
     # shift waits for a fresh 5-hour window. 1 means never stop early.

@@ -2,6 +2,28 @@
 # watches and restarts its lanes, then ends the shift. Dot-sourced by RunDarkFactory.ps1 in
 # its order; see the loader there.
 
+function Get-IdlePollDecision {
+    # One look of an idle -Continuous coordinator's poll (BL-3092): 'stop' past the -Hours
+    # -Deadline or while -UsageStop (Get-UsageStop's reason) says no shift may start, 'start'
+    # when -ClaimableId names a task claimable now, else 'wait' - also when only cost-capped
+    # tasks (-CappedIds) are ready. Why is the trace text. Pure: the clock, the usage and the
+    # board are its arguments, so -TestHeartbeat drives it.
+    param([datetime]$Now, [datetime]$Deadline, [string]$UsageStop, [string]$ClaimableId, [string[]]$CappedIds = @())
+    if ($Now -ge $Deadline) { return [pscustomobject]@{ Action = 'stop'; Why = "the -Hours deadline $($Deadline.ToString('HH:mm', [System.Globalization.CultureInfo]::InvariantCulture)) has passed" } }
+    if ($UsageStop) { return [pscustomobject]@{ Action = 'stop'; Why = $UsageStop } }
+    if ($ClaimableId) { return [pscustomobject]@{ Action = 'start'; Why = "$ClaimableId is claimable" } }
+    $why = if ($CappedIds.Count) { "only cost-capped tasks ready ($($CappedIds -join ', '))" } else { 'nothing claimable' }
+    return [pscustomobject]@{ Action = 'wait'; Why = $why }
+}
+
+function Write-IdlePollHeartbeat {
+    # The heartbeat of a coordinator polling an idle board: phase 'idle', step 'polling'. A
+    # coordinator writes none while it has lanes; once they have ended it writes this one, as
+    # lane 0, which Write-Heartbeat publishes on the board branch every -HeartbeatMinutes.
+    $script:WritesHeartbeat = $true
+    Write-Heartbeat 'idle' 'polling'
+}
+
 if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - $(if ($AutoLanes) { 'auto' } else { $LaneCount }) lanes" } catch { }
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
@@ -453,21 +475,48 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $capFreesAt = if (-not $stillReady.Id -and $stillReady.Capped.Count) { Get-CapFreesAt $stillReady.Capped } else { $null }
     $end = Get-ShiftEndDecision -Continuous ([bool]$Continuous) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped -CapFreesAt $capFreesAt
     if ($end.Trace) { Write-Trace '-' 'shift' $end.Trace 'Yellow' }
-    if ($end.Continue) {
-        foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
+    # The one hand-over to the next shift, used when work is still ready and when the idle
+    # poll below finds some. -Why says which.
+    $startNextShift = {
+        param([string]$Why)
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
-        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-Continuous', '-ShiftBranch', $branch)
+        $forward = @('-Lanes', $(if ($AutoLanes) { 'Auto' } else { $LaneCount }), '-Hours', $Hours, '-MaxTasks', $MaxTasks, '-TaskMinutes', $TaskMinutes, '-TaskBudgetUsd', $TaskBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture), '-Model', $Model, '-MaxRunTurns', $MaxRunTurns, '-HeartbeatMinutes', $HeartbeatMinutes, '-IdlePollMinutes', $IdlePollMinutes, '-Continuous', '-ShiftBranch', $branch)
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
         $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
-        Write-Trace '-' 'shift' "work is still ready; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
+        Write-Trace '-' 'shift' "$Why; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
         # The review runs beside the next shift, which claims what it files (ADR-0710).
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
         # The next shift has its own tab; this one has only notes, and they are in the log.
         if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
+    }
+    if ($end.Continue) {
+        foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
+        & $startNextShift 'work is still ready'
         exit 0
+    }
+    # -Continuous with nothing claimable: poll the board every -IdlePollMinutes and start the
+    # next shift once something is claimable, until the -Hours deadline or a usage limit
+    # stops it (BL-3092, ADR-0758). What waits on Stewart is shown once now; the alarm that
+    # waits for a key rings only when polling stops, so it never holds the poll.
+    if ($Continuous) {
+        foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
+        Set-OwnTabLabel $(if ($reasons.Count -gt 0) { 'ALARM, read; idle, polling' } else { 'idle, polling' })
+        Write-Trace '-' 'shift' "nothing claimable; polling the board every $IdlePollMinutes minutes until $($shiftEnd.ToString('HH:mm'))" 'Cyan'
+        while ($true) {
+            Write-IdlePollHeartbeat
+            $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped
+            if ($poll.Action -eq 'start') { & $startNextShift $poll.Why; exit 0 }
+            if ($poll.Action -eq 'stop') { Write-Trace '-' 'shift' "polling stopped: $($poll.Why)" 'Yellow'; break }
+            # The heartbeat is refreshed every minute of the wait, as a lane's is.
+            foreach ($minute in 1..$IdlePollMinutes) { Start-Sleep -Seconds 60; Write-Heartbeat }
+            if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
+            $stillReady = Get-ClaimableTaskId
+        }
+        Write-Heartbeat 'finished'
+        Publish-BoardStatus -Branch $branch -State 'ended'
     }
     if ($reasons.Count -gt 0) { Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons $reasons; exit 2 }
     try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }

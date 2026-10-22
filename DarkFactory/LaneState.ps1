@@ -156,8 +156,36 @@ if ($TestHeartbeat) {
         $json = Get-BoardStatusJson -Branch 'work/dark-factory'
         $json
         New-BoardCommit $json
+        # The idle -Continuous coordinator's poll (BL-3092). ShiftCoordinator.ps1 loads after
+        # this file; with $Lane set its coordinator block is skipped, so loading it here only
+        # defines its functions. Its last line marks it finished; this file is not, so the
+        # loader still stops at this file's exit below.
+        . (Join-Path $FactoryScriptDir 'DarkFactory\ShiftCoordinator.ps1')
+        $AreaFileFinished = $false
+        $Lane = 4
+        Set-HeartbeatTask ''
+        Write-IdlePollHeartbeat
+        $idleBeat = Get-Content -Raw (Get-LaneStatePath $Lane 'heartbeat.json')
+        $idleBeat
+        $idleObject = $idleBeat | ConvertFrom-Json
+        $now = [datetime]'2026-10-22 02:20'
+        $deadline = [datetime]'2026-10-22 09:45'
+        $poll = { param($At, $Usage, $Id, $Capped) (Get-IdlePollDecision -Now $At -Deadline $deadline -UsageStop $Usage -ClaimableId $Id -CappedIds $Capped).Action }
+        $cases = @(
+            ,@('the polling heartbeat is phase idle, step polling', 'idle/polling', "$($idleObject.phase)/$($idleObject.step)")
+            ,@('nothing claimable and time left waits', 'wait', (& $poll $now '' '' @()))
+            ,@('something claimable starts the next shift', 'start', (& $poll $now '' 'BL-3011' @()))
+            ,@('past the -Hours deadline stops', 'stop', (& $poll $deadline.AddMinutes(1) '' 'BL-3011' @()))
+            ,@('usage over the stop threshold stops', 'stop', (& $poll $now 'session tokens 86% used, reset 04:00' 'BL-3011' @()))
+            ,@('only cost-capped tasks waits', 'wait', (& $poll $now '' '' @('BL-2969')))
+        )
+        $failed = 0
+        foreach ($case in $cases) {
+            if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
+            else { Write-Host "FAIL $($case[0]): expected $($case[1]), got $($case[2])" -ForegroundColor Red; $failed++ }
+        }
     } finally { Remove-Item $LogDir -Recurse -Force -ErrorAction SilentlyContinue }
-    exit 0
+    exit $(if ($failed) { 1 } else { 0 })
 }
 
 # This file ran to its end; RunDarkFactory.ps1 goes on to the next one.
