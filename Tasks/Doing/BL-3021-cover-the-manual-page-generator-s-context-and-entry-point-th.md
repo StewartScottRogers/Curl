@@ -31,3 +31,4 @@ Split from BL-2881, the last of its coverage tasks (after BL-3019 and BL-3020). 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: cd304d37 c61ae074 a9c88fc5.
