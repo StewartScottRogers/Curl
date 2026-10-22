@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1582_PerformsWithNegotiateAndAnswersItsCode:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3126
+tasks: BL-3126
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md

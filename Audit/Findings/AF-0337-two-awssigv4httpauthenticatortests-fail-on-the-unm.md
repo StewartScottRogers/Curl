@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs:Sign:baseline-failure
 reproduction: none
-task: none
-tasks:
+task: BL-3117
+tasks: BL-3117
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
