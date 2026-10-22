@@ -7,6 +7,7 @@ namespace Libcurl.Options;
 /// </summary>
 public static class CurlOptions
 {
+    /// <summary>Upstream's lib/easyoptions.c rows in its order (alphabetical by name); <c>Next</c> walks it by position.</summary>
     private static readonly CurlEasyOption[] Table =
     [
         new("ABSTRACT_UNIX_SOCKET", CurlOption.AbstractUnixSocket, CurlOptionType.String, CurlEasyOptionFlags.None),
@@ -338,8 +339,10 @@ public static class CurlOptions
         new("XOAUTH2_BEARER", CurlOption.Xoauth2Bearer, CurlOptionType.String, CurlEasyOptionFlags.None),
     ];
 
+    /// <summary>Every row, alias rows included, by its upper-case name.</summary>
     private static readonly Dictionary<string, CurlEasyOption> RowsByName = Table.ToDictionary(row => row.Name, StringComparer.Ordinal);
 
+    /// <summary>Non-alias rows by option: an alias shares its target's number, so only the real row may answer by id.</summary>
     private static readonly Dictionary<CurlOption, CurlEasyOption> RowsById = Table.Where(row => !row.IsAlias).ToDictionary(row => row.Id);
 
     /// <summary>Every row of the table, in upstream's order.</summary>
@@ -368,6 +371,7 @@ public static class CurlOptions
         return next > 0 || previous is null ? Table.ElementAtOrDefault(next) : null;
     }
 
+    /// <summary>Upper-cases ASCII letters only, so a non-ASCII letter never folds into an option name (culture-free, like curl_strequal).</summary>
     private static string AsciiUpper(string name) =>
         string.Create(name.Length, name, static (span, source) =>
         {
