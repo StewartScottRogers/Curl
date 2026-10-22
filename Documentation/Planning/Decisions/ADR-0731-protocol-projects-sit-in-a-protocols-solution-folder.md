@@ -40,3 +40,10 @@ folder with `/Conformance/<Part>/` for each `Curl.Conformance.<Part>.*` group (H
 Http3Server, LibTest, SshServer, UnitProgram), each with its library and tests. The harness itself,
 `Curl.Conformance.UnitLibrary` and `Curl.Conformance.UnitTests`, has no part in its name, so it sits
 in `/Conformance/Harness/`, named for what it is. As before, only the solution file changes.
+
+## Amendment, 2026-10-21: shared projects (BL-3008)
+
+Stewart asked the same day to do the same for the shared projects. `Curl.slnx` has a `/Shared/`
+folder holding the five `.shproj` projects - Audit, Claude (`.claude`), Documentation, Gap and
+Tasks - flat and in alphabetical order, since none has a test project beside it. Only the solution
+file changes; the `Audit/` and `Gap/` folders themselves are untouched.

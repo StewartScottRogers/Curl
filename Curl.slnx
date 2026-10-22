@@ -230,13 +230,16 @@
   <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
   <Project Path="Curl.Zstandard.UnitLibrary/Curl.Zstandard.UnitLibrary.csproj" />
   <Project Path="Curl.Zstandard.UnitTests/Curl.Zstandard.UnitTests.csproj" />
-
-  <Project Path="Documentation/Documentation.shproj" />
-  <Project Path=".claude/Claude.shproj" />
   <Project Path="Libcurl/Libcurl.csproj" />
   <Project Path="Libcurl.UnitTests/Libcurl.UnitTests.csproj" />
-  <Project Path="Tasks/Tasks.shproj" />
-  <Project Path="Audit/Audit.shproj" />
-  <Project Path="Gap/Gap.shproj" />
+
+  <!-- The shared projects sit together in /Shared/ (ADR-0731). -->
+  <Folder Name="/Shared/">
+    <Project Path="Audit/Audit.shproj" />
+    <Project Path=".claude/Claude.shproj" />
+    <Project Path="Documentation/Documentation.shproj" />
+    <Project Path="Gap/Gap.shproj" />
+    <Project Path="Tasks/Tasks.shproj" />
+  </Folder>
 
 </Solution>

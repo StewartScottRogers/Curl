@@ -326,7 +326,9 @@ them, except the protocols and the conformance projects: each `Curl.Protocol.<Na
 project sits with its tests in the `/Protocols/<Name>/` solution folder,
 `Curl.Protocol.Abstractions.*` in `/Protocols/Abstractions/`, each
 `Curl.Conformance.<Part>.*` project in `/Conformance/<Part>/`, and the harness itself
-(`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/` (ADR-0731). Solution folders change only the solution file; the
+(`Curl.Conformance.UnitLibrary` and `.UnitTests`) in `/Conformance/Harness/`, and the
+shared projects (Audit, Claude, Documentation, Gap, Tasks) in `/Shared/` (ADR-0731).
+Solution folders change only the solution file; the
 directories on disk stay flat. The `Solution Items` and `Scripts` solution folders hold
 loose files only.
 
