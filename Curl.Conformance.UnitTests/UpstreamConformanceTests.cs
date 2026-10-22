@@ -212,7 +212,8 @@ public sealed partial class UpstreamConformanceTests
             fileSystem: FileSystemFor(invocation.EnvironmentVariables),
             securityContexts: SecurityContextsFor(invocation.EnvironmentVariables),
             featureMask: featureMask,
-            standardOutputIsTerminal: StandardOutputIsTerminalFor(invocation.EnvironmentVariables)).RunAsync(ArgumentsFor(invocation));
+            standardOutputIsTerminal: StandardOutputIsTerminalFor(invocation.EnvironmentVariables),
+            digestRandomBytes: DigestRandomBytesFor(invocation.EnvironmentVariables)).RunAsync(ArgumentsFor(invocation));
 
     // A ported libtest program's engine, in place of curl (BL-2558, ADR-0658): the managed Libcurl engine, every TCP
     // dial reaching the case's in-memory servers through InMemoryServerTcpDialer, names resolved to loopback but
@@ -245,6 +246,24 @@ public sealed partial class UpstreamConformanceTests
         environment.GetValueOrDefault("CURL_ENTROPY") is { } entropy ? new ForcedEntropyWebSocketRandomSource(entropy)
         : environment.ContainsKey("CURL_WS_FORCE_ZERO_MASK") ? new ZeroMaskWebSocketRandomSource()
         : null;
+
+    // The Digest and DIGEST-MD5 client nonce's bytes under the debug build's CURL_ENTROPY sequence (ADR-0751, BL-2834),
+    // else null, for the system's random numbers.
+    internal static Func<int, byte[]>? DigestRandomBytesFor(IReadOnlyDictionary<string, string> environment)
+    {
+        if (environment.GetValueOrDefault("CURL_ENTROPY") is not { } entropy)
+        {
+            return null;
+        }
+
+        ForcedEntropyWebSocketRandomSource source = new(entropy);
+        return count =>
+        {
+            byte[] bytes = new byte[count];
+            source.Fill(bytes);
+            return bytes;
+        };
+    }
 
     // The ported libtest programs the ratchet runs a <tool> case's program from, over CreateEngine.
     private static readonly UpstreamLibTests LibTests = new(LibTestPrograms.Ported, CreateEngine);

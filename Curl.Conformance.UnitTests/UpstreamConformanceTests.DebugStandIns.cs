@@ -32,6 +32,9 @@ public sealed partial class UpstreamConformanceTests
     // The cases that split curl's sends with CURL_SMALLREQSEND or CURL_SMALLSENDS (363, 1294, 1295, 5028) rely on Debug
     // too: the harness reports it to a case setting either, and the runner splits the writes on every connection the
     // case makes (UpstreamSmallSendsFront, ADR-0721, BL-2832).
+    // The Digest, DIGEST-MD5 and NTLM cases that name !SSPI (159, 823, 832, 835, 869, 878, 881, 907, 934, 937, 1100
+    // and 1647) rely on Debug for CURL_ENTROPY, which pins the Digest cnonce, or only name it: the harness reports Debug
+    // to a case naming !SSPI with digest or NTLM, and gives the cnonce the forced sequence under CURL_ENTROPY (ADR-0759, BL-2834).
     // The table below is the one shared edit a case needing a Debug stand-in makes: one line per rule, each telling
     // from the test file's text whether the case gets the Debug feature.
     private static readonly Func<string, bool>[] DebugStandInRules =
@@ -46,6 +49,7 @@ public sealed partial class UpstreamConformanceTests
         text => text.Contains(":%HTTP2TLSPORT/", StringComparison.Ordinal),
         text => text.Contains("\nCURL_FTP_PWD_STOP=", StringComparison.Ordinal),
         text => text.Contains("\n" + FakeExtendedAttributesVariableName + "=", StringComparison.Ordinal),
+        NamesHandBuiltAuthentication,
         SetsSmallSendsVariable,
         RunsMimeLibTest,
         RunsCurlWithDohUrl,
@@ -54,6 +58,11 @@ public sealed partial class UpstreamConformanceTests
         SetsStubGssCredentialsVariable,
         SetsToolIsAttyVariable,
     ];
+
+    // A case naming !SSPI with digest or NTLM: curl's own Digest, DIGEST-MD5 or NTLM code, which the debug build runs (BL-2834).
+    private static bool NamesHandBuiltAuthentication(string text) =>
+        text.Contains("\n!SSPI\n", StringComparison.Ordinal)
+        && (text.Contains("\ndigest\n", StringComparison.Ordinal) || text.Contains("\nNTLM\n", StringComparison.Ordinal));
 
     internal static UpstreamCurlPlatform PlatformFor(byte[] testFile)
     {

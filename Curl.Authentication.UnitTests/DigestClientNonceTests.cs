@@ -93,4 +93,38 @@ public sealed class DigestClientNonceTests
         Assert.HasCount(12, decoded);
         Assert.AreEqual(16, clientNonce.Length);
     }
+
+    [TestMethod]
+    public void HexFrom_ForcedBytes_GivesThe16BytesAsLowerCaseHex()
+    {
+        // test823's CURL_ENTROPY=12345678 gives the bytes 34 33 32 31, 35 33 32 31, ... (ADR-0678, ADR-0751).
+        var diagnostics = TestDiagnostics.For(TestContext);
+        int asked = 0;
+        byte[] Forced(int count)
+        {
+            asked = count;
+            return Convert.FromHexString("34333231353332313633323137333231")[..count];
+        }
+
+        string clientNonce = DigestClientNonce.HexFrom(Forced)();
+
+        diagnostics.Act("client nonce", clientNonce);
+        diagnostics.Assert("bytes asked for", 16, asked);
+        Assert.AreEqual(16, asked);
+        Assert.AreEqual("34333231353332313633323137333231", clientNonce);
+    }
+
+    [TestMethod]
+    [DataRow(true, "000102030405060708090a0b0c0d0e0f", DisplayName = "SSPI build: 16 bytes in hex")]
+    [DataRow(false, "AAECAwQFBgcICQoL", DisplayName = "Own Digest code: 12 bytes in base64")]
+    public void ForBuild_ForcedBytes_DrawsTheBuildsNonceFromThem(bool matchesSspiBuild, string expected)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        static byte[] Counting(int count) => [.. Enumerable.Range(0, count).Select(index => (byte)index)];
+
+        string clientNonce = DigestClientNonce.ForBuild(matchesSspiBuild, Counting)();
+
+        diagnostics.Assert("client nonce", expected, clientNonce);
+        Assert.AreEqual(expected, clientNonce);
+    }
 }
