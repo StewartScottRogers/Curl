@@ -3,8 +3,8 @@ id: AF-0324
 title: Curl.Console/CLAUDE.md says it is the only project without a .UnitLibrary suffix; Curl.Api, Curl.Config, Curl.Mcp and Libcurl also lack it
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Console/CLAUDE.md:OnlyProjectWithoutUnitLibrarySuffix:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Console/CLAUDE.md -Pattern 'only project without'; Get-
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
