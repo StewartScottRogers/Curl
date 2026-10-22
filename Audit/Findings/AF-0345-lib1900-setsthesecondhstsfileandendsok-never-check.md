@@ -3,8 +3,8 @@ id: AF-0345
 title: Lib1900_SetsTheSecondHstsFileAndEndsOk never checks that any HSTS file is set
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs:Lib1900_SetsTheSecondHstsFileAndEndsOk:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs -Pa
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
