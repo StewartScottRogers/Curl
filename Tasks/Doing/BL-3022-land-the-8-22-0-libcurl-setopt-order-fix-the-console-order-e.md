@@ -37,3 +37,4 @@ Left in this task: `Curl.Console.UnitTests/CurlCommandRunnerLibcurlTests.cs`, te
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 8869e893 8598eb64 445fd6a6 e0ff5a3e 97abd8b3.
