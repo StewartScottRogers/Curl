@@ -674,6 +674,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The engine.</returns>
     private static ICurlEngine GivenOrManagedEngine(ICurlEngine? curlEngine, TimeProvider? timeProvider) =>
         curlEngine ?? new ManagedCurlEngine(timeProvider ?? TimeProvider.System, null, EasyErrorText);
+
     /// <summary>
     /// The run's HSTS cache, shared by every transfer of every option group and on with or without
     /// <c>--hsts</c>, as curl 8.21.0's tool shares one through its share handle: an <c>https</c>
@@ -768,7 +769,9 @@ internal sealed class CurlCommandRunner(
     private IDiagnosticLog diagnosticLog = NoDiagnosticLog.Instance;
 
     /// <summary>
-    /// Runs <paramref name="arguments" /> to completion.
+    /// Runs <paramref name="arguments" /> to completion: parses them, writes the parser's warnings,
+    /// runs the accepted command line or prints its refusal, and closes the run's diagnostic log and
+    /// <c>--stderr</c> file whatever the outcome.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>
     /// <returns>The process exit code.</returns>
@@ -815,6 +818,8 @@ internal sealed class CurlCommandRunner(
     /// <returns>The work's result.</returns>
     private static async Task<T> ThenCleanUpAsync<T>(Task<T> work, Func<Task> cleanUp)
     {
+        // WhenAny completes when the work ends, faulted or cancelled included, without throwing,
+        // so the clean-up runs before the awaited result rethrows.
         await Task.WhenAny(work).ConfigureAwait(false);
         await cleanUp().ConfigureAwait(false);
 
@@ -1025,12 +1030,18 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Runs an accepted command line, for <see cref="RunAsync" />, once standard error is where
-    /// <c>--stderr</c> sends it.
+    /// <c>--stderr</c> sends it. <c>--ai-help</c>, the information options (<see cref="InformationLines" />)
+    /// and an option's manual section (<c>--help &lt;option&gt;</c>) are answered with no transfer; otherwise
+    /// the groups are transferred, the <c>--libcurl</c> source is written whether or not they succeeded,
+    /// and the parser's warning lines meant for after the transfers are written last.
     /// </summary>
     /// <param name="options">The accepted command line's first option group.</param>
     /// <param name="groups">The option groups to run, <paramref name="options" /> first.</param>
     /// <param name="warningLinesAfterTransfers">The parser's warning lines printed after the transfers.</param>
-    /// <returns>The process exit code.</returns>
+    /// <returns>
+    /// The process exit code: the transfers' (<see cref="TransferAllGroupsAsync" />), or
+    /// <see cref="CurlExitCode.FailedInit" /> when a group's request methods conflict.
+    /// </returns>
     private async Task<int> RunAcceptedAsync(
         CommandLineOptions options,
         IReadOnlyList<CommandLineOptions> groups,
@@ -1726,6 +1737,7 @@ internal sealed class CurlCommandRunner(
         transferPerformer.RecordSerialAttemptStart(runsInParallel: false);
         TransferResult result = await TransferAndReportAsync(dispatch, options, transfer).ConfigureAwait(false);
 
+        // A transfer skipped for its --etag-save file is not reported, so it neither sets the exit code nor ends the run.
         return ReferenceEquals(result, EtagSaveFileSkippedTransfer)
             ? (exitCode, false)
             : (result.ExitCode, EndsTheRun(options, result));
@@ -1832,9 +1844,8 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Performs one transfer of a <c>-Z</c> run, then, holding the run's <see cref="writeGate" />,
-    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). Where <c>-w</c> or <c>--trace-ids</c> prints
-    /// it, a transfer
-    /// <c>--fail-early</c> cancels ends as <see cref="ParallelRun.AbortedResult" />.
+    /// records how it ended and writes its report (<see cref="EndParallelTransferAsync" />). A transfer
+    /// that <c>--fail-early</c> cancels ends as <see cref="ParallelRun.AbortedResult" />.
     /// </summary>
     /// <param name="run">The run.</param>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
@@ -2604,8 +2615,7 @@ internal sealed class CurlCommandRunner(
     /// opened: one sending its body to standard output, or discarding it under <c>--out-null</c>
     /// (<c>--out-null u -w "%{http_code}\n"</c> wrote LF, measured 2026-09-28, BL-495 Notes). An
     /// IPFS URL that could not be rewritten counts: curl 8.21.0 wrote its <c>-w</c> line feed as LF
-    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). Where <c>-w</c> or <c>--trace-ids</c> prints
-    /// it, a transfer
+    /// without <c>-o</c> and as CR LF with one (measured 2026-09-27, BL-240 Notes). A transfer
     /// under <c>-B</c> / <c>--use-ascii</c> never does: curl leaves standard output in text mode
     /// for it (measured 2026-10-01, BL-961 Notes). A transfer under <c>-D -</c> always does, even
     /// under <c>-B</c> and even when it fails: curl sets standard output to binary for the header
@@ -2776,6 +2786,13 @@ internal sealed class CurlCommandRunner(
     /// <c>-e "...;auto" -L</c> the URL the last redirect came from, as the redirect follower reports
     /// it - else the <c>-e</c> text (BL-361 Notes).
     /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="givenUrl">The URL <c>%{url}</c> prints.</param>
+    /// <param name="transferUrl">The URL transferred.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="connectionId">The transfer's <c>%{conn_id}</c>.</param>
+    /// <returns>The variables the <c>-w</c> template renders from.</returns>
     private TransferWriteOutVariables WriteOutVariables(
         CommandLineOptions options,
         UrlTransfer transfer,
@@ -2964,6 +2981,14 @@ internal sealed class CurlCommandRunner(
         return options.ResumeFromOutputSize ? uploading with { ResumeFrom = -1 } : uploading;
     }
 
+    /// <summary>
+    /// Adds the <c>[MULTI]</c> trace lines under <c>--trace-config multi</c>, or, with the multi not
+    /// traced, only the response wait's <c>[TIMER]</c> lines under <c>--trace-config timer</c>.
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="inner">The events the lines are written through.</param>
+    /// <param name="takeConnectionId">Gives the number of the connection the transfer opens.</param>
+    /// <returns>The wrapping events, or <paramref name="inner" /> when neither is traced.</returns>
     private ITransferEvents WithMultiOrTimerEvents(CommandLineOptions options, ITransferEvents inner, Func<long> takeConnectionId)
     {
         TransferTimers timers = TransferTimers.Of(EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TransferOf(options));
@@ -3463,6 +3488,9 @@ internal sealed class CurlCommandRunner(
     {
         EasyProxyOptions proxyOptions = EasyOptionsFromCommandLine.ProxyOf(options);
         EasyAuthenticationOptions authentication = EasyOptionsFromCommandLine.AuthenticationOf(options);
+
+        // The callback below selects the proxy and checks the URL credentials of each hop, so a redirect
+        // is judged afresh; the follower is built per transfer because the options are the group's.
         RedirectFollower follower = new(
             dispatch.Dispatcher,
             (CurlUrl hopUrl, out ProxyEndpoint? hopProxy, [NotNullWhen(false)] out TransferResult? hopFailure) =>
@@ -3492,6 +3520,8 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
 
+        // smtp and imap upload -F parts as a MIME mail message that is the body itself; every other
+        // scheme sends them as a form body beside any -T upload.
         bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
         MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
@@ -4510,6 +4540,7 @@ internal sealed class CurlCommandRunner(
     {
         RunningTransferState state = Running;
         state.StandardOutput.ClearWriteFailure();
+        // No output file: every attempt's body stays on standard output, so no retried bytes are kept or cut back.
         TransferResult result = await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null)
             .ConfigureAwait(false);
         await state.GatedStandardOutput.FlushAsync().ConfigureAwait(false);
@@ -4561,6 +4592,7 @@ internal sealed class CurlCommandRunner(
     private EngineToolTransferInputs AttemptInputsOf(CommandLineOptions options, ByteRange? range, long? resumeFrom, HttpRequestBody? formBody, Stream? upload, ProxyEndpoint? proxy)
     {
         RunningTransferState state = Running;
+        // Only a form built as a stream can be read at the rate; a form held in memory is sent as it is.
         HttpRequestBody? sentFormBody = formBody is StreamBody streamBody
             ? streamBody with { Content = SendRateLimited(options, streamBody.Content) }
             : formBody;

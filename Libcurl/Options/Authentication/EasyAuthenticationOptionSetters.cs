@@ -18,8 +18,10 @@ internal static class EasyAuthenticationOptionSetters
     /// <summary>The <c>--httpsig-algo</c> text of each <c>CURLHTTPSIG_*</c> number, <see langword="null"/> for <c>CURLHTTPSIG_NONE</c>.</summary>
     private static readonly string?[] HttpSignatureAlgorithmNames = [null, "ed25519", "hmac-sha256"];
 
+    /// <summary><c>CURLAUTH_BASIC</c>, the lowest method bit.</summary>
     private const long LowestAuthenticationBit = 1L << 0;
 
+    /// <summary><c>CURLAUTH_ONLY</c>, a modifier rather than a method; every bit below it is a method.</summary>
     private const long OnlyBit = 1L << 31;
 
     /// <summary>Adds the authentication rows to <paramref name="setters"/>.</summary>
@@ -196,15 +198,18 @@ internal static class EasyAuthenticationOptionSetters
             : CurlCode.NotBuiltIn;
     }
 
+    /// <summary>Whether a <c>TLSAUTH_TYPE</c> value is acceptable: <see langword="null"/> (none) or <c>SRP</c> in any case, the one method libcurl knows.</summary>
     private static bool IsTlsAuthType(object? value) =>
         value is null || string.Equals((string)value, SecureRemotePassword, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Replaces the handle's <see cref="EasyAuthenticationOptions"/> with the copy <paramref name="change"/> returns; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Change(ref EasyOptions options, Func<EasyAuthenticationOptions, EasyAuthenticationOptions> change)
     {
         options = options with { Authentication = change(options.Authentication) };
         return CurlCode.Ok;
     }
 
+    /// <summary>Whether a <c>CURLOT_LONG</c> on/off value is on: any value but 0, as in libcurl.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 
     private static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);

@@ -57,6 +57,7 @@ internal sealed class EtagSaveStream(
     }
 
     /// <inheritdoc />
+    /// <remarks>Does nothing; it does not flush <c>headerOutput</c>, and the ETag is saved as each line is read.</remarks>
     public override void Flush()
     {
     }

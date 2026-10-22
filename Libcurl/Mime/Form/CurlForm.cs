@@ -26,6 +26,8 @@ public sealed class CurlForm : IDisposable
     /// <summary>Whether <c>curl_formfree</c> has run.</summary>
     public bool IsFreed => freed;
 
+    /// <summary>The engine's builder, after checking the form has not been freed.</summary>
+    /// <exception cref="ObjectDisposedException">The form has been freed.</exception>
     private ICurlFormBuilder Builder
     {
         get

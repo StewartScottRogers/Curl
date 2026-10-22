@@ -143,3 +143,22 @@ HTTPS-origin resolve for, and when the DNS cache later answers that host and por
 `HttpsRecordReportLine.Format`'s line from `HttpsRecordFor` before the address lines. An address entry
 that no HTTPS resolve accompanied (a `--resolve` entry, or one an `http://` connect cached) writes no
 `HTTPS-RR` line; curl would send the HTTPS query there, which Curl does not yet do.
+
+## Amendment (BL-2979, 2026-10-22): which `--trace-config` components write the HTTPS-RR lines
+
+Decided by Claude under Stewart's delegation, from curl 8.22.0's source (`lib/vdns/doh.c` line 311,
+`lib/curl_trc.c` `Curl_trc_dns` and `trc_feats`; the reference curl on Windows has no HTTPSRR feature
+to measure). The DoH sub-transfer is verbose only under the `doh` feature, so its `[DoH] ...` lines
+(`infof`) are written under `doh`, and its `[DNS] [HTTPS] got N records` and `[DNS] [HTTPS] record:`
+lines (`CURL_TRC_DNS` on the sub-transfer) only under `doh` and `dns` both. `network` and `all` turn
+on both features. So `dns` alone writes none of them, `doh` only the `[DoH]` lines, and `dns,doh`,
+`network` and `all` every line. `EngineComposition.HttpsRecordTraceOf` maps the components to a
+`DohHttpsRecordTrace`, which `DohDnsResolver.HttpsRecordTrace` holds and
+`DohTraceLines.ReportHttpsRecord` filters by. The A and AAAA queries' lines keep their gating.
+
+`doh_probe_done` also refuses an HTTPS answer whose HTTP status is outside 200-299: the lane writes
+`[DoH] [DoH] [HTTPS] error: HTTP status N` (N is 0 for a status line with no number) and keeps no
+record. `DohResponseReader.ReadResponseAsync` now returns the status beside the body
+(`DohQueryResult.StatusCode`). The A and AAAA queries still ignore the status, as 8.21.0 was measured
+to, until their own task says otherwise. Pinned by `DohDnsResolverHttpsRecordTraceTests` and
+`EngineCompositionDohHttpsRecordTraceTests`.

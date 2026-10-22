@@ -96,6 +96,7 @@ internal static partial class EasyOptionSetters
             : CurlCode.BadFunctionArgument;
     }
 
+    /// <summary>Replaces the handle's <see cref="EasyBehaviourOptions"/> with <paramref name="behaviour"/>; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode SetBehaviour(ref EasyOptions options, EasyBehaviourOptions behaviour)
     {
         options = options with { Behaviour = behaviour };

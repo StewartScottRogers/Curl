@@ -11,10 +11,13 @@ namespace Libcurl.Options;
 /// </summary>
 internal static class EasyProtocolOptionSetters
 {
+    /// <summary>The smallest <c>CURLOPT_TFTP_BLKSIZE</c> libcurl accepts (<c>setopt.c</c>); a smaller value is not stored.</summary>
     private const long SmallestTftpBlockSize = 8;
 
+    /// <summary>The largest <c>CURLOPT_TFTP_BLKSIZE</c> libcurl accepts: 65464, the 65535-byte UDP datagram less the TFTP and IP headers.</summary>
     private const long LargestTftpBlockSize = 65464;
 
+    /// <summary>The TFTP block size RFC 1350 uses when no <c>CURLOPT_TFTP_BLKSIZE</c> is set.</summary>
     private const int DefaultTftpBlockSize = 512;
 
     /// <summary>Adds the protocol rows to <paramref name="setters"/>.</summary>
@@ -27,6 +30,7 @@ internal static class EasyProtocolOptionSetters
         AddRtspAndWebSocketSetters(setters);
     }
 
+    /// <summary>Adds the FTP rows (<c>CURLOPT_FTPPORT</c>, the quote lists, the EPSV and EPRT switches and the rest).</summary>
     private static void AddFtpSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.Ftpport] = new(SetActiveAddress);
@@ -46,6 +50,7 @@ internal static class EasyProtocolOptionSetters
         setters[CurlOption.FtpFilemethod] = new(SetFileMethod);
     }
 
+    /// <summary>Adds the SSH, SFTP and SCP rows (authentication types, host key and key file options).</summary>
     private static void AddSshSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.SshAuthTypes] = new(SetAuthenticationTypes);
@@ -57,6 +62,7 @@ internal static class EasyProtocolOptionSetters
         setters[CurlOption.SshKnownhosts] = new(SetKnownHostsFile);
     }
 
+    /// <summary>Adds the SMTP and IMAP mail rows with the TFTP and TELNET rows, none of which has enough options to need its own method.</summary>
     private static void AddMailTftpAndTelnetSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.MailFrom] = new(SetMailFrom);
@@ -68,6 +74,7 @@ internal static class EasyProtocolOptionSetters
         setters[CurlOption.Telnetoptions] = new(SetTelnetOptions);
     }
 
+    /// <summary>Adds the RTSP rows and <c>CURLOPT_WS_OPTIONS</c>.</summary>
     private static void AddRtspAndWebSocketSetters(Dictionary<CurlOption, EasyOptionSetter> setters)
     {
         setters[CurlOption.RtspRequest] = new(SetRtspRequest);
@@ -161,6 +168,7 @@ internal static class EasyProtocolOptionSetters
 
     private static CurlCode SetTftpNoOptions(ref EasyOptions o, object? v) => Tftp(ref o, t => t with { NoOptions = IsOn(v) });
 
+    /// <summary><c>CURLOPT_TELNETOPTIONS</c>: a copy of the <c>NAME=value</c> list; <see langword="null"/> empties it.</summary>
     private static CurlCode SetTelnetOptions(ref EasyOptions o, object? v)
     {
         o = o with { Protocols = o.Protocols with { Telnet = o.Protocols.Telnet with { TelnetOptions = ListOf(v) } } };
@@ -195,30 +203,35 @@ internal static class EasyProtocolOptionSetters
         return CurlCode.Ok;
     }
 
+    /// <summary>Replaces the FTP options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Ftp(ref EasyOptions options, Func<EasyFtpOptions, EasyFtpOptions> change)
     {
         options = options with { Protocols = options.Protocols with { Ftp = change(options.Protocols.Ftp) } };
         return CurlCode.Ok;
     }
 
+    /// <summary>Replaces the SSH options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Ssh(ref EasyOptions options, Func<EasySshOptions, EasySshOptions> change)
     {
         options = options with { Protocols = options.Protocols with { Ssh = change(options.Protocols.Ssh) } };
         return CurlCode.Ok;
     }
 
+    /// <summary>Replaces the SMTP options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Smtp(ref EasyOptions options, Func<EasySmtpOptions, EasySmtpOptions> change)
     {
         options = options with { Protocols = options.Protocols with { Smtp = change(options.Protocols.Smtp) } };
         return CurlCode.Ok;
     }
 
+    /// <summary>Replaces the TFTP options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Tftp(ref EasyOptions options, Func<EasyTftpOptions, EasyTftpOptions> change)
     {
         options = options with { Protocols = options.Protocols with { Tftp = change(options.Protocols.Tftp) } };
         return CurlCode.Ok;
     }
 
+    /// <summary>Replaces the RTSP options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Rtsp(ref EasyOptions options, Func<EasyRtspOptions, EasyRtspOptions> change)
     {
         options = options with { Protocols = options.Protocols with { Rtsp = change(options.Protocols.Rtsp) } };
@@ -232,9 +245,12 @@ internal static class EasyProtocolOptionSetters
         return number >= 0 && number <= largest;
     }
 
+    /// <summary>A copy of the string list <paramref name="value"/> (<c>curl_slist</c>), so the caller may change its own afterwards; an empty list for <see langword="null"/>.</summary>
     private static IReadOnlyList<string> ListOf(object? value) => value is IEnumerable<string> lines ? [.. lines] : [];
 
+    /// <summary>Whether the option's integer value is not 0, as libcurl treats an on/off option.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 
+    /// <summary>The option's integer value, whether it arrived as an <see cref="int"/>, a <see cref="long"/> or an enum.</summary>
     private static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);
 }

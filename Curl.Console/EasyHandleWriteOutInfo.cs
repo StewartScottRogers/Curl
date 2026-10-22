@@ -78,12 +78,16 @@ internal sealed record EasyHandleWriteOutInfo(TransferInfo Info, TransferReport?
     internal bool Describes(TransferResult result) =>
         PerformedReport is not null && ReferenceEquals(result.Report, PerformedReport);
 
+    /// <summary>Reads a string-valued info; <see langword="null" /> when the handle has none.</summary>
     private static string? Text(CurlEasy easy, CurlInfo info) => (string?)Value(easy, info);
 
+    /// <summary>Reads an integer-valued info; Libcurl answers each one read here as a <see cref="long" />.</summary>
     private static long Number(CurlEasy easy, CurlInfo info) => (long)Value(easy, info)!;
 
+    /// <summary>Reads a <c>*_T</c> time info, which libcurl gives as whole microseconds.</summary>
     private static TimeSpan Time(CurlEasy easy, CurlInfo info) => TimeSpan.FromMicroseconds(Number(easy, info));
 
+    /// <summary>Reads one info; the <c>CURLcode</c> is discarded because <see cref="Read" /> asks only for infos that always answer <c>CURLE_OK</c>.</summary>
     private static object? Value(CurlEasy easy, CurlInfo info)
     {
         _ = easy.GetInfo(info, out object? value);

@@ -18,8 +18,6 @@ internal sealed partial class DnsAnswerReader(byte[] message, DnsRecordType aske
 
     public List<IPAddress> Addresses { get; } = [];
 
-    public List<string> CanonicalNames { get; } = [];
-
     public List<DnsServiceRecord> ServiceRecords { get; } = [];
 
     public List<byte[]> HttpsRecordData { get; } = [];
@@ -63,17 +61,11 @@ internal sealed partial class DnsAnswerReader(byte[] message, DnsRecordType aske
         };
     }
 
-    private DnsMessageFailure CheckEnd()
-    {
-        if (_index != message.Length)
-        {
-            return DnsMessageFailure.Malformed;
-        }
-
-        return Addresses.Count == 0 && CanonicalNames.Count == 0 && ServiceRecords.Count == 0 && HttpsRecordData.Count == 0
-            ? DnsMessageFailure.NoContent
-            : DnsMessageFailure.None;
-    }
+    // An HTTPS query's answer with no answer record keeps 8.21.0's "no content", which the HTTPS
+    // trace writes as "No such name" (BL-2954); an A or AAAA answer never has it (BL-2970).
+    private DnsMessageFailure CheckEnd() => _index != message.Length
+        ? DnsMessageFailure.Malformed
+        : askedType == DnsRecordType.Https && ReadUInt16At(6) == 0 ? DnsMessageFailure.NoContent : DnsMessageFailure.None;
 
     private DnsMessageFailure RepeatForCount(int countOffset, Func<DnsMessageFailure> readOne)
     {

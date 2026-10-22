@@ -79,7 +79,6 @@ internal sealed partial class DnsAnswerReader
         {
             (ushort)DnsRecordType.A => StoreAddress(4),
             (ushort)DnsRecordType.Aaaa => StoreAddress(16),
-            (ushort)DnsRecordType.Cname => StoreCanonicalName(),
             (ushort)DnsRecordType.Srv => StoreServiceRecord(),
             _ => StoreHttpsRecordData(),
         };

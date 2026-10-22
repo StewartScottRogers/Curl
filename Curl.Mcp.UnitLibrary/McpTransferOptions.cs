@@ -43,6 +43,7 @@ public static class McpTransferOptions
             Timeout = TimeSpan.FromSeconds(request.TimeoutSeconds ?? 0),
         };
 
+    /// <summary>The <c>CURLOPT_CUSTOMREQUEST</c> text: none for <c>HEAD</c> (<c>NOBODY</c>), <c>POST</c> (<c>POST</c>) and a bodiless <c>GET</c>, the method as given otherwise.</summary>
     private static string? CustomRequest(string method, byte[]? body) => method switch
     {
         "HEAD" or "POST" => null,
@@ -70,6 +71,7 @@ public static class McpTransferOptions
     private static string HeaderLine(McpTransferHeader header) =>
         header.Value.Trim().Length == 0 ? $"{header.Name};" : $"{header.Name}: {header.Value.Trim()}";
 
+    /// <summary>Turns off peer and host verification for an insecure request, as <c>curl -k</c> does; otherwise leaves libcurl's defaults.</summary>
     private static EasyTlsOptions Tls(EasyTlsOptions defaults, bool insecure) =>
         insecure
             ? defaults with { Origin = defaults.Origin with { VerifyPeer = false, VerifyHost = false } }

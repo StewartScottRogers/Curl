@@ -13,7 +13,9 @@ namespace Libcurl.Url;
 /// </summary>
 public sealed class CurlUrlHandle : IDisposable
 {
+    /// <summary>The engine's URL handle every call goes through.</summary>
     private readonly ICurlUrlHandle handle;
+    /// <summary>1 once <see cref="Dispose"/> has run, set atomically so the engine handle is disposed once; 0 until then.</summary>
     private int cleanedUp;
 
     /// <summary>Wraps the engine's <paramref name="handle"/>.</summary>
@@ -67,6 +69,8 @@ public sealed class CurlUrlHandle : IDisposable
         }
     }
 
+    /// <summary>The engine handle for a call to use.</summary>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     private ICurlUrlHandle LiveHandle()
     {
         ObjectDisposedException.ThrowIf(IsCleanedUp, this);

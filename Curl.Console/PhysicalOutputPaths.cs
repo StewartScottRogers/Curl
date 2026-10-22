@@ -134,6 +134,7 @@ internal sealed class PhysicalOutputPaths(Func<string, bool>? isRegularFile, CRu
             ? hresult
             : (hresult & 0xFFFF) switch
             {
+                // ERROR_DISK_FULL (112) is ENOSPC; ERROR_FILE_EXISTS (80) and ERROR_ALREADY_EXISTS (183) are EEXIST.
                 112 => CRuntimeErrorNumbers.NoSpaceLeft,
                 80 or 183 => CRuntimeErrorNumbers.AlreadyExists,
                 _ => InvalidArgument,

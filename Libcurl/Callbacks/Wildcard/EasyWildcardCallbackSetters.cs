@@ -76,5 +76,9 @@ internal static class EasyWildcardCallbackSetters
         return CurlCode.Ok;
     }
 
+    /// <summary>Accepts a <c>*DATA</c> value and keeps nothing, since the managed callback's closure carries its user data.</summary>
+    /// <param name="options">The options, left unchanged.</param>
+    /// <param name="value">The value, ignored.</param>
+    /// <returns><see cref="CurlCode.Ok"/>.</returns>
     private static CurlCode TakeUserData(ref EasyOptions options, object? value) => CurlCode.Ok;
 }

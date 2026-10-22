@@ -54,6 +54,7 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadHttpVersion(TransferInfo info, EasyOptions options) => info.HttpVersion;
 
+    /// <summary>Reads the document's modification time in seconds; <see cref="CurlInfo.Filetime"/> and <see cref="CurlInfo.FiletimeT"/> share it.</summary>
     private static object? ReadFileTime(TransferInfo info, EasyOptions options) => info.FileTime;
 
     private static object? ReadRedirectCount(TransferInfo info, EasyOptions options) => info.RedirectCount;

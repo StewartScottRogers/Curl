@@ -134,6 +134,7 @@ internal static partial class EasySetoptsFromCommandLine
             Protocols = ProtocolsKeptOnHooks(options.Protocols),
         };
 
+    // Transfer settings a setter would refuse or cut (a buffer size out of range, a time not in whole units) stay on the hooks.
     private static EasyTransferOptions TransferKeptOnHooks(EasyTransferOptions transfer) =>
         UnsetTransfer with
         {
@@ -142,6 +143,7 @@ internal static partial class EasySetoptsFromCommandLine
             Timeout = KeptUnlessWhole(transfer.Timeout, TimeSpan.TicksPerMillisecond, UnsetTransfer.Timeout),
         };
 
+    // Network settings the tool sets no CURLOPT_* for (TOS, VLAN priority, MPTCP), and times a setter would cut, stay on the hooks.
     private static EasyNetworkOptions NetworkKeptOnHooks(EasyNetworkOptions network) =>
         UnsetNetwork with
         {
@@ -154,6 +156,7 @@ internal static partial class EasySetoptsFromCommandLine
             HappyEyeballsTimeout = KeptUnlessWhole(network.HappyEyeballsTimeout, TimeSpan.TicksPerMillisecond, UnsetNetwork.HappyEyeballsTimeout),
         };
 
+    // The setopts for the rows whose value differs from the unset record's, skipping any the setter would refuse.
     private static IEnumerable<EasySetopt> SetoptsOf<T>(SetoptRow<T>[] rows, T given, T unset) =>
         rows.Where(row => row.IsSettable(given) && !Equals(row.ValueOf(given), row.ValueOf(unset)))
             .Select(row => new EasySetopt(row.Option, row.ValueOf(given)));
@@ -162,17 +165,21 @@ internal static partial class EasySetoptsFromCommandLine
     private static TimeSpan KeptUnlessWhole(TimeSpan time, long ticksPerUnit, TimeSpan unset) =>
         WholeUnitsOf(time, ticksPerUnit) is null ? time : unset;
 
+    // CURLOPT_BUFFERSIZE keeps only sizes within its least and most.
     private static bool IsSettableBufferSize(EasyTransferOptions transfer) =>
         transfer.BufferSize is >= LeastBufferSize and <= MostBufferSize;
 
+    // The time in whole seconds, or null when it is not a whole number of seconds the setter takes.
     private static long? WholeSecondsOf(TimeSpan time) => WholeUnitsOf(time, TimeSpan.TicksPerSecond);
 
+    // The time in whole milliseconds, or null when it is not a whole number of milliseconds the setter takes.
     private static long? WholeMillisecondsOf(TimeSpan time) => WholeUnitsOf(time, TimeSpan.TicksPerMillisecond);
 
     // The time in whole units up to INT_MAX, or null when the setter would hold it to another value.
     private static long? WholeUnitsOf(TimeSpan time, long ticksPerUnit) =>
         time.Ticks % ticksPerUnit == 0 && time.Ticks / ticksPerUnit is >= 0 and <= MostCount ? time.Ticks / ticksPerUnit : null;
 
+    // libcurl's long 0 or 1 for an on/off option.
     private static long FlagOf(bool on) => on ? 1L : 0L;
 
     // An empty list is libcurl's default, no slist; a list is passed as the strings it holds.
@@ -185,6 +192,7 @@ internal static partial class EasySetoptsFromCommandLine
     /// <param name="Settable">Whether the setter keeps that value as given; <see langword="null" /> when it always does.</param>
     private sealed record SetoptRow<T>(CurlOption Option, Func<T, object?> ValueOf, Func<T, bool>? Settable = null)
     {
+        // True when no Settable check is given, or it accepts <given>.
         public bool IsSettable(T given) => Settable?.Invoke(given) ?? true;
     }
 }

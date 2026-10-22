@@ -55,6 +55,11 @@ public sealed class McpCurlTool(ICurlCommandRunner runner, McpConfinementRoot ro
         return ToResult(exitCode, output.ToReturnedBytes(), error.ToReturnedBytes(), cancellationToken);
     }
 
+    /// <summary>
+    /// Builds the result of a run that returned. A cancellation that arrived while curl was finishing
+    /// still wins, so a cancelled request never reports output. Standard error is read as curl's
+    /// message only when it is text; base64 error output adds nothing readable to the failure.
+    /// </summary>
     private static McpCurlToolResult ToResult(int exitCode, McpReturnedBytes output, McpReturnedBytes error, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)

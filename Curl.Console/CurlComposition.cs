@@ -562,6 +562,7 @@ internal static class CurlComposition
         return lines;
     }
 
+    // The tool's warning for an option curl's Schannel build ignores.
     private static string SchannelIgnoredOptionWarning(string option) =>
         $"Warning: ignoring {option}, not supported by libcurl with Schannel";
 

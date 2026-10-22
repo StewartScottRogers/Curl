@@ -101,6 +101,9 @@ public sealed partial class CurlLibrary : IAsyncDisposable
     /// <exception cref="ObjectDisposedException">The library has been cleaned up.</exception>
     internal ICurlFormBuilder CreateFormBuilder() => LiveEngine().CreateForm();
 
+    /// <summary>The engine, refusing a library that has been cleaned up, as libcurl's handle creators need a live global state.</summary>
+    /// <returns>The engine.</returns>
+    /// <exception cref="ObjectDisposedException">The library has been cleaned up.</exception>
     private ICurlEngine LiveEngine()
     {
         ObjectDisposedException.ThrowIf(IsCleanedUp, this);

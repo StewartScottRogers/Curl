@@ -27,36 +27,52 @@ internal sealed class ParallelProgressMeter : IDisposable
     /// <summary>How long curl's loop waits for activity before it draws anyway (its poll timeout).</summary>
     private static readonly TimeSpan IdleDrawDelay = TimeSpan.FromSeconds(1);
 
+    /// <summary>The clock every draw and speed sample reads.</summary>
     private readonly TimeProvider timeProvider;
 
+    /// <summary>The run's gate, held while a draw is written so it never splits another write.</summary>
     private readonly WriteGate writeGate;
 
+    /// <summary>Writes the meter's text to standard error.</summary>
     private readonly Action<string> write;
 
+    /// <summary>Draws after a second without a draw, as curl's loop does when its poll times out; set again by each draw.</summary>
     private readonly ITimer idleDraw;
 
+    /// <summary>Guards every figure below and the transfers' own counters, which byte reports update under it.</summary>
     private readonly object figuresLock = new();
 
+    /// <summary>The transfers taken on and not yet ended.</summary>
     private readonly List<ParallelTransferProgress> transfers = [];
 
+    /// <summary>The ring of the last <see cref="SpeedSampleCount" /> samples of bytes received, bytes sent and timestamp.</summary>
     private readonly (long Downloaded, long Uploaded, long Time)[] speedSamples = new (long, long, long)[SpeedSampleCount];
 
+    /// <summary>The clock's timestamp when the run began; the time spent counts from it.</summary>
     private readonly long start;
 
+    /// <summary>The timestamp of the last draw, or <see langword="null" /> before the first.</summary>
     private long? lastDraw;
 
+    /// <summary>The index in <see cref="speedSamples" /> the next sample is stored at.</summary>
     private int nextSpeedSample;
 
+    /// <summary>Whether the ring has filled, so the oldest sample is the one about to be overwritten.</summary>
     private bool speedSamplesWrapped;
 
+    /// <summary>How many transfers the run has taken on, ended or not.</summary>
     private long transferCount;
 
+    /// <summary>The bytes received by transfers that have ended.</summary>
     private long endedDownloaded;
 
+    /// <summary>The bytes sent by transfers that have ended.</summary>
     private long endedUploaded;
 
+    /// <summary>The sum of the download sizes known so far, each added once.</summary>
     private long downloadTotal;
 
+    /// <summary>The sum of the upload sizes known so far, each added once.</summary>
     private long uploadTotal;
 
     /// <summary>

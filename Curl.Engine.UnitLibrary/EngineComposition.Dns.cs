@@ -32,7 +32,7 @@ internal static partial class EngineComposition
     {
         if (network.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider), AddressFamilyOf(network), dohTrace, easyErrorText);
+            return CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider), AddressFamilyOf(network), dohTrace, easyErrorText, traces);
         }
 
         DnsServerResolverOptions resolverOptions = new(
@@ -75,13 +75,15 @@ internal static partial class EngineComposition
     /// (BL-1180); <see langword="null" /> for none.
     /// </param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components, which gate the HTTPS query's trace lines (<see cref="HttpsRecordTraceOf" />); <see langword="null" /> to write them all.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null) =>
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null) =>
         DohUrlOf(dohUrl) is { } url
             ? new DohDnsResolver(connector, url, dohTrace ?? NoTransferEvents.Instance, easyErrorText ?? NoEasyErrorText)
             {
                 AddressFamily = addressFamily,
                 SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess),
+                HttpsRecordTrace = HttpsRecordTraceOf(traces),
             }
             : new UnusableDohUrlResolver();
 
@@ -89,6 +91,26 @@ internal static partial class EngineComposition
     /// <param name="exitCode">The exit code.</param>
     /// <returns>An empty text.</returns>
     private static string NoEasyErrorText(CurlExitCode exitCode) => string.Empty;
+
+    /// <summary>
+    /// Which HTTPS-RR DoH trace lines curl 8.22.0 writes for the run's <c>--trace-config</c>
+    /// (ADR-0727's BL-2979 amendment): its <c>[DoH]</c> lines under the <c>doh</c> feature, and its
+    /// <c>[DNS] [HTTPS]</c> lines under <c>doh</c> and <c>dns</c> both; <c>network</c> and <c>all</c>
+    /// turn on both features (<c>lib/curl_trc.c</c>'s <c>trc_feats</c>).
+    /// </summary>
+    /// <param name="traces">The run's <c>--trace-config</c> components.</param>
+    /// <returns>The gate; <see cref="DohHttpsRecordTrace.All" /> for no components given.</returns>
+    internal static DohHttpsRecordTrace HttpsRecordTraceOf(EngineTraceComponents? traces)
+    {
+        if (traces is null)
+        {
+            return DohHttpsRecordTrace.All;
+        }
+
+        var both = traces.Components.Contains("network") || traces.Components.Contains("all");
+        var doh = both || traces.Components.Contains("doh");
+        return new DohHttpsRecordTrace(doh, doh && (both || traces.Components.Contains("dns")));
+    }
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
@@ -149,7 +171,7 @@ internal static partial class EngineComposition
     /// <returns>The resolver.</returns>
     private static IDnsResolver DialingResolverOf(EngineDialing dialing, EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents traces) =>
         network.DohUrl is { } dohUrl
-            ? CreateDohResolver(dohUrl, CreateDohConnector(traces, tls, dialing.TcpDialer, timeProvider, dialing.DnsResolver), AddressFamilyOf(network), dohTrace, easyErrorText)
+            ? CreateDohResolver(dohUrl, CreateDohConnector(traces, tls, dialing.TcpDialer, timeProvider, dialing.DnsResolver), AddressFamilyOf(network), dohTrace, easyErrorText, traces)
             : dialing.DnsResolver;
 
     /// <summary>The variable curl's debug build reads the DNS server to ask from (<c>override-dns</c>).</summary>

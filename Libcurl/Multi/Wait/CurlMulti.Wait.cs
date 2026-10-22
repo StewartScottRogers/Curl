@@ -91,6 +91,10 @@ public sealed partial class CurlMulti
         return CurlMultiCode.Ok;
     }
 
+    /// <summary>Reads the sockets the engine waits on, asking again with a big enough array when the first, empty one was too small.</summary>
+    /// <param name="live">The engine's multi transfer.</param>
+    /// <param name="sockets">The sockets, trimmed to the count the engine reported.</param>
+    /// <returns>The engine's answer.</returns>
     private static CurlMultiCode ReadWaitSockets(IMultiTransfer live, out CurlWaitSocket[] sockets)
     {
         sockets = [];
@@ -106,6 +110,10 @@ public sealed partial class CurlMulti
         return code;
     }
 
+    /// <summary>Adds <paramref name="socket"/> to <paramref name="set"/> when it waits for any of <paramref name="events"/>; a <see langword="null"/> set is skipped.</summary>
+    /// <param name="set">The <c>fd_set</c> stand-in, or <see langword="null"/> when the caller gave none.</param>
+    /// <param name="socket">The socket the engine waits on.</param>
+    /// <param name="events">The events that put it in this set.</param>
     private static void AddWhenWaitingFor(ISet<CurlSocket>? set, CurlWaitSocket socket, CurlWaitEvents events)
     {
         if (set is not null && (socket.Events & events) != 0)

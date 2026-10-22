@@ -86,7 +86,7 @@ laid out in [the plan](../Planning/Curl-Api-And-libcurl.md).
 
 | Term | Meaning | Name in code |
 | --- | --- | --- |
-| `Curl.Api` | The .NET-shaped public API over the engine; planned, with the seam's project beneath it. | the `Curl.Api` project |
+| `Curl.Api` | The .NET-shaped public API over the engine: an async client with `HttpClient`-shaped ergonomics. It sends through the seam, whose project `Curl.Api.UnitLibrary` sits beneath it. | the `Curl.Api` project |
 | `CurlCode` | A libcurl function's result (`CURLcode`), used by both public APIs. Its numbers equal `CurlExitCode`'s member for member and the seam converts by number; the two are separate concepts. | `Curl.Api.Codes.CurlCode` |
 | `CurlExitCode` | The engine-internal outcome of a transfer and the curl tool's process exit status. Not renamed, because it would touch every protocol library for no behaviour. | `Curl.Protocol.Abstractions.CurlExitCode` |
 | `curl-config` | The helper executable that reports the libcurl build: `--version`, `--vernum`, `--protocols`, `--feature`, `--ssl-backends` and the build-flag options (empty in Curl, which has no C flags). Planned by ADR-0712; upstream cases 1013, 1014, 1022 and 1023 compare it with `curl --version`. | `Curl.Config` (planned, BL-2854) |
@@ -96,7 +96,8 @@ laid out in [the plan](../Planning/Curl-Api-And-libcurl.md).
 | `EasyOptions` | The aggregate of every easy option group, the whole of what an easy transfer is configured with. | `Curl.Api.Options.EasyOptions` |
 | `EasyOptionsFromCommandLine` | The curl tool's translation of a parsed command line into `EasyOptions`; upstream's `config2setopts`. It lives in the tool, so the engine never reads `Curl.Cli`. | `EasyOptionsFromCommandLine` in `Curl.Console` |
 | Engine contracts | The interfaces the engine implements and both public APIs call: the seam. | `Curl.Api.EngineContracts` (`ICurlEngine`, `IEasyTransfer` and the rest) |
-| `Libcurl` | The libcurl-faithful public API (planned types `CurlEasy`, `CurlMulti` and the rest; the project has none yet), named as upstream's library is; renamed from `Curl.libcurl` on 2026-10-15. The curl tool is re-based onto it. | the `Libcurl` project, root namespace `Libcurl` |
+| Host | A project that exposes the engine to a caller and holds little logic of its own: `Curl.Console` (the `curl` executable), `Curl.Api`, `Libcurl` and `Curl.Mcp`, with the `.UnitLibrary` projects `Curl.Api.UnitLibrary` and `Curl.Mcp.UnitLibrary` beneath two of them. | `Curl.Console`, `Curl.Api`, `Libcurl`, `Curl.Mcp` |
+| `Libcurl` | The libcurl-faithful public API (`CurlEasy`, `CurlMulti`, `CurlShare`, `CurlUrlHandle` and the rest), named as upstream's library is; renamed from `Curl.libcurl` on 2026-10-15. The curl tool is re-based onto it. | the `Libcurl` project, root namespace `Libcurl` |
 | MCP resource | A read-only document an MCP server offers a client by URI; `Curl.Mcp` offers the `--ai-help` Markdown at `curl://ai-help`, `curl://ai-help/all` and `curl://ai-help/<category>`. | `McpAiHelpResourceCatalogue`, `McpAiHelpResource` |
 | MCP server | A program that offers tools and resources to an AI agent over the Model Context Protocol; `Curl.Mcp` serves Curl this way over standard input and output. | the `Curl.Mcp` project |
 | MCP tool | One action an MCP server lets an agent call, with named parameters and a result: `curl`, `transfer`, `parse_url`, `build_url` and `version`. | `CurlCommandTool`, `CurlTransferTool`, `CurlUrlTool`, `CurlVersionTool` in `Curl.Mcp`; logic in `Curl.Mcp.UnitLibrary` |

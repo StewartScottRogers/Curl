@@ -83,6 +83,8 @@ internal sealed class EasyAllocations(MemoryCallbacks? callbacks)
         blocks.Clear();
     }
 
+    /// <summary>Remembers a block for <see cref="FreeAll"/>; a callback that answered null or a null pointer (a failed allocation) leaves nothing to free.</summary>
+    /// <param name="block">The pointer the callback returned, or <see langword="null"/> when there were no callbacks.</param>
     private void Keep(nint? block)
     {
         if (block is { } allocated && allocated != 0)

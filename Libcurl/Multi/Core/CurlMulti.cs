@@ -20,7 +20,9 @@ namespace Libcurl.Multi;
 public sealed partial class CurlMulti : IAsyncDisposable
 {
     private readonly IMultiTransfer transfer;
+    // Maps the engine's transfer back to the CurlEasy added, by reference, for messages and callbacks.
     private readonly Dictionary<IEasyTransfer, CurlEasy> handles = new(ReferenceEqualityComparer.Instance);
+    // 0 until DisposeAsync runs; exchanged atomically so cleanup happens once.
     private int cleanedUp;
 
     /// <summary>Wraps the engine's multi <paramref name="transfer"/>.</summary>
@@ -126,6 +128,9 @@ public sealed partial class CurlMulti : IAsyncDisposable
         await transfer.DisposeAsync().ConfigureAwait(false);
     }
 
+    /// <summary>The engine transfer, for a member that must not run after cleanup.</summary>
+    /// <returns>The engine's multi transfer.</returns>
+    /// <exception cref="ObjectDisposedException">The multi handle has been cleaned up.</exception>
     private IMultiTransfer LiveTransfer()
     {
         ObjectDisposedException.ThrowIf(IsCleanedUp, this);

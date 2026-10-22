@@ -10,6 +10,7 @@ public sealed class McpCappedCaptureStream(McpResponseCap cap) : Stream
 {
     private readonly MemoryStream kept = new();
 
+    // One byte past the cap lets McpReturnedBytes see whether a multi-byte character straddles the cut.
     private readonly int keepLimit = cap.MaxBytes == int.MaxValue ? int.MaxValue : cap.MaxBytes + 1;
 
     /// <summary>How many bytes were written, kept or not.</summary>

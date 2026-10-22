@@ -12,7 +12,7 @@ namespace Curl.Mcp;
 /// <param name="Body">The body's bytes when the request is valid and has one; otherwise <see langword="null" />.</param>
 public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Body)
 {
-    /// <summary>The longest timeout a request may ask for: about 24 days, the most milliseconds a 32-bit <c>long</c> holds.</summary>
+    /// <summary>The longest timeout a request may ask for: 2147483 seconds, about 24.8 days, so that its milliseconds fit the 32-bit <c>long</c> of <c>CURLOPT_TIMEOUT_MS</c> on Windows.</summary>
     public const double MaxTimeoutSeconds = int.MaxValue / 1000;
 
     private const string TokenSymbols = "!#$%&'*+-.^_`|~";
@@ -34,6 +34,7 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
         return failure is null ? DecodeBody(request) : new McpTransferRequestCheck(failure, null);
     }
 
+    /// <summary>The "://" test keeps <see cref="Uri" /> from reading a bare path such as <c>/tmp/x</c> as an absolute <c>file</c> URI.</summary>
     private static McpToolFailure? CheckUrl(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
@@ -90,6 +91,7 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
             ? McpToolFailure.InvalidRequest("body", "a HEAD request carries no body.")
             : null;
 
+    /// <summary>The valid-request answer: the body as UTF-8 text bytes, as decoded base64, or none; invalid base64 is a failure.</summary>
     private static McpTransferRequestCheck DecodeBody(McpTransferRequest request)
     {
         McpTransferBody? body = request.Body;

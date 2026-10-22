@@ -50,7 +50,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             if ($returned.Count) {
                 git -C $Root add -A Tasks 2>&1 | Out-Null
                 git -C $Root commit -q -m "chore(tasks): return $($returned -join ', ') to Backlog - in Doing and held by no lane" -m $SkipCiNote 2>&1 | Out-Null
-                git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null
+                # The push takes the integrate lock like every lane's, so it cannot land in the
+                # middle of a lane's verify and cost that lane its push (BL-3060).
+                $boardLock = Enter-Lock
+                try { git -C $Root push -q origin "HEAD:$branch" 2>&1 | Out-Null } finally { $boardLock.Dispose() }
                 if ($LASTEXITCODE -ne 0) {
                     git -C $Root reset -q --hard "origin/$branch" 2>&1 | Out-Null
                     Stop-ShiftStart "$($returned -join ', ') in Doing and held by no lane; returning them to Backlog could not be pushed to origin/$branch"; exit 1

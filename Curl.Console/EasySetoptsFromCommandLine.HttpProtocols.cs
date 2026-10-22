@@ -129,6 +129,7 @@ internal static partial class EasySetoptsFromCommandLine
             StreamWeight = http.StreamWeight is >= (int)LeastStreamWeight and <= (int)MostStreamWeight ? UnsetHttp.StreamWeight : http.StreamWeight,
         };
 
+    // An SSH host key MD5 that is not 32 hex digits and a TFTP block size CURLOPT_TFTP_BLKSIZE would not keep stay on the hooks.
     private static EasyProtocolOptions ProtocolsKeptOnHooks(EasyProtocolOptions protocols) =>
         UnsetProtocols with
         {
@@ -141,7 +142,9 @@ internal static partial class EasySetoptsFromCommandLine
 
     private static bool IsSettablePostFieldSize(EasyHttpOptions http) => http.PostFieldSize >= -1;
 
+    // CURLOPT_SSH_HOST_PUBLIC_KEY_MD5 refuses anything but 32 hex digits.
     private static bool IsSettableHostPublicKeyMd5(EasyProtocolOptions protocols) => protocols.Ssh.HostPublicKeyMd5 is null or { Length: Md5HexDigits };
 
+    // CURLOPT_TFTP_BLKSIZE keeps only a size within the TFTP block size range.
     private static bool IsSettableTftpBlockSize(EasyProtocolOptions protocols) => protocols.Tftp.BlockSize is >= (int)LeastTftpBlockSize and <= (int)MostTftpBlockSize;
 }

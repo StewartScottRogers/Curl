@@ -45,8 +45,16 @@ internal static partial class DohTraceLines
     /// <param name="trace">Receives each line as a <see cref="ITransferEvents.ReportInfo" /> text.</param>
     /// <param name="describeExitCode">Gives curl's <c>curl_easy_strerror</c> text for an exit code.</param>
     /// <param name="result">The HTTPS query's result.</param>
-    public static void ReportHttpsRecord(ITransferEvents trace, Func<CurlExitCode, string> describeExitCode, DohQueryResult result) =>
-        HttpsRecordLines(describeExitCode, result).ForEach(trace.ReportInfo);
+    /// <param name="writes">
+    /// Which of the lines are written: curl's <c>[DoH]</c> lines (<c>infof</c> on the sub-transfer) and
+    /// its <c>[DNS] [HTTPS]</c> lines (<c>CURL_TRC_DNS</c> on the sub-transfer), gated apart by
+    /// <c>--trace-config</c> (ADR-0727's BL-2979 amendment).
+    /// </param>
+    public static void ReportHttpsRecord(ITransferEvents trace, Func<CurlExitCode, string> describeExitCode, DohQueryResult result, DohHttpsRecordTrace writes) =>
+        HttpsRecordLines(describeExitCode, result)
+            .Where(line => line.StartsWith("[DNS]", StringComparison.Ordinal) ? writes.DnsLines : writes.DohLines)
+            .ToList()
+            .ForEach(trace.ReportInfo);
 
     /// <summary>
     /// Writes an HTTPS record as curl's <c>Curl_httpsrr_print</c> does: the priority, the target
@@ -70,9 +78,9 @@ internal static partial class DohTraceLines
 
     private static List<string> HttpsRecordLines(Func<CurlExitCode, string> describeExitCode, DohQueryResult result)
     {
-        if (result.ExchangeFailure != CurlExitCode.Ok)
+        if (ResponseFailureLine(describeExitCode, result) is { } failureLine)
         {
-            return [$"[DoH] [DoH] [HTTPS] error: {describeExitCode(result.ExchangeFailure)}"];
+            return [failureLine];
         }
 
         // curl turns an HTTPS answer with no content into NXDOMAIN before it writes the failure.
@@ -87,6 +95,12 @@ internal static partial class DohTraceLines
             ? [FormattableString.Invariant($"[DNS] [HTTPS] got {answer.HttpsRecordData.Count} records"), .. FirstHttpsRecordLines(describeExitCode, first)]
             : [HttpsRequestCompleteLine];
     }
+
+    // The error line for a query whose exchange failed or whose status is outside 200-299; null otherwise.
+    private static string? ResponseFailureLine(Func<CurlExitCode, string> describeExitCode, DohQueryResult result) =>
+        result.ExchangeFailure != CurlExitCode.Ok
+            ? $"[DoH] [DoH] [HTTPS] error: {describeExitCode(result.ExchangeFailure)}"
+            : result.HasSuccessStatus ? null : FormattableString.Invariant($"[DoH] [DoH] [HTTPS] error: HTTP status {result.StatusCode}");
 
     // curl writes the record so far after each parameter it reads, and stops at the first it refuses.
     private static List<string> FirstHttpsRecordLines(Func<CurlExitCode, string> describeExitCode, byte[] record)

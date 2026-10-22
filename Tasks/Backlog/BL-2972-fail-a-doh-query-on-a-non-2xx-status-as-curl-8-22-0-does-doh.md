@@ -1,11 +1,11 @@
-﻿---
+---
 id: BL-2972
 title: Fail a DoH query on a non-2xx status as curl 8.22.0 does: [DoH] [A] error: HTTP status N
 priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3011]
-touches: [Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DohDnsResolver.Exchange.cs, Curl.Networking.UnitLibrary/DohTraceLines.ExchangeFailures.cs, Curl.Networking.UnitTests/DohResponseReaderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.ExchangeFailures.cs]
+touches: [Curl.Networking.UnitLibrary/DohResponseReader.cs, Curl.Networking.UnitLibrary/DohDnsResolver.Exchange.cs, Curl.Networking.UnitLibrary/DohTraceLines.ExchangeFailures.cs, Curl.Networking.UnitTests/DohResponseReaderTests.cs, Curl.Networking.UnitTests/DohDnsResolverTraceTests.ExchangeFailures.cs, Curl.Networking.UnitLibrary/DohQueryResult.cs, Curl.Networking.UnitLibrary/DohTraceLines.cs, Curl.Networking.UnitLibrary/DohTraceLines.HttpsRecord.cs]
 requirement: none
 created: 2026-10-21
 completed:
@@ -27,6 +27,11 @@ Split from BL-2970 (ADR-0738). Measured 2026-10-21 with the local curl 8.22.0 (S
 
 ## Notes
 
+- 2026-10-22 (lane 3, before any code): `lib/vdns/doh.c` at `curl-8_22_0` (`doh_probe_done`, lines 1072-1083) fails a probe with `DOH_HTTP_FAILED` and `infof "[DoH] [%s] error: HTTP status %d"` whenever `httpcode < 200 || httpcode >= 300`, after the body has been read and before `doh_resp_decode`; so 1xx (as a final status) and 3xx fail too, exactly like a failed exchange (`result != 0`, the same `DOH_HTTP_FAILED`). Plan: `DohResponseReader` parses the status code from the status line and returns it with the body (a status line without three digits stays a receive failure); `QueryAsync` writes `Connection #N ... left intact` and then returns a failed `DohQueryResult` (Answer null, so it counts as answered like an exchange failure) carrying the status (new optional `HttpStatus` on `DohQueryResult`); `FailureLine` (and `HttpsRecordLines`, which today dereferences `Answer!` when `ExchangeFailure` is Ok) write `error: HTTP status <n>` through a helper in the new `DohTraceLines.ExchangeFailures.cs` partial.
+- Touches widened: the line is built in `DohTraceLines.FailureLine` (`DohTraceLines.cs`), which needs a one-line call into the new partial; `DohQueryResult.cs` must carry the status; `DohTraceLines.HttpsRecord.cs` must not take an HTTP failure for a decoded answer. `DohTraceLines.cs` is in BL-2973's `touches` (Doing on lane 2), so the task goes back to Backlog until BL-2973 lands.
+
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a401cbb2 2a446683.
+- 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/DohTraceLines.cs, which BL-2973 (Doing) touches; requeue once BL-2973 lands

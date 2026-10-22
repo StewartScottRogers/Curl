@@ -90,6 +90,8 @@ public sealed class McpConfinementRoot
         {
             string asWritten = ResolveLinks(System.IO.Path.GetFullPath(path, ResolvedRoot), 0);
             string stepByStep = ResolveLinks(System.IO.Path.Combine(ResolvedRoot, path), 0);
+            // The readings differ only when a link precedes a "..". The path is inside only if both
+            // are, so report the step-by-step one when it is outside and the as-written one otherwise.
             string resolved = IsInside(stepByStep) ? asWritten : stepByStep;
             return IsInside(resolved)
                 ? new McpPathCheck(path, McpPathVerdict.Inside, resolved, $"'{path}' resolves to '{resolved}', inside {VariableName}.")
@@ -154,9 +156,14 @@ public sealed class McpConfinementRoot
         return current;
     }
 
+    /// <summary>
+    /// <paramref name="path" /> itself when it is not an existing symbolic link; otherwise its target,
+    /// resolved in turn. A relative target resolves against the link's folder.
+    /// </summary>
     private static string FollowLink(string path, int linkDepth)
     {
         FileInfo entry = new(path);
+        // FileInfo.Attributes is -1 for a name that does not exist, which cannot be a link.
         if ((int)entry.Attributes == -1 || entry.LinkTarget is not string target)
         {
             return path;
@@ -170,6 +177,7 @@ public sealed class McpConfinementRoot
         return ResolveLinks(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, target), linkDepth + 1);
     }
 
+    /// <summary>Whether <paramref name="resolved" /> is the root or lies under it; the trailing separator stops <c>/root-other</c> matching <c>/root</c>.</summary>
     private bool IsInside(string resolved) =>
         string.Equals(resolved, ResolvedRoot, comparison) || resolved.StartsWith(rootWithSeparator, comparison);
 }

@@ -1226,7 +1226,7 @@ public sealed partial class TcpConnector(
             var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
             _httpsRecordsResolved[DnsCacheKey(host, port)] = true;
             ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
-            return new DnsResolution(addresses, DnsLookupFailure.None);
+            return new DnsResolution(dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Shuffle(addresses) : addresses, DnsLookupFailure.None);
         }
 
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason

@@ -106,5 +106,7 @@ internal sealed class ParallelTransferProgress(ParallelProgressMeter meter, obje
     /// <inheritdoc />
     public void ReportTransferDone()
     {
+        // Nothing to record: the runner ends the transfer on the meter through End, once its reports are
+        // written, as curl's tool ends a parallel transfer only when its message arrives.
     }
 }

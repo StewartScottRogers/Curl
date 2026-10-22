@@ -277,6 +277,8 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
         }
     }
 
+    /// <summary>Writes each line as an info line to the transfer's own events, so it takes their stamp and marker.</summary>
+    /// <param name="lines">The <c>[MULTI]</c> lines.</param>
     private void Write(IEnumerable<string> lines)
     {
         foreach (string line in lines)
@@ -285,6 +287,8 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
         }
     }
 
+    /// <summary>The lines after <c>[SETUP] added</c>; takes the connection's number from the run here, as curl creates the connection then.</summary>
+    /// <returns>The lines, naming that connection in the pool line.</returns>
     private string[] ConnectionCreatedLines()
     {
         connectionId = takeConnectionId();
@@ -296,6 +300,8 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
         ];
     }
 
+    /// <summary>The lines curl writes after <c>Failed to connect to</c>, up to the connection's termination (ADR-0391).</summary>
+    /// <returns>The lines, naming the connection and the host and port that failed.</returns>
     private string[] FailedConnectLines() =>
     [
         "[MULTI] [CONNECTING] failed to connect [0][!DNS][!SETUP][!HAPPY-EYEBALLS]",
@@ -341,15 +347,25 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
 
     private string[] ResponseStartedLines() => [Added("PERFORMING", "STARTTRANSFER")];
 
+    /// <summary>A <c>[PGRS-*] added</c> line, whose number is the microseconds since this object was created, as curl labels them <c>ns</c>.</summary>
+    /// <param name="state">The multi state the line is written in.</param>
+    /// <param name="timer">The name of the progress timer, without <c>PGRS-</c>.</param>
+    /// <returns>The line.</returns>
     private string Added(string state, string timer) =>
         Invariant($"[MULTI] [{state}] [PGRS-{timer}] added {(long)timeProvider.GetElapsedTime(startTimestamp).TotalMicroseconds}ns");
 
+    /// <summary>Makes a group side whose lines do not depend on the transfer.</summary>
+    /// <param name="lines">The lines.</param>
+    /// <returns>A function that gives them.</returns>
     private static Func<string[]> Fixed(params string[] lines) => () => lines;
 
     private static bool StartsWith(string text, string prefix) => text.StartsWith(prefix, StringComparison.Ordinal);
 
     private static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 
+    /// <summary>Whether <paramref name="text" /> is curl's <c>Connection #N ... left intact</c> or <c>shutting down connection #N</c> line, which closes the multi's last groups.</summary>
+    /// <param name="text">The line about to be written.</param>
+    /// <returns><see langword="true" /> for either line.</returns>
     private static bool EndsTheTransfer(string text) =>
         (StartsWith(text, ConnectionPrefix) && text.EndsWith(LeftIntactSuffix, StringComparison.Ordinal))
         || StartsWith(text, ShuttingDownPrefix);

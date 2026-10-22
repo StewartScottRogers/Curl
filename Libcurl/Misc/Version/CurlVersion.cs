@@ -112,6 +112,7 @@ public static class CurlVersion
     public static CurlVersionFeatures FeatureBit(string featureName) =>
         FeatureBits.GetValueOrDefault(featureName);
 
+    // Combines the bits of every feature name the engine lists into curl_version_info_data.features.
     private static CurlVersionFeatures FeaturesOf(IReadOnlyList<string> featureNames)
     {
         CurlVersionFeatures features = CurlVersionFeatures.None;

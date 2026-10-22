@@ -99,7 +99,7 @@ public static class DnsServerQuery
         return answer.Failure switch
         {
             DnsMessageFailure.None when answer.Addresses.Count > 0 || answer.ServiceRecords.Count > 0 => new DnsQueryOutcome(answer, DnsLookupFailure.None),
-            DnsMessageFailure.None or DnsMessageFailure.NoContent or DnsMessageFailure.UnexpectedType or DnsMessageFailure.UnexpectedClass
+            DnsMessageFailure.None or DnsMessageFailure.UnexpectedType or DnsMessageFailure.UnexpectedClass
                 => new DnsQueryOutcome(null, DnsLookupFailure.NoData),
             _ => new DnsQueryOutcome(null, DnsLookupFailure.BadReply),
         };

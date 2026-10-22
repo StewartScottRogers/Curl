@@ -57,12 +57,18 @@ public sealed class McpTransferTool(ICurlEngine engine, McpResponseCap cap)
         return ToResult(code, transfer, body, headers, cancellationToken);
     }
 
+    /// <summary>The write callback: keeps the chunk (up to the cap) and reports all of it taken, since libcurl aborts the transfer on a short count.</summary>
     private static long WriteBody(McpCappedCaptureStream body, ReadOnlySpan<byte> data)
     {
         body.Write(data);
         return data.Length;
     }
 
+    /// <summary>
+    /// Builds the result of a finished transfer: cancellation wins over a late result, a code other
+    /// than <see cref="CurlCode.Ok" /> becomes a tool error with libcurl's error text, and success
+    /// carries the last response's status, headers, body and info.
+    /// </summary>
     private static McpTransferToolResult ToResult(
         CurlCode code,
         IEasyTransfer transfer,

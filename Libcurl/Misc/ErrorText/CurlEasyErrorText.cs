@@ -13,6 +13,7 @@ public static class CurlEasyErrorText
     /// <summary>The text for a code libcurl does not name.</summary>
     public const string UnknownError = "Unknown error";
 
+    // Each code's text, verbatim from libcurl; a code absent from the table answers UnknownError.
     private static readonly Dictionary<CurlExitCode, string> Texts = new()
     {
         [CurlExitCode.Ok] = "No error",

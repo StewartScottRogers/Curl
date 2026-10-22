@@ -74,10 +74,32 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// </summary>
     internal const int LastNumberedName = 99;
 
+    /// <summary>The open file, or <see langword="null" /> before the first open and after a failed one.</summary>
     private Stream? file;
+
+    /// <summary>
+    /// How the next open treats existing content: the constructor's write mode, until
+    /// <see cref="TryOpenUnderNameAsync" /> switches it for a <c>-J</c> name.
+    /// </summary>
     private FileWriteMode openMode = writeMode;
+
+    /// <summary>
+    /// The size of the write (or of the <c>Content-Disposition</c> line) that failed because the
+    /// file could not be opened, which <c>client returned ERROR on write of N bytes</c> reports;
+    /// <see langword="null" /> while none has failed.
+    /// </summary>
     private long? failedWriteLength;
+
+    /// <summary>
+    /// The file's length when it was opened, or the end of the bytes <see cref="KeepForRetry" />
+    /// last kept: where <see cref="TruncateForRetry" /> cuts back to.
+    /// </summary>
     private long lengthAtAttemptStart;
+
+    /// <summary>
+    /// The bytes past <see cref="lengthAtAttemptStart" /> that earlier attempts left in place
+    /// (<see cref="LeaveForRetry" />), which <see cref="AttemptBytesWritten" /> does not count.
+    /// </summary>
     private long bytesLeftByEarlierAttempts;
 
     /// <summary>
@@ -233,7 +255,8 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// curl's <c>client returned ERROR on write of N bytes</c> when the file could not be
     /// created, N being the size of the first write that failed; exit 23 with no message
     /// when a successful transfer wrote nothing, was not skipped by an unmet time
-    /// condition, and the empty file could not be created; otherwise <paramref name="result" />.
+    /// condition, was not answered <c>304</c>, and the empty file could not be created;
+    /// otherwise <paramref name="result" />.
     /// </returns>
     internal async ValueTask<TransferResult> CompleteAsync(TransferResult result)
     {

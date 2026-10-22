@@ -48,13 +48,37 @@ function Get-UsageCostUsd {
     return $weighted * $script:RunPriceBaseUsdPerMillion[$family] / 1e6
 }
 
+function Read-SharedLogLines {
+    # The lines of a log another process may still hold open for writing, read with shared
+    # access and retried briefly on IOException; a log that stays locked reads as no lines (BL-3061).
+    param([string]$Path)
+    for ($try = 1; $try -le 5; $try++) {
+        try {
+            $stream = [System.IO.FileStream]::new($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, ([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+            try {
+                $reader = [System.IO.StreamReader]::new($stream)
+                $lines = [System.Collections.Generic.List[string]]::new()
+                while ($null -ne ($line = $reader.ReadLine())) { $lines.Add($line) }
+                return , $lines.ToArray()
+            }
+            finally { $stream.Dispose() }
+        }
+        catch [System.IO.IOException] {
+            if ($try -lt 5) { Start-Sleep -Milliseconds 200 }
+        }
+        catch { break }
+    }
+    Write-Verbose "Could not read $Path; its cost is not counted."
+    return , @()
+}
+
 function Get-LogEstimatedCostUsd {
     # A run log's cost in US dollars estimated from the usage of its assistant messages.
     # stream-json repeats a message's id on each of its content blocks, with the output count
     # growing, so each id counts once with its largest count of each kind.
     param([string]$Path)
     $byId = @{}
-    foreach ($line in [System.IO.File]::ReadLines($Path)) {
+    foreach ($line in (Read-SharedLogLines $Path)) {
         if (-not $line.StartsWith('{"type":"assistant"')) { continue }
         $evt = try { $line | ConvertFrom-Json } catch { $null }
         $message = if ($evt) { $evt.message } else { $null }
@@ -227,6 +251,16 @@ if ($TestTaskBudget) {
     $cases += ,@('a result of 0 with no usage costs 0', '0,False', ((Get-RunLogCost (Join-Path $dir 'BL-12-20261003-100000-L1.jsonl')) | ForEach-Object { "$($_.Usd),$($_.Estimated)" }))
     $cases += ,@('a killed run counts toward its task spend', '6.16', ((Get-TaskSpentUsd $dir 'BL-7').ToString('0.00', $usd)))
     $cases += ,@('a killed run counts toward the recent costs', '6.16', (((@(Get-RecentRunCosts $dir -Count 100) | Sort-Object -Descending) | Where-Object { $_ -gt 6.1 -and $_ -lt 6.2 } | Select-Object -First 1).ToString('0.00', $usd)))
+    # A log a running claude still holds open for writing is read (BL-3061).
+    $lockedPath = Join-Path $dir 'BL-13-20261003-100000-L1.jsonl'
+    $writer = [System.IO.FileStream]::new($lockedPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
+    $bytes = [Text.Encoding]::UTF8.GetBytes($usageA + "`n"); $writer.Write($bytes, 0, $bytes.Length); $writer.Flush()
+    $cases += ,@('a log held open for writing costs what it costs once closed', '6.16', ((Get-LogEstimatedCostUsd $lockedPath).ToString('0.00', $usd)))
+    $writer.Dispose()
+    $writer = [System.IO.FileStream]::new($lockedPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    $cases += ,@('a log locked exclusively costs 0 and never throws', '0', "$(Get-LogEstimatedCostUsd $lockedPath)")
+    $writer.Dispose()
+    $cases += ,@('a log released after being locked costs its usage', '6.16', ((Get-LogEstimatedCostUsd $lockedPath).ToString('0.00', $usd)))
     Remove-Item -Recurse -Force $dir
     $failed = 0
     foreach ($case in $cases) {

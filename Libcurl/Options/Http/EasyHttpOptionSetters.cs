@@ -13,6 +13,7 @@ namespace Libcurl.Options;
 /// </summary>
 internal static class EasyHttpOptionSetters
 {
+    /// <summary>The largest <c>CURLOPT_EXPECT_100_TIMEOUT_MS</c> kept: libcurl's <c>INT_MAX</c>.</summary>
     private const long MostExpect100TimeoutMilliseconds = int.MaxValue;
 
     /// <summary>Adds the HTTP rows to <paramref name="setters"/>.</summary>
@@ -121,12 +122,14 @@ internal static class EasyHttpOptionSetters
 
     private static CurlCode SetSslEnableAlpn(ref EasyOptions o, object? v) => Set(ref o, h => h with { SslEnableAlpn = IsOn(v) });
 
+    /// <summary>Replaces the handle's <see cref="EasyHttpOptions"/> with the copy <paramref name="change"/> returns; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Set(ref EasyOptions options, Func<EasyHttpOptions, EasyHttpOptions> change)
     {
         options = options with { Http = change(options.Http) };
         return CurlCode.Ok;
     }
 
+    /// <summary>A value of -1 or more (-1 meaning unlimited or unknown); a smaller one is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetAtLeastMinusOne(ref EasyOptions options, object? value, Func<EasyHttpOptions, long, EasyHttpOptions> change)
     {
         var number = NumberOf(value);
@@ -190,6 +193,7 @@ internal static class EasyHttpOptionSetters
         return Set(ref options, h => h with { PostFields = copy ? CopyOf(fields, h.PostFieldSize) : fields, Post = true, HttpGet = false });
     }
 
+    /// <summary>A private copy of <paramref name="fields"/>, cut to <paramref name="size"/> bytes when that is not negative and shorter; <see langword="null"/> stays <see langword="null"/>.</summary>
     private static ReadOnlyMemory<byte>? CopyOf(ReadOnlyMemory<byte>? fields, long size) =>
         fields is { } bytes ? bytes[..(int)Math.Min(size < 0 ? bytes.Length : size, bytes.Length)].ToArray() : (ReadOnlyMemory<byte>?)null;
 
@@ -237,14 +241,18 @@ internal static class EasyHttpOptionSetters
         return weight is < 1 or > 256 ? CurlCode.Ok : Set(ref options, h => h with { StreamWeight = (int)weight });
     }
 
+    /// <summary>The <c>CURLOPT_HSTS_CTRL</c> flags kept: none unless <c>CURLHSTS_ENABLE</c> is set, then only it and <c>CURLHSTS_READONLYFILE</c>.</summary>
     private static HstsControl HstsControlOf(long number) =>
         (number & (long)HstsControl.Enable) == 0 ? HstsControl.None : (HstsControl)(number & (long)(HstsControl.Enable | HstsControl.ReadOnlyFile));
 
+    /// <summary>The HTTP/2 stream dependency on the <c>CURL *</c> handle <paramref name="parent"/>, or none for <see langword="null"/>.</summary>
     private static EasyStreamDependency? DependencyOn(object? parent, bool exclusive) =>
         parent is null ? null : new EasyStreamDependency(parent, exclusive);
 
+    /// <summary>A private copy of a string list option (<c>curl_slist</c>), so a later change by the caller does not alter the handle; <see langword="null"/> is an empty list.</summary>
     private static IReadOnlyList<string> ListOf(object? value) => value is IEnumerable<string> lines ? [.. lines] : [];
 
+    /// <summary>Whether a <c>CURLOT_LONG</c> on/off value is on: any value but 0, as in libcurl.</summary>
     private static bool IsOn(object? value) => NumberOf(value) != 0;
 
     private static long NumberOf(object? value) => Convert.ToInt64(value, CultureInfo.InvariantCulture);

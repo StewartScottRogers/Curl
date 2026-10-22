@@ -21,6 +21,7 @@ public sealed class CurlCookieStore
     ];
 
     private readonly Lock _gate = new();
+    // Replaced whole, never edited in place, under _gate.
     private List<string> _lines = [];
 
     internal CurlCookieStore()
@@ -74,6 +75,7 @@ public sealed class CurlCookieStore
     public async Task LoadAsync(string path, CancellationToken cancellationToken)
     {
         IReadOnlyList<string> lines = await StoreFile.ReadEntryLinesAsync(path, "#HttpOnly_", cancellationToken).ConfigureAwait(false);
+        // Validate every line before adding any, so a bad line leaves the store unchanged.
         CurlCookieStore checkedLines = new();
         foreach (string line in lines)
         {

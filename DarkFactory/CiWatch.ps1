@@ -97,13 +97,14 @@ function Get-CiFailures {
         $key = "job $($parts[0].Trim()) step $($parts[1].Trim())"
         $text = ($parts[2] -replace '^\d{4}-\d\d-\d\dT[\d:.]+Z ?', '').Trim()
         if (-not $found.Contains($key)) {
-            $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = '' }
+            $found[$key] = [pscustomobject]@{ Key = $key; Kind = 'job'; Platforms = @(Get-CiPlatform $parts[0].Trim()); Project = ''; Message = ''; GateMembers = @(); Files = @() }
         }
         # The quality gate annotates each member outside a gate ("X is outside a gate: ..."). Those
         # lines are the message, not the step's echoed script (AF-0244: BL-2466 read the script
         # line and never named CurlMulti.SetOption, so the real gap waited for a Normal task).
+        # A step's ::error file=<path> annotation names the file at fault (BL-3028).
+        if ($text -match '::error file=(.+?)(?:,|::)' -and @($found[$key].Files).Count -lt 5) { $found[$key].Files += $Matches[1].Trim() }
         if ($text -match '(?:^|\s)(?:##\[error\])?(\S.* is outside a gate: .*)$') {
-            if (-not $found[$key].PSObject.Properties['GateMembers']) { $found[$key] | Add-Member -NotePropertyName GateMembers -NotePropertyValue @() }
             if (@($found[$key].GateMembers).Count -lt 5) { $found[$key].GateMembers += $Matches[1].Trim() }
             $found[$key].Message = (@($found[$key].GateMembers) -join '; ')
         } elseif (-not $found[$key].Message -and $text -match '(?i)error|fail|timed? ?out|cancel|exit code') { $found[$key].Message = $text }
@@ -145,6 +146,7 @@ function Get-CiVerdicts {
         $verdicts += [pscustomobject]@{
             Key = $key; Kind = $failure.Kind; Verdict = $verdict; RunId = $Runs[$at].Id; FirstSha = $Runs[$first].Sha
             Platforms = @($platforms | Select-Object -Unique | Sort-Object); Project = $failure.Project; Message = $failure.Message
+            GateMembers = @($failure.GateMembers | Where-Object { $_ }); Files = @($failure.Files | Where-Object { $_ })
         }
     }
     return $verdicts
@@ -175,9 +177,41 @@ function Get-CiTaskNewArgs {
         return @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'direct',
             '-Touches', (Get-CiAuditPath $Verdict.Key), '-NoLane')
     }
-    $newArgs = @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'feature')
-    if (@($Touches).Count) { $newArgs += @('-Touches', (@($Touches) -join ',')) }
-    return $newArgs
+    # Never empty touches: a task with none is unready and no lane takes it (BL-3028).
+    $Touches = @($Touches | Where-Object { $_ })
+    if (-not $Touches.Count) { $Touches = @(Get-CiFallbackTouches $Verdict) }
+    return @('new', '-Title', (Get-CiTaskTitle $Verdict), '-Priority', 'High', '-Pipeline', 'feature', '-Touches', ($Touches -join ','))
+}
+
+function Get-CiFallbackTouches {
+    # The narrow touches of a CI task whose failure names no project or file: the script a
+    # quality-gate step runs, Measure-CodeQuality.ps1, and otherwise Curl.slnx, which the build
+    # and test steps build. Never .github/workflows/ci.yml: it is a guard file, so a lane could
+    # not take the task.
+    param($Verdict)
+    if ("$($Verdict.Key)" -match '(?i)quality|coverage|complexity|crap') { return @('Measure-CodeQuality.ps1') }
+    return @('Curl.slnx')
+}
+
+function Get-CiJobTouches {
+    # A job failure's touches, as far as they exist in -Repo: the files its ::error file=
+    # annotations name, and the source files that declare each member outside a gate
+    # ("Type.Method is outside a gate" -> */Type.cs and its */Type.*.cs partials). Empty when
+    # the log names neither; Get-CiTaskNewArgs then falls back to Get-CiFallbackTouches.
+    param($Verdict, [string]$Repo)
+    $touches = @()
+    foreach ($file in @($Verdict.Files | Where-Object { $_ })) {
+        $relative = ("$file" -replace '\\', '/') -replace '^(?:[A-Za-z]:)?/.*?/Curl/Curl/', ''
+        if (Test-Path (Join-Path $Repo $relative) -PathType Leaf) { $touches += $relative }
+    }
+    foreach ($member in @($Verdict.GateMembers | Where-Object { $_ })) {
+        $name = @(("$member" -replace ' is outside a gate:.*$', '').Trim() -split '\s+')[-1] -replace '\(.*$', ''
+        $parts = @($name -split '\.' | Where-Object { $_ })
+        if ($parts.Count -lt 2) { continue }
+        $type = ($parts[-2] -split '\+')[-1] -replace '[<`].*$', ''
+        $touches += @(git -C $Repo ls-files -- "*/$type.cs" "*/$type.*.cs" 2>$null | Select-Object -First 3)
+    }
+    return @($touches | Where-Object { $_ } | Select-Object -Unique)
 }
 
 function Get-CiTouches {
@@ -397,6 +431,7 @@ function Invoke-CiWatch {
     $all = @(Get-CiVerdicts -Runs $runs -ConfirmMinutes $confirm)
     $verdicts = @($all | Where-Object { -not $script:CiWatch.Settled.ContainsKey("$($_.Key)|$($_.RunId)") })
     if ($verdicts.Count) { New-CiFailureTasks -Branch $Branch -Runs $runs -Verdicts $verdicts }
+    Move-FixedCiTasksToDeferred -Branch $Branch -Runs $runs
     foreach ($run in $runs) {
         Write-CiRunLine -RunId $run.Id -Line (Get-CiRunOutcome -Run $run -Runs $runs -Verdicts $all -Settled $script:CiWatch.Settled -ConfirmMinutes $confirm)
     }
@@ -410,21 +445,14 @@ function New-CiFailureTasks {
     $saved = $env:CLAUDE_PROJECT_DIR
     try {
         foreach ($attempt in 1..3) {
-            git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
-            if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
-                New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
-                git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null
-            }
-            git -C $CiWatchDir checkout -q -f --detach "origin/$Branch" 2>&1 | Out-Null
-            git -C $CiWatchDir clean -q -fd -- Tasks 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'ci' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return }
+            if (-not (Reset-CiWatchWorktree -Branch $Branch)) { return }
             $env:CLAUDE_PROJECT_DIR = $CiWatchDir
             $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
             $filed = @()
             foreach ($verdict in $verdicts) {
                 $sha = @($runs | Where-Object { $_.Id -eq $verdict.RunId })[0].Sha
                 if (Test-CiFailureCovered -Key $verdict.Key -Sha $sha -Repo $CiWatchDir) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = 'covered by a task'; continue }
-                $touches = @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir)
+                $touches = if ($verdict.Kind -eq 'job') { @(Get-CiJobTouches -Verdict $verdict -Repo $CiWatchDir) } else { @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir) }
                 $newArgs = Get-CiTaskNewArgs -Verdict $verdict -Touches $touches
                 $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
                 if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file $($verdict.Key): $(Get-Short $out 60)" 'DarkYellow'; continue }
@@ -447,6 +475,75 @@ function New-CiFailureTasks {
             return
         }
         Write-Trace '-' 'ci' "could not push the CI failure tasks to $Branch; trying again next heartbeat" 'DarkYellow'
+    } catch {
+        Write-Trace '-' 'ci' "CI watch failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
+    } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+}
+
+function Reset-CiWatchWorktree {
+    # Fetches -Branch and checks the ci-watch worktree out at origin/-Branch, adding it the
+    # first time, with Tasks cleaned; $false, traced, when that fails.
+    param([string]$Branch)
+    git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+    if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
+        New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
+        git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null
+    }
+    git -C $CiWatchDir checkout -q -f --detach "origin/$Branch" 2>&1 | Out-Null
+    git -C $CiWatchDir clean -q -fd -- Tasks 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'ci' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return $false }
+    return $true
+}
+
+function Get-FixedCiTaskIds {
+    # The Backlog CI-fix tasks ("Fix CI failure ...", "Fix CI build ...", "Fix flaky CI test
+    # ...") in -Repo that the newest of -Runs proves fixed: that run is green, so green for
+    # the job or test each names, and its commit contains the task's filing. A red newest run
+    # proves nothing, and a task in Doing is left to its lane (BL-3028).
+    param([string]$Repo, [object[]]$Runs)
+    $newest = @($Runs)[0]
+    if (-not $newest -or @($newest.Failures | Where-Object { $_ }).Count) { return @() }
+    $ids = @()
+    foreach ($file in @(Get-ChildItem (Join-Path $Repo 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue)) {
+        $title = @(Get-Content -LiteralPath $file.FullName -TotalCount 6 | Where-Object { $_ -match '^title:\s*' })[0]
+        if ($title -notmatch '^title:\s*Fix (?:CI failure|CI build|flaky CI test) ') { continue }
+        $filedIn = "$(git -C $Repo log --diff-filter=A --format=%H -1 -- "Tasks/Backlog/$($file.Name)" 2>$null)".Trim()
+        if (-not $filedIn) { continue }
+        git -C $Repo merge-base --is-ancestor $filedIn $newest.Sha 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $ids += ($file.Name -replace '^(BL-\d+).*$', '$1') }
+    }
+    return $ids
+}
+
+function Move-FixedCiTasksToDeferred {
+    # Once per green newest run: defers each task Get-FixedCiTaskIds finds with "already
+    # fixed, CI green on <sha>" through task-board.ps1 move, in the ci-watch worktree at
+    # origin/-Branch, pushed straight to -Branch like a filing; up to three tries when the
+    # push races a lane. Deferred, not Done: the board moves only a task in Doing to Done,
+    # and no lane did its work (ADR-0756).
+    param([string]$Branch, [object[]]$Runs)
+    $newest = @($Runs)[0]
+    if (-not $newest -or @($newest.Failures | Where-Object { $_ }).Count -or $script:CiWatch.Logged.ContainsKey("deferred $($newest.Id)")) { return }
+    $script:CiWatch.Logged["deferred $($newest.Id)"] = 'looked'
+    $on = "$($newest.Sha)".Substring(0, [math]::Min(9, "$($newest.Sha)".Length))
+    $saved = $env:CLAUDE_PROJECT_DIR
+    try {
+        foreach ($attempt in 1..3) {
+            if (-not (Reset-CiWatchWorktree -Branch $Branch)) { return }
+            $ids = @(Get-FixedCiTaskIds -Repo $CiWatchDir -Runs $Runs)
+            if (-not $ids.Count) { return }
+            $env:CLAUDE_PROJECT_DIR = $CiWatchDir
+            $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
+            foreach ($id in $ids) { & powershell -NoProfile -ExecutionPolicy Bypass -File $board move -Id $id -To Deferred -Reason "already fixed, CI green on $on" 2>&1 | Out-Null }
+            git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
+            git -C $CiWatchDir commit -q -m "chore(tasks): defer $($ids -join ', '), already fixed, CI green on $on" -m "Moved by the dark factory's CI watch (BL-3028)." -m $SkipCiNote 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { return }
+            git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { continue }
+            foreach ($id in $ids) { Write-Trace $id 'ci' "deferred: already fixed, CI green on $on, run $($newest.Id)" 'Yellow' }
+            return
+        }
+        Write-Trace '-' 'ci' "could not push the deferral of fixed CI tasks to $Branch" 'DarkYellow'
     } catch {
         Write-Trace '-' 'ci' "CI watch failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
@@ -755,6 +852,62 @@ if ($TestCiWatch) {
     } finally {
         $env:CLAUDE_PROJECT_DIR = $savedDir; $env:CURL_DARK_FACTORY_LANE = $savedLane
         Remove-Item -Recurse -Force -Path $board -ErrorAction SilentlyContinue
+    }
+    # BL-3028: a job failure is filed with touches the log names, never with none.
+    $quality = @(Get-CiFailures @(
+        "Quality gates (windows-latest)${t}Measure coverage, complexity and CRAP${t}2026-10-21T21:10:00.0000000Z ##[error]Unit2413ConnectionPeer.Mismatch is outside a gate: complexity 12"
+        "Quality gates (windows-latest)${t}Measure coverage, complexity and CRAP${t}2026-10-21T21:10:01.0000000Z ::error file=D:\a\Curl\Curl\Curl.slnx::not a real annotation"
+        "Quality gates (windows-latest)${t}Measure coverage, complexity and CRAP${t}2026-10-21T21:10:02.0000000Z ##[error]Process completed with exit code 1."))
+    $qualityArgs = @(Get-CiTaskNewArgs -Verdict $quality[0] -Touches @(Get-CiJobTouches -Verdict $quality[0] -Repo $Root))
+    & $check 'a quality-gate job failure names the file of the member outside a gate and the ::error file (BL-3028)' `
+        'Curl.slnx,Curl.Conformance.UnitProgram.UnitLibrary/Dns/Easy/Unit2413ConnectionPeer.cs' $qualityArgs[[array]::IndexOf($qualityArgs, '-Touches') + 1]
+    $bare = [pscustomobject]@{ Key = 'job unknown job step unknown step'; Kind = 'job'; Platforms = @('unknown job'); Project = ''; Message = '' }
+    $bareArgs = @(Get-CiTaskNewArgs -Verdict $bare -Touches @(Get-CiJobTouches -Verdict $bare -Repo $Root))
+    & $check 'an unknown step with no file in its log is filed with Curl.slnx, never empty touches' 'Curl.slnx' $bareArgs[[array]::IndexOf($bareArgs, '-Touches') + 1]
+    $gateOnly = [pscustomobject]@{ Key = 'job quality step Measure code quality'; Kind = 'job'; Platforms = @('quality'); Project = ''; Message = '' }
+    & $check 'a quality step naming no member falls back to Measure-CodeQuality.ps1' 'Measure-CodeQuality.ps1' "$(Get-CiFallbackTouches $gateOnly)"
+    # BL-3028: a green run that contains a Backlog CI-fix task's filing defers it.
+    $ciTemp = Join-Path ([IO.Path]::GetTempPath()) "df-ci-defer-$PID"
+    $ciOrigin = Join-Path $ciTemp 'origin.git'; $ciRepo = Join-Path $ciTemp 'repo'
+    $savedRoot = $Root; $savedWatchDir = $CiWatchDir; $savedLanesDir = $LanesDir; $savedDir = $env:CLAUDE_PROJECT_DIR; $savedLane = $env:CURL_DARK_FACTORY_LANE
+    try {
+        New-Item -ItemType Directory -Force -Path $ciTemp | Out-Null
+        git init -q --bare -b work $ciOrigin 2>&1 | Out-Null
+        git clone -q $ciOrigin $ciRepo 2>&1 | Out-Null
+        git -C $ciRepo config user.name t; git -C $ciRepo config user.email t@t
+        git -C $ciRepo checkout -q -b work 2>&1 | Out-Null
+        foreach ($state in 'Doing', 'Backlog', 'Blocked', 'Deferred', 'Done') { New-Item -ItemType Directory -Force -Path (Join-Path $ciRepo "Tasks\$state") | Out-Null; Set-Content -Path (Join-Path $ciRepo "Tasks\$state\.gitkeep") -Value '' }
+        Copy-Item -Recurse -Path (Join-Path $savedRoot '.claude\skills\task-board') -Destination (New-Item -ItemType Directory -Force -Path (Join-Path $ciRepo '.claude\skills')).FullName
+        $ciTask = {
+            param([string]$Id, [string]$State, [string]$Title)
+            Set-Content -Path (Join-Path $ciRepo "Tasks\$State\$Id-task.md") -Encoding UTF8 -Value ((@('---', "id: $Id", "title: $Title", 'priority: High', 'assignee: Claude', 'pipeline: feature', 'depends-on: []',
+                'touches: [Curl.slnx]', 'requirement: none', 'created: 2026-10-21', 'completed:', '---', "# $Id - $Title", '', '## Goal', '', 'x', '', '## Context', '', 'x', '',
+                '## Acceptance criteria', '', '- [ ] x', '', '## Notes', '', '## Log', '', '- 2026-10-21: Created.')) -join "`n")
+        }
+        & $ciTask 'BL-001' 'Backlog' 'Fix CI failure job quality step Measure code quality on quality'
+        & $ciTask 'BL-002' 'Backlog' 'Fix flaky CI test A_B that failed once on Linux'
+        & $ciTask 'BL-003' 'Doing' 'Fix CI failure C_D on Linux'
+        & $ciTask 'BL-004' 'Backlog' 'Change one file'
+        git -C $ciRepo add -A 2>&1 | Out-Null; git -C $ciRepo commit -q -m 'file tasks' 2>&1 | Out-Null
+        $sha1 = "$(git -C $ciRepo rev-parse HEAD)".Trim()
+        & $ciTask 'BL-005' 'Backlog' 'Fix CI build error CS1002 in X.cs on macOS'
+        git -C $ciRepo add -A 2>&1 | Out-Null; git -C $ciRepo commit -q -m 'file BL-005' 2>&1 | Out-Null
+        git -C $ciRepo push -q origin work 2>&1 | Out-Null
+        $sha2 = "$(git -C $ciRepo rev-parse HEAD)".Trim()
+        $green = @([pscustomobject]@{ Id = '21'; Sha = $sha1; FinishedAt = (Get-Date); Failures = @() })
+        $red = @([pscustomobject]@{ Id = '22'; Sha = $sha2; FinishedAt = (Get-Date); Failures = @([pscustomobject]@{ Key = 'A_B'; Kind = 'test' }) }) + $green
+        & $check 'a green run defers the Backlog CI-fix and flaky tasks it contains, not the Doing one, another task or one filed after it' 'BL-001,BL-002' ((@(Get-FixedCiTaskIds -Repo $ciRepo -Runs $green)) -join ',')
+        & $check 'a still-red newest run defers nothing' '' ((@(Get-FixedCiTaskIds -Repo $ciRepo -Runs $red)) -join ',')
+        $script:Root = $ciRepo; $script:CiWatchDir = Join-Path $ciTemp 'ci-watch'; $script:LanesDir = $ciTemp; $env:CURL_DARK_FACTORY_LANE = '0'
+        Move-FixedCiTasksToDeferred -Branch 'work' -Runs $red
+        Move-FixedCiTasksToDeferred -Branch 'work' -Runs $green
+        $pushed = @(git -C $ciOrigin ls-tree -r --name-only work -- Tasks 2>$null | Where-Object { $_ -match 'BL-00\d' } | ForEach-Object { $_ -replace '^Tasks/(\w+)/(BL-\d+).*$', '$2 $1' } | Sort-Object) -join ', '
+        & $check 'the watch pushes the deferral; the Doing task and a task filed after the green commit stay' 'BL-001 Deferred, BL-002 Deferred, BL-003 Doing, BL-004 Backlog, BL-005 Backlog' $pushed
+        $reason = "$(git -C $ciOrigin show "work:Tasks/Deferred/BL-001-task.md" 2>$null)"
+        & $check 'the deferral says why' 'True' "$($reason -match "already fixed, CI green on $($sha1.Substring(0, 9))")"
+    } finally {
+        $script:Root = $savedRoot; $script:CiWatchDir = $savedWatchDir; $script:LanesDir = $savedLanesDir; $env:CLAUDE_PROJECT_DIR = $savedDir; $env:CURL_DARK_FACTORY_LANE = $savedLane
+        Remove-Item -Recurse -Force -Path $ciTemp -ErrorAction SilentlyContinue
     }
     $script:CiWatch.AuditTasks = @{ 'BL-2001' = "Revert the dark factory's change to Audit/Findings/x.md" }
     & $check 'end report names an open audit task' "BL-2001 AUDIT    needs an interactive session: Revert the dark factory's change to Audit/Findings/x.md" `
