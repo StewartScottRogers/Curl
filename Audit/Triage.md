@@ -38,7 +38,11 @@ order:
    consecutive "no" ([Closing](Findings/README.md#closing), ADR-0422). A finding about one past
    run's cost (key ending `:cost-outlier`) is the exception: no fix can change history, so the
    first audit after all its tasks are Done closes it, `closed-how: task-done-historical`,
-   without a re-audit (ADR-0422, amended 2026-10-14).
+   without a re-audit (ADR-0422, amended 2026-10-14). Any other process finding is the second
+   exception (ADR-0761): its reproduction measures a frozen log copy, which reproduces forever, so
+   its task's first criterion is the same measurement run over the live logs written after the fix
+   landed, with the window and the numbers in the task's Notes, and the task is interactive only,
+   since the measurement runs a script under `Audit/`. The finding still closes only by re-audit.
 5. **A fix that did not hold is re-fixed.** When every task of an accepted finding is Done and its
    latest re-audit - by its own auditor, dated after the last task was completed - says it still
    reproduces, the same script files `Re-fix AF-####: <title>` with that re-audit's evidence, and
@@ -63,6 +67,6 @@ How a finding maps to its task:
 | Severity Medium | Priority Normal |
 | Severity Low | Priority Low |
 | Auditor truthfulness | Pipeline `docs` |
-| Auditor process | Pipeline `direct` |
+| Auditor process | Pipeline `direct`; unless its key ends `:cost-outlier`, `lane: no` and a first criterion measured on the live logs after the fix (ADR-0761) |
 | Any other auditor | Pipeline `feature` |
 | The project folders its location names (never an audit path) | `touches`; none when it names no repository folder, so the task runs alone |
