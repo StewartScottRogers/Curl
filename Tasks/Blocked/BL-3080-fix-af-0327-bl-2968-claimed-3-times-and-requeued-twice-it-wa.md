@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [RunDarkFactory.ps1]
+touches: [RunDarkFactory.ps1, DarkFactory/TaskStash.ps1]
 requirement: none
 created: 2026-10-22
 completed:
@@ -42,11 +42,14 @@ The finding closes only when a later re-audit by the process auditor confirms th
 ## Acceptance criteria
 
 - [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: Restore-TaskStash applied a stash but left it in the list, so the next claim was offered the same, already committed, stash. Fix: DarkFactory/TaskStash.ps1 drops the stash once applied; -TestTaskStash pins it. Added DarkFactory/TaskStash.ps1 to touches (no other Doing task names it). The reproduction reads past logs through the audit office tools, which a lane may not run; the re-audit confirms the fix.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Blocked. Stewart: the fix is committed (applied stash is dropped), but the reproduction needs the audit tools a lane may not run; run it interactively and move to Done

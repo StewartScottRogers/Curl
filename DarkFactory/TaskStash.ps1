@@ -31,6 +31,15 @@ function Restore-TaskStash {
         }
     }
     if ($applied) {
+        # Its work now lives in the worktree and will be committed; a stash left in the list
+        # is offered again on the next claim (AF-0327: BL-2968's third claim was told a
+        # stash "did not apply cleanly" that its second claim had already applied and committed).
+        # A run that goes back to Backlog stashes its work afresh, so dropping loses nothing.
+        $index = 0
+        foreach ($line in @(git -C $Repo stash list --format='%H' 2>$null)) {
+            if ($line -eq $sha) { git -C $Repo stash drop -q "stash@{$index}" 2>&1 | Out-Null; break }
+            $index++
+        }
         Write-Trace $Id 'stash' "applied the earlier run's work from stash $($sha.Substring(0, 8))" 'Yellow'
         return @"
 STASHED WORK. An earlier run of $Id went back to Backlog with uncommitted work, which the
@@ -77,12 +86,18 @@ if ($TestTaskStash) {
         & $check 'its own stash is applied' 'two new' "$(& $read 'a.txt') $(& $read 'b.txt')"
         & $check 'the note says it was applied' 'True' "$($note -match 'has applied to this worktree')"
         & $check 'the note says not to re-verify finished work' 'True' "$($note -match 'Do not rebuild or rerun')"
-        # Back to clean, then a branch that moved under the stash: it cannot apply.
+        & $check 'an applied stash is dropped from the list' '0' "$(@(git -C $repo stash list).Count)"
+        # Back to clean, then a branch that moved under a stash: it cannot apply.
         git -C $repo reset -q --hard HEAD 2>&1 | Out-Null; git -C $repo clean -fdq 2>&1 | Out-Null
         Set-Content -Path (Join-Path $repo 'a.txt') -Value 'three'
         git -C $repo commit -q -am three 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'four'
+        git -C $repo stash push -q -m 'darkfactory BL-1 20260102-000000' 2>&1 | Out-Null
+        git -C $repo reset -q --hard HEAD 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $repo 'a.txt') -Value 'five'
+        git -C $repo commit -q -am five 2>&1 | Out-Null
         $note = Restore-TaskStash -Id 'BL-1' -Repo $repo
-        & $check 'a conflict leaves the worktree clean' "three - True" "$(& $read 'a.txt') $(& $read 'b.txt') $(-not (git -C $repo status --porcelain))"
+        & $check 'a conflict leaves the worktree clean' "five - True" "$(& $read 'a.txt') $(& $read 'b.txt') $(-not (git -C $repo status --porcelain))"
         $sha = "$(git -C $repo rev-parse 'stash@{0}')".Trim()
         & $check 'the note gives the hash to read it by' 'True' "$($note.Contains("git diff $sha^1 $sha"))"
     } finally {
