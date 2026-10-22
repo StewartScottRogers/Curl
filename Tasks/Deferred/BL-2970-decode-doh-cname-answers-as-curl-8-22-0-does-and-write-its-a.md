@@ -97,3 +97,4 @@ If too big for one run, split it: the decoder change (CNAME skipped, no NoConten
 - 2026-10-21: Doing -> Backlog. Cost cap: library side ported onto BL-2981's split files and builds; trace and Engine tests, ADR amendment and quality run left, see Notes
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 582ece38 47a1bf8a 2a446683.
 - 2026-10-21: Doing -> Backlog. Cost cap: this claim's $1.02 cap cannot cover the trace and Engine tests, ADR amendment, build, tests and quality run; work stays in the stash, see Notes
+- 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3011 (decoder change, tests; stash applied there), BL-3012 (ADR-0738 amendment) and BL-3013 (coverage); nothing left here

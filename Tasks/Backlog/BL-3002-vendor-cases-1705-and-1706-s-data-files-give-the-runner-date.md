@@ -4,7 +4,7 @@ title: Vendor cases 1705 and 1706's data files, give the runner %DATE and %VERNU
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-2881]
+depends-on: [BL-3018]
 touches: [Curl.Conformance.UnitTests/UpstreamTestData/Update-UpstreamTestData.ps1, Curl.Conformance.UnitTests/UpstreamTestData/data, Curl.Conformance.UnitTests/UpstreamTestDataTests.cs, Curl.Conformance.UnitLibrary/UpstreamCaseRunner.cs, Curl.Conformance.UnitTests/UpstreamCaseRunnerTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21

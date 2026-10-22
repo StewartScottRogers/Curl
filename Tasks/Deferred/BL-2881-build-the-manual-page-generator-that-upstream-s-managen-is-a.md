@@ -43,3 +43,4 @@ Found by BL-2852 (ADR for cases 1135 to 1706). Upstream cases 1705 "managen make
 - 2026-10-21: Doing -> Backlog. Cost cap: generator built, both upstream pages render byte for byte, build and fast tests green; coverage tests and the quality run remain (Notes), code left for the next claim.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: e77fbcd3 d386f87e cd5a64f3 c5f8cef6.
 - 2026-10-21: Doing -> Backlog. Cost cap: helper tests added and green; coverage tests for the renderer, page, header, layout and generator, the script tests and the quality run remain (Notes), code left for the next claim.
+- 2026-10-21: Backlog -> Deferred. Split for the cost cap into BL-3018 (land generator and script tests), BL-3019, BL-3020 and BL-3021 (coverage); nothing left here
