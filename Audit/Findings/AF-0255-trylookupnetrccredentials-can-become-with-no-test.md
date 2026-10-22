@@ -3,8 +3,8 @@ id: AF-0255
 title: TryLookUpNetrcCredentials' || can become && with no test failing, so tool-driven or netrc-ignored transfers still read .netrc
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Fixed by BL-2766 (Done 2026-10-18): TryLookUpNetrcCredentials was rewritten into TryLookUpUrlAndNetrcCredentials and TransferCredentialLookup, so the mutant site no longer exists and three re-audits could only report site-missing.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:TryLookUpNetrcCredentials-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:707:||
 task: BL-2766
@@ -13,9 +13,9 @@ found: 2026-10-18
 found-at: 19ea231be8b4d749462d15058a3c6b97c7e70836
 scorecard: 2026-10-18_1045.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0255 - TryLookUpNetrcCredentials' || can become && with no test failing, so tool-driven or netrc-ignored transfers still read .netrc
 
@@ -51,3 +51,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 - 2026-10-18: filed proposed.
 - 2026-10-18: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Stewart closed it: Fixed by BL-2766 (Done 2026-10-18): TryLookUpNetrcCredentials was rewritten into TryLookUpUrlAndNetrcCredentials and TransferCredentialLookup, so the mutant site no longer exists and three re-audits could only report site-missing.
