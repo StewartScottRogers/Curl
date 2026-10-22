@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-22
 completed:
@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- 2026-10-22 (lane 2): The fix is a test only: a QUIC handshake test in Curl.Networking.UnitTests (beside TcpConnectorQuicTests.cs, using Fakes/QuicTestServer.cs) that asserts the verify result is reported with isProxy false (origin, not proxy). Added Curl.Networking.UnitTests to touches for that test; BL-3127 holds that whole project, so requeued until it is Done. No other prerequisite found.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Backlog. Needs Curl.Networking.UnitTests for the killing test; BL-3127 holds that project
