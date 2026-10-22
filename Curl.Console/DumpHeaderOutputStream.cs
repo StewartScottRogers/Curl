@@ -46,6 +46,7 @@ internal sealed class DumpHeaderOutputStream(Stream destination, string headerFi
     private byte[] FailureLine => Encoding.UTF8.GetBytes($"curl: Failed writing headers to {headerFile}{Environment.NewLine}");
 
     /// <inheritdoc />
+    /// <remarks>Does nothing: every write has already flushed the destination.</remarks>
     public override void Flush()
     {
     }

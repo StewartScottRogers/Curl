@@ -16,8 +16,10 @@ namespace Curl.Console;
 /// </remarks>
 internal sealed class HoldableStream(Stream inner) : Stream
 {
+    /// <summary>The bytes written since <see cref="Hold" />, in order, awaiting <see cref="Release" />.</summary>
     private readonly List<byte> held = [];
 
+    /// <summary>Whether writes are being kept rather than passed to the wrapped stream.</summary>
     private bool isHeld;
 
     /// <inheritdoc />

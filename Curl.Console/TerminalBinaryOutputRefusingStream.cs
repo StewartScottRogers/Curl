@@ -2,14 +2,16 @@ namespace Curl.Console;
 
 /// <summary>
 /// Passes a body on to standard output while it is a terminal, but refuses a write holding a NUL byte
-/// among the first <see cref="CheckedByteCount" /> bytes, as curl 8.22.0's <c>tool_write_cb</c>
-/// (<c>src/tool_cb_wrt.c</c>) refuses binary output to a terminal unless <c>--output -</c> was given.
+/// when fewer than <see cref="CheckedByteCount" /> bytes were written before it (the whole write is
+/// searched), as curl 8.22.0's <c>tool_write_cb</c> (<c>src/tool_cb_wrt.c</c>) refuses binary output to
+/// a terminal unless <c>--output -</c> was given. A refused write reaches nothing and throws an
+/// <see cref="IOException" />.
 /// </summary>
 /// <param name="inner">The standard output the body goes to; disposing this stream disposes it.</param>
 internal sealed class TerminalBinaryOutputRefusingStream(Stream inner) : Stream
 {
     /// <summary>
-    /// The number of bytes written before which a write is checked for a NUL byte; curl checks no
+    /// The count of bytes already written below which a write is checked for a NUL byte; curl checks no
     /// write once it has written this many.
     /// </summary>
     internal const int CheckedByteCount = 2000;
@@ -22,9 +24,10 @@ internal sealed class TerminalBinaryOutputRefusingStream(Stream inner) : Stream
     internal const string RefusalWarning =
         "Warning: Binary output can mess up your terminal. Use \"--output -\" to tell curl to output it to your terminal anyway, or consider \"--output <FILE>\" to save to a file.";
 
+    /// <summary>The bytes passed on to standard output so far; a refused write adds none.</summary>
     private long bytesWritten;
 
-    /// <summary>Gets whether a write was refused for holding a NUL byte.</summary>
+    /// <summary>Gets a value indicating whether a write was refused for holding a NUL byte.</summary>
     internal bool HasRefused { get; private set; }
 
     /// <inheritdoc />

@@ -44,8 +44,13 @@ internal sealed class RemoteHeaderNameStream(
     /// <summary>The start of a status line.</summary>
     private static ReadOnlySpan<byte> StatusLinePrefix => "HTTP/"u8;
 
+    /// <summary>The first digit of the latest status line's code (2 for 200); 0 before any status line.</summary>
     private int statusClass;
 
+    /// <summary>
+    /// The lines of a head being held back until its empty line, or <see langword="null" /> when
+    /// none is held; see <see cref="ForwardLineAsync" />.
+    /// </summary>
     private MemoryStream? heldHead;
 
     /// <inheritdoc />
