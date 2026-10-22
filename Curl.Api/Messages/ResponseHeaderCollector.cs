@@ -60,6 +60,8 @@ internal sealed class ResponseHeaderCollector
         return line.Length;
     }
 
+    /// <summary>Begins a new response from its status line, discarding the headers and trailers of any earlier response (a <c>1xx</c> or a redirect hop), as only the final response is reported.</summary>
+    /// <param name="statusLine">The status line without its end of line.</param>
     private void StartResponse(string statusLine)
     {
         _headers = [];
@@ -71,6 +73,9 @@ internal sealed class ResponseHeaderCollector
         ReasonPhrase = parts.Length == 3 ? parts[2].Trim() : "";
     }
 
+    /// <summary>Splits a header line at its first colon, trimming the value of spaces and tabs; a line without a colon is a field with an empty value.</summary>
+    /// <param name="text">The line without its end of line.</param>
+    /// <returns>The field name and value.</returns>
     private static KeyValuePair<string, string> ParseField(string text)
     {
         int colon = text.IndexOf(':', StringComparison.Ordinal);

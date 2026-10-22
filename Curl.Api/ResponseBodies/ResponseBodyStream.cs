@@ -177,6 +177,7 @@ internal sealed class ResponseBodyStream : Stream
         base.Dispose(disposing);
     }
 
+    /// <summary>Runs the transfer to its end, then completes the buffer with its result; always ends progress reports and disposes the owned handles, whatever the outcome.</summary>
     private async Task PerformAsync()
     {
         try
@@ -196,6 +197,7 @@ internal sealed class ResponseBodyStream : Stream
         }
     }
 
+    /// <summary>Aborts the buffer and the perform token, then waits for the transfer to finish so the handle is never freed while the engine is still using it.</summary>
     private async Task CloseAsync()
     {
         _buffer.Abort();

@@ -12,6 +12,7 @@ namespace Curl.Api;
 /// <param name="trailingHeaders">The message's trailing headers, filled at the body's end.</param>
 internal sealed class TrailerFillingStream(Stream body, IReadOnlyList<KeyValuePair<string, string>> trailers, HttpHeaders trailingHeaders) : Stream
 {
+    /// <summary>Whether the trailers have been copied, so a read after the end does not add them twice.</summary>
     private bool _filled;
 
     /// <inheritdoc/>
