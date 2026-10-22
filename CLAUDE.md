@@ -307,8 +307,9 @@ Curl/
 - Tests: the same name with `.UnitTests` instead of `.UnitLibrary`.
 - Integration tests, once an area has any: the same name with `.IntegrationTests`
   instead of `.UnitLibrary` (ADR-0421).
-- Four projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executable
-  `Curl.Console` (no `.UnitLibrary` suffix, because it is not a library), the two
+- Five projects are exceptions to the `Curl.<Area>.UnitLibrary` rule: the executables
+  `Curl.Console` and `Curl.Config` (the `curl-config` executable, ADR-0712; no `.UnitLibrary`
+  suffix, because they are not libraries), the two
   programming interfaces `Curl.Api` and `Libcurl` (ADR-0506), and the MCP server host
   `Curl.Mcp` (ADR-0548). `Libcurl` also has no `Curl.` prefix, matching upstream's library
   name. `Curl.Api`, `Libcurl` and `Curl.Mcp` are held to the four quality gates like a
