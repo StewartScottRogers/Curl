@@ -5,7 +5,8 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/Requeue.ps1]
+touches: [DarkFactory/Requeue.ps1, DarkFactory/Prompts.ps1]
+lane: no
 requirement: none
 created: 2026-10-22
 completed:
@@ -42,11 +43,16 @@ The finding closes only when a later re-audit by the process auditor confirms th
 ## Acceptance criteria
 
 - [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Interactive only: criterion 1 runs a script under the office path a lane may not read. Remove lane: no once an interactive session has run the reproduction (rule 11 in DarkFactory/Prompts.ps1 is already in the tree, build and fast tests green) and ticked criterion 1.
+
+- Requeue.ps1 only moves Blocked tasks back; the two requeues were lane decisions, so the fix is rule 11 in both prompt copies of DarkFactory/Prompts.ps1 (added to touches; no other Doing task holds it). The reproduction script is in an office path a lane may not read, so the re-audit checks criterion 1.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Backlog. Interactive only: the reproduction is under an audit path a lane may not run; rule 11 added to Prompts.ps1 kept uncommitted
