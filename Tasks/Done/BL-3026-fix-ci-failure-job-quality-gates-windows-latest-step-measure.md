@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: []
+touches: [Curl.Core.UnitLibrary/ConnectionPeer.cs, Curl.Conformance.UnitProgram/Dns/Easy/Unit2413ConnectionPeer.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-22
 ---
 # BL-3026 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -26,10 +26,14 @@ Lanes test only on Windows, so reproduce with `gh run view 39718635967 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `job Quality gates (windows-latest) step Measure coverage, complexity and CRAP` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+Already fixed before any lane claimed it: `refactor(conformance): split unit2413's Mismatch under the complexity gate` and `refactor(core): split ConnectionPeer.Create under the complexity gate (BL-3016)` brought both members inside the gate. CI run 39723672567 on 1afd80a99 passed every job, Quality gates (windows-latest) included, on Windows, Linux and macOS. The empty `touches` had left the task unready while it held the queue's first place, which idled the shift from 21:39 to 01:30 Arizona.
 
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-10-22: Doing -> Done. Already fixed by the unit2413 Mismatch and ConnectionPeer.Create splits; CI run 39723672567 on 1afd80a99 green on all three platforms
