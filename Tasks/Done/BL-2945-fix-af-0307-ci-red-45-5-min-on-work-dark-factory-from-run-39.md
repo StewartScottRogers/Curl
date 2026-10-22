@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2945 — Fix AF-0307: CI red 45.5 min on work/dark-factory from run 39226925458 (SslsImportThenExport_OnTheManagedEngineOffWindows...)
 
@@ -54,3 +54,6 @@ Investigated 2026-10-21 (shift log DarkFactory-20261018-192454.log lines 104-125
 - 2026-10-21: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-21: Doing -> Blocked. Stewart: accept AF-0307 as inherent (CI about 21 min plus a busy overlapping lane), or authorise pre-empting a running lane for High CI-fix tasks?
 - 2026-10-21: Blocked -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-21: Doing -> Backlog. reword criteria to Stewart's decision
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 908c2545 1a839751.
+- 2026-10-21: Doing -> Done. Stewart 2026-10-21: accept AF-0307 as inherent; no pre-empting of running lanes
