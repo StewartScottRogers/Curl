@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3134 — Fix AF-0354: BL-2973 cost $2.06, 7.6 times the median
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-2973 was a `feature`-pipeline task (Opus, 47 turns) that changed two libraries (Curl.Networking.UnitLibrary, Curl.Output.UnitLibrary), about 9 test files after its `touches` were widened (old A-first order and wording were pinned in several tests), and ran Measure-CodeQuality.ps1 for both libraries. Cache rereads (3.45M tokens) grow with turns, so cost tracks task size. Claimed once, no requeue, no redo, within the $3 cap. The median is set by small tasks, so 7.6 times it is size, not waste.
+- Unavoidable: no avoidable waste found in the run; RunDarFactory.ps1 needs no change. Build clean and fast tests green on this checkout.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0354 cause named (feature-size task, 2 libraries, 9 test files); no avoidable waste
