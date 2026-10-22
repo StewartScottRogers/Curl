@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.Dns.cs, Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh/Unit1650DohEncodingAndDecoding.cs, Curl.Conformance.UnitProgram.UnitTests/Dns/Doh/Unit1650DohEncodingAndDecodingTests.cs, Curl.Networking.UnitLibrary/DnsAnswerReader.cs, Curl.Networking.UnitTests/DohRequestEncodingTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3062 — Port upstream unit program 1650: DoH request encoding and response decoding
 
@@ -22,14 +22,26 @@ Split from BL-2923 (which ported unit1655 as `Curl.Conformance.UnitProgram.UnitL
 
 ## Acceptance criteria
 
-- [ ] `unit1650` is ported in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh/` with checks matching the C program row for row (named in its doc comment), registered in `UnitPrograms.Dns.cs`, with a test.
-- [ ] Case 1650 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1650'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] Where the port finds Curl wrong, the fix has a focused unit test in `Curl.Networking.UnitTests` (ADR-0482).
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and each changed library keeps 100% line and branch coverage and complexity at most 10.
+- [x] `unit1650` is ported in `Curl.Conformance.UnitProgram.UnitLibrary/Dns/Doh/` with checks matching the C program row for row (named in its doc comment), registered in `UnitPrograms.Dns.cs`, with a test.
+- [x] Case 1650 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1650'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] Where the port finds Curl wrong, the fix has a focused unit test in `Curl.Networking.UnitTests` (ADR-0482).
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, the fast tests pass, and each changed library keeps 100% line and branch coverage and complexity at most 10.
 
 ## Notes
+
+- 2026-10-22, lane 1. Row 11 checked first: BL-2970's decoder change landed as BL-3011 (Done), so the
+  self-pointing CNAME decodes `None` and BL-2970 is not a dependency. Ported as
+  `Unit1650DohEncodingAndDecoding` (116 checks: 3 request rows byte for byte, 14 response rows, 49
+  prefixes and 49 suffixes of `full49`, and the whole `full49`), with the encoder and decoder injected
+  so its test counts the checks a wrong codec fails. Every row matched Curl as it is: no Curl fix, so no
+  `Curl.Networking` change (the third criterion holds vacuously). Choice: the C program's `abort_if`
+  stops at the first mismatch; the port, like unit1655's, runs every check and counts the failures,
+  since the case only checks the exit code. Case 1650 passes by name and is on the ratchet; it prints
+  nothing platform-dependent. `Curl.Conformance.UnitProgram.UnitLibrary`: 100% line and branch,
+  complexity at most 10, 0 failing members.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: ec1a9147 dc9e6844 a1753666 8e1ce02b.
+- 2026-10-22: Doing -> Done. unit1650 ported over DnsQueryEncoder and DnsAnswerDecoder; case 1650 passes and is on the ratchet
