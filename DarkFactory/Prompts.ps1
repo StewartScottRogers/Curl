@@ -89,7 +89,18 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run; AF-0204: 37 of 49 Bash calls in one 68-turn run were sed -n, head or tail slices, which took BL-2142 to $3.11, 4.25 times the median, so Read the whole file once and do not slice it with sed -n, head or tail; AF-0205: 8 Reads with an offset and 12 sed -n slices of one large file in a 62-turn run took BL-2152 to $2.46, 3.4 times the median, so Read a large file once with a wide limit and never page it in offset slices; AF-0206: 19 of 25 Bash calls were slice reads and a repair run took test1462 off the ratchet although BL-2136 already owned that test, which took BL-2134 to $2.34, 3.2 times the median, so when a failing test is named by another live task, leave it to that task and do not repair it here; AF-0268: two shell loops over 2,077 upstream test files, one grep/tr/awk per file, held BL-2550 for 24 of its 51.6 minutes and cost $7.39, 3.04 times the median, so search a folder with one Select-String or grep -l over the whole folder, never a loop that starts a process per file; AF-0309: BL-2787 ran 82 turns, 9 dotnet builds and 27 single-line Edits in one session, re-reading a 132K context each turn for $4.85, 3.4 times the median, so make all the edits for a change before you build, batch edits to one file into as few Edit calls as the file allows, and build once per change, not after every edit).
+   carry on. Every turn re-reads the whole run so far, so (AF-0105 to AF-0111, AF-0172,
+   AF-0190, AF-0204 to AF-0206, AF-0268, AF-0309): run the fast tests once when the change is
+   done, never after every edit or in reruns; make all the edits for a change before you
+   build, batch edits to one file into as few Edit calls as it allows, and build once per
+   change; when a test pass fails twice on the same file, or you are measuring without
+   fixing, file what is left as a task and move this one to Backlog; do the work yourself
+   and start a sub-agent only when it saves more than it costs; batch independent calls
+   into one turn; read each file once - whole when it is short, or with one offset and
+   limit around what Grep -n found when it is long - never in repeated sed -n, head, tail
+   or offset slices; decide the task's touches once; leave a failing test another live
+   task names to that task; search a folder with one Select-String or grep -l, never a
+   loop that starts a process per file.
 8. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -119,6 +130,14 @@ Rules for this unattended run, in addition to CLAUDE.md:
    stopped) before it reads the result, never rely on Windows happening to run one side
    first (AF-0226 re-audit: BL-2546's 35c73029 left a multiplexing test taking a connection
    before the transfer had opened it, and Lib1565 racing its thread, red for 44 minutes).
+10. Keep what you read small: every line a tool returns is re-read on every later call.
+   Search before reading: Grep or rg with -l or a match count first, then -n with a small
+   context, output capped (`| head -50`); never cat several files in one command. Read a
+   file over about 400 lines in parts with offset and limit around what you need, and note
+   what you need the first time rather than reading a large file twice. Never re-read a
+   persisted tool-result file under .claude\projects; run a narrower command instead.
+   Start git diff, show and log with --stat or the paths you need. Send Curl and
+   Record-CurlExchange output to a file and read only the lines you need.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -249,7 +268,18 @@ Rules for this unattended run, in addition to CLAUDE.md:
    parallel all spend inside one turn and carry the run past the cap (AF-0052, AF-0100, AF-0102, AF-0104).
    Run a test project once per change, not in a loop of reruns to hunt a flaky test: when
    one passes alone and fails in the run, file a task for it with the board script and
-   carry on (AF-0105: about 15 test runs, three of them reruns in a loop, took BL-1499 to $3.86; AF-0106: 66 turns on a flaky cookie test cost BL-1619 $3.32 before it was parked, and a fresh lane finished it in 2.4 minutes for $0.46; AF-0107: BL-1682 cost $3.76 over three runs, 48 turns in one of them spent measuring without fixing, so park what is left as a task rather than measure again; AF-0108: 41 test runs in 45 Bash calls took BL-1645 to $3.75 in one 28-minute run, so run the fast tests once when the change is done, not after every edit; AF-0109: 38 mentions of dotnet test in one 76-turn run took BL-1556 to $3.68, 3.1 times the median; AF-0110: three Opus sub-agents in one 15-turn run took BL-1587 to $3.68, 3.1 times the median, so do the work yourself and start a sub-agent only when it saves more than it costs; AF-0111: 117 tool calls and no Read in one 118-turn run took BL-1557 to $3.63, 3.05 times the median, so read a file once with Read and batch independent calls into one turn; AF-0172: 14 edits to one file and a failed test pass sent back for 4 more took BL-2043 to $3.66, 5.2 times the median, so when a test pass fails twice on the same file, stop editing it, file what is left as a task and move this one to Backlog, rather than a third round of edit and test; AF-0190: 56 Bash calls, most of them sed -n or grep slices of the same few files, took BL-2131 to $3.11, 6.1 times the median, each one a turn re-reading a 100k+ context, so Read a file once, whole or with a wide offset and limit, rather than slicing it call by call, and decide a task's touches once rather than rewriting them mid-run; AF-0204: 37 of 49 Bash calls in one 68-turn run were sed -n, head or tail slices, which took BL-2142 to $3.11, 4.25 times the median, so Read the whole file once and do not slice it with sed -n, head or tail; AF-0205: 8 Reads with an offset and 12 sed -n slices of one large file in a 62-turn run took BL-2152 to $2.46, 3.4 times the median, so Read a large file once with a wide limit and never page it in offset slices; AF-0206: 19 of 25 Bash calls were slice reads and a repair run took test1462 off the ratchet although BL-2136 already owned that test, which took BL-2134 to $2.34, 3.2 times the median, so when a failing test is named by another live task, leave it to that task and do not repair it here; AF-0268: two shell loops over 2,077 upstream test files, one grep/tr/awk per file, held BL-2550 for 24 of its 51.6 minutes and cost $7.39, 3.04 times the median, so search a folder with one Select-String or grep -l over the whole folder, never a loop that starts a process per file; AF-0309: BL-2787 ran 82 turns, 9 dotnet builds and 27 single-line Edits in one session, re-reading a 132K context each turn for $4.85, 3.4 times the median, so make all the edits for a change before you build, batch edits to one file into as few Edit calls as the file allows, and build once per change, not after every edit).
+   carry on. Every turn re-reads the whole run so far, so (AF-0105 to AF-0111, AF-0172,
+   AF-0190, AF-0204 to AF-0206, AF-0268, AF-0309): run the fast tests once when the change is
+   done, never after every edit or in reruns; make all the edits for a change before you
+   build, batch edits to one file into as few Edit calls as it allows, and build once per
+   change; when a test pass fails twice on the same file, or you are measuring without
+   fixing, file what is left as a task and move this one to Backlog; do the work yourself
+   and start a sub-agent only when it saves more than it costs; batch independent calls
+   into one turn; read each file once - whole when it is short, or with one offset and
+   limit around what Grep -n found when it is long - never in repeated sed -n, head, tail
+   or offset slices; decide the task's touches once; leave a failing test another live
+   task names to that task; search a folder with one Select-String or grep -l, never a
+   loop that starts a process per file.
 9. The shift kills this run at {DEADLINE}, {MINUTES} minutes after it started, and a
    killed run ends Blocked. While other lanes build, one Measure-CodeQuality.ps1 run can
    take 30 to 45 minutes: run it once per library you changed, with -ReportPath, and
@@ -279,6 +309,14 @@ Rules for this unattended run, in addition to CLAUDE.md:
    stopped) before it reads the result, never rely on Windows happening to run one side
    first (AF-0226 re-audit: BL-2546's 35c73029 left a multiplexing test taking a connection
    before the transfer had opened it, and Lib1565 racing its thread, red for 44 minutes).
+10. Keep what you read small: every line a tool returns is re-read on every later call.
+   Search before reading: Grep or rg with -l or a match count first, then -n with a small
+   context, output capped (`| head -50`); never cat several files in one command. Read a
+   file over about 400 lines in parts with offset and limit around what you need, and note
+   what you need the first time rather than reading a large file twice. Never re-read a
+   persisted tool-result file under .claude\projects; run a narrower command instead.
+   Start git diff, show and log with --stat or the paths you need. Send Curl and
+   Record-CurlExchange output to a file and read only the lines you need.
 
 End your reply with exactly one line, either
 FACTORY: DONE {ID} <what now works>
@@ -309,6 +347,8 @@ stopped on conflicts. Resolve them:
 6. This run ends the moment your reply ends, and anything still in the background dies
    with it. Run dotnet build and dotnet test in the foreground with the Bash tool and a
    timeout of up to 3600000 ms, and never end your reply to wait for a notification.
+7. Keep what you read small: Grep with -l or -n and a small context, not cat; Read a file over
+   about 400 lines in parts; never re-read a persisted tool-result file; git diff --stat first.
 
 End your reply with exactly one line, either
 FACTORY: RESOLVED {ID}
@@ -343,6 +383,8 @@ member or test helper renamed, moved or deleted on one side, for instance). Fix 
    with it. Run dotnet build and dotnet test in the foreground with the Bash tool and a
    timeout of up to 3600000 ms, and never end your reply to wait for a notification.
    It is killed at {DEADLINE}.
+6. Keep what you read small: Grep with -l or -n and a small context, not cat; Read a file over
+   about 400 lines in parts; never re-read a persisted tool-result file; git diff --stat first.
 
 End your reply with exactly one line, either
 FACTORY: REPAIRED {ID}
