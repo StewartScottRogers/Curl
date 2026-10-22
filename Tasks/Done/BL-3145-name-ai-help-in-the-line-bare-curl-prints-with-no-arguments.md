@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitTests/CommandLineRefusalTests.cs, Documentation/Planning/Decisions]
+touches: [Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitTests, Curl.Console.UnitTests/CurlCommandRunnerTests.cs, Curl.Console.UnitTests/CurlCommandRunnerConfigFileTests.cs, Documentation/Planning/Decisions]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3145 — Name --ai-help in the line bare curl prints with no arguments
 
@@ -26,15 +26,19 @@ Measure first what Curl prints today for bare `curl` (stderr bytes and exit code
 
 ## Acceptance criteria
 
-- [ ] `curl` with no arguments writes `curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information` on that line of stderr, with the same exit code and the same other bytes as before. A unit test in `Curl.Cli.UnitTests` pins it.
-- [ ] Every other output that ends in the try-help line, such as an unknown option or a missing option argument, still prints `curl: try 'curl --help' or 'curl --manual' for more information` exactly. A unit test pins one such case beside the new one, and the upstream cases on `PassingUpstreamCases.txt` still pass.
-- [ ] `--ai-help`'s own index mentions that bare `curl` points to it, if the index lists entry points; otherwise it is unchanged.
-- [ ] An ADR records the deliberate difference from curl 8.22.0 and why it is limited to the no-argument case.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `curl` with no arguments writes `curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information` on that line of stderr, with the same exit code and the same other bytes as before. A unit test in `Curl.Cli.UnitTests` pins it.
+- [x] Every other output that ends in the try-help line, such as an unknown option or a missing option argument, still prints `curl: try 'curl --help' or 'curl --manual' for more information` exactly. A unit test pins one such case beside the new one, and the upstream cases on `PassingUpstreamCases.txt` still pass.
+- [x] `--ai-help`'s own index mentions that bare `curl` points to it, if the index lists entry points; otherwise it is unchanged.
+- [x] An ADR records the deliberate difference from curl 8.22.0 and why it is limited to the no-argument case.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Bare curl is every empty command line, so the two Console tests and the Cli default-config tests that pin an empty command line now pin the new line; added Curl.Console.UnitTests files to touches (no other Doing task held them).
+- The --ai-help index lists no entry points, so it is unchanged. ADR-0762 records the difference. CI on Linux and macOS: change is platform-neutral, fast tests green here.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 63b98b66 e2aa702f cd7b69ab 3e377a02 9742157d.
+- 2026-10-22: Doing -> Done. bare curl names --ai-help

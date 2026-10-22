@@ -24,6 +24,12 @@ public sealed class CommandLineRefusal
     /// <summary>The last line of every refusal, exactly as curl prints it.</summary>
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
+    /// <summary>
+    /// The only line of <see cref="EmptyCommandLine"/>: <see cref="TryHelpLine"/> that also names <c>--ai-help</c>
+    /// (a deliberate difference from curl, ADR-0762).
+    /// </summary>
+    public const string TryHelpLineNamingAiHelp = "curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information";
+
     /// <summary>The first line of <see cref="NoUrlSpecified"/>.</summary>
     private const string NoUrlSpecifiedLine = "curl: (2) no URL specified";
 
@@ -53,12 +59,12 @@ public sealed class CommandLineRefusal
         FoundAtTransferSetup = foundAtTransferSetup;
     }
 
-    private CommandLineRefusal(params string[] linesBeforeTryHelp)
+    private CommandLineRefusal(string tryHelpLine)
     {
         ExitCode = CurlExitCode.FailedInit;
-        ErrorLines = linesBeforeTryHelp;
+        ErrorLines = [];
         Reason = string.Empty;
-        StandardErrorLines = [.. linesBeforeTryHelp, TryHelpLine];
+        StandardErrorLines = [tryHelpLine];
     }
 
     /// <summary>
@@ -278,15 +284,16 @@ public sealed class CommandLineRefusal
     }
 
     /// <summary>
-    /// Refuses an empty command line with <see cref="TryHelpLine"/> alone, as curl does.
+    /// Refuses an empty command line with <see cref="TryHelpLineNamingAiHelp"/> alone.
     /// </summary>
     /// <remarks>
     /// Measured with the local curl 8.21.0 on 2026-09-26: <c>curl</c> with no arguments prints only
-    /// the try-help line on standard error, no <c>no URL specified</c> line, and exits 2.
+    /// the try-help line on standard error, no <c>no URL specified</c> line, and exits 2. Curl differs
+    /// in that line only, by naming <c>--ai-help</c> (ADR-0762).
     /// </remarks>
-    /// <returns>A refusal of one line, <see cref="TryHelpLine"/>.</returns>
+    /// <returns>A refusal of one line, <see cref="TryHelpLineNamingAiHelp"/>.</returns>
     public static CommandLineRefusal EmptyCommandLine() =>
-        new();
+        new(TryHelpLineNamingAiHelp);
 
     /// <summary>
     /// Refuses a command line that, once read, asks for a multipart form post (<c>-F</c> /

@@ -324,11 +324,11 @@ x", Url]);
         Diagnostics.Assert("exit code", 2, exitCode);
         Diagnostics.Assert(
             "stderr",
-            Visible("curl: try 'curl --help' or 'curl --manual' for more information" + NewLine),
+            Visible("curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information" + NewLine),
             Visible(StandardErrorText));
         Assert.AreEqual(2, exitCode);
         Assert.AreEqual(
-            "curl: try 'curl --help' or 'curl --manual' for more information" + NewLine,
+            "curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information" + NewLine,
             StandardErrorText);
     }
 
