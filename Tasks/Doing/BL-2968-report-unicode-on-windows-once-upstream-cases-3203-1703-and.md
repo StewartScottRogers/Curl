@@ -76,3 +76,4 @@ Where the fix lands outside `touches`, add the folder in the same commit. Each p
 - 2026-10-21: Backlog -> Doing. Criteria at claim: de350832 ba7c7a94 6c1653fd dd1cc079.
 - 2026-10-21: Doing -> Backlog. Criteria rewritten: Unicode and test1703/test472 dropped per ADR-0741; harness UTF-8 file-name fix committed, next claim only verifies and completes
 - 2026-10-21: touches narrowed: dropped Curl.Protocol.File.UnitLibrary/UnitTests and Curl.Authentication.UnitLibrary/UnitTests, which served test1703's file:// path and test472's SigV4 query; both left this task's criteria under ADR-0741, and the remaining work is in the Conformance files already listed. Frees BL-2834 to run beside it.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: 80698ca8 dc2ad84d dd1cc079.
