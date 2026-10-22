@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3117 — Fix AF-0337: Two AwsSigV4HttpAuthenticatorTests fail on the unmutated tree: Sign writes the secret key into the -v 'Server auth using AWS_SIGV4' line
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change: `AwsSigV4HttpAuthenticator.cs:118` already reports only `with user '{credential.UserName}'`, and `git log -S"password '{credential.Password}'"` finds no commit that ever wrote the password, so the line AF-0337 saw was most likely a planted defect left in the audit worktree (the seeder's catalogue), not a defect in this tree.
+- The reproduction (`dotnet test Curl.Engine.UnitTests --filter "FullyQualifiedName~AwsSigV4HttpAuthenticatorTests"`) gives Passed: 12, Failed: 0. `dotnet build` is clean and the fast tests are green. No production code changed, so no Measure-CodeQuality.ps1 run was needed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Reproduction passes (12/12) on this tree; the secret-key line was never committed here, so no code change was needed
