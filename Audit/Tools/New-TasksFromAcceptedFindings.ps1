@@ -23,7 +23,12 @@
     cost and fix it or record that nothing can be, and a Context saying the first audit after the
     task is Done closes the finding - and writes the new
     task's ID into the finding's `task` field and its `tasks` list. The tasks are lane-eligible:
-    they change product code, not audit paths.
+    they change product code, not audit paths. The exception is any other process finding
+    (ADR-0761): its reproduction measures a frozen log copy, which reproduces forever, so its
+    task's first criterion is the same measurement run over the live logs written after the fix
+    landed, with the window and the numbers in the task's Notes; and since that measurement runs
+    Audit/Tools/Measure-FactoryProcess.ps1, which a lane may not read, the task is filed with
+    -NoLane (interactive only).
 
     The reopen loop (ADR-0422), for every accepted finding that already has tasks:
 
@@ -178,6 +183,11 @@ function Set-TaskBody([string]$Path, $Finding, $Reopen, [string[]]$Earlier) {
     # next audit closes it once the task is Done (ADR-0422, amended 2026-10-14).
     $historical = "$($Finding.Key)".EndsWith(':cost-outlier')
     $closing = if ($historical) { "The finding describes a past run's cost, which no fix can change, so no re-audit can close it: the first audit after this task reaches Done closes it (closed-how task-done-historical, ADR-0422 amended 2026-10-14). Look for avoidable waste in what drove the cost and fix its cause, or record that there is none." } else { "The finding closes only when a later re-audit by the $($Finding.Auditor) auditor confirms the fix, never because this task reaches Done." }
+    # Any other process finding describes past factory behaviour in a frozen log copy, so its
+    # reproduction reproduces forever; the task's evidence is the same measurement over the logs
+    # written after the fix landed, as the process auditor's re-audit measures it (ADR-0761).
+    $liveWindow = ($Finding.Auditor -eq 'process') -and -not $historical
+    if ($liveWindow) { $closing = "The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). $closing" }
     $again = @()
     if ($Reopen) {
         $again = @(
@@ -204,6 +214,10 @@ function Set-TaskBody([string]$Path, $Finding, $Reopen, [string[]]$Earlier) {
     if ($historical) {
         $goal = "What drove the past run's cost that the audit office reported as $($Finding.Id) is found, and any avoidable waste in it is fixed, or the task records that there is none."
         $criteria = "- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
+    }
+    if ($liveWindow) {
+        $goal = "The cause of the factory behaviour the audit office reported as $($Finding.Id) is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding."
+        $criteria = "- [ ] The finding's measurement, run over the live logs written after the fix landed (``-LogRoot`` the repository's ``.logs`` folder, ``-CiRunsJson`` a fresh ``gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500``, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.`n- [ ] ``dotnet build`` and the fast tests (``dotnet test --filter `"TestCategory!=Integration`"``) pass."
     }
     $text = [IO.File]::ReadAllText($Path)
     $text = $text.Replace('<!-- One sentence: the observable outcome once this task is done. -->', $goal)
@@ -280,6 +294,8 @@ function New-FindingTask($Finding, $Reopen, [string[]]$Earlier, [string]$BoardSc
     # are no repository path; its fix is in the factory's script.
     if (-not $touches.Count -and $Finding.Auditor -eq 'process') { $touches = @('RunDarkFactory.ps1') }
     if ($touches.Count) { $newArgs += @('-Touches', ($touches -join ',')) }
+    # Its evidence runs the audit office's process measurement, which a lane may not read (ADR-0761).
+    if ($Finding.Auditor -eq 'process' -and -not "$($Finding.Key)".EndsWith(':cost-outlier')) { $newArgs += '-NoLane' }
     if ($WhatIf) { Write-Host "would file: $($newArgs -join ' ')"; return '' }
     $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $BoardScript @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
     if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Error "task-board.ps1 new failed for $($Finding.Id): $out" -ErrorAction Continue; return 'failed' }
@@ -338,6 +354,8 @@ if ($SelfTest) {
     & $finding 'AF-0012' 'accepted' 'BL-907' 'Low' 'process' 'process:logs:BL-800:cost-outlier'
     & $reaudit 'AF-0012' @('- 2026-10-07 | 2026-10-07_0844.md | reproduces: yes | BL-800 still cost 4 times the median')
     & $finding 'AF-0013' 'accepted' 'none' 'Low' 'process' 'process:logs:BL-801:cost-outlier'
+    # Any other process finding measures a frozen log copy: its task measures the live logs (ADR-0761).
+    & $finding 'AF-0014' 'accepted' 'none' 'Medium' 'process' 'process:logs:BL-802:requeues'
     & $reaudit 'AF-0011' @('- 2026-10-06 | 2026-10-06_0900.md | reproduces: yes | still fails', '- 2026-10-07 | 2026-10-07_0844.md | not re-audited | overlaps planted defect PD-303 in Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, so the auditor''s verdict (reproduces yes) is set aside: 282 options')
     $before = @{}; foreach ($f in Get-ChildItem (Join-Path $work 'findings')) { $before[$f.Name] = [IO.File]::ReadAllText($f.FullName) }
     $board = Join-Path $repo '.claude\skills\task-board\task-board.ps1'
@@ -376,6 +394,11 @@ if ($SelfTest) {
         $costTask = @(Get-ChildItem (Join-Path $work 'Tasks\Backlog') -Filter 'BL-*.md' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match '(?m)^title: Fix AF-0013' })
         $costText = if ($costTask.Count -eq 1) { [IO.File]::ReadAllText($costTask[0].FullName) } else { '' }
         Check 'a new cost-outlier finding gets one Fix task saying the first audit after it is Done closes the finding' ($costTask.Count -eq 1 -and $costText -match 'task-done-historical' -and $costText -match 'recorded as unavoidable' -and $costText -notmatch 'confirms the fix' -and $costText -notmatch '<!--') "$($costTask.Count)"
+        Check 'a cost-outlier task stays lane-eligible' ($costText -notmatch '(?m)^lane: no') 'AF-0013'
+        $liveTask = @(Get-ChildItem (Join-Path $work 'Tasks\Backlog') -Filter 'BL-*.md' | Where-Object { [IO.File]::ReadAllText($_.FullName) -match '(?m)^title: Fix AF-0014' })
+        $liveText = if ($liveTask.Count -eq 1) { [IO.File]::ReadAllText($liveTask[0].FullName) } else { '' }
+        Check 'a process finding''s task measures the live logs after the fix, not the frozen copy' ($liveTask.Count -eq 1 -and $liveText -match 'run over the live logs written after the fix landed' -and $liveText -match 'ADR-0761' -and $liveText -notmatch 'run from the repository root, gives the expected result' -and $liveText -match 'confirms the fix' -and $liveText -notmatch '<!--') "$($liveTask.Count)"
+        Check 'a process finding''s task is interactive only' ($liveText -match '(?m)^lane: no\r?$') 'AF-0014'
         if ($tasks.Count -eq 1) {
             $t = [IO.File]::ReadAllText($tasks[0].FullName)
             $id = ($tasks[0].Name -split '-')[0..1] -join '-'
