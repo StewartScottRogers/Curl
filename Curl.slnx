@@ -187,7 +187,7 @@
     <Project Path="Curl.Api.UnitLibrary/Curl.Api.UnitLibrary.csproj" />
     <Project Path="Curl.Api.UnitTests/Curl.Api.UnitTests.csproj" />
   </Folder>
-  <Folder Name="/Hosts/Console/">
+  <Folder Name="/Hosts/Curl/">
     <Project Path="Curl.Console.IntegrationTests/Curl.Console.IntegrationTests.csproj" />
     <Project Path="Curl.Console.UnitTests/Curl.Console.UnitTests.csproj" />
     <Project Path="Curl.Console/Curl.Console.csproj" />

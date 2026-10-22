@@ -324,7 +324,8 @@ Curl/
 In `Curl.slnx`, every project sits with its tests in a solution folder for its area,
 under one folder for its group (ADR-0731):
 
-- `/Hosts/`: Api, Console, Libcurl, Mcp - the ways Curl is used.
+- `/Hosts/`: Api, Curl (the `Curl.Console` projects, which build `curl.exe`), Libcurl,
+  Mcp - the ways Curl is used.
 - `/CommandLine/`: Cli, Config, Output.
 - `/Transfer/`: Cookies, Core, Engine, Networking.
 - `/Wire/`: Http2, Http3, Quic, Zstandard - framing and encoding below the protocols.

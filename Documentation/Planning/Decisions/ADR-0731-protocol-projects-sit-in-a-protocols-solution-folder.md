@@ -63,3 +63,9 @@ area sits with its tests in `/<Group>/<Area>/`, so no project stays in a flat ru
 Tls went to Security rather than Wire because it is hand-built cryptography; Zstandard to Wire as
 the nearest fit for an encoding; Cookies to Transfer, where the cookie engine runs. A new area goes in
 the group it belongs to, in a folder named for the area. As before, only the solution file changes.
+
+## Amendment, 2026-10-21: the console's folder is named Curl (BL-3010)
+
+Stewart asked the same day for the `Curl.Console` projects' solution folder to be named `Curl`,
+the name of the program they build (`curl.exe`), so `/Hosts/Console/` is now `/Hosts/Curl/`. The
+projects keep their names; only the solution folder changed.
