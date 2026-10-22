@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.NtlmConnectionClosure.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-3006 — Stop after the NTLM type 1 when an HTTP/1.0 server closes the connection with its type 2 so upstream case 159 passes
 
@@ -22,13 +22,17 @@ Split from BL-3003 (whose case 1100 had a different cause). test159 ("known to f
 
 ## Acceptance criteria
 
-- [ ] Upstream case 159 passes and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
-- [ ] A focused unit test in `Curl.Protocol.Http.UnitTests` pins that a 401 with an NTLM type 2 that closes the connection is not retried (ADR-0482).
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Upstream case 159 passes and is listed in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt`.
+- [x] A focused unit test in `Curl.Protocol.Http.UnitTests` pins that a 401 with an NTLM type 2 that closes the connection is not retried (ADR-0482).
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Measured curl 8.22.0 (`Record-CurlExchange.ps1`, `-v -0 -u testuser:testpass --ntlm` against an HTTP/1.0 401 with an NTLM Type 2 and `Connection: close`): it writes `* Connection closure while negotiating auth (HTTP 1.0?)` after the last header and before the empty line, and sends nothing more. Curl now does the same: `RetryWithAuthorizationAsync` plans no retry when a 401 to an NTLM Type 1 carries a Type 2 on a connection `HttpConnectionPersistence.KeepsAlive` says ends. No ADR: this matches curl with no choice left open.
+- Measure-CodeQuality.ps1 for Curl.Protocol.Http.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: 15c3cbe3 36593e1e 3d836d5e.
+- 2026-10-21: Doing -> Done. With -0 --ntlm a 401 carrying the NTLM Type 2 on a closing connection ends the transfer as curl does; upstream case 159 passes
