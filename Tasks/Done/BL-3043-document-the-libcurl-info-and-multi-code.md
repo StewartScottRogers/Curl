@@ -31,6 +31,8 @@ Stewart, 2026-10-22: "Fully document and comment all code in each Host." Hosts a
 
 ## Notes
 
+Public members were already documented; added docs to the unclear private helpers in Multi and Info/Times, plus short why-comments in Info. Comments only.
+
 ## Log
 
 - 2026-10-22: Created.
