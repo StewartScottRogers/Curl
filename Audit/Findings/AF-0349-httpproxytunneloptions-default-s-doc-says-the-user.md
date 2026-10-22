@@ -3,8 +3,8 @@ id: AF-0349
 title: HttpProxyTunnelOptions.Default's doc says the User-Agent is curl/8.21.0; the code sets curl/8.22.0
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Networking.UnitLibrary/HttpProxyTunnelOptions.cs:HttpProxyTunnelOptions.Default:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitLibrary/HttpProxyTunnelOptions.cs -Patte
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
