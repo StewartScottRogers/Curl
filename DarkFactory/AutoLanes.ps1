@@ -148,6 +148,25 @@ function Get-OverlapWaitingCount {
     return [math]::Max(0, $ready - $more)
 }
 
+function Get-CapacityReadyIds {
+    # The ready task IDs task-board.ps1 capacity names in parentheses ("Capacity 3: 2 in
+    # Doing, 1 more can start (BL-5)."), or none.
+    param([string]$CapacityLine)
+    if ($CapacityLine -notmatch '\(([^)]*)\)') { return @() }
+    return @([regex]::Matches($Matches[1], '\bBL-\d+\b') | ForEach-Object { $_.Value })
+}
+
+function Get-ClaimableCapacity {
+    # The capacity line's count less the ready tasks it names that are not claimable now
+    # (-NotClaimableIds: over their cost cap or interactive only), so -Lanes Auto adds no
+    # lane for a task no lane may claim (BL-3090). $null when the line has no count.
+    param([string]$CapacityLine, [string[]]$NotClaimableIds = @())
+    if ($CapacityLine -notmatch '(?m)^Capacity (\d+):') { return $null }
+    $count = [int]$Matches[1]
+    $passed = @(Get-CapacityReadyIds $CapacityLine | Where-Object { $NotClaimableIds -contains $_ }).Count
+    return [math]::Max(0, $count - $passed)
+}
+
 function Get-CapacityStreak {
     # The Auto steps running whose binding limit was the board's capacity: -Previous plus
     # one when -Binding is 'capacity', else 0.
@@ -381,6 +400,11 @@ if ($TestAutoLanes) {
         ,@('lane-to-retire 1,2,3 retiring 1,2,3', 'null', "$(if ($null -eq (Get-LaneToRetire -Active 1, 2, 3 -Retiring 1, 2, 3)) { 'null' } else { 'a lane' })")
         ,@('lane-to-retire 1,2,3,4 idle 1,2', '2', "$(Get-LaneToRetire -Active 1, 2, 3, 4 -Retiring @() -Idle 1, 2)")
         ,@('lane-to-retire 1,2,3 retiring 2 idle 2', '3', "$(Get-LaneToRetire -Active 1, 2, 3 -Retiring 2 -Idle 2)")
+        ,@('claimable capacity of capped-only ready tasks', '0', "$(Get-ClaimableCapacity -CapacityLine 'Capacity 2: 0 in Doing, 2 more can start (BL-5, BL-6).' -NotClaimableIds 'BL-5', 'BL-6')")
+        ,@('claimable capacity less one capped task', '2', "$(Get-ClaimableCapacity -CapacityLine 'Capacity 3: 1 in Doing, 2 more can start (BL-5, BL-6).' -NotClaimableIds 'BL-6', 'BL-9')")
+        ,@('claimable capacity with nothing capped', '1', "$(Get-ClaimableCapacity -CapacityLine 'Capacity 1: 0 in Doing, 1 more can start (BL-5).')")
+        ,@('claimable capacity with no count', 'null', "$(if ($null -eq (Get-ClaimableCapacity -CapacityLine 'oops')) { 'null' } else { 'a count' })")
+        ,@('capacity ready ids none more', '', ((Get-CapacityReadyIds 'Capacity 2: 2 in Doing, none more can start.') -join ','))
         ,@('capacity 9 lanes capacity 4 idle 6', 'lanes 9 -> 4 (4 ready tasks can run at once)', (Get-CapacityLaneCount -Current 9 -Capacity 4 -Requested 9 -Idle 6).Reason)
         ,@('capacity 9 lanes capacity 4 idle 2', 'lanes 9 -> 7 (4 ready tasks can run at once)', (Get-CapacityLaneCount -Current 9 -Capacity 4 -Requested 9 -Idle 2).Reason)
         ,@('capacity 3 lanes capacity 0', 'lanes 3 -> 1 (no ready task can run)', (Get-CapacityLaneCount -Current 3 -Capacity 0 -Requested 9 -Idle 3).Reason)

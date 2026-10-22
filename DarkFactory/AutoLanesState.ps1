@@ -69,7 +69,13 @@ function Get-BoardCapacity {
         if ($LASTEXITCODE) { return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "cannot check out $Ref in $AutoBoardDir" } }
         $env:CLAUDE_PROJECT_DIR = $AutoBoardDir
         $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AutoBoardDir '.claude\skills\task-board\task-board.ps1') capacity 2>&1) -join "`n"
-        if ($out -match '(?m)^Capacity (\d+):') { return [pscustomobject]@{ Capacity = [int]$Matches[1]; Created = $created; Why = '' } }
+        $line = @($out -split "`r?`n" | Where-Object { $_ -match '^Capacity \d+:' }) | Select-Object -First 1
+        if ($line) {
+            # A ready task over its cost cap or interactive only gets no lane (BL-3090).
+            $tasksDir = Join-Path $AutoBoardDir 'Tasks'
+            $notClaimable = @(Get-CapacityReadyIds $line | Where-Object { Get-TaskNotClaimableWhy $_ -TasksDir $tasksDir })
+            return [pscustomobject]@{ Capacity = (Get-ClaimableCapacity $line $notClaimable); Created = $created; Why = '' }
+        }
         return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "the board printed no capacity: $(Get-Short $out 60)" }
     } catch {
         return [pscustomobject]@{ Capacity = $null; Created = $created; Why = $_.Exception.Message }

@@ -221,8 +221,10 @@ function Invoke-Claim {
                     Write-Trace $id 'claim' "next offered it again although -Skip named it ($($skipNow -join ',')); waiting" 'DarkYellow'
                     return @{ Wait = $true; Why = "next kept offering skipped $id" }
                 }
-                $overCap = [bool]($id -and (Get-TaskCapSpentWhy $id))
-                if ($overCap) { Write-Trace $id 'cost cap' 'its runs of the last day already spent its cost cap; not claimed' 'Yellow'; $skipNow += $id }
+                # The shared claimable-now predicate (BL-3090): over its cost cap or interactive only.
+                $notClaimableWhy = if ($id) { Get-TaskNotClaimableWhy $id } else { '' }
+                $overCap = [bool]$notClaimableWhy
+                if ($overCap) { Write-Trace $id 'unclaimable' "$(Get-Short $notClaimableWhy 80); not claimed" 'Yellow'; $skipNow += $id }
                 # An unready task that overlaps work in Doing is never offered: next holds back
                 # every task behind it instead ("No task can start yet ... e.g. BL-### with ...").
                 # Skipping it releases them; without that, BL-3026 (touches: []) held lane 1 in

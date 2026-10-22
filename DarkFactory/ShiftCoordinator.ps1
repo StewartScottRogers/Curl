@@ -440,15 +440,20 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $reasons = @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)
     # -Continuous: while the board still has ready work, the next shift starts itself, so
     # the factory keeps going without anyone - Stewart or a Claude session - to restart it.
-    $stillReady = (Invoke-Board @('next')) -join "`n"
-    # Nothing ready: the review runs now, and what it files can start the next shift.
-    if ($review -and -not ($Continuous -and (Get-NextTaskId $stillReady))) {
+    # Only a task claimable now counts: one over its cost cap or interactive only does not,
+    # or -Continuous starts shift after empty shift (BL-3090).
+    $stillReady = Get-ClaimableTaskId
+    # Nothing claimable: the review runs now, and what it files can start the next shift.
+    if ($review -and -not ($Continuous -and $stillReady.Id)) {
         Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan'
         $review = $null
         if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
-        $stillReady = (Invoke-Board @('next')) -join "`n"
+        $stillReady = Get-ClaimableTaskId
     }
-    if ($Continuous -and (Get-NextTaskId $stillReady)) {
+    $capFreesAt = if (-not $stillReady.Id -and $stillReady.Capped.Count) { Get-CapFreesAt $stillReady.Capped } else { $null }
+    $end = Get-ShiftEndDecision -Continuous ([bool]$Continuous) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped -CapFreesAt $capFreesAt
+    if ($end.Trace) { Write-Trace '-' 'shift' $end.Trace 'Yellow' }
+    if ($end.Continue) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
         # the count auto-lanes.json saved.
