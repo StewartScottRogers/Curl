@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/ADR-0760-a-run-starts-only-with-2-dollars-of-its-cap-left.md]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3111 — Correct ADR-0760's statement of how far a task can spend past its cost cap
 
@@ -36,3 +36,4 @@ Checked against TaskBudget.ps1 (Get-RunBudgetUsd, Test-TaskCapSpent) and ShiftRu
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b25bcd25 9f77ca2a.
+- 2026-10-22: Doing -> Done. ADR-0760 Consequences now state the real bound from Get-RunBudgetUsd and Test-TaskCapSpent
