@@ -71,7 +71,9 @@ try {
     New-Item -ItemType Directory -Path $dataDestination -Force | Out-Null
     Get-ChildItem -LiteralPath $dataDestination -File | Remove-Item -Force
     # data1461.txt and data1463.txt are curl's --help and --help file text, which cases 1461, 1463 and 1464 include (BL-2830).
-    foreach ($dataFile in 'data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1', 'data1461.txt', 'data1463.txt') {
+    # data1400.c to data1407.c, data1420.c, data1465.c and data1481.c are the C the --libcurl cases expect (BL-2965).
+    $libcurlFiles = '1400', '1401', '1402', '1403', '1404', '1405', '1406', '1407', '1420', '1465', '1481' | ForEach-Object { "data$_.c" }
+    foreach ($dataFile in @('data-httpsig-ed25519.key', 'data-httpsig-hmac-sha256.key', 'data-xml1', 'data1461.txt', 'data1463.txt') + $libcurlFiles) {
         Copy-Item -LiteralPath (Join-Path $upstreamData $dataFile) -Destination (Join-Path $dataDestination $dataFile)
     }
 

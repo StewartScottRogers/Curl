@@ -33,7 +33,9 @@ copies `certs/` to the test output beside the cases. `.gitattributes` marks them
 `data-httpsig-ed25519.key` and `data-httpsig-hmac-sha256.key` for httpsig cases 5001 to 5025
 (BL-2183), and `data-xml1`, the document the compressed-reply cases 222, 230, 232, 314, 396, 1123
 and 1277 include with `%includetext` (BL-2829), and `data1461.txt` and `data1463.txt`, curl's `--help` and
-`--help file` text that cases 1461, 1463 and 1464 include with `%includetext` (BL-2830;
+`--help file` text that cases 1461, 1463 and 1464 include with `%includetext` (BL-2830), and
+`data1400.c` to `data1407.c`, `data1420.c`, `data1465.c` and `data1481.c`, the C program the
+`--libcurl` cases of the same numbers include with `%includetext` (BL-2965;
 `Update-UpstreamTestData.ps1` fetches them too). `UpstreamConformanceTests` passes this folder as `%SRCDIR`; any other `%SRCDIR/data/...` file is
 not vendored, so a case that names one fails with curl's read error. The csproj copies `data/` to
 the test output; `.gitattributes` marks the files `-text`.
