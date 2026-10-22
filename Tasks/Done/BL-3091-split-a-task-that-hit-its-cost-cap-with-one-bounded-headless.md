@@ -40,7 +40,7 @@ Write an ADR under `Documentation/Planning/Decisions/` ("Decided by Claude under
 ## Notes
 
 - Delivered directly rather than through the full /feature stages: the change is four DarkFactory scripts and their self-test, and the run's cost cap is 3 US dollars.
-- Invoke-TaskSplit, Invoke-TaskSplitRun, Register-TaskSplitAttempt, Get-TaskSplitArguments and Get-TaskStashSha (factored out of Restore-TaskStash) are in TaskStash.ps1; SplitPrompt and SplitForbidden in Prompts.ps1 (ADR-0758).
+- Invoke-TaskSplit, Invoke-TaskSplitRun, Register-TaskSplitAttempt, Get-TaskSplitArguments and Get-TaskStashSha (factored out of Restore-TaskStash) are in TaskStash.ps1; SplitPrompt and SplitForbidden in Prompts.ps1 (ADR-0759).
 - Invoke-Claim queues an over-cap task (cost cap, not interactive only) and splits it in its finally block after the lock is released, so the minutes-long split run never holds every lane's claim lock; Invoke-TaskSplit takes the lock again only to commit and push.
 - Default taken: in ShiftRunner a refused push leaves the split commit for the shift's integration rather than pulling, since the lane may hold its own commits there; from a claim it pulls with rebase and pushes again.
 - Default taken: 1 US dollar, 30 turns, 20 minutes; one marker file per task per day under <log>/splits.
