@@ -8,7 +8,7 @@ depends-on: [BL-3022, BL-3021]
 touches: [Curl.Cli.UnitLibrary/LibcurlSourceCode.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.ProtocolOptions.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionCoverageTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeTests.cs]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-22
 ---
 # BL-3023 — Measure Curl.Cli.UnitLibrary quality after the --libcurl reorder and confirm CI is green on Linux and macOS
 
@@ -23,7 +23,7 @@ Split from BL-2966. Run `powershell -NoProfile -File Measure-CodeQuality.ps1 -Li
 ## Acceptance criteria
 
 - [x] Measure-CodeQuality for `Curl.Cli.UnitLibrary` reports no member of `LibcurlSourceCode*` outside the four gates.
-- [ ] Notes record the CI run id and that its Windows, Linux and macOS jobs and the quality job passed for a commit that contains BL-3022's work.
+- [x] Notes record the CI run id and that its Windows, Linux and macOS jobs and the quality job passed for a commit that contains BL-3022's work.
 - [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Cli.UnitTests`.
 
 ## Notes
@@ -31,6 +31,7 @@ Split from BL-2966. Run `powershell -NoProfile -File Measure-CodeQuality.ps1 -Li
 - 2026-10-21 (lane 1, first claim): Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary on 271ce9c41: no `LibcurlSourceCode*` member fails a gate. The library's 47 failing members (98.09% line, 95.58% branch) are all in `ManualPages/` from b68112072 (BL-3018's managen port), work that BL-3019, BL-3020 and BL-3021 cover. `dotnet build Curl.slnx -warnaserror` is clean; Curl.Cli.UnitTests passes 4003, 18 skipped, 0 failed.
 - CI for BL-3022's commit d6d35bf61 is run 39718635967: Build and test passed on windows-latest, ubuntu-latest and macos-latest, but Quality gates failed on `ConnectionPeer.Create` (Curl.Core) and `Unit2413ConnectionPeer.Mismatch` (Curl.Conformance.UnitProgram). Both were fixed later in 879349362 and 9ad7757f2. Run 39720875902 on 1097ca82b, which has BL-3022's work and both fixes, passed all three build and test jobs. Its Quality gates job failed only on the 47 Curl.Cli ManualPages members; none is in `LibcurlSourceCode*`.
 - Requeued with depends-on BL-3021 (Doing on the shared branch; BL-3019 and BL-3020 are already Done). The quality job cannot pass until BL-3021 lands the rest of the ManualPages coverage. Next claim: find the first CI run after BL-3021 is Done, check that its three build and test jobs and its Quality gates job passed, record the run id here, and tick the second criterion. The other two criteria are already verified above.
+- 2026-10-22 (lane 2, second claim): CI run 39723672567 on 1afd80a99 (BL-3021 finished; contains BL-3022's commit d6d35bf61, checked with git merge-base --is-ancestor) passed Build and test on windows-latest, ubuntu-latest and macos-latest and Quality gates (windows-latest). No code changed on this claim, so the build and test results above still hold.
 
 ## Log
 
@@ -38,3 +39,4 @@ Split from BL-2966. Run `powershell -NoProfile -File Measure-CodeQuality.ps1 -Li
 - 2026-10-21: Backlog -> Doing. Criteria at claim: f1c8149c 809c786e 48b212cd.
 - 2026-10-21: Doing -> Backlog. Waits for BL-3021: CI's quality job is red only on the ManualPages members BL-3021 is covering; LibcurlSourceCode* passes every gate and the build and test jobs pass on all three OSes
 - 2026-10-22: Backlog -> Doing. Criteria at claim: f1c8149c 809c786e 48b212cd.
+- 2026-10-22: Doing -> Done. CI run 39723672567 is green on Windows, Linux, macOS and quality for a commit with BL-3022's reorder; LibcurlSourceCode* passes every gate
