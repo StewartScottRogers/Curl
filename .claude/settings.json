@@ -40,8 +40,8 @@
       "Read(./**/bin/**)",
       "Read(./**/obj/**)",
       "Read(./.vs/**)",
-      "Read(./data/**)",
-      "Edit(./data/**)",
+      "Read(/data/**)",
+      "Edit(/data/**)",
       "Read(./**/appsettings.*.Local.json)",
       "Read(./**/*.pfx)",
       "Read(./**/*.snk)"
