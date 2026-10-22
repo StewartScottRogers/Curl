@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Prompts.ps1]
 requirement: none
 created: 2026-10-21
-completed:
+completed: 2026-10-21
 ---
 # BL-2950 — Fix AF-0312: BL-2724 cost $4.45, 3.1 times the median, in one 73-turn run
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause: the run researched upstream FTP response-timeout behaviour in-run (unpacked ftp.c, pingpong.c, ftpserver.pl; 35 Bash calls, 73 turns, context re-read each turn). That research was the task itself (a protocol-behaviour port), so it is unavoidable; the only avoidable part was grep/sed/cat slicing and rereading two test files, which Run rule 7 already forbids (read each file once, batch calls, one Select-String over a folder) in both prompt variants in DarkFactory/Prompts.ps1. At 3.1x the median, just over the 3x line, a Low finding, no further rule is warranted. No code change.
 
 ## Log
 
 - 2026-10-21: Created.
 - 2026-10-21: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-21: Doing -> Done. Cause recorded: in-run upstream FTP research, already covered by the read-once rule; no change needed
