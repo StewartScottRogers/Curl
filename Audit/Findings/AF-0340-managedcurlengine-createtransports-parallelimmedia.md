@@ -3,8 +3,8 @@ id: AF-0340
 title: ManagedCurlEngine.CreateTransports' ParallelImmediate: false can become true with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedCurlEngine.cs:CreateTransports-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedCurlEngine.cs:318:false
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
