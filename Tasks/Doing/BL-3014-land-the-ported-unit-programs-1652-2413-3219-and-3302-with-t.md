@@ -36,3 +36,4 @@ Left in this task: one failing row of `Unit2413_PeerWrongInOneField_...` (the `i
 ## Log
 
 - 2026-10-21: Created.
+- 2026-10-21: Backlog -> Doing. Criteria at claim: d4cfaded 2ef82892 f6a8a38a 4789c509.
