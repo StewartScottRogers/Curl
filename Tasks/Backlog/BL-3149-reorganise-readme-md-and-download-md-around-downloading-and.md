@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-3146, BL-3148]
-touches: [README.md, DOWNLOAD.md]
+touches: [README.md, DOWNLOAD.md, Curl.Api/README.md, Libcurl/README.md, Curl.Api/Curl.Api.csproj, Libcurl/Libcurl.csproj]
 requirement: none
 created: 2026-10-22
 completed:
@@ -24,6 +24,7 @@ The "For AI agents" section links to `llms.txt`, `resources.json`, `--ai-help` (
 
 ## Acceptance criteria
 
+- [ ] Wherever Curl.Api and Libcurl are offered, it says which to use (Stewart, 2026-10-22): `Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.` That is the README's Download and use table, a which-to-use table in the README (writing new .NET code: Curl.Api; porting C or libcurl code, or needing a CURLOPT that Curl.Api lacks: Libcurl; running commands or scripts: curl.exe; an AI agent: Curl.Mcp or `curl --ai-help`), DOWNLOAD.md's two sections, the first paragraph of `Curl.Api/README.md` and `Libcurl/README.md`, and each package's `<Description>`. Curl.Api is listed first.
 - [ ] `README.md`'s first three sections are: what Curl is, Download and use, For AI agents. Every link in them returns 200.
 - [ ] `DOWNLOAD.md` has Curl.Api and Libcurl sections, each with a command that was run and that worked, with output in Notes, and a SHA256SUMS verification step for each platform.
 - [ ] No heading that another file links to was renamed without updating that link. A search for links to `README.md#` and `DOWNLOAD.md#` across the repository finds none broken.

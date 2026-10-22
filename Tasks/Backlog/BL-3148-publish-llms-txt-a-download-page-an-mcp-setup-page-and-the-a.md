@@ -30,6 +30,7 @@ Record the layout in an ADR (next free number; "Decided by Claude under Stewart'
 
 ## Acceptance criteria
 
+- [ ] `llms.txt` and `/download/` say which .NET library to use (Stewart, 2026-10-22): `Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.` Curl.Api is listed before Libcurl.
 - [ ] After the job runs, fetching `/Curl/llms.txt`, `/Curl/download/`, `/Curl/mcp/` and `/Curl/ai-help/` each returns 200. Every download URL they name returns 200 (checked with a HEAD request). The checks and their output are in Notes.
 - [ ] `llms.txt` lists every resource kind in `resources.json` and no resource that is not there.
 - [ ] The video page, `board/`, `gaps/`, `coverage/` and `integration/` still load as before.
