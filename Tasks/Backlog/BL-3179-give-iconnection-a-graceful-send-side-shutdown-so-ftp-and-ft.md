@@ -1,5 +1,5 @@
 ---
-id: BL-3172
+id: BL-3179
 title: Give IConnection a graceful send-side shutdown so FTP and FTPS data connections end with FIN and close_notify
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3172 — Give IConnection a graceful send-side shutdown so FTP and FTPS data connections end with FIN and close_notify
+# BL-3179 — Give IConnection a graceful send-side shutdown so FTP and FTPS data connections end with FIN and close_notify
 
 ## Goal
 
