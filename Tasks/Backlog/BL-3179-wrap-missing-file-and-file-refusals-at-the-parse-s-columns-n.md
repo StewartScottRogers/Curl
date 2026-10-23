@@ -1,5 +1,5 @@
 ---
-id: BL-3172
+id: BL-3179
 title: Wrap missing-file and @file refusals at the parse's COLUMNS, not the process's
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3172 — Wrap missing-file and @file refusals at the parse's COLUMNS, not the process's
+# BL-3179 — Wrap missing-file and @file refusals at the parse's COLUMNS, not the process's
 
 ## Goal
 
