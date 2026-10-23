@@ -1,7 +1,7 @@
 ---
 id: BL-3196
 title: Abort a slow API transfer with CURLOPT_LOW_SPEED_LIMIT and LOW_SPEED_TIME
-priority: Normal
+priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
@@ -27,6 +27,7 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 - [ ] `Curl.Engine.UnitTests/LowSpeedLimitTests.cs` drives a fake-clock transfer below the limit for longer than LOW_SPEED_TIME and expects exit 28 with upstream's message text.
 - [ ] A transfer above the limit, and one with LOW_SPEED_TIME 0, completes normally.
 - [ ] `Libcurl.UnitTests/Options/LowSpeedOptionTests.cs` sets both options through `CurlEasy` and expects 28.
+- [ ] A test adds the same slow handle to a multi handle (`CurlMulti`) and expects it to finish with 28, as upstream does.
 - [ ] BL-3163's CLI tests still pass. Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
 
 ## Notes
@@ -39,3 +40,4 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: e1d22e45 7a673b40 f5b1d08b 42f0e3f4.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs (ProgressStartingWatchdogsOf), which BL-3195 in Doing holds
+- 2026-10-22: Priority Normal -> High and a multi-handle criterion added, from Stewart's prioritised findings list (P1, reports 3 and 25: "easy, multi and CLI").
