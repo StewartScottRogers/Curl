@@ -176,7 +176,7 @@ internal sealed partial class ManagedEasyTransfer
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
-        info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl) };
+        info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl), HttpVersion = HttpVersionOf(info.HttpVersion, result, headers.HttpVersion) };
         return toolState is null
             ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
@@ -220,6 +220,17 @@ internal sealed partial class ManagedEasyTransfer
 
     private static bool CutOffAfterHead(TransferInfo info, TransferResult result) =>
         result.Report is null && result.ExitCode != CurlExitCode.Ok && info.ResponseCode > 0;
+
+    /// <summary>
+    /// <c>CURLINFO_HTTP_VERSION</c> of a performed transfer: the report's, else, when the transfer failed, the version of the
+    /// last status line the handle's headers read, as libcurl keeps it after a low-speed abort or a refused redirect hop (BL-3338).
+    /// </summary>
+    /// <param name="reported">The version the report gave, 0 for none.</param>
+    /// <param name="result">The attempt's result.</param>
+    /// <param name="lastStatusLineVersion">The version of the last status line the headers read, 0 for none.</param>
+    /// <returns>The <c>CURL_HTTP_VERSION_*</c> number.</returns>
+    internal static long HttpVersionOf(long reported, TransferResult result, long lastStatusLineVersion) =>
+        reported == 0 && result.ExitCode != CurlExitCode.Ok ? lastStatusLineVersion : reported;
 
     /// <summary>
     /// The <c>CURLINFO_PRIMARY_PORT</c> of a performed transfer: -1 for a failed one that reached no peer, as libcurl
