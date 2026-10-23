@@ -31,3 +31,4 @@ BL-3215 (ADR-0783) made the Schannel build check revocation online against the s
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 8d39bdc8 c424c2e3 a2f56bec.
