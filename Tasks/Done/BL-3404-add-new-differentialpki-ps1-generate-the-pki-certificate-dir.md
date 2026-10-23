@@ -8,7 +8,7 @@ depends-on: []
 touches: [New-DifferentialPki.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3404 — Add New-DifferentialPki.ps1: generate the pki certificate directory the TLS differential cases need, with no interaction
 
@@ -22,13 +22,17 @@ Stewart (2026-10-23) wants the differential tests (Curl.Conformance.Differential
 
 ## Acceptance criteria
 
-- [ ] `New-DifferentialPki.ps1 -Directory <dir>` creates `ca.pem`, `server.pem`/`.key`, `wrong.pem`/`.key`, `expired.pem`/`.key`, `rsa.pem`/`.key`, `client.pem`/`.key` and `client.p12` there, asks nothing, is safe to run twice (overwrites), and its comment-based help states what each file is for.
-- [ ] With `CURL_DIFFERENTIAL_PKI` set to that directory and `CURL_DIFFERENTIAL_REFERENCE=/ucrt64/bin/curl.exe`'s Windows path, `dotnet test Curl.Conformance.Differential.IntegrationTests --filter "FullyQualifiedName~CliTlsDifferentialTests"` is no longer Inconclusive for a missing certificate (it runs and writes its `### DIFF` report); state the outcome in Notes.
-- [ ] The script writes no private key outside the directory it is given.
+- [x] `New-DifferentialPki.ps1 -Directory <dir>` creates `ca.pem`, `server.pem`/`.key`, `wrong.pem`/`.key`, `expired.pem`/`.key`, `rsa.pem`/`.key`, `client.pem`/`.key` and `client.p12` there, asks nothing, is safe to run twice (overwrites), and its comment-based help states what each file is for.
+- [x] With `CURL_DIFFERENTIAL_PKI` set to that directory and `CURL_DIFFERENTIAL_REFERENCE=/ucrt64/bin/curl.exe`'s Windows path, `dotnet test Curl.Conformance.Differential.IntegrationTests --filter "FullyQualifiedName~CliTlsDifferentialTests"` is no longer Inconclusive for a missing certificate (it runs and writes its `### DIFF` report); state the outcome in Notes.
+- [x] The script writes no private key outside the directory it is given.
 
 ## Notes
+
+- Keys are created as named CNG keys (a null name fails "Object already exists" in PowerShell) and deleted in a finally block, so none persists. Certificates are signed through X509SignatureGenerator because the RSA server certificate has a different algorithm from the ECDSA CA. Ran the script twice in Windows PowerShell 5.1 and PowerShell 7: both wrote all 12 files.
+- Outcome: with CURL_DIFFERENTIAL_PKI set to a generated directory and CURL_DIFFERENTIAL_REFERENCE=C:Program FilesGitCrt64binrl.exe, CliTlsDifferentialTests passed (not Inconclusive; ran 49 s, 1 passed). The `/ucrt64/bin` path resolves to that Windows path on this machine.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 63762334 7522486b f2aeb944.
+- 2026-10-23: Doing -> Done. New-DifferentialPki.ps1 generates the TLS differential pki directory; CliTlsDifferentialTests runs instead of skipping
