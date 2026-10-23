@@ -51,6 +51,9 @@ curl and `Update-UpstreamTestData.ps1` does not refresh it. test1707.pl reads it
 
 `src/tool_getparam.c` and `src/tool_listhelp.c` (test1139.pl) sit beside it.
 
+`lib/libcurl.def` (test1135.pl, case 1279), `lib/optiontable.pl` and `lib/easyoptions.c` (test1276.pl) and
+`projects/OS400/ccsidcurl.c` (test1544.pl) are vendored byte for byte by `Update-UpstreamTestData.ps1` too (BL-3391); `.gitattributes` marks them `-text`.
+
 ## docs/libcurl and include
 
 `docs/libcurl/` (105 files: `symbols-in-versions` and the `*.md` pages; `opts/*.md`, 422 files) and

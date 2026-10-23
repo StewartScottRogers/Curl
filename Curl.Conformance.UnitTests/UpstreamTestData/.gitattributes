@@ -5,3 +5,5 @@ data/* -text
 docs/** -text
 src/* -text
 include/** -text
+lib/* -text
+projects/** -text
