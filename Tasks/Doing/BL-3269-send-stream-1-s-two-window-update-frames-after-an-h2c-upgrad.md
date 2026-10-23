@@ -31,3 +31,4 @@ Found by BL-3207 (2026-10-23): `Record-CurlExchange.ps1 -Http2Origin h2c-upgrade
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f1e2decf 529878da 5ddedddc.
