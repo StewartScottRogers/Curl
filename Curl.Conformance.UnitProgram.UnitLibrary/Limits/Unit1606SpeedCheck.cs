@@ -65,22 +65,21 @@ public sealed class Unit1606SpeedCheck(Func<long, TimeSpan, TimeProvider, LowSpe
         using LowSpeedWatchdog watchdog = createWatchdog(speedLimit, TimeSpan.FromSeconds(timeLimit), clock);
         using Stream output = watchdog.WatchOutput(Stream.Null);
         List<long> writtenBySecond = [0];
-        int counter = 1;
-        do
+
+        // Creating the watchdog is the C program's first check (counter 1), which starts the slow spell as
+        // curl's first Curl_speedcheck at a transfer's start does (BL-3163); each stepped second is the next.
+        for (int counter = 2; counter < LastCounter; counter++)
         {
+            speed -= decrement;
             WriteForSpeed(output, writtenBySecond, speed);
             clock.Step(TimeSpan.FromSeconds(1));
             if (watchdog.IsTooSlow)
             {
-                break;
+                return counter - 1;
             }
-
-            counter++;
-            speed -= decrement;
         }
-        while (counter < LastCounter);
 
-        return counter - 1;
+        return LastCounter - 1;
     }
 
     // The watchdog's speed at second n is the bytes written since second max(0, n - 5) over the seconds between.
