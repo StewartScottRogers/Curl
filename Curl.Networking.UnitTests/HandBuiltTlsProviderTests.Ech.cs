@@ -339,6 +339,9 @@ public sealed partial class HandBuiltTlsProviderTests
         [new TlsClientOptions(Ech: "hard", EchConfigList: "not base64!"), null, new[] { "ECH: SSL_ECH_set1_ech_config_list failed" }],
         [new TlsClientOptions(Ech: "false", EchConfigList: "not base64!"), null, new[] { "ECH: SSL_ECH_set1_ech_config_list failed" }],
         [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(null), new[] { "ECH: requested but no ECHConfig available" }],
+        // An HTTPS record whose ech value is present but empty is no list at all (AF-0376).
+        [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup([]), new[] { "ECH: requested but no ECHConfig available" }],
+        [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup([]), new[] { "ECH: requested but no ECHConfig available" }],
         [new TlsClientOptions(Ech: "true"), new FakeEchConfigListLookup(EchConfigListBytes("dns.test")), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: imported ECHConfigList of length 61" }],
         [new TlsClientOptions(Ech: "hard"), new FakeEchConfigListLookup([0x00, 0x05, 0xfe]), new[] { "ECH: ECHConfig from HTTPS RR", "ECH: SSL_set1_ech_config_list failed" }],
         // Through --doh-url, measured with curl 8.21.0 and OpenSSL 4.0.0 against the recorder's DoH server (BL-1173).
