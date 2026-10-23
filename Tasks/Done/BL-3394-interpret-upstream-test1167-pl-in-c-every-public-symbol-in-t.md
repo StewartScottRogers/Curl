@@ -8,7 +8,7 @@ depends-on: [BL-3406]
 touches: [Curl.Conformance.UnitLibrary/UpstreamTest1167Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1167.cs, Curl.Conformance.UnitTests/UpstreamTest1167ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3394 — Interpret upstream test1167.pl in C#: every public symbol in the headers has the curl prefix (case 1167)
 
@@ -35,3 +35,4 @@ Decided in BL-3406 (supersedes the no-counterpart row of ADR-0718/ADR-0755): lik
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 41467e0c c9ef8a5b b41964f0.
+- 2026-10-23: Doing -> Done. Case 1167 runs through UpstreamTest1167Script and is on the ratchet; fast tests green, library quality gates met
