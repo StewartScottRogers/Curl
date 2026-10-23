@@ -33,3 +33,4 @@ BL-3237's replay of the tester's h_in.json: every header case differs only in or
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 27ba8421 ebc469ce 0ac4089b.
