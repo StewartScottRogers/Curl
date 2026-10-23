@@ -24,11 +24,13 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-3293, BL-3301, BL-3302, BL-3338, BL-3339) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-3293, BL-3301, BL-3302, BL-3338, BL-3339) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Split into ContentLength, ContentLengthStoppedBeforeBody, ChunkedOrHeadResponse, FileLength and HeaderValues files; LengthAndCondition.cs keeps only the composer. Pure move, same behaviour. BL-3339 touches narrowed to a new UploadSize.cs; BL-3293, BL-3301, BL-3302 name the whole library, so hotspots reports none. Quality run: 0 failing members.
 
 ## Log
 
