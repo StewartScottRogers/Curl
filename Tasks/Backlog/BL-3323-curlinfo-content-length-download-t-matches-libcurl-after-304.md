@@ -4,8 +4,8 @@ title: CURLINFO_CONTENT_LENGTH_DOWNLOAD_T matches libcurl after 304, conflicting
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoFromReportTests.cs]
+depends-on: [BL-3316]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs]
 requirement: none
 created: 2026-10-23
 completed:
@@ -28,7 +28,11 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 
 ## Notes
 
+- Run 1 (lane 7): fixed in TransferInfoFromReport.LengthAndCondition.cs and pinned in TransferInfoLengthAndConditionTests (touches changed from TransferInfoFromReportTests.cs, which holds no length tests): any 304 -> 0; HEAD ignores chunked; unmet time condition -> the header length; -1 after exits 1, 22, 33, 36, 63; file:// directory -> -1. Measured with LibcurlEasyDifferentialTests (10 min a run): notmod, cl-and-te, resume-norange, timecond-*, maxfilesize-*, proto-redir-restrict and file-dir now match. Code left uncommitted; the shift stashes it.
+- Left: cl-dup-diff (ref -1, ours 1) because ManagedEasyTransfer.Finish.cs line ~273 overwrites the length with the header store's headers.ContentLength (the first of the duplicate lengths); ignore-cl and ignore-cl-head (ref -1, ours 100/3) because CURLOPT_IGNORE_CONTENT_LENGTH is not passed to TransferInfoFromReport.Of (add a parameter from options.Http.IgnoreContentLength, answer -1). Both need Finish.cs, which BL-3316 (Doing) holds, so depends-on BL-3316.
+- Do not widen the failure rule: a blanket -1 on any failure broke bad-gzip (15), unknown-encoding (4), maxredirs (0) and gziptrail, where libcurl keeps the header length.
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
+- 2026-10-23: Doing -> Backlog. Finish.cs is held by BL-3316 (Doing); cl-dup-diff and ignore-cl cases need it - depends-on BL-3316
