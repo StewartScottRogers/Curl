@@ -358,13 +358,24 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // the file's certificates, where a leaf the file lists is itself a trust anchor: a chain
     // .NET finds partial or untrusted only for want of a root is accepted (measured with curl
     // 8.22.0, tls-wrong-ca, BL-3289, ADR-0797).
+    //
+    // curl's OpenSSL build sets X509_V_FLAG_PARTIAL_CHAIN, so there any certificate of the
+    // chain the file lists, leaf or intermediate, anchors it (measured with curl 8.18.0 and
+    // OpenSSL 3.5.5, BL-3335).
     private bool SchannelTrustsListedLeaf(X509Chain? chain) =>
-        matchesSchannelBuild
-        && options.HasCaCertificates
+        options.HasCaCertificates
         && chain is not null
         && chain.ChainElements.Count > 0
         && HasOnlyMissingRootStatus(ReadChainStatus(chain))
-        && ListsCertificate(chain.ChainPolicy.CustomTrustStore, chain.ChainElements[0].Certificate);
+        && ListsAnAnchorCandidate(chain);
+
+    private bool ListsAnAnchorCandidate(X509Chain chain)
+    {
+        var candidates = matchesSchannelBuild
+            ? chain.ChainElements.Cast<X509ChainElement>().Take(1)
+            : chain.ChainElements.Cast<X509ChainElement>();
+        return candidates.Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
+    }
 
     private static bool HasOnlyMissingRootStatus(X509ChainStatus[] chainStatus) =>
         chainStatus.All(status => (status.Status & ~(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) == 0);

@@ -63,14 +63,14 @@ public sealed class ServerCertificateVerificationLeafAnchorTests
     }
 
     [TestMethod]
-    public void VerifyPeer_CaCertificateFileHoldingOnlyTheServersLeafInTheOpenSslBuild_IsExit60()
+    public void VerifyPeer_CaCertificateFileHoldingOnlyTheServersLeafInTheOpenSslBuild_Accepts()
     {
         using var authority = CreateAuthority();
         using var leaf = CreateLeaf(authority);
 
         var failure = VerifyAgainstCaFile(OpenSslBuild, leaf, listed: leaf, PartialChainStatus);
 
-        Assert.AreEqual(CurlExitCode.PeerFailedVerification, failure?.ExitCode);
+        Assert.IsNull(failure);
     }
 
     [TestMethod]
