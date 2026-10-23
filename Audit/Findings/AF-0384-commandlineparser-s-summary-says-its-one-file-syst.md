@@ -3,8 +3,8 @@ id: AF-0384
 title: CommandLineParser's summary says its one file-system question is the --cacert path and that only --variable %name reads the environment; six options probe paths and every off-Windows parse reads CA environment variables
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Cli.UnitLibrary/CommandLineParser.cs:CommandLineParser:false-doc-comment
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Cli.UnitLibrary/CommandLineParser.cs, Curl.Cli.UnitLibr
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
