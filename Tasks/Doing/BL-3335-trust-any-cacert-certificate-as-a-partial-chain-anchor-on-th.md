@@ -30,3 +30,4 @@ Follow-up from BL-3289 (ADR-0797), which made the Schannel build accept a leaf l
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: c58749b7 c46ca32a.
