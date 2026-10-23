@@ -3,8 +3,8 @@ id: AF-0374
 title: BL-3151 cost $0.96 (4.4x the median) across two Opus runs that each found the same unmet precondition and requeued
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3151:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
