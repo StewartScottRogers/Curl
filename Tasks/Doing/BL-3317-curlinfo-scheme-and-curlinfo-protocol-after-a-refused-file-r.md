@@ -31,3 +31,4 @@ get-follow/loc-file: libcurl keeps scheme http and protocol 1 (0x100031, 0x20003
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
