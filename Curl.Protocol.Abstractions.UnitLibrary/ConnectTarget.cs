@@ -8,7 +8,7 @@ namespace Curl.Protocol.Abstractions;
 /// The host name or address literal from the transfer's URL, or a host the protocol
 /// negotiated mid-session, such as for FTP's data connection. Never empty or whitespace.
 /// </param>
-/// <param name="Port">The TCP port, from 1 to 65535.</param>
+/// <param name="Port">The TCP port, from 0 to 65535; port 0 is kept so the connect fails with exit 7, as curl's does (BL-3172).</param>
 /// <param name="UseTls">
 /// <see langword="true" /> to wrap the connection in TLS before it is returned, as a
 /// secure scheme such as <c>ftps://</c> or <c>ldaps://</c> requires.
@@ -21,7 +21,7 @@ namespace Curl.Protocol.Abstractions;
 /// <exception cref="ArgumentNullException"><paramref name="Host" /> is <see langword="null" />.</exception>
 /// <exception cref="ArgumentException"><paramref name="Host" /> is empty or whitespace.</exception>
 /// <exception cref="ArgumentOutOfRangeException">
-/// <paramref name="Port" /> is less than 1 or greater than 65535.
+/// <paramref name="Port" /> is negative or greater than 65535.
 /// </exception>
 public sealed record ConnectTarget(string Host, int Port, bool UseTls)
 {
@@ -31,7 +31,7 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     public string Host { get; } = RequireHost(Host);
 
     /// <summary>
-    /// Gets the TCP port to connect to, from 1 to 65535.
+    /// Gets the TCP port to connect to, from 0 to 65535; port 0 is kept so the connect fails with exit 7, as curl's does (BL-3172).
     /// </summary>
     public int Port { get; } = RequirePort(Port);
 
@@ -150,7 +150,7 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
 
     private static int RequirePort(int port)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1, nameof(Port));
+        ArgumentOutOfRangeException.ThrowIfNegative(port, nameof(Port));
         ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535, nameof(Port));
 
         return port;

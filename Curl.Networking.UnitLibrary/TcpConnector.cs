@@ -2396,6 +2396,13 @@ public sealed partial class TcpConnector(
         CancellationToken cancellationToken,
         ConnectAttemptTraceEvents? trace = null)
     {
+        // No server listens on port 0: curl 8.22.0 fails it at once with exit 7 "Could not connect
+        // to server", so no socket is dialled for it (measured, BL-3172 Notes).
+        if (port == 0)
+        {
+            return (null, SocketError.ConnectionRefused, null);
+        }
+
         var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null

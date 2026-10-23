@@ -184,7 +184,6 @@ public sealed class CoreParserAdversarialTests
     }
 
     [TestMethod]
-    [DataRow("proxy.test:0")]
     [DataRow("proxy.test:65536")]
     [DataRow("proxy.test:-1")]
     [DataRow("proxy.test:99999999999999999999")]

@@ -6,7 +6,7 @@ namespace Curl.Protocol.Abstractions;
 /// </summary>
 /// <param name="Kind">The kind of proxy, which decides how a tunnel through it is opened.</param>
 /// <param name="Host">The proxy's host name or address literal. Never empty or whitespace.</param>
-/// <param name="Port">The proxy's TCP port, from 1 to 65535.</param>
+/// <param name="Port">The proxy's TCP port, from 0 to 65535; port 0 is kept so the connect fails with exit 7, as curl's does (BL-3172).</param>
 /// <param name="Credential">
 /// The user name and password from <c>-U</c>/<c>--proxy-user</c>, else from the proxy
 /// URL's user information, or <see langword="null" /> when neither is present.
@@ -19,7 +19,7 @@ namespace Curl.Protocol.Abstractions;
 /// <exception cref="ArgumentNullException"><paramref name="Host" /> is <see langword="null" />.</exception>
 /// <exception cref="ArgumentException"><paramref name="Host" /> is empty or whitespace.</exception>
 /// <exception cref="ArgumentOutOfRangeException">
-/// <paramref name="Port" /> is less than 1 or greater than 65535.
+/// <paramref name="Port" /> is negative or greater than 65535.
 /// </exception>
 public sealed record ProxyEndpoint(
     ProxyKind Kind,
@@ -33,7 +33,7 @@ public sealed record ProxyEndpoint(
     public string Host { get; } = RequireHost(Host);
 
     /// <summary>
-    /// Gets the proxy's TCP port, from 1 to 65535.
+    /// Gets the proxy's TCP port, from 0 to 65535; port 0 is kept so the connect fails with exit 7, as curl's does (BL-3172).
     /// </summary>
     public int Port { get; } = RequirePort(Port);
 
@@ -53,7 +53,7 @@ public sealed record ProxyEndpoint(
 
     private static int RequirePort(int port)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(port, 1, nameof(Port));
+        ArgumentOutOfRangeException.ThrowIfNegative(port, nameof(Port));
         ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535, nameof(Port));
 
         return port;

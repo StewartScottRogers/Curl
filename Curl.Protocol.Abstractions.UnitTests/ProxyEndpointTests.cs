@@ -80,7 +80,6 @@ public sealed class ProxyEndpointTests
     }
 
     [TestMethod]
-    [DataRow(0)]
     [DataRow(-1)]
     [DataRow(65536)]
     public void Constructor_WithPortOutsideRange_ThrowsArgumentOutOfRangeException(int port)
