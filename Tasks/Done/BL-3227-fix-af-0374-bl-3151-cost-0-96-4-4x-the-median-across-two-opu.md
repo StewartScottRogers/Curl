@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-22
 ---
 # BL-3227 — Fix AF-0374: BL-3151 cost $0.96 (4.4x the median) across two Opus runs that each found the same unmet precondition and requeued
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (read from Tasks/Backlog/BL-3151 Notes and Log): BL-3151 waits on an external event, the shift-end merge of BL-3147 to master and the release.yml upload of resources.json, which `depends-on` cannot express (it only names tasks). Run 1 ($0.643) found the precondition unmet and requeued; the board re-offered the task, and run 2 ($0.319) found the same. Run 2 already set `lane: no` with the exact step to remove it, which stopped further empty claims, so the waste is bounded at one repeat claim.
+- Recorded as unavoidable: a first claim has to probe the live pages to learn the precondition is unmet; no code in RunDarkFactory.ps1 can know the merge has not landed. The existing AF-0161 rule (restore `lane: no` with a removal step) is what stopped the loop and already holds. No change made; build clean and fast tests green (0 failed).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named (external merge precondition, unavoidable first probe; lane: no already stops repeats)
