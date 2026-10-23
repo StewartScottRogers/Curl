@@ -515,14 +515,6 @@ internal static class TlsFailureMessages
     public const string OpenSslNoProtocolsAvailable = "TLS connect error: error:0A0000BF:SSL routines::no protocols available";
 
     /// <summary>
-    /// The Windows message for exit 35 when the server answers a <c>--curves</c> ClientHello
-    /// with a <c>handshake_failure</c> alert, as the one Windows build that applies
-    /// <c>--curves</c>, curl.se's curl 8.18.0 with LibreSSL 4.2.1, prints it (measured
-    /// 2026-09-30 against a server limited to P-384; BL-709, ADR-0151, ADR-0284).
-    /// </summary>
-    public const string LibreSslHandshakeFailureAlert = "TLS connect error: error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure";
-
-    /// <summary>
     /// Every build's message for exit 59 when OpenSSL refuses a <c>--curves</c> value, as curl
     /// 8.18.0's OpenSSL and LibreSSL builds print it (measured, ADR-0151, BL-709).
     /// </summary>

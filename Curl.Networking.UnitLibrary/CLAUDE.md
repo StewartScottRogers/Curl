@@ -27,7 +27,7 @@ for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-01
 adds its row and a data row in `TlsClientRoutingTests`; `KeyLogFile`, the OpenSSL build's `SSLKEYLOGFILE`, is ADR-0518's row (BL-2327): the provider hands `Curl.Tls`'s TLS 1.2 and TLS 1.3 settings one `NssKeyLogFile`, which appends each `CLIENT_RANDOM` line and each TLS 1.3 traffic secret line (BL-2339) and skips a file it cannot write), `SslStreamTlsProvider` otherwise. Per
 ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
 and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
-and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms`;
+and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms` in the OpenSSL build; the Schannel build ignores both, as curl 8.22.0 Schannel does (ADR-0793, BL-3305);
 a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
 `CertificateStatusFailureMessages`' text on every platform; a good, revoked or unknown status is
