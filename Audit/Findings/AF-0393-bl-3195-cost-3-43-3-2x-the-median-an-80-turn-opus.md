@@ -3,8 +3,8 @@ id: AF-0393
 title: BL-3195 cost $3.43 (3.2x the median): an 80-turn Opus run plus two rebase-conflict resolve runs
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3195:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
