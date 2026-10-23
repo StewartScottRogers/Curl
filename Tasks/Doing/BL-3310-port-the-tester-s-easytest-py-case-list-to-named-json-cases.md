@@ -31,3 +31,4 @@ Split from BL-3303 for size. BL-3237 (ADR-0792) built the easy-handle runner: Li
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 8e79cbd0 4ce8ce3c 0ac4089b.
