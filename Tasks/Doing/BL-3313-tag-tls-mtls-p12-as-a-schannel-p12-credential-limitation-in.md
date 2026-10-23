@@ -30,3 +30,4 @@ BL-3290 measured that curl 8.22.0 (ucrt64) and curl 8.21.0 (System32) on Windows
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 1abf7f6d c46ca32a.
