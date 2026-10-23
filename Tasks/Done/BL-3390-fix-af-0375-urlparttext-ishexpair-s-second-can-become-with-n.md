@@ -1,5 +1,5 @@
 ---
-id: BL-3352
+id: BL-3390
 title: Fix AF-0375: UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed: 2026-10-23
 ---
-# BL-3352 — Fix AF-0375: UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
+# BL-3390 — Fix AF-0375: UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
 
 ## Goal
 
