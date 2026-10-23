@@ -27,7 +27,7 @@ Found by BL-3187. Upstream 8.22.0 `src/tool_getpass.c` (non-Windows): `fd = open
 
 ## Notes
 
-- Decided (ADR-0771): `ConsolePasswordPrompt` takes `turnEchoOff`/`turnEchoOn`; the line terminator and the echo restore happen only when echo was turned off. The two-argument constructor keeps Windows behaviour. Off Windows `ForPlatform(false, ...)` reads through the new `PosixTerminalPasswordInput` (`/dev/tty`, else standard input; `tcgetattr`/`tcsetattr` from libc on the `ECHO` bit), a thin native adapter excluded from coverage per ADR-0083, like `UserDatabaseHomeDirectory`.
+- Decided (ADR-0773): `ConsolePasswordPrompt` takes `turnEchoOff`/`turnEchoOn`; the line terminator and the echo restore happen only when echo was turned off. The two-argument constructor keeps Windows behaviour. Off Windows `ForPlatform(false, ...)` reads through the new `PosixTerminalPasswordInput` (`/dev/tty`, else standard input; `tcgetattr`/`tcsetattr` from libc on the `ECHO` bit), a thin native adapter excluded from coverage per ADR-0083, like `UserDatabaseHomeDirectory`.
 - Added `Curl.Cli.UnitLibrary/PosixTerminalPasswordInput.cs` (new file) and `Curl.Cli.UnitLibrary/README.md` (its `ConsolePasswordPrompt` row described the old behaviour) to touches; no task in Doing on origin/work/dark-factory names either.
 - `ForProcessConsole_InputRedirected_ReturnsAnEmptyPassword` is now Windows only: off Windows the prompt reads standard input to its end, which would wait on the test host's input.
 - Off-Windows tests are platform-neutral by construction (scripted keys and echo control, StringWriter); they and a platform-neutral data-row test cover both branches. CI on Linux and macOS is left to the shift's CI watch.
