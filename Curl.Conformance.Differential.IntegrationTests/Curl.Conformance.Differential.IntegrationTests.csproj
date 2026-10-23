@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Conformance.Differential.UnitLibrary\Curl.Conformance.Differential.UnitLibrary.csproj" />
+    <!-- Builds the Curl under test into this project's output (ADR-0785). -->
+    <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+  </ItemGroup>
+
+</Project>
