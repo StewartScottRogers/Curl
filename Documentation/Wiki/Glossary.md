@@ -20,7 +20,7 @@ Terms used by `Curl.Cli.UnitLibrary`. How they fit together is in
 | Options | The settings one command line asks for, filled in by the rows' appliers: URLs, output files, flags and values. Not to be confused with the option table, which defines what can be asked for. | `CommandLineOptions` |
 | Refusal | The outcome of a command line curl will not run: the two standard-error lines (a first line naming the problem, then the try-help line) and exit 2 (`CurlExitCode.FailedInit`, curl's `CURLE_FAILED_INIT`). A refusal writes nothing itself. | `CommandLineRefusal` |
 | Spelled option | The whole argument exactly as the user typed it, which a refusal quotes: `--output=`, `-so`, `--bogus=x`, or empty for a blank positional argument. It is not the option's canonical name. | `spelledOption` parameters |
-| Try-help line | The second standard-error line of every refusal, `curl: try 'curl --help' or 'curl --manual' for more information`. | `CommandLineRefusal.TryHelpLine` |
+| Try-help line | The second standard-error line of every refusal, `curl: try 'curl --help' or 'curl --manual' for more information`. An empty command line prints the variant that also names `--ai-help`, `curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information` (ADR-0762). | `CommandLineRefusal.TryHelpLine` |
 | Value option | An option that takes a value, attached (`-ofile`, `--output=file`) or as the next argument. Built with `CommandLineOption.Text`, which refuses an empty value as blank, or with `CommandLineOption.Value`, whose applier decides what an empty value means. | `CommandLineOption.Text`, `CommandLineOption.Value`, `TakesValue == true` |
 
 ## Testing

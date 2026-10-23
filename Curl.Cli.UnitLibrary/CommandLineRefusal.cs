@@ -5,8 +5,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Why the command line was refused: the lines curl prints on standard error,
 /// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> (or, for <see cref="NoUrlSpecified"/>,
-/// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, or <see cref="TryHelpLine"/>
-/// alone for <see cref="EmptyCommandLine"/>, with the error lines curl printed on the way in front
+/// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, or, for <see cref="EmptyCommandLine"/>,
+/// <see cref="TryHelpLineNamingAiHelp"/> alone (ADR-0762), with the error lines curl printed on the way in front
 /// (one for <see cref="FileDoesNotExist"/>, <see cref="ContinueAtExclusiveWithRange"/> and
 /// <see cref="DataFileUnreadable"/>, any number for a refusal met inside a <c>-K</c> file), and the
 /// exit code, which is <see cref="CurlExitCode.FailedInit"/>
@@ -17,11 +17,12 @@ namespace Curl.Cli;
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
 /// </summary>
 /// <remarks>
-/// The message texts were checked byte for byte against the local curl 8.21.0 on 2026-09-26.
+/// The message texts were checked byte for byte against the local curl 8.21.0 on 2026-09-26. The one deliberate
+/// difference from curl's bytes is <see cref="TryHelpLineNamingAiHelp"/> (ADR-0762).
 /// </remarks>
 public sealed class CommandLineRefusal
 {
-    /// <summary>The last line of every refusal, exactly as curl prints it.</summary>
+    /// <summary>The last line of every refusal except <see cref="EmptyCommandLine"/>, exactly as curl prints it.</summary>
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
 
     /// <summary>

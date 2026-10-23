@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Documentation/Wiki/Glossary.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3152 — Correct CommandLineRefusal's doc comments and the ADR-0762 index row for bare curl's --ai-help try-help line
 
@@ -30,16 +30,19 @@ CLAUDE.md's "Say what it does, do what it says" rule counts each of these as a d
 
 ## Acceptance criteria
 
-- [ ] The class summary of `CommandLineRefusal` names `TryHelpLineNamingAiHelp` as the only line of `EmptyCommandLine`, and cites ADR-0762.
-- [ ] `TryHelpLine`'s summary says it is the last line of every refusal except `EmptyCommandLine`.
-- [ ] The `<remarks>` say that `TryHelpLineNamingAiHelp` is the one deliberate difference from curl's bytes (ADR-0762).
-- [ ] The Glossary's "Try-help line" entry mentions the variant that names `--ai-help` and is printed for an empty command line.
-- [ ] The ADR-0762 row in `Documentation/Planning/Decisions/README.md` has four cells, ending `| Accepted | 2026-10-22 |`. That status matches the ADR's own Status line.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The class summary of `CommandLineRefusal` names `TryHelpLineNamingAiHelp` as the only line of `EmptyCommandLine`, and cites ADR-0762.
+- [x] `TryHelpLine`'s summary says it is the last line of every refusal except `EmptyCommandLine`.
+- [x] The `<remarks>` say that `TryHelpLineNamingAiHelp` is the one deliberate difference from curl's bytes (ADR-0762).
+- [x] The Glossary's "Try-help line" entry mentions the variant that names `--ai-help` and is printed for an empty command line.
+- [x] The ADR-0762 row in `Documentation/Planning/Decisions/README.md` has four cells, ending `| Accepted | 2026-10-22 |`. That status matches the ADR's own Status line.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Comment and document edits only (no code change), so no Measure-CodeQuality run; build clean, Curl.Cli.UnitTests 4115 passed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 512cd130 ea4252d7 aa44bc58 6237b2f8 64b4d5af 3d836d5e.
+- 2026-10-22: Doing -> Done. CommandLineRefusal doc comments, Glossary entry and ADR-0762 index row now match bare curl's --ai-help try-help line
