@@ -32,3 +32,4 @@ Found by BL-3240's WebSocket differential run (case `ws_meta_outside_callback`, 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 776ec306 13a699ce de379de1 2c994b29.
