@@ -34,3 +34,4 @@ Routes: `/utf8`, `/ctype`, `/jsonish`, `/bom`, `/nul`, `/crlf-body`, `/binary`, 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 6b474468 ae951636 5e81fa96.
