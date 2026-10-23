@@ -34,3 +34,4 @@ file-read and file-dir (file:// URLs on the tester's disk): FILETIME (0x20000E) 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
