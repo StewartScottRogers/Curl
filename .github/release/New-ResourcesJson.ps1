@@ -60,22 +60,22 @@ function Get-ResourceDescription([string]$File) {
         }
         '^Curl\.Mcp\.\d' {
             return @{ name = 'Curl.Mcp'; kind = 'mcp-server'; platform = 'any'
-                use = 'Put every Curl.Mcp nupkg file in one folder and run the server over stdio with: dnx Curl.Mcp --add-source <folder>.'
+                use = 'Put every Curl.Mcp nupkg file in one folder and run the server over stdio with: dnx Curl.Mcp --yes --prerelease --add-source <folder>.'
                 docs = "$blob/Curl.Mcp/README.md" }
         }
         '^Curl\.Api\.\d' {
             return @{ name = 'Curl.Api'; kind = 'dotnet-library'; platform = 'any'
-                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Curl.Api. For new .NET code.'
+                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Curl.Api --prerelease. For new .NET code.'
                 docs = "$blob/Curl.Api/README.md" }
         }
         '^Libcurl\.\d' {
             return @{ name = 'Libcurl'; kind = 'dotnet-library'; platform = 'any'
-                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Libcurl. For porting C code that uses libcurl.'
+                use = 'Use the folder holding the nupkg file as a package source, then: dotnet add package Libcurl --prerelease. For porting C code that uses libcurl.'
                 docs = "$blob/Libcurl/README.md" }
         }
         '^SHA256SUMS$' {
             return @{ name = 'SHA256SUMS'; kind = 'checksums'; platform = 'any'
-                use = 'Check downloads with: sha256sum --check SHA256SUMS (each line is "<sha256>  <file>").'
+                use = 'Check downloads with: sha256sum --check --ignore-missing SHA256SUMS (each line is "<sha256>  <file>").'
                 docs = "$blob/DOWNLOAD.md" }
         }
         '^ai-help\.md$' {

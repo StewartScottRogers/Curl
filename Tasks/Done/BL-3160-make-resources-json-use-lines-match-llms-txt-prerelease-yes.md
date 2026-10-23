@@ -8,7 +8,7 @@ depends-on: []
 touches: [.github/release/New-ResourcesJson.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3160 — Make resources.json use lines match llms.txt (--prerelease, --yes, --ignore-missing)
 
@@ -30,14 +30,17 @@ BL-3158 (commit 396caeaa2) fixed the install and checksum commands in `llms.txt`
 
 ## Acceptance criteria
 
-- [ ] The Curl.Mcp `use` string in `New-ResourcesJson.ps1` contains `dnx Curl.Mcp --yes --prerelease --add-source <folder>`.
-- [ ] The Curl.Api and Libcurl `use` strings contain `dotnet add package Curl.Api --prerelease` and `dotnet add package Libcurl --prerelease`.
-- [ ] The SHA256SUMS `use` string contains `sha256sum --check --ignore-missing SHA256SUMS`.
-- [ ] Running `New-ResourcesJson.ps1` and then `Test-ResourcesJson.ps1` on a folder of dummy release files writes a `resources.json` whose `use` lines match `llms.txt`'s commands word for word, and the test script passes.
+- [x] The Curl.Mcp `use` string in `New-ResourcesJson.ps1` contains `dnx Curl.Mcp --yes --prerelease --add-source <folder>`.
+- [x] The Curl.Api and Libcurl `use` strings contain `dotnet add package Curl.Api --prerelease` and `dotnet add package Libcurl --prerelease`.
+- [x] The SHA256SUMS `use` string contains `sha256sum --check --ignore-missing SHA256SUMS`.
+- [x] Running `New-ResourcesJson.ps1` and then `Test-ResourcesJson.ps1` on a folder of dummy release files writes a `resources.json` whose `use` lines match `llms.txt`'s commands word for word, and the test script passes.
 
 ## Notes
+
+Only `use` strings changed; verified by running New-ResourcesJson.ps1 then Test-ResourcesJson.ps1 on dummy files (passed); the four `use` lines match llms.txt. No C# changed, so no build or quality run.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 68df6651 e53a5abf 9eac453c 3804208d.
+- 2026-10-22: Doing -> Done. use lines match llms.txt; generator and test script pass
