@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/README.md, Documentation/Planning/Decisions/ADR-0718-upstream-c-source-and-man-page-tooling-cases-have-no-counterpart-except-managen.md, Documentation/Planning/Decisions/ADR-0755-upstream-cases-745-and-1276-check-c-only-header-tooling.md]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3406 — Decide the upstream source-analysis perl cases 1140, 1165, 1169, 1173, 1182, 1185 and 1275 against the vendored upstream files, and supersede the no-counterpart rows of ADR-0718 and ADR-0755 for 745, 1135, 1167, 1276, 1279 and 1544
 
@@ -26,15 +26,19 @@ This task decides; it does not implement. Cases 745, 1135 and 1279 (`test1135.pl
 
 ## Acceptance criteria
 
-- [ ] One new ADR, "Decided by Claude under Stewart's delegation", has one row per case for 1140, 1165, 1169, 1173, 1182, 1185 and 1275: `interpret` (naming the vendored or to-be-vendored upstream files the script needs) or `no counterpart` with the exact C-only thing it tests. No row gives difficulty or a missing BCL primitive as its reason (root CLAUDE.md, "Decisions"). For 1169 and 1182, which run upstream's runtests.pl with `-L` and `-E`, the row says whether the C# runner can honour those options and the 1182 precheck line (`mkdir`, `cp`, `echo`).
-- [ ] The same ADR states that ADR-0718's rows for 1135, 1167 and 1279 and ADR-0755's rows for 745, 1276 and 1544 are superseded by ADR-0749's reasoning, and names the port task for each (the tasks filed 2026-10-23 for those cases).
-- [ ] Every case this ADR decides as `interpret` has a port task filed on the board (naming the case, depending on this task, touching only that script's `UpstreamTest<N>Script.cs`, `UpstreamPerlCommandScripts.Test<N>.cs`, `UpstreamTest<N>ScriptTests.cs` and the ratchet).
-- [ ] ADR-0718 and ADR-0755 each get a one-line "Superseded in part by ADR-nnnn" status note, and the Decisions README.md index lists the new ADR.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] One new ADR, "Decided by Claude under Stewart's delegation", has one row per case for 1140, 1165, 1169, 1173, 1182, 1185 and 1275: `interpret` (naming the vendored or to-be-vendored upstream files the script needs) or `no counterpart` with the exact C-only thing it tests. No row gives difficulty or a missing BCL primitive as its reason (root CLAUDE.md, "Decisions"). For 1169 and 1182, which run upstream's runtests.pl with `-L` and `-E`, the row says whether the C# runner can honour those options and the 1182 precheck line (`mkdir`, `cp`, `echo`).
+- [x] The same ADR states that ADR-0718's rows for 1135, 1167 and 1279 and ADR-0755's rows for 745, 1276 and 1544 are superseded by ADR-0749's reasoning, and names the port task for each (the tasks filed 2026-10-23 for those cases).
+- [x] Every case this ADR decides as `interpret` has a port task filed on the board (naming the case, depending on this task, touching only that script's `UpstreamTest<N>Script.cs`, `UpstreamPerlCommandScripts.Test<N>.cs`, `UpstreamTest<N>ScriptTests.cs` and the ratchet).
+- [x] ADR-0718 and ADR-0755 each get a one-line "Superseded in part by ADR-nnnn" status note, and the Decisions README.md index lists the new ADR.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Decided all seven as `interpret` in ADR-0803 (ADR-0749 reasoning). Port tasks: BL-3408 (1140), BL-3409 (1165), BL-3410 (1169), BL-3411 (1173), BL-3412 (1182), BL-3413 (1185), BL-3414 (1275). BL-3407 vendors the extra files 1165 and 1275 read (depends on BL-3391, which touches the same lib/ and script). Existing port tasks BL-3392..3396 cover 745, 1135 and 1279, 1167, 1276, 1544.
+- Build and fast tests green on Windows; text-only change, platform-neutral.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 878e4073 ac5261d9 98cb7648 a6e4dcf9 c5f8cef6.
+- 2026-10-23: Doing -> Done. ADR-0803 decides 1140, 1165, 1169, 1173, 1182, 1185, 1275 as interpret, supersedes ADR-0718/0755 no-counterpart rows; port tasks BL-3407..3414 filed
