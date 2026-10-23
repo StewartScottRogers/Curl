@@ -83,6 +83,14 @@ public sealed class MultipartFormBodyBuilder(
     private readonly Func<string, long, long?> seekableFileLength =
         seekableFileLength ?? SeekableFileLength.ForPlatform(OperatingSystem.IsWindows());
 
+    /// <summary>
+    /// Gets a value indicating whether a <c>7bit</c> part's refusal of a byte above 127 waits for
+    /// the send, as libcurl 8.22.0 meets it (the headers and the bytes before the refused one go out,
+    /// then the read fails, CURLcode 26; measured, BL-3210 case 2), instead of failing the build
+    /// before connecting as the curl tool does.
+    /// </summary>
+    public bool SevenBitRefusalWaitsForSend { get; init; }
+
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
 
@@ -352,7 +360,7 @@ public sealed class MultipartFormBodyBuilder(
     /// file name and fails nothing, as libcurl 8.22.0 sends a missing <c>curl_mime_filedata</c> file (BL-3211); any
     /// other part fails with exit 26.
     /// </summary>
-    private static TransferResult? OpenFailure(
+    private TransferResult? OpenFailure(
         MultipartBodySegments segments,
         MultipartFormPart part,
         FileAccessStatus status,
@@ -380,7 +388,7 @@ public sealed class MultipartFormBodyBuilder(
     /// <c>7bit</c> file that can seek back is checked first, and one that cannot is refused
     /// only when the send reaches the refused byte.
     /// </summary>
-    private static ValueTask<TransferResult?> AddFileDataAsync(
+    private ValueTask<TransferResult?> AddFileDataAsync(
         MultipartBodySegments segments,
         Stream content,
         long? length,
@@ -394,7 +402,7 @@ public sealed class MultipartFormBodyBuilder(
             return ValueTask.FromResult<TransferResult?>(null);
         }
 
-        if (encoder.CanRefuseData && content.CanSeek && !forMail)
+        if (RefusesBeforeSending(encoder, content, forMail))
         {
             return AddCheckedFileAsync(segments, content, length, encoder, cancellationToken);
         }
@@ -402,6 +410,10 @@ public sealed class MultipartFormBodyBuilder(
         segments.AddStream(encoder.EncodeWhileReading(content, length), encoder.EncodedLength(length));
         return ValueTask.FromResult<TransferResult?>(null);
     }
+
+    /// <summary>Whether <paramref name="encoder" />'s refusal of <paramref name="content" /> is found by reading it through before the send.</summary>
+    private bool RefusesBeforeSending(MultipartPartEncoder encoder, Stream content, bool forMail) =>
+        encoder.CanRefuseData && content.CanSeek && !forMail && !SevenBitRefusalWaitsForSend;
 
     /// <summary>
     /// Reads <paramref name="content" /> through its encoder once, keeping nothing, then adds it
@@ -436,7 +448,7 @@ public sealed class MultipartFormBodyBuilder(
     }
 
     /// <summary>Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder.</summary>
-    private static async ValueTask<TransferResult?> AddStandardInputPartAsync(
+    private async ValueTask<TransferResult?> AddStandardInputPartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
@@ -510,7 +522,7 @@ public sealed class MultipartFormBodyBuilder(
     }
 
     /// <summary>Adds <paramref name="data" />, whose length is known, encoded when there is an encoder.</summary>
-    private static void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder, bool forMail)
+    private void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder, bool forMail)
     {
         if (encoder is null)
         {
@@ -527,9 +539,9 @@ public sealed class MultipartFormBodyBuilder(
     /// that reaches it fails, as curl 8.21.0 sends it (measured, BL-2025), while a form's
     /// refused data fails the body before it connects.
     /// </summary>
-    private static void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder, bool forMail)
+    private void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder, bool forMail)
     {
-        if (forMail && encoder.CanRefuseData)
+        if ((forMail || SevenBitRefusalWaitsForSend) && encoder.CanRefuseData)
         {
             segments.AddStream(encoder.EncodeWhileReading(new MemoryStream(data, writable: false), data.Length), data.Length);
             return;
