@@ -36,3 +36,4 @@ Found by the shift-end review (ADR-0710) of 76d4c7a87..2f68618ca, by the code-re
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: ee636d52 516954dc f55a34f8 99077a4d.
