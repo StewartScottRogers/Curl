@@ -52,7 +52,7 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
 - CI on Linux and macOS: the change is platform-neutral (no paths, error text or OS-specific values) and
   the fast tests are green here.
 
-- Lane 7 resumed lane 1's commit 793cd681c (its rebase conflicted only in the ADR README row) and renumbered its ADR to 0776, as 0775 was taken by BL-3200.
+- Lane 7 resumed lane 1's commit 793cd681c (its rebase conflicted only in the ADR README row) and renumbered its ADR to 0776, as 0775 was taken by BL-3200; a later rebase renumbered it to 0777, as 0776 was taken by BL-3197.
 - Lane 7 re-ran the checks: Networking build -warnaserror clean; fast tests Curl.Networking.UnitTests 3403 passed, Curl.Console.UnitTests 2843 passed; the mapped-literal integration test passed; Measure-CodeQuality -Library Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
@@ -61,4 +61,4 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
 - 2026-10-22: Doing -> Backlog. Lane 1 could not integrate: rebase conflict the resolver could not settle. The work is on branch factory/BL-3174-lane-1-20261022-192710; start with git cherry-pick --no-commit factory/BL-3174-lane-1-20261022-192710 and fix it.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
-- 2026-10-22: Doing -> Done. IPv6 sockets are dual-stack (ADR-0776), so [::ffff:127.0.0.1] reaches an IPv4 server as in curl 8.22.0
+- 2026-10-22: Doing -> Done. IPv6 sockets are dual-stack (ADR-0777), so [::ffff:127.0.0.1] reaches an IPv4 server as in curl 8.22.0
