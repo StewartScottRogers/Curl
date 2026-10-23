@@ -8,7 +8,7 @@ depends-on: [BL-3316]
 touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---# BL-3312 — CURLINFO_CONTENT_LENGTH_DOWNLOAD_T matches libcurl after 304, conflicting lengths, resume, unmet time condition and aborts
 
 ## Goal
@@ -40,3 +40,4 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
 - 2026-10-23: Doing -> Backlog. Finish.cs is held by BL-3316 (Doing); cl-dup-diff and ignore-cl cases need it - depends-on BL-3316
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
+- 2026-10-23: Doing -> Done. 304, HEAD chunked, unmet time condition, early failures, file directory and ignore-cl lengths match libcurl; cl-dup-diff moved to BL-3334
