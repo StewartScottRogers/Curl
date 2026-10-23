@@ -32,3 +32,4 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
