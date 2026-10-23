@@ -198,7 +198,7 @@ internal sealed partial class ManagedEasyTransfer
     /// connection the report does not (BL-3316): a <c>tftp</c> transfer (its socket is the connection), a transfer under
     /// <c>CURLOPT_FRESH_CONNECT</c> or <c>CURLOPT_FORBID_REUSE</c> that succeeded (libcurl always opens a new connection
     /// for it; this engine does not yet, see BL-3316 Notes), and one a watchdog cut off after the response head came, as the
-    /// low-speed timeout does.
+    /// low-speed timeout does, and one that timed out with no report, whose attempted connection libcurl counts (BL-3302).
     /// </summary>
     /// <param name="info">The info with the report's count.</param>
     /// <param name="result">The transfer's result.</param>
@@ -212,11 +212,14 @@ internal sealed partial class ManagedEasyTransfer
             return info.NumConnects;
         }
 
-        return ForcesNewConnection(options.Network, result) || CutOffAfterHead(info, result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        return ForcesNewConnection(options.Network, result) || CutOffAfterHead(info, result) || TimedOutWithNoReport(result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
     }
 
     private static bool ForcesNewConnection(EasyNetworkOptions network, TransferResult result) =>
         (network.FreshConnect || network.ForbidReuse) && result.ExitCode == CurlExitCode.Ok;
+
+    private static bool TimedOutWithNoReport(TransferResult result) =>
+        result.Report is null && result.ExitCode == CurlExitCode.OperationTimedOut;
 
     private static bool CutOffAfterHead(TransferInfo info, TransferResult result) =>
         result.Report is null && result.ExitCode != CurlExitCode.Ok && info.ResponseCode > 0;

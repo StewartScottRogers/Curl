@@ -38,10 +38,18 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(1, ManagedEasyTransfer.NumConnectsOf(new TransferInfo { ResponseCode = 200 }, TimedOutWithNoReport, new EasyOptions(), "http://h/"));
 
     [TestMethod]
-    public void NumConnectsOf_TimeoutBeforeAnyHead_IsZero() =>
-        Assert.AreEqual(0, ManagedEasyTransfer.NumConnectsOf(new TransferInfo(), TimedOutWithNoReport, new EasyOptions(), "http://h/"));
+    public void NumConnectsOf_TimeoutBeforeAnyHead_CountsTheAttemptedConnection() =>
+        Assert.AreEqual(1, ManagedEasyTransfer.NumConnectsOf(new TransferInfo(), TimedOutWithNoReport, new EasyOptions(), "http://h/"));
 
     [TestMethod]
     public void NumConnectsOf_TftpFailure_IsOne() =>
         Assert.AreEqual(1, ManagedEasyTransfer.NumConnectsOf(new TransferInfo(), new TransferResult(CurlExitCode.OperationTimedOut, 0), new EasyOptions(), "TFTP://h/x"));
+
+    [TestMethod]
+    public void NumConnectsOf_TimeoutWithAReportThatCountsNone_IsZero() =>
+        Assert.AreEqual(0, ManagedEasyTransfer.NumConnectsOf(new TransferInfo(), TimedOutWithNoReport with { Report = new TransferReport() }, new EasyOptions(), "http://h/"));
+
+    [TestMethod]
+    public void NumConnectsOf_TlsHandshakeTimeout_IsOne() =>
+        Assert.AreEqual(1, ManagedEasyTransfer.NumConnectsOf(new TransferInfo(), TimedOutWithNoReport, new EasyOptions(), "https://127.0.0.1:18080/echo"));
 }
