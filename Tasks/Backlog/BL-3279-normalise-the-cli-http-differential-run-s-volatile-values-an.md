@@ -1,5 +1,5 @@
 ---
-id: BL-3274
+id: BL-3279
 title: Normalise the CLI HTTP differential run's volatile values and name the reference build's remaining faults
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3274 — Normalise the CLI HTTP differential run's volatile values and name the reference build's remaining faults
+# BL-3279 — Normalise the CLI HTTP differential run's volatile values and name the reference build's remaining faults
 
 ## Goal
 

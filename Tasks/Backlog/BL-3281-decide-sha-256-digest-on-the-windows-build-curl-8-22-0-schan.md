@@ -1,5 +1,5 @@
 ---
-id: BL-3276
+id: BL-3281
 title: Decide SHA-256 Digest on the Windows build: curl 8.22.0 Schannel fails it with exit 94 (differential auth-digest256)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3276 — Decide SHA-256 Digest on the Windows build: curl 8.22.0 Schannel fails it with exit 94 (differential auth-digest256)
+# BL-3281 — Decide SHA-256 Digest on the Windows build: curl 8.22.0 Schannel fails it with exit 94 (differential auth-digest256)
 
 ## Goal
 

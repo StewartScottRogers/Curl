@@ -1,5 +1,5 @@
 ---
-id: BL-3277
+id: BL-3282
 title: Measure and fix the small CLI HTTP differential gaps: proxy reset text, --curves on Schannel, --local-port, --anyauth -v
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3277 — Measure and fix the small CLI HTTP differential gaps: proxy reset text, --curves on Schannel, --local-port, --anyauth -v
+# BL-3282 — Measure and fix the small CLI HTTP differential gaps: proxy reset text, --curves on Schannel, --local-port, --anyauth -v
 
 ## Goal
 

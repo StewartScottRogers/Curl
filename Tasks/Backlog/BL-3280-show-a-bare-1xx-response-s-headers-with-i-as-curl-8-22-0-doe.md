@@ -1,5 +1,5 @@
 ---
-id: BL-3275
+id: BL-3280
 title: Show a bare 1xx response's headers with -i, as curl 8.22.0 does (differential status-100)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3275 — Show a bare 1xx response's headers with -i, as curl 8.22.0 does (differential status-100)
+# BL-3280 — Show a bare 1xx response's headers with -i, as curl 8.22.0 does (differential status-100)
 
 ## Goal
 

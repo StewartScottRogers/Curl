@@ -37,11 +37,11 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 - Compared with the tester's report.txt and report_more.txt (36 distinct names): 19 of ours carry their names. 17 of theirs no longer differ, mostly the url-* parsing cases plus auth-empty-user, redir-loc-multi-url, srv-gziptrail-v and srv-te-trailers, all fixed since. 30 of ours are not in theirs, nearly all timing or reference-build noise.
 - Named exclusions: the four non-ASCII argument cases (post-unicode-arg, post-unicode-url, post-urlencode-unicode, url-http___127_0_0_1_18080_é7) differed only because the reference reads ANSI arguments, so they are now tagged `AnsiArguments` in CliHttpMoreCases.json (ADR-0782). help, short-h, help-all and help-category differ only by Curl's deliberate `--ai-help` line and httpsig options (ADR-0485), so they get no task.
 - Filed for the rest:
-  - BL-3274: normaliser noise and the reference build's other faults (timings, ports, WebSocket key, cookie expiry, trace warnings, -Z order, --dns-servers/--ech/--test-event, the console password prompt, PSL lines, --version libraries).
-  - BL-3275: status-100, where -si shows no bare 100 headers.
-  - BL-3278: the missing "Unsolicited Transfer-Encoding" verbose line.
-  - BL-3276: SHA-256 Digest on Windows, where real curl exits 94.
-  - BL-3277: proxy "reset" vs "aborted" text, --curves nope on Schannel, the --local-port range, and auth-all-challenges-v.
+  - BL-3279: normaliser noise and the reference build's other faults (timings, ports, WebSocket key, cookie expiry, trace warnings, -Z order, --dns-servers/--ech/--test-event, the console password prompt, PSL lines, --version libraries).
+  - BL-3280: status-100, where -si shows no bare 100 headers.
+  - BL-3283: the missing "Unsolicited Transfer-Encoding" verbose line.
+  - BL-3281: SHA-256 Digest on Windows, where real curl exits 94.
+  - BL-3282: proxy "reset" vs "aborted" text, --curves nope on Schannel, the --local-port range, and auth-all-challenges-v.
 - Measure-CodeQuality.ps1 -Library Curl.Conformance.Differential.UnitLibrary: 0 failing members.
 
 ## Log
@@ -50,4 +50,4 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 69dc0dc5 e4778720 ae951636 5e81fa96.
 - 2026-10-23: Doing -> Backlog. Split for size: waits on BL-3259, BL-3260, BL-3261 and BL-3262 (case-file bytes, runner host, the two case ports)
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 69dc0dc5 e4778720 ae951636 5e81fa96.
-- 2026-10-23: Doing -> Done. The CLI HTTP differential run replays both case files against curl 8.22.0 and writes a ### DIFF report; its 49 differences are excluded or filed (BL-3274 to BL-3278)
+- 2026-10-23: Doing -> Done. The CLI HTTP differential run replays both case files against curl 8.22.0 and writes a ### DIFF report; its 49 differences are excluded or filed (BL-3279 to BL-3283)

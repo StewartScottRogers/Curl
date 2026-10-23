@@ -1,5 +1,5 @@
 ---
-id: BL-3278
+id: BL-3283
 title: Write curl's Unsolicited Transfer-Encoding verbose line (differential srv-te-gzip-chunked-v)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3278 — Write curl's Unsolicited Transfer-Encoding verbose line (differential srv-te-gzip-chunked-v)
+# BL-3283 — Write curl's Unsolicited Transfer-Encoding verbose line (differential srv-te-gzip-chunked-v)
 
 ## Goal
 
