@@ -31,3 +31,4 @@ Unlike the C-only structures of ADR-0717, case 1307 has a Curl counterpart: BL-2
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 27813ec6 d2d03e5c 8b2b45e3.
