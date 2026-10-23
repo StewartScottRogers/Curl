@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3360 — Fix AF-0383: RunDarkFactory.ps1 help says a run that reaches its cost cap sends its task to Blocked for Stewart; the shift splits it with Invoke-TaskSplit instead
 
@@ -52,3 +52,4 @@ Rewrote the COST CAP help paragraph to describe the bounded split run (BL-3091, 
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. RunDarkFactory.ps1 help now describes the cost-cap split run
