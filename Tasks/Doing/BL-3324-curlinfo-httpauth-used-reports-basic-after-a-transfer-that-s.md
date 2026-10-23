@@ -31,3 +31,4 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
