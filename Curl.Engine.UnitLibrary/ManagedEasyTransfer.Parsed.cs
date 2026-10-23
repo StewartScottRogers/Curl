@@ -49,7 +49,7 @@ internal sealed partial class ManagedEasyTransfer
     {
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
         EngineToolTransferEvents? toolEvents = ToolEvents;
-        (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder, NegotiateFailureRecordingTransferEvents? negotiateFailure) = StateAndEventsOf(toolEvents, options);
+        (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder, NegotiateFailureRecordingTransferEvents? negotiateFailure, AbortedHeadRecordingTransferEvents? abortedHead) = StateAndEventsOf(toolEvents, options);
         (string transferUrl, TransferResult? setUpFailure) = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         if (setUpFailure is not null)
         {
@@ -81,7 +81,7 @@ internal sealed partial class ManagedEasyTransfer
             callbackProgress,
             callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
-        KeepHandleStateOf(recorder, negotiateFailure, result, url);
+        KeepHandleStateOf(recorder, negotiateFailure, abortedHead is null ? result : abortedHead.ReportOn(result), url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
