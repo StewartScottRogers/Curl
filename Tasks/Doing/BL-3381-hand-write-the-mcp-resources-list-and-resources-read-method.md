@@ -35,3 +35,4 @@ completed:
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: fefc5816 e551d4c4 6fe1cfe1 bf223748 6d2cec38.
