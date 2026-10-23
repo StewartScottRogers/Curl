@@ -3,8 +3,8 @@ id: AF-0351
 title: task-board.ps1's help says next prints a task or 'No task is ready.'; it also prints 'No task can start yet: ...'
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.
 key: truthfulness:.claude/skills/task-board/task-board.ps1:next:false-help
 reproduction: none
 task: BL-3131
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0351 - task-board.ps1's help says next prints a task or 'No task is ready.'; it also prints 'No task can start yet: ...'
 
@@ -42,7 +42,10 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'or "No ta
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the reproduction: help line 16 now reads 'task is ready; or "No task can start yet: ..." when every ready task', and code line 616 prints 'No task can start yet: ...'. The help names both outputs of next.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.

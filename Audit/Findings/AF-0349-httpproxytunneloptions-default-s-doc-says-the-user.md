@@ -3,8 +3,8 @@ id: AF-0349
 title: HttpProxyTunnelOptions.Default's doc says the User-Agent is curl/8.21.0; the code sets curl/8.22.0
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.
 key: truthfulness:Curl.Networking.UnitLibrary/HttpProxyTunnelOptions.cs:HttpProxyTunnelOptions.Default:false-doc-comment
 reproduction: none
 task: BL-3129
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0349 - HttpProxyTunnelOptions.Default's doc says the User-Agent is curl/8.21.0; the code sets curl/8.22.0
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Networking.UnitLibrary/HttpProxyTunnelOptions.cs -Patte
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the reproduction: '26: /// curl/8.22.0</c> and UTF-8 credentials.' and '28: public static HttpProxyTunnelOptions Default { get; } = new("curl/8.22.0", Encoding.UTF8);'. The doc and the code agree on curl/8.22.0.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.

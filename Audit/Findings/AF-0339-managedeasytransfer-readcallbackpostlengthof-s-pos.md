@@ -3,8 +3,8 @@ id: AF-0339
 title: ManagedEasyTransfer.ReadCallbackPostLengthOf's PostFieldSize < 0 can become <= 0 with no test failing, so a read-callback post with CURLOPT_POSTFIELDSIZE 0 goes chunked
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:ReadCallbackPostLengthOf-lt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs:916:<
 task: BL-3119
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: mechanical
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0339 - ManagedEasyTransfer.ReadCallbackPostLengthOf's PostFieldSize < 0 can become <= 0 with no test failing, so a read-callback post with CURLOPT_POSTFIELDSIZE 0 goes chunked
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the -Site reproduction: ManagedEasyTransfer.cs:916:< (ReadCallbackPostLengthOf), resolvedLine 916, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

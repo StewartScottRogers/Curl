@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTest
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the Select-String reproduction: ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord now also asserts record.Priority == 1 and ApplicationProtocols == ["h2"] (lines 248-249).
+
 ## Log
 
 - 2026-10-22: filed proposed.

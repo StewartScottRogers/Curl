@@ -3,8 +3,8 @@ id: AF-0361
 title: BL-3079 cost $0.93 over two claims; the first was requeued because DarkFactory/TaskBudget.ps1 was held by another task
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-22_1902.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3141) are Done at 9ada2459e768, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-3079:cost-outlier
 reproduction: none
 task: BL-3141
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: task-done-historical
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0361 - BL-3079 cost $0.93 over two claims; the first was requeued because DarkFactory/TaskBudget.ps1 was held by another task
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Audit 2026-10-22_1902.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3141) are Done at 9ada2459e768, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
