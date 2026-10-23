@@ -94,15 +94,15 @@ public sealed class ServerCertificateVerificationPartialChainTests
         request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign, true));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
-        var notBefore = DateTimeOffset.UtcNow.AddDays(-2);
-        var notAfter = DateTimeOffset.UtcNow.AddDays(30);
         if (issuer is null)
         {
-            return request.CreateSelfSigned(notBefore, notAfter);
+            return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-2), DateTimeOffset.UtcNow.AddDays(30));
         }
 
+        // A child takes its issuer's validity, which the issuer stores truncated to whole
+        // seconds: a fresh UtcNow can fall a second past it and Create would refuse it.
         request.CertificateExtensions.Add(X509AuthorityKeyIdentifierExtension.CreateFromCertificate(issuer, true, false));
-        using var signed = request.Create(issuer, notBefore, notAfter, RandomNumberGenerator.GetBytes(8));
+        using var signed = request.Create(issuer, new DateTimeOffset(issuer.NotBefore), new DateTimeOffset(issuer.NotAfter), RandomNumberGenerator.GetBytes(8));
         return signed.CopyWithPrivateKey(key);
     }
 
