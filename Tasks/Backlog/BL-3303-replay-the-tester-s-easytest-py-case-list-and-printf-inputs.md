@@ -4,7 +4,7 @@ title: Replay the tester's easytest.py case list and printf inputs (t1.json, pf_
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3308, BL-3309]
 touches: [Curl.Conformance.Differential.UnitLibrary/Cases/LibcurlEasyCases, Curl.Conformance.Differential.UnitLibrary/Libcurl/Printf, Curl.Conformance.Differential.UnitTests/Libcurl/Printf, Curl.Conformance.Differential.IntegrationTests/LibcurlPrintf]
 requirement: none
 created: 2026-10-23
@@ -29,8 +29,10 @@ BL-3237 built the easy-handle runner (Curl.Conformance.Differential.UnitLibrary/
 ## Notes
 
 - Filed by BL-3237's differential run on 2026-10-23.
+- 2026-10-23 lane 4: sized before any code and split for size: porting easytest.py's ~300 loop-generated cases is BL-3308, and the printf replay (variadic curl_msnprintf through a function pointer, a separate reader, comparer and Integration test) is BL-3309. Checked: every path easytest.py requests is already a DifferentialRoutes route, LibcurlEasyRoundReader exists, the csproj embeds Cases\**\*.json, and Libcurl's CurlPrintf.MSNPrintf exists, so neither subtask waits on anything else. Once both are Done, this task's remaining work is one combined run, its report under Notes and the ADR-0482 unit test for any fix.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: a81919c1 ebc469ce 0ac4089b.
+- 2026-10-23: Doing -> Backlog. Split for size into BL-3308 (easytest.py case list) and BL-3309 (printf replay); waits on both
