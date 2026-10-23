@@ -31,3 +31,4 @@ BL-3207 (ADR-0786) turned `--http2`, `--http2-prior-knowledge` and `--proxy-http
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 67d42b28 bb146c16 afd7f1cd.
