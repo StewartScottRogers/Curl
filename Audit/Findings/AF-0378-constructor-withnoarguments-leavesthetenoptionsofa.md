@@ -3,8 +3,8 @@ id: AF-0378
 title: Constructor_WithNoArguments_LeavesTheTenOptionsOfAdr0151NotGiven checks eight defaults, not ten
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/TlsClientOptionsTests.cs:Constructor_WithNoArguments_LeavesTheTenOptionsOfAdr0151NotGiven:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/TlsClientOptionsTests.cs -Pattern 
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
