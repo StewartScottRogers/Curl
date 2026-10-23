@@ -38,4 +38,4 @@ and through libcurl 8.22.0 (`libcurl-4.dll` from Git for Windows' ucrt64) with P
 ## Consequences
 
 The scenarios replay in under a second. A `curl_url_get` result that Curl's managed API returns as
-a string cannot carry bytes that are not UTF-8, which shows as U+FFFD differences (BL-3293).
+a string cannot carry bytes that are not UTF-8, which shows as U+FFFD differences (BL-3299).

@@ -1,5 +1,5 @@
 ---
-id: BL-3289
+id: BL-3295
 title: curl_url_set with CURLU_DEFAULT_SCHEME takes a scheme that starts with a digit or dash as a host, as libcurl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3289 — curl_url_set with CURLU_DEFAULT_SCHEME takes a scheme that starts with a digit or dash as a host, as libcurl does
+# BL-3295 — curl_url_set with CURLU_DEFAULT_SCHEME takes a scheme that starts with a digit or dash as a host, as libcurl does
 
 ## Goal
 

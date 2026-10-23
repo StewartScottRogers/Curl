@@ -1,5 +1,5 @@
 ---
-id: BL-3293
+id: BL-3299
 title: curl_url_get with CURLU_URLDECODE keeps decoded bytes that are not UTF-8 instead of U+FFFD
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3293 — curl_url_get with CURLU_URLDECODE keeps decoded bytes that are not UTF-8 instead of U+FFFD
+# BL-3299 — curl_url_get with CURLU_URLDECODE keeps decoded bytes that are not UTF-8 instead of U+FFFD
 
 ## Goal
 

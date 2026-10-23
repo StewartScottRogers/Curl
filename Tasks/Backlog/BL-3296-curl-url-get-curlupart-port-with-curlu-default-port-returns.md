@@ -1,5 +1,5 @@
 ---
-id: BL-3290
+id: BL-3296
 title: curl_url_get CURLUPART_PORT with CURLU_DEFAULT_PORT returns 0 for a file URL, as libcurl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3290 — curl_url_get CURLUPART_PORT with CURLU_DEFAULT_PORT returns 0 for a file URL, as libcurl does
+# BL-3296 — curl_url_get CURLUPART_PORT with CURLU_DEFAULT_PORT returns 0 for a file URL, as libcurl does
 
 ## Goal
 

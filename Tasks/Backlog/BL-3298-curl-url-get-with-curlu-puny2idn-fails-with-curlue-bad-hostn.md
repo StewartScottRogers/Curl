@@ -1,5 +1,5 @@
 ---
-id: BL-3292
+id: BL-3298
 title: curl_url_get with CURLU_PUNY2IDN fails with CURLUE_BAD_HOSTNAME on a host label over 63 characters, as libcurl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3292 — curl_url_get with CURLU_PUNY2IDN fails with CURLUE_BAD_HOSTNAME on a host label over 63 characters, as libcurl does
+# BL-3298 — curl_url_get with CURLU_PUNY2IDN fails with CURLUE_BAD_HOSTNAME on a host label over 63 characters, as libcurl does
 
 ## Goal
 
