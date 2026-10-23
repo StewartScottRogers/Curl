@@ -8,7 +8,7 @@ depends-on: [BL-3284]
 touches: [Curl.Conformance.Differential.UnitLibrary/Protocols/Binary, Curl.Conformance.Differential.UnitTests/Protocols/Binary, Curl.Conformance.Differential.IntegrationTests/CliProtocols/Host]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3287 — Port proto2_servers.py's WebSocket, MQTT and TFTP servers to the differential runner
 
@@ -22,15 +22,18 @@ Reference scripts: `Z:\repos\Curl.difftest\2026-10-22\proto2_servers.py` (read o
 
 ## Acceptance criteria
 
-- [ ] WebSocket, MQTT and TFTP responders send the same bytes and log the same wire lines as the Python classes, each covered by unit tests.
-- [ ] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
-- [ ] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
+- [x] WebSocket, MQTT and TFTP responders send the same bytes and log the same wire lines as the Python classes, each covered by unit tests.
+- [x] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
+- [x] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
 
 ## Notes
 
 - Split out of BL-3234 by its lane-3 run on 2026-10-23.
+- WebSocket, MQTT and TFTP responders live in Protocols/Binary; TFTP packet logic sits behind ITftpTransferSocket, and TftpLoopbackHost (UDP plus the TCP control port) is the Integration-side adapter. Python crash paths end the connection, as the handler did.
+- Platform-neutral: only byte arrays and loopback sockets; Measure-CodeQuality.ps1 reports 0 failing members for the library.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 6602971e ae951636 5e81fa96.
+- 2026-10-23: Doing -> Done. WebSocket, MQTT and TFTP responders ported
