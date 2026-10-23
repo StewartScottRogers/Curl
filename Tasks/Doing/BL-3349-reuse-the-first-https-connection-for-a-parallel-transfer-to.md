@@ -31,3 +31,4 @@ Split from BL-3293. Measured with curl 8.21.0 (Schannel, no HTTP/2): `curl -sS -
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e29e1a80 d89098e4 c46ca32a.
