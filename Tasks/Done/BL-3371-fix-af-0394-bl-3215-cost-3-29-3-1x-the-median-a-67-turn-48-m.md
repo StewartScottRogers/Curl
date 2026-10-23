@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3371 — Fix AF-0394: BL-3215 cost $3.29 (3.1x the median): a 67-turn, 48-minute Opus run plus a rebase-conflict resolve run
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: an Opus `feature` task on Curl.Networking (revoked-certificate exit 35) with repeated partial test runs while fixing, then one Measure-CodeQuality.ps1 run (required before committing library code, rules 9) that took about 29 minutes while other lanes built, plus a rebase-conflict resolve run ($0.22). Recorded as unavoidable, no change: the gate is mandatory, the lane prompt already says to run it once per change, and the load-dependent duration is not something RunDarkFactory.ps1 can shorten. Decided by Claude under Stewart's delegation; no ADR needed since nothing changed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-23: Doing -> Done. Cost cause named (mandatory 29-min quality run under load plus Opus feature); recorded unavoidable
