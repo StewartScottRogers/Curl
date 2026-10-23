@@ -35,3 +35,4 @@ Start in `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs`: the download path dispos
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 0527dce9 eff28298 bca41a23 81c923d1 cdfdbbfe.
