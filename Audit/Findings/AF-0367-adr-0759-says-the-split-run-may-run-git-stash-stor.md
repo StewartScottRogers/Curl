@@ -3,8 +3,8 @@ id: AF-0367
 title: ADR-0759 says the split run may run git stash store; $SplitForbidden denies it
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0759-a-task-over-its-cost-cap-is-split-by-one-bounded-run.md:SplitForbidden:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0759-*.md, DarkFactory/
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
