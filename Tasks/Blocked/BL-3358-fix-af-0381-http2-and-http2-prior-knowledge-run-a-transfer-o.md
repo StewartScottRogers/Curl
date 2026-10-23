@@ -46,7 +46,10 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-23 (lane 1): Not implemented. The criterion expects Windows to refuse `--http2` with exit 2, which would undo ADR-0786, Stewart's own decision (2026-10-22, "do it") that the Windows build runs HTTP/2. The finding itself says its Phase 2 is explained by that ADR. A lane may decide only what Stewart has not decided, so only he can choose between the ADR and this finding. No code changed. The part the ADR does not cover, the 16/56 exit-code flip on `--http2-prior-knowledge` against an HTTP/1.1 server, is filed as BL-3372.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Blocked. Stewart: ADR-0786 (your decision) has Windows run --http2/--http2-prior-knowledge, but accepted AF-0381 expects exit 2 - revert ADR-0786 for these options, or close AF-0381 as explained by it?
