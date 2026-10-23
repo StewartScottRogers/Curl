@@ -30,3 +30,4 @@ Found by BL-3235's CLI TLS differential run (case `tls-mtls-p12`, also in the te
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: df7eab68 c46ca32a.
