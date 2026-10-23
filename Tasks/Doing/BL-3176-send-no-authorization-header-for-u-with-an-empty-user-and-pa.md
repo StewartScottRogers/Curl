@@ -32,3 +32,4 @@ Stewart reported on 2026-10-22: `curl -v -u : http://host/`. Upstream sends no A
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 0a072548 b63de15c fc0592ec d60bebb2.
