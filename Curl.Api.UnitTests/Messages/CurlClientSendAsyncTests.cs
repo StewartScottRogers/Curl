@@ -20,6 +20,20 @@ public sealed class CurlClientSendAsyncTests
     private static EasyOptions Performed(ScriptedEasyTransfer easy) => easy.PerformedOptions!;
 
     [TestMethod]
+    public async Task SendAsync_RemovedHeader_IsSentAsNameColonAfterTheValuedAndEmptyHeaders()
+    {
+        CurlRequest request = new(HttpMethod.Get, "http://example/a")
+        {
+            Headers = [new("X-One", "1"), new("X-Empty", "")],
+            RemovedHeaders = ["Accept", "Host"],
+        };
+
+        (_, ScriptedEasyTransfer easy) = await SendAsync(request);
+
+        CollectionAssert.AreEqual(new[] { "X-One: 1", "X-Empty;", "Accept:", "Host:" }, Performed(easy).Http.HttpHeaders.ToArray());
+    }
+
+    [TestMethod]
     public async Task SendAsync_PutsUrlAndHeadersInTheOptions_KeepingClientDefaults()
     {
         CurlRequest request = new(HttpMethod.Get, "http://example/a")

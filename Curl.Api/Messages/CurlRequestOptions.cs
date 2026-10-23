@@ -26,7 +26,7 @@ internal static class CurlRequestOptions
         {
             Network = options.Network with { Url = request.Url },
             Transfer = ApplyMethod(options.Transfer, request.Method, post),
-            Http = options.Http with { HttpHeaders = [.. request.Headers.Select(HeaderLine)], Post = post },
+            Http = options.Http with { HttpHeaders = [.. request.Headers.Select(HeaderLine), .. request.RemovedHeaders.Select(name => $"{name}:")], Post = post },
             Callbacks = options.Callbacks with { Header = header, Write = write },
         };
         return post ? (request.Body ?? CurlContent.Empty).ApplyTo(applied, engine, owned) : applied;

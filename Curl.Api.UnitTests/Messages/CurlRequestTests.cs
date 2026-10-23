@@ -41,4 +41,17 @@ public sealed class CurlRequestTests
         Assert.AreEqual(1, ((BytesContent)changed.Body!).Bytes.Length);
         Assert.AreEqual(original.Url, changed.Url);
     }
-}
+
+    [TestMethod]
+    public void With_NullRemovedHeaders_Throws()
+    {
+        CurlRequest request = new(HttpMethod.Get, "http://example/");
+
+        Assert.ThrowsExactly<ArgumentNullException>(() => request with { RemovedHeaders = null! });
+    }
+
+    [TestMethod]
+    public void Constructor_HasNoRemovedHeaders()
+    {
+        Assert.AreEqual(0, new CurlRequest(HttpMethod.Get, "http://example/").RemovedHeaders.Count);
+    }}
