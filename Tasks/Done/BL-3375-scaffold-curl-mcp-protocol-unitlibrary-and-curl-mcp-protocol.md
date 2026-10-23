@@ -9,7 +9,7 @@ touches: [Curl.slnx, Curl.Mcp.Protocol.UnitLibrary, Curl.Mcp.Protocol.UnitTests,
 model: sonnet
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3375 — Scaffold Curl.Mcp.Protocol.UnitLibrary and Curl.Mcp.Protocol.UnitTests for the hand-written MCP server core
 
@@ -26,15 +26,19 @@ The projects `Curl.Mcp.Protocol.UnitLibrary` and `Curl.Mcp.Protocol.UnitTests` e
 
 ## Acceptance criteria
 
-- [ ] `Curl.slnx` lists both projects under `/Hosts/Mcp/`, library then tests, and `dotnet build Curl.slnx` is clean with warnings as errors.
-- [ ] `Curl.Mcp.Protocol.UnitLibrary.csproj` has no PackageReference and no ProjectReference; `Curl.Mcp.Protocol.UnitTests.csproj` references MSTest as the other test projects do, and the library.
-- [ ] `Curl.Mcp` and `Curl.Mcp.UnitTests` reference `Curl.Mcp.Protocol.UnitLibrary`.
-- [ ] Each new project folder has a `CLAUDE.md` and `README.md` that are true of the repository as it is, with intent written as intent.
-- [ ] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
+- [x] `Curl.slnx` lists both projects under `/Hosts/Mcp/`, library then tests, and `dotnet build Curl.slnx` is clean with warnings as errors.
+- [x] `Curl.Mcp.Protocol.UnitLibrary.csproj` has no PackageReference and no ProjectReference; `Curl.Mcp.Protocol.UnitTests.csproj` references MSTest as the other test projects do, and the library.
+- [x] `Curl.Mcp` and `Curl.Mcp.UnitTests` reference `Curl.Mcp.Protocol.UnitLibrary`.
+- [x] Each new project folder has a `CLAUDE.md` and `README.md` that are true of the repository as it is, with intent written as intent.
+- [x] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
 
 ## Notes
+
+- The library holds no code yet, so there was nothing for Measure-CodeQuality.ps1 to measure. One test (ProtocolLibraryDependencyTests) keeps the test project non-empty and checks the library references no package or Curl project.
+- No list needed the new entry: Measure-CodeQuality.ps1 matches *.UnitLibrary by name. ci.yml (a guard file) was not checked or changed; an interactive session should see whether it lists libraries.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 55930721 4c43dc30 81e501b3 a508f334 6d2cec38.
+- 2026-10-23: Doing -> Done. Curl.Mcp.Protocol.UnitLibrary and UnitTests scaffolded, in Curl.slnx, referenced by Curl.Mcp and Curl.Mcp.UnitTests

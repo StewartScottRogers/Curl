@@ -204,6 +204,8 @@
   <Folder Name="/Hosts/Mcp/">
     <Project Path="Curl.Mcp.IntegrationTests/Curl.Mcp.IntegrationTests.csproj" />
     <Project Path="Curl.Mcp/Curl.Mcp.csproj" />
+    <Project Path="Curl.Mcp.Protocol.UnitLibrary/Curl.Mcp.Protocol.UnitLibrary.csproj" />
+    <Project Path="Curl.Mcp.Protocol.UnitTests/Curl.Mcp.Protocol.UnitTests.csproj" />
     <Project Path="Curl.Mcp.UnitLibrary/Curl.Mcp.UnitLibrary.csproj" />
     <Project Path="Curl.Mcp.UnitTests/Curl.Mcp.UnitTests.csproj" />
   </Folder>
