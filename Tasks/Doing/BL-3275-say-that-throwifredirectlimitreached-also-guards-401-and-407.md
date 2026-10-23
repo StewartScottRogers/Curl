@@ -33,3 +33,4 @@ The diff made the 401 and 407 retries (`HttpProtocolHandler.cs` around lines 257
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 38d4d21d 207edf4a 3d836d5e.
