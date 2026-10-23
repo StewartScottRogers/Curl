@@ -32,3 +32,4 @@ Stewart (2026-10-23) wants every test passing. Case 938 is disabled upstream (th
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 520fab4f 1add111b 2e34bbbe c5f8cef6.
