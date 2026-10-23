@@ -8,7 +8,7 @@ depends-on: [BL-3253, BL-3254, BL-3255]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs, Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-23
 ---
 # BL-3178 — Start --parallel transfers in URL order and pick up waiting ones in URL order
 
@@ -23,8 +23,8 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
 ## Acceptance criteria
 
 - [x] Notes record the start order and stdout order of curl 8.22.0 for the repro, `--parallel-max 1` and `--parallel-max 2`.
-- [ ] BL-3189 is Done: its tests pin curl 8.22.0's measured order (ADR-0768) for the repro, `--parallel-max 1` and `--parallel-max 2`, in place of the URL order this task first asked for.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; existing `-Z` tests unchanged.
+- [x] BL-3189 is Done: its tests pin curl 8.22.0's measured order (ADR-0768) for the repro, `--parallel-max 1` and `--parallel-max 2`, in place of the URL order this task first asked for.
+- [x] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; existing `-Z` tests unchanged.
 
 ## Notes
 
@@ -44,9 +44,13 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
     change plus a 30 to 45 minute quality run). The three criteria that asked for URL order contradicted
     the measurement and were replaced, after the move to Backlog, by one: BL-3189 is Done.
 
+- 2026-10-23, lane 4: BL-3189 was Deferred over its cost cap and split into BL-3253, BL-3254 and BL-3255, which replaced it in this task's `depends-on` and are all Done; between them they meet every BL-3189 criterion (ADR-0768 order tests in `ParallelHostQueueOrderTests`, `ParallelTransferQueueTests`, `CurlCommandRunnerParallelOrderTests` pinning `/echo /utf8 /four /default` at 50, `/echo /utf8 /default /four` at 2, URL order at 1; ADR-0786; Curl.Console inside every gate). Ticked the BL-3189 criterion on that basis rather than reopening a Deferred task. No code change in this run, so no quality run.
+- 2026-10-23, lane 4: `dotnet build Curl.Console -warnaserror` clean; Curl.Console.UnitTests fast run 2854 passed, 25 skipped, 0 failed; existing `-Z` tests unchanged.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 184a969c 65c3687b c7498130 cc00745f 34f328d9.
 - 2026-10-22: Doing -> Backlog. Waits for BL-3189: curl 8.22.0 measured not to start -Z transfers in URL order (ADR-0768); the implementation of its measured order is BL-3189
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 184a969c 3567fe96 34f328d9.
+- 2026-10-23: Doing -> Done. -Z starts transfers to one host in curl 8.22.0's measured order, deterministically (ADR-0768, via BL-3253/3254/3255)
