@@ -33,14 +33,14 @@ Part 2, the top-level guard: `Curl.Console/Program.cs` `Main` has no handler. Ad
 
 ## Notes
 
-- Measured curl 8.22.0 (Git for Windows ucrt64) with `Record-CurlExchange.ps1 -NoServer` on 2026-10-22: every port 0 case is exit 7, `Failed to connect to <host>:0 after 0 ms: Could not connect to server` (`::1:0` for `[::1]`), `127.0.0.1:0 over proxy 127.0.0.1` for an HTTP forward proxy on port 0, and `example.test:80 over proxy 127.0.0.1` (`:443` for https) through a SOCKS5 or tunnelling proxy on port 0. Table in ADR-0765. Not measured on Linux/macOS: Curl now fails port 0 before any socket, so its answer is the same text on every platform, and the tests use fakes only (platform-neutral, no network).
+- Measured curl 8.22.0 (Git for Windows ucrt64) with `Record-CurlExchange.ps1 -NoServer` on 2026-10-22: every port 0 case is exit 7, `Failed to connect to <host>:0 after 0 ms: Could not connect to server` (`::1:0` for `[::1]`), `127.0.0.1:0 over proxy 127.0.0.1` for an HTTP forward proxy on port 0, and `example.test:80 over proxy 127.0.0.1` (`:443` for https) through a SOCKS5 or tunnelling proxy on port 0. Table in ADR-0766. Not measured on Linux/macOS: Curl now fails port 0 before any socket, so its answer is the same text on every platform, and the tests use fakes only (platform-neutral, no network).
 - The throw was not in `TcpDialer` but in `ConnectTarget`/`ProxyEndpoint`'s port guard (Curl.Protocol.Abstractions), and `ProxyUrlParser` (Curl.Core) failed a port 0 proxy early with the HTTP-proxy wording, wrong for SOCKS. Added those files and their tests to `touches`; no task in Doing on origin/work/dark-factory names them (BL-3173 holds other Abstractions and Core files). `TcpDialer.cs` needed no change.
 - Default taken: a port 0 dial reports `SocketError.ConnectionRefused` as its last error (`%{errno}` not measured).
-- The guard test drives `UnhandledExceptionGuard.RunAsync` with a run delegate that throws `InvalidOperationException`, which is what a throwing handler escaping the runner amounts to; `OperationCanceledException` escapes unchanged as before. Exit 2 chosen (ADR-0765).
+- The guard test drives `UnhandledExceptionGuard.RunAsync` with a run delegate that throws `InvalidOperationException`, which is what a throwing handler escaping the runner amounts to; `OperationCanceledException` escapes unchanged as before. Exit 2 chosen (ADR-0766).
 - Measure-CodeQuality.ps1 for Networking, Abstractions, Core and Console: 0 failing members. Fast tests of Networking, Console, Abstractions and Core UnitTests green. CI on Linux/macOS: changes are platform-neutral, so ticked.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a5477d9d d4af9781 3ec186c5 9cedf5fd.
-- 2026-10-22: Doing -> Done. Port 0 fails with exit 7 as curl 8.22.0 does; unhandled exceptions end with curl: (2) and exit 2 (ADR-0765)
+- 2026-10-22: Doing -> Done. Port 0 fails with exit 7 as curl 8.22.0 does; unhandled exceptions end with curl: (2) and exit 2 (ADR-0766)
