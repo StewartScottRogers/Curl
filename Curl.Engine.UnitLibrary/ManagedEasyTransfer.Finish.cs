@@ -157,11 +157,22 @@ internal sealed partial class ManagedEasyTransfer
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
-        info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer };
+        info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
         return toolState is null
             ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
+
+    /// <summary>
+    /// The <c>CURLINFO_RESPONSE_CODE</c> of a performed transfer: the report's, else - for a transfer a watchdog cut off
+    /// with no report, such as a multi transfer's low-speed timeout - the status the header recording already put on the
+    /// handle's info, as libcurl 8.22.0 keeps the status it received (BL-3309).
+    /// </summary>
+    /// <param name="info">The info from the report.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The response code.</returns>
+    private long ResponseCodeOf(TransferInfo info, TransferResult result) =>
+        result.Report is null ? Info.ResponseCode : info.ResponseCode;
 
     /// <summary>
     /// The <c>CURLINFO_PRIMARY_PORT</c> of a performed transfer: -1 for a failed one that reached no peer, as libcurl

@@ -110,6 +110,34 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_StalledBelowSpeedLimitAfterTheStatusLine_KeepsTheReceivedResponseCode()
+    {
+        SteppingTimeProvider clock = new();
+        TaskCompletionSource stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        RecordingProtocolHandler handler = new("http", async context =>
+        {
+            await context.HeaderOutput!.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n"));
+            stalled.TrySetResult();
+            await Task.Delay(Timeout.Infinite, context.CancellationToken);
+            return TransferResult.Success(0);
+        });
+        await using ManagedEasyTransfer easy = EasyOn(clock, handler);
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/x" },
+            Transfer = new EasyTransferOptions { LowSpeedLimit = 100, LowSpeedTime = TimeSpan.FromSeconds(2) },
+        };
+        easy.ToolProgress = new EngineToolTransferProgress(new RecordingToolProgress(), CancellationToken.None);
+
+        Task<CurlCode> perform = easy.PerformAsync(CancellationToken.None).AsTask();
+        await stalled.Task;
+        clock.Advance(TimeSpan.FromSeconds(3));
+        CurlCode code = await perform;
+
+        Assert.AreEqual(CurlCode.OperationTimedOut, code);
+        Assert.AreEqual(200, easy.Info.ResponseCode);
+    }
+    [TestMethod]
     public async Task PerformAsync_ToolProgressSetTwice_StartsAFreshMaxTimeWatchdogForEachPerform()
     {
         SteppingTimeProvider clock = new();
