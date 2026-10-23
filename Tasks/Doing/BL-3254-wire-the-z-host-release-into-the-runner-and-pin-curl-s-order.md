@@ -22,13 +22,16 @@ Split from BL-3189. BL-3253 gives `ParallelHostQueue`/`ParallelTransferQueue` th
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs` with a fake server answering instantly after holding `/echo` shows stdout order `/echo /utf8 /four /default` at the default `--parallel-max`, `/echo /utf8 /default /four` at 2 and URL order at 1, for `/echo /default /utf8 /four`.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean.
-- [ ] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes, finishes without hanging, with the existing `-Z` tests unchanged.
+- [x] A test in `Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs` with a fake server answering instantly after holding `/echo` shows stdout order `/echo /utf8 /four /default` at the default `--parallel-max`, `/echo /utf8 /default /four` at 2 and URL order at 1, for `/echo /default /utf8 /four`.
+- [x] `dotnet build Curl.Console -warnaserror` is clean.
+- [x] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes, finishes without hanging, with the existing `-Z` tests unchanged.
 
 ## Notes
 
 - Split from BL-3189 (over its cost cap). Depends on BL-3253, which holds the stashed work; take the hang's cause into account when wiring.
+- The runner wiring (`NewParallelRun` setting `BeforeEachWait = run.Hosts.StartReleased`) already landed with BL-3253 (f232fb4df); this run adds no production change, so no Measure-CodeQuality run was needed.
+- The test signals "every transfer it can is started" through the progress meter's first draw (stderr's first write): the runner draws when the queue is full or at `EndAsync`, both after the waiting transfers have joined the host queue, so no sleep or polling is needed. Chose this over adding a hook to the runner to keep production unchanged.
+- Full fast run of Curl.Console.UnitTests with `--blame-hang-timeout 120s`: 2850 passed, 25 skipped, ended in 4 s; no hang with BL-3253's committed release. Existing `-Z` tests unchanged. Change is platform-neutral (no paths, OS text or timing), so CI on Linux and macOS is covered by the green run here.
 
 ## Log
 
