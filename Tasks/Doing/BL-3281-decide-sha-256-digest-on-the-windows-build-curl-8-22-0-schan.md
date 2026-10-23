@@ -30,3 +30,4 @@ BL-3233 differential case auth-digest256 (-sS --digest -u u:p {U}/digest256): cu
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f344be36 69edf767.
