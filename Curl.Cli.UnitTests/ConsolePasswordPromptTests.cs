@@ -83,7 +83,65 @@ public sealed class ConsolePasswordPromptTests
         Assert.AreSame(first, second);
     }
 
+    /// <summary>
+    /// Off Windows curl 8.22.0's <c>getpass_r</c> writes the LF after the password only
+    /// <c>if(disabled)</c>: when <c>ttyecho(FALSE, fd)</c> could not turn echo off (no terminal on
+    /// <c>/dev/tty</c> or standard input), the prompt is all that reaches stderr.
+    /// </summary>
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void ReadPassword_OffWindowsEchoNotTurnedOff_WritesNoLfAfterThePassword()
+    {
+        AssertPromptBytesWithEcho(echoTurnsOff: false, "Enter host password for user 'bob':");
+    }
+
+    /// <summary>Off Windows, when <c>ttyecho(FALSE, fd)</c> turned echo off, curl 8.22.0 writes one LF after the password.</summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void ReadPassword_OffWindowsEchoTurnedOff_WritesLfAfterThePassword()
+    {
+        AssertPromptBytesWithEcho(echoTurnsOff: true, "Enter host password for user 'bob':\n");
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void ReadPassword_EchoControl_WritesTheLineTerminatorAndTurnsEchoOnOnlyWhenEchoWasTurnedOff(bool echoTurnsOff)
+    {
+        StringWriter standardError = new();
+        int echoTurnedOn = 0;
+        ConsolePasswordPrompt prompt = new(standardError, ScriptedKeys("secret\n"), () => echoTurnsOff, () => echoTurnedOn++);
+        Diagnostics.Arrange("echo turns off", echoTurnsOff);
+
+        string password = ReadPassword(prompt, "p:", standardError);
+
+        string expected = echoTurnsOff ? "p:" + standardError.NewLine : "p:";
+        Diagnostics.Diff("stderr", expected, standardError.ToString());
+        Diagnostics.Assert("echo turned on", echoTurnsOff ? 1 : 0, echoTurnedOn);
+        Assert.AreEqual("secret", password);
+        Assert.AreEqual(expected, standardError.ToString());
+        Assert.AreEqual(echoTurnsOff ? 1 : 0, echoTurnedOn);
+    }
+
+    [TestMethod]
+    public void ForPlatform_WindowsAndOffWindows_AreDifferentPrompts()
+    {
+        Diagnostics.Arrange("platforms", "Windows, then not Windows");
+
+        ConsolePasswordPrompt windows = ConsolePasswordPrompt.ForPlatform(isWindows: true, TextWriter.Null);
+        ConsolePasswordPrompt offWindows = ConsolePasswordPrompt.ForPlatform(isWindows: false, TextWriter.Null);
+
+        Diagnostics.Assert("different prompts", true, !ReferenceEquals(windows, offWindows));
+        Assert.AreNotSame(windows, offWindows);
+    }
+
+    /// <summary>
+    /// On Windows a redirected input cannot be read by <see cref="Console.ReadKey(bool)"/>, so the
+    /// password is empty; off Windows the prompt reads <c>/dev/tty</c> or standard input instead,
+    /// which would wait on the test host's input.
+    /// </summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public void ForProcessConsole_InputRedirected_ReturnsAnEmptyPassword()
     {
         Diagnostics.Arrange("prompt", "\"\"");
@@ -106,6 +164,20 @@ public sealed class ConsolePasswordPromptTests
     {
         StringWriter standardError = new();
         ConsolePasswordPrompt prompt = new(standardError, ScriptedKeys("secret\r"));
+
+        string password = ReadPassword(prompt, "Enter host password for user 'bob':", standardError);
+
+        Diagnostics.Diff("stderr", expectedStandardError, standardError.ToString());
+        Assert.AreEqual("secret", password);
+        Assert.AreEqual(expectedStandardError, standardError.ToString());
+    }
+
+    /// <summary>Reads <c>secret</c> then LF through a prompt whose echo control reports <paramref name="echoTurnsOff"/> and pins what went to stderr.</summary>
+    private void AssertPromptBytesWithEcho(bool echoTurnsOff, string expectedStandardError)
+    {
+        StringWriter standardError = new();
+        ConsolePasswordPrompt prompt = new(standardError, ScriptedKeys("secret\n"), () => echoTurnsOff, () => { });
+        Diagnostics.Arrange("echo turns off", echoTurnsOff);
 
         string password = ReadPassword(prompt, "Enter host password for user 'bob':", standardError);
 
