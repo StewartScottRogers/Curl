@@ -35,3 +35,4 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 7d61c82b 6f49e668 a1cb8068 ae951636 5e81fa96.
