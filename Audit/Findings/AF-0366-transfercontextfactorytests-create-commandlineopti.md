@@ -3,8 +3,8 @@ id: AF-0366
 title: TransferContextFactoryTests.Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine fails on the unmutated tree: the parser refuses its command line
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Engine.UnitTests --filter "FullyQualifiedName~TransferContextFa
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
