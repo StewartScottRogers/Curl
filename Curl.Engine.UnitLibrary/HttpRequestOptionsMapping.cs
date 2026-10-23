@@ -208,8 +208,18 @@ internal static class HttpRequestOptionsMapping
 
     /// <summary>
     /// The <see cref="EasyHttpOptions.PostFields" /> body, or <see langword="null" /> when there is none, as
-    /// under <c>-G</c>, which moved it into the query.
+    /// under <c>-G</c>, which moved it into the query. Only its first <see cref="EasyHttpOptions.PostFieldSize" />
+    /// bytes are sent when that is not negative (<c>CURLOPT_POSTFIELDSIZE</c>, BL-3190), never more than the data
+    /// holds (ADR-0773).
     /// </summary>
     private static BytesBody? PostFieldsBodyOf(EasyHttpOptions http) =>
-        http.PostFields is { } data ? new BytesBody(data, FormUrlEncoded) : null;
+        http.PostFields is { } data ? new BytesBody(SizedPostFieldsOf(data, http.PostFieldSize), FormUrlEncoded) : null;
+
+    /// <summary>
+    /// <paramref name="data" /> cut to <paramref name="size" /> bytes when that is not negative and shorter, as
+    /// libcurl sends <c>CURLOPT_POSTFIELDSIZE</c> bytes of <c>CURLOPT_POSTFIELDS</c>; a larger size sends the whole
+    /// data rather than reading past it (ADR-0773).
+    /// </summary>
+    private static ReadOnlyMemory<byte> SizedPostFieldsOf(ReadOnlyMemory<byte> data, long size) =>
+        size < 0 || size >= data.Length ? data : data[..(int)size];
 }
