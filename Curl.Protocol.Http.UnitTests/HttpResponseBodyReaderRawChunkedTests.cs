@@ -99,7 +99,7 @@ public sealed class HttpResponseBodyReaderRawChunkedTests
                 {
                     Url = CurlUrl.Parse("http://127.0.0.1:18180/a"),
                     Output = output,
-                    Http = new HttpRequestOptions { Raw = raw },
+                    Http = new HttpRequestOptions { PassesContentCoding = raw, PassesTransferCoding = raw },
                 });
 
             Diagnostics.Assert($"exit at chunk size {chunkSize}", CurlExitCode.Ok, result.ExitCode);

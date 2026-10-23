@@ -214,7 +214,7 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Arrange("scripted body", OneLine(body));
 
             TransferResult result = await Handler(QueueConnector.For(Connection(head + body, chunkSize, LoopbackGet)))
-                .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Raw = true }, headerOutput));
+                .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { PassesContentCoding = true, PassesTransferCoding = true }, headerOutput));
 
             WriteResult(result);
             Diagnostics.Assert("body", OneLine(body), OneLine(Latin1(output.ToArray())));
@@ -237,7 +237,7 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Arrange("scripted response", "200, Content-Length: 3, body hello; --raw");
 
             TransferResult result = await Handler(QueueConnector.For(Connection("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nhello", chunkSize)))
-                .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Raw = true }));
+                .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { PassesContentCoding = true, PassesTransferCoding = true }));
 
             WriteResult(result);
             Diagnostics.Assert("body", "hel", Latin1(output.ToArray()));
@@ -281,7 +281,7 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Arrange("options", "--raw --compressed");
 
         TransferResult result = await Handler(QueueConnector.For(Connection(response, 65536, expected)))
-            .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { Raw = true, Compressed = true }));
+            .ExecuteAsync(EncodingContext(output, new HttpRequestOptions { PassesContentCoding = true, PassesTransferCoding = true, Compressed = true }));
 
         WriteResult(result);
         Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));

@@ -106,7 +106,8 @@ public sealed partial class HttpProtocolHandlerTests
             Http = new HttpRequestOptions
             {
                 Compressed = option != "no --compressed",
-                Raw = option == "--raw",
+                PassesContentCoding = option == "--raw",
+                PassesTransferCoding = option == "--raw",
                 Fail = option == "-f" ? HttpFailMode.Fail : HttpFailMode.None,
                 FollowRedirects = option == "-L",
             },

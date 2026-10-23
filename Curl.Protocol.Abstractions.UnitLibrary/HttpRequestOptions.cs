@@ -224,10 +224,16 @@ public sealed record HttpRequestOptions
     public bool TransferEncoding { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether <c>--raw</c> was given: pass content and transfer
-    /// encodings through undecoded.
+    /// Gets a value indicating whether Content-Encoding is passed through undecoded, even with
+    /// <see cref="Compressed" />: <c>CURLOPT_HTTP_CONTENT_DECODING</c> 0, and half of <c>--raw</c>.
     /// </summary>
-    public bool Raw { get; init; }
+    public bool PassesContentCoding { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the transfer codings, <c>chunked</c> included, are passed
+    /// through undecoded: <c>CURLOPT_HTTP_TRANSFER_DECODING</c> 0, and half of <c>--raw</c>.
+    /// </summary>
+    public bool PassesTransferCoding { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether <c>--ignore-content-length</c> was given: read the

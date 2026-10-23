@@ -70,7 +70,9 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="HttpRequestOptions.Version" />, as <see cref="HttpVersionMapping.ToHttpVersionPreference" />
     /// maps it; a set <see cref="EasyHttpOptions.AcceptEncoding" /> as <see cref="HttpRequestOptions.Compressed" />
     /// and, when not empty, exactly as given as <see cref="HttpRequestOptions.AcceptEncoding" /> (ADR-0777);
-    /// both decodings off (<c>--raw</c>) as <see cref="HttpRequestOptions.Raw" />;
+    /// <see cref="EasyHttpOptions.HttpContentDecoding" /> and <see cref="EasyHttpOptions.HttpTransferDecoding" /> off
+    /// (each half of <c>--raw</c>) as <see cref="HttpRequestOptions.PassesContentCoding" /> and
+    /// <see cref="HttpRequestOptions.PassesTransferCoding" />, each on its own (ADR-0780);
     /// <see cref="EasyHttpOptions.TransferEncoding" />, <see cref="EasyHttpOptions.IgnoreContentLength" /> and
     /// <see cref="EasyHttpOptions.Http09Allowed" /> verbatim; and <see cref="EasyHttpOptions.Expect100Timeout" /> as
     /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
@@ -125,7 +127,8 @@ internal static class HttpRequestOptionsMapping
             Compressed = http.AcceptEncoding is not null,
             AcceptEncoding = http.AcceptEncoding is { Length: > 0 } given ? given : HttpRequestOptions.DefaultAcceptEncoding,
             TransferEncoding = http.TransferEncoding,
-            Raw = !http.HttpContentDecoding && !http.HttpTransferDecoding,
+            PassesContentCoding = !http.HttpContentDecoding,
+            PassesTransferCoding = !http.HttpTransferDecoding,
             IgnoreContentLength = http.IgnoreContentLength,
             AllowHttp09Reply = http.Http09Allowed,
             Http200Aliases = http.Http200Aliases,

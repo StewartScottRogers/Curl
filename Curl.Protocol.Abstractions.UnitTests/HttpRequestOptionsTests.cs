@@ -45,7 +45,8 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(HttpRequestOptions.DefaultContinueWait, options.ContinueWait);
         Assert.IsFalse(options.Compressed);
         Assert.IsFalse(options.TransferEncoding);
-        Assert.IsFalse(options.Raw);
+        Assert.IsFalse(options.PassesContentCoding);
+        Assert.IsFalse(options.PassesTransferCoding);
         Assert.IsFalse(options.IgnoreContentLength);
         Assert.IsEmpty(options.Http200Aliases);
         Assert.IsNull(options.RequestTarget);
@@ -87,7 +88,8 @@ public sealed class HttpRequestOptionsTests
             ContinueWait = TimeSpan.FromMilliseconds(200),
             Compressed = true,
             TransferEncoding = true,
-            Raw = true,
+            PassesContentCoding = true,
+            PassesTransferCoding = true,
             IgnoreContentLength = true,
             Http200Aliases = ["ICY 200 OK"],
             RequestTarget = "*",
@@ -122,7 +124,8 @@ public sealed class HttpRequestOptionsTests
         Assert.AreEqual(TimeSpan.FromMilliseconds(200), options.ContinueWait);
         Assert.IsTrue(options.Compressed);
         Assert.IsTrue(options.TransferEncoding);
-        Assert.IsTrue(options.Raw);
+        Assert.IsTrue(options.PassesContentCoding);
+        Assert.IsTrue(options.PassesTransferCoding);
         Assert.IsTrue(options.IgnoreContentLength);
         CollectionAssert.AreEqual(new[] { "ICY 200 OK" }, options.Http200Aliases.ToArray());
         Assert.AreEqual("*", options.RequestTarget);
