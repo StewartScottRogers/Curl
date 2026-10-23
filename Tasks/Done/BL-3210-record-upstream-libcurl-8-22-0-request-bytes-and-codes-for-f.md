@@ -8,7 +8,7 @@ depends-on: []
 touches: [Record-LibcurlMimeExchange.cs, Documentation/Product/LibcurlMimeEdgeCaseRecordings.md]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3210 — Record upstream libcurl 8.22.0 request bytes and codes for four MIME edge cases through a P/Invoke harness
 
@@ -24,12 +24,15 @@ Cases: (1) a part `curl_mime_filedata(part, "nope.txt")` plus a data part; (2) a
 
 ## Acceptance criteria
 
-- [ ] `Record-LibcurlMimeExchange.cs` runs each of the four cases against libcurl-4.dll and exits with the CURLcode.
-- [ ] `Documentation/Product/LibcurlMimeEdgeCaseRecordings.md` holds, per case, the exact code, the recorded request bytes (with chunk framing for case 4) and the body length.
+- [x] `Record-LibcurlMimeExchange.cs` runs each of the four cases against libcurl-4.dll and exits with the CURLcode.
+- [x] `Documentation/Product/LibcurlMimeEdgeCaseRecordings.md` holds, per case, the exact code, the recorded request bytes (with chunk framing for case 4) and the body length.
 
 ## Notes
+
+- Libcurl DLL is Git for Windows's `C:Program FilesGitCrt64binibcurl-4.dll` (8.22.0, Schannel); the harness takes an optional third argument for another path. Case 1 (missing file) gives code 0 with an empty part, case 2 gives 26, case 3 body is 483 bytes with this harness, case 4 chunk is 0x99. Part names a/b are my choice.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 5ef7e827 6f47a55a.
+- 2026-10-22: Doing -> Done. Four cases recorded
