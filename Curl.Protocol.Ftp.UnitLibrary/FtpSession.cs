@@ -2241,6 +2241,7 @@ internal sealed class FtpSession(
     {
         ReportRememberedDirectory();
         trace.ClosingDataConnection();
+        await CloseDataConnectionAsync().ConfigureAwait(false);
         FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
         trace.TransferReplyRead(complete);
         if (expectedSize is { } expected && bytesTransferred < expected)
@@ -2255,6 +2256,19 @@ internal sealed class FtpSession(
         }
 
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes the data connection, if one is still open, before the end-of-transfer reply is
+    /// read, as curl 8.22.0's <c>ftp_done</c> closes it first: a server that waits for the
+    /// client to close the data connection answers <c>426</c> after its own timeout when the
+    /// close comes only after the reply (BL-3161).
+    /// </summary>
+    private async ValueTask CloseDataConnectionAsync()
+    {
+        IConnection? data = dataConnection;
+        dataConnection = null;
+        await DisposeIfOpenAsync(data).ConfigureAwait(false);
     }
 
     /// <summary>

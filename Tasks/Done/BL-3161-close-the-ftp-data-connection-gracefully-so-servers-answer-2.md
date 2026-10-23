@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerGracefulDataCloseTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3161 — Close the FTP data connection gracefully so servers answer 226, not 426
 
@@ -24,11 +24,11 @@ Start in `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs`: the download path dispos
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerGracefulDataCloseTests.cs` has a fake FTP server that answers `426` when the data connection is disposed without its send side first being shut down (a reset) and `226` after a graceful close; a RETR download then returns `CurlExitCode.Ok` with all bytes and waits on no timeout (fake `TimeProvider`, no sleeping).
-- [ ] The same test class covers an upload (STOR) and a `LIST` listing, both returning `Ok` against that server.
-- [ ] The same test class covers the FTPS (TLS data connection) case if the handler has a separate close path for it; otherwise a comment in the test says the path is shared.
-- [ ] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean and `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration"` passes with the existing FTP tests unchanged.
-- [ ] No test needs `TestCategory=Integration`, and none uses a Windows-only path or text.
+- [x] `Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerGracefulDataCloseTests.cs` has a fake FTP server that answers `426` when the data connection is disposed without its send side first being shut down (a reset) and `226` after a graceful close; a RETR download then returns `CurlExitCode.Ok` with all bytes and waits on no timeout (fake `TimeProvider`, no sleeping).
+- [x] The same test class covers an upload (STOR) and a `LIST` listing, both returning `Ok` against that server.
+- [x] The same test class covers the FTPS (TLS data connection) case if the handler has a separate close path for it; otherwise a comment in the test says the path is shared.
+- [x] `dotnet build Curl.Protocol.Ftp.UnitLibrary -warnaserror` is clean and `dotnet test Curl.Protocol.Ftp.UnitTests --filter "TestCategory!=Integration"` passes with the existing FTP tests unchanged.
+- [x] No test needs `TestCategory=Integration`, and none uses a Windows-only path or text.
 
 ## Notes
 
@@ -36,3 +36,4 @@ Start in `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs`: the download path dispos
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 0527dce9 eff28298 bca41a23 81c923d1 cdfdbbfe.
+- 2026-10-22: Doing -> Done. Data connection closed before the end-of-transfer reply; download, LIST and upload pass against a server that waits for the close.
