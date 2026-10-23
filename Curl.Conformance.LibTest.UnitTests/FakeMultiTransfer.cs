@@ -30,7 +30,18 @@ internal sealed class FakeMultiTransfer : IMultiTransfer
     /// <summary>The events each wait reports for every extra socket it is given.</summary>
     public CurlWaitEvents ExtraSocketEvents { get; set; }
 
-    public MultiOptions Options { get; set; } = new();
+    public MultiOptions Options
+    {
+        get;
+        set
+        {
+            field = value;
+            OptionsWritten.Add(value);
+        }
+    } = new();
+
+    /// <summary>Every <see cref="Options"/> written to this transfer, in order: one per option set with an Ok answer.</summary>
+    public List<MultiOptions> OptionsWritten { get; } = [];
 
     /// <summary>Perform answers taken in turn before <see cref="PerformResult"/>.</summary>
     public Queue<(CurlMultiCode Code, int RunningTransfers)> PerformResults { get; } = new();
