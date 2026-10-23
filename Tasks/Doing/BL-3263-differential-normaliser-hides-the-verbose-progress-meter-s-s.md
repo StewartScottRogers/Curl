@@ -30,3 +30,4 @@ BL-3260's first host run (ADR-0785) of `-v {U}/echo` against curl 8.22.0 reporte
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 082cab35 fe680ad5.
