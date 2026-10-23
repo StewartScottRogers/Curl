@@ -280,10 +280,8 @@ public sealed class MultipartFormBodyBuilder(
     {
         if (part.Kind == MultipartFormPartKind.Multipart)
         {
-            string boundary = createBoundary();
-            segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, null, nameEscaping, forMail, out string? contentType));
-            string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
-            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+            // An encoder libcurl does not have is ignored here, as it always was for a nested multipart.
+            return await AddMultipartPartAsync(segments, part, disposition, nameEscaping, forMail, part.Encoder is null ? null : MultipartPartEncoder.Find(part.Encoder), cancellationToken).ConfigureAwait(false);
         }
 
         if (!TryFindEncoder(part.Encoder, out MultipartPartEncoder? encoder))
@@ -300,6 +298,59 @@ public sealed class MultipartFormBodyBuilder(
         return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Adds a part with subparts: its headers, then the nested multipart block, which a part given an
+    /// encoder through libcurl has encoded whole, headers and boundaries included, under
+    /// <c>Content-Transfer-Encoding</c> (measured against libcurl 8.22.0, BL-3213).
+    /// </summary>
+    private async ValueTask<TransferResult?> AddMultipartPartAsync(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder,
+        CancellationToken cancellationToken)
+    {
+        string boundary = createBoundary();
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, encoder?.Name, nameEscaping, forMail, out string? contentType));
+        string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
+        if (encoder is null || encoder.PassesDataThrough)
+        {
+            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+        }
+
+        return await AddEncodedPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Adds the nested multipart block of <paramref name="parts" />, built whole and encoded as it is sent.</summary>
+    private async ValueTask<TransferResult?> AddEncodedPartsAsync(
+        MultipartBodySegments segments,
+        IReadOnlyList<MultipartFormPart> parts,
+        string boundary,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder encoder,
+        CancellationToken cancellationToken)
+    {
+        MultipartBodySegments nested = new(textEncoding);
+        TransferResult? failure = await AddPartsAsync(nested, parts, boundary, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            nested.Dispose();
+            return failure;
+        }
+
+        if (nested.HoldsRefusedData)
+        {
+            segments.AddRefusedData();
+        }
+
+        ConcatenatedReadStream block = nested.ToStream();
+        segments.AddStream(encoder.EncodeWhileReading(block, nested.Length), encoder.EncodedLength(nested.Length));
+        return null;
+    }
     /// <summary>
     /// Gives exit 43 for a part whose name or file name holds a CR or LF that its escaping cannot
     /// write, as <see cref="MultipartPartHeaders.RefusesLineBreakInName" /> tells; otherwise <see langword="null" />.

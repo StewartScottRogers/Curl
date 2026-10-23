@@ -8,7 +8,7 @@ depends-on: [BL-3210]
 touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Core.UnitTests/Multipart/MultipartFormBodyBuilderEncodedSubpartsTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-23
 ---
 # BL-3213 — Encode a MIME part with subparts by its base64 encoder as libcurl 8.22.0 does
 
@@ -22,12 +22,15 @@ Split from BL-3208. Stewart's harness gave 449 bytes upstream, 297 ours: libcurl
 
 ## Acceptance criteria
 
-- [ ] `Curl.Core.UnitTests/Multipart/MultipartFormBodyBuilderEncodedSubpartsTests.cs` pins the body BL-3210 recorded for case 3 byte for byte (boundaries fixed by the test).
-- [ ] Build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members for the changed libraries.
+- [x] `Curl.Core.UnitTests/Multipart/MultipartFormBodyBuilderEncodedSubpartsTests.cs` pins the body BL-3210 recorded for case 3 byte for byte (boundaries fixed by the test).
+- [x] Build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members for the changed libraries.
 
 ## Notes
+
+- The pinned body follows the structure BL-3210 recorded for case 3 (the byte count differs by harness boundaries and names). An encoder libcurl does not have, on a part with subparts, stays ignored as before; 8bit and binary label the nested block and send it as it is.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: cad4ed1b 491059de.
+- 2026-10-23: Doing -> Done. A part with subparts and an encoder now sends its nested block encoded under Content-Transfer-Encoding as libcurl 8.22.0 does
