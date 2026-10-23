@@ -34,3 +34,4 @@ post-flag-only (CURLOPT_POST 1 alone; BL-3319 made Curl send the empty chunked P
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
