@@ -32,8 +32,14 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <summary>The option groups' dispatches, closed once every transfer has ended.</summary>
     private readonly List<TransferDispatch> dispatches = [];
 
-    /// <summary>Gets the queue the run's transfers wait in for a free slot.</summary>
-    internal ParallelTransferQueue Queue { get; } = new(maxRunning);
+    /// <summary>The queue for a free slot, built on first use so that it can start <see cref="Hosts" />' freed transfers.</summary>
+    private ParallelTransferQueue? queue;
+
+    /// <summary>
+    /// Gets the queue the run's transfers wait in for a free slot; before each wait it starts the transfers
+    /// <see cref="Hosts" /> freed.
+    /// </summary>
+    internal ParallelTransferQueue Queue => queue ??= new(maxRunning) { BeforeEachWait = () => Hosts.StartReleased() };
 
     /// <summary>Gets the queue the run's transfers wait in, holding their slot, for a busy host.</summary>
     internal ParallelHostQueue Hosts { get; } = new(maxPerHost, parallelImmediate);

@@ -1271,7 +1271,6 @@ internal sealed class CurlCommandRunner(
                 ? new ParallelProgressMeter(timeProvider, writeGate, WriteParallelProgressMeter)
                 : null,
         };
-        run.Queue.BeforeEachWait = run.Hosts.StartReleased;
         return run;
     }
 

@@ -182,6 +182,44 @@ public sealed class ParallelHostQueueTests
     }
 
     [TestMethod]
+    public async Task WaitForHostAsync_AbortedWhileFreed_FinishesItsBookkeepingBeforeTheCancelledTransferRuns()
+    {
+        Diagnostics.Arrange("queue", "--parallel-max-host 1, no --parallel-immediate; /2 freed by Leave, then aborted");
+        ParallelHostQueue queue = new(1, parallelImmediate: false);
+        using CancellationTokenSource abort = new();
+        await queue.WaitForHostAsync("http://h/1", CancellationToken.None);
+        Task second = queue.WaitForHostAsync("http://h/2", abort.Token);
+        queue.Leave("http://h/1");
+        Task<bool> thirdStartsInsideTheCancelledTransfer = ThirdStartsWhenCancelledAsync(queue, second);
+
+        await abort.CancelAsync();
+        bool thirdStarts = await thirdStartsInsideTheCancelledTransfer;
+        Diagnostics.Act("third started at once, from the cancelled transfer's continuation", thirdStarts);
+
+        Diagnostics.Assert("third started at once", true, thirdStarts);
+        Assert.IsTrue(thirdStarts);
+    }
+
+    [TestMethod]
+    public async Task StartReleased_AbortedAfterItWasTakenBeforeItStarts_GivesItsCountBack()
+    {
+        Diagnostics.Arrange("queue", "--parallel-max-host 1, no --parallel-immediate; /2 freed by Leave, taken, then aborted before it starts");
+        ParallelHostQueue queue = new(1, parallelImmediate: false);
+        using CancellationTokenSource abort = new();
+        await queue.WaitForHostAsync("http://h/1", CancellationToken.None);
+        Task second = queue.WaitForHostAsync("http://h/2", abort.Token);
+        queue.Leave("http://h/1");
+
+        queue.StartReleased(afterEachTake: abort.Cancel);
+        bool thirdStarts = queue.WaitForHostAsync("http://h/3", CancellationToken.None).IsCompleted;
+        Diagnostics.Act("third started at once", thirdStarts);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => second);
+        Diagnostics.Assert("third started at once", true, thirdStarts);
+        Assert.IsTrue(thirdStarts);
+    }
+
+    [TestMethod]
     public async Task WaitForHostAsync_AlreadyAborted_Throws()
     {
         Diagnostics.Arrange("queue", "--parallel-max-host 1, --parallel-immediate");
@@ -194,5 +232,20 @@ public sealed class ParallelHostQueueTests
         Diagnostics.Assert("exception", nameof(OperationCanceledException), "checked by Assert.ThrowsAsync");
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => queue.WaitForHostAsync("http://h/2", new CancellationToken(canceled: true)));
+    }
+
+    /// <summary>When the wait ends cancelled, asks for the host at once, from the continuation, and tells whether it was free.</summary>
+    private static async Task<bool> ThirdStartsWhenCancelledAsync(ParallelHostQueue queue, Task cancelled)
+    {
+        try
+        {
+            await cancelled;
+        }
+        catch (OperationCanceledException)
+        {
+            return queue.WaitForHostAsync("http://h/3", CancellationToken.None).IsCompleted;
+        }
+
+        return false;
     }
 }

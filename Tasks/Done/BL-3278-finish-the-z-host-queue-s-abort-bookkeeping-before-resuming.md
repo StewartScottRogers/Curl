@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/ParallelHostQueueTests.cs]
+touches: [Curl.Console/ParallelHostQueue.cs, Curl.Console/ParallelRun.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/ParallelHostQueueTests.cs, Curl.Console.UnitTests/ParallelRunTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3278 — Finish the -Z host queue's abort bookkeeping before resuming a cancelled transfer
 
@@ -29,14 +29,17 @@ Also worth fixing while here: `ParallelTransferQueue.BeforeEachWait` defaults to
 
 ## Acceptance criteria
 
-- [ ] The abort callback does its `Waiting`/`released`/`Running` bookkeeping before completing `Turn`, and completes `Turn` outside `lock (hosts)`.
-- [ ] A transfer taken by `TakeReleased` and then aborted before it starts gives its host count back (a unit test pins the host's count after such an abort).
-- [ ] `ParallelRun` connects `Queue.BeforeEachWait` to `Hosts.StartReleased` itself, or the hook becomes a required constructor argument.
-- [ ] The existing order tests (`ParallelHostQueueOrderTests`, `CurlCommandRunnerParallelOrderTests`) still pass; `dotnet build` is clean and the fast tests pass.
+- [x] The abort callback does its `Waiting`/`released`/`Running` bookkeeping before completing `Turn`, and completes `Turn` outside `lock (hosts)`.
+- [x] A transfer taken by `TakeReleased` and then aborted before it starts gives its host count back (a unit test pins the host's count after such an abort).
+- [x] `ParallelRun` connects `Queue.BeforeEachWait` to `Hosts.StartReleased` itself, or the hook becomes a required constructor argument.
+- [x] The existing order tests (`ParallelHostQueueOrderTests`, `CurlCommandRunnerParallelOrderTests`) still pass; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- touches widened to ParallelRun.cs, CurlCommandRunner.cs and ParallelRunTests.cs (no other Doing task names them). The abort callback now does its bookkeeping under the lock and cancels Turn after it. A transfer taken by TakeReleased and aborted before its Turn is set gives its count back in StartReleased (GiveBackCountIfAborted); StartReleased takes an optional afterEachTake hook so a test can land that abort. ParallelRun builds Queue with BeforeEachWait wired to Hosts.StartReleased. Measure-CodeQuality Curl.Console: 0 failing members; Curl.Console.UnitTests 2868 passed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 2d9aca23 a39fa834 55027aec a482d2ec.
+- 2026-10-23: Doing -> Done. -Z host queue finishes abort bookkeeping before cancelling, returns counts of taken-then-aborted transfers, ParallelRun wires its own hook

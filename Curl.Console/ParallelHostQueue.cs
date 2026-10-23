@@ -56,7 +56,7 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
         lock (hosts)
         {
             HostTransfers transfers = TransfersTo(destination.Host);
-            WaitingTransfer transfer = new(destination.WaitsForFirstToEnd && !speaksHttp2FromTheStart);
+            WaitingTransfer transfer = new(transfers, destination.WaitsForFirstToEnd && !speaksHttp2FromTheStart);
             if (transfers.MayStart(transfer, maxPerHost))
             {
                 transfers.Running++;
@@ -142,11 +142,26 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// Starts the transfers <see cref="Leave" /> freed, one after another in the order it freed them: each
     /// runs on this thread until its first wait, such as for its connection, before the next is started.
     /// </summary>
-    internal void StartReleased()
+    /// <param name="afterEachTake">Called after each transfer is taken and before it starts, which is where an abort can land; tests use it to land one.</param>
+    internal void StartReleased(Action? afterEachTake = null)
     {
         while (TakeReleased() is { } next)
         {
-            next.Turn.TrySetResult();
+            afterEachTake?.Invoke();
+            GiveBackCountIfAborted(next);
+        }
+    }
+
+    /// <summary>
+    /// Lets a taken transfer start; when an abort cancelled its wait after it was taken, so the abort found it
+    /// in neither queue, gives back the count <see cref="Leave" /> gave it.
+    /// </summary>
+    private void GiveBackCountIfAborted(WaitingTransfer transfer)
+    {
+        bool aborted = !transfer.Turn.TrySetResult();
+        lock (hosts)
+        {
+            transfer.Host.Running -= Convert.ToInt32(aborted);
         }
     }
 
@@ -168,7 +183,8 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// <summary>
     /// Waits for a queued transfer's turn; when <paramref name="abortToken" /> is cancelled first, the
     /// transfer leaves the queue, or gives back its count at the host when it was freed and not yet
-    /// started, and the wait throws.
+    /// started, and the wait throws. The bookkeeping is done, under the lock, before the wait is cancelled,
+    /// and the cancelled transfer's code runs outside the lock.
     /// </summary>
     private async Task WaitForTurnAsync(HostTransfers transfers, WaitingTransfer transfer, CancellationToken abortToken)
     {
@@ -176,10 +192,11 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
         {
             lock (hosts)
             {
-                transfer.Turn.TrySetCanceled(abortToken);
                 transfers.Waiting.Remove(transfer);
                 transfers.Running -= Convert.ToInt32(released.Remove(transfer));
             }
+
+            transfer.Turn.TrySetCanceled(abortToken);
         });
         await transfer.Turn.Task.ConfigureAwait(false);
     }
@@ -231,9 +248,13 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     }
 
     /// <summary>A transfer waiting for its host, and the signal that it may start.</summary>
+    /// <param name="host">The transfers to the host it waits for.</param>
     /// <param name="waitsForFirstToEnd">Whether it waits for the host's first transfer to end.</param>
-    private sealed class WaitingTransfer(bool waitsForFirstToEnd)
+    private sealed class WaitingTransfer(HostTransfers host, bool waitsForFirstToEnd)
     {
+        /// <summary>Gets the transfers to the host it waits for.</summary>
+        internal HostTransfers Host { get; } = host;
+
         /// <summary>Gets a value indicating whether it waits for the host's first transfer to end.</summary>
         internal bool WaitsForFirstToEnd { get; } = waitsForFirstToEnd;
 
