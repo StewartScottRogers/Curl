@@ -1,5 +1,5 @@
 ---
-id: BL-3288
+id: BL-3293
 title: Measure the --parallel num_connects and live br size_download differential gaps
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3288 — Measure the --parallel num_connects and live br size_download differential gaps
+# BL-3293 — Measure the --parallel num_connects and live br size_download differential gaps
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-3284
+id: BL-3289
 title: Trust a leaf certificate named by --cacert on the Schannel build (tls-wrong-ca)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3284 — Trust a leaf certificate named by --cacert on the Schannel build (tls-wrong-ca)
+# BL-3289 — Trust a leaf certificate named by --cacert on the Schannel build (tls-wrong-ca)
 
 ## Goal
 

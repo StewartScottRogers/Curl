@@ -1,5 +1,5 @@
 ---
-id: BL-3285
+id: BL-3290
 title: Measure and match Schannel curl on a P12 client certificate (tls-mtls-p12)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3285 — Measure and match Schannel curl on a P12 client certificate (tls-mtls-p12)
+# BL-3290 — Measure and match Schannel curl on a P12 client certificate (tls-mtls-p12)
 
 ## Goal
 

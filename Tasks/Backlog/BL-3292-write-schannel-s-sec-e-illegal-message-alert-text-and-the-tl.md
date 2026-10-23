@@ -1,5 +1,5 @@
 ---
-id: BL-3287
+id: BL-3292
 title: Write Schannel's SEC_E_ILLEGAL_MESSAGE alert text and the --tls-max 1.2 SEC_E_UNSUPPORTED_FUNCTION failure
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3287 — Write Schannel's SEC_E_ILLEGAL_MESSAGE alert text and the --tls-max 1.2 SEC_E_UNSUPPORTED_FUNCTION failure
+# BL-3292 — Write Schannel's SEC_E_ILLEGAL_MESSAGE alert text and the --tls-max 1.2 SEC_E_UNSUPPORTED_FUNCTION failure
 
 ## Goal
 

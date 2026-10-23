@@ -1,5 +1,5 @@
 ---
-id: BL-3286
+id: BL-3291
 title: Measure and match --cert-status on the Schannel build (tls-cert-status)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3286 — Measure and match --cert-status on the Schannel build (tls-cert-status)
+# BL-3291 — Measure and match --cert-status on the Schannel build (tls-cert-status)
 
 ## Goal
 
