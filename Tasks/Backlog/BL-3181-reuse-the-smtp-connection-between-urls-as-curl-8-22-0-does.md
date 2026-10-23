@@ -1,5 +1,5 @@
 ---
-id: BL-3172
+id: BL-3181
 title: Reuse the SMTP connection between URLs as curl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3172 — Reuse the SMTP connection between URLs as curl 8.22.0 does
+# BL-3181 — Reuse the SMTP connection between URLs as curl 8.22.0 does
 
 ## Goal
 
