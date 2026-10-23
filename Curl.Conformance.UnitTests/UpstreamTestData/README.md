@@ -53,6 +53,7 @@ curl and `Update-UpstreamTestData.ps1` does not refresh it. test1707.pl reads it
 
 `lib/libcurl.def` (test1135.pl, case 1279), `lib/optiontable.pl` and `lib/easyoptions.c` (test1276.pl) and
 `projects/OS400/ccsidcurl.c` (test1544.pl) are vendored byte for byte by `Update-UpstreamTestData.ps1` too (BL-3391); `.gitattributes` marks them `-text`.
+`configure.ac`, `CMakeLists.txt`, `m4/*.m4`, `lib/curl_config-cmake.h.in`, the `*.c` and `*.h` files of `lib` and `src`, and every `*.md` file of the tree except the root `README.md` (this file stands there) are vendored the same way for test1165.pl and test1275.pl (BL-3407).
 
 ## docs/libcurl and include
 

@@ -8,7 +8,7 @@
     file in certs\ with the files of tests/certs at that tag except its build files
     (Makefile.*, CMakeLists.txt) and dot files, and COPYING with curl's
     COPYING at that tag, plus the extra folders it names below (docs, include, src, and lib/libcurl.def, lib/optiontable.pl,
-    lib/easyoptions.c and projects/OS400/ccsidcurl.c for the source-analysis cases). Files are written byte for byte; the .gitattributes beside them marks
+    lib/easyoptions.c and projects/OS400/ccsidcurl.c for the source-analysis cases, and configure.ac, m4, CMakeLists.txt, the lib and src C sources and every Markdown file for cases 1165 and 1275). Files are written byte for byte; the .gitattributes beside them marks
     them -text so git keeps their line endings. ADR-0013, decision 3: the data is vendored and
     pinned, and tests never download anything - only this script does.
 
@@ -58,6 +58,28 @@ try {
         Copy-Item -LiteralPath $test.FullName -Destination (Join-Path $destination ($test.Name + '.curltest'))
     }
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/COPYING") -Destination (Join-Path $destination 'COPYING') -Force
+
+    # The files test1165.pl and test1275.pl read (BL-3407): configure.ac, m4/*.m4, CMakeLists.txt, lib/curl_config-cmake.h.in,
+    # the lib and src C sources (*.c, *.h) and every Markdown file of the tree, at the same relative paths.
+    & $tar -xzf $archive -C $workFolder --include "$sourceRoot/*.md" --include "$sourceRoot/lib/*" --include "$sourceRoot/src/*" --include "$sourceRoot/m4/*" --include "$sourceRoot/configure.ac" --include "$sourceRoot/CMakeLists.txt"
+    if ($LASTEXITCODE -ne 0) { throw "tar could not extract the configure, C source and Markdown files from $archive." }
+    $sourceRootFull = (Join-Path $workFolder $sourceRoot).TrimEnd('\') + '\'
+    $scanFiles = @(Get-ChildItem -LiteralPath (Join-Path $workFolder $sourceRoot) -File -Recurse | Where-Object {
+        $relative = $_.FullName.Substring($sourceRootFull.Length).Replace('\', '/')
+        $relative -eq 'configure.ac' -or $relative -eq 'CMakeLists.txt' -or $relative -eq 'lib/curl_config-cmake.h.in' -or
+        $_.Extension -eq '.md' -or
+        (($_.Extension -eq '.c' -or $_.Extension -eq '.h') -and ($relative.StartsWith('lib/') -or $relative.StartsWith('src/'))) -or
+        ($_.Extension -eq '.m4' -and $relative.StartsWith('m4/')) })
+    if ($scanFiles.Count -eq 0) { throw "No configure, C source or Markdown files found at $Tag." }
+    foreach ($scanFile in $scanFiles) {
+        $scanRelative = $scanFile.FullName.Substring($sourceRootFull.Length)
+        # Upstream's root README.md would overwrite this folder's own README.md, so it is not vendored.
+        if ($scanRelative -eq 'README.md') { continue }
+        $scanDestination = Join-Path $destination $scanRelative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $scanDestination) -Force | Out-Null
+        Copy-Item -LiteralPath $scanFile.FullName -Destination $scanDestination -Force
+    }
+
 
     $certsDestination = Join-Path $destination 'certs'
     New-Item -ItemType Directory -Path $certsDestination -Force | Out-Null
