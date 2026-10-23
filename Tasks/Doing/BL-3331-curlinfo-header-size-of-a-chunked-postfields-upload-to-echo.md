@@ -30,3 +30,4 @@ Found by BL-3320's run of LibcurlEasyDifferentialTests (CURL_DIFFERENTIAL_REFERE
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 37e91894 db93e725.
