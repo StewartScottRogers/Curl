@@ -550,7 +550,8 @@ public sealed partial class HttpProtocolHandlerTests
             Http = new HttpRequestOptions
             {
                 Compressed = flags.Contains("--compressed"),
-                Raw = flags.Contains("--raw"),
+                PassesContentCoding = flags.Contains("--raw"),
+                PassesTransferCoding = flags.Contains("--raw"),
                 TransferEncoding = flags.Contains("--tr-encoding"),
                 IgnoreContentLength = flags.Contains("--ignore-content-length"),
                 Fail = flags.Contains("-f") ? HttpFailMode.Fail : HttpFailMode.None,

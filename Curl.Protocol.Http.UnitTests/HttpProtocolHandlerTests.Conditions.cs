@@ -360,6 +360,25 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_TimeConditionSentAsLastModified_SendsLastModifiedInRfc1123Form()
+    {
+        string expected = $"GET /f HTTP/1.1\r\nHost: 127.0.0.1:18793\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\nLast-Modified: {ConditionDate}\r\n\r\n";
+        TransferContext context = new TransferContext
+        {
+            Url = ConditionUrl(18793),
+            Output = new MemoryStream(),
+            TimeCondition = new TimeCondition(new DateTimeOffset(1994, 11, 6, 9, 49, 37, TimeSpan.FromHours(1)), TimeConditionKind.IfModifiedSince) { SentAsLastModified = true },
+        };
+        Diagnostics.Arrange("expected request", OneLine(expected));
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(WholeHead + "hello", 65536, expected))).ExecuteAsync(context);
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_TimeConditionOfTheLastTimeWindowsFormats_SendsIt()
     {
         const string expected = "GET /f HTTP/1.1\r\nHost: 127.0.0.1:18798\r\nUser-Agent: curl/8.22.0\r\nAccept: */*\r\n"

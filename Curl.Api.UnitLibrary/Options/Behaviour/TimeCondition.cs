@@ -15,6 +15,9 @@ public enum TimeCondition
     /// <summary><c>CURL_TIMECOND_IFUNMODSINCE</c> (2): transfer only if not modified since the time value.</summary>
     IfUnmodifiedSince = 2,
 
-    /// <summary><c>CURL_TIMECOND_LASTMOD</c> (3): transfer only if last modified at the time value.</summary>
+    /// <summary>
+    /// <c>CURL_TIMECOND_LASTMOD</c> (3): an HTTP request sends the time value as a <c>Last-Modified</c>
+    /// header, and the transfer is compared as <see cref="IfModifiedSince" /> is, as libcurl 8.22.0 does.
+    /// </summary>
     LastModified = 3,
 }

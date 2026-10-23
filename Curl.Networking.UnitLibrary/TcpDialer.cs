@@ -212,8 +212,34 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
             return connected;
         }
 
+        FailRefusedLoopbackAtOnce(socket, endPoint);
         await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
         return socket;
+    }
+
+    /// <summary>
+    /// On Windows, stops the SYN retransmissions of a connect to a loopback address (SIO_TCP_INITIAL_RTO with
+    /// no retransmissions), so a refused port fails at once with exit 7 as in curl 8.22.0 rather than after
+    /// about two seconds, which a short <c>--connect-timeout</c> reports as exit 28 (BL-3182).
+    /// </summary>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static void FailRefusedLoopbackAtOnce(Socket socket, IPEndPoint endPoint)
+    {
+        if (!OperatingSystem.IsWindows() || !IPAddress.IsLoopback(endPoint.Address))
+        {
+            return;
+        }
+
+        const int SioTcpInitialRto = unchecked((int)0x98000011);
+        var parameters = new byte[] { 0xFF, 0xFF, 0xFE, 0x00 };
+        try
+        {
+            socket.IOControl(SioTcpInitialRto, parameters, null);
+        }
+        catch (SocketException)
+        {
+            // Older Windows lacks the control: the connect then waits for the retransmissions as before.
+        }
     }
 
     /// <summary>
@@ -375,7 +401,9 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// names it when <see cref="TcpSocketOptions.FastOpen" /> is set, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
     /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count
-    /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on.
+    /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on. An IPv6 socket is made dual-stack
+    /// (<see cref="Socket.DualMode" />), so an IPv4-mapped address such as <c>[::ffff:127.0.0.1]</c> reaches an
+    /// IPv4 listener, as curl 8.22.0 does (BL-3174, ADR-0778).
     /// </summary>
     /// <remarks>
     /// A timer the platform refuses is left at the platform's value and the connection goes ahead,
@@ -386,6 +414,11 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     internal void ApplySocketOptions(Socket socket)
     {
         socket.NoDelay = SocketOptions.NoDelay;
+        if (socket.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            socket.DualMode = true;
+        }
+
         var platform = QualityOfServiceSocketOptions.CurrentPlatform;
         foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, platform).Concat(FastOpenSocketOption.For(SocketOptions, platform)))
         {

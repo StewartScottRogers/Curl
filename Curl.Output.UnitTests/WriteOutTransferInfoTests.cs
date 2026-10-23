@@ -55,6 +55,21 @@ public sealed class WriteOutTransferInfoTests
     }
 
     [TestMethod]
+    public void FromReport_FtpReportOverOneSecond_SpeedIsTheDownloadSizePerSecond()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        long oneSecond = TimeProvider.System.TimestampFrequency;
+        TransferReport report = new() { ResponseCode = 226, DownloadSize = 379, Timings = new TransferTimings(0, null, null, null, null, oneSecond) };
+        diagnostics.Arrange("download size", report.DownloadSize);
+
+        TransferInfo info = WriteOutTransferInfo.FromReport(TransferResult.Success(379) with { Report = report }, "ftp://example.test/readme.txt", TimeProvider.System);
+
+        string sizeAndSpeed = $"{info.SizeDownload} {info.SpeedDownload} {info.TotalTime}";
+        diagnostics.Act("size, speed and total time", sizeAndSpeed);
+        Assert.AreEqual("379 379 00:00:01", sizeAndSpeed);
+    }
+
+    [TestMethod]
     public void FromReport_NoReport_KeepsDefaultsAndTakesTheBytesTransferred()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

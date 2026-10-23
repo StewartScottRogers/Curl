@@ -1101,7 +1101,7 @@ public sealed partial class HttpProtocolHandlerTests
             {
                 Url = CurlUrl.Parse("http://example.com/"),
                 Output = output,
-                Http = new HttpRequestOptions { Compressed = true, Raw = raw },
+                Http = new HttpRequestOptions { Compressed = true, PassesContentCoding = raw, PassesTransferCoding = raw },
             };
             Diagnostics.Arrange("chunk size, raw", $"{chunkSize}, {raw}");
             Diagnostics.Arrange("expected request", OneLine(request));

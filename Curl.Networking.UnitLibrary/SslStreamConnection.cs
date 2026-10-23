@@ -119,6 +119,14 @@ internal sealed class SslStreamConnection(
     }
 
     /// <inheritdoc />
+    /// <remarks>Sends <c>close_notify</c>, then ends the TCP send side under it.</remarks>
+    public async ValueTask ShutDownSendingAsync(CancellationToken cancellationToken)
+    {
+        await sslStream.ShutdownAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        await plaintext.ShutDownSendingAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await sslStream.DisposeAsync().ConfigureAwait(false);

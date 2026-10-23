@@ -9,7 +9,9 @@ It contains only attribute wiring and forwarding calls: the generic host, the st
 (`CurlCommandTool`, the `curl` tool; `CurlTransferTool`, the `transfer` tool over a production
 `ManagedCurlEngine` the host creates once, as `Libcurl` does; `CurlVersionTool`, the `version` tool
 over that same engine; `CurlUrlTool`, the `parse_url` and `build_url` tools over that engine's URL
-handles), the `--ai-help` resource handlers over
+handles), the call-tool filter `CurlTransferTool.RefuseWrongArgumentShapes`, which refuses a
+`transfer` argument of the wrong JSON shape through `McpTransferRequestCheck.CheckArgumentShapes`
+before the SDK binds it (ADR-0771), the `--ai-help` resource handlers over
 `McpAiHelpResourceCatalogue` (`CurlAiHelpResourceHandlers`, ADR-0589), the runner adapters over `Curl.Console` and the engine
 (`InProcessCurlCommandRunner`), and the source-generated JSON context. Tool logic - checking,
 capping, turning a result into an error - lives in `Curl.Mcp.UnitLibrary`, never here; a branch

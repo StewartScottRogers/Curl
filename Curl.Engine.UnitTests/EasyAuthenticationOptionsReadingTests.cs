@@ -151,9 +151,13 @@ public sealed class EasyAuthenticationOptionsReadingTests
     }
 
     [TestMethod]
-    public void TryCheckUrlCredentials_ControlCodeInUrlUser_FailsUnlessAUserNameWins()
+    [DataRow("ftp://a%01b@h/")]
+    [DataRow("ftp://%01u:p@h/")]
+    [DataRow("ftp://u:%01p@h/")]
+    public void TryCheckUrlCredentials_ControlCodeInUrlCredentials_FailsUnlessAUserNameWins(string text)
     {
-        CurlUrl url = CurlUrl.Parse("ftp://a%01b@h/");
+        // The control code first (index 0) as well as inside, in the user name and in the password (AF-0364).
+        CurlUrl url = CurlUrl.Parse(text);
         Diagnostics.Arrange("url", url);
 
         bool refused = !TransferCredentialLookup.TryCheckUrlCredentials(new EasyAuthenticationOptions(), url, out TransferResult? failure);
@@ -176,6 +180,32 @@ public sealed class EasyAuthenticationOptionsReadingTests
 
         Assert.IsTrue(passed);
         Assert.IsNull(failure);
+    }
+
+    [TestMethod]
+    [DataRow("http://zz@h/", "zz", "")]
+    [DataRow("http://:x@h/", "", "x")]
+    public void TryLookUp_NoNetrcAndUrlGivesOnlyOneHalf_SendsItWithTheOtherHalfEmpty(string url, string user, string password)
+    {
+        Diagnostics.Arrange("url", url);
+
+        bool looked = Lookup().TryLookUp(new EasyAuthenticationOptions(), CurlUrl.Parse(url), out NetworkCredential? credentials, out _);
+        Diagnostics.Act("looked / credentials", $"{looked} / {credentials?.UserName}:{credentials?.Password}");
+
+        Assert.IsTrue(looked);
+        Assert.IsNotNull(credentials);
+        Assert.AreEqual(user, credentials.UserName);
+        Assert.AreEqual(password, credentials.Password);
+    }
+
+    [TestMethod]
+    public void TryLookUp_NoNetrcAndUrlWithEmptyUserInformation_SendsNoCredentials()
+    {
+        bool looked = Lookup().TryLookUp(new EasyAuthenticationOptions(), CurlUrl.Parse("http://@h/"), out NetworkCredential? credentials, out _);
+        Diagnostics.Act("looked / credentials", $"{looked} / {credentials?.UserName}");
+
+        Assert.IsTrue(looked);
+        Assert.IsNull(credentials);
     }
 
     private static TransferCredentialLookup Lookup(InMemoryDataFileReader? reader = null) =>

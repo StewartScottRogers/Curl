@@ -598,8 +598,8 @@ public sealed class CurlCommandRunnerTests
         Assert.AreEqual(2, exitCode);
         Diagnostics.Assert("stdout length", 0L, standardOutput.Length);
         Assert.AreEqual(0, standardOutput.Length);
-        Diagnostics.Diff("stderr", CommandLineRefusal.TryHelpLineNamingAiHelp + "\n", Lf(StandardErrorText));
-        Assert.AreEqual(CommandLineRefusal.TryHelpLineNamingAiHelp + NewLine, StandardErrorText);
+        Diagnostics.Diff("stderr", CommandLineRefusal.TryHelpLine + "\n", Lf(StandardErrorText));
+        Assert.AreEqual(CommandLineRefusal.TryHelpLine + NewLine, StandardErrorText);
         Diagnostics.Assert("file contexts", 0, file.Contexts.Count);
         Assert.IsEmpty(file.Contexts);
     }

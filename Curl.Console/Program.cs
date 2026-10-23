@@ -22,9 +22,12 @@ internal static class Program
         bool terminalRendersStyles = StandardOutputVirtualTerminal.RendersStyles(
             standardOutputIsTerminal, OperatingSystem.IsWindows(), virtualTerminal.Enable);
 
-        return await CurlComposition
-            .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal, terminalRendersStyles)
-            .RunAsync(args)
+        return await UnhandledExceptionGuard.RunAsync(
+                () => CurlComposition
+                    .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal, terminalRendersStyles)
+                    .RunAsync(args),
+                standardOutput,
+                standardError)
             .ConfigureAwait(false);
     }
 }

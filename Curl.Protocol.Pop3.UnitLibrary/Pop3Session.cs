@@ -50,7 +50,9 @@ internal sealed class Pop3Session(
     ITransferContext context,
     bool implicitTls,
     ISaslAuthenticator? saslAuthenticator = null,
-    ConnectionOpenedEvent? opened = null) : IAsyncDisposable
+    ConnectionOpenedEvent? opened = null,
+    Pop3KeptConnection? kept = null,
+    bool resumesKept = false) : IAsyncDisposable
 {
     private bool secure = implicitTls;
 
@@ -88,7 +90,8 @@ internal sealed class Pop3Session(
     public bool IsOpen { get; private set; }
 
     /// <summary>
-    /// Opens the session, lists or retrieves, and closes the session again with <c>QUIT</c>.
+    /// Opens or resumes the session, lists or retrieves, and closes the session again with
+    /// <c>QUIT</c> or, after a success, keeps the connection logged in for the next URL.
     /// </summary>
     /// <returns>
     /// A success carrying the body bytes written, or the failure that stopped the session.
@@ -103,7 +106,7 @@ internal sealed class Pop3Session(
         TransferResult result;
         try
         {
-            if (await OpenAsync(loginOptions).ConfigureAwait(false) is { } failure)
+            if (await OpenOrResumeAsync(loginOptions).ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -136,7 +139,7 @@ internal sealed class Pop3Session(
 
         if (!bodyCutOff)
         {
-            await QuitAsync().ConfigureAwait(false);
+            await QuitOrKeepAsync(result.ExitCode == CurlExitCode.Ok).ConfigureAwait(false);
         }
 
         return result;
@@ -330,6 +333,38 @@ internal sealed class Pop3Session(
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Opens and logs in on a new connection; on one a previous URL left logged in, carries on,
+    /// sending no <c>QUIT</c> at exit unless this transfer leaves it intact too (BL-3167).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenOrResumeAsync(Pop3LoginOptions loginOptions)
+    {
+        if (resumesKept)
+        {
+            kept!.QuitsOnShutDown = false;
+            return null;
+        }
+
+        return await OpenAsync(loginOptions).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Hands the connection back to the run's connection cache for the next URL when
+    /// <paramref name="keeps" /> is set, instead of sending <c>QUIT</c>, as curl keeps a
+    /// connection its <c>pop3_done</c> leaves valid (BL-3167); otherwise, or when the connection
+    /// cannot be kept, sends <c>QUIT</c>. Only a pooled connection the session still talks on,
+    /// not one <c>STLS</c> replaced, can be kept.
+    /// </summary>
+    private async ValueTask QuitOrKeepAsync(bool keeps)
+    {
+        if (keeps && securedConnection is null && kept is not null && kept.TryKeep())
+        {
+            return;
+        }
+
+        await QuitAsync().ConfigureAwait(false);
     }
 
     private async ValueTask QuitAsync()

@@ -6,7 +6,7 @@ namespace Curl.Cli;
 /// Why the command line was refused: the lines curl prints on standard error,
 /// <c>curl: option &lt;spelled&gt;: &lt;reason&gt;</c> (or, for <see cref="NoUrlSpecified"/>,
 /// <c>curl: (2) no URL specified</c>) followed by <see cref="TryHelpLine"/>, or, for <see cref="EmptyCommandLine"/>,
-/// <see cref="TryHelpLineNamingAiHelp"/> alone (ADR-0762), with the error lines curl printed on the way in front
+/// <see cref="TryHelpLine"/> alone, with the error lines curl printed on the way in front
 /// (one for <see cref="FileDoesNotExist"/>, <see cref="ContinueAtExclusiveWithRange"/> and
 /// <see cref="DataFileUnreadable"/>, any number for a refusal met inside a <c>-K</c> file), and the
 /// exit code, which is <see cref="CurlExitCode.FailedInit"/>
@@ -17,19 +17,13 @@ namespace Curl.Cli;
 /// It writes nothing itself; the console layer writes the lines and chooses the newline.
 /// </summary>
 /// <remarks>
-/// The message texts were checked byte for byte against the local curl 8.21.0 on 2026-09-26. The one deliberate
-/// difference from curl's bytes is <see cref="TryHelpLineNamingAiHelp"/> (ADR-0762).
+/// The message texts were checked byte for byte against the local curl 8.21.0 on 2026-09-26, and the empty
+/// command line's against curl 8.22.0 on 2026-10-22; none differs from curl's bytes (ADR-0762 is superseded).
 /// </remarks>
 public sealed class CommandLineRefusal
 {
-    /// <summary>The last line of every refusal except <see cref="EmptyCommandLine"/>, exactly as curl prints it.</summary>
+    /// <summary>The last line of every refusal, and the only line of <see cref="EmptyCommandLine"/>, exactly as curl prints it.</summary>
     public const string TryHelpLine = "curl: try 'curl --help' or 'curl --manual' for more information";
-
-    /// <summary>
-    /// The only line of <see cref="EmptyCommandLine"/>: <see cref="TryHelpLine"/> that also names <c>--ai-help</c>
-    /// (a deliberate difference from curl, ADR-0762).
-    /// </summary>
-    public const string TryHelpLineNamingAiHelp = "curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information";
 
     /// <summary>The first line of <see cref="NoUrlSpecified"/>.</summary>
     private const string NoUrlSpecifiedLine = "curl: (2) no URL specified";
@@ -285,16 +279,16 @@ public sealed class CommandLineRefusal
     }
 
     /// <summary>
-    /// Refuses an empty command line with <see cref="TryHelpLineNamingAiHelp"/> alone.
+    /// Refuses an empty command line with <see cref="TryHelpLine"/> alone.
     /// </summary>
     /// <remarks>
-    /// Measured with the local curl 8.21.0 on 2026-09-26: <c>curl</c> with no arguments prints only
-    /// the try-help line on standard error, no <c>no URL specified</c> line, and exits 2. Curl differs
-    /// in that line only, by naming <c>--ai-help</c> (ADR-0762).
+    /// Measured with the local curl 8.22.0 (Schannel) on 2026-10-22: <c>curl</c> with no arguments prints only
+    /// the try-help line on standard error, no <c>no URL specified</c> line, and exits 2. ADR-0762's
+    /// <c>--ai-help</c> variant of that line is superseded; <c>--ai-help</c> is named only in <c>curl --help</c>.
     /// </remarks>
-    /// <returns>A refusal of one line, <see cref="TryHelpLineNamingAiHelp"/>.</returns>
+    /// <returns>A refusal of one line, <see cref="TryHelpLine"/>.</returns>
     public static CommandLineRefusal EmptyCommandLine() =>
-        new(TryHelpLineNamingAiHelp);
+        new(TryHelpLine);
 
     /// <summary>
     /// Refuses a command line that, once read, asks for a multipart form post (<c>-F</c> /
@@ -364,9 +358,14 @@ public sealed class CommandLineRefusal
     /// the first line (measured with <c>-s --cacert nope</c> and <c>-s --knownhosts nope</c>, curl 8.21.0,
     /// 2026-09-28).
     /// </param>
-    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <param name="terminalColumns">
+    /// The width the first line wraps at, as curl 8.22.0's <c>errorf</c> wraps it (<see cref="WrappedMessage"/>;
+    /// measured on Windows on 2026-10-22, BL-3169), or <see langword="null"/> for
+    /// <see cref="WrappedMessage.TerminalColumns"/> of this process's <c>COLUMNS</c>.
+    /// </param>
+    /// <returns>A refusal of three lines or more, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineRefusal FileDoesNotExist(string spelledOption, string longOption, string file, bool errorsHidden)
+    public static CommandLineRefusal FileDoesNotExist(string spelledOption, string longOption, string file, bool errorsHidden, int? terminalColumns = null)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(longOption);
@@ -374,7 +373,7 @@ public sealed class CommandLineRefusal
 
         return new CommandLineRefusal(
             CurlExitCode.FailedInit,
-            errorsHidden ? [] : [$"curl: The file '{file}' provided to {longOption} does not exist"],
+            WrappedErrorLines(errorsHidden, $"The file '{file}' provided to {longOption} does not exist", terminalColumns),
             spelledOption,
             "is badly used here");
     }
@@ -394,16 +393,21 @@ public sealed class CommandLineRefusal
     /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c>, <c>-d@missing</c> or <c>--data=@missing</c>.</param>
     /// <param name="file">The file name after <c>@</c>, possibly empty.</param>
     /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
-    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <param name="terminalColumns">
+    /// The width the first line wraps at, as curl 8.22.0's <c>errorf</c> wraps it (<see cref="WrappedMessage"/>;
+    /// measured on Windows on 2026-10-22, BL-3169), or <see langword="null"/> for
+    /// <see cref="WrappedMessage.TerminalColumns"/> of this process's <c>COLUMNS</c>.
+    /// </param>
+    /// <returns>A refusal of three lines or more, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> or <paramref name="file"/> is <see langword="null"/>.</exception>
-    public static CommandLineRefusal DataFileUnreadable(string spelledOption, string file, bool errorsHidden)
+    public static CommandLineRefusal DataFileUnreadable(string spelledOption, string file, bool errorsHidden, int? terminalColumns = null)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(file);
 
         return new CommandLineRefusal(
             CurlExitCode.ReadError,
-            errorsHidden ? [] : [$"curl: Failed to open {file}"],
+            WrappedErrorLines(errorsHidden, $"Failed to open {file}", terminalColumns),
             spelledOption,
             ReadErrorReason);
     }
@@ -710,6 +714,15 @@ public sealed class CommandLineRefusal
     /// <summary>An error message's lines as curl prints them, or none when errors are hidden.</summary>
     private static IReadOnlyList<string> ErrorMessageLines(bool errorsHidden, string message) =>
         errorsHidden ? [] : WrappedMessage.Lines("curl: ", message);
+
+    /// <summary>
+    /// An error message's lines wrapped at <paramref name="terminalColumns"/>, or at this process's <c>COLUMNS</c>
+    /// when it is <see langword="null"/>, or none when errors are hidden.
+    /// </summary>
+    private static IReadOnlyList<string> WrappedErrorLines(bool errorsHidden, string message, int? terminalColumns) =>
+        errorsHidden
+            ? []
+            : WrappedMessage.Lines("curl: ", message, terminalColumns ?? WrappedMessage.TerminalColumns(Environment.GetEnvironmentVariable("COLUMNS")));
 
     private static CommandLineRefusal Create(string spelledOption, string reason)
     {

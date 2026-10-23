@@ -1,0 +1,17 @@
+using Curl.Conformance.Differential.Http.Routes.Bodies;
+using static Curl.Conformance.Differential.UnitTests.Http.Routes.Bodies.BodyRouteResponder;
+
+namespace Curl.Conformance.Differential.UnitTests.Http.Routes.Bodies;
+
+/// <summary>Pins the response bytes of <see cref="CrlfBodyRoute"/>.</summary>
+[TestClass]
+public sealed class CrlfBodyRouteTests
+{
+    [TestMethod]
+    public async Task RespondAsync_TwoRequests_AnswersMixedLineEndsAndKeepsTheConnection()
+    {
+        Assert.AreEqual(
+            string.Concat(Enumerable.Repeat($"HTTP/1.1 200 OK\r\n{Date}Content-Length: 26\r\n\r\nline1\r\nline2\nline3\r\n\u001A end\n", 2)),
+            await RespondAsync(new CrlfBodyRoute(), "GET /crlf-body HTTP/1.1\r\n\r\nGET /crlf-body HTTP/1.1\r\n\r\n"));
+    }
+}

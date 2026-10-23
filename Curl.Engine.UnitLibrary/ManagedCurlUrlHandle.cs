@@ -40,7 +40,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     ];
 
     /// <summary>The schemes whose handler takes login options (upstream's <c>PROTOPT_URLOPTIONS</c>).</summary>
-    private static readonly HashSet<string> SchemesWithLoginOptions = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> SchemesWithLoginOptions = new(StringComparer.OrdinalIgnoreCase)
     {
         "imap", "imaps", "pop3", "pop3s", "smtp", "smtps",
     };
@@ -145,7 +145,10 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>A bare <c>#</c> gives no fragment unless <c>CURLU_GET_EMPTY</c> asks for the empty one.</summary>
     private static UrlPartResult ReadFragment(UrlHandleParts parts, CurlUrlFlags flags) =>
-        Transformed(Shown(parts.Fragment, flags), CurlUrlCode.NoFragment, flags, CurlUrlPart.Fragment);
+        Transformed(ShownFragment(parts, flags), CurlUrlCode.NoFragment, flags, CurlUrlPart.Fragment);
+
+    private static string? ShownFragment(UrlHandleParts parts, CurlUrlFlags flags) =>
+        parts.EmptyFragmentSet ? parts.Fragment : Shown(parts.Fragment, flags);
 
     private static string? Shown(string? value, CurlUrlFlags flags) =>
         value is { Length: 0 } && !flags.HasFlag(CurlUrlFlags.GetEmpty) ? null : value;
@@ -159,7 +162,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     private static UrlPartResult ReadUrl(UrlHandleParts parts, CurlUrlFlags flags)
     {
         string tail = TailOf(parts, flags);
-        if (parts.Scheme == FileScheme)
+        if (string.Equals(parts.Scheme, FileScheme, StringComparison.OrdinalIgnoreCase))
         {
             return UrlPartResult.Found("file://" + tail);
         }
@@ -176,7 +179,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>The path, then the query and fragment when <see cref="Shown" /> shows them.</summary>
     private static string TailOf(UrlHandleParts parts, CurlUrlFlags flags) =>
-        (parts.Path ?? "/") + Suffix('?', Shown(parts.Query, flags)) + Suffix('#', Shown(parts.Fragment, flags));
+        (parts.Path ?? "/") + Suffix('?', Shown(parts.Query, flags)) + Suffix('#', ShownFragment(parts, flags));
 
     /// <summary>The scheme set, else <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, else <see langword="null" />.</summary>
     private static string? SchemeForUrl(UrlHandleParts parts, CurlUrlFlags flags) =>
@@ -270,8 +273,28 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         return value.Length == 0 || HoldsDisallowedSpace(value, flags) ? CurlUrlCode.MalformedInput : ParseWithoutScheme(value, flags);
     }
 
-    private CurlUrlCode ParseAbsolute(string value, CurlUrlFlags flags) =>
-        IsAcceptedScheme(value, flags) ? Parse(value, flags) : CurlUrlCode.UnsupportedScheme;
+    private CurlUrlCode ParseAbsolute(string value, CurlUrlFlags flags)
+    {
+        if (!IsAcceptedScheme(value, flags))
+        {
+            return CurlUrlCode.UnsupportedScheme;
+        }
+
+        return LacksSlashAfterScheme(value) ? CurlUrlCode.BadSlashes : Parse(value, flags);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="value" />, a URL with a scheme other than <c>file</c>, has no <c>/</c> after the
+    /// scheme&apos;s <c>:</c>, as <c>http:a</c> and <c>http:\a</c> have: upstream refuses those with
+    /// <c>CURLUE_BAD_SLASHES</c> (BL-3197).
+    /// </summary>
+    private static bool LacksSlashAfterScheme(string value)
+    {
+        int colon = value.IndexOf(':', StringComparison.Ordinal);
+
+        return !value.AsSpan(0, colon).Equals(FileScheme, StringComparison.OrdinalIgnoreCase)
+            && !value.AsSpan(colon + 1).StartsWith("/", StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// Whether <paramref name="value" /> holds a control byte (below 0x20, or 0x7f) anywhere, which
@@ -352,9 +375,9 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>
     /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
-    /// <c>CURLU_GUESS_SCHEME</c>, else <see cref="CurlUrlCode.BadSlashes" />, as upstream's <c>parseurl</c>
-    /// answers text whose accepted scheme (<see cref="IsAcceptedScheme" />) has no <c>/</c> after its colon
-    /// (<c>http:80/x</c>); with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
+    /// <c>CURLU_GUESS_SCHEME</c>, the only other way a URL with no scheme gets here (<see cref="ParseWithoutScheme" />
+    /// asks for one of the two, and <see cref="ParseAbsolute" /> refuses text with no <c>/</c> after its scheme's
+    /// colon, such as <c>http:80/x</c>, with <see cref="CurlUrlCode.BadSlashes" /> first); with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
     /// <c>CURLU_NON_SUPPORT_SCHEME</c>.
     /// </summary>
     private CurlUrlCode Accept(string value, CurlUrlFlags flags, UrlHandleParts newParts)
@@ -366,12 +389,9 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             return supported ? Keep(newParts) : CurlUrlCode.UnsupportedScheme;
         }
 
-        if (flags.HasFlag(CurlUrlFlags.DefaultScheme))
-        {
-            return Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme);
-        }
-
-        return flags.HasFlag(CurlUrlFlags.GuessScheme) ? Keep(newParts) : CurlUrlCode.BadSlashes;
+        return flags.HasFlag(CurlUrlFlags.DefaultScheme)
+            ? Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme)
+            : Keep(newParts);
     }
 
     /// <summary>

@@ -18,8 +18,6 @@ public sealed class HttpResponseBodyFramingTests
     [DataRow("chunked", "3", false, false, true, null, DisplayName = "Chunked wins over Content-Length")]
     [DataRow(null, "3", false, false, false, 3L, DisplayName = "Content-Length")]
     [DataRow(null, null, false, false, false, null, DisplayName = "Neither runs to close")]
-    [DataRow("chunked", "3", true, false, false, null, DisplayName = "--raw chunked runs to close")]
-    [DataRow("gzip, chunked", null, true, false, false, null, DisplayName = "--raw refuses no coding")]
     [DataRow(null, "3", true, false, false, 3L, DisplayName = "--raw keeps Content-Length")]
     [DataRow(null, "3", false, true, false, null, DisplayName = "--ignore-content-length runs to close")]
     [DataRow("chunked", "3", false, true, true, null, DisplayName = "--ignore-content-length still decodes chunked")]
@@ -51,6 +49,29 @@ public sealed class HttpResponseBodyFramingTests
         Assert.AreEqual(isChunked, framing.IsChunked);
         Assert.AreEqual(expectedLength, framing.ContentLength);
         Assert.AreEqual(!isChunked && expectedLength is null, framing.RunsToClose);
+    }
+
+    [TestMethod]
+    [DataRow("chunked", "3", false, DisplayName = "--raw chunked ignores Content-Length")]
+    [DataRow("gzip, chunked", null, false, DisplayName = "--raw refuses no coding")]
+    [DataRow("chunked", null, true, DisplayName = "--raw --tr-encoding chunked")]
+    public void Of_RawChunked_PassesTheChunksAndEndsAtTheLastOne(string transferEncoding, string? contentLength, bool decodesTransferCoding)
+    {
+        List<HttpResponseHeader> headers = [new("Transfer-Encoding", transferEncoding)];
+        if (contentLength is not null)
+        {
+            headers.Add(new("Content-Length", contentLength));
+        }
+
+        Diagnostics.Arrange("Transfer-Encoding, Content-Length, --tr-encoding", $"{transferEncoding}, {contentLength ?? "(none)"}, {decodesTransferCoding}");
+
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(headers, true, false, decodesTransferCoding);
+
+        Diagnostics.Act("PassesChunks, IsChunked, RunsToClose", $"{framing.PassesChunks}, {framing.IsChunked}, {framing.RunsToClose}");
+        Assert.IsTrue(framing.PassesChunks);
+        Assert.IsFalse(framing.IsChunked);
+        Assert.IsNull(framing.ContentLength);
+        Assert.IsFalse(framing.RunsToClose);
     }
 
     [TestMethod]

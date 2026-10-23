@@ -68,8 +68,11 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="FollowLocation.None" /> as <see cref="HttpRequestOptions.FollowRedirects" />;
     /// <see cref="EasyHttpOptions.MaxRedirects" /> verbatim; <see cref="EasyHttpOptions.HttpVersion" /> as
     /// <see cref="HttpRequestOptions.Version" />, as <see cref="HttpVersionMapping.ToHttpVersionPreference" />
-    /// maps it; a set <see cref="EasyHttpOptions.AcceptEncoding" /> as <see cref="HttpRequestOptions.Compressed" />;
-    /// both decodings off (<c>--raw</c>) as <see cref="HttpRequestOptions.Raw" />;
+    /// maps it; a set <see cref="EasyHttpOptions.AcceptEncoding" /> as <see cref="HttpRequestOptions.Compressed" />
+    /// and, when not empty, exactly as given as <see cref="HttpRequestOptions.AcceptEncoding" /> (ADR-0777);
+    /// <see cref="EasyHttpOptions.HttpContentDecoding" /> and <see cref="EasyHttpOptions.HttpTransferDecoding" /> off
+    /// (each half of <c>--raw</c>) as <see cref="HttpRequestOptions.PassesContentCoding" /> and
+    /// <see cref="HttpRequestOptions.PassesTransferCoding" />, each on its own (ADR-0780);
     /// <see cref="EasyHttpOptions.TransferEncoding" />, <see cref="EasyHttpOptions.IgnoreContentLength" /> and
     /// <see cref="EasyHttpOptions.Http09Allowed" /> verbatim; and <see cref="EasyHttpOptions.Expect100Timeout" /> as
     /// <see cref="HttpRequestOptions.ContinueWait" />. <see cref="EasyTransferOptions.CustomRequest" /> as
@@ -122,8 +125,10 @@ internal static class HttpRequestOptionsMapping
             HttpSignature = HttpSignatureSetup.Of(authentication).Settings,
             Version = HttpVersionMapping.ToHttpVersionPreference(http.HttpVersion),
             Compressed = http.AcceptEncoding is not null,
+            AcceptEncoding = http.AcceptEncoding is { Length: > 0 } given ? given : HttpRequestOptions.DefaultAcceptEncoding,
             TransferEncoding = http.TransferEncoding,
-            Raw = !http.HttpContentDecoding && !http.HttpTransferDecoding,
+            PassesContentCoding = !http.HttpContentDecoding,
+            PassesTransferCoding = !http.HttpTransferDecoding,
             IgnoreContentLength = http.IgnoreContentLength,
             AllowHttp09Reply = http.Http09Allowed,
             Http200Aliases = http.Http200Aliases,
@@ -208,8 +213,18 @@ internal static class HttpRequestOptionsMapping
 
     /// <summary>
     /// The <see cref="EasyHttpOptions.PostFields" /> body, or <see langword="null" /> when there is none, as
-    /// under <c>-G</c>, which moved it into the query.
+    /// under <c>-G</c>, which moved it into the query. Only its first <see cref="EasyHttpOptions.PostFieldSize" />
+    /// bytes are sent when that is not negative (<c>CURLOPT_POSTFIELDSIZE</c>, BL-3190), never more than the data
+    /// holds (ADR-0773).
     /// </summary>
     private static BytesBody? PostFieldsBodyOf(EasyHttpOptions http) =>
-        http.PostFields is { } data ? new BytesBody(data, FormUrlEncoded) : null;
+        http.PostFields is { } data ? new BytesBody(SizedPostFieldsOf(data, http.PostFieldSize), FormUrlEncoded) : null;
+
+    /// <summary>
+    /// <paramref name="data" /> cut to <paramref name="size" /> bytes when that is not negative and shorter, as
+    /// libcurl sends <c>CURLOPT_POSTFIELDSIZE</c> bytes of <c>CURLOPT_POSTFIELDS</c>; a larger size sends the whole
+    /// data rather than reading past it (ADR-0773).
+    /// </summary>
+    private static ReadOnlyMemory<byte> SizedPostFieldsOf(ReadOnlyMemory<byte> data, long size) =>
+        size < 0 || size >= data.Length ? data : data[..(int)size];
 }

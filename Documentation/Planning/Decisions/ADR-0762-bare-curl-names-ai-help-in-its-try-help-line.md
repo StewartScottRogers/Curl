@@ -1,6 +1,6 @@
 # ADR-0762 — Bare curl names --ai-help in its try-help line
 
-- Status: Accepted
+- Status: Superseded by ADR-0769 (Stewart's decision of 2026-10-22, BL-3185)
 - Date: 2026-10-22
 - Task: BL-3145
 - Decided by Stewart; scope decided by Claude under Stewart's delegation.
@@ -28,3 +28,12 @@ agent looks for guidance and no script parses it for a reason.
 
 This is a deliberate, single-output difference from curl 8.22.0. The `--ai-help` index lists no entry
 points, so it is unchanged.
+
+## Superseded
+
+On 2026-10-22 Stewart decided (BL-3171 item 3, carried out by BL-3185) that bare `curl` prints curl
+8.22.0's exact line, `curl: try 'curl --help' or 'curl --manual' for more information`, and exits 2, as
+the measured curl 8.22.0 (Schannel) does on Windows and upstream's `helpf` does elsewhere.
+`CommandLineRefusal.TryHelpLineNamingAiHelp` is gone and `CommandLineRefusal.EmptyCommandLine` returns
+`CommandLineRefusal.TryHelpLine`. `--ai-help` is named only in `curl --help`'s footer
+(`CurlHelpText.AiHelpUsageLine`, ADR-0224).

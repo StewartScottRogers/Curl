@@ -328,7 +328,9 @@ internal sealed class FtpSession(
     /// <returns>
     /// The transfer's outcome, its <see cref="TransferReport.ResponseCode" /> the code of
     /// the last reply read before <c>QUIT</c>, as curl 8.21.0 reports
-    /// <c>%{response_code}</c> for FTP (BL-392), and under <c>-R</c> a success's
+    /// <c>%{response_code}</c> for FTP (BL-392), its <see cref="TransferReport.DownloadSize" />
+    /// or, for an upload, <see cref="TransferReport.UploadSize" /> the bytes this transfer
+    /// moved, a resumed download's offset not counted (BL-3166), and under <c>-R</c> a success's
     /// <see cref="TransferResult.SourceLastWriteTimeUtc" /> the time <c>MDTM</c> named.
     /// </returns>
     public async ValueTask<TransferResult> RunAsync()
@@ -347,9 +349,16 @@ internal sealed class FtpSession(
 
         trace.Ended(result.ExitCode);
         log.SessionEnded(result, context.TimeProvider.GetElapsedTime(started));
+        bool uploaded = context.Upload is not null;
         return result with
         {
-            Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath },
+            Report = new TransferReport
+            {
+                ResponseCode = lastReplyCode,
+                FtpEntryPath = entryPath,
+                DownloadSize = uploaded ? 0 : result.BytesTransferred,
+                UploadSize = uploaded ? result.BytesTransferred : 0,
+            },
             SourceLastWriteTimeUtc = result.IsSuccess && context.RemoteTime ? modifiedUtc : null,
         };
     }
@@ -1046,7 +1055,7 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// The listing command: <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise, with the
+    /// The listing command: <see cref="ListVerb" />, with the
     /// directory as its argument under <c>--ftp-method nocwd</c>.
     /// </summary>
     private string ListCommand(FtpUrlPath path) =>
@@ -1056,8 +1065,13 @@ internal sealed class FtpSession(
     private string DownloadPretArgument(FtpUrlPath path, bool listing) =>
         listing ? ListVerb : "RETR " + path.FileName;
 
-    /// <summary>The listing verb: <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise.</summary>
-    private string ListVerb => typeCode.ListOnly ? "NLST" : "LIST";
+    /// <summary>
+    /// The listing verb: <c>-X</c>'s command when one was given, as upstream's
+    /// <c>ftp_state_list</c> sends <c>CURLOPT_CUSTOMREQUEST</c> in its place (BL-3165);
+    /// otherwise <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise. A file download keeps
+    /// <c>RETR</c> whatever <c>-X</c> says.
+    /// </summary>
+    private string ListVerb => context.Http?.CustomMethod ?? (typeCode.ListOnly ? "NLST" : "LIST");
 
     /// <summary>
     /// Uploads <paramref name="upload" /> to the file <paramref name="path" /> names: exit 3,
@@ -2241,6 +2255,7 @@ internal sealed class FtpSession(
     {
         ReportRememberedDirectory();
         trace.ClosingDataConnection();
+        await CloseDataConnectionAsync().ConfigureAwait(false);
         FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
         trace.TransferReplyRead(complete);
         if (expectedSize is { } expected && bytesTransferred < expected)
@@ -2255,6 +2270,40 @@ internal sealed class FtpSession(
         }
 
         return await QuitAndKeepConnectionAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes the data connection, if one is still open, before the end-of-transfer reply is
+    /// read, as curl 8.22.0's <c>ftp_done</c> closes it first: a server that waits for the
+    /// client to close the data connection answers <c>426</c> after its own timeout when the
+    /// close comes only after the reply (BL-3161).
+    /// </summary>
+    private async ValueTask CloseDataConnectionAsync()
+    {
+        IConnection? data = dataConnection;
+        dataConnection = null;
+        if (data is not null)
+        {
+            await ShutDownSendingQuietlyAsync(data).ConfigureAwait(false);
+            await data.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Ends the data connection's send side gracefully - TLS <c>close_notify</c>, then FIN - so
+    /// the close is not a reset, which servers such as Rebex answer with <c>426</c> (BL-3179,
+    /// ADR-0770). A peer already gone leaves nothing to end, as curl ignores a failed shutdown.
+    /// </summary>
+    private async ValueTask ShutDownSendingQuietlyAsync(IConnection data)
+    {
+        try
+        {
+            await data.ShutDownSendingAsync(control.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The peer ended the connection first.
+        }
     }
 
     /// <summary>

@@ -35,6 +35,10 @@ namespace Curl.Protocol.Smtp;
 /// message through <see cref="SmtpMailTransaction" /> (BL-542). Otherwise it sends
 /// <c>VRFY</c>, <c>EXPN</c>, <c>HELP</c> or the <c>-X</c> command through
 /// <see cref="SmtpCommandTransfer" /> (BL-543).</item>
+/// <item>Given a <see cref="SmtpKeptConnection" /> a previous URL left greeted, the session
+/// skips the greeting, <c>EHLO</c> and <c>AUTH</c> and carries on with its envelope; a
+/// success on a connection <c>STARTTLS</c> did not replace keeps it for the next URL instead
+/// of sending <c>QUIT</c> (BL-3181).</item>
 /// </list>
 /// </remarks>
 internal sealed class SmtpSession(
@@ -45,7 +49,8 @@ internal sealed class SmtpSession(
     string domain,
     bool implicitTls,
     SmtpCommandLineText commandLineText,
-    ConnectionOpenedEvent? opened) : IAsyncDisposable
+    ConnectionOpenedEvent? opened,
+    SmtpKeptConnection kept) : IAsyncDisposable
 {
     private const int StartTlsAccepted = 220;
 
@@ -74,7 +79,7 @@ internal sealed class SmtpSession(
     {
         try
         {
-            if ((await OpenAsync().ConfigureAwait(false) ?? await AuthenticateAsync().ConfigureAwait(false)) is { } failure)
+            if (await OpenOrResumeAsync().ConfigureAwait(false) is { } failure)
             {
                 return failure;
             }
@@ -131,6 +136,31 @@ internal sealed class SmtpSession(
 
     /// <summary>Whether the last accepted <c>EHLO</c> advertised <paramref name="keyword" />; never after <c>HELO</c>.</summary>
     private bool Advertises(string keyword) => capabilities?.Advertises(keyword) == true;
+
+    /// <summary>
+    /// On a connection a previous URL kept (its <see cref="SmtpKeptConnection.QuitsOnShutDown" />
+    /// set), takes back the greeting's capabilities and login and sends nothing, clearing the flag
+    /// so a failure here sends no <c>QUIT</c> at exit; otherwise opens and authenticates, and
+    /// records both on the kept connection for a later URL (BL-3181).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenOrResumeAsync()
+    {
+        if (kept.QuitsOnShutDown)
+        {
+            kept.QuitsOnShutDown = false;
+            capabilities = kept.Capabilities;
+            authenticated = kept.IsAuthenticated;
+            channel.KeptConnection = kept;
+            return null;
+        }
+
+        TransferResult? failure = await OpenAsync().ConfigureAwait(false) ?? await AuthenticateAsync().ConfigureAwait(false);
+        kept.Capabilities = capabilities;
+        kept.IsAuthenticated = authenticated;
+        channel.KeptConnection = kept;
+
+        return failure;
+    }
 
     private async ValueTask<TransferResult?> AuthenticateAsync()
     {

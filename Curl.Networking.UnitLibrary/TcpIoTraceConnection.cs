@@ -95,5 +95,9 @@ internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents ev
         inner.ClearTlsAsync(sendCloseNotifyFirst, cancellationToken);
 
     /// <inheritdoc />
+    public ValueTask ShutDownSendingAsync(CancellationToken cancellationToken) =>
+        inner.ShutDownSendingAsync(cancellationToken);
+
+    /// <inheritdoc />
     public ValueTask DisposeAsync() => inner.DisposeAsync();
 }

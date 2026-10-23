@@ -1,4 +1,6 @@
+using System.Collections.Frozen;
 using System.Text;
+using System.Text.Json;
 
 namespace Curl.Mcp;
 
@@ -33,6 +35,78 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
             ?? CheckBodyAllowed(request);
         return failure is null ? DecodeBody(request) : new McpTransferRequestCheck(failure, null);
     }
+
+    /// <summary>
+    /// Checks the shapes of the <c>transfer</c> tool's raw JSON arguments before they are bound to an
+    /// <see cref="McpTransferRequest" /> (ADR-0771), so that a wrong shape, such as <c>headers</c> as an
+    /// object or <c>body</c> as a string, is refused naming the field and the shape it must have. An
+    /// argument the tool has no field for is left to the binder, which ignores it.
+    /// </summary>
+    /// <param name="arguments">The tool call's arguments by name; <see langword="null" /> when it has none.</param>
+    /// <returns>The tool error naming the first argument of the wrong shape; <see langword="null" /> when every shape is right.</returns>
+    public static McpToolFailure? CheckArgumentShapes(IEnumerable<KeyValuePair<string, JsonElement>>? arguments)
+    {
+        foreach ((string name, JsonElement value) in arguments ?? [])
+        {
+            if (ArgumentShapes.TryGetValue(name, out McpArgumentShape? shape) && !shape.Fits(value))
+            {
+                return McpToolFailure.InvalidRequest(name, $"it must be {shape.Description}, not {DescribeKind(value.ValueKind)}.");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The shape each argument of the <c>transfer</c> tool must have, by its name.</summary>
+    private static readonly FrozenDictionary<string, McpArgumentShape> ArgumentShapes = new Dictionary<string, McpArgumentShape>
+    {
+        ["url"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["method"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["headers"] = new("an array of objects with a string name and a string value", IsHeaderArrayOrNull),
+        ["body"] = new("an object with a string content and a boolean isBase64", IsBodyOrNull),
+        ["followRedirects"] = new("a boolean", IsBoolean),
+        ["timeoutSeconds"] = new("a number", value => IsKindOrNull(value, JsonValueKind.Number)),
+        ["insecure"] = new("a boolean", IsBoolean),
+        ["proxy"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+        ["userAgent"] = new("a string", value => IsKindOrNull(value, JsonValueKind.String)),
+    }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    private static bool IsKindOrNull(JsonElement value, JsonValueKind kind) =>
+        value.ValueKind == kind || value.ValueKind == JsonValueKind.Null;
+
+    private static bool IsBoolean(JsonElement value) =>
+        value.ValueKind is JsonValueKind.True or JsonValueKind.False;
+
+    private static bool IsHeaderArrayOrNull(JsonElement value) =>
+        value.ValueKind == JsonValueKind.Null
+        || (value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(IsHeader));
+
+    private static bool IsHeader(JsonElement header) =>
+        header.ValueKind == JsonValueKind.Object
+        && HasPropertyOfShape(header, "name", JsonValueKind.String)
+        && HasPropertyOfShape(header, "value", JsonValueKind.String);
+
+    /// <summary>A body needs its <c>content</c>, as it is the text sent; <c>isBase64</c> may be left out, and then is false.</summary>
+    private static bool IsBodyOrNull(JsonElement value) =>
+        value.ValueKind == JsonValueKind.Null
+        || (value.ValueKind == JsonValueKind.Object
+            && value.TryGetProperty("content", out JsonElement content)
+            && content.ValueKind == JsonValueKind.String
+            && (!value.TryGetProperty("isBase64", out JsonElement isBase64) || IsBoolean(isBase64)));
+
+    /// <summary>Whether <paramref name="element" />'s <paramref name="name" /> property is there and of <paramref name="kind" />.</summary>
+    private static bool HasPropertyOfShape(JsonElement element, string name, JsonValueKind kind) =>
+        element.TryGetProperty(name, out JsonElement property) && property.ValueKind == kind;
+
+    private static string DescribeKind(JsonValueKind kind) => kind switch
+    {
+        JsonValueKind.Object => "an object",
+        JsonValueKind.Array => "an array",
+        JsonValueKind.String => "a string",
+        JsonValueKind.Number => "a number",
+        JsonValueKind.True or JsonValueKind.False => "a boolean",
+        _ => "null",
+    };
 
     /// <summary>The "://" test keeps <see cref="Uri" /> from reading a bare path such as <c>/tmp/x</c> as an absolute <c>file</c> URI.</summary>
     private static McpToolFailure? CheckUrl(string url)
@@ -118,4 +192,9 @@ public sealed record McpTransferRequestCheck(McpToolFailure? Failure, byte[]? Bo
     /// <summary>Whether <paramref name="text" /> is an RFC 9110 token: one or more letters, digits and token symbols.</summary>
     private static bool IsToken(string? text) =>
         !string.IsNullOrEmpty(text) && text.All(character => char.IsAsciiLetterOrDigit(character) || TokenSymbols.Contains(character, StringComparison.Ordinal));
+
+    /// <summary>The shape one argument must have: its description, as the tool error names it, and its test.</summary>
+    /// <param name="Description">The shape, e.g. <c>a string</c>.</param>
+    /// <param name="Fits">Whether a JSON value has the shape.</param>
+    private sealed record McpArgumentShape(string Description, Func<JsonElement, bool> Fits);
 }

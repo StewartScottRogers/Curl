@@ -18,6 +18,9 @@ internal static class UrlPartSetter
     /// <summary>The longest scheme upstream accepts (<c>MAX_SCHEME_LEN</c>).</summary>
     private const int MaximumSchemeLength = 40;
 
+    /// <summary>The longest host name a set accepts, as curl 8.22.0 refuses a longer one (BL-3197).</summary>
+    private const int MaximumHostLength = 255;
+
     private const string HexDigits = "0123456789ABCDEF";
 
     /// <summary>The bytes upstream's set leaves as they are under <c>CURLU_URLENCODE</c> (<c>ISUNRESERVED</c>).</summary>
@@ -45,7 +48,7 @@ internal static class UrlPartSetter
         parts => parts with { Port = null },
         parts => parts with { Path = null },
         parts => parts with { Query = null },
-        parts => parts with { Fragment = null },
+        parts => parts with { Fragment = null, EmptyFragmentSet = false },
         parts => parts with { ZoneId = null },
     ];
 
@@ -53,15 +56,15 @@ internal static class UrlPartSetter
     private static readonly Func<UrlHandleParts, string, CurlUrlFlags, UrlSetResult>[] Setters =
     [
         SetScheme,
-        (parts, value, flags) => UrlSetResult.Set(parts with { User = Stored(value, flags) }),
-        (parts, value, flags) => UrlSetResult.Set(parts with { Password = Stored(value, flags) }),
-        (parts, value, flags) => UrlSetResult.Set(parts with { Options = Stored(value, flags) }),
+        (parts, value, flags) => UrlSetResult.Set(parts with { User = StoredOrUnset(value, flags) }),
+        (parts, value, flags) => UrlSetResult.Set(parts with { Password = StoredOrUnset(value, flags) }),
+        (parts, value, flags) => UrlSetResult.Set(parts with { Options = StoredOrUnset(value, flags) }),
         SetHost,
         (parts, value, _) => SetPort(parts, value),
         (parts, value, flags) => UrlSetResult.Set(parts with { Path = WithLeadingSlash(Stored(value, flags, inPath: true)) }),
         SetQuery,
-        (parts, value, flags) => UrlSetResult.Set(parts with { Fragment = Stored(value, flags) }),
-        (parts, value, flags) => UrlSetResult.Set(parts with { ZoneId = Stored(value, flags) }),
+        SetFragment,
+        (parts, value, flags) => UrlSetResult.Set(parts with { ZoneId = StoredOrUnset(value, flags) }),
     ];
 
     /// <summary>The parts with <paramref name="part" /> cleared, as <c>curl_url_set</c> with a null value does.</summary>
@@ -80,16 +83,15 @@ internal static class UrlPartSetter
         Setters[(int)part - 1](parts, value, flags);
 
     /// <summary>
-    /// A scheme: 1 to 40 characters, one libcurl supports unless <c>CURLU_NON_SUPPORT_SCHEME</c>, a
+    /// A scheme, kept in the case given as curl 8.22.0 keeps it: 1 to 40 characters, one libcurl supports unless <c>CURLU_NON_SUPPORT_SCHEME</c>, a
     /// letter then letters, digits, <c>+</c>, <c>-</c> or <c>.</c>; checked in upstream's order.
     /// </summary>
     private static UrlSetResult SetScheme(UrlHandleParts parts, string value, CurlUrlFlags flags)
     {
-        string scheme = value.ToLowerInvariant();
-        CurlUrlCode code = SchemeCode(value, scheme, flags);
+        CurlUrlCode code = SchemeCode(value, value.ToLowerInvariant(), flags);
 
         return code == CurlUrlCode.Ok
-            ? UrlSetResult.Set(parts with { Scheme = scheme, SchemeGuessed = false })
+            ? UrlSetResult.Set(parts with { Scheme = value, SchemeGuessed = false })
             : UrlSetResult.Refused(code);
     }
 
@@ -121,7 +123,8 @@ internal static class UrlPartSetter
 
     /// <summary>
     /// A host, which clears the zone id: empty only under <c>CURLU_NO_AUTHORITY</c>; encoded under
-    /// <c>CURLU_URLENCODE</c>; else a name or bracketed IPv6 address Curl's URL parser accepts, a name
+    /// <c>CURLU_URLENCODE</c>, where a host that needed an escape is refused, as upstream checks the encoded text;
+    /// no longer than 255 characters; and a name or bracketed IPv6 address Curl's URL parser accepts, a name
     /// kept as given (curl 8.22.0 stores <c>%43url.se</c> and <c>0xff</c> unnormalised) and an IPv6
     /// address normalised with its zone id kept apart, or <see cref="CurlUrlCode.BadHostname" />, which
     /// a blank host under <c>CURLU_URLENCODE</c> is too (lib1560).
@@ -136,9 +139,9 @@ internal static class UrlPartSetter
                 : UrlSetResult.Refused(CurlUrlCode.BadHostname);
         }
 
-        return flags.HasFlag(CurlUrlFlags.UrlEncode) && !string.IsNullOrWhiteSpace(value)
-            ? UrlSetResult.Set(parts with { Host = host, ZoneId = null })
-            : CheckedHost(parts, host);
+        bool refused = host.Length > MaximumHostLength || (flags.HasFlag(CurlUrlFlags.UrlEncode) && host.Contains('%', StringComparison.Ordinal));
+
+        return refused ? UrlSetResult.Refused(CurlUrlCode.BadHostname) : CheckedHost(parts, host);
     }
 
     private static UrlSetResult CheckedHost(UrlHandleParts parts, string host)
@@ -172,11 +175,12 @@ internal static class UrlPartSetter
     /// <summary>
     /// A query: under <c>CURLU_URLENCODE</c> a space is <c>+</c>, and under <c>CURLU_APPENDQUERY</c> the
     /// first <c>=</c> stays and the text is joined to a query already set with one <c>&amp;</c>; an
-    /// empty text is stored as the empty query, appended or not, as curl 8.22.0 does (lib1560).
+    /// empty text is stored as the empty query, or under <c>CURLU_APPENDQUERY</c> without <c>CURLU_URLENCODE</c>
+    /// appended as a lone <c>&amp;</c>, as curl 8.22.0 does (lib1560, BL-3197).
     /// </summary>
     private static UrlSetResult SetQuery(UrlHandleParts parts, string value, CurlUrlFlags flags)
     {
-        bool append = flags.HasFlag(CurlUrlFlags.AppendQuery) && value.Length > 0;
+        bool append = AppendsQuery(value, flags);
         string query = Stored(value, flags, plusForSpace: true, keepFirstEquals: append);
         string? existing = parts.Query;
         if (append && existing is { Length: > 0 })
@@ -186,6 +190,29 @@ internal static class UrlPartSetter
 
         return UrlSetResult.Set(parts with { Query = query });
     }
+
+    /// <summary>Whether a query set appends: under <c>CURLU_APPENDQUERY</c>, unless an empty text is encoded to nothing.</summary>
+    private static bool AppendsQuery(string value, CurlUrlFlags flags) =>
+        flags.HasFlag(CurlUrlFlags.AppendQuery) && (value.Length > 0 || !flags.HasFlag(CurlUrlFlags.UrlEncode));
+
+    /// <summary>
+    /// A fragment: an empty one set without <c>CURLU_URLENCODE</c> is kept and shown as a bare <c>#</c>,
+    /// and under <c>CURLU_URLENCODE</c> leaves the fragment unset, as curl 8.22.0 does (BL-3197).
+    /// </summary>
+    private static UrlSetResult SetFragment(UrlHandleParts parts, string value, CurlUrlFlags flags)
+    {
+        string? fragment = StoredOrUnset(value, flags);
+
+        return UrlSetResult.Set(parts with { Fragment = fragment, EmptyFragmentSet = fragment is { Length: 0 } });
+    }
+
+    /// <summary>
+    /// The text <see cref="Stored" /> gives, or <see langword="null" /> for an empty text under
+    /// <c>CURLU_URLENCODE</c>: upstream encodes nothing into a buffer it never allocated and so stores no
+    /// part at all.
+    /// </summary>
+    private static string? StoredOrUnset(string value, CurlUrlFlags flags) =>
+        value.Length == 0 && flags.HasFlag(CurlUrlFlags.UrlEncode) ? null : Stored(value, flags);
 
     /// <summary>
     /// The text a set stores: under <c>CURLU_URLENCODE</c> every UTF-8 byte but the unreserved ones

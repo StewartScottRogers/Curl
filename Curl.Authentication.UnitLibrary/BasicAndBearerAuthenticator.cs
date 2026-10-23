@@ -13,7 +13,7 @@ namespace Curl.Authentication;
 /// </param>
 /// <remarks>
 /// Before the first response it answers only when exactly one scheme is allowed, Basic or
-/// Bearer, as libcurl does: <c>-u u:p</c> alone sends <c>Basic dTpw</c>, and
+/// Bearer, as libcurl does: <c>-u u:p</c> alone sends <c>Basic dTpw</c>, <c>-u :</c> nothing, and
 /// <c>--anyauth</c> sends nothing until challenged. After a challenge it picks among the
 /// allowed schemes offered in libcurl's order - Negotiate, Bearer, Digest, NTLM, Basic -
 /// and answers only when the pick is Basic or Bearer; Digest, NTLM and Negotiate are not
@@ -36,8 +36,10 @@ public sealed class BasicAndBearerAuthenticator(Encoding credentialEncoding) : I
         };
     }
 
+    // An empty user with an empty password (-u :) sends nothing, as curl 8.22.0 does
+    // (measured, BL-3176), which also keeps the "auth using" -v line silent.
     private string? CreateBasic(HttpAuthRequest request) =>
-        request.Credential is { } credential
+        request.Credential is { } credential && (credential.UserName.Length > 0 || credential.Password.Length > 0)
             ? "Basic " + Convert.ToBase64String(credentialEncoding.GetBytes(credential.UserName + ":" + credential.Password))
             : null;
 

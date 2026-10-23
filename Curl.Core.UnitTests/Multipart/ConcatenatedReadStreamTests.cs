@@ -18,12 +18,12 @@ public sealed class ConcatenatedReadStreamTests
 
         int first = stream.Read(buffer, 1, 3);
         diagnostics.Act("first read", first);
-        diagnostics.Assert("first read", 2, first);
-        Assert.AreEqual(2, first);
+        diagnostics.Assert("first read", 3, first);
+        Assert.AreEqual(3, first);
         int second = stream.Read(buffer, 3, 1);
         diagnostics.Act("second read", second);
-        diagnostics.Assert("second read", 1, second);
-        Assert.AreEqual(1, second);
+        diagnostics.Assert("second read", 0, second);
+        Assert.AreEqual(0, second);
         int third = stream.Read(buffer, 0, 4);
         diagnostics.Act("third read", third);
         diagnostics.Assert("third read", 0, third);
@@ -43,12 +43,12 @@ public sealed class ConcatenatedReadStreamTests
 
         int first = await stream.ReadAsync(buffer, 0, 2, TestContext.CancellationToken);
         diagnostics.Act("first read", first);
-        diagnostics.Assert("first read", 1, first);
-        Assert.AreEqual(1, first);
+        diagnostics.Assert("first read", 2, first);
+        Assert.AreEqual(2, first);
         int second = await stream.ReadAsync(buffer, 1, 1, TestContext.CancellationToken);
         diagnostics.Act("second read", second);
-        diagnostics.Assert("second read", 1, second);
-        Assert.AreEqual(1, second);
+        diagnostics.Assert("second read", 0, second);
+        Assert.AreEqual(0, second);
         int third = await stream.ReadAsync(buffer, 0, 2, TestContext.CancellationToken);
         diagnostics.Act("third read", third);
         diagnostics.Assert("third read", 0, third);
@@ -390,14 +390,14 @@ public sealed class ConcatenatedReadStreamTests
     }
 
     [TestMethod]
-    public void Read_WithFileSegmentsOnly_ReadsOneSegmentPerRead()
+    public void Read_WithFileSegmentsOnly_FillsAcrossSegments()
     {
         using ConcatenatedReadStream stream = new([Segment(1, 2), Segment(3)], fileSegments: [1]);
         byte[] buffer = new byte[10];
 
-        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 2, 8)];
+        int[] reads = [stream.Read(buffer, 0, 10), stream.Read(buffer, 3, 7)];
 
-        CollectionAssert.AreEqual(new[] { 2, 1 }, reads);
+        CollectionAssert.AreEqual(new[] { 3, 0 }, reads);
     }
 
     [TestMethod]

@@ -41,7 +41,7 @@ public sealed class HttpConnectionPersistenceTests
     }
 
     [TestMethod]
-    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n", true, false, false, DisplayName = "--raw chunked runs to the close")]
+    [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n", true, false, true, DisplayName = "--raw chunked stays open")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", true, false, true, DisplayName = "--raw with a length stays open")]
     [DataRow("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n", false, true, false, DisplayName = "--ignore-content-length runs to the close")]
     [DataRow("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n", false, true, true, DisplayName = "--ignore-content-length chunked stays open")]

@@ -16,7 +16,8 @@ for `-C` or `-a` (ADR-0323's BL-439 addendum; `-a`, BL-633), converting LF to CR
 (`FtpUploadLineEndings`, BL-1957),
 sends `TYPE A` under `-B` or a `;type=a` URL suffix (`FtpTypeCode`; an ASCII download sends no
 `SIZE` or `REST`, BL-633, and a download under `--ignore-content-length` no `SIZE`, BL-1982), and honours `--disable-epsv`,
-`--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l` and `-Q`
+`--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l`, `-X` (sent in place of `LIST` or `NLST` for a
+listing, never for a file download, BL-3165) and `-Q`
 (ADR-0323's BL-436 addendum), and `--ftp-account` (`ACCT` after a `332` to `USER` or
 `PASS`; anything but `230` is exit 11), `--ftp-alternative-to-user` (sent once after a
 refused `USER` or `PASS`) and `--ftp-pret` (`PRET RETR <file>`, `PRET LIST`/`NLST` or

@@ -255,14 +255,14 @@ public sealed class Lib1564To1588Tests
     [TestMethod]
     public async Task Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode()
     {
-        string? userAgent = null;
-        var engine = new FakeCurlEngine { Performing = o => { userAgent = o.Http.UserAgent; return CurlCode.LoginDenied; } };
+        string? performed = null;
+        var engine = new FakeCurlEngine { Performing = o => { performed = $"{o.Http.UserAgent} {o.Authentication.UserPassword} {o.Authentication.HttpAuthentication}"; return CurlCode.LoginDenied; } };
         var run = new PortRun(engine, 1568, "http://127.0.0.1/1568", "8990");
 
         LibTestResult result = await new Lib1568().RunAsync(run.Context, CancellationToken.None);
 
         Assert.AreEqual((int)CurlCode.LoginDenied, result.ExitCode);
-        Assert.AreEqual("lib1568", userAgent);
+        Assert.AreEqual($"lib1568 testuser:testpass {HttpAuthenticationMethods.Digest}", performed);
     }
 
     [TestMethod]

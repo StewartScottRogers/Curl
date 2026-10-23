@@ -470,9 +470,10 @@ internal sealed class CurlCommandRunner(
     private readonly DebugWriteOutStandIn debugWriteOut = DebugWriteOutStandIn.OrNone(debugWriteOut);
 
     /// <summary>
-    /// The result of a transfer whose write to standard output failed. It is compared by
-    /// reference, so that <see cref="FormatErrorLine" /> prints
-    /// <see cref="FailedWritingBodyLine" /> for it rather than a <c>curl: (23)</c> line.
+    /// The exit code and message of a transfer whose write to standard output failed, laid over the handler's
+    /// result so <c>-w</c> still reports what arrived, as curl 8.22.0 does (BL-3170). Its message is compared by
+    /// reference, so that <see cref="FormatErrorLine" /> prints <see cref="FailedWritingBodyLine" /> for it
+    /// rather than a <c>curl: (23)</c> line.
     /// </summary>
     private static readonly TransferResult StandardOutputWriteFailure =
         new(CurlExitCode.WriteError, 0, "Failed writing body");
@@ -3145,7 +3146,7 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private static string FormatErrorLine(TransferResult result, string? message)
     {
-        if (ReferenceEquals(result, StandardOutputWriteFailure))
+        if (ReferenceEquals(result.ErrorMessage, StandardOutputWriteFailure.ErrorMessage))
         {
             return FailedWritingBodyLine;
         }
@@ -4527,8 +4528,8 @@ internal sealed class CurlCommandRunner(
     /// <returns>
     /// <see cref="TerminalBinaryOutputRefusal" />, after <see cref="TerminalBinaryOutputRefusingStream.RefusalWarning" />
     /// unless <c>-s</c>, when <paramref name="terminalGuard" /> refused binary bytes;
-    /// <see cref="StandardOutputWriteFailure" /> when the handler succeeded but standard
-    /// output failed, which is curl's failed flush at the end of the transfer; otherwise the
+    /// the handler's result with <see cref="StandardOutputWriteFailure" />'s exit code and message when the handler
+    /// succeeded but standard output failed, which is curl's failed flush at the end of the transfer; otherwise the
     /// handler's result, including its own write failure when curl's stdio buffer would have
     /// filled (see <see cref="StandardOutputFailureDeferringStream" />).
     /// </returns>
@@ -4550,7 +4551,9 @@ internal sealed class CurlCommandRunner(
             return TerminalBinaryOutputRefusal;
         }
 
-        return result.IsSuccess && state.StandardOutput.HasWriteFailed ? StandardOutputWriteFailure : result;
+        return result.IsSuccess && state.StandardOutput.HasWriteFailed
+            ? result with { ExitCode = StandardOutputWriteFailure.ExitCode, ErrorMessage = StandardOutputWriteFailure.ErrorMessage }
+            : result;
     }
 
     /// <summary>

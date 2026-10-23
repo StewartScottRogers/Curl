@@ -364,6 +364,7 @@ internal sealed class HttpResponseHeadReader
         HttpResponseHead read = builder.Build(statusLine, []);
         HttpResponseHead head = new(statusLine, [.. heldHeaders.Select(held => held.Header)], read.HeadBytes, ReadOnlyMemory<byte>.Empty);
         failure.HeadBytesBeforeFailure = builder.HeadBytesWithPendingHeader();
+        failure.StatusLineBeforeFailure = statusLine;
         Refusal = FindRefusalOrTooMany(head) ?? throw failure;
         heldHeaderLines.Clear();
         heldHeaderInfoLine = null;

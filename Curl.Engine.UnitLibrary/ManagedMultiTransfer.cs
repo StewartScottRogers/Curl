@@ -309,8 +309,10 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_wait</c>: waits until a running transfer finishes, an extra socket has one of its
-    /// events, the timeout passes, or the handle's own timeout (<see cref="GetTimeout" />) comes sooner;
-    /// with no running transfer and no extra socket it returns at once, as libcurl does.
+    /// events, the timeout passes, or the handle's own timeout (<see cref="GetTimeout" />) comes sooner -
+    /// counting only a transfer timeout still ahead, since one already passed ends its transfer, which ends
+    /// the wait (<see cref="WaitTimerMilliseconds" />); with no running transfer and no extra socket it
+    /// returns at once, as libcurl does.
     /// </summary>
     /// <param name="extraSockets">More sockets to wait on; the wait sets each one's <see cref="CurlWaitSocket.ReturnedEvents" />.</param>
     /// <param name="timeout">The longest wait.</param>
@@ -866,9 +868,20 @@ internal sealed class ManagedMultiTransfer(
 
     private TimeSpan WaitLimit(TimeSpan timeout)
     {
-        long handleTimeout = GetTimeout().TimeoutMilliseconds;
+        long handleTimeout = WaitTimerMilliseconds();
         return handleTimeout >= 0 && handleTimeout < timeout.TotalMilliseconds ? TimeSpan.FromMilliseconds(handleTimeout) : timeout;
     }
+
+    /// <summary>
+    /// The handle's timeout as a wait or poll counts it: 0 while a perform has work, else the milliseconds
+    /// until the first running transfer's timeout still ahead, or -1 when none is. A timeout already passed
+    /// is left out: the transfer's perform ends it with <see cref="CurlCode.OperationTimedOut" /> on its own
+    /// clock, a moment later, and the wait ends when a perform finishes. Counted as 0 (as
+    /// <see cref="GetTimeout" /> answers it), every wait until then returned at once, and a perform-and-poll
+    /// loop spun at full CPU (BL-3206).
+    /// </summary>
+    internal long WaitTimerMilliseconds() =>
+        entries.Exists(HasWorkForPerform) ? 0 : entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds > 0).DefaultIfEmpty(-1).Min();
 
     private int MarkReadySockets(Span<CurlWaitSocket> sockets)
     {

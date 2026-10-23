@@ -26,6 +26,9 @@ public static class UrlSchemeGuesser
     /// <summary>The scheme guessed when no host prefix implies another.</summary>
     public const string DefaultScheme = "http";
 
+    /// <summary>The scheme whose URL has no authority to hold a port, so an empty "port" is kept.</summary>
+    private const string FileScheme = "file";
+
     private static readonly string[] HostPrefixSchemes = ["ftp", "dict", "ldap", "imap", "smtp", "pop3"];
 
     /// <summary>
@@ -43,14 +46,24 @@ public static class UrlSchemeGuesser
     }
 
     /// <summary>
-    /// Returns <paramref name="url" /> unchanged when it names a scheme, otherwise
-    /// <paramref name="defaultScheme" /> (the <c>--proto-default</c> scheme) or, when that is
-    /// <see langword="null" />, the guessed scheme, followed by <c>://</c> and <paramref name="url" />.
+    /// Returns <paramref name="url" /> unchanged when it names a scheme or, for a scheme other than
+    /// <c>file</c>, its authority ends in an empty port, otherwise <paramref name="defaultScheme" /> (the <c>--proto-default</c> scheme) or,
+    /// when that is <see langword="null" />, the guessed scheme, followed by <c>://</c> and <paramref name="url" />.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A default scheme replaces the guess outright, as curl 8.21.0 does: with
     /// <c>--proto-default dict</c>, <c>ftp.localhost:1/</c> becomes <c>dict://ftp.localhost:1/</c>
     /// (measured on Windows, 2026-09-28).
+    /// </para>
+    /// <para>
+    /// curl 8.22.0's <c>Curl_parse_port</c> accepts an empty port only in a URL that named its own
+    /// scheme, so <c>http:</c>, <c>1http://127.0.0.1:9/</c> and, on Windows, <c>h://127.0.0.1:9/x</c>
+    /// (authorities <c>http:</c>, <c>1http:</c> and <c>h:</c>) are exit 3, <c>URL rejected: Port number
+    /// was not a decimal number between 0 and 65535</c>, while <c>http://127.0.0.1:/</c> goes to port 80
+    /// (BL-3175 Notes). Such a URL is left without a scheme, so the transfer URL parser reads it as one
+    /// with no scheme and rejects it as curl does, before anything connects (ADR-0767).
+    /// </para>
     /// </remarks>
     /// <param name="url">The URL as the command line gave it.</param>
     /// <param name="defaultScheme">The scheme for a URL without one, lowercase; <see langword="null" /> to guess.</param>
@@ -60,7 +73,14 @@ public static class UrlSchemeGuesser
     {
         ArgumentNullException.ThrowIfNull(url);
 
-        return HasScheme(url) ? url : (defaultScheme ?? GuessScheme(url)) + "://" + url;
+        if (HasScheme(url))
+        {
+            return url;
+        }
+
+        string scheme = defaultScheme ?? GuessScheme(url);
+
+        return scheme != FileScheme && HostAndPort(url).EndsWith(':') ? url : scheme + "://" + url;
     }
 
     /// <summary>Tells whether <paramref name="url" /> starts with a scheme and <c>:/</c>.</summary>
@@ -113,14 +133,7 @@ public static class UrlSchemeGuesser
     {
         ArgumentNullException.ThrowIfNull(url);
 
-        ReadOnlySpan<char> authority = url.AsSpan();
-        int authorityEnd = authority.IndexOfAny('/', '?', '#');
-        if (authorityEnd >= 0)
-        {
-            authority = authority[..authorityEnd];
-        }
-
-        ReadOnlySpan<char> host = authority[(authority.LastIndexOf('@') + 1)..];
+        ReadOnlySpan<char> host = HostAndPort(url);
         foreach (string scheme in HostPrefixSchemes)
         {
             if (host.Length > scheme.Length
@@ -132,6 +145,19 @@ public static class UrlSchemeGuesser
         }
 
         return DefaultScheme;
+    }
+
+    /// <summary>The authority of <paramref name="url" />, read as one with no scheme, after its last <c>@</c>.</summary>
+    private static ReadOnlySpan<char> HostAndPort(string url)
+    {
+        ReadOnlySpan<char> authority = url.AsSpan();
+        int authorityEnd = authority.IndexOfAny('/', '?', '#');
+        if (authorityEnd >= 0)
+        {
+            authority = authority[..authorityEnd];
+        }
+
+        return authority[(authority.LastIndexOf('@') + 1)..];
     }
 
     private static bool IsSchemeCharacter(char character) =>

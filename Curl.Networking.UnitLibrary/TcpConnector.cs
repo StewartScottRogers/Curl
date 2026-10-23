@@ -917,7 +917,7 @@ public sealed partial class TcpConnector(
         var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return HostNotResolved(target.Events, destination, failure, fromCache);
+            return HostNotResolved(target, destination, failure, fromCache);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -932,7 +932,7 @@ public sealed partial class TcpConnector(
                 lastDialError,
                 lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port}{via}{overProxy} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
+                $"Failed to connect to {HostWithoutZoneId(target.Host)}:{target.Port}{via}{overProxy} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
@@ -1096,16 +1096,21 @@ public sealed partial class TcpConnector(
     /// <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>, around which a
     /// <see cref="DnsFilterTraceEvents" /> writes its own. A negative DNS cache entry writes
     /// <c>Could not resolve host: &lt;host&gt;</c> once, <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>
-    /// and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1181 Notes).
+    /// and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1181 Notes). A
+    /// <see cref="ConnectTarget.IsForwardProxy" /> target names the proxy, so its name failing is exit 5
+    /// <c>Could not resolve proxy: &lt;proxy&gt;</c>, as curl 8.22.0 reports <c>-x</c>, <c>--proxy1.0</c> and an
+    /// <c>https://</c> proxy (measured, BL-3168).
     /// </summary>
-    private ConnectResult HostNotResolved(ITransferEvents events, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
+    private ConnectResult HostNotResolved(ConnectTarget target, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
     {
-        var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+        var events = target.Events;
+        var (notResolved, subject) = target.IsForwardProxy ? (CurlExitCode.CouldntResolveProxy, "proxy") : (CurlExitCode.CouldntResolveHost, "host");
+        var (exitCode, message) = NameResolutionFailure.Describe(notResolved, subject, destination.Host, destination.Port, failure);
         if (fromCache)
         {
             ReportNegativeEntryFailed(events, destination, message);
         }
-        else if (exitCode == CurlExitCode.CouldntResolveHost)
+        else if (exitCode == notResolved)
         {
             ReportLookUpFailed(events, destination, message);
         }
@@ -2391,6 +2396,13 @@ public sealed partial class TcpConnector(
         CancellationToken cancellationToken,
         ConnectAttemptTraceEvents? trace = null)
     {
+        // No server listens on port 0: curl 8.22.0 fails it at once with exit 7 "Could not connect
+        // to server", so no socket is dialled for it (measured, BL-3172 Notes).
+        if (port == 0)
+        {
+            return (null, SocketError.ConnectionRefused, null);
+        }
+
         var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
@@ -2429,6 +2441,10 @@ public sealed partial class TcpConnector(
     /// <c>CURLE_BAD_FUNCTION_ARGUMENT</c> when the last address failed to bind its local end with
     /// one of them, <c>Could not connect to server</c> otherwise (measured, BL-600 Notes).
     /// </summary>
+    // curl 8.22.0 names an IPv6 zone-id host without its zone: [::1%25lo] reads ::1 (BL-3182).
+    private static string HostWithoutZoneId(string host) =>
+        host.IndexOf('%', StringComparison.Ordinal) is var zone and > 0 && host.Contains(':') ? host[..zone] : host;
+
     private static string DialFailureText(LocalBindFailure? lastBindFailure) => lastBindFailure switch
     {
         LocalBindFailure.InterfaceFailed => "Failed binding local connection end",

@@ -104,7 +104,8 @@ internal sealed class HandBuiltCertificateVerifier(
         return failure is { } rejected ? ServerCertificateVerdict.Rejected(rejected) : ServerCertificateVerdict.Accepted;
     }
 
-    // The chain SslStream builds: the --cacert policy, or the system store for server
+    // The chain SslStream builds: the policy ServerCertificateVerification read (--cacert, or the
+    // Schannel build's system store revocation check), or the system store for server
     // authentication, with what else the server sent as candidates; then its name check.
     private SslPolicyErrors BuildChain(X509Chain chain, List<X509Certificate2> sent)
     {

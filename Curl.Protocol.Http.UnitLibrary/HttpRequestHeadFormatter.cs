@@ -50,7 +50,7 @@ internal static class HttpRequestHeadFormatter
     /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's, the same
     /// four tokens on the Schannel and OpenSSL builds (measured, BL-861 Notes; ADR-0287).
     /// </summary>
-    internal const string AcceptEncoding = "deflate, gzip, br, zstd";
+    internal const string AcceptEncoding = HttpRequestOptions.DefaultAcceptEncoding;
 
     private const string HostName = "Host";
 
@@ -247,14 +247,15 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "User-Agent", HeadText(options.UserAgent, options) ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "TE", options.TransferEncoding ? "gzip" : null);
-        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
+        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? options.AcceptEncoding : null);
         AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
     }
 
     /// <summary>
     /// Appends <c>If-Modified-Since</c> for <c>-z date</c> or <c>If-Unmodified-Since</c> for
-    /// <c>-z -date</c>, the time in RFC 1123 form in GMT (<see cref="HttpConditionDate" />),
-    /// unless an <c>-H</c> value names it.
+    /// <c>-z -date</c>, or <c>Last-Modified</c> for <c>CURL_TIMECOND_LASTMOD</c>
+    /// (<see cref="TimeCondition.SentAsLastModified" />), the time in RFC 1123 form in GMT
+    /// (<see cref="HttpConditionDate" />), unless an <c>-H</c> value names it.
     /// </summary>
     private static void AppendTimeCondition(StringBuilder head, HttpCustomHeader[] customHeaders, TimeCondition? timeCondition)
     {
@@ -263,9 +264,18 @@ internal static class HttpRequestHeadFormatter
             return;
         }
 
-        string name = timeCondition.Kind == TimeConditionKind.IfUnmodifiedSince ? "If-Unmodified-Since" : "If-Modified-Since";
-        AppendUnlessOverridden(head, customHeaders, name, HttpConditionDate.Format(timeCondition));
+        AppendUnlessOverridden(head, customHeaders, TimeConditionHeaderName(timeCondition), HttpConditionDate.Format(timeCondition));
     }
+
+    /// <summary>
+    /// Names the header <see cref="AppendTimeCondition" /> sends, as libcurl 8.22.0's
+    /// <c>Curl_add_timecondition</c> does: <c>Last-Modified</c> for <c>CURL_TIMECOND_LASTMOD</c>,
+    /// <c>If-Unmodified-Since</c> for <c>-z -date</c>, and <c>If-Modified-Since</c> otherwise.
+    /// </summary>
+    private static string TimeConditionHeaderName(TimeCondition timeCondition) =>
+        timeCondition.SentAsLastModified ? "Last-Modified"
+            : timeCondition.Kind == TimeConditionKind.IfUnmodifiedSince ? "If-Unmodified-Since"
+            : "If-Modified-Since";
 
     /// <summary>
     /// Formats the <c>Host</c> line: the first <c>-H</c> value naming <c>Host</c> with its

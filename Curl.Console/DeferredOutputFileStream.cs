@@ -262,7 +262,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     {
         if (failedWriteLength is { } length)
         {
-            return WriteFailure(length);
+            return WriteFailure(length) with { Report = result.Report };
         }
 
         bool createsEmptyFile = file is null && CreatesEmptyFileAfter(result);
@@ -295,7 +295,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal (TransferResult Result, string? Warning) SettleRetriedAttempt(TransferResult attempt)
     {
         string? warning = OpenFailureWarning;
-        TransferResult result = failedWriteLength is { } length ? WriteFailure(length) : attempt;
+        TransferResult result = failedWriteLength is { } length ? WriteFailure(length) with { Report = attempt.Report } : attempt;
         OpenFailureWarning = null;
         failedWriteLength = null;
 

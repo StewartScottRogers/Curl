@@ -308,7 +308,9 @@ public sealed class CookieStore : ICookieStore
     /// Loads the cookie file at <paramref name="path"/> as
     /// <see cref="LoadCookieFileAsync(IFileSystem, string, bool, DateTimeOffset, CancellationToken)"/> does,
     /// reporting its refused <c>Set-Cookie:</c> lines to <paramref name="events"/> as
-    /// <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset, ITransferEvents)"/> does. A file that cannot
+    /// <see cref="LoadCookieFile(TextReader, bool, DateTimeOffset, ITransferEvents)"/> does. An empty
+    /// <paramref name="path"/> opens nothing, loads nothing and reports nothing, as curl 8.22.0's <c>-b ''</c> only
+    /// turns the cookie engine on (BL-3177). A file that cannot
     /// be opened loads nothing and reports the line <see cref="DescribeCookieFileOpenFailure"/> gives for this
     /// platform, with <paramref name="path"/> as given: on Windows curl 8.21.0's
     /// <c>WARNING: failed to open cookie file "&lt;path&gt;"</c> for every failure, a directory included (BL-487);
@@ -325,6 +327,11 @@ public sealed class CookieStore : ICookieStore
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(events);
+
+        if (path.Length == 0)
+        {
+            return true;
+        }
 
         FileOpenResult opened = await fileSystem.OpenForReadAsync(path, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)

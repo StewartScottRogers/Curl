@@ -68,7 +68,7 @@ internal sealed class SmtpMailTransaction(
             long? size = RemainingLength(upload);
             result = await SendEnvelopeAsync(mail, size).ConfigureAwait(false)
                 ?? await SendMessageAsync(upload, size).ConfigureAwait(false);
-            await channel.QuitAsync().ConfigureAwait(false);
+            await channel.QuitOrKeepAsync(result.ExitCode == CurlExitCode.Ok).ConfigureAwait(false);
         }
         catch (SmtpReplyMissingException)
         {

@@ -73,3 +73,4 @@ Curl.Conformance.UnitTests/PassingUpstreamCases.txt merge=union
 Curl.Conformance.UnitLibrary/Upstream*Features.cs merge=union
 Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs merge=union
 Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.*.cs merge=union
+Documentation/Planning/Decisions/README.md merge=union

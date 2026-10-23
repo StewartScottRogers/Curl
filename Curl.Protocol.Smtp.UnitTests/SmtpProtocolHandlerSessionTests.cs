@@ -53,7 +53,7 @@ public sealed class SmtpProtocolHandlerSessionTests
         Diagnostics.AssertValues("connection disposed", true, run.Connection.IsDisposed);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18025, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18025, false) { PoolScheme = "smtp" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsTrue(run.Connection.IsDisposed);
     }
 
@@ -63,7 +63,7 @@ public sealed class SmtpProtocolHandlerSessionTests
         SmtpRun run = await RunAsync("smtp://127.0.0.1/client.example", Greeting + EhloReply + HelpReplyAndBye);
 
         Diagnostics.AssertValues("connect port", 25, run.Connector.Targets.Single().Port);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 25, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 25, false) { PoolScheme = "smtp" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]
@@ -104,7 +104,7 @@ public sealed class SmtpProtocolHandlerSessionTests
         Diagnostics.AssertValues("handshake count", 0, run.Tls.Handshakes.Count);
         Diagnostics.AssertResult(SmtpRun.HelpAnswered, run.Result);
         Assert.AreEqual(Ehlo + HelpAndQuit, run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 465, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 465, true) { PoolScheme = "smtps" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.AreEqual(SmtpRun.HelpAnswered, run.Result);
     }

@@ -444,7 +444,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
 
     /// <summary>
     /// Gets the <c>-z</c> condition the handlers read from <see cref="EasyTransferOptions.TimeCondition" /> and
-    /// the whole seconds of <see cref="EasyTransferOptions.TimeValue" />, or <see langword="null" /> for none.
+    /// the whole seconds of <see cref="EasyTransferOptions.TimeValue" />, or <see langword="null" /> for none;
+    /// <c>CURL_TIMECOND_LASTMOD</c> compares as if-modified-since and is sent as <c>Last-Modified</c> (ADR-0781).
     /// </summary>
     /// <param name="transfer">The transfer's options.</param>
     /// <returns>The context's <see cref="TransferContext.TimeCondition" />.</returns>
@@ -452,7 +453,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     {
         EasyTimeCondition.None => null,
         EasyTimeCondition.IfUnmodifiedSince => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfUnmodifiedSince),
-        _ => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfModifiedSince),
+        _ => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfModifiedSince) with
+        {
+            SentAsLastModified = transfer.TimeCondition == EasyTimeCondition.LastModified,
+        },
     };
 
     /// <summary>
@@ -599,13 +603,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
             : events;
 
     /// <summary>
-    /// Chooses where a transfer's header lines go. <c>-i</c> and <c>-I</c> send them to the
-    /// body output as well as to any <c>-D</c> output, as curl 8.21.0 does, except on a
+    /// Chooses where a transfer's header lines go. <c>-i</c> (<c>CURLOPT_HEADER</c>, which <c>-I</c> sets too)
+    /// sends them to the body output as well as to any <c>-D</c> output, as curl 8.21.0 does, except on a
     /// <c>ws</c> or <c>wss</c> transfer, where curl writes the upgrade reply head only to
-    /// <c>-D</c> (ADR-0128 row 5; <c>-I</c> measured the same, BL-583).
+    /// <c>-D</c> (ADR-0128 row 5; <c>-I</c> measured the same, BL-583). <c>CURLOPT_NOBODY</c> alone
+    /// sends them there only for <c>ftp</c> and <c>ftps</c>, whose <c>-I</c> lines curl 8.22.0's
+    /// <c>client_write_header</c> always writes to the body; every other scheme's go only to the
+    /// header output, as measured with <c>-I --no-include</c> (BL-3199, ADR-0779).
     /// </summary>
     /// <param name="behaviour">The option group's behaviour options, whose <see cref="EasyBehaviourOptions.IncludeHeader" /> is <c>-i</c>.</param>
-    /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.NoBody" /> is <c>-I</c>.</param>
+    /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.NoBody" /> is <c>CURLOPT_NOBODY</c>.</param>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="output">Where the transfer's body goes.</param>
     /// <param name="dumpHeaderOutput">Where the <c>-D</c> header lines go, or <see langword="null" /> without <c>-D</c>.</param>
@@ -614,14 +621,14 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// the <c>-D</c> lines are never styled, as curl 8.21.0 styles only <c>-i</c>'s (BL-736 Notes).
     /// </param>
     /// <returns>
-    /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> or <c>-I</c>, or for a WebSocket URL;
+    /// <paramref name="dumpHeaderOutput" /> without <c>-i</c> (or an FTP <c>CURLOPT_NOBODY</c>), or for a WebSocket URL;
     /// otherwise <paramref name="output" /> (as a <see cref="StyledHeaderStream" /> when
     /// <paramref name="bodyHeaderStyles" /> is given) when there is no <c>-D</c>, or a
     /// <see cref="HeaderLineTeeStream" /> writing each line to both.
     /// </returns>
     private static Stream? HeaderOutputOf(EasyBehaviourOptions behaviour, EasyTransferOptions transfer, CurlUrl url, Stream output, Stream? dumpHeaderOutput, StyledHeaderLines? bodyHeaderStyles)
     {
-        if ((!behaviour.IncludeHeader && !transfer.NoBody) || IsWebSocket(url))
+        if (!WritesHeaderLinesToBody(behaviour, transfer, url))
         {
             return dumpHeaderOutput;
         }
@@ -629,6 +636,17 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
         Stream headerLinesOutput = bodyHeaderStyles is null ? output : new StyledHeaderStream(output, bodyHeaderStyles);
         return dumpHeaderOutput is null ? headerLinesOutput : new HeaderLineTeeStream(dumpHeaderOutput, headerLinesOutput);
     }
+
+    /// <summary>
+    /// Whether a transfer's header lines go to its body output: under <c>CURLOPT_HEADER</c>, or under
+    /// <c>CURLOPT_NOBODY</c> for an <c>ftp</c> or <c>ftps</c> URL, never for a WebSocket URL (<see cref="HeaderOutputOf" />).
+    /// </summary>
+    /// <param name="behaviour">The behaviour options, whose <see cref="EasyBehaviourOptions.IncludeHeader" /> is <c>CURLOPT_HEADER</c>.</param>
+    /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.NoBody" /> is <c>CURLOPT_NOBODY</c>.</param>
+    /// <param name="url">The URL to transfer.</param>
+    /// <returns><see langword="true" /> when the header lines are written to the body output too.</returns>
+    private static bool WritesHeaderLinesToBody(EasyBehaviourOptions behaviour, EasyTransferOptions transfer, CurlUrl url) =>
+        !IsWebSocket(url) && (behaviour.IncludeHeader || (transfer.NoBody && url.Scheme is "ftp" or "ftps"));
 
     /// <summary>Whether <paramref name="url" /> is a <c>ws</c> or <c>wss</c> URL.</summary>
     /// <param name="url">The URL to transfer.</param>

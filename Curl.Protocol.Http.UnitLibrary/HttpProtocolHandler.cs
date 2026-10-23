@@ -69,8 +69,8 @@ namespace Curl.Protocol.Http;
 /// it, while its head and trailers are still written to the header output (BL-179 Notes).
 /// </para>
 /// <para>
-/// <see cref="HttpRequestOptions.Compressed" /> sends <c>Accept-Encoding: deflate, gzip, br, zstd</c>
-/// (ADR-0287) and, unless <see cref="HttpRequestOptions.Raw" /> is set, decodes the body as
+/// <see cref="HttpRequestOptions.Compressed" /> sends <c>Accept-Encoding</c> with
+/// <see cref="HttpRequestOptions.AcceptEncoding" />, <c>deflate, gzip, br, zstd</c> by default (ADR-0287, ADR-0777) and, unless <see cref="HttpRequestOptions.PassesContentCoding" /> is set, decodes the body as
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
 /// </para>
 /// <para>
@@ -83,8 +83,8 @@ namespace Curl.Protocol.Http;
 /// <para>
 /// <see cref="HttpVersionPreference.Http10" /> (<c>-0</c>) ends the request line in
 /// <c>HTTP/1.0</c>, adds no <c>Expect: 100-continue</c>, and fails a body of unknown length
-/// with exit 25 once connected, sending nothing. <see cref="HttpRequestOptions.Raw" /> writes a
-/// chunked body undecoded, chunk lines included, until the server closes, and refuses no
+/// with exit 25 once connected, sending nothing. <see cref="HttpRequestOptions.PassesTransferCoding" /> writes a
+/// chunked body undecoded, chunk lines included, through its zero-length chunk and trailers, and refuses no
 /// transfer coding. <see cref="HttpRequestOptions.IgnoreContentLength" /> reads a body that is
 /// not chunked until the server closes, whatever its Content-Length says. Either leaves a
 /// connection whose body ran to close unused afterwards (<see cref="HttpResponseBodyFraming" />;
@@ -1376,9 +1376,24 @@ public sealed class HttpProtocolHandler(
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
-        { Report = exchange.Report(body) };
+        { Report = WithHeadBeforeFailure(exchange.Report(body), failure) };
         return FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
     }
+
+    /// <summary>
+    /// Puts the response code, HTTP version and header size of the head a failure cut short on
+    /// <paramref name="report" />, as libcurl 8.22.0 keeps them after a header line it refuses (BL-3195);
+    /// <paramref name="report" /> itself when the head was read whole or the failure came before its status line.
+    /// </summary>
+    private static TransferReport WithHeadBeforeFailure(TransferReport report, HttpTransferException failure) =>
+        report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
+            ? report
+            : report with
+            {
+                ResponseCode = statusLine.StatusCode,
+                HttpVersion = statusLine.Version,
+                HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
+            };
 
     /// <summary>
     /// Reports a timed-out exchange's held header lines, and gives the attempt's outcome: exit
@@ -1483,7 +1498,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         return new HttpResponseBodyReader(responseConnection)
         {
-            PassesTransferCoding = options.Raw,
+            PassesTransferCoding = options.PassesTransferCoding,
             IgnoresContentLength = options.IgnoreContentLength,
             LimitsFileSize = HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize) is not null,
             DecodesTransferCoding = options.TransferEncoding,
@@ -1958,7 +1973,7 @@ public sealed class HttpProtocolHandler(
     {
         HttpRequestOptions options = plan.Options;
         if (!discardsBody
-            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options)))
+            || !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options)))
         {
             return;
         }
@@ -2009,7 +2024,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         if (HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
         {
-            return HttpResponseBodyFraming.Of(head.Headers, options.Raw, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
+            return HttpResponseBodyFraming.Of(head.Headers, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
         }
 
         return options.IgnoreContentLength || HttpTransferEncoding.ListsChunked(head.Headers) ? null : HttpContentLength.Find(head.Headers);
@@ -2138,7 +2153,7 @@ public sealed class HttpProtocolHandler(
     private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
         DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
-                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options)));
+                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options)));
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
@@ -2148,7 +2163,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
         DeliveredWhole(head, upload, headReader, delivery)
-            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
 
     /// <summary>
     /// Decides whether the exchange ran whole: its request body was not cut short, its
@@ -2259,7 +2274,7 @@ public sealed class HttpProtocolHandler(
         }
 
         HttpRequestOptions options = plan.Options;
-        if (HttpResponseBodyFraming.Of(head.Headers, options.Raw, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
+        if (HttpResponseBodyFraming.Of(head.Headers, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
         {
             string message = HttpTransferMessages.TransferClosedWithBytesRemaining(remaining);
             plan.Context.Events.ReportInfo(message);
@@ -2324,7 +2339,7 @@ public sealed class HttpProtocolHandler(
         return discardsBody
             && delivery == HttpBodyDelivery.Deliver
             && requestStream is null
-            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
     }
 
     /// <summary>
@@ -2669,7 +2684,7 @@ public sealed class HttpProtocolHandler(
         bodyStopped
             && head.StatusLine.StatusCode == 417
             && plan.Options.Fail != HttpFailMode.Fail
-            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.Raw, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options));
+            && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options));
 
     /// <summary>
     /// Decides whether the transfer goes through an HTTP proxy, where curl 8.21.0 reads
@@ -2769,7 +2784,7 @@ public sealed class HttpProtocolHandler(
         return head.StatusLine.StatusCode == 401
             && IsNtlmType1(plan.Authorization)
             && ValuesOf(head, "WWW-Authenticate").Any(IsNtlmType2Challenge)
-            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.Raw, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
+            && !HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding, IsThroughHttpProxy(options));
     }
 
     /// <summary>
@@ -2987,7 +3002,7 @@ public sealed class HttpProtocolHandler(
             .Select(header => header.Value)];
 
     /// <summary>
-    /// Decides whether the body is decoded: for <c>--compressed</c> without <c>--raw</c>, and
+    /// Decides whether the body is decoded: for <c>--compressed</c> without <see cref="HttpRequestOptions.PassesContentCoding" /> (<c>--raw</c>, <c>CURLOPT_HTTP_CONTENT_DECODING</c> 0), and
     /// not for a body that is read and discarded - a 3xx body <c>-L</c> follows past, which
     /// curl 8.21.0 does not decode (measured, BL-177 Notes), or a 401 body an authentication
     /// retry follows.
@@ -2997,11 +3012,11 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Decides whether Content-Encoding is decoded at all: for <c>--compressed</c> without
-    /// <c>--raw</c>, which is also when curl 8.21.0 holds the response to
+    /// <see cref="HttpRequestOptions.PassesContentCoding" /> (<c>--raw</c>, <c>CURLOPT_HTTP_CONTENT_DECODING</c> 0), which is also when curl 8.21.0 holds the response to
     /// <see cref="HttpContentDecoder.MaximumCodings" /> (measured, BL-364 Notes).
     /// </summary>
     private static bool DecodesContent(HttpRequestOptions options) =>
-        options.Compressed && !options.Raw;
+        options.Compressed && !options.PassesContentCoding;
 
     /// <summary>
     /// Sends the request head and body, if there is one: the head alone when there is no body

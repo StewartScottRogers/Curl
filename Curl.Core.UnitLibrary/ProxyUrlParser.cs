@@ -33,8 +33,8 @@ namespace Curl.Core;
 /// Text curl cannot parse is exit 5, <see cref="CurlExitCode.CouldntResolveProxy" />, with
 /// <c>Unsupported proxy syntax in '&lt;text&gt;': &lt;reason&gt;</c>; a well-formed URL with
 /// another scheme is exit 7, <see cref="CurlExitCode.CouldntConnect" />, with
-/// <c>Unsupported proxy scheme for '&lt;text&gt;'</c>; and port 0, which curl tries and
-/// cannot connect to, is exit 7 with the line curl prints for that attempt. An empty port
+/// <c>Unsupported proxy scheme for '&lt;text&gt;'</c>; port 0 is kept, and the connect to it
+/// fails with exit 7 and the line curl prints for that attempt (BL-3172). An empty port
 /// after <c>host:</c> is the default port when the text names a scheme and a port error
 /// when it does not. Every case was measured against curl 8.21.0 on 2026-09-26.
 /// </para>
@@ -127,14 +127,6 @@ public static class ProxyUrlParser
         }
 
         int port = parts.Port ?? (portWhenTextGivesNone > 0 ? portWhenTextGivesNone : kind.DefaultPort);
-        if (port == 0)
-        {
-            failure = TransferResult.Failure(
-                CurlExitCode.CouldntConnect,
-                $"Failed to connect to {parts.Host}:0 over proxy {parts.Host} after 0 ms: Could not connect to server");
-            return false;
-        }
-
         failure = null;
         proxy = new ProxyEndpoint(kind.Kind, parts.Host, port, parts.Credential) { UnixSocketPath = UnixSocketPathOf(kind.Kind, parts.Host, path) };
         return true;

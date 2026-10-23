@@ -83,6 +83,14 @@ public sealed class MultipartFormBodyBuilder(
     private readonly Func<string, long, long?> seekableFileLength =
         seekableFileLength ?? SeekableFileLength.ForPlatform(OperatingSystem.IsWindows());
 
+    /// <summary>
+    /// Gets a value indicating whether a <c>7bit</c> part's refusal of a byte above 127 waits for
+    /// the send, as libcurl 8.22.0 meets it (the headers and the bytes before the refused one go out,
+    /// then the read fails, CURLcode 26; measured, BL-3210 case 2), instead of failing the build
+    /// before connecting as the curl tool does.
+    /// </summary>
+    public bool SevenBitRefusalWaitsForSend { get; init; }
+
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
 
@@ -272,10 +280,8 @@ public sealed class MultipartFormBodyBuilder(
     {
         if (part.Kind == MultipartFormPartKind.Multipart)
         {
-            string boundary = createBoundary();
-            segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, null, nameEscaping, forMail, out string? contentType));
-            string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
-            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+            // An encoder libcurl does not have is ignored here, as it always was for a nested multipart.
+            return await AddMultipartPartAsync(segments, part, disposition, nameEscaping, forMail, part.Encoder is null ? null : MultipartPartEncoder.Find(part.Encoder), cancellationToken).ConfigureAwait(false);
         }
 
         if (!TryFindEncoder(part.Encoder, out MultipartPartEncoder? encoder))
@@ -292,6 +298,59 @@ public sealed class MultipartFormBodyBuilder(
         return await AddFilePartAsync(segments, part, disposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Adds a part with subparts: its headers, then the nested multipart block, which a part given an
+    /// encoder through libcurl has encoded whole, headers and boundaries included, under
+    /// <c>Content-Transfer-Encoding</c> (measured against libcurl 8.22.0, BL-3213).
+    /// </summary>
+    private async ValueTask<TransferResult?> AddMultipartPartAsync(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder,
+        CancellationToken cancellationToken)
+    {
+        string boundary = createBoundary();
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, boundary, encoder?.Name, nameEscaping, forMail, out string? contentType));
+        string? partsDisposition = MultipartPartHeaders.IsContentType(contentType, "multipart/form-data") ? FormDataDisposition : null;
+        if (encoder is null || encoder.PassesDataThrough)
+        {
+            return await AddPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+        }
+
+        return await AddEncodedPartsAsync(segments, part.Parts, boundary, partsDisposition, nameEscaping, forMail, encoder, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Adds the nested multipart block of <paramref name="parts" />, built whole and encoded as it is sent.</summary>
+    private async ValueTask<TransferResult?> AddEncodedPartsAsync(
+        MultipartBodySegments segments,
+        IReadOnlyList<MultipartFormPart> parts,
+        string boundary,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder encoder,
+        CancellationToken cancellationToken)
+    {
+        MultipartBodySegments nested = new(textEncoding);
+        TransferResult? failure = await AddPartsAsync(nested, parts, boundary, disposition, nameEscaping, forMail, cancellationToken).ConfigureAwait(false);
+        if (failure is not null)
+        {
+            nested.Dispose();
+            return failure;
+        }
+
+        if (nested.HoldsRefusedData)
+        {
+            segments.AddRefusedData();
+        }
+
+        ConcatenatedReadStream block = nested.ToStream();
+        segments.AddStream(encoder.EncodeWhileReading(block, nested.Length), encoder.EncodedLength(nested.Length));
+        return null;
+    }
     /// <summary>
     /// Gives exit 43 for a part whose name or file name holds a CR or LF that its escaping cannot
     /// write, as <see cref="MultipartPartHeaders.RefusesLineBreakInName" /> tells; otherwise <see langword="null" />.
@@ -337,8 +396,7 @@ public sealed class MultipartFormBodyBuilder(
         FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)
         {
-            string message = opened.Status == FileAccessStatus.IsDirectory ? ReadFailedMessage : OpenFailedMessage;
-            return TransferResult.Failure(CurlExitCode.ReadError, message);
+            return OpenFailure(segments, part, opened.Status, disposition, nameEscaping, forMail, encoder);
         }
 
         Stream content = opened.Content!;
@@ -349,11 +407,39 @@ public sealed class MultipartFormBodyBuilder(
     }
 
     /// <summary>
+    /// Handles a file that did not open: a part that may be sent empty (not a directory) adds an empty text part with no
+    /// file name and fails nothing, as libcurl 8.22.0 sends a missing <c>curl_mime_filedata</c> file (BL-3211); any
+    /// other part fails with exit 26.
+    /// </summary>
+    private TransferResult? OpenFailure(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        FileAccessStatus status,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder)
+    {
+        if (status == FileAccessStatus.IsDirectory)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+        }
+
+        if (!part.SendsEmptyWhenMissing)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, OpenFailedMessage);
+        }
+
+        segments.AddText(MultipartPartHeaders.Format(part with { Kind = MultipartFormPartKind.Text, FileName = null }, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        AddData(segments, [], encoder, forMail);
+        return null;
+    }
+    /// <summary>
     /// Streams <paramref name="content" />, encoded as it is sent when its encoder encodes; a
     /// <c>7bit</c> file that can seek back is checked first, and one that cannot is refused
     /// only when the send reaches the refused byte.
     /// </summary>
-    private static ValueTask<TransferResult?> AddFileDataAsync(
+    private ValueTask<TransferResult?> AddFileDataAsync(
         MultipartBodySegments segments,
         Stream content,
         long? length,
@@ -367,7 +453,7 @@ public sealed class MultipartFormBodyBuilder(
             return ValueTask.FromResult<TransferResult?>(null);
         }
 
-        if (encoder.CanRefuseData && content.CanSeek && !forMail)
+        if (RefusesBeforeSending(encoder, content, forMail))
         {
             return AddCheckedFileAsync(segments, content, length, encoder, cancellationToken);
         }
@@ -375,6 +461,10 @@ public sealed class MultipartFormBodyBuilder(
         segments.AddStream(encoder.EncodeWhileReading(content, length), encoder.EncodedLength(length));
         return ValueTask.FromResult<TransferResult?>(null);
     }
+
+    /// <summary>Whether <paramref name="encoder" />'s refusal of <paramref name="content" /> is found by reading it through before the send.</summary>
+    private bool RefusesBeforeSending(MultipartPartEncoder encoder, Stream content, bool forMail) =>
+        encoder.CanRefuseData && content.CanSeek && !forMail && !SevenBitRefusalWaitsForSend;
 
     /// <summary>
     /// Reads <paramref name="content" /> through its encoder once, keeping nothing, then adds it
@@ -409,7 +499,7 @@ public sealed class MultipartFormBodyBuilder(
     }
 
     /// <summary>Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder.</summary>
-    private static async ValueTask<TransferResult?> AddStandardInputPartAsync(
+    private async ValueTask<TransferResult?> AddStandardInputPartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
         string? disposition,
@@ -483,7 +573,7 @@ public sealed class MultipartFormBodyBuilder(
     }
 
     /// <summary>Adds <paramref name="data" />, whose length is known, encoded when there is an encoder.</summary>
-    private static void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder, bool forMail)
+    private void AddData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder? encoder, bool forMail)
     {
         if (encoder is null)
         {
@@ -500,9 +590,9 @@ public sealed class MultipartFormBodyBuilder(
     /// that reaches it fails, as curl 8.21.0 sends it (measured, BL-2025), while a form's
     /// refused data fails the body before it connects.
     /// </summary>
-    private static void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder, bool forMail)
+    private void AddEncodedData(MultipartBodySegments segments, byte[] data, MultipartPartEncoder encoder, bool forMail)
     {
-        if (forMail && encoder.CanRefuseData)
+        if ((forMail || SevenBitRefusalWaitsForSend) && encoder.CanRefuseData)
         {
             segments.AddStream(encoder.EncodeWhileReading(new MemoryStream(data, writable: false), data.Length), data.Length);
             return;

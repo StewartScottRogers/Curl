@@ -17,7 +17,9 @@ public sealed record HttpRequestOptions
 {
     /// <summary>
     /// Gets the method from <c>-X</c>/<c>--request</c>, verbatim, or
-    /// <see langword="null" /> to let the handler choose GET, HEAD, POST or PUT.
+    /// <see langword="null" /> to let the handler choose GET, HEAD, POST or PUT. The FTP
+    /// handler sends it in place of <c>LIST</c> or <c>NLST</c> for a directory listing
+    /// (BL-3165).
     /// </summary>
     public string? CustomMethod { get; init; }
 
@@ -203,16 +205,35 @@ public sealed record HttpRequestOptions
     public bool Compressed { get; init; }
 
     /// <summary>
+    /// The <c>Accept-Encoding</c> value curl 8.22.0 sends for an empty <c>CURLOPT_ACCEPT_ENCODING</c> and
+    /// <c>--compressed</c>: every encoding it decodes, the same four on the Schannel and OpenSSL builds (ADR-0287).
+    /// </summary>
+    public const string DefaultAcceptEncoding = "deflate, gzip, br, zstd";
+
+    /// <summary>
+    /// Gets the <c>Accept-Encoding</c> value sent when <see cref="Compressed" /> is set: the
+    /// <c>CURLOPT_ACCEPT_ENCODING</c> string exactly as given, or <see cref="DefaultAcceptEncoding" />
+    /// (the default) for an empty one (ADR-0777).
+    /// </summary>
+    public string AcceptEncoding { get; init; } = DefaultAcceptEncoding;
+
+    /// <summary>
     /// Gets a value indicating whether <c>--tr-encoding</c> was given: send <c>TE: gzip</c>
     /// and decode a compressed Transfer-Encoding.
     /// </summary>
     public bool TransferEncoding { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether <c>--raw</c> was given: pass content and transfer
-    /// encodings through undecoded.
+    /// Gets a value indicating whether Content-Encoding is passed through undecoded, even with
+    /// <see cref="Compressed" />: <c>CURLOPT_HTTP_CONTENT_DECODING</c> 0, and half of <c>--raw</c>.
     /// </summary>
-    public bool Raw { get; init; }
+    public bool PassesContentCoding { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the transfer codings, <c>chunked</c> included, are passed
+    /// through undecoded: <c>CURLOPT_HTTP_TRANSFER_DECODING</c> 0, and half of <c>--raw</c>.
+    /// </summary>
+    public bool PassesTransferCoding { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether <c>--ignore-content-length</c> was given: read the

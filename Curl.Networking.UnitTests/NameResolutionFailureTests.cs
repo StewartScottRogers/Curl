@@ -46,6 +46,27 @@ public sealed class NameResolutionFailureTests
     }
 
     [TestMethod]
+    public void Describe_AProxyWithoutAReason_IsExit5WithThePlainMessage()
+    {
+        // curl -sS -x badproxy.invalid http://x/ -> curl: (5) Could not resolve proxy: badproxy.invalid (8.22.0, BL-3168)
+        var (exitCode, message) = Describe(CurlExitCode.CouldntResolveProxy, "proxy", "badproxy.invalid", 1080, DnsLookupFailure.None);
+
+        AssertDescription(CurlExitCode.CouldntResolveProxy, "Could not resolve proxy: badproxy.invalid", exitCode, message);
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, exitCode);
+        Assert.AreEqual("Could not resolve proxy: badproxy.invalid", message);
+    }
+
+    [TestMethod]
+    public void Describe_AProxyWithATimeout_IsExit5WithTheReasonInBrackets()
+    {
+        var (exitCode, message) = Describe(CurlExitCode.CouldntResolveProxy, "proxy", "badproxy.invalid", 1080, DnsLookupFailure.Timeout);
+
+        AssertDescription(CurlExitCode.CouldntResolveProxy, "Could not resolve proxy: badproxy.invalid (Timeout while contacting DNS servers)", exitCode, message);
+        Assert.AreEqual(CurlExitCode.CouldntResolveProxy, exitCode);
+        Assert.AreEqual("Could not resolve proxy: badproxy.invalid (Timeout while contacting DNS servers)", message);
+    }
+
+    [TestMethod]
     public void Describe_ABadConfiguration_IsExit43WithTheHostAndPort()
     {
         var (exitCode, message) = Describe(CurlExitCode.CouldntResolveHost, "host", "bl643.example", 1, DnsLookupFailure.BadConfiguration);

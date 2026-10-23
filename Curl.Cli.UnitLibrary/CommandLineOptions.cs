@@ -1354,7 +1354,7 @@ public sealed class CommandLineOptions
     /// </summary>
     public string? ProxyClientCertificate { get; internal set; }
 
-    /// <summary>The <c>--proxy-key</c> private key file, verbatim and unchecked; <see langword="null"/> when not given. The last value wins.</summary>
+    /// <summary>The <c>--proxy-key</c> private key file, verbatim and unchecked; <see langword="null"/> when not given. An empty value is accepted, as curl 8.22.0 accepts it (BL-3183). The last value wins.</summary>
     public string? ProxyPrivateKey { get; internal set; }
 
     /// <summary>The <c>--proxy-cert-type</c> value, verbatim, as <see cref="ClientCertificateType"/> is; <see langword="null"/> when not given. The last value wins.</summary>
@@ -1363,7 +1363,7 @@ public sealed class CommandLineOptions
     /// <summary>The <c>--proxy-key-type</c> value, verbatim, as <see cref="PrivateKeyType"/> is; <see langword="null"/> when not given. The last value wins.</summary>
     public string? ProxyPrivateKeyType { get; internal set; }
 
-    /// <summary>The <c>--proxy-pass</c> passphrase for the proxy's private key, verbatim; <see langword="null"/> when not given. The last value wins.</summary>
+    /// <summary>The <c>--proxy-pass</c> passphrase for the proxy's private key, verbatim; <see langword="null"/> when not given. An empty value is accepted, as curl 8.22.0 accepts it (BL-3183). The last value wins.</summary>
     public string? ProxyPassphrase { get; internal set; }
 
     /// <summary>The <c>--proxy-ciphers</c> list, verbatim; <see langword="null"/> when not given. The last value wins.</summary>

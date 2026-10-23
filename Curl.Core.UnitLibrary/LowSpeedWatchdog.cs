@@ -10,10 +10,12 @@ namespace Curl.Core;
 /// <see cref="TimeProvider" />, it takes a sample of the bytes written to the watched output
 /// and the bytes the handler reported uploaded, and measures the current speed as curl's
 /// progress meter does: the faster of the two directions over the last five seconds of
-/// samples (fewer at the start). The first check that finds the speed below the limit starts
-/// a slow spell, a check at or above it ends the spell, and a check that finds the spell has
-/// lasted the whole speed time sets <see cref="IsTooSlow" /> and cancels <see cref="Token" />.
-/// The timer starts when the watchdog is created.
+/// samples (fewer at the start). A slow spell starts when the watchdog is created, as curl's
+/// first <c>Curl_speedcheck</c> at the transfer's start finds a speed of zero, so a transfer
+/// that never reaches the limit ends <c>-y</c> seconds after it started (BL-3163). A check at
+/// or above the limit ends the spell, the next check below it starts another, and a check that
+/// finds the spell has lasted the whole speed time sets <see cref="IsTooSlow" /> and cancels
+/// <see cref="Token" />. The timer starts when the watchdog is created.
 /// </summary>
 public sealed class LowSpeedWatchdog : IDisposable
 {
@@ -93,7 +95,9 @@ public sealed class LowSpeedWatchdog : IDisposable
                 $"--speed-limit {bytesPerSecond} bytes/s over --speed-time {(long)speedTime.TotalSeconds} s armed"));
         }
 
-        samples.Enqueue(new(timeProvider.GetTimestamp(), 0, 0));
+        long started = timeProvider.GetTimestamp();
+        samples.Enqueue(new(started, 0, 0));
+        slowSince = started;
         timer = timeProvider.CreateTimer(_ => CheckSpeed(), null, CheckInterval, CheckInterval);
     }
 

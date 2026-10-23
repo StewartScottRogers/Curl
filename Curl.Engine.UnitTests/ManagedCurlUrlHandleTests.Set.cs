@@ -79,14 +79,14 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
-    public void Set_SchemeInUpperCase_StoresItLowerCasedAndRebuildsTheUrl()
+    public void Set_SchemeInUpperCase_KeepsItsCaseAndRebuildsTheUrl()
     {
         using ManagedCurlUrlHandle url = Parsed("http://example.com/a");
 
         Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Scheme, "FTP", CurlUrlFlags.None));
 
-        Assert.AreEqual("ftp", GetOk(url, CurlUrlPart.Scheme));
-        Assert.AreEqual("ftp://example.com/a", GetOk(url, CurlUrlPart.Url));
+        Assert.AreEqual("FTP", GetOk(url, CurlUrlPart.Scheme));
+        Assert.AreEqual("FTP://example.com/a", GetOk(url, CurlUrlPart.Url));
     }
 
     [TestMethod]
@@ -242,6 +242,16 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    public void Set_OnlyAPassword_KeepsTheLoginInTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://example.com/");
+
+        url.Set(CurlUrlPart.Password, "p", CurlUrlFlags.None);
+
+        Assert.AreEqual("http://:p@example.com/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
     public void Set_Host_ReplacesItAndItsZoneId()
     {
         using ManagedCurlUrlHandle url = Parsed("http://[fe80::1%25eth0]:81/x");
@@ -321,13 +331,13 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
-    public void Set_HostUnderUrlEncode_StoresItEscaped()
+    public void Set_HostUnderUrlEncodeOfUnreservedText_StoresIt()
     {
         using ManagedCurlUrlHandle url = Parsed("http://example.com/");
 
-        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Host, "a b", CurlUrlFlags.UrlEncode));
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Host, "a-b.example", CurlUrlFlags.UrlEncode));
 
-        Assert.AreEqual("a%20b", GetOk(url, CurlUrlPart.Host));
+        Assert.AreEqual("a-b.example", GetOk(url, CurlUrlPart.Host));
     }
 
     [TestMethod]

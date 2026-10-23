@@ -117,6 +117,21 @@ public interface IConnection : IAsyncDisposable
         ValueTask.FromResult<IConnection?>(null);
 
     /// <summary>
+    /// Ends the sending side of the connection gracefully before it is disposed: a TLS
+    /// connection sends <c>close_notify</c>, then the TCP connection under it shuts its send
+    /// side down (FIN) and discards bytes already received but unread, so closing the socket
+    /// does not reset the connection. FTP calls it on a data connection before the
+    /// end-of-transfer reply, as curl 8.22.0 does, since servers such as Rebex answer
+    /// <c>426</c> to a data connection that ends with a reset (BL-3179, ADR-0770).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the shutdown.</param>
+    /// <returns>
+    /// A task that completes when the send side has ended. The default does nothing: an
+    /// implementation with no transport of its own, such as a test fake, has nothing to end.
+    /// </returns>
+    ValueTask ShutDownSendingAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    /// <summary>
     /// Gets a value indicating whether another transfer is carried on the connection beside
     /// this one, on a stream of its own (<see cref="IConnectionSession.ConcurrentTransferLimit" />):
     /// curl 8.21.0 reports a connection left intact only when the last transfer on it ends

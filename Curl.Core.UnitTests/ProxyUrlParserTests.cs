@@ -290,23 +290,19 @@ public sealed class ProxyUrlParserTests
     }
 
     [TestMethod]
-    public void TryParse_PortZero_IsTheMeasuredConnectFailure()
+    public void TryParse_PortZero_KeepsPortZeroForTheConnectToFail()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("text", "http://localhost:0");
+        diagnostics.Arrange("text", "socks5://localhost:0");
 
-        bool parsed = ProxyUrlParser.TryParse("http://localhost:0", out _, out TransferResult? failure);
+        bool parsed = ProxyUrlParser.TryParse("socks5://localhost:0", out ProxyEndpoint? proxy, out TransferResult? failure);
 
-        const string ExpectedMessage = "Failed to connect to localhost:0 over proxy localhost after 0 ms: Could not connect to server";
         diagnostics.Act("parsed", parsed);
-        diagnostics.Act("exit code", failure?.ExitCode);
-        diagnostics.Act("error message", failure?.ErrorMessage);
-        diagnostics.Assert("parsed", false, parsed);
-        Assert.IsFalse(parsed);
-        diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, failure!.ExitCode);
-        Assert.AreEqual(CurlExitCode.CouldntConnect, failure!.ExitCode);
-        diagnostics.Assert("error message", ExpectedMessage, failure!.ErrorMessage);
-        Assert.AreEqual(ExpectedMessage, failure!.ErrorMessage);
+        diagnostics.Act("port", proxy?.Port);
+        diagnostics.Assert("parsed", true, parsed);
+        Assert.IsTrue(parsed);
+        Assert.IsNull(failure);
+        Assert.AreEqual(0, proxy!.Port);
     }
 
     [TestMethod]

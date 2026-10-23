@@ -51,6 +51,35 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_PostFieldsWithSizeAndTrailerCallback_SendsOnlyThatManyBytes()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        EasyOptions options = PostFieldsTrailerOptions([], _ => TrailerResult.Ok);
+        easy.Options = options with { Http = options.Http with { PostFields = Encoding.ASCII.GetBytes("abcdef"), PostFieldSize = 3 } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.Ok, code);
+        string written = Encoding.ASCII.GetString(connector.Written);
+        StringAssert.Contains(written, "Content-Length: 3\r\n");
+        StringAssert.EndsWith(written, "\r\n\r\nabc");
+    }
+
+    [TestMethod]
+    public void TrailerPostFieldsBodyOf_SizePastTheDataOrNegative_KeepsAllTheData()
+    {
+        EasyOptions options = PostFieldsTrailerOptions([], _ => TrailerResult.Ok);
+        CurlUrl url = CurlUrl.Parse("http://h/x");
+
+        StreamBody? past = ManagedEasyTransfer.TrailerPostFieldsBodyOf(null, options with { Http = options.Http with { PostFieldSize = 99 } }, url);
+        StreamBody? negative = ManagedEasyTransfer.TrailerPostFieldsBodyOf(null, options with { Http = options.Http with { PostFieldSize = -1 } }, url);
+
+        Assert.AreEqual(7, past?.Length);
+        Assert.AreEqual(7, negative?.Length);
+    }
+
+    [TestMethod]
     public async Task PerformAsync_PostFieldsChunkedByHeaderWithTrailerCallbackAborting_ReturnsAbortedByCallback()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);

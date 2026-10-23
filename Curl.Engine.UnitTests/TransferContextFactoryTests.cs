@@ -939,7 +939,8 @@ public sealed class TransferContextFactoryTests
     {
         Diagnostics.Arrange("command line", string.Join(' ', arguments));
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true);
-        Assert.IsTrue(parsed.IsAccepted);
+        Diagnostics.Act("parsed.Refusal", parsed.Refusal is null ? "none" : string.Join(" | ", parsed.Refusal.StandardErrorLines));
+        Assert.IsTrue(parsed.IsAccepted, parsed.Refusal is null ? null : $"The parser refused the command line (exit {parsed.Refusal.ExitCode}): {string.Join(" | ", parsed.Refusal.StandardErrorLines)}");
         return parsed.Options;
     }
 

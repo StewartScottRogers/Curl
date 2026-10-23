@@ -17,7 +17,7 @@ internal sealed class ConcatenatedReadStream : Stream
 
     private readonly long[]? starts;
 
-    private readonly bool[]? readsOncePerFill;
+    private readonly bool[] readsOncePerFill;
 
     private readonly bool[] files;
 
@@ -27,6 +27,12 @@ internal sealed class ConcatenatedReadStream : Stream
 
     private int current;
 
+    /// <summary>
+    /// The failure of a segment read that came after bytes of the same fill: those bytes are returned first and the
+    /// next read throws this, so the bytes before a refused one still go out, as with one segment per read.
+    /// </summary>
+    private Exception? deferredFailure;
+
     /// <summary>Initialises a stream over <paramref name="segments" />, which it now owns.</summary>
     /// <param name="segments">The streams to read, in order.</param>
     /// <param name="allowsSeeking">
@@ -35,8 +41,8 @@ internal sealed class ConcatenatedReadStream : Stream
     /// </param>
     /// <param name="callbackSegments">
     /// The indexes of the segments that are a <c>curl_mime_data_cb</c> part's read callback, or
-    /// <see langword="null" /> for none. With none, each read reads one segment. With any, each read
-    /// fills the buffer across segments and reads a callback segment at most once, stopping before
+    /// <see langword="null" /> for none. Every read fills the buffer across segments, as libcurl's
+    /// <c>mime_read</c> does (BL-3214), and with any it reads a callback segment at most once, stopping before
     /// a second, as curl 8.22.0's <c>read_part_content</c> answers <c>STOP_FILLING</c> once a buffer
     /// fill has called a read callback (upstream test645, BL-2624).
     /// </param>
@@ -69,9 +75,9 @@ internal sealed class ConcatenatedReadStream : Stream
         segmentReads = new long[segments.Count];
     }
 
-    /// <summary>One flag per segment read at most once per fill, or <see langword="null" /> when no segment is a callback.</summary>
-    private static bool[]? ReadOnceMarks(int count, IReadOnlyCollection<int>? callbackSegments, IReadOnlyCollection<int>? fileSegments) =>
-        callbackSegments is { Count: > 0 } ? MarkSegments(count, [.. callbackSegments, .. fileSegments ?? []]) : null;
+    /// <summary>One flag per segment read at most once per fill; none is set when no segment is a callback.</summary>
+    private static bool[] ReadOnceMarks(int count, IReadOnlyCollection<int>? callbackSegments, IReadOnlyCollection<int>? fileSegments) =>
+        MarkSegments(count, callbackSegments is { Count: > 0 } ? [.. callbackSegments, .. fileSegments ?? []] : []);
 
     /// <summary>One known length or <see langword="null" /> per segment, from <paramref name="lengths" />.</summary>
     private static long?[] LengthsByIndex(int count, IReadOnlyDictionary<int, long> lengths)
@@ -142,53 +148,20 @@ internal sealed class ConcatenatedReadStream : Stream
     public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
     /// <inheritdoc />
-    public override int Read(Span<byte> buffer) => readsOncePerFill is null ? ReadOneSegment(buffer) : Fill(buffer, readsOncePerFill);
+    public override int Read(Span<byte> buffer) => Fill(buffer, readsOncePerFill);
 
     /// <inheritdoc />
     public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-        readsOncePerFill is null ? ReadOneSegmentAsync(buffer, cancellationToken) : FillAsync(buffer, readsOncePerFill, cancellationToken);
-
-    /// <summary>Reads from the first segment with bytes left.</summary>
-    private int ReadOneSegment(Span<byte> buffer)
-    {
-        while (buffer.Length > 0 && current < segments.Count)
-        {
-            int read = segments[current].Read(buffer);
-            if (read > 0)
-            {
-                return read;
-            }
-
-            current++;
-        }
-
-        return 0;
-    }
+        FillAsync(buffer, readsOncePerFill, cancellationToken);
 
     /// <inheritdoc />
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
         ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
-    /// <summary>Reads from the first segment with bytes left.</summary>
-    private async ValueTask<int> ReadOneSegmentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
-    {
-        while (buffer.Length > 0 && current < segments.Count)
-        {
-            int read = await segments[current].ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            if (read > 0)
-            {
-                return read;
-            }
-
-            current++;
-        }
-
-        return 0;
-    }
-
     /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
     private int Fill(Span<byte> buffer, bool[] readsOnce)
     {
+        ThrowDeferredFailure();
         int filled;
         bool stopped;
         do
@@ -200,6 +173,15 @@ internal sealed class ConcatenatedReadStream : Stream
         return filled;
     }
 
+    /// <summary>Throws the failure a fill deferred behind its bytes, if one did.</summary>
+    private void ThrowDeferredFailure()
+    {
+        if (deferredFailure is not null)
+        {
+            throw deferredFailure;
+        }
+    }
+
     /// <summary>One buffer fill: its byte count, and whether an encoded segment stopped it.</summary>
     private (int Filled, bool Stopped) FillOnce(Span<byte> buffer, bool[] readsOnce)
     {
@@ -208,7 +190,17 @@ internal sealed class ConcatenatedReadStream : Stream
         while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
         {
             calledBack |= CountsAsTheRead(readsOnce, current, IsAtItsEnd(current));
-            int read = segments[current].Read(buffer[filled..]);
+            int read;
+            try
+            {
+                read = segments[current].Read(buffer[filled..]);
+            }
+            catch (Exception failure) when (filled > 0)
+            {
+                deferredFailure = failure;
+                return (filled, false);
+            }
+
             filled += read;
             if (StoppedFilling(read))
             {
@@ -235,6 +227,7 @@ internal sealed class ConcatenatedReadStream : Stream
     /// <summary>Fills <paramref name="buffer" /> across segments, reading a callback or file segment at most once.</summary>
     private async ValueTask<int> FillAsync(Memory<byte> buffer, bool[] readsOnce, CancellationToken cancellationToken)
     {
+        ThrowDeferredFailure();
         int filled;
         bool stopped;
         do
@@ -254,7 +247,17 @@ internal sealed class ConcatenatedReadStream : Stream
         while (FillsOn(filled, buffer.Length, calledBack, readsOnce))
         {
             calledBack |= CountsAsTheRead(readsOnce, current, IsAtItsEnd(current));
-            int read = await segments[current].ReadAsync(buffer[filled..], cancellationToken).ConfigureAwait(false);
+            int read;
+            try
+            {
+                read = await segments[current].ReadAsync(buffer[filled..], cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception failure) when (filled > 0)
+            {
+                deferredFailure = failure;
+                return (filled, false);
+            }
+
             filled += read;
             if (StoppedFilling(read))
             {

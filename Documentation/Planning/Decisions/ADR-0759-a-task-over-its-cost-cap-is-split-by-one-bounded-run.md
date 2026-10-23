@@ -18,7 +18,7 @@ every task depending on them was stalled.
 - `Invoke-TaskSplit` (`DarkFactory/TaskStash.ps1`) does that split with one headless run built
   like a task run: `claude -p --model sonnet`, `--max-budget-usd 1`, `--max-turns 30`, a
   20-minute limit, and `$SplitForbidden`, which denies every git command a lane may not run and
-  every `git stash` subcommand except `list` and `store`. Its prompt is `$SplitPrompt`
+  every `git stash` subcommand except `list`. Its prompt is `$SplitPrompt`
   (`DarkFactory/Prompts.ps1`).
 - It runs when a claim passes over a task for its cost cap (`Invoke-Claim`, after the claim
   lock is released, so a split run never holds every lane's claims) and when a run stops at its

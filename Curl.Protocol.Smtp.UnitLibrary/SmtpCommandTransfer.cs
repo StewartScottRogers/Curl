@@ -66,7 +66,7 @@ internal sealed class SmtpCommandTransfer(
                 channel.Trace.DoingDone();
             }
 
-            await channel.QuitAsync().ConfigureAwait(false);
+            await channel.QuitOrKeepAsync(result.ExitCode == CurlExitCode.Ok).ConfigureAwait(false);
         }
         catch (SmtpReplyMissingException)
         {

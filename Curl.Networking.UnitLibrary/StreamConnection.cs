@@ -104,6 +104,47 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     public ValueTask FlushAsync(CancellationToken cancellationToken) =>
         new(_stream.FlushAsync(cancellationToken));
 
+    /// <summary>
+    /// Gets the send-side shutdown <see cref="ShutDownSendingAsync" /> runs on the stream.
+    /// Production discards the bytes the socket under a <see cref="NetworkStream" /> has received
+    /// but not read, then shuts its send side down; tests set it (BL-3179).
+    /// </summary>
+    internal Action<Stream> ShutDownSendSide { get; init; } = DiscardUnreadAndShutDownSocketUnder;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Discarding what is already received before the FIN keeps the close that follows from
+    /// sending a reset over unread bytes (ADR-0770).
+    /// </remarks>
+    public ValueTask ShutDownSendingAsync(CancellationToken cancellationToken)
+    {
+        ShutDownSendSide(_stream);
+        return ValueTask.CompletedTask;
+    }
+
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static void DiscardUnreadAndShutDownSocketUnder(Stream stream)
+    {
+        if (stream is not NetworkStream network)
+        {
+            return;
+        }
+
+        try
+        {
+            byte[] discard = new byte[4096];
+            while (network.Socket.Available > 0 && network.Socket.Receive(discard) > 0)
+            {
+            }
+
+            network.Socket.Shutdown(SocketShutdown.Send);
+        }
+        catch (SocketException)
+        {
+            // The peer has already gone: there is no send side left to end.
+        }
+    }
+
     /// <inheritdoc />
     public ValueTask DisposeAsync() => _stream.DisposeAsync();
 }

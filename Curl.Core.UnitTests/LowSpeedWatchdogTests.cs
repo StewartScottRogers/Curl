@@ -65,23 +65,79 @@ public sealed class LowSpeedWatchdogTests
         diagnostics.Arrange("time", TimeSpan.FromSeconds(2));
         using LowSpeedWatchdog watchdog = new(100, TimeSpan.FromSeconds(2), clock);
 
-        diagnostics.Arrange("tick seconds", 2);
-        clock.Tick(2);
-        diagnostics.Act("too slow after 2 s", watchdog.IsTooSlow);
-        diagnostics.Act("cancelled after 2 s", watchdog.Token.IsCancellationRequested);
-        diagnostics.Assert("too slow after 2 s", false, watchdog.IsTooSlow);
+        diagnostics.Arrange("tick seconds", 1);
+        clock.Tick();
+        diagnostics.Act("too slow after 1 s", watchdog.IsTooSlow);
+        diagnostics.Act("cancelled after 1 s", watchdog.Token.IsCancellationRequested);
+        diagnostics.Assert("too slow after 1 s", false, watchdog.IsTooSlow);
         Assert.IsFalse(watchdog.IsTooSlow);
-        diagnostics.Assert("cancelled after 2 s", false, watchdog.Token.IsCancellationRequested);
+        diagnostics.Assert("cancelled after 1 s", false, watchdog.Token.IsCancellationRequested);
         Assert.IsFalse(watchdog.Token.IsCancellationRequested);
 
         diagnostics.Arrange("tick seconds", 1);
         clock.Tick();
-        diagnostics.Act("too slow after 3 s", watchdog.IsTooSlow);
-        diagnostics.Act("cancelled after 3 s", watchdog.Token.IsCancellationRequested);
-        diagnostics.Assert("too slow after 3 s", true, watchdog.IsTooSlow);
+        diagnostics.Act("too slow after 2 s", watchdog.IsTooSlow);
+        diagnostics.Act("cancelled after 2 s", watchdog.Token.IsCancellationRequested);
+        diagnostics.Assert("too slow after 2 s", true, watchdog.IsTooSlow);
         Assert.IsTrue(watchdog.IsTooSlow);
-        diagnostics.Assert("cancelled after 3 s", true, watchdog.Token.IsCancellationRequested);
+        diagnostics.Assert("cancelled after 2 s", true, watchdog.Token.IsCancellationRequested);
         Assert.IsTrue(watchdog.Token.IsCancellationRequested);
+    }
+
+    // Stewart's 2026-10-22 report (BL-3163): 10 bytes, a 3 s pause, 10 more under -y 2 -Y 100000.
+    // curl 8.22.0 measured on Windows the same day exits 28 about 2.2 s after it started, so the
+    // slow spell counts from the transfer's start.
+    [TestMethod]
+    public void TenBytesThenAThreeSecondPause_UnderTheLimitForTheSpeedTime_EndsWithExit28()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("limit", 100000);
+        diagnostics.Arrange("time", TimeSpan.FromSeconds(2));
+        using LowSpeedWatchdog watchdog = new(100000, TimeSpan.FromSeconds(2), clock);
+        Stream output = watchdog.WatchOutput(new MemoryStream());
+
+        output.Write(new byte[10], 0, 10);
+        clock.Tick(2);
+        bool tooSlowBeforeThePauseEnds = watchdog.IsTooSlow;
+        clock.Tick();
+        output.Write(new byte[10], 0, 10);
+        TransferResult failure = watchdog.Failure;
+
+        diagnostics.Act("too slow after 2 s", tooSlowBeforeThePauseEnds);
+        diagnostics.Act("exit code", failure.ExitCode);
+        diagnostics.Act("error message", failure.ErrorMessage);
+        Assert.IsTrue(tooSlowBeforeThePauseEnds);
+        Assert.IsTrue(watchdog.Token.IsCancellationRequested);
+        Assert.AreEqual(CurlExitCode.OperationTimedOut, failure.ExitCode);
+        Assert.AreEqual("Operation too slow. Less than 100000 bytes/sec transferred the last 2 seconds", failure.ErrorMessage);
+    }
+
+    [TestMethod]
+    public void SlowSecond_ShorterThanTheSpeedTimeAndRecovered_NeverTrips()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("limit", 100);
+        using LowSpeedWatchdog watchdog = new(100, TimeSpan.FromSeconds(2), clock);
+        Stream output = watchdog.WatchOutput(new MemoryStream());
+
+        for (int second = 0; second < 3; second++)
+        {
+            output.Write(new byte[100], 0, 100);
+            clock.Tick();
+        }
+
+        clock.Tick();
+        output.Write(new byte[1000], 0, 1000);
+        clock.Tick();
+        for (int second = 0; second < 10; second++)
+        {
+            output.Write(new byte[100], 0, 100);
+            clock.Tick();
+        }
+
+        diagnostics.Act("too slow", watchdog.IsTooSlow);
+        diagnostics.Assert("too slow", false, watchdog.IsTooSlow);
+        Assert.IsFalse(watchdog.IsTooSlow);
     }
 
     [TestMethod]
@@ -134,8 +190,8 @@ public sealed class LowSpeedWatchdogTests
         using LowSpeedWatchdog watchdog = new(100, TimeSpan.FromSeconds(2), clock);
         Stream output = watchdog.WatchOutput(new MemoryStream());
 
-        diagnostics.Arrange("tick seconds", 2);
-        clock.Tick(2);
+        diagnostics.Arrange("tick seconds", 1);
+        clock.Tick();
         diagnostics.Arrange("bytes written", 1000);
         output.Write(new byte[1000], 0, 1000);
         diagnostics.Arrange("tick seconds", 1);
@@ -311,15 +367,15 @@ public sealed class LowSpeedWatchdogTests
         diagnostics.Act("error message", watchdog!.Failure.ErrorMessage);
         diagnostics.Assert("error message", "Operation too slow. Less than 100 bytes/sec transferred the last 30 seconds", watchdog.Failure.ErrorMessage);
         Assert.AreEqual("Operation too slow. Less than 100 bytes/sec transferred the last 30 seconds", watchdog!.Failure.ErrorMessage);
-        diagnostics.Arrange("tick seconds", 30);
-        clock.Tick(30);
-        diagnostics.Act("too slow after 30 s", watchdog.IsTooSlow);
-        diagnostics.Assert("too slow after 30 s", false, watchdog.IsTooSlow);
+        diagnostics.Arrange("tick seconds", 29);
+        clock.Tick(29);
+        diagnostics.Act("too slow after 29 s", watchdog.IsTooSlow);
+        diagnostics.Assert("too slow after 29 s", false, watchdog.IsTooSlow);
         Assert.IsFalse(watchdog.IsTooSlow);
         diagnostics.Arrange("tick seconds", 1);
         clock.Tick();
-        diagnostics.Act("too slow after 31 s", watchdog.IsTooSlow);
-        diagnostics.Assert("too slow after 31 s", true, watchdog.IsTooSlow);
+        diagnostics.Act("too slow after 30 s", watchdog.IsTooSlow);
+        diagnostics.Assert("too slow after 30 s", true, watchdog.IsTooSlow);
         Assert.IsTrue(watchdog.IsTooSlow);
     }
 

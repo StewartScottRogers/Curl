@@ -165,7 +165,7 @@ public sealed partial class HttpProtocolHandlerTests
         foreach (int chunkSize in ChunkSizes)
         {
             MemoryStream output = new();
-            HttpRequestOptions options = new() { TransferEncoding = true, Raw = true, Compressed = response.Contains("Content-Encoding", StringComparison.Ordinal) };
+            HttpRequestOptions options = new() { TransferEncoding = true, PassesContentCoding = true, PassesTransferCoding = true, Compressed = response.Contains("Content-Encoding", StringComparison.Ordinal) };
             string expected = options.Compressed
                 ? "GET /a HTTP/1.1\r\n" + LoopbackHeaders + "TE: gzip\r\nAccept-Encoding: deflate, gzip, br, zstd\r\nConnection: TE\r\n\r\n"
                 : TrEncodingGet;
@@ -192,7 +192,7 @@ public sealed partial class HttpProtocolHandlerTests
             WriteEncodingArrange(chunkSize, response, "--tr-encoding --raw");
 
             TransferResult result = await Handler(QueueConnector.For(Connection(Encoded(response), chunkSize, TrEncodingGet)))
-                .ExecuteAsync(EncodingContext(new MemoryStream(), new HttpRequestOptions { TransferEncoding = true, Raw = true }));
+                .ExecuteAsync(EncodingContext(new MemoryStream(), new HttpRequestOptions { TransferEncoding = true, PassesContentCoding = true, PassesTransferCoding = true }));
 
             WriteResult(result);
             Diagnostics.Assert("error text", message, result.ErrorMessage);

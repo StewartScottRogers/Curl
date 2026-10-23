@@ -9,8 +9,9 @@ namespace Curl.Protocol.Http;
 /// <remarks>
 /// By default a chunked body wins over a Content-Length, which is still checked, and a body
 /// with neither runs to close. <c>--raw</c> decodes no transfer coding: a body whose
-/// Transfer-Encoding lists <c>chunked</c> runs to close and is written as it arrives, chunk
-/// lines included, and no other coding is refused; one without still stops at its
+/// Transfer-Encoding lists <c>chunked</c> is written as it arrives, chunk lines included, yet
+/// its chunks are still read to end it after the zero-length chunk and its trailers, as curl
+/// 8.22.0 does (measured, BL-3162 Notes), and no other coding is refused; one without still stops at its
 /// Content-Length. <c>--ignore-content-length</c> never reads the Content-Length, so a body
 /// that is not chunked runs to close, however short or long it is. Under
 /// <c>--tr-encoding</c> any Transfer-Encoding header makes the Content-Length untrusted: the
@@ -27,7 +28,15 @@ namespace Curl.Protocol.Http;
 /// The transfer codings other than <c>chunked</c> that <c>--tr-encoding</c> decodes, in the
 /// order the server applied them, or <see langword="null" /> for none.
 /// </param>
-internal readonly struct HttpResponseBodyFraming(bool isChunked, long? contentLength, IReadOnlyList<string>? transferCodings = null)
+/// <param name="passesChunks">
+/// Whether the body is chunked but written undecoded (<c>--raw</c>), its chunks read only to
+/// find where it ends.
+/// </param>
+internal readonly struct HttpResponseBodyFraming(
+    bool isChunked,
+    long? contentLength,
+    IReadOnlyList<string>? transferCodings = null,
+    bool passesChunks = false)
 {
     /// <summary>
     /// Gets a value indicating whether the body is decoded as chunked transfer coding.
@@ -47,9 +56,15 @@ internal readonly struct HttpResponseBodyFraming(bool isChunked, long? contentLe
     internal IReadOnlyList<string> TransferCodings { get; } = transferCodings ?? [];
 
     /// <summary>
+    /// Gets a value indicating whether the body is chunked but written undecoded
+    /// (<c>--raw</c>), its chunks read only to find where it ends.
+    /// </summary>
+    internal bool PassesChunks { get; } = passesChunks;
+
+    /// <summary>
     /// Gets a value indicating whether the body runs until the peer closes.
     /// </summary>
-    internal bool RunsToClose => !IsChunked && ContentLength is null;
+    internal bool RunsToClose => !IsChunked && !PassesChunks && ContentLength is null;
 
     /// <summary>
     /// Decides how the body framed by <paramref name="headers" /> ends.
@@ -83,9 +98,9 @@ internal readonly struct HttpResponseBodyFraming(bool isChunked, long? contentLe
         bool ignoresContentLength)
     {
         bool isChunked = !passesTransferCoding && HttpTransferEncoding.IsChunked(headers);
-        bool listsChunked = isChunked || (passesTransferCoding && HttpTransferEncoding.ListsChunked(headers));
+        bool passesChunks = passesTransferCoding && HttpTransferEncoding.ListsChunked(headers);
         long? contentLength = ignoresContentLength ? null : HttpContentLength.Find(headers);
-        return new HttpResponseBodyFraming(isChunked, listsChunked ? null : contentLength);
+        return new HttpResponseBodyFraming(isChunked, isChunked || passesChunks ? null : contentLength, passesChunks: passesChunks);
     }
 
     /// <summary>
@@ -98,6 +113,7 @@ internal readonly struct HttpResponseBodyFraming(bool isChunked, long? contentLe
     {
         HttpTransferCodings codings = HttpTransferEncoding.Requested(headers, passesTransferCoding);
         long? contentLength = ignoresContentLength ? null : HttpContentLength.Find(headers);
-        return new HttpResponseBodyFraming(codings.IsChunked, codings.FirstHeaderIndex is null ? contentLength : null, codings.Codings);
+        bool passesChunks = passesTransferCoding && HttpTransferEncoding.ListsChunked(headers);
+        return new HttpResponseBodyFraming(codings.IsChunked, codings.FirstHeaderIndex is null ? contentLength : null, codings.Codings, passesChunks);
     }
 }

@@ -67,7 +67,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         Assert.AreEqual(Capa + List + Quit, run.Sent);
         Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);
         Assert.AreEqual(TransferResult.Success(ListedBytes), run.Result);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18110, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 18110, false) { PoolScheme = "pop3" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Diagnostics.AssertValues("run.Tls.Handshakes count", 0, run.Tls.Handshakes.Count());
         Assert.IsEmpty(run.Tls.Handshakes);
         Assert.IsTrue(run.Connection.IsDisposed);
@@ -79,7 +79,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
         Pop3Run run = await RunAsync("pop3://127.0.0.1/", Greeting + CapaReply + ListReply + Bye);
 
         Diagnostics.Assert("connect target", "127.0.0.1:110 tls False", $"{run.Connector.Targets.Single().Host}:{run.Connector.Targets.Single().Port} tls {run.Connector.Targets.Single().UseTls}");
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 110, false), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 110, false) { PoolScheme = "pop3" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
     }
 
     [TestMethod]
@@ -111,7 +111,7 @@ public sealed class Pop3ProtocolHandlerSessionTests
 
         Diagnostics.Diff("sent", Capa + List + Quit, run.Sent);
         Assert.AreEqual(Capa + List + Quit, run.Sent);
-        Assert.AreEqual(new ConnectTarget("127.0.0.1", 995, true), run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
+        Assert.AreEqual(new ConnectTarget("127.0.0.1", 995, true) { PoolScheme = "pop3s" }, run.Connector.Targets.Single() with { Events = NoTransferEvents.Instance });
         Diagnostics.AssertValues("run.Tls.Handshakes count", 0, run.Tls.Handshakes.Count());
         Assert.IsEmpty(run.Tls.Handshakes);
         Diagnostics.AssertResult(TransferResult.Success(ListedBytes), run.Result);

@@ -486,6 +486,24 @@
     protocol by ALPN as a TLS server; HPACK's Huffman strings are decoded by .NET's own
     internal decoder, found by reflection.
 
+.PARAMETER Http2Origin
+    Stand in for an HTTP/2 origin server (BL-3209) instead of an HTTPS proxy; it implies
+    -Http2 and uses the same frame logging. One connection, then the answer is the first
+    Response over HTTP/1.1, or for HTTP/2 a HEADERS frame ":status: 200" with
+    "content-length: 0" that ends the stream (a body-less answer; ProxyStatus picks the status).
+      h2c-upgrade          plain TCP. A request with "Upgrade: h2c" is answered 101, then the
+                           connection preface and frames, the request being stream 1. Any
+                           other request is answered as HTTP/1.1.
+      h2c-upgrade-ignored  plain TCP. The upgrade request is answered as ordinary HTTP/1.1
+                           (the first Response), the upgrade ignored.
+      prior-knowledge      plain TCP. A connection opening with the HTTP/2 preface ("PRI ")
+                           is served HTTP/2; an HTTP/1.1 request is answered as HTTP/1.1.
+      alpn                 needs -Tls. ProxyAlpn (h2 or http/1.1) is the one protocol offered
+                           by ALPN; h2 gets HTTP/2 frames, http/1.1 gets the first Response.
+    request.bin holds every byte curl sent; transcript.txt one line per frame or header line,
+    as for -Http2. Needs PowerShell 7 (pwsh).
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin h2c-upgrade -Port 18080 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello' -Curl <nghttp2 curl> -CurlArgs '--http2','-sS','-w','%{http_version}','http://127.0.0.1:18080/' -OutDirectory fixtures\h2-origin-upgrade
+
 .PARAMETER ProxyStatus
     With -Http2, the status the proxy answers curl's first request with: a 2xx opens a
     CONNECT tunnel, anything else refuses it. Default 200. With ProxyAlpn http/1.1 the
@@ -673,6 +691,7 @@ param(
     [string] $TlsRevokingCrlFile,
     [string] $TlsPublicKeyFile,
     [switch] $Http2,
+    [ValidateSet('', 'h2c-upgrade', 'h2c-upgrade-ignored', 'prior-knowledge', 'alpn')] [string] $Http2Origin = '',
     [ValidateRange(100, 999)] [int] $ProxyStatus = 200,
     [ValidateSet('h2', 'http/1.1')] [string] $ProxyAlpn = 'h2',
     [string] $Curl,
@@ -702,7 +721,10 @@ if (-not $NoServer -and -not $UnixSocket -and $Port -eq 0) { throw '-Port is req
 if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is required with it.' }
 if ($Tftp -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $UdpSink)) { throw '-Tftp serves one TFTP transfer on UDP -Port, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket or -UdpSink.' }
 if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
-if ($Http2 -and -not $Tls) { throw '-Http2 is an HTTPS proxy that picks h2 by ALPN, so it needs -Tls.' }
+if ($Http2Origin) { $Http2 = [switch] $true }
+if ($Http2Origin -eq 'alpn' -and -not $Tls) { throw '-Http2Origin alpn is an HTTPS origin that picks h2 or http/1.1 by ALPN, so it needs -Tls.' }
+if ($Http2Origin -and $Http2Origin -ne 'alpn' -and $Tls) { throw '-Http2Origin h2c-upgrade, h2c-upgrade-ignored and prior-knowledge are plain TCP, so they cannot be combined with -Tls.' }
+if ($Http2 -and -not $Tls -and -not $Http2Origin) { throw '-Http2 is an HTTPS proxy that picks h2 by ALPN, so it needs -Tls.' }
 if ($Http2 -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $NoServer -or $UnixSocket -or $Tftp)) { throw '-Http2 serves one HTTPS proxy connection, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp.' }
 if ($Http2 -and $PSVersionTable.PSVersion.Major -lt 7) { throw '-Http2 needs PowerShell 7 (pwsh): Windows PowerShell 5.1''s .NET Framework cannot pick a protocol by ALPN as a TLS server.' }
 
@@ -2174,14 +2196,16 @@ public sealed class RecorderHttp2Proxy
     private readonly string _alpn;
     private readonly int _status;
     private readonly byte[] _tunnelResponse;
+    private readonly string _origin;
     private readonly StringBuilder _log = new StringBuilder();
     private readonly MemoryStream _received = new MemoryStream();
     private readonly List<KeyValuePair<string, string>> _dynamicTable = new List<KeyValuePair<string, string>>();
     private readonly HuffmanDecoder _huffman;
     private Thread _thread;
 
-    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse)
+    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin)
     {
+        _origin = origin;
         _listener = listener;
         _certificate = certificate;
         _alpn = alpn;
@@ -2227,6 +2251,7 @@ public sealed class RecorderHttp2Proxy
         {
             try
             {
+                if (_origin.Length > 0 && _origin != "alpn") { ServePlainOrigin(client.GetStream()); return; }
                 var tls = new SslStream(client.GetStream(), false);
                 var options = new SslServerAuthenticationOptions
                 {
@@ -2238,7 +2263,7 @@ public sealed class RecorderHttp2Proxy
                 tls.ReadTimeout = 5000;
                 string negotiated = tls.NegotiatedApplicationProtocol.ToString();
                 Note("= TLS handshake completed, ALPN " + (negotiated.Length == 0 ? "none" : negotiated));
-                if (negotiated == "h2") { ServeHttp2(tls); } else { ServeHttp11(tls); }
+                if (negotiated == "h2") { ServeHttp2(tls, new byte[0], false); } else if (_origin.Length > 0) { ServeHttp11Origin(tls, ReadHeaderBlock(tls)); } else { ServeHttp11(tls); }
             }
             catch (Exception exception)
             {
@@ -2286,16 +2311,60 @@ public sealed class RecorderHttp2Proxy
         return new[] { (byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value };
     }
 
-    private void ServeHttp2(Stream stream)
+    // An origin on plain TCP: the first bytes tell prior knowledge (the HTTP/2 preface, which
+    // starts "PRI ") from an HTTP/1.1 request. In h2c-upgrade mode a request asking for
+    // "Upgrade: h2c" is answered 101; in every other mode it is answered as HTTP/1.1.
+    private void ServePlainOrigin(Stream stream)
     {
-        byte[] preface = ReadExact(stream, 24);
-        if (preface == null) { Note("= curl hung up before the connection preface"); return; }
+        byte[] first = ReadExact(stream, 4);
+        if (first == null) { Note("= curl hung up before sending anything"); return; }
+        if (Encoding.Latin1.GetString(first) == "PRI ") { Note("= prior knowledge: curl opened with the HTTP/2 preface"); ServeHttp2(stream, first, false); return; }
+        byte[] rest = ReadHeaderBlock(stream);
+        if (rest == null) { Note("= curl hung up before its request ended"); return; }
+        byte[] request = new byte[first.Length + rest.Length];
+        Buffer.BlockCopy(first, 0, request, 0, first.Length);
+        Buffer.BlockCopy(rest, 0, request, first.Length, rest.Length);
+        string text = Encoding.Latin1.GetString(request);
+        if (_origin == "h2c-upgrade" && text.ToLowerInvariant().Contains("\r\nupgrade: h2c\r\n"))
+        {
+            NoteLines("> ", text);
+            byte[] switching = Encoding.Latin1.GetBytes("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n");
+            stream.Write(switching, 0, switching.Length);
+            stream.Flush();
+            NoteLines("< ", Encoding.Latin1.GetString(switching));
+            ServeHttp2(stream, new byte[0], true);
+            return;
+        }
+        ServeHttp11Origin(stream, request);
+    }
+
+    // An HTTP/1.1 answer to a request already read: the first Response, then wait for the hang-up.
+    private void ServeHttp11Origin(Stream stream, byte[] request)
+    {
+        if (request == null) { Note("= curl hung up before its request ended"); return; }
+        NoteLines("> ", Encoding.Latin1.GetString(request));
+        stream.Write(_tunnelResponse, 0, _tunnelResponse.Length);
+        stream.Flush();
+        Note("< " + Escape(_tunnelResponse, 0, _tunnelResponse.Length));
+        WaitForHangUp(stream);
+    }
+
+    // already: connection bytes the caller has read. upgraded: the request that asked for the
+    // h2c upgrade becomes stream 1 and is answered once SETTINGS are out.
+    private void ServeHttp2(Stream stream, byte[] already, bool upgraded)
+    {
+        byte[] more = ReadExact(stream, 24 - already.Length);
+        if (more == null) { Note("= curl hung up before the connection preface"); return; }
+        byte[] preface = new byte[24];
+        Buffer.BlockCopy(already, 0, preface, 0, already.Length);
+        Buffer.BlockCopy(more, 0, preface, already.Length, more.Length);
         Note("> PREFACE " + Escape(preface, 0, preface.Length));
         WriteFrame(stream, 4, 0, 0, new byte[0]);
         Note("< SETTINGS");
         var headerBlock = new MemoryStream();
         var tunnel = new MemoryStream();
         int tunnelStream = 0;
+        if (upgraded) { tunnelStream = 1; AnswerConnect(stream, 1, false); }
         bool answered = false;
         while (true)
         {
@@ -2525,7 +2594,7 @@ public sealed class RecorderHttp2Proxy
 '@
     $server.Dispose()
     $server = $null
-    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0])
+    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }))
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {

@@ -184,7 +184,6 @@ public sealed class CoreParserAdversarialTests
     }
 
     [TestMethod]
-    [DataRow("proxy.test:0")]
     [DataRow("proxy.test:65536")]
     [DataRow("proxy.test:-1")]
     [DataRow("proxy.test:99999999999999999999")]
@@ -225,7 +224,7 @@ public sealed class CoreParserAdversarialTests
     [DataRow("user@ftp.example.com", "ftp://user@ftp.example.com")]
     [DataRow("ftp.example.com@www.test", "http://ftp.example.com@www.test")]
     [DataRow("www.test/ftp.example.com", "http://www.test/ftp.example.com")]
-    [DataRow("1http://x", "http://1http://x")]
+    [DataRow("1http:9//x", "http://1http:9//x")]
     [DataRow("http:x", "http://http:x")]
     public void UrlSchemeGuesser_UrlsAtThePrefixAndSchemeEdges_GuessByTheHostOnly(string url, string expected)
     {

@@ -66,7 +66,8 @@ public sealed class HttpRequestOptionsMappingTests
         BytesBody body = (BytesBody)mapped.Body!;
         Assert.AreEqual(HttpRequestOptionsMapping.FormUrlEncoded, body.ContentType);
         CollectionAssert.AreEqual(new[] { (byte)'a' }, body.Content.ToArray());
-        Assert.IsFalse(mapped.Raw);
+        Assert.IsFalse(mapped.PassesContentCoding);
+        Assert.IsFalse(mapped.PassesTransferCoding);
     }
 
     [TestMethod]
@@ -124,21 +125,23 @@ public sealed class HttpRequestOptionsMappingTests
     }
 
     [TestMethod]
-    [DataRow(true, true, false)]
-    [DataRow(false, true, false)]
-    [DataRow(true, false, false)]
-    [DataRow(false, false, true)]
-    public void Of_Decodings_AreRawOnlyWhenBothAreOff(bool contentDecoding, bool transferDecoding, bool expectedRaw)
+    [DataRow(true, true)]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    [DataRow(false, false)]
+    public void Of_Decodings_PassEachCodingWhoseDecodingIsOff(bool contentDecoding, bool transferDecoding)
     {
         Diagnostics.Arrange("content / transfer decoding", $"{contentDecoding}/{transferDecoding}");
 
-        bool raw = HttpRequestOptionsMapping.Of(
+        HttpRequestOptions mapped = HttpRequestOptionsMapping.Of(
             EasyOptionsFromCommandLine.TransferSettingsOf(NoOptions),
-            new EasyHttpOptions { HttpContentDecoding = contentDecoding, HttpTransferDecoding = transferDecoding }, new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions()).Raw;
+            new EasyHttpOptions { HttpContentDecoding = contentDecoding, HttpTransferDecoding = transferDecoding }, new EasyBehaviourOptions(), new EasyTransferOptions(), new EasyAuthenticationOptions());
 
-        Diagnostics.Act("raw", raw);
+        Diagnostics.Act("passes content / transfer coding", $"{mapped.PassesContentCoding}/{mapped.PassesTransferCoding}");
 
-        Diagnostics.Assert("raw", expectedRaw, raw);
-        Assert.AreEqual(expectedRaw, raw);
+        Diagnostics.Assert("passes content coding", !contentDecoding, mapped.PassesContentCoding);
+        Assert.AreEqual(!contentDecoding, mapped.PassesContentCoding);
+        Diagnostics.Assert("passes transfer coding", !transferDecoding, mapped.PassesTransferCoding);
+        Assert.AreEqual(!transferDecoding, mapped.PassesTransferCoding);
     }
 }
