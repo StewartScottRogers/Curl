@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3370 — Fix AF-0393: BL-3195 cost $3.43 (3.2x the median): an 80-turn Opus run plus two rebase-conflict resolve runs
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (from the BL-3195 jsonl logs): the main run was a legitimate cross-cutting Engine feature (HttpTransferException, HttpResponseHeadReader, HttpProtocolHandler, ManagedEasyTransfer plus two test files) that took 80 Opus turns, $3.17; the first test pass was 0/4 then 1/4, normal red-green work. The two resolve runs ($0.71) came from one rebase conflict: this lane and BL-3190 both took ADR numbers 0769 and then 0773, so the Decisions README conflicted, and the resolver renumbered, rebuilt and ran the whole fast suite each time.
+- Recorded as unavoidable, no change: the work itself was needed, and the ADR-number collision is already handled by the lane prompt (rule 3: the shift resolver renumbers) and cannot be prevented without a central ADR number allocator, which is outside this task's touches (RunDarkFactory.ps1) and a one-off $0.71. Decided by Claude under Stewart's delegation; no ADR needed since nothing changed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-23: Doing -> Done. Cause named (large Opus Engine feature plus ADR-number rebase collision); recorded unavoidable
