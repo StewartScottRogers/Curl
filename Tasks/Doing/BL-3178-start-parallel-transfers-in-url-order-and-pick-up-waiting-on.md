@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 184a969c 65c3687b c7498130 cc00745f 34f328d9.
