@@ -84,7 +84,7 @@ public sealed class CurlMcpGoldenConversationIntegrationTests
     public async Task Conversation_AnswersAsRecorded(string name)
     {
         (string _, string listenerKind, string[] lines) = Conversations.Single(conversation => conversation.Name == name);
-        string root = Path.Combine(Path.GetTempPath(), $"curl-mcp-golden-{Guid.NewGuid():N}");
+        string root = Path.Combine(ResolveRealPath(Path.GetTempPath()), $"curl-mcp-golden-{Guid.NewGuid():N}");
         string outside = root + "-outside";
         Directory.CreateDirectory(root);
         using TcpListener listener = new(IPAddress.Loopback, 0);
@@ -187,6 +187,25 @@ public sealed class CurlMcpGoldenConversationIntegrationTests
         {
             return JsonValue.Create(line);
         }
+    }
+
+    /// <summary>
+    /// The path with every symbolic link along it resolved, so the root the test names matches the
+    /// one the server reports (macOS's temporary folder sits under <c>/var</c>, a link to
+    /// <c>/private/var</c>, BL-3415).
+    /// </summary>
+    private static string ResolveRealPath(string path)
+    {
+        string full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        string? parent = Path.GetDirectoryName(full);
+        if (parent is null)
+        {
+            return full;
+        }
+
+        string candidate = Path.Combine(ResolveRealPath(parent), Path.GetFileName(full));
+        FileSystemInfo? target = new DirectoryInfo(candidate).ResolveLinkTarget(returnFinalTarget: true);
+        return target is null ? candidate : ResolveRealPath(target.FullName);
     }
 
     private static JsonNode? Normalise(JsonNode? node, string root, string outside, int port)
