@@ -242,6 +242,16 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    public void Set_OnlyAPassword_KeepsTheLoginInTheUrl()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://example.com/");
+
+        url.Set(CurlUrlPart.Password, "p", CurlUrlFlags.None);
+
+        Assert.AreEqual("http://:p@example.com/", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
     public void Set_Host_ReplacesItAndItsZoneId()
     {
         using ManagedCurlUrlHandle url = Parsed("http://[fe80::1%25eth0]:81/x");
