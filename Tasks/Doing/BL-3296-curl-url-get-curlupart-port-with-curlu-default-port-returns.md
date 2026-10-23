@@ -30,3 +30,4 @@ Scenarios 744 to 806 (file:///c:/x, file://localhost/x, file:/x, file:///x/y?z#w
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: bb20f7e3 c46ca32a.
