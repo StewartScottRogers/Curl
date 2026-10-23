@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/ParallelHostQueue.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console.UnitTests/ParallelHostQueueTests.cs, Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs, Curl.Console.UnitTests/ParallelTransferQueueTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3253 — Release a host's -Z waiters one at a time, first waiter last, in ParallelHostQueue
 
@@ -41,3 +41,4 @@ Split from BL-3189. Curl races today: `ParallelHostQueue.Leave` releases every w
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: e910298d 9f090ed0 d86ddc33 8aba9703.
+- 2026-10-23: Doing -> Done. ParallelHostQueue frees a host's waiters one at a time, first waiter behind those freed with it; Curl.Console fast run green, quality gate clean
