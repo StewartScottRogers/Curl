@@ -32,3 +32,4 @@ Stewart (2026-10-23) wants every test passing. Case 1211 (`ftp://HOST:PORT/1211 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 8481adb5 817ebe6e 3331bee8 c5f8cef6.
