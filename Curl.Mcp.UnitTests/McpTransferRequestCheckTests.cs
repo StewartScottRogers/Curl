@@ -143,4 +143,20 @@ public sealed class McpTransferRequestCheckTests
     {
         Assert.ThrowsExactly<ArgumentNullException>(() => McpTransferRequestCheck.Check(null!));
     }
+
+    [TestMethod]
+    public void CheckArgumentShapes_NoArguments_IsNull()
+    {
+        Assert.IsNull(McpTransferRequestCheck.CheckArgumentShapes(null));
+    }
+
+    [TestMethod]
+    public void CheckArgumentShapes_AnArgumentTheToolHasNoFieldFor_IsIgnored()
+    {
+        using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse("""{"unknown":5,"url":"https://example.test/"}""");
+
+        McpToolFailure? failure = McpTransferRequestCheck.CheckArgumentShapes(document.RootElement.EnumerateObject().Select(property => KeyValuePair.Create(property.Name, property.Value)));
+
+        Assert.IsNull(failure);
+    }
 }

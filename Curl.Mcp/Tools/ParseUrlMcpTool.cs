@@ -6,7 +6,7 @@ namespace Curl.Mcp.Tools;
 /// <summary>
 /// The MCP tool <c>parse_url</c> on the hand-written server abstractions: forwards to <see cref="McpUrlTool" /> and
 /// returns its result as JSON text, flagged as a tool error when the result is one. It offers the same name,
-/// description, annotations, input schema and results as <see cref="CurlUrlTool.ParseUrl" />.
+/// description, annotations, input schema and results as the SDK-attributed tool it replaced (BL-3388).
 /// </summary>
 /// <param name="tool">The tools' logic.</param>
 public sealed class ParseUrlMcpTool(McpUrlTool tool) : IMcpTool
@@ -18,7 +18,10 @@ public sealed class ParseUrlMcpTool(McpUrlTool tool) : IMcpTool
     public string Name => "parse_url";
 
     /// <inheritdoc />
-    public string Description => CurlUrlTool.ParseDescription;
+    public string Description =>
+        "Parses a URL with libcurl's URL API (curl_url_set and curl_url_get) and returns the URL as the parser rebuilt it and its "
+        + "parts: scheme, user, password, options, host, port, path, query, fragment and zoneId. A part the URL does not have is "
+        + "null, never an empty string. A URL the parser refuses is a tool error naming the CURLUcode.";
 
     /// <inheritdoc />
     public string InputSchemaJson =>

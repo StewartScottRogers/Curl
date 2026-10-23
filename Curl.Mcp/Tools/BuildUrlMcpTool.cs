@@ -6,7 +6,7 @@ namespace Curl.Mcp.Tools;
 /// <summary>
 /// The MCP tool <c>build_url</c> on the hand-written server abstractions: forwards to <see cref="McpUrlTool" /> and
 /// returns its result as JSON text, flagged as a tool error when the result is one. It offers the same name,
-/// description, annotations, input schema and results as <see cref="CurlUrlTool.BuildUrl" />.
+/// description, annotations, input schema and results as the SDK-attributed tool it replaced (BL-3388).
 /// </summary>
 /// <param name="tool">The tools' logic.</param>
 public sealed class BuildUrlMcpTool(McpUrlTool tool) : IMcpTool
@@ -20,7 +20,10 @@ public sealed class BuildUrlMcpTool(McpUrlTool tool) : IMcpTool
     public string Name => "build_url";
 
     /// <inheritdoc />
-    public string Description => CurlUrlTool.BuildDescription;
+    public string Description =>
+        "Builds a URL from its parts with libcurl's URL API: sets only the parts supplied (curl_url_set), in libcurl's order, and "
+        + "returns the whole URL (curl_url_get). A part or URL the parser refuses, such as a bad port or no host, is a tool error "
+        + "naming the part and the CURLUcode.";
 
     /// <inheritdoc />
     public string InputSchemaJson =>

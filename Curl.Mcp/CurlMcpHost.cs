@@ -1,65 +1,92 @@
 using Curl.Engine;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Curl.Mcp.Protocol.Model;
+using Curl.Mcp.Protocol.Resources;
+using Curl.Mcp.Protocol.Server;
+using Curl.Mcp.Protocol.Tools;
+using Curl.Mcp.Tools;
 
 namespace Curl.Mcp;
 
 /// <summary>
-/// Builds the generic host that serves Curl as a Model Context Protocol server over
-/// standard input and output (ADR-0548).
+/// Composes the hand-written MCP server that serves Curl over standard input and output (ADR-0548, BL-3388).
 /// </summary>
 internal static class CurlMcpHost
 {
     /// <summary>
-    /// Builds the host over the process's environment, as <see cref="Build(string[], Func{string, string?})" /> does.
+    /// The name and version <c>initialize</c> answers with: the assembly's name and version, as the SDK host
+    /// this one replaced answered.
     /// </summary>
-    /// <param name="args">The arguments as received from the shell.</param>
-    /// <returns>The built host, not yet started.</returns>
-    internal static IHost Build(string[] args) => Build(args, Environment.GetEnvironmentVariable);
+    internal static readonly McpServerInfo ServerInfo = new(
+        typeof(CurlMcpHost).Assembly.GetName().Name!,
+        typeof(CurlMcpHost).Assembly.GetName().Version!.ToString());
 
     /// <summary>
-    /// Builds the host: the MCP server on the stdio transport, with every log line sent to
-    /// standard error, because standard output carries only the protocol. It reads
-    /// <c>CURL_MCP_ROOT</c> and <c>CURL_MCP_MAX_RESPONSE_BYTES</c> once, so a bad value stops the
-    /// server before it starts, and makes the root the process's current directory, so curl's
-    /// relative paths resolve inside it (ADR-0575). Tools are registered one by one, never by
-    /// scanning an assembly: the <c>curl</c> tool over <see cref="InProcessCurlCommandRunner" />, the <c>transfer</c>
-    /// tool over a production <see cref="ManagedCurlEngine" /> that lives as long as the process, as
-    /// <c>Libcurl</c>'s does, the <c>version</c> tool over that same engine, the <c>parse_url</c> and <c>build_url</c> tools
-    /// over that engine's URL handles, and the <c>--ai-help</c>
-    /// resources through <see cref="CurlAiHelpResourceHandlers" /> (ADR-0589).
+    /// Builds the host over the process's environment, standard input, standard output and standard error, as
+    /// <see cref="Build(Func{string, string?}, Stream, Stream, TextWriter)" /> does.
     /// </summary>
-    /// <param name="args">The arguments as received from the shell.</param>
+    /// <returns>The host, not yet running.</returns>
+    internal static McpStdioHost Build() =>
+        Build(Environment.GetEnvironmentVariable, System.Console.OpenStandardInput(), System.Console.OpenStandardOutput(), System.Console.Error);
+
+    /// <summary>
+    /// Builds the host: an <see cref="McpStdioHost" /> that reads <c>CURL_MCP_ROOT</c> and
+    /// <c>CURL_MCP_MAX_RESPONSE_BYTES</c> once when it runs, so a bad value stops the server before it serves, and
+    /// makes the root the process's current directory, so curl's relative paths resolve inside it (ADR-0575).
+    /// Every log line goes to <paramref name="error" />; <paramref name="output" /> carries only the protocol.
+    /// The tools and resources are those of <see cref="CreateRegistry" />.
+    /// </summary>
     /// <param name="readEnvironmentVariable">Reads an environment variable, <see langword="null" /> when it is unset.</param>
-    /// <returns>The built host, not yet started.</returns>
-    /// <exception cref="ArgumentException"><c>CURL_MCP_ROOT</c> is set but names no existing absolute folder.</exception>
-    /// <exception cref="McpConfigurationException"><c>CURL_MCP_MAX_RESPONSE_BYTES</c> is not a positive whole number.</exception>
-    internal static IHost Build(string[] args, Func<string, string?> readEnvironmentVariable)
+    /// <param name="input">The stream the client's messages are read from.</param>
+    /// <param name="output">The stream the protocol messages are written to.</param>
+    /// <param name="error">Where the log lines go.</param>
+    /// <returns>The host, not yet running.</returns>
+    internal static McpStdioHost Build(Func<string, string?> readEnvironmentVariable, Stream input, Stream output, TextWriter error) =>
+        new(
+            ServerInfo,
+            CreateHandlers,
+            input,
+            output,
+            new McpStandardErrorLog(error, TimeProvider.System),
+            readEnvironmentVariable,
+            TimeProvider.System,
+            McpStdioHost.RegisterProcessStopSignals);
+
+    /// <summary>
+    /// Builds the handlers of <c>tools/list</c>, <c>tools/call</c>, <c>resources/list</c> and
+    /// <c>resources/read</c> over one <see cref="CreateRegistry" /> registry, and <c>logging/setLevel</c>.
+    /// </summary>
+    /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
+    /// <param name="cap">The most bytes a tool returns.</param>
+    /// <returns>The five handlers.</returns>
+    internal static IEnumerable<IMcpMethodHandler> CreateHandlers(McpConfinementRoot root, McpResponseCap cap)
     {
-        McpConfinementRoot root = McpConfinementRoot.FromEnvironment(readEnvironmentVariable);
-        McpResponseCap cap = McpResponseCap.FromEnvironment(readEnvironmentVariable);
-        Directory.SetCurrentDirectory(root.ResolvedRoot ?? Directory.GetCurrentDirectory());
-        HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
-        // Drop the default console provider: it writes to standard output, which carries only the protocol.
-        builder.Logging.ClearProviders();
-        builder.Logging.AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
-        builder.Services.AddSingleton(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap));
+        McpServerRegistry registry = CreateRegistry(root, cap);
+        return [new ToolsListHandler(registry), new ToolsCallHandler(registry), new ResourcesListHandler(registry), new ResourcesReadHandler(registry), new LoggingSetLevelMcpHandler()];
+    }
+
+    /// <summary>
+    /// Registers the tools and resources one by one, never by scanning an assembly: the <c>curl</c> tool over
+    /// <see cref="InProcessCurlCommandRunner" />, the <c>transfer</c> tool over a production
+    /// <see cref="ManagedCurlEngine" /> that lives as long as the process, as <c>Libcurl</c>'s does, the
+    /// <c>version</c> tool over that same engine, the <c>parse_url</c> and <c>build_url</c> tools over that engine's
+    /// URL handles, and the <c>--ai-help</c> resources through <see cref="AiHelpMcpResourceProvider" /> (ADR-0589).
+    /// </summary>
+    /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
+    /// <param name="cap">The most bytes a tool returns.</param>
+    /// <returns>The registry of the five tools and the resources.</returns>
+    internal static McpServerRegistry CreateRegistry(McpConfinementRoot root, McpResponseCap cap)
+    {
         // One engine for the process, shared by the transfer, version and URL tools.
         ManagedCurlEngine engine = new();
-        builder.Services.AddSingleton(new McpTransferTool(engine, cap));
-        builder.Services.AddSingleton(new McpVersionTool(engine));
-        builder.Services.AddSingleton(new McpUrlTool(engine.CreateUrl));
-        builder.Services
-            .AddMcpServer()
-            .WithStdioServerTransport()
-            .WithTools<CurlCommandTool>(CurlMcpJsonContext.ToolOptions)
-            .WithTools<CurlTransferTool>(CurlMcpJsonContext.ToolOptions)
-            .WithTools<CurlVersionTool>(CurlMcpJsonContext.ToolOptions)
-            .WithTools<CurlUrlTool>(CurlMcpJsonContext.ToolOptions)
-            .WithRequestFilters(filters => filters.AddCallToolFilter(CurlTransferTool.RefuseWrongArgumentShapes))
-            .WithListResourcesHandler(CurlAiHelpResourceHandlers.ListAsync)
-            .WithReadResourceHandler(CurlAiHelpResourceHandlers.ReadAsync);
-        return builder.Build();
+        McpUrlTool urlTool = new(engine.CreateUrl);
+        McpServerRegistry registry = new();
+        // tools/list answers in registration order; this is the order the SDK host listed them in (the golden tools-list).
+        registry.Add(new ParseUrlMcpTool(urlTool));
+        registry.Add(new TransferMcpTool(new McpTransferTool(engine, cap)));
+        registry.Add(new CurlCommandMcpTool(new McpCurlTool(new InProcessCurlCommandRunner(), root, cap)));
+        registry.Add(new BuildUrlMcpTool(urlTool));
+        registry.Add(new VersionMcpTool(new McpVersionTool(engine)));
+        registry.Add(new AiHelpMcpResourceProvider());
+        return registry;
     }
 }

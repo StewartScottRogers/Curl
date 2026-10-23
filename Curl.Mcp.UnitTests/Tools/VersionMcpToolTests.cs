@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Curl.Api.EngineContracts;
 using Curl.Mcp.Protocol.Model;
-using ModelContextProtocol.Protocol;
 
 namespace Curl.Mcp.Tools;
 
@@ -11,12 +10,13 @@ public sealed class VersionMcpToolTests
     private static readonly CurlVersionInfo Info = new() { Version = "9.1.2", Protocols = ["file", "http"], Features = ["IPv6", "SSL"], TlsBackend = "OpenSSL/3.5.0" };
 
     [TestMethod]
-    public void Description_NameAndAnnotations_AreTheSdkToolsAndTheSchemaIsTheGoldenOne()
+    public void Description_NameAndAnnotations_AreTheGoldenOnesAndSoIsTheSchema()
     {
         VersionMcpTool tool = Tool();
 
         Assert.AreEqual("version", tool.Name);
-        Assert.AreEqual(CurlVersionTool.ToolDescription, tool.Description);
+        StringAssert.StartsWith(tool.Description, "Reports what `curl -V` reports about Curl's transfer engine");
+        StringAssert.EndsWith(tool.Description, "Takes no arguments.");
         Assert.AreEqual(true, tool.Annotations!.IdempotentHint);
         Assert.AreEqual(true, tool.Annotations.ReadOnlyHint);
         using JsonDocument schema = JsonDocument.Parse(tool.InputSchemaJson);
@@ -45,15 +45,6 @@ public sealed class VersionMcpToolTests
 
         Assert.IsFalse(result.IsError);
         Assert.AreEqual((await Tool().CallAsync(Arguments("{}"), CancellationToken.None)).Content.Single().Text, result.Content.Single().Text);
-    }
-
-    [TestMethod]
-    public async Task CallAsync_SameEngine_SerializesTheSameTextAsTheSdkTool()
-    {
-        McpToolCallResult result = await Tool().CallAsync(Arguments("{}"), CancellationToken.None);
-        CallToolResult sdkResult = new CurlVersionTool(new McpVersionTool(Engine())).Version();
-
-        Assert.AreEqual(((TextContentBlock)sdkResult.Content.Single()).Text, result.Content.Single().Text);
     }
 
     private static FakeTransferEngine Engine() => new(new FakeEasyTransfer()) { VersionInfoToReport = Info };

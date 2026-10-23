@@ -6,7 +6,7 @@ namespace Curl.Mcp.Tools;
 
 /// <summary>
 /// The source-generated JSON contract of the <c>parse_url</c> and <c>build_url</c> tools' results, set up exactly as
-/// <see cref="CurlMcpJsonContext" /> sets it up so the text blocks are byte-identical to the SDK tools'.
+/// the SDK-era JSON context did, so the text blocks are byte-identical to the SDK tools'.
 /// </summary>
 [ExcludeFromCodeCoverage(Justification = "ADR-0575: the JSON source generator writes every member; the tests reach them through ParseUrlMcpTool and BuildUrlMcpTool.")]
 [JsonSourceGenerationOptions(UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]

@@ -1,11 +1,6 @@
 using Curl.Cli;
 using Curl.Mcp.Protocol.Model;
 using Curl.Mcp.Tools;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
 
 namespace Curl.Mcp;
 
@@ -47,38 +42,5 @@ public sealed class AiHelpMcpResourceProviderTests
         McpResourceContents? contents = await new AiHelpMcpResourceProvider().ReadAsync(uri, CancellationToken.None);
 
         Assert.IsNull(contents);
-    }
-
-    [TestMethod]
-    public async Task Provider_ListAndReadEqualTheSdkHandlersForEveryCatalogueResource()
-    {
-        using IHost host = CurlMcpHost.Build([], _ => null);
-        McpServerOptions options = host.Services.GetRequiredService<IOptions<McpServerOptions>>().Value;
-        await using McpServer server = McpServer.Create(new StreamServerTransport(Stream.Null, Stream.Null), options, null, host.Services);
-        AiHelpMcpResourceProvider provider = new();
-
-        ListResourcesResult sdkList = await options.Handlers.ListResourcesHandler!(
-            new RequestContext<ListResourcesRequestParams>(server, new JsonRpcRequest { Method = RequestMethods.ResourcesList }, new ListResourcesRequestParams()),
-            CancellationToken.None);
-        IReadOnlyList<McpResource> list = provider.ListResources();
-
-        Assert.AreEqual(sdkList.Resources.Count, list.Count);
-        for (int index = 0; index < list.Count; index++)
-        {
-            Assert.AreEqual(sdkList.Resources[index].Uri, list[index].Uri);
-            Assert.AreEqual(sdkList.Resources[index].Name, list[index].Name);
-            Assert.AreEqual(sdkList.Resources[index].Description, list[index].Description);
-            Assert.AreEqual(sdkList.Resources[index].MimeType, list[index].MimeType);
-
-            ReadResourceResult sdkRead = await options.Handlers.ReadResourceHandler!(
-                new RequestContext<ReadResourceRequestParams>(server, new JsonRpcRequest { Method = RequestMethods.ResourcesRead }, new ReadResourceRequestParams { Uri = list[index].Uri }),
-                CancellationToken.None);
-            TextResourceContents expected = (TextResourceContents)sdkRead.Contents.Single();
-            McpResourceContents? actual = await provider.ReadAsync(list[index].Uri, CancellationToken.None);
-            Assert.IsNotNull(actual);
-            Assert.AreEqual(expected.Uri, actual.Uri);
-            Assert.AreEqual(expected.MimeType, actual.MimeType);
-            Assert.AreEqual(expected.Text, actual.Text);
-        }
     }
 }

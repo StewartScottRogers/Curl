@@ -2,7 +2,6 @@ using System.Text.Json;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Url;
 using Curl.Mcp.Protocol.Model;
-using ModelContextProtocol.Protocol;
 
 namespace Curl.Mcp.Tools;
 
@@ -36,12 +35,13 @@ public sealed class ParseUrlMcpToolTests
     private static string Canonical(string json) => JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement);
 
     [TestMethod]
-    public void Identity_MatchesTheSdkTool()
+    public void Identity_IsTheGoldenNameDescriptionAndAnnotations()
     {
         ParseUrlMcpTool tool = new(new McpUrlTool(NewHandle));
 
         Assert.AreEqual("parse_url", tool.Name);
-        Assert.AreEqual(CurlUrlTool.ParseDescription, tool.Description);
+        StringAssert.StartsWith(tool.Description, "Parses a URL with libcurl's URL API");
+        StringAssert.EndsWith(tool.Description, "A URL the parser refuses is a tool error naming the CURLUcode.");
         Assert.IsTrue(tool.Annotations!.ReadOnlyHint);
         Assert.IsTrue(tool.Annotations.IdempotentHint);
         Assert.AreEqual(Canonical(GoldenSchema), Canonical(tool.InputSchemaJson));
@@ -100,25 +100,5 @@ public sealed class ParseUrlMcpToolTests
         McpToolCallResult result = await tool.CallAsync(default, CancellationToken.None);
 
         Assert.IsTrue(result.IsError);
-    }
-
-    [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public async Task CallAsync_SameInputs_SerializeLikeTheSdkTool(bool refused)
-    {
-        FakeUrlHandle handle = NewHandle();
-        if (refused)
-        {
-            handle.SetResults[CurlUrlPart.Url] = CurlUrlCode.NoHost;
-        }
-
-        McpUrlTool logic = new(() => handle);
-
-        McpToolCallResult ported = await new ParseUrlMcpTool(logic).CallAsync(Arguments("""{"url":"https://h/"}"""), CancellationToken.None);
-        CallToolResult original = new CurlUrlTool(logic).ParseUrl("https://h/");
-
-        Assert.AreEqual(((TextContentBlock)original.Content.Single()).Text, ported.Content.Single().Text);
-        Assert.AreEqual(original.IsError, ported.IsError);
     }
 }

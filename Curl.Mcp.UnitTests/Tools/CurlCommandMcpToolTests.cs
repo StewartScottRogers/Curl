@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using Curl.Mcp.Protocol.Model;
-using ModelContextProtocol.Protocol;
 
 namespace Curl.Mcp.Tools;
 
@@ -19,12 +18,13 @@ public sealed class CurlCommandMcpToolTests
     private static JsonElement Arguments(string json) => JsonDocument.Parse(json).RootElement;
 
     [TestMethod]
-    public void Identity_MatchesTheSdkTool()
+    public void Identity_IsTheGoldenNameDescriptionAndAnnotations()
     {
         CurlCommandMcpTool tool = NewTool(new StubRunner(0, string.Empty));
 
         Assert.AreEqual("curl", tool.Name);
-        Assert.AreEqual(CurlCommandTool.ToolDescription, tool.Description);
+        StringAssert.StartsWith(tool.Description, "Runs curl in-process, exactly as the curl command line would.");
+        StringAssert.EndsWith(tool.Description, "Returns curl's standard output, standard error and exit code; a nonzero exit is a tool error.");
         Assert.IsNull(tool.Annotations);
     }
 
@@ -100,21 +100,6 @@ public sealed class CurlCommandMcpToolTests
         McpToolCallResult result = await tool.CallAsync(default, CancellationToken.None);
 
         Assert.IsTrue(result.IsError);
-    }
-
-    [TestMethod]
-    [DataRow(0, "hello")]
-    [DataRow(6, "")]
-    public async Task CallAsync_SameInputs_SerializeLikeTheSdkTool(int exitCode, string output)
-    {
-        CurlCommandMcpTool port = NewTool(new StubRunner(exitCode, output));
-        CurlCommandTool old = new(new McpCurlTool(new StubRunner(exitCode, output), McpConfinementRoot.NotConfigured, new McpResponseCap(McpResponseCap.DefaultMaxBytes)));
-
-        McpToolCallResult ported = await port.CallAsync(Arguments("""{"args":["-s","http://example.invalid/"],"stdin":"in"}"""), CancellationToken.None);
-        CallToolResult original = await old.RunCurlAsync(["-s", "http://example.invalid/"], "in");
-
-        Assert.AreEqual(((TextContentBlock)original.Content.Single()).Text, ported.Content.Single().Text);
-        Assert.AreEqual(original.IsError, ported.IsError);
     }
 
     private static string Canonical(string json) => JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement);

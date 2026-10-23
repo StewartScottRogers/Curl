@@ -33,7 +33,19 @@
           "content": [
             {
               "type": "text",
-              "text": "An error occurred invoking 'transfer'."
+              "text": {
+                "statusCode": null,
+                "headers": null,
+                "body": null,
+                "info": null,
+                "failure": {
+                  "kind": "InvalidRequest",
+                  "text": "Invalid url: it is empty.",
+                  "exitCode": null
+                },
+                "isError": true,
+                "isBodyTruncated": false
+              }
             }
           ],
           "isError": true

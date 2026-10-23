@@ -5,7 +5,7 @@ namespace Curl.Mcp.Tools;
 
 /// <summary>
 /// The <c>transfer</c> tool on the hand-written server abstractions: the same name, description, input schema and
-/// results as <see cref="CurlTransferTool" />, reading its <c>arguments</c> itself. A wrong argument shape is refused
+/// results as the SDK-attributed tool it replaced (BL-3388), reading its <c>arguments</c> itself. A wrong argument shape is refused
 /// first with <see cref="McpTransferRequestCheck.CheckArgumentShapes" />, as the SDK's call-tool filter refused it
 /// (ADR-0771); an omitted or <c>null</c> field takes the default the SDK method's signature gave it.
 /// </summary>

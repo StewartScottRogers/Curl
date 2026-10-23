@@ -6,7 +6,7 @@ namespace Curl.Mcp.Tools;
 /// <summary>
 /// The MCP tool <c>curl</c> on the hand-written server abstractions: forwards to <see cref="McpCurlTool" /> and
 /// returns its result as JSON text, flagged as a tool error when the result is one. It offers the same name,
-/// description, input schema and results as <see cref="CurlCommandTool" />.
+/// description, input schema and results as the SDK-attributed tool it replaced (BL-3388).
 /// </summary>
 /// <param name="tool">The tool's logic.</param>
 public sealed class CurlCommandMcpTool(McpCurlTool tool) : IMcpTool
@@ -18,7 +18,11 @@ public sealed class CurlCommandMcpTool(McpCurlTool tool) : IMcpTool
     public string Name => "curl";
 
     /// <inheritdoc />
-    public string Description => CurlCommandTool.ToolDescription;
+    public string Description =>
+        "Runs curl in-process, exactly as the curl command line would. `args` are curl's arguments without the program name, "
+        + "for example [\"-s\", \"https://example.com\"]. Every file curl reads or writes must lie inside the folder CURL_MCP_ROOT names; "
+        + "a path outside it is refused before curl runs. Run [\"--ai-help\"] for an index of every option and [\"--ai-help\", \"all\"] "
+        + "for the full reference. Returns curl's standard output, standard error and exit code; a nonzero exit is a tool error.";
 
     /// <inheritdoc />
     public string InputSchemaJson =>

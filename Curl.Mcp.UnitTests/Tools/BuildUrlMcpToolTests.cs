@@ -2,7 +2,6 @@ using System.Text.Json;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Url;
 using Curl.Mcp.Protocol.Model;
-using ModelContextProtocol.Protocol;
 
 namespace Curl.Mcp.Tools;
 
@@ -29,12 +28,13 @@ public sealed class BuildUrlMcpToolTests
     private static string Canonical(string json) => JsonSerializer.Serialize(JsonDocument.Parse(json).RootElement);
 
     [TestMethod]
-    public void Identity_MatchesTheSdkTool()
+    public void Identity_IsTheGoldenNameDescriptionAndAnnotations()
     {
         BuildUrlMcpTool tool = new(new McpUrlTool(() => new FakeUrlHandle()));
 
         Assert.AreEqual("build_url", tool.Name);
-        Assert.AreEqual(CurlUrlTool.BuildDescription, tool.Description);
+        StringAssert.StartsWith(tool.Description, "Builds a URL from its parts with libcurl's URL API");
+        StringAssert.EndsWith(tool.Description, "is a tool error naming the part and the CURLUcode.");
         Assert.IsTrue(tool.Annotations!.ReadOnlyHint);
         Assert.IsTrue(tool.Annotations.IdempotentHint);
         Assert.AreEqual(Canonical(GoldenSchema), Canonical(tool.InputSchemaJson));
@@ -93,26 +93,5 @@ public sealed class BuildUrlMcpToolTests
         McpToolCallResult result = await tool.CallAsync(default, CancellationToken.None);
 
         Assert.IsTrue(result.IsError);
-    }
-
-    [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public async Task CallAsync_SameInputs_SerializeLikeTheSdkTool(bool refused)
-    {
-        FakeUrlHandle handle = new();
-        handle.Parts[CurlUrlPart.Url] = (CurlUrlCode.Ok, "built");
-        if (refused)
-        {
-            handle.SetResults[CurlUrlPart.Port] = CurlUrlCode.BadPortNumber;
-        }
-
-        McpUrlTool logic = new(() => handle);
-
-        McpToolCallResult ported = await new BuildUrlMcpTool(logic).CallAsync(Arguments("""{"host":"h","port":"x"}"""), CancellationToken.None);
-        CallToolResult original = new CurlUrlTool(logic).BuildUrl(host: "h", port: "x");
-
-        Assert.AreEqual(((TextContentBlock)original.Content.Single()).Text, ported.Content.Single().Text);
-        Assert.AreEqual(original.IsError, ported.IsError);
     }
 }

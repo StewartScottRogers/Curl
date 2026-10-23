@@ -4,7 +4,7 @@ namespace Curl.Mcp.Tools;
 
 /// <summary>
 /// The MCP resources of curl's <c>--ai-help</c> Markdown on the hand-written server abstractions: lists and reads
-/// <see cref="McpAiHelpResourceCatalogue" /> with the same entries and contents as <see cref="CurlAiHelpResourceHandlers" />.
+/// <see cref="McpAiHelpResourceCatalogue" /> with the same entries and contents the SDK-era handlers served (BL-3388).
 /// </summary>
 public sealed class AiHelpMcpResourceProvider : IMcpResourceProvider
 {

@@ -3,7 +3,6 @@ using System.Text.Json;
 using Curl.Api.Codes;
 using Curl.Api.Info;
 using Curl.Mcp.Protocol.Model;
-using ModelContextProtocol.Protocol;
 
 namespace Curl.Mcp.Tools;
 
@@ -30,12 +29,13 @@ public sealed class TransferMcpToolTests
         """;
 
     [TestMethod]
-    public void Description_NameAndAnnotations_AreTheSdkToolsAndTheSchemaIsTheGoldenOne()
+    public void Description_NameAndAnnotations_AreTheGoldenOnesAndSoIsTheSchema()
     {
         TransferMcpTool tool = Tool(new FakeEasyTransfer());
 
         Assert.AreEqual("transfer", tool.Name);
-        Assert.AreEqual(CurlTransferTool.ToolDescription, tool.Description);
+        StringAssert.StartsWith(tool.Description, "Makes one request, described by fields rather than a command line, through Curl's transfer engine,");
+        StringAssert.EndsWith(tool.Description, "A failed transfer is a tool error carrying libcurl's error code.");
         Assert.IsNull(tool.Annotations);
         using JsonDocument schema = JsonDocument.Parse(tool.InputSchemaJson);
         using JsonDocument golden = JsonDocument.Parse(GoldenInputSchema);
@@ -159,20 +159,6 @@ public sealed class TransferMcpToolTests
         using JsonDocument json = JsonDocument.Parse(result.Content.Single().Text);
         Assert.AreEqual("InvalidRequest", json.RootElement.GetProperty("failure").GetProperty("kind").GetString());
         Assert.AreEqual(expected, json.RootElement.GetProperty("failure").GetProperty("text").GetString());
-    }
-
-    [TestMethod]
-    [DataRow("http://example.test/")]
-    [DataRow("")]
-    public async Task CallAsync_SameResult_SerializesAsTheSdkToolDoes(string url)
-    {
-        CurlTransferTool sdkTool = new(new McpTransferTool(new FakeTransferEngine(Transfer()), Cap));
-        CallToolResult expected = await sdkTool.TransferAsync(url);
-
-        McpToolCallResult result = await CallAsync(Transfer(), $$"""{"url":"{{url}}"}""");
-
-        Assert.AreEqual(expected.IsError, result.IsError);
-        Assert.AreEqual(((TextContentBlock)expected.Content.Single()).Text, result.Content.Single().Text);
     }
 
     private static FakeEasyTransfer Transfer() => new()
