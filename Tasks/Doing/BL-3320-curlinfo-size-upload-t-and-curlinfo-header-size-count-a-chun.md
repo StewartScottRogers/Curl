@@ -35,3 +35,4 @@ post-chunked-header (Transfer-Encoding: chunked header with POSTFIELDS "x"): 0x6
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
 - 2026-10-23: Doing -> Backlog. Waits on BL-3331 (header size 147 vs 137 unexplained); upload-size fix left uncommitted
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
