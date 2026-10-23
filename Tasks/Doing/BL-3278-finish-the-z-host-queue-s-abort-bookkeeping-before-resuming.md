@@ -39,3 +39,4 @@ Also worth fixing while here: `ParallelTransferQueue.BeforeEachWait` defaults to
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 2d9aca23 a39fa834 55027aec a482d2ec.
