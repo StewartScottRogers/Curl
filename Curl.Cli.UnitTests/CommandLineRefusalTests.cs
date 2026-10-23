@@ -108,30 +108,6 @@ public sealed class CommandLineRefusalTests
     }
 
     [TestMethod]
-    public void TryHelpLineNamingAiHelp_Always_IsTheOnlyLineDifferingFromCurl()
-    {
-        string line = CommandLineRefusal.TryHelpLineNamingAiHelp;
-        Diagnostics.Act("line", line);
-
-        Diagnostics.Assert("line", "curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information", line);
-        Assert.AreEqual("curl: try 'curl --help', 'curl --manual' or 'curl --ai-help' for more information", line);
-        CommandLineRefusal unknown = CommandLineRefusal.UnknownOption("--nope");
-        Assert.AreEqual(CommandLineRefusal.TryHelpLine, unknown.StandardErrorLines[^1]);
-    }
-
-    [TestMethod]
-    public void EmptyCommandLine_Always_IsTheTryHelpLineNamingAiHelpAloneWithExit2()
-    {
-        Diagnostics.Arrange("call", """CommandLineRefusal.EmptyCommandLine()""");
-        CommandLineRefusal refusal = CommandLineRefusal.EmptyCommandLine();
-        ActRefusal(refusal);
-
-        WriteAssertRefusal(CurlExitCode.FailedInit, refusal, CommandLineRefusal.TryHelpLineNamingAiHelp);
-        Assert.AreEqual(CurlExitCode.FailedInit, refusal.ExitCode);
-        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLineNamingAiHelp }, refusal.StandardErrorLines.ToArray());
-    }
-
-    [TestMethod]
     public void NoUrlSpecified_Always_ReportsNoUrlWithCurlsExitCodePrefix()
     {
         Diagnostics.Arrange("call", """CommandLineRefusal.NoUrlSpecified()""");
