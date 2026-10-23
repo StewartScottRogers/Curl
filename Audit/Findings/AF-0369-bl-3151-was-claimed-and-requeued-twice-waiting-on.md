@@ -3,8 +3,8 @@ id: AF-0369
 title: BL-3151 was claimed and requeued twice waiting on a shift-end merge it could not cause; the second claim came from a shift started for it during that merge's CI wait
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3151:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
