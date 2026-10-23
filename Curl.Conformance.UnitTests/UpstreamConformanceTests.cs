@@ -129,7 +129,7 @@ public sealed partial class UpstreamConformanceTests
                 Assert.Fail(verdict.Message);
                 break;
             case UpstreamCaseVerdictKind.Inconclusive:
-                Assert.Inconclusive(verdict.Message);
+                Assert.Inconclusive(WithPlatformHoldReason(verdict.Message, testFile));
                 break;
         }
     }

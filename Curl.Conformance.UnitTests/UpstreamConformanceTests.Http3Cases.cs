@@ -14,6 +14,16 @@ public sealed partial class UpstreamConformanceTests
     private static bool IsHeldOnThisPlatform(byte[] testFile) =>
         !(OperatingSystem.IsWindows() && NamesHttp3Server(System.Text.Encoding.Latin1.GetString(testFile)));
 
+    // Measured for 2500, 2502 and 2503 against curl 8.22.0's Schannel build (ADR-0720 addendum, BL-3403).
+    private const string Http3CaseNotHeldOnWindowsReason =
+        "Not held on Windows: the Schannel build's revocation check under --cacert fails on the generated test CA, which names no revocation endpoint (curl: (60) schannel: the revocation status is unknown), as curl 8.22.0's Schannel build does; judged on Linux and macOS (ADR-0720).";
+
+    /// <summary>
+    /// <paramref name="verdictMessage"/>, led by why the case is not held when <see cref="IsHeldOnThisPlatform"/> is false.
+    /// </summary>
+    private static string WithPlatformHoldReason(string verdictMessage, byte[] testFile) =>
+        IsHeldOnThisPlatform(testFile) ? verdictMessage : $"{Http3CaseNotHeldOnWindowsReason} {verdictMessage}";
+
     /// <summary>
     /// <paramref name="platform"/> with <c>http/3</c> and <c>Debug</c> when the test file's <c>&lt;server&gt;</c> part
     /// names the <c>http/3</c> server the harness stands in for, else <paramref name="platform"/> itself.
