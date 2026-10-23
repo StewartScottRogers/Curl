@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3369 — Fix AF-0392: BL-3206 cost $3.51 (3.3x the median) over an 82-minute, 65-turn Opus run
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+- Cause (read from the run log, 65 tool calls): BL-3206 was a real busy-wait bug in two projects (Curl.Engine.UnitLibrary, Libcurl). The run read the engine and wait code (calls 3-11), wrote and re-wrote a loopback repro file-app (12-19) to confirm the 100,000-turn spin, then added two new test files, one on the system clock (about 1.3 s each), had one test hang that needed TaskStop (40-45), ran Measure-CodeQuality.ps1 and the whole-solution fast tests (48-50), and wrote an ADR and a CLAUDE.md fix. Its task file set pipeline: feature and four touches, so this is the expected shape of such a task.
+- Verdict: unavoidable, no fix. The reading was targeted (grep and sed slices, no whole-file dumps), the repro is what the lane rules require, and the one avoidable cost (a hung test, one TaskStop) was caught by the run itself and fixed by a cap on the loop. Cost was $3.51 against the $3.93 cap; no lane rule or RunDarkFactory.ps1 change would have cut it without dropping the quality run or the repro. RunDarkFactory.ps1 unchanged.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-23: Doing -> Done. Cause named: a genuine two-project busy-wait fix with repro, ADR and quality run; unavoidable, no change
