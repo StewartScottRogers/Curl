@@ -31,3 +31,4 @@ Stewart (2026-10-23) wants the differential tests (Curl.Conformance.Differential
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 63762334 7522486b f2aeb944.
