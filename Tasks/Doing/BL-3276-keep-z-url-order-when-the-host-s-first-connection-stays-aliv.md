@@ -36,3 +36,4 @@ The code does not do this: `Curl.Console/ParallelHostQueue.cs` `Leave` (around l
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 2dd00fe0 a9f0f029 b47b94ac 20f2597e.
