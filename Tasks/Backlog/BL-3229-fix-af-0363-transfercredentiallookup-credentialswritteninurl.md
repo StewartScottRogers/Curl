@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs]
 requirement: none
 created: 2026-10-23
 completed:

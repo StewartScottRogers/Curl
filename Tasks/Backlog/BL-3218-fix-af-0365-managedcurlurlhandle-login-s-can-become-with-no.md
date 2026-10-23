@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs]
 requirement: none
 created: 2026-10-23
 completed:

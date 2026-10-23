@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3193]
-touches: [Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Libcurl.UnitTests/Info/EasyInfoLengthAndConditionTests.cs]
+touches: [Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Libcurl.UnitTests/Info/EasyInfoLengthAndConditionTests.cs]
 requirement: none
 created: 2026-10-22
 completed:
