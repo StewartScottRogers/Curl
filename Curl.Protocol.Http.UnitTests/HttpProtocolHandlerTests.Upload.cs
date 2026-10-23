@@ -63,10 +63,10 @@ public sealed partial class HttpProtocolHandlerTests
 
             WriteResult(result);
             Diagnostics.Assert("written", OneLine(head + body), OneLine(Latin1(connection.Written)));
-            Diagnostics.Assert("upload size", 5L, result.Report?.UploadSize);
+            Diagnostics.Assert("upload size", 15L, result.Report?.UploadSize);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(head + body, Latin1(connection.Written), $"Chunk size {chunkSize}");
-            Assert.AreEqual(5L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
+            Assert.AreEqual(15L, result.Report!.UploadSize, $"Chunk size {chunkSize}");
         }
     }
 
@@ -109,9 +109,9 @@ public sealed partial class HttpProtocolHandlerTests
         TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
 
         WriteResult(result);
-        Diagnostics.Assert("upload size", 200000L, result.Report?.UploadSize);
+        Diagnostics.Assert("upload size", 200036L, result.Report?.UploadSize);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(200000L, result.Report!.UploadSize);
+        Assert.AreEqual(200036L, result.Report!.UploadSize);
     }
 
     [TestMethod]

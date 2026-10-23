@@ -3284,7 +3284,8 @@ public sealed class HttpProtocolHandler(
         /// Builds the report: what the connect and request told, their timings with the
         /// transfer's end taken now, and what the final head told once it was read. The request
         /// size counts the body bytes sent, chunk framing included, as well as the head, as curl 8.21.0's
-        /// <c>%{size_request}</c> does (BL-175 Notes).
+        /// <c>%{size_request}</c> does (BL-175 Notes); the upload size counts the chunk framing too, as
+        /// libcurl 8.22.0's <c>CURLINFO_SIZE_UPLOAD_T</c> does (BL-3320).
         /// </summary>
         /// <param name="body">
         /// The body reader, whose bytes accepted before and after content decoding are
@@ -3297,7 +3298,7 @@ public sealed class HttpProtocolHandler(
             {
                 Method = method,
                 RequestSize = RequestSizeSoFar() + headSize + upload.BytesSent,
-                UploadSize = upload.BytesWritten,
+                UploadSize = upload.BytesSent,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
                 HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
