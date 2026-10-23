@@ -1,0 +1,5 @@
+{
+  "cases": [
+    { "name": "smoke-get-root", "command": "-sS {U}/" }
+  ]
+}

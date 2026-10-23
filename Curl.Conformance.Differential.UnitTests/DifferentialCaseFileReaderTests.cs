@@ -41,6 +41,65 @@ public sealed class DifferentialCaseFileReaderTests
     }
 
     [TestMethod]
+    public void Read_Base64Content_ReadsTheBytes()
+    {
+        var differentialCase = DifferentialCaseFileReader.Read("""
+            {"cases": [{"name": "a", "command": "-s {U}/", "stdin": {"base64": "AP/+"}, "files": {"b.bin": {"base64": "gAE="}}}]}
+            """).Single();
+
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0xff, 0xfe }, differentialCase.StandardInput);
+        CollectionAssert.AreEqual(new byte[] { 0x80, 0x01 }, differentialCase.Files["b.bin"]);
+    }
+
+    [TestMethod]
+    public void Read_RepeatedContent_RepeatsTheUtf8Bytes()
+    {
+        var differentialCase = DifferentialCaseFileReader.Read("""
+            {"cases": [{"name": "a", "command": "-s {U}/", "stdin": {"repeat": "x", "count": 2000000}, "files": {"r.txt": {"repeat": "ab", "count": 3}}}]}
+            """).Single();
+
+        Assert.HasCount(2_000_000, differentialCase.StandardInput!);
+        Assert.IsTrue(differentialCase.StandardInput!.All(value => value == (byte)'x'));
+        CollectionAssert.AreEqual(Encoding.ASCII.GetBytes("ababab"), differentialCase.Files["r.txt"]);
+    }
+
+    [TestMethod]
+    public void Read_RepeatedContentZeroTimes_IsEmpty()
+    {
+        var differentialCase = DifferentialCaseFileReader.Read("""
+            {"cases": [{"name": "a", "command": "-s {U}/", "stdin": {"repeat": "x", "count": 0}}]}
+            """).Single();
+
+        Assert.IsEmpty(differentialCase.StandardInput!);
+    }
+
+    [TestMethod]
+    public void Read_PlainStringContent_IsUtf8Text()
+    {
+        var differentialCase = DifferentialCaseFileReader.Read("""
+            {"cases": [{"name": "a", "command": "-s {U}/", "stdin": "é", "files": {"t.txt": "ü"}}]}
+            """).Single();
+
+        CollectionAssert.AreEqual(new byte[] { 0xc3, 0xa9 }, differentialCase.StandardInput);
+        CollectionAssert.AreEqual(new byte[] { 0xc3, 0xbc }, differentialCase.Files["t.txt"]);
+    }
+
+    [TestMethod]
+    public void ReadEmbedded_SmokeCases_ReadsTheEmbeddedCaseFileByName()
+    {
+        var differentialCase = DifferentialCaseFileReader.ReadEmbedded("Smoke/SmokeCases.json").Single();
+
+        Assert.AreEqual("smoke-get-root", differentialCase.Name);
+        CollectionAssert.AreEqual(new[] { "-sS", "{U}/" }, differentialCase.Arguments.ToArray());
+    }
+
+    [TestMethod]
+    public void ReadEmbedded_UnknownName_ThrowsFileNotFoundException()
+    {
+        Assert.ThrowsExactly<FileNotFoundException>(() => DifferentialCaseFileReader.ReadEmbedded("Smoke/Missing.json"));
+    }
+
+    [TestMethod]
     public void Read_NullName_ThrowsFormatException()
     {
         Assert.ThrowsExactly<FormatException>(() => DifferentialCaseFileReader.Read("""{"cases": [{"name": null, "command": ""}]}"""));
