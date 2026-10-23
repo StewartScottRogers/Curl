@@ -8,7 +8,8 @@
 //
 // A commit with a Co-authored-by trailer is drawn once for each author, so work Claude
 // co-authored shows Claude and the human at the same files. Every Claude model version
-// is drawn as one user, "Claude". Runs of whitespace in a name collapse to one space, so a
+// is drawn as one user, "Claude". Archived tasks (every file under Tasks/Done/<timestamp>/,
+// the timestamped folders task archiving makes) are left out; the rest of Tasks/ stays. Runs of whitespace in a name collapse to one space, so a
 // typo in git's user.name does not split one person into two.
 using System.Diagnostics;
 using System.Text;
@@ -44,6 +45,10 @@ foreach (string line in SplitLines(text))
         int tab = line.IndexOf('\t');
         string meta = line[..tab];
         string path = line[(tab + 1)..];
+        if (IsArchivedTask(path))
+        {
+            continue;
+        }
         char status = SplitWhitespace(meta)[4][0];
         char kind = status is 'A' or 'D' ? status : 'M';
         foreach (string author in authors)
@@ -67,6 +72,17 @@ internal static class Tools
     {
         string name = string.Join(' ', SplitWhitespace(raw.Split('<', 2)[0]));
         return name.StartsWith("Claude", StringComparison.Ordinal) ? "Claude" : name;
+    }
+
+    // True for a file under Tasks/Done/<timestamp>/, an archived task: thousands of files that
+    // would crowd the tree. Tasks/Backlog, Doing, Done itself and the rest stay.
+    internal static bool IsArchivedTask(string path)
+    {
+        const string prefix = "Tasks/Done/";
+        return path.StartsWith(prefix, StringComparison.Ordinal)
+            && path.Length > prefix.Length
+            && char.IsAsciiDigit(path[prefix.Length])
+            && path.IndexOf('/', prefix.Length) > 0;
     }
 
     // Runs git in the current directory and returns its standard output; exits on failure.

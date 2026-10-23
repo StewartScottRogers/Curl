@@ -1,6 +1,6 @@
 # Keeps the README's showcase on the `gource` branch, served by GitHub Pages at
 # https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (a 4K
-# adaptive stream with a full-screen viewer page, and the GIF the README shows) and the
+# AV1 and 1080p adaptive stream, 1080p H.264 for other browsers, with a full-screen viewer page, and the GIF the README shows) and the
 # code coverage report (coverage/index.html, and coverage/badge.svg for the README), and
 # llms.txt with the download, MCP setup and --ai-help pages (llms.txt and mcp/ are published
 # from work/dark-factory only; download/ and ai-help/ also from master's hourly run, because
@@ -13,9 +13,11 @@
 #   * coverage   - on Windows, where the quality gates are measured: Measure-CodeQuality.ps1
 #                  measures, .github/coverage/make-coverage-report.cs renders the page and
 #                  the badge, and the result is committed onto the gource branch;
-#   * render     - the video. It waits for coverage, then force-pushes a new single-commit
+#   * render     - the video: AV1 at 2160p and 1080p, H.264 at 1080p only, gource.mp4 the 1080p
+#                  remux, and a log without archived tasks (Tasks/Done/<timestamp>/). It needs only
+#                  decide, not coverage, and force-pushes a new single-commit
 #                  gource branch that carries the coverage/, board/, gaps/, integration/, llms.txt, download/, mcp/ and ai-help/
-#                  folders over (integration/ is the Integration test badge integration.yml
+#                  folders over, retrying the push up to three times and fetching them again before each retry (integration/ is the Integration test badge integration.yml
 #                  commits; gaps/index.html comes from this commit when it has one, as
 #                  board/ does, and gaps/data.json always from the branch);
 #   * board-page - on every run on work/dark-factory, never gated on decide (other branches
@@ -43,18 +45,20 @@
 # The push trigger already covers gap (it ignores only gource and board), so gaps-page needs
 # no trigger of its own.
 #
-# decide, coverage and render share the concurrency group gource-render, so renders never
-# overlap and a run decides only once the render before it has finished; board-page,
+# decide has no concurrency group, so it always runs at once. render has the group gource-render
+# (one running, one pending, a newer pending render replaces an older one, so the newest state is
+# always the one rendered) and coverage has gource-coverage; render does not wait for coverage.
+# board-page,
 # gaps-page and site-pages (gource-site) have groups of their own, so the pages go up within minutes instead of waiting
 # behind a render.
 #
 # A render with its MP4 re-encode can take an hour or more on a runner, hence the long timeout.
 #
-# When it renders:
-#   * hourly (from master, once this file is merged), if any branch has new commits;
-#   * on a push to any branch, if any branch has new commits and the last render is at
-#     least 30 minutes old;
-#   * at least once a day regardless;
+# When it renders (decide logs which rule applied):
+#   * hourly (from master), or on a push to any branch, if any branch has new commits and the
+#     last render is at least 3 hours (10800 s) old;
+#   * on every push to master (the shift-end merge) when any branch has new commits;
+#   * at least once a day (86400 s) regardless;
 #   * whenever it is run by hand (workflow_dispatch).
 #   * never for a push to `board`: that branch holds only the dark factory's lane
 #     heartbeats, so it starts no run and its commits do not count as new commits.
@@ -78,9 +82,6 @@ permissions:
 jobs:
   decide:
     runs-on: ubuntu-latest
-    concurrency:
-      group: gource-render
-      cancel-in-progress: false
     outputs:
       render: ${{ steps.decide.outputs.render }}
       fingerprint: ${{ steps.decide.outputs.fingerprint }}
@@ -97,12 +98,17 @@ jobs:
           prev_at=$(git show origin/gource:rendered-at.txt 2>/dev/null || echo 0)
           age=$(( $(date +%s) - prev_at ))
           render=no
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then render=yes
-          elif [ -z "$prev_fp" ] || [ "$age" -ge 86400 ]; then render=yes
+          rule="fingerprint unchanged, or the last render is under 10800 s old"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then render=yes; rule="run by hand"
+          elif [ -z "$prev_fp" ]; then render=yes; rule="no previous fingerprint"
+          elif [ "$age" -ge 86400 ]; then render=yes; rule="last render at least 86400 s old"
           elif [ "$fp" != "$prev_fp" ]; then
-            if [ "$GITHUB_EVENT_NAME" = schedule ] || [ "$age" -ge 1800 ]; then render=yes; fi
+            if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/master ]; then
+              render=yes; rule="push to master with new commits"
+            elif [ "$age" -ge 10800 ]; then render=yes; rule="new commits and last render at least 10800 s old"
+            fi
           fi
-          echo "fingerprint=$fp previous=${prev_fp:-none} age=${age}s event=$GITHUB_EVENT_NAME render=$render"
+          echo "fingerprint=$fp previous=${prev_fp:-none} age=${age}s event=$GITHUB_EVENT_NAME ref=$GITHUB_REF render=$render rule: $rule"
           echo "render=$render" >> "$GITHUB_OUTPUT"
           echo "fingerprint=$fp" >> "$GITHUB_OUTPUT"
 
@@ -112,7 +118,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     concurrency:
-      group: gource-render
+      group: gource-coverage
       cancel-in-progress: false
     defaults:
       run:
@@ -175,10 +181,9 @@ jobs:
         run: gh api -X POST "repos/$env:GITHUB_REPOSITORY/pages/builds" --silent
 
   render:
-    needs: [decide, coverage]
-    # Renders even when the coverage job failed: the video does not depend on it. Not when
-    # it was cancelled: a newer run queued in gource-render replaced it and renders instead.
-    if: always() && needs.decide.outputs.render == 'yes' && needs.coverage.result != 'cancelled'
+    needs: decide
+    # Does not wait for coverage: it carries over whatever coverage files are on the branch.
+    if: needs.decide.outputs.render == 'yes'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     concurrency:
@@ -221,7 +226,7 @@ jobs:
           echo "$FINGERPRINT" > fingerprint.txt
           date +%s > rendered-at.txt
           printf '%s\n' '# gource' '' \
-            'The README showcase of Curl: the 4K Gource viewer, the code coverage report and' \
+            'The README showcase of Curl: the 4K (AV1) Gource viewer, the code coverage report and' \
             'the live task board page (board/) and the gap dashboard (gaps/), served by' \
             'GitHub Pages at https://stewartscottrogers.github.io/Curl/ (the board at' \
             '.../Curl/board/, the gap dashboard at .../Curl/gaps/), and' \
@@ -229,6 +234,10 @@ jobs:
             'Generated by .github/workflows/gource.yml and replaced on every render; do not edit.' > README.md
           cp "$GITHUB_WORKSPACE/.github/gource/site/index.html" index.html
           touch .nojekyll
+          # Everything the other jobs committed onto the gource branch while this one rendered
+          # is fetched again before each push attempt (a page committed during the upload makes
+          # the force push be refused), so this function runs once per try.
+          carry_over() {
           # Keep the coverage report the coverage job committed onto the branch: its three
           # files, fetched one by one rather than the whole branch and its video.
           mkdir -p coverage
@@ -285,6 +294,9 @@ jobs:
           [ -f download/index.html ] && extra="$extra download"
           [ -f mcp/index.html ] && extra="$extra mcp"
           [ -f ai-help/index.html ] && extra="$extra ai-help"
+          return 0
+          }
+          carry_over
           # GitHub refuses any file over 100 MB (GH001), and a refused push leaves the README's
           # video frozen while the coverage job keeps the branch looking fresh. Name every
           # file over 95 MiB and stop here instead. GitHub Pages serves at most 1 GB: stop
@@ -304,13 +316,25 @@ jobs:
           elif [ "$site" -gt $(( 900 * 1024 * 1024 )) ]; then
             echo "::warning::the site is $site bytes, near GitHub Pages' 1 GB limit"
           fi
-          git init -q -b gource
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html .nojekyll hls gource.mp4 gource.gif still-4k.jpg poster.jpg stats.json \
-            fingerprint.txt rendered-at.txt README.md $extra
-          git commit -q -m "chore(gource): render $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gource
+          # The push can be refused (cannot lock ref) when board-page, site-pages or
+          # integration.yml commit onto the branch during the upload: fetch their files again
+          # and rebuild the single commit, up to three times.
+          for try in 1 2 3; do
+            [ "$try" -gt 1 ] && carry_over
+            rm -rf .git
+            git init -q -b gource
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add index.html .nojekyll hls gource.mp4 gource.gif still-4k.jpg poster.jpg stats.json \
+              fingerprint.txt rendered-at.txt README.md $extra
+            git commit -q -m "chore(gource): render $(date -u +%Y-%m-%dT%H:%MZ)"
+            if rejection=$(git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gource 2>&1); then
+              exit 0
+            fi
+            echo "push attempt $try was refused: $rejection"
+          done
+          echo "::error::the force push to gource was refused three times; last rejection: $rejection"
+          exit 1
 
       # A push made with GITHUB_TOKEN does not start a Pages build by itself; ask for one.
       - name: Rebuild GitHub Pages
