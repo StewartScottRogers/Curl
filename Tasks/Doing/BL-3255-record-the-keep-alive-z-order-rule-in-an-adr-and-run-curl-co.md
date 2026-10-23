@@ -33,3 +33,4 @@ Split from BL-3189. Measured against curl 8.22.0 with a keep-alive loopback serv
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 31901186 6a0116a9 4c1375d3.
