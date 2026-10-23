@@ -32,3 +32,4 @@ Split from BL-3173 (over its cost cap). Needs BL-3182 (refused-connect fix in `C
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 08c88f15 399a2eb6.
