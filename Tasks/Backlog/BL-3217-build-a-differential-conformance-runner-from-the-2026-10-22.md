@@ -4,7 +4,7 @@ title: Build a differential conformance runner from the 2026-10-22 tester's case
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3218, BL-3219, BL-3220, BL-3221, BL-3222, BL-3223, BL-3224, BL-3225, BL-3226, BL-3227, BL-3228, BL-3229]
 touches: [Curl.Conformance.Differential.UnitLibrary, Curl.Conformance.Differential.UnitTests, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-22
@@ -31,7 +31,12 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Notes
 
+- 2026-10-22, lane 3: split for size before any code (the task's own instruction and lane rule 4). The tester's inputs are about 680 CLI cases in `cases*.py` (cases.py 380, cases_more.py 228, cases_proto*.py 128, cases_tls.py 70, plus cases_proxy.py) on five Python servers, and the Libcurl inputs `scen.json` (3,289 URL, printf, escape and version scenarios) plus `e_in`, `h_in`, `h_round`, `t1`, `m_in`, `m2`, `m2i`, `m3`, `mi`, `sh`, `mimefile` and `pf_in` JSON files driven by the C# `LibTest` folder. Every part needs a C# port, and the real-binary and socket parts need a host outside the 100%-covered UnitLibrary, which BL-3218's ADR decides. Filed: BL-3218 (ADR, projects, runner core), BL-3219 (HTTP mock routes), BL-3220 (CLI HTTP replay and host), BL-3221 (CLI protocols and proxy), BL-3222 (CLI TLS), BL-3223 (Libcurl scen.json), BL-3224 (Libcurl easy), BL-3225 (multi and share), BL-3226 (MIME and printf), BL-3227 (WebSocket cases), BL-3228 (curl_formadd cases), BL-3229 (Curl.Api cases). Each subtask touches its own subfolder of the new projects so they can run in parallel once BL-3220 lands.
+- The second criterion says "CLI HTTP cases from scen.json", but scen.json holds the Libcurl scenarios; the CLI HTTP cases are in cases.py and cases_more.py. BL-3220 ports those, and BL-3223 replays scen.json, so the criterion is met as written once both are Done.
+- Once every subtask is Done, this task only verifies: tick the criteria against the subtasks' work and run the build, fast tests and quality gate.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 2ff5cb0a 5b38a42d 04d49e93 c1b5bc31.
+- 2026-10-22: Doing -> Backlog. Split for size: waits on BL-3218 to BL-3229 (ADR and runner core, HTTP routes, CLI HTTP/protocol/TLS replay, Libcurl scen/easy/multi/MIME replay, WebSocket, formadd and Curl.Api cases)
