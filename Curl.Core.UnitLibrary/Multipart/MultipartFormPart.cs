@@ -69,4 +69,11 @@ public sealed record MultipartFormPart(
     /// <see langword="null" /> when it is unknown, which leaves the whole body's size unknown.
     /// </summary>
     public long? ContentLength { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a file part whose file cannot be opened is sent as an empty text part with no
+    /// file name, as libcurl 8.22.0 sends a <c>curl_mime_filedata</c> part (BL-3211), instead of failing the body with
+    /// exit 26 as the tool's <c>-F</c> does. A directory still fails.
+    /// </summary>
+    public bool SendsEmptyWhenMissing { get; init; }
 }

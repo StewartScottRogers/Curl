@@ -87,24 +87,6 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_MimePostOfAMissingFile_FailsWithReadErrorBeforeSendingAnything()
-    {
-        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
-        ManagedCurlEngine engine = CreateEngine(connector);
-        IMimeBuilder mime = engine.CreateMime();
-        IMimePartBuilder part = mime.AddPart();
-        part.SetName("f");
-        part.SetFileData(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing.txt"));
-        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
-
-        CurlCode code = await PerformMimePostAsync(easy, "http://h/form", mime.Build());
-
-        Assert.AreEqual(CurlCode.ReadError, code);
-        Assert.AreEqual(MultipartFormBodyBuilder.OpenFailedMessage, easy.ErrorText);
-        Assert.IsEmpty(connector.Written);
-    }
-
-    [TestMethod]
     public async Task PerformAsync_MimePostOfEveryByteValue_SendsTheBytesUnchanged()
     {
         byte[] everyByte = [.. Enumerable.Range(0, 256).Select(value => (byte)value)];

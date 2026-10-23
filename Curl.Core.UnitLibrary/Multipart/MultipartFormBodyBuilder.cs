@@ -337,8 +337,7 @@ public sealed class MultipartFormBodyBuilder(
         FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)
         {
-            string message = opened.Status == FileAccessStatus.IsDirectory ? ReadFailedMessage : OpenFailedMessage;
-            return TransferResult.Failure(CurlExitCode.ReadError, message);
+            return OpenFailure(segments, part, opened.Status, disposition, nameEscaping, forMail, encoder);
         }
 
         Stream content = opened.Content!;
@@ -348,6 +347,34 @@ public sealed class MultipartFormBodyBuilder(
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Handles a file that did not open: a part that may be sent empty (not a directory) adds an empty text part with no
+    /// file name and fails nothing, as libcurl 8.22.0 sends a missing <c>curl_mime_filedata</c> file (BL-3211); any
+    /// other part fails with exit 26.
+    /// </summary>
+    private static TransferResult? OpenFailure(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        FileAccessStatus status,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder)
+    {
+        if (status == FileAccessStatus.IsDirectory)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+        }
+
+        if (!part.SendsEmptyWhenMissing)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, OpenFailedMessage);
+        }
+
+        segments.AddText(MultipartPartHeaders.Format(part with { Kind = MultipartFormPartKind.Text, FileName = null }, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        AddData(segments, [], encoder, forMail);
+        return null;
+    }
     /// <summary>
     /// Streams <paramref name="content" />, encoded as it is sent when its encoder encodes; a
     /// <c>7bit</c> file that can seek back is checked first, and one that cannot is refused

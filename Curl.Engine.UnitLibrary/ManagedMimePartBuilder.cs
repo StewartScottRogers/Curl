@@ -76,8 +76,8 @@ internal sealed class ManagedMimePartBuilder(ManagedMimeBuilder owner) : IMimePa
     /// <summary>
     /// <c>curl_mime_filedata</c>: the file's content, read when the transfer sends it, and its base name as the file
     /// name; <see langword="null" /> clears the data and leaves the file name. A file that does not exist is still
-    /// set, so the transfer fails reading it as the tool's <c>-F name=@file</c> does, and answers
-    /// <see cref="CurlCode.ReadError" />.
+    /// set and answers <see cref="CurlCode.ReadError" />, but the transfer then sends the part empty, with no file name,
+    /// as libcurl 8.22.0 does (BL-3211), where the tool's <c>-F name=@file</c> fails with exit 26.
     /// </summary>
     /// <param name="path">The file's path, or <see langword="null" />.</param>
     /// <returns><see cref="CurlCode.Ok" />, or <see cref="CurlCode.ReadError" /> when the file does not exist.</returns>
@@ -89,7 +89,7 @@ internal sealed class ManagedMimePartBuilder(ManagedMimeBuilder owner) : IMimePa
             return CurlCode.Ok;
         }
 
-        ReplaceData(new EasyMimeFile(path));
+        ReplaceData(new EasyMimeFile(path, SendsEmptyWhenMissing: true));
         fileName = Path.GetFileName(path);
         return File.Exists(path) || Directory.Exists(path) ? CurlCode.Ok : CurlCode.ReadError;
     }

@@ -83,6 +83,7 @@ internal static class MultipartFormPartMapping
             Bytes = RawBytesOf(part.Data),
             OpenContent = OpenerOf(part.Data, callbackReads, pauseGate),
             ContentLength = ContentLengthOf(part.Data),
+            SendsEmptyWhenMissing = part.Data is EasyMimeFile { SendsEmptyWhenMissing: true },
         };
 
     private static MultipartFormPartKind KindOf(EasyMimePart part) =>
