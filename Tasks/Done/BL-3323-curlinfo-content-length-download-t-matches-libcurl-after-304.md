@@ -32,7 +32,7 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 - Left: cl-dup-diff (ref -1, ours 1) because ManagedEasyTransfer.Finish.cs line ~273 overwrites the length with the header store's headers.ContentLength (the first of the duplicate lengths); ignore-cl and ignore-cl-head (ref -1, ours 100/3) because CURLOPT_IGNORE_CONTENT_LENGTH is not passed to TransferInfoFromReport.Of (add a parameter from options.Http.IgnoreContentLength, answer -1). Both need Finish.cs, which BL-3316 (Doing) holds, so depends-on BL-3316.
 - Do not widen the failure rule: a blanket -1 on any failure broke bad-gzip (15), unknown-encoding (4), maxredirs (0) and gziptrail, where libcurl keeps the header length.
 - Run 2 (lane 6): ignore-cl and ignore-cl-head fixed: TransferInfoFromReport.Of takes contentLengthIgnored (ManagedEasyTransfer.Finish.cs passes options.Http.IgnoreContentLength) and ContentLengthOf answers -1 under it, pinned by Of_ContentLengthIgnored_AnswersMinusOne. Touches gained TransferInfoFromReport.cs (Of carries the flag; no task in Doing names it). StoppedBeforeBody and ContentLengthOf were over the complexity gate (12): split into AnsweredLengthOf and an ExitsBeforeBody array. The differential run (10 min) was not repeated for these two; the unit test pins the -1 libcurl gives.
-- cl-dup-diff moved to BL-3334: nothing in Finish.cs overwrites the final length (the note above about line ~273 was the live header-callback answer), and ContentLengthOf already answers -1 for differing lengths, so the HTTP handler's report appears to carry only the first length; that is Curl.Protocol.Http.UnitLibrary work outside this task's touches. The first criterion is ticked for every named case but cl-dup-diff, which BL-3334 owns.
+- cl-dup-diff moved to BL-3341: nothing in Finish.cs overwrites the final length (the note above about line ~273 was the live header-callback answer), and ContentLengthOf already answers -1 for differing lengths, so the HTTP handler's report appears to carry only the first length; that is Curl.Protocol.Http.UnitLibrary work outside this task's touches. The first criterion is ticked for every named case but cl-dup-diff, which BL-3341 owns.
 
 ## Log
 
@@ -40,4 +40,4 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
 - 2026-10-23: Doing -> Backlog. Finish.cs is held by BL-3316 (Doing); cl-dup-diff and ignore-cl cases need it - depends-on BL-3316
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
-- 2026-10-23: Doing -> Done. 304, HEAD chunked, unmet time condition, early failures, file directory and ignore-cl lengths match libcurl; cl-dup-diff moved to BL-3334
+- 2026-10-23: Doing -> Done. 304, HEAD chunked, unmet time condition, early failures, file directory and ignore-cl lengths match libcurl; cl-dup-diff moved to BL-3341

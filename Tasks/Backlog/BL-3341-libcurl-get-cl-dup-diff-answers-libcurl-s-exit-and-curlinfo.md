@@ -1,5 +1,5 @@
 ---
-id: BL-3334
+id: BL-3341
 title: Libcurl get/cl-dup-diff answers libcurl's exit and CURLINFO_CONTENT_LENGTH_DOWNLOAD_T for two different Content-Length headers
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3334 — Libcurl get/cl-dup-diff answers libcurl's exit and CURLINFO_CONTENT_LENGTH_DOWNLOAD_T for two different Content-Length headers
+# BL-3341 — Libcurl get/cl-dup-diff answers libcurl's exit and CURLINFO_CONTENT_LENGTH_DOWNLOAD_T for two different Content-Length headers
 
 ## Goal
 
