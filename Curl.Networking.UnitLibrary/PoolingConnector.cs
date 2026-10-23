@@ -367,7 +367,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
 
     private static bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
         connect.ApplicationProtocol == "h2"
-            || (!target.UseTls && !target.IsForwardProxy && target.Proxy is null);
+            || (!target.IsForwardProxy && target.Proxy is null);
 
     private static int? ConcurrentTransferLimitOf(PoolEntry entry, ConnectionPoolKey key) =>
         key.Equals(entry.Key) && !entry.IsShareBarred && !entry.HasReadPeerClose
