@@ -364,9 +364,14 @@ public sealed class CommandLineRefusal
     /// the first line (measured with <c>-s --cacert nope</c> and <c>-s --knownhosts nope</c>, curl 8.21.0,
     /// 2026-09-28).
     /// </param>
-    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <param name="terminalColumns">
+    /// The width the first line wraps at, as curl 8.22.0's <c>errorf</c> wraps it (<see cref="WrappedMessage"/>;
+    /// measured on Windows on 2026-10-22, BL-3169), or <see langword="null"/> for
+    /// <see cref="WrappedMessage.TerminalColumns"/> of this process's <c>COLUMNS</c>.
+    /// </param>
+    /// <returns>A refusal of three lines or more, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineRefusal FileDoesNotExist(string spelledOption, string longOption, string file, bool errorsHidden)
+    public static CommandLineRefusal FileDoesNotExist(string spelledOption, string longOption, string file, bool errorsHidden, int? terminalColumns = null)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(longOption);
@@ -374,7 +379,7 @@ public sealed class CommandLineRefusal
 
         return new CommandLineRefusal(
             CurlExitCode.FailedInit,
-            errorsHidden ? [] : [$"curl: The file '{file}' provided to {longOption} does not exist"],
+            WrappedErrorLines(errorsHidden, $"The file '{file}' provided to {longOption} does not exist", terminalColumns),
             spelledOption,
             "is badly used here");
     }
@@ -394,16 +399,21 @@ public sealed class CommandLineRefusal
     /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c>, <c>-d@missing</c> or <c>--data=@missing</c>.</param>
     /// <param name="file">The file name after <c>@</c>, possibly empty.</param>
     /// <param name="errorsHidden"><see langword="true"/> when <c>-s</c> without <c>-S</c> was read before the refused option.</param>
-    /// <returns>A refusal of three lines, or two when <paramref name="errorsHidden"/>.</returns>
+    /// <param name="terminalColumns">
+    /// The width the first line wraps at, as curl 8.22.0's <c>errorf</c> wraps it (<see cref="WrappedMessage"/>;
+    /// measured on Windows on 2026-10-22, BL-3169), or <see langword="null"/> for
+    /// <see cref="WrappedMessage.TerminalColumns"/> of this process's <c>COLUMNS</c>.
+    /// </param>
+    /// <returns>A refusal of three lines or more, or two when <paramref name="errorsHidden"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> or <paramref name="file"/> is <see langword="null"/>.</exception>
-    public static CommandLineRefusal DataFileUnreadable(string spelledOption, string file, bool errorsHidden)
+    public static CommandLineRefusal DataFileUnreadable(string spelledOption, string file, bool errorsHidden, int? terminalColumns = null)
     {
         ArgumentNullException.ThrowIfNull(spelledOption);
         ArgumentNullException.ThrowIfNull(file);
 
         return new CommandLineRefusal(
             CurlExitCode.ReadError,
-            errorsHidden ? [] : [$"curl: Failed to open {file}"],
+            WrappedErrorLines(errorsHidden, $"Failed to open {file}", terminalColumns),
             spelledOption,
             ReadErrorReason);
     }
@@ -710,6 +720,15 @@ public sealed class CommandLineRefusal
     /// <summary>An error message's lines as curl prints them, or none when errors are hidden.</summary>
     private static IReadOnlyList<string> ErrorMessageLines(bool errorsHidden, string message) =>
         errorsHidden ? [] : WrappedMessage.Lines("curl: ", message);
+
+    /// <summary>
+    /// An error message's lines wrapped at <paramref name="terminalColumns"/>, or at this process's <c>COLUMNS</c>
+    /// when it is <see langword="null"/>, or none when errors are hidden.
+    /// </summary>
+    private static IReadOnlyList<string> WrappedErrorLines(bool errorsHidden, string message, int? terminalColumns) =>
+        errorsHidden
+            ? []
+            : WrappedMessage.Lines("curl: ", message, terminalColumns ?? WrappedMessage.TerminalColumns(Environment.GetEnvironmentVariable("COLUMNS")));
 
     private static CommandLineRefusal Create(string spelledOption, string reason)
     {
