@@ -118,11 +118,28 @@ internal sealed partial class ManagedEasyTransfer
                 new TransferInfo { EffectiveUrl = transferUrl, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
         }
 
+        CurlCode code = result.ExitCode.ToCurlCode();
         return Finish(
-            result.ExitCode.ToCurlCode(),
-            result.ErrorMessage ?? string.Empty,
+            code,
+            ErrorTextOf(code, result.ErrorMessage),
             PerformedInfoOf(result, options, transferUrl, transferId, cookieList, connectionId, toolState));
     }
+
+    /// <summary>
+    /// The text a failed perform leaves as <see cref="ErrorText" />: the handler's message, except that for
+    /// <see cref="CurlCode.TooLarge" /> and <see cref="CurlCode.WriteError" /> a message that is only the code's stock
+    /// text is dropped, as libcurl 8.22.0 returns those codes (an oversized header, a failed gzip trailer write) with no
+    /// <c>failf</c>, leaving <c>CURLOPT_ERRORBUFFER</c> empty (BL-3318).
+    /// </summary>
+    /// <param name="code">The perform's code.</param>
+    /// <param name="message">The handler's message, or <see langword="null" />.</param>
+    /// <returns>The error text.</returns>
+    internal static string ErrorTextOf(CurlCode code, string? message) =>
+        message is null
+        || (code == CurlCode.TooLarge && message == "A value or data field grew larger than allowed")
+        || (code == CurlCode.WriteError && message == "Failed writing received data to disk/application")
+            ? string.Empty
+            : message;
 
     /// <summary>
     /// The <c>WWW-Authenticate</c> values of <paramref name="result" />'s last response when it is a 401, else none.
