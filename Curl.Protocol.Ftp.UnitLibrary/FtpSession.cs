@@ -328,7 +328,9 @@ internal sealed class FtpSession(
     /// <returns>
     /// The transfer's outcome, its <see cref="TransferReport.ResponseCode" /> the code of
     /// the last reply read before <c>QUIT</c>, as curl 8.21.0 reports
-    /// <c>%{response_code}</c> for FTP (BL-392), and under <c>-R</c> a success's
+    /// <c>%{response_code}</c> for FTP (BL-392), its <see cref="TransferReport.DownloadSize" />
+    /// or, for an upload, <see cref="TransferReport.UploadSize" /> the bytes this transfer
+    /// moved, a resumed download's offset not counted (BL-3166), and under <c>-R</c> a success's
     /// <see cref="TransferResult.SourceLastWriteTimeUtc" /> the time <c>MDTM</c> named.
     /// </returns>
     public async ValueTask<TransferResult> RunAsync()
@@ -347,9 +349,16 @@ internal sealed class FtpSession(
 
         trace.Ended(result.ExitCode);
         log.SessionEnded(result, context.TimeProvider.GetElapsedTime(started));
+        bool uploaded = context.Upload is not null;
         return result with
         {
-            Report = new TransferReport { ResponseCode = lastReplyCode, FtpEntryPath = entryPath },
+            Report = new TransferReport
+            {
+                ResponseCode = lastReplyCode,
+                FtpEntryPath = entryPath,
+                DownloadSize = uploaded ? 0 : result.BytesTransferred,
+                UploadSize = uploaded ? result.BytesTransferred : 0,
+            },
             SourceLastWriteTimeUtc = result.IsSuccess && context.RemoteTime ? modifiedUtc : null,
         };
     }
