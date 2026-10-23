@@ -8,7 +8,7 @@ depends-on: []
 touches: [.github/workflows/gource.yml]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3157 — Stop gource.yml site-pages and render jobs overwriting or silently dropping the published agent pages
 
@@ -27,14 +27,17 @@ Found by the shift-end review (ADR-0710) of 76d4c7a87..2f68618ca (BL-3148), by t
 
 ## Acceptance criteria
 
-- [ ] `llms.txt` and `mcp/` are published only from `work/dark-factory` (master runs refresh at most the release-derived `download/` and `ai-help/`), with a comment saying why, as `board-page` has.
-- [ ] The render job keeps a page it could not fetch for a reason other than 404 (or fails, or emits `::warning::`) rather than deleting it; a 404 still drops it quietly.
-- [ ] Fetching `resources.json` or `ai-help.md` treats only HTTP 404 as "not yet"; any other failure emits `::warning::` or fails the step.
-- [ ] The publish clone distinguishes a missing `gource` branch (`git ls-remote --exit-code`) from other clone failures, and retries the latter within its loop.
+- [x] `llms.txt` and `mcp/` are published only from `work/dark-factory` (master runs refresh at most the release-derived `download/` and `ai-help/`), with a comment saying why, as `board-page` has.
+- [x] The render job keeps a page it could not fetch for a reason other than 404 (or fails, or emits `::warning::`) rather than deleting it; a 404 still drops it quietly.
+- [x] Fetching `resources.json` or `ai-help.md` treats only HTTP 404 as "not yet"; any other failure emits `::warning::` or fails the step.
+- [x] The publish clone distinguishes a missing `gource` branch (`git ls-remote --exit-code`) from other clone failures, and retries the latter within its loop.
 
 ## Notes
+
+- Render job: a non-404 fetch failure retries 3 times then fails the step with ::error:: (a kept page is impossible there, the branch is rebuilt from an empty dir). site-pages on master skips llms.txt and mcp/; the clone retries within its loop.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 4b79d485 73c92be4 73c1e8c0 ee88ffce.
+- 2026-10-22: Doing -> Done. gource.yml no longer overwrites or silently drops the agent pages
