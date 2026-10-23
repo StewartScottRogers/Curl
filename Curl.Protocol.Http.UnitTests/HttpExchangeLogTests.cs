@@ -159,6 +159,19 @@ public sealed class HttpExchangeLogTests
     }
 
     [TestMethod]
+    public void BodyFramed_RawChunkedAtInfo_LogsTheChunksPassedThrough()
+    {
+        RecordingDiagnosticLog log = new(DiagnosticLogLevel.Info);
+        Diagnostics.Arrange("framing", "--raw, chunked");
+
+        new HttpExchangeLog(log, DiagnosticLogComponents.Http).BodyFramed(new HttpResponseBodyFraming(false, null, passesChunks: true), []);
+
+        Diagnostics.Act("logged", Logged(log));
+        Diagnostics.Assert("logged", "Info http body framed chunked, passed through undecoded", Logged(log));
+        Assert.AreEqual((DiagnosticLogLevel.Info, DiagnosticLogComponents.Http, "body framed chunked, passed through undecoded"), log.Lines.Single());
+    }
+
+    [TestMethod]
     public void BodyFramed_AtVerboseWithCodings_LogsTheDecoderChain()
     {
         RecordingDiagnosticLog log = new();

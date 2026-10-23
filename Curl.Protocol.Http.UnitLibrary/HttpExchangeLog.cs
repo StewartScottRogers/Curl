@@ -238,6 +238,7 @@ internal sealed class HttpExchangeLog(IDiagnosticLog log, string component)
         framing switch
         {
             { IsChunked: true } => "chunked",
+            { PassesChunks: true } => "chunked, passed through undecoded",
             { ContentLength: { } length } => "by Content-Length " + length.ToString(CultureInfo.InvariantCulture),
             _ => "until the connection closes",
         };

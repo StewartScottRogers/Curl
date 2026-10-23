@@ -193,8 +193,8 @@ public sealed partial class HttpProtocolHandlerTests
         DisplayName = "--raw chunked")]
     [DataRow(
         "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n",
-        "5\r\nhello\r\n0\r\nX-T: 1\r\n\r\nEXTRA",
-        DisplayName = "--raw chunked with trailers and bytes past the end")]
+        "5\r\nhello\r\n0\r\nX-T: 1\r\n\r\n",
+        DisplayName = "--raw chunked with trailers")]
     [DataRow(
         "HTTP/1.1 200 OK\r\nTransfer-Encoding: gzip, chunked\r\n\r\n",
         "5\r\nhello\r\n0\r\n\r\n",
@@ -203,7 +203,7 @@ public sealed partial class HttpProtocolHandlerTests
         "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\n\r\n",
         "5\r\nhello\r\n0\r\n\r\n",
         DisplayName = "--raw chunked ignores Content-Length")]
-    public async Task ExecuteAsync_RawChunked_WritesTheBodyUndecodedUntilTheServerCloses(string head, string body)
+    public async Task ExecuteAsync_RawChunked_WritesTheBodyUndecodedUpToItsEnd(string head, string body)
     {
         foreach (int chunkSize in ChunkSizes)
         {

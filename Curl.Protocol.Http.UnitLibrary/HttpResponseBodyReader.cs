@@ -42,6 +42,8 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     private HttpChunkedDecoder? decoder;
 
+    private bool passesChunks;
+
     private HttpContentDecoder? contentDecoder;
 
     /// <summary>
@@ -60,10 +62,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Gets a chunked body's trailer lines, each ending in a carriage return and line feed,
-    /// which curl 8.21.0 writes to header output after the body; empty for any other body.
-    /// After a failure it holds the trailer lines decoded before it.
+    /// which curl 8.21.0 writes to header output after the body; empty for any other body, and
+    /// for a <c>--raw</c> one, whose trailers curl 8.22.0 writes only to the output, with its
+    /// chunks (measured, BL-3162 Notes). After a failure it holds the trailer lines decoded before it.
     /// </summary>
-    internal ReadOnlyMemory<byte> TrailerBytes => decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
+    internal ReadOnlyMemory<byte> TrailerBytes =>
+        passesChunks ? ReadOnlyMemory<byte>.Empty : decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
     /// Gets or sets how many response headers the transfer has stored before a chunked body's
@@ -310,7 +314,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         Progress.ReportDownloaded(BytesWritten, ExpectedLength);
         try
         {
-            await CopyFramedAsync(head.BodyPrefix, framing.IsChunked, framing.ContentLength, output, cancellationToken).ConfigureAwait(false);
+            await CopyFramedAsync(head.BodyPrefix, framing, output, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -342,16 +346,17 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// </summary>
     private async ValueTask CopyFramedAsync(
         ReadOnlyMemory<byte> bodyPrefix,
-        bool isChunked,
-        long? contentLength,
+        HttpResponseBodyFraming framing,
         Stream output,
         CancellationToken cancellationToken)
     {
-        if (isChunked)
+        if (framing.IsChunked || framing.PassesChunks)
         {
-            await CopyChunkedAsync(bodyPrefix, output, cancellationToken).ConfigureAwait(false);
+            await CopyChunkedAsync(bodyPrefix, framing.PassesChunks, output, cancellationToken).ConfigureAwait(false);
             return;
         }
+
+        long? contentLength = framing.ContentLength;
 
         long remaining = contentLength ?? long.MaxValue;
         ReadOnlyMemory<byte> prefix = bodyPrefix[..(int)Math.Min(bodyPrefix.Length, remaining)];
@@ -437,22 +442,20 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Decodes a chunked body, starting with the bytes read along with the head, and writes
-    /// its data to <paramref name="output" /> until the empty line after its trailers.
+    /// its data to <paramref name="output" /> until the empty line after its trailers. With
+    /// <paramref name="passesChunks" /> (<c>--raw</c>) it writes each read whole as it arrived
+    /// instead, chunk lines, trailers and any bytes after the end in that read included, and
+    /// still stops reading at that empty line, as curl 8.22.0 does (measured, BL-3162 Notes).
     /// </summary>
-    private async ValueTask CopyChunkedAsync(ReadOnlyMemory<byte> bytes, Stream output, CancellationToken cancellationToken)
+    private async ValueTask CopyChunkedAsync(ReadOnlyMemory<byte> bytes, bool passesChunks, Stream output, CancellationToken cancellationToken)
     {
+        this.passesChunks = passesChunks;
         decoder = new HttpChunkedDecoder { TrailerLimit = HttpResponseHeadReader.MaximumHeaderCount - HeadersStoredBefore };
         ReportReceived(bytes);
         byte[] buffer = new byte[WriteSize];
         while (true)
         {
-            while (!bytes.IsEmpty && !decoder.IsComplete)
-            {
-                ReadOnlyMemory<byte> data = decoder.DecodeNext(bytes, out int consumed);
-                bytes = bytes[consumed..];
-                await WriteChunkDataAsync(output, data, cancellationToken).ConfigureAwait(false);
-            }
-
+            bytes = await DecodeReadAsync(bytes, decoder, output, cancellationToken).ConfigureAwait(false);
             if (decoder.IsComplete)
             {
                 ReportLeftovers(bytes);
@@ -468,6 +471,32 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             bytes = buffer.AsMemory(0, read);
             ReportReceived(bytes);
         }
+    }
+
+    /// <summary>
+    /// Decodes one read of a chunked body until it is spent or the body is complete, writing
+    /// the chunk data, or for <c>--raw</c> the whole read as it arrived.
+    /// </summary>
+    /// <returns>The bytes of the read left after the end of the body.</returns>
+    private async ValueTask<ReadOnlyMemory<byte>> DecodeReadAsync(
+        ReadOnlyMemory<byte> bytes,
+        HttpChunkedDecoder chunkedDecoder,
+        Stream output,
+        CancellationToken cancellationToken)
+    {
+        if (passesChunks)
+        {
+            await WriteAsync(output, bytes, cancellationToken).ConfigureAwait(false);
+        }
+
+        while (!bytes.IsEmpty && !chunkedDecoder.IsComplete)
+        {
+            ReadOnlyMemory<byte> data = chunkedDecoder.DecodeNext(bytes, out int consumed);
+            bytes = bytes[consumed..];
+            await WriteChunkDataAsync(output, passesChunks ? default : data, cancellationToken).ConfigureAwait(false);
+        }
+
+        return bytes;
     }
 
     /// <summary>
