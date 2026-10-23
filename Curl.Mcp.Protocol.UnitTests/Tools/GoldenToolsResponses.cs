@@ -1,0 +1,312 @@
+namespace Curl.Mcp.Protocol.Tools;
+
+/// <summary>
+/// The SDK 2.2.0 server's answers recorded by BL-3374 in <c>Curl.Mcp.IntegrationTests/Golden/</c>, copied here so the
+/// golden comparison runs without reading a file: the <c>tools/list</c> result of <c>tools-list.json</c> and the
+/// error of <c>tools-call-unknown-tool.json</c>.
+/// </summary>
+internal static class GoldenToolsResponses
+{
+    /// <summary>The <c>result</c> of the golden <c>tools/list</c> response.</summary>
+    public const string ToolsListResult = """
+        {
+          "tools": [
+            {
+              "name": "parse_url",
+              "description": "Parses a URL with libcurl's URL API (curl_url_set and curl_url_get) and returns the URL as the parser rebuilt it and its parts: scheme, user, password, options, host, port, path, query, fragment and zoneId. A part the URL does not have is null, never an empty string. A URL the parser refuses is a tool error naming the CURLUcode.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "description": "The URL to parse, e.g. https://user:pw@example.com:8443/a?x=1#f.",
+                    "type": "string"
+                  },
+                  "flags": {
+                    "description": "libcurl URL flags by name (CURLU_* without the prefix, in CamelCase), e.g. NonSupportScheme, DefaultPort, UrlDecode, GuessScheme, PathAsIs; none when omitted.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "default": null
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              },
+              "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+              }
+            },
+            {
+              "name": "transfer",
+              "description": "Makes one request, described by fields rather than a command line, through Curl's transfer engine, and returns a structured result: the status code, the response headers, the body (text, or base64 when it is not UTF-8) and timing and size information. Prefer it to the `curl` tool for a single HTTP request whose response you want to read; use `curl` for anything else, such as files, other protocols or any curl option this tool has no field for. A failed transfer is a tool error carrying libcurl's error code.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "description": "The absolute URL to transfer, e.g. https://example.com/; file: URLs are refused.",
+                    "type": "string"
+                  },
+                  "method": {
+                    "description": "The request method, sent as given; GET when omitted.",
+                    "type": "string",
+                    "default": "GET"
+                  },
+                  "headers": {
+                    "description": "Extra request headers, in the order sent; an empty value sends the header empty.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "value": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "value"
+                      ]
+                    },
+                    "default": null
+                  },
+                  "body": {
+                    "description": "The request body: inline text sent as UTF-8, or base64 when isBase64 is true. Never a file.",
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "content": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "isBase64": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "content",
+                      "isBase64"
+                    ],
+                    "default": null
+                  },
+                  "followRedirects": {
+                    "description": "Whether redirects are followed, as curl -L follows them.",
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "timeoutSeconds": {
+                    "description": "The longest the whole transfer may take, in seconds; omit or 0 for no limit.",
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "insecure": {
+                    "description": "Whether the server's certificate goes unverified, as curl -k leaves it.",
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "proxy": {
+                    "description": "The proxy to use, as curl -x takes it; the environment's when omitted.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "userAgent": {
+                    "description": "The User-Agent header; none is sent when omitted.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            },
+            {
+              "name": "curl",
+              "description": "Runs curl in-process, exactly as the curl command line would. `args` are curl's arguments without the program name, for example [\"-s\", \"https://example.com\"]. Every file curl reads or writes must lie inside the folder CURL_MCP_ROOT names; a path outside it is refused before curl runs. Run [\"--ai-help\"] for an index of every option and [\"--ai-help\", \"all\"] for the full reference. Returns curl's standard output, standard error and exit code; a nonzero exit is a tool error.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "args": {
+                    "description": "curl's command-line arguments, without the program name.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "stdin": {
+                    "description": "The text curl reads as standard input, as UTF-8; omit for none.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "args"
+                ]
+              }
+            },
+            {
+              "name": "build_url",
+              "description": "Builds a URL from its parts with libcurl's URL API: sets only the parts supplied (curl_url_set), in libcurl's order, and returns the whole URL (curl_url_get). A part or URL the parser refuses, such as a bad port or no host, is a tool error naming the part and the CURLUcode.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "scheme": {
+                    "description": "The scheme, e.g. https.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "user": {
+                    "description": "The user name.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "password": {
+                    "description": "The password.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "options": {
+                    "description": "The login options (IMAP, POP3 and SMTP).",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "host": {
+                    "description": "The host name or address.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "port": {
+                    "description": "The port number, as text.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "path": {
+                    "description": "The path, e.g. /a/b.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "query": {
+                    "description": "The query, without its '?'.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "fragment": {
+                    "description": "The fragment, without its '#'.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "zoneId": {
+                    "description": "The IPv6 zone identifier.",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "flags": {
+                    "description": "libcurl URL flags by name (CURLU_* without the prefix, in CamelCase), e.g. NonSupportScheme, DefaultPort, UrlDecode, GuessScheme, PathAsIs; none when omitted.",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "default": null
+                  }
+                }
+              },
+              "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+              }
+            },
+            {
+              "name": "version",
+              "description": "Reports what `curl -V` reports about Curl's transfer engine: the version, the protocols it supports, the features it has built in and its TLS backend, each as its own field, and `curl -V`'s first line as `versionLine`. Takes no arguments.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              },
+              "annotations": {
+                "idempotentHint": true,
+                "readOnlyHint": true
+              }
+            }
+          ]
+        }
+        """;
+
+    /// <summary>The <c>error</c> of the golden <c>tools/call</c> response for the unknown tool <c>no_such_tool</c>.</summary>
+    public const string UnknownToolError = """
+        {"code":-32602,"message":"Unknown tool: 'no_such_tool'"}
+        """;
+}
