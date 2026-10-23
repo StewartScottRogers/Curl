@@ -31,3 +31,4 @@ Found by BL-3242's Curl.Api differential cases (ADR-0790). `CurlRequest.Headers`
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 0cc07379 f8c89d09 2d023807.
