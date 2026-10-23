@@ -33,3 +33,4 @@ Reference scripts: `Z:\repos\Curl.difftest\2026-10-22\proto_servers.py` (read on
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: a60fbd14 ae951636 5e81fa96.
