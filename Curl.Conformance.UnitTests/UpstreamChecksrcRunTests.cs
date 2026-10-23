@@ -167,10 +167,11 @@ public sealed class UpstreamChecksrcRunTests
             $"{file}:3:1: warning: Disable zero not supported, did you mean to enable? (BADCOMMAND)\n /* !checksrc! disable LONGLINE 0 */\n ^\n" +
             $"{file}:4:1: warning: Illegal !checksrc! command (BADCOMMAND)\n // !checksrc! frob\n ^\n" +
             $"{file}:4:1: warning: // comment (CPPCOMMENTS)\n // !checksrc! frob\n ^\n" +
+            $"{file}:4:14: warning: space after exclamation mark (EXCLAMATIONSPACE)\n // !checksrc! frob\n" + new string(' ', 14) + "^\n" +
             $"{file}:5:16: warning: No warning was inhibited! (UNUSEDIGNORE)\n /* !checksrc! enable TABS */\n" + new string(' ', 16) + "^\n" +
             "other.c:6:15: warning: Unused ignore: FOO (UNUSEDIGNORE)\n /* !checksrc! disable FOO all */\n" + new string(' ', 15) + "^\n" +
             "other.c:7:15: warning: Unused ignore: BAR (UNUSEDIGNORE)\n /* !checksrc! disable BAR abc */\n" + new string(' ', 15) + "^\n" +
-            "checksrc: 0 errors and 7 warnings\nchecksrc: 1 errors and 1 warnings suppressed\n",
+            "checksrc: 0 errors and 8 warnings\nchecksrc: 1 errors and 1 warnings suppressed\n",
             result.Output);
     }
 
@@ -203,7 +204,7 @@ public sealed class UpstreamChecksrcRunTests
         scan.StartLine("#include <a.h>");
         scan.Preprocessor = true;
         scan.Column = 4;
-        UpstreamChecksrcRun.CheckLineSecondHalf(scan);
+        new UpstreamChecksrcRun([]).CheckLineSecondHalf(scan);
         scan.EndLine();
         scan.StartLine("int a;");
         scan.Preprocessor = false;

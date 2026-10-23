@@ -12,7 +12,7 @@ namespace Curl.Conformance;
 /// <remarks>
 /// The per-line checks plug into <see cref="CheckLineFirstHalf"/> (script lines 532-900, BL-3417) and
 /// <see cref="CheckLineSecondHalf"/> (script lines 900-1268, BL-3418), called in the script's order with the file's
-/// <see cref="FileScan"/>; until they land they check nothing.
+/// <see cref="FileScan"/>.
 /// </remarks>
 internal sealed class UpstreamChecksrcRun
 {
@@ -200,9 +200,12 @@ internal sealed class UpstreamChecksrcRun
     /// <param name="scan">The file being scanned, its current line in <see cref="FileScan.Text"/>.</param>
     internal void CheckLineFirstHalf(FileScan scan) => UpstreamChecksrcScanFirstChecks.Check(this, scan);
 
-    /// <summary>The script's checks of script lines 900-1268 for one line (BL-3418); none yet.</summary>
+    /// <summary>
+    /// The script's checks of script lines 900-1268 for one line (<see cref="UpstreamChecksrcScanLastChecks"/>), after
+    /// <see cref="CheckLineFirstHalf"/>.
+    /// </summary>
     /// <param name="scan">The file being scanned, its current line in <see cref="FileScan.Text"/>.</param>
-    internal static void CheckLineSecondHalf(FileScan scan) => ArgumentNullException.ThrowIfNull(scan);
+    internal void CheckLineSecondHalf(FileScan scan) => UpstreamChecksrcScanLastChecks.Check(this, scan);
 
     /// <summary>
     /// The script's checks after the last line: <c>COPYRIGHT</c>, <c>OPENCOMMENT</c> and <c>checksrc_endoffile</c>'s
