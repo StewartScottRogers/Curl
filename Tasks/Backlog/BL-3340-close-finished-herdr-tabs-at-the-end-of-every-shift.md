@@ -1,5 +1,5 @@
 ---
-id: BL-3336
+id: BL-3340
 title: Close finished herdr tabs at the end of every shift
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3336 — Close finished herdr tabs at the end of every shift
+# BL-3340 — Close finished herdr tabs at the end of every shift
 
 ## Goal
 
