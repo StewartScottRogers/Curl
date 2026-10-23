@@ -1,5 +1,5 @@
 ---
-id: BL-3200
+id: BL-3201
 title: Cut a trailer-callback CURLOPT_POSTFIELDS post to CURLOPT_POSTFIELDSIZE
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3200 — Cut a trailer-callback CURLOPT_POSTFIELDS post to CURLOPT_POSTFIELDSIZE
+# BL-3201 — Cut a trailer-callback CURLOPT_POSTFIELDS post to CURLOPT_POSTFIELDSIZE
 
 ## Goal
 
@@ -18,7 +18,7 @@ A `CURLOPT_POSTFIELDS` post with the trailer callback set sends only `CURLOPT_PO
 
 ## Context
 
-BL-3190 cut the plain post in `HttpRequestOptionsMapping.PostFieldsBodyOf` (ADR-0771); `ManagedEasyTransfer.TrailerPostFieldsBodyOf` still builds its `PostFieldsTrailerStream` over the whole `PostFields` with `fields.Length`. Apply the same cut there.
+BL-3190 cut the plain post in `HttpRequestOptionsMapping.PostFieldsBodyOf` (ADR-0772); `ManagedEasyTransfer.TrailerPostFieldsBodyOf` still builds its `PostFieldsTrailerStream` over the whole `PostFields` with `fields.Length`. Apply the same cut there.
 
 ## Acceptance criteria
 
