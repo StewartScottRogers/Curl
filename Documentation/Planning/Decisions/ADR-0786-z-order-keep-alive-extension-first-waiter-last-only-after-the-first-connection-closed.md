@@ -31,3 +31,12 @@ With a server that closes each connection the order is ADR-0768's (pending trans
 
 - Tests that pin the order use a closing server for the reordered case and a keep-alive server
   for the URL-order case at 50 and 1; none pins keep-alive at 2.
+
+## Implementation (BL-3276)
+
+`ParallelHostQueue.Leave(url, connectionStayedOpen)` moves the first waiter last only when
+`connectionStayedOpen` is false. The runner passes `ParallelHostQueue.ConnectionStayedOpen(result)`: true for a
+successful HTTP transfer whose response is HTTP/2, or HTTP/1.1 without `Connection: close`, or HTTP/1.0 with
+`Connection: keep-alive`. A server that closes the socket without saying so in a header is taken as keep-alive,
+since the result carries no other signal. Tests: `ParallelHostQueueOrderTests` pins URL order for a keep-alive
+host with no per-host limit and with one at a time; none pins `--parallel-max` 2.

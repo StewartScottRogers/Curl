@@ -1,3 +1,4 @@
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Console;
@@ -46,6 +47,86 @@ public sealed class ParallelHostQueueOrderTests
         Assert.AreEqual("/utf8 /four /default", string.Join(' ', started));
         Assert.AreEqual("|/utf8|/utf8 /four", string.Join('|', runningWhenStarted));
         Assert.AreEqual(startedAt, time.GetTimestamp());
+    }
+
+    [TestMethod]
+    public async Task StartReleased_FirstConnectionStayedOpen_StartsTheWaitersInUrlOrder()
+    {
+        Diagnostics.Arrange("queue", "no --parallel-max-host; /echo runs and its connection stays open; /default, /utf8, /four wait");
+        ParallelHostQueue queue = new(0, parallelImmediate: false);
+        List<string> started = [];
+        await queue.WaitForHostAsync("http://h/echo", CancellationToken.None);
+        Task[] waiters =
+        [
+            StartWhenFreeAsync(queue, "/default", started, []),
+            StartWhenFreeAsync(queue, "/utf8", started, []),
+            StartWhenFreeAsync(queue, "/four", started, []),
+        ];
+
+        queue.Leave("http://h/echo", connectionStayedOpen: true);
+        queue.StartReleased();
+        await Task.WhenAll(waiters);
+        Diagnostics.Act("started", string.Join(' ', started));
+
+        Diagnostics.Assert("start order", "/default /utf8 /four", string.Join(' ', started));
+        Assert.AreEqual("/default /utf8 /four", string.Join(' ', started));
+    }
+
+    [TestMethod]
+    public async Task StartReleased_OneTransferAtATimeAndConnectionStayedOpen_StartsTheWaitersInUrlOrder()
+    {
+        Diagnostics.Arrange("queue", "--parallel-max-host 1 (one transfer at a time); /1 runs and keeps its connection; /2, /3 wait");
+        ParallelHostQueue queue = new(1, parallelImmediate: false);
+        List<string> started = [];
+        await queue.WaitForHostAsync("http://h/1", CancellationToken.None);
+        Task[] waiters = [StartWhenFreeAsync(queue, "/2", started, []), StartWhenFreeAsync(queue, "/3", started, [])];
+
+        queue.Leave("http://h/1", connectionStayedOpen: true);
+        queue.StartReleased();
+        queue.Leave("http://h/2", connectionStayedOpen: true);
+        queue.StartReleased();
+        await Task.WhenAll(waiters);
+        Diagnostics.Act("started", string.Join(' ', started));
+
+        Diagnostics.Assert("start order", "/2 /3", string.Join(' ', started));
+        Assert.AreEqual("/2 /3", string.Join(' ', started));
+    }
+
+    [TestMethod]
+    [DataRow(CurlExitCode.Ok, "1.1", "", true)]
+    [DataRow(CurlExitCode.Ok, "1.1", "close", false)]
+    [DataRow(CurlExitCode.Ok, "1.1", "Close", false)]
+    [DataRow(CurlExitCode.Ok, "1.0", "", false)]
+    [DataRow(CurlExitCode.Ok, "1.0", "keep-alive", true)]
+    [DataRow(CurlExitCode.Ok, "2.0", "", true)]
+    [DataRow(CurlExitCode.CouldntConnect, "1.1", "", false)]
+    public void ConnectionStayedOpen_ByVersionAndConnectionHeader_ReflectsWhetherTheConnectionWasKept(
+        CurlExitCode exitCode, string version, string connectionHeader, bool expected)
+    {
+        Diagnostics.Arrange("result", $"{exitCode} HTTP/{version} Connection: '{connectionHeader}'");
+        List<KeyValuePair<string, string>> headers = [new("Content-Length", "0")];
+        if (connectionHeader.Length > 0)
+        {
+            headers.Add(new("connection", connectionHeader));
+        }
+
+        TransferResult result = new(exitCode, 0) { Report = new TransferReport { HttpVersion = Version.Parse(version), ResponseHeaders = headers } };
+
+        bool actual = ParallelHostQueue.ConnectionStayedOpen(result);
+
+        Diagnostics.Assert("stayed open", expected, actual);
+        Assert.AreEqual(expected, actual);
+    }
+
+    [TestMethod]
+    public void ConnectionStayedOpen_NoReport_IsFalse()
+    {
+        Diagnostics.Arrange("result", "success with no report (a non-HTTP transfer)");
+
+        bool actual = ParallelHostQueue.ConnectionStayedOpen(new TransferResult(CurlExitCode.Ok, 0));
+
+        Diagnostics.Assert("stayed open", false, actual);
+        Assert.IsFalse(actual);
     }
 
     [TestMethod]

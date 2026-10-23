@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -9,7 +11,8 @@ namespace Curl.Console;
 /// (measured 2026-09-28, BL-520 Notes). A waiting transfer keeps its <c>--parallel-max</c> slot, as it
 /// does in curl, and waiting transfers start in the order they began to wait, except that when a host's
 /// first transfer ends, the first to wait for it (curl's pending transfer) starts after the others, as
-/// curl 8.22.0 does against a server that closes each connection (ADR-0768). The transfers a
+/// curl 8.22.0 does against a server that closes each connection (ADR-0768); when that first connection stays
+/// open the waiter reuses it and starts in URL order (ADR-0786). The transfers a
 /// <see cref="Leave" /> frees start only at <see cref="StartReleased" />, one after another, so that
 /// they start in that order every run rather than racing.
 /// </summary>
@@ -68,10 +71,12 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// <summary>
     /// Counts the transfer of <paramref name="url" /> as no longer running at its host, and frees the
     /// transfers waiting for it that may now start, for <see cref="StartReleased" /> to start. When it is the
-    /// host's first to end, the first transfer to wait for the host is freed after the others (ADR-0768).
+    /// host's first to end and its connection was closed, the first transfer to wait for the host is freed after
+    /// the others (ADR-0768); when the connection stayed open they are freed in the order they waited (ADR-0786).
     /// </summary>
     /// <param name="url">The URL <see cref="WaitForHostAsync(string, CancellationToken)" /> was given.</param>
-    internal void Leave(string url)
+    /// <param name="connectionStayedOpen">Whether the ended transfer's connection was kept for reuse.</param>
+    internal void Leave(string url, bool connectionStayedOpen = false)
     {
         if (DestinationOf(url) is not { } destination)
         {
@@ -82,10 +87,31 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
         {
             HostTransfers transfers = hosts[destination.Host];
             transfers.Running--;
-            WaitingTransfer? pending = transfers.FirstHasEnded ? null : transfers.Waiting.First?.Value;
+            WaitingTransfer? pending = transfers.FirstHasEnded || connectionStayedOpen ? null : transfers.Waiting.First?.Value;
             transfers.FirstHasEnded = true;
             FreeWaiting(transfers, pending);
         }
+    }
+
+    /// <summary>
+    /// Tells whether the connection of a transfer that ended with <paramref name="result" /> stayed open for
+    /// reuse: it succeeded over HTTP and its response did not close the connection (<c>Connection: close</c>,
+    /// or HTTP/1.0 without <c>Connection: keep-alive</c>).
+    /// </summary>
+    /// <param name="result">The ended transfer's result.</param>
+    /// <returns><see langword="true" /> when the connection was kept open.</returns>
+    internal static bool ConnectionStayedOpen(TransferResult result)
+    {
+        if (result.ExitCode != CurlExitCode.Ok || result.Report is not { HttpVersion: { } version } report)
+        {
+            return false;
+        }
+
+        bool Names(string token) => report.ResponseHeaders.Any(header =>
+            header.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
+            && header.Value.Contains(token, StringComparison.OrdinalIgnoreCase));
+
+        return version.Major >= 2 || (version >= new Version(1, 1) ? !Names("close") : Names("keep-alive"));
     }
 
     /// <summary>
