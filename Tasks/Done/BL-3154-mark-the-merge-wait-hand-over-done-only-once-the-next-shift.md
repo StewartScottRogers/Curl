@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/ShiftCoordinator.ps1]
+touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/LaneState.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3154 — Mark the merge-wait hand-over done only once the next shift has really started
 
@@ -31,14 +31,18 @@ So a `-Continuous` factory stops silently with exit 0, and a CI failure on the s
 
 ## Acceptance criteria
 
-- [ ] `$startNextShift` reports whether a tab or a process was started. `$handOver.Done` is set only when one was.
-- [ ] A failed start writes a red trace line naming the failure, and the "next shift started" line is not written.
-- [ ] When the start failed, the coordinator runs the final CI watch, the idle poll and the alarm path, as if no hand-over had been attempted.
-- [ ] The coordinator's self-test (or a new one in the factory's test blocks) covers a failed start during the merge wait.
+- [x] `$startNextShift` reports whether a tab or a process was started. `$handOver.Done` is set only when one was.
+- [x] A failed start writes a red trace line naming the failure, and the "next shift started" line is not written.
+- [x] When the start failed, the coordinator runs the final CI watch, the idle poll and the alarm path, as if no hand-over had been attempted.
+- [x] The coordinator's self-test (or a new one in the factory's test blocks) covers a failed start during the merge wait.
 
 ## Notes
+
+- touches widened to add DarkFactory/LaneState.ps1, where the -TestHeartbeat cases live; no other Doing task names it.
+- Start-NextShiftDetached wraps Start-Detached; $startNextShift returns $true only on a real start, and every caller continues (final CI watch, idle poll, alarm) when it returns $false. Cases added to -TestHeartbeat, all PASS.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b63c3000 036e81f0 83391103 6565a75d.
+- 2026-10-22: Doing -> Done. a failed next-shift start is traced in red and no longer counts as a merge-wait hand-over

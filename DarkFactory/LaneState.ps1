@@ -229,6 +229,22 @@ if ($TestHeartbeat) {
         $cases += ,@('after a hand-over, a newer head with code commits is not followed', 'not merged: the next shift was handed over and pushed code to factory/test after aaaaaaa, so its work is not merged with this shift''s', "$(Get-FollowWaitFailure $true '3' '1')")
         $cases += ,@('after a hand-over, a newer head of board commits only is followed', 'not merged: CI did not finish on bbbbbbb within 60 min', "$(Get-FollowWaitFailure $true '2' '2')")
         $cases += ,@('without a hand-over, a newer head with code commits is followed', 'not merged: CI did not finish on bbbbbbb within 60 min', "$(Get-FollowWaitFailure $false '3' '1')")
+
+        # A failed start of the next shift is not a hand-over (BL-3154): a start that throws, or
+        # returns neither a tab nor a process, reports Started false and says why.
+        $startCases = @(
+            ,@('a herdr tab counts as started', 'True/t1', { @{ Tab = 't1' } })
+            ,@('a process counts as started', 'True/p', { @{ Process = 'p' } })
+            ,@('a start that throws is not started', 'False/herdr said no', { throw 'herdr said no' })
+            ,@('a start that returns neither is not started', 'False/neither a herdr tab nor a process was started', { @{ } })
+            ,@('a start that returns nothing is not started', 'False/neither a herdr tab nor a process was started', { })
+        )
+        foreach ($startCase in $startCases) {
+            $script:fakeStart = $startCase[2]
+            function Start-Detached { param($Label, $Dir, $ScriptArgs) & $script:fakeStart }
+            try { $startResult = Start-NextShiftDetached -Label 'x' -Dir '.' -ScriptArgs @() } finally { Remove-Item function:Start-Detached }
+            $cases += ,@($startCase[0], $startCase[1], "$($startResult.Started)/$(if ($startResult.Started) { "$($startResult.Tab)$($startResult.Process)" } else { $startResult.Failure })")
+        }
         $failed = 0
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
