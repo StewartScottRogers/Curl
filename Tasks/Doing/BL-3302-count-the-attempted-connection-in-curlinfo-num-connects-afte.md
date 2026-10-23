@@ -33,3 +33,4 @@ BL-3237's replay of e_in.json (tls-notls-server: https to a plain HTTP loopback 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 70f7c991 ebc469ce 0ac4089b.
