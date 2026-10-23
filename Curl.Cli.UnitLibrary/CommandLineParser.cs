@@ -14,8 +14,8 @@ namespace Curl.Cli;
 /// looks like a flag) are carried on the result, accepted or refused. A command line that is
 /// read without refusal but names no URL is
 /// refused with <see cref="CommandLineRefusal.NoUrlSpecified"/>; an empty command line is
-/// refused with <see cref="CommandLineRefusal.EmptyCommandLine"/>, the try-help line alone. The one file-system question it asks is
-/// whether the <c>--cacert</c> path exists, through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool}, IPasswordPrompt, IDataFileReader)"/>
+/// refused with <see cref="CommandLineRefusal.EmptyCommandLine"/>, the try-help line alone. Its file-system questions (whether the path given to <c>--netrc-file</c>, <c>--cacert</c>, <c>--crlfile</c>,
+/// <c>--proxy-cacert</c>, <c>--proxy-crlfile</c> or <c>--knownhosts</c> exists, and whether the default config file exists) are asked through a check <see cref="Parse(IReadOnlyList{string}, Func{string, bool}, IPasswordPrompt, IDataFileReader)"/>
 /// takes as a parameter. When the whole command line is read without refusal and the last
 /// <c>-u</c> / <c>--user</c> or <c>-U</c> / <c>--proxy-user</c> names a user with no colon, it asks the
 /// injected <see cref="IPasswordPrompt"/> for the password, host first, before the no-URL check, as curl 8.21.0 does
@@ -29,8 +29,9 @@ namespace Curl.Cli;
 /// A <c>-K</c> / <c>--config</c> file is read through the same reader and its lines applied in
 /// place of the option (see <see cref="ConfigFileApplier"/>). Only the overload taking a
 /// <see cref="DefaultConfigFileSearch"/> reads the default config file (<c>.curlrc</c>) first; the others
-/// never do, so what they return does not depend on the machine they run on, except that a
-/// <c>--variable %name</c> reads this process's environment (ADR-0064). An option given as
+/// never do. What they return still depends on the machine's environment: a
+/// <c>--variable %name</c> reads this process's environment (ADR-0064), off Windows every parse reads <c>CURL_CA_BUNDLE</c>,
+/// <c>SSL_CERT_DIR</c> and <c>SSL_CERT_FILE</c> (see <see cref="CaCertificateEnvironment"/>), and refusal texts read <c>COLUMNS</c>. An option given as
 /// <c>--expand-&lt;name&gt;</c> has its value expanded by <see cref="VariableExpansion"/> first.
 /// <c>-V</c> / <c>--version</c> on the command line ends parsing where it stands, even inside a bundle,
 /// with <see cref="CommandLineParseResult.InformationRequested(CommandLineOptions)"/>: the arguments after it

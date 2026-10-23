@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3361 — Fix AF-0384: CommandLineParser's summary says its one file-system question is the --cacert path and that only --variable %name reads the environment; six options probe paths and every off-Windows parse reads CA environment variables
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Rewrote the CommandLineParser summary to list all six path-checked options, the default config file check, and the CA, COLUMNS and --variable environment reads. Reproduction now prints nothing for the two doc patterns. Doc-only change, no quality run needed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. CommandLineParser summary now lists every path check and environment read
