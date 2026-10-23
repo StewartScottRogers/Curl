@@ -47,7 +47,10 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Notes
 
+Fix (2026-10-23): the poll during the shift-end merge's CI wait (BL-3142) now calls `Get-MergeWaitClaimableTaskId` (DarkFactory/ShiftCoordinator.ps1), which skips every task in the shift's `requeued.txt` (`Get-ShiftRequeued`). Lanes already record a requeue there, so a task that waited on this merge is not offered to the shift started beside it; the next shift tries it afresh. Tests: three cases in the -TestHeartbeat rehearsal (DarkFactory/LaneState.ps1); -TestHeartbeat and -TestTaskIds pass with no FAIL. Only PowerShell changed, so dotnet build and tests were not rerun. Live-log measurement not done: no shift has run since the fix, so criterion 1 stays open and the task waits in Backlog.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Interactive session claims AF-0369 fix Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-23: Doing -> Backlog. Fix landed; live-log measurement needs a shift run after it
