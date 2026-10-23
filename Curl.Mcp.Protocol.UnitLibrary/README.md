@@ -6,9 +6,13 @@ read and written with source-generated JSON, and the server logic over them.
 
 ## Status
 
-The project is a scaffold. It holds no code yet; the later tasks of the plan that replaced the
-`ModelContextProtocol` and `Microsoft.Extensions.Hosting` packages add the protocol types here,
-and [`Curl.Mcp`](../Curl.Mcp) will use them in place of those packages.
+`JsonRpc/` holds the JSON-RPC 2.0 layer (BL-3376, ADR-0800): the message model
+(`JsonRpcRequest`, `JsonRpcNotification`, `JsonRpcInvalidMessage`, `JsonRpcRequestId`, the
+responses and `JsonRpcError`), the error codes in `JsonRpcErrorCodes`, `JsonRpcMessageParser`,
+which reads one line, and `JsonRpcResponseWriter`, which writes a response, through the
+source-generated `JsonRpcJsonContext`. The later tasks of the plan that replaced the
+`ModelContextProtocol` and `Microsoft.Extensions.Hosting` packages add the Model Context Protocol
+types and server logic here, and [`Curl.Mcp`](../Curl.Mcp) will use them in place of those packages.
 
 ## Rules
 
