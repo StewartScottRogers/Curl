@@ -4,7 +4,7 @@ title: A group of small conformance fixes
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3183, BL-3184, BL-3185, BL-3186, BL-3187, BL-3188]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitLibrary/ConsolePasswordPrompt.cs, Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs, Curl.Cli.UnitTests/CommandLineRefusalEmptyCommandLineTests.cs, Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs, Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerBare100Tests.cs, Curl.Output.UnitLibrary/WriteOutTransferInfo.cs, Curl.Output.UnitTests/WriteOutSpeedDownloadTests.cs, Curl.Mcp.UnitLibrary/McpTransferTool.cs, Curl.Mcp.UnitLibrary/McpTransferRequestCheck.cs, Curl.Mcp.UnitTests/McpTransferToolShapeTests.cs, Documentation/Planning/Decisions/ADR-0762-bare-curl-names-ai-help-in-its-try-help-line.md, Documentation/Planning/Decisions/README.md, Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-10-22
@@ -39,7 +39,10 @@ Filed on Stewart's behalf on 2026-10-22 as one task, one sub-criterion per fix. 
 
 ## Notes
 
+- 2026-10-22 (lane 6): Split for size before any code: six fixes across four libraries (Curl.Cli, Curl.Protocol.Http, Curl.Output, Curl.Mcp), each needing a curl 8.22.0 measurement and its own Measure-CodeQuality.ps1 run (30 to 45 minutes each), do not fit one run. Filed one subtask per item: BL-3183 (item 1), BL-3184 (item 2), BL-3185 (item 3), BL-3186 (item 4), BL-3187 (item 5), BL-3188 (item 6). Each carries its item's criterion verbatim. Prerequisite pass: every file named in Context exists; item 6 also needs `Curl.Mcp/CurlTransferTool.cs` (the SDK binds arguments there before the UnitLibrary sees them), so BL-3188 names it. curl 8.22.0 Schannel is on PATH here. When all six are Done, the next claim ticks this task's boxes from their results and runs the combined build and fast tests.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 1564fed0 4b320894 922672d5 458d0126 4890ae0e 47752f91 992fc681.
+- 2026-10-22: Doing -> Backlog. Split for size into BL-3183..BL-3188, one subtask per item; waits on them
