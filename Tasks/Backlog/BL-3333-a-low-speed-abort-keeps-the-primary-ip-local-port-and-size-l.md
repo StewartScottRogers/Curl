@@ -1,5 +1,5 @@
 ---
-id: BL-3332
+id: BL-3333
 title: A low-speed abort keeps the primary IP, local port and size libcurl reports
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3332 — A low-speed abort keeps the primary IP, local port and size libcurl reports
+# BL-3333 — A low-speed abort keeps the primary IP, local port and size libcurl reports
 
 ## Goal
 
