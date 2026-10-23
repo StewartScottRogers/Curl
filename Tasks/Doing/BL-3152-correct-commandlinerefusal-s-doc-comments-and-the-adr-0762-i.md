@@ -42,3 +42,4 @@ CLAUDE.md's "Say what it does, do what it says" rule counts each of these as a d
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 512cd130 ea4252d7 aa44bc58 6237b2f8 64b4d5af 3d836d5e.
