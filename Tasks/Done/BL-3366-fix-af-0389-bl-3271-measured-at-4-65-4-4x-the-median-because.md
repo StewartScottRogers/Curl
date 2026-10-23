@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3366 — Fix AF-0389: BL-3271 measured at $4.65 (4.4x the median) because two different tasks shared its ID; the merged cost then tripped the cost cap and a split that failed
 
@@ -41,12 +41,17 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: two different tasks were given the ID BL-3271 (L2's split of BL-3204, "Land per-handle caches", and L3's "Keep -Z URL order..."). The cost tool and the claim path's cost cap add runs by ID, so the merged $4.65 (L2 $2.91 Opus + L3 $1.59 + $0.15 resolve) tripped the cap at 04:19:42, and L4's renumber plus split run ($0.18) was refused on push. Neither task's own cost exceeded the $3.19 threshold.
+- Avoidable waste: only the duplicate ID itself, the same cause as AF-0386 (BL-3263). Its fix (the board no longer giving out a duplicate ID) is BL-3363 in Backlog, which touches the same RunDarkFactory.ps1; fixing it here would duplicate that task, so no change is made in this one. The cost itself is otherwise unavoidable: each task was sized normally.
+- The logs named by the finding are not in this checkout, so the numbers are taken from the task text.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-23: Doing -> Done. AF-0389 cost named as a duplicate task ID; its fix is BL-3363, no change here
