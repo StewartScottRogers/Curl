@@ -32,3 +32,4 @@ Stewart reported on 2026-10-22: `curl -v -b '' http://host/` prints `* WARNING: 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: abb48cca 27151861 7e71333d c06e9478.
