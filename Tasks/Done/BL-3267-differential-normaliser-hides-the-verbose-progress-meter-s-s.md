@@ -28,7 +28,7 @@ BL-3260's first host run (ADR-0785) of `-v {U}/echo` against curl 8.22.0 reporte
 ## Notes
 
 - Added a VerboseProgressLines regex (after ProgressMeter) replacing runs of ``-led meter lines anywhere in the output with `<PROGRESS>`. Measure-CodeQuality: 0 failing members.
-
+- Another lane filed the same fix as BL-3263 (a ProgressMeterLines regex, dropped for this one); its extra test is kept. Its note: runs of orphan ``-led meter lines anywhere with `<PROGRESS>`. Measure-CodeQuality: 0 failing members; 223 tests green.
 ## Log
 
 - 2026-10-23: Created.
