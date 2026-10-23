@@ -917,7 +917,7 @@ public sealed partial class TcpConnector(
         var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return HostNotResolved(target.Events, destination, failure, fromCache);
+            return HostNotResolved(target, destination, failure, fromCache);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -1096,16 +1096,21 @@ public sealed partial class TcpConnector(
     /// <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>, around which a
     /// <see cref="DnsFilterTraceEvents" /> writes its own. A negative DNS cache entry writes
     /// <c>Could not resolve host: &lt;host&gt;</c> once, <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>
-    /// and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1181 Notes).
+    /// and <c>Could not resolve: &lt;host&gt;</c> (measured, BL-1181 Notes). A
+    /// <see cref="ConnectTarget.IsForwardProxy" /> target names the proxy, so its name failing is exit 5
+    /// <c>Could not resolve proxy: &lt;proxy&gt;</c>, as curl 8.22.0 reports <c>-x</c>, <c>--proxy1.0</c> and an
+    /// <c>https://</c> proxy (measured, BL-3168).
     /// </summary>
-    private ConnectResult HostNotResolved(ITransferEvents events, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
+    private ConnectResult HostNotResolved(ConnectTarget target, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
     {
-        var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+        var events = target.Events;
+        var (notResolved, subject) = target.IsForwardProxy ? (CurlExitCode.CouldntResolveProxy, "proxy") : (CurlExitCode.CouldntResolveHost, "host");
+        var (exitCode, message) = NameResolutionFailure.Describe(notResolved, subject, destination.Host, destination.Port, failure);
         if (fromCache)
         {
             ReportNegativeEntryFailed(events, destination, message);
         }
-        else if (exitCode == CurlExitCode.CouldntResolveHost)
+        else if (exitCode == notResolved)
         {
             ReportLookUpFailed(events, destination, message);
         }
