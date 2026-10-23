@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22: against `ftp://test.rebex.net/readme.txt` (user 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: c2f22077 fd1f997d 96f608cd 84a9cd29 4be569d0.
