@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: protocol
 depends-on: []
-touches: [Curl.Protocol.Pop3.UnitLibrary/Pop3ProtocolHandler.cs, Curl.Protocol.Pop3.UnitLibrary/Pop3Session.cs, Curl.Protocol.Pop3.UnitLibrary/Pop3KeptConnection.cs, Curl.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerKeptConnectionTests.cs, Curl.Protocol.Imap.UnitTests/ImapProtocolHandlerTwoUrlTests.cs, Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerTwoUrlTests.cs]
+touches: [Curl.Protocol.Pop3.UnitLibrary/Pop3ProtocolHandler.cs, Curl.Protocol.Pop3.UnitLibrary/Pop3Session.cs, Curl.Protocol.Pop3.UnitLibrary/Pop3KeptConnection.cs, Curl.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerKeptConnectionTests.cs, Curl.Protocol.Imap.UnitTests/ImapProtocolHandlerTwoUrlTests.cs, Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerTwoUrlTests.cs, Curl.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerSessionTests.cs, Curl.Console.UnitTests/CurlCompositionTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3167 — Reuse the POP3 connection between URLs and check IMAP and SMTP do the same
 
@@ -22,11 +22,11 @@ Stewart reported on 2026-10-22: `curl -s pop3://h/1 pop3://h/2`. Upstream sends 
 
 ## Acceptance criteria
 
-- [ ] `Curl.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerKeptConnectionTests.cs` has a mock POP3 server whose command log for two URLs on one handler equals curl 8.22.0's measured log (one login, `RETR 1`, `RETR 2`, one `QUIT`), with the measurement noted in the test.
-- [ ] A test shows a second URL with a different user, or with fresh-connect, opens a second connection and logs in again.
-- [ ] A test shows a failed first transfer leaves no half-used kept connection for the second URL.
-- [ ] `Curl.Protocol.Imap.UnitTests/ImapProtocolHandlerTwoUrlTests.cs` and `Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerTwoUrlTests.cs` each check the command log for two URLs against curl 8.22.0's measured log; a mismatch is filed as a follow-up task and named in Notes.
-- [ ] `dotnet build Curl.Protocol.Pop3.UnitLibrary -warnaserror` is clean and the fast tests of `Curl.Protocol.Pop3.UnitTests`, `Curl.Protocol.Imap.UnitTests` and `Curl.Protocol.Smtp.UnitTests` pass.
+- [x] `Curl.Protocol.Pop3.UnitTests/Pop3ProtocolHandlerKeptConnectionTests.cs` has a mock POP3 server whose command log for two URLs on one handler equals curl 8.22.0's measured log (one login, `RETR 1`, `RETR 2`, one `QUIT`), with the measurement noted in the test.
+- [x] A test shows a second URL with a different user, or with fresh-connect, opens a second connection and logs in again.
+- [x] A test shows a failed first transfer leaves no half-used kept connection for the second URL.
+- [x] `Curl.Protocol.Imap.UnitTests/ImapProtocolHandlerTwoUrlTests.cs` and `Curl.Protocol.Smtp.UnitTests/SmtpProtocolHandlerTwoUrlTests.cs` each check the command log for two URLs against curl 8.22.0's measured log; a mismatch is filed as a follow-up task and named in Notes.
+- [x] `dotnet build Curl.Protocol.Pop3.UnitLibrary -warnaserror` is clean and the fast tests of `Curl.Protocol.Pop3.UnitTests`, `Curl.Protocol.Imap.UnitTests` and `Curl.Protocol.Smtp.UnitTests` pass.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Stewart reported on 2026-10-22: `curl -s pop3://h/1 pop3://h/2`. Upstream sends 
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 1d893d7d 50de25b4 500464f5 b8889381 c47bcc15.
+- 2026-10-22: Doing -> Done. pop3://h/1 pop3://h/2 logs in once and quits once on one kept connection, as curl 8.22.0 does
