@@ -1,5 +1,5 @@
 ---
-id: BL-3417
+id: BL-3422
 title: Diagnose CliHttpDifferentialTests and LibcurlEasyDifferentialTests hanging past 150 s with the reference curl 8.22.0 set
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3417 — Diagnose CliHttpDifferentialTests and LibcurlEasyDifferentialTests hanging past 150 s with the reference curl 8.22.0 set
+# BL-3422 — Diagnose CliHttpDifferentialTests and LibcurlEasyDifferentialTests hanging past 150 s with the reference curl 8.22.0 set
 
 ## Goal
 

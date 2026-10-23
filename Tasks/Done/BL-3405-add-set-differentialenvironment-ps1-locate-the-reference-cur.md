@@ -29,7 +29,7 @@ Stewart (2026-10-23) wants the 11 differential tests in `Curl.Conformance.Differ
 
 ## Notes
 
-- Ran the Integration filter per test class (150 s cap each; a whole-project run hung 50 min). None is Inconclusive for an unset variable. Of 11: 8 passed (CliTls, Formadd, Mime, Multi, Printf, Scenario, WebSocket, Host); ApiDifferentialTests failed (KeyNotFoundException in DifferentialProcessRunner.WorkingDirectoryOf, filed BL-3416); CliHttp and LibcurlEasy ran past 150 s and were killed (filed BL-3417). The script found the reference at Git for Windows ucrt64bin (curl 8.22.0 Schannel, Debug libcurl).
+- Ran the Integration filter per test class (150 s cap each; a whole-project run hung 50 min). None is Inconclusive for an unset variable. Of 11: 8 passed (CliTls, Formadd, Mime, Multi, Printf, Scenario, WebSocket, Host); ApiDifferentialTests failed (KeyNotFoundException in DifferentialProcessRunner.WorkingDirectoryOf, filed BL-3421); CliHttp and LibcurlEasy ran past 150 s and were killed (filed BL-3422). The script found the reference at Git for Windows ucrt64bin (curl 8.22.0 Schannel, Debug libcurl).
 - Changed .ps1 and .md only, no .cs, so the dotnet build and fast tests were not rerun.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-3416
+id: BL-3421
 title: Fix ApiDifferentialTests KeyNotFoundException (A, api-get) in DifferentialProcessRunner.WorkingDirectoryOf when CURL_DIFFERENTIAL_REFERENCE is set
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3416 — Fix ApiDifferentialTests KeyNotFoundException (A, api-get) in DifferentialProcessRunner.WorkingDirectoryOf when CURL_DIFFERENTIAL_REFERENCE is set
+# BL-3421 — Fix ApiDifferentialTests KeyNotFoundException (A, api-get) in DifferentialProcessRunner.WorkingDirectoryOf when CURL_DIFFERENTIAL_REFERENCE is set
 
 ## Goal
 
