@@ -28,7 +28,7 @@ public sealed class DifferentialHostTests
         var root = Directory.CreateTempSubdirectory("difftest_").FullName;
         await using var server = DifferentialLoopbackServer.Start(LoopbackPort);
         var runner = new DifferentialCaseRunner(
-            new DifferentialProcessRunner(root, server.BaseUrl), server.ControlPort, DifferentialBinaries.FindOurs(), [reference]);
+            new DifferentialProcessRunner(root, server.BaseUrl), server.ControlPort, DifferentialBinaries.FindOurs(), [reference], server.ThrowIfFaulted);
 
         var outcomes = await runner.RunAsync([InlineCase("echo-silent", "-s", "{U}/echo"), InlineCase("echo-verbose", "-v", "{U}/echo")]);
 

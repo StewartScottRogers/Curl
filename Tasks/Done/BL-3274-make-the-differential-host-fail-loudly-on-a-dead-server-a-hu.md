@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.IntegrationTests/Host]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3274 — Make the differential host fail loudly on a dead server, a hung stdin write and leftover files
 
@@ -26,14 +26,17 @@ Found by the shift-end review (ADR-0710) of 6b344d38b...af2f6a9bd, silent-failur
 
 ## Acceptance criteria
 
-- [ ] The accept loop stops quietly only when the server is stopping; any other accept or responder exception is recorded and fails the run (for example thrown from `DisposeAsync` or before the next case), and `DisposeAsync` awaits in-flight connections.
-- [ ] The case's timeout covers the stdin write (its token is passed to the write), and a hung write ends as a timeout, not a hang.
-- [ ] Each case runs in a directory no other case uses and that starts empty.
-- [ ] Unit tests (in `Curl.Conformance.Differential.UnitTests` where the code is pure) or Integration tests in this project pin each of the three; `dotnet build` is clean and the fast tests pass.
+- [x] The accept loop stops quietly only when the server is stopping; any other accept or responder exception is recorded and fails the run (for example thrown from `DisposeAsync` or before the next case), and `DisposeAsync` awaits in-flight connections.
+- [x] The case's timeout covers the stdin write (its token is passed to the write), and a hung write ends as a timeout, not a hang.
+- [x] Each case runs in a directory no other case uses and that starts empty.
+- [x] Unit tests (in `Curl.Conformance.Differential.UnitTests` where the code is pure) or Integration tests in this project pin each of the three; `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Each run gets its own numbered directory (`<n>_<name>`); `WorkingDirectoryOf` returns the last one. The case runner takes an optional server-fault check, called before and after each run. Fault tests need ports 18090 (and 18091). Hung-stdin and directory tests use `ping`/`sleep`/`true` as the binary, so they are platform-neutral.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 065bc64c f42bb3e7 dc4dec2e fc7e5cc3.
+- 2026-10-23: Doing -> Done. Server faults, stdin write timeout and per-run directories fixed and pinned

@@ -6,7 +6,7 @@ namespace Curl.Conformance.Differential.IntegrationTests.Host;
 /// binary, fetches the wire log from the control port, then normalises and compares.
 /// </summary>
 internal sealed class DifferentialCaseRunner(
-    DifferentialProcessRunner processRunner, int controlPort, IReadOnlyList<string> ours, IReadOnlyList<string> reference)
+    DifferentialProcessRunner processRunner, int controlPort, IReadOnlyList<string> ours, IReadOnlyList<string> reference, Action? throwIfServerFaulted = null)
 {
     private const int ControlAttempts = 5;
 
@@ -29,9 +29,11 @@ internal sealed class DifferentialCaseRunner(
 
     private async Task<DifferentialRunResult> RunOneAsync(HttpClient control, IReadOnlyList<string> command, DifferentialCase differentialCase, string tag)
     {
+        throwIfServerFaulted?.Invoke();
         await FetchControlAsync(control, "/reset", differentialCase, tag);
         var result = await processRunner.RunAsync(command, differentialCase, tag);
         var wire = await FetchControlAsync(control, "/log", differentialCase, tag);
+        throwIfServerFaulted?.Invoke();
         return DifferentialOutputNormaliser.Normalise(result with { Wire = wire }, processRunner.WorkingDirectoryOf(differentialCase, tag));
     }
 
