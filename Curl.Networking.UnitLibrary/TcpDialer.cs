@@ -212,8 +212,34 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
             return connected;
         }
 
+        FailRefusedLoopbackAtOnce(socket, endPoint);
         await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
         return socket;
+    }
+
+    /// <summary>
+    /// On Windows, stops the SYN retransmissions of a connect to a loopback address (SIO_TCP_INITIAL_RTO with
+    /// no retransmissions), so a refused port fails at once with exit 7 as in curl 8.22.0 rather than after
+    /// about two seconds, which a short <c>--connect-timeout</c> reports as exit 28 (BL-3182).
+    /// </summary>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static void FailRefusedLoopbackAtOnce(Socket socket, IPEndPoint endPoint)
+    {
+        if (!OperatingSystem.IsWindows() || !IPAddress.IsLoopback(endPoint.Address))
+        {
+            return;
+        }
+
+        const int SioTcpInitialRto = unchecked((int)0x98000011);
+        var parameters = new byte[] { 0xFF, 0xFF, 0xFE, 0x00 };
+        try
+        {
+            socket.IOControl(SioTcpInitialRto, parameters, null);
+        }
+        catch (SocketException)
+        {
+            // Older Windows lacks the control: the connect then waits for the retransmissions as before.
+        }
     }
 
     /// <summary>

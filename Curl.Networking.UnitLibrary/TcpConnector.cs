@@ -932,7 +932,7 @@ public sealed partial class TcpConnector(
                 lastDialError,
                 lastBindFailure,
                 new ConnectTimings(started, nameResolved, null, null),
-                $"Failed to connect to {target.Host}:{target.Port}{via}{overProxy} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
+                $"Failed to connect to {HostWithoutZoneId(target.Host)}:{target.Port}{via}{overProxy} after {elapsedMilliseconds} ms: {DialFailureText(lastBindFailure)}");
         }
 
         var timings = new ConnectTimings(started, nameResolved, timeProvider.GetTimestamp(), null);
@@ -2441,6 +2441,10 @@ public sealed partial class TcpConnector(
     /// <c>CURLE_BAD_FUNCTION_ARGUMENT</c> when the last address failed to bind its local end with
     /// one of them, <c>Could not connect to server</c> otherwise (measured, BL-600 Notes).
     /// </summary>
+    // curl 8.22.0 names an IPv6 zone-id host without its zone: [::1%25lo] reads ::1 (BL-3182).
+    private static string HostWithoutZoneId(string host) =>
+        host.IndexOf('%', StringComparison.Ordinal) is var zone and > 0 && host.Contains(':') ? host[..zone] : host;
+
     private static string DialFailureText(LocalBindFailure? lastBindFailure) => lastBindFailure switch
     {
         LocalBindFailure.InterfaceFailed => "Failed binding local connection end",

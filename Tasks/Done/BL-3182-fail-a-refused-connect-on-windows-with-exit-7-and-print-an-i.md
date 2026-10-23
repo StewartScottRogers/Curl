@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorRefusedZoneIdTests.cs]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Networking.UnitTests/TcpConnectorRefusedZoneIdTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3182 — Fail a refused connect on Windows with exit 7 and print an IPv6 zone-ID host as curl 8.22.0 does
 
@@ -22,13 +22,16 @@ Found by BL-3173 on 2026-10-22 (Windows). curl 8.22.0 (`C:\Program Files\Git\ucr
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Networking.UnitTests/TcpConnectorRefusedZoneIdTests.cs` pins exit 7 and `Failed to connect to ::1:9 after <n> ms: Could not connect to server` for a refused dial of a zone-id IPv6 target.
-- [ ] On Windows, `curl -sS http://127.0.0.1:9/` (nothing listening) exits 7 at once, not 28 after the connect timeout.
-- [ ] `dotnet build` is clean and the fast tests of `Curl.Networking.UnitTests` pass.
+- [x] A unit test in `Curl.Networking.UnitTests/TcpConnectorRefusedZoneIdTests.cs` pins exit 7 and `Failed to connect to ::1:9 after <n> ms: Could not connect to server` for a refused dial of a zone-id IPv6 target.
+- [x] On Windows, `curl -sS http://127.0.0.1:9/` (nothing listening) exits 7 at once, not 28 after the connect timeout.
+- [x] `dotnet build` is clean and the fast tests of `Curl.Networking.UnitTests` pass.
 
 ## Notes
+
+Cause: Windows retries the SYN for about 2 s before reporting a refused loopback connect, so a 2 s connect timeout won first. TcpDialer now sets SIO_TCP_INITIAL_RTO with no SYN retransmissions on loopback dials (as curl does); TcpConnector names an IPv6 zone-id host without its zone. Added TcpDialer.cs to touches (no other Doing task names it). Measured: curl -sS http://127.0.0.1:9/ exits 7 in 21 ms; [::1%25lo] prints ::1:9. Measure-CodeQuality: 0 failing members.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: f19261e5 f8cd11fa 81018761.
+- 2026-10-22: Doing -> Done. refused loopback connect exits 7 at once on Windows; zone-id host printed without zone
