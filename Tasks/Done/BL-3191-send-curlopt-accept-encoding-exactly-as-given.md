@@ -31,7 +31,7 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 
 ## Notes
 
-- Plan: `HttpRequestOptions` (Abstractions) gains `AcceptEncoding` (default `DefaultAcceptEncoding`, `deflate, gzip, br, zstd`), the value `HttpRequestHeadFormatter` sends while `Compressed` is set; `HttpRequestOptionsMapping` passes a non-empty `CURLOPT_ACCEPT_ENCODING` unchanged and the default for "". `Compressed` stays "not NULL", so decoding stays on for any value (ADR-0774).
+- Plan: `HttpRequestOptions` (Abstractions) gains `AcceptEncoding` (default `DefaultAcceptEncoding`, `deflate, gzip, br, zstd`), the value `HttpRequestHeadFormatter` sends while `Compressed` is set; `HttpRequestOptionsMapping` passes a non-empty `CURLOPT_ACCEPT_ENCODING` unchanged and the default for "". `Compressed` stays "not NULL", so decoding stays on for any value (ADR-0776).
 - touches widened to `Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs`, `Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs` and `HttpProtocolHandler.cs` (doc comment): the header is built there, not in the Engine. No task in Doing on origin/work/dark-factory named them.
 - Measuring: the curl tool can only set "" (`--compressed`), so the non-empty values follow libcurl 8.22.0's `lib/http.c` (sends the string as set); the "" list is ADR-0287's measurement. Same on every platform, so no OSCondition split.
 - Gates: build -warnaserror clean, fast tests 44 projects green, Measure-CodeQuality (Engine, Http, Abstractions) 0 failing members.
