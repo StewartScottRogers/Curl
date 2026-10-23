@@ -169,8 +169,19 @@ internal sealed partial class ManagedEasyTransfer(
     /// <summary>The caches the share handle the running perform is attached to gives (ADR-0606), or <see langword="null" /> for none.</summary>
     private ManagedEngineSharedState? attachedShared;
 
-    /// <summary>Gets the caches the running perform uses: those its share handle gives, else the engine's.</summary>
-    private ManagedEngineSharedState PerformShared => attachedShared ?? shared;
+    /// <summary>
+    /// Gets the caches the running perform uses: those its share handle gives, else the engine's for the curl tool's
+    /// transfers (<see cref="ToolSettings" />, ADR-0542), else the multi's connections, TLS sessions and resolved names with
+    /// the handle's own cookies and HSTS while it performs in a multi handle, else the handle's own (BL-3204).
+    /// </summary>
+    private ManagedEngineSharedState PerformShared => attachedShared ?? (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared);
+
+    /// <summary>The caches the handle runs over in the multi handle it is in, or <see langword="null" /> outside one.</summary>
+    /// <returns>The handle's state over the multi's caches, or <see langword="null" />.</returns>
+    private ManagedEngineSharedState? MultiCachesOf() =>
+        shared.MultiOwners.TryGetValue(this, out ManagedMultiTransfer? multi) && shared.MultiCaches.TryGetValue(multi, out ManagedEngineSharedState? caches)
+            ? shared.InMulti(caches)
+            : null;
 
     /// <summary>The share handle the running perform is attached to, or <see langword="null" /> for none.</summary>
     private ManagedShareHandle? performShare;

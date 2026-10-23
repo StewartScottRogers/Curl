@@ -151,14 +151,21 @@ public sealed class ManagedCurlEngine : ICurlEngine
     public CurlVersionInfo VersionInfo { get; } = ManagedCurlVersion.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
 
     /// <inheritdoc />
-    public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared) { Host = handleHost };
+    /// <remarks>The handle runs over caches of its own (<see cref="ManagedEngineSharedState.WithOwnCaches" />, BL-3204), as upstream's easy handle does.</remarks>
+    public IEasyTransfer CreateEasy() => new ManagedEasyTransfer(createDispatcher, shared.WithOwnCaches()) { Host = handleHost };
 
     /// <summary>
-    /// <c>curl_multi_init</c>: a <see cref="ManagedMultiTransfer" /> whose transfers run over the
-    /// engine's shared connections (ADR-0594).
+    /// <c>curl_multi_init</c>: a <see cref="ManagedMultiTransfer" /> whose transfers pool connections, TLS sessions and
+    /// resolved names in caches of the multi's own (ADR-0594, BL-3204), as upstream's multi handle does.
     /// </summary>
     /// <returns>The new multi handle; the caller disposes it (<c>curl_multi_cleanup</c>).</returns>
-    public IMultiTransfer CreateMulti() => new ManagedMultiTransfer(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, shared.Connections.CloseIdleAsync, shared.Connections.CloseIdleBeyondAsync, shared.DnsCache.Clear);
+    public IMultiTransfer CreateMulti()
+    {
+        ManagedEngineSharedState caches = shared.WithOwnCaches();
+        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.Connections.CloseIdleAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear);
+        shared.MultiCaches.Add(multi, caches);
+        return multi;
+    }
 
     /// <summary><c>curl_share_init</c>: a <see cref="ManagedShareHandle" /> sharing nothing yet, on the engine's clock (ADR-0606).</summary>
     /// <returns>The new share handle; the caller frees it with <see cref="IShareHandle.Cleanup" />.</returns>
@@ -176,9 +183,20 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>A <see cref="ManagedFormBuilder" /> whose <c>curl_formget</c> reads files from disk under curl's random boundary.</returns>
     public ICurlFormBuilder CreateForm() => new ManagedFormBuilder(new PhysicalFileSystem(), MultipartBoundary.CreateRandom);
 
-    /// <summary>Closes every connection the engine's transfers kept open (<c>curl_global_cleanup</c>).</summary>
+    /// <summary>
+    /// Closes every connection the engine's transfers kept open (<c>curl_global_cleanup</c>): those of each library easy
+    /// handle's and multi handle's own pool, an FTP control connection with <c>QUIT</c>, then the engine-wide pool's (ADR-0789).
+    /// </summary>
     /// <returns>A task that completes once they are closed.</returns>
-    public ValueTask DisposeAsync() => shared.Connections.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        foreach (KeyValuePair<Networking.ConnectionCache, Networking.ConnectionCache> own in shared.OwnConnectionCaches)
+        {
+            await own.Key.DisposeAsync().ConfigureAwait(false);
+        }
+
+        await shared.Connections.DisposeAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Builds a transfer's dispatcher as <c>Curl.Console</c>'s composition builds an option group's:

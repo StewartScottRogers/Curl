@@ -87,7 +87,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task DisposeAsync_HandleThatNeverPerformed_HandsTheEnginesHstsCacheToTheWriteCallback()
+    public async Task DisposeAsync_HandleThatNeverPerformed_HandsNoEntryAnotherHandleLearnedToTheWriteCallback()
     {
         ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([Encoding.ASCII.GetBytes(HstsOk)]));
         await using ManagedEasyTransfer loader = (ManagedEasyTransfer)engine.CreateEasy();
@@ -103,7 +103,7 @@ public sealed partial class ManagedEasyTransferTests
 
         await saver.DisposeAsync();
 
-        CollectionAssert.AreEqual(new[] { (new HstsEntry("h", false, null), 0, 1) }, saved);
+        Assert.IsEmpty(saved);
     }
 
     [TestMethod]

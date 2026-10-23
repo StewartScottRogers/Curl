@@ -594,7 +594,7 @@ public sealed partial class ManagedEasyTransferTests
         }));
 
     [TestMethod]
-    public async Task PerformAsync_TwoHandlesOfOneEngine_ShareTheCookiesAndThePooledConnection()
+    public async Task PerformAsync_TwoHandlesOfOneEngine_ShareNeitherTheCookiesNorThePooledConnection()
     {
         const string SetsCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nContent-Length: 0\r\n\r\n";
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie), Encoding.ASCII.GetBytes(Response)]);
@@ -619,8 +619,8 @@ public sealed partial class ManagedEasyTransferTests
         CurlCode code = await second.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Ok, code);
-        Assert.HasCount(1, connector.Targets);
-        StringAssert.Contains(Encoding.ASCII.GetString(connector.Written[written..]), "Cookie: a=1\r\n");
+        Assert.HasCount(2, connector.Targets);
+        Assert.DoesNotContain("Cookie:", Encoding.ASCII.GetString(connector.Written[written..]));
         Assert.AreEqual(0, first.Info.TransferId);
         Assert.AreEqual(1, second.Info.TransferId);
     }

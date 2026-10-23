@@ -51,7 +51,7 @@ internal sealed partial class ManagedEasyTransfer
         EasyOptions options = Options;
         if (options.Callbacks.HstsWrite is { } write && CallbackHstsCache.IsEnabled(options.Http))
         {
-            CallbackHstsCache.Save(write, performedHsts ?? shared.Hsts);
+            CallbackHstsCache.Save(write, performedHsts ?? PerformShared.Hsts);
         }
     }
 
