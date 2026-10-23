@@ -33,7 +33,7 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 
 - Cause: `TransferContextFactory.HeaderOutputOf` treated `EasyTransferOptions.NoBody` like the tool's `-I`
   and sent header lines to the body output. The tool's `-I` already sets `ShowHeaders` (`IncludeHeader`), so
-  the fix keys on `CURLOPT_HEADER` alone, except for FTP (ADR-0777). Added
+  the fix keys on `CURLOPT_HEADER` alone, except for FTP (ADR-0778). Added
   `Curl.Engine.UnitLibrary/TransferContextFactory.cs` to touches: the fix lives there, and no task in Doing on
   `origin/work/dark-factory` names it. `CallbackWriteStream`, `HeaderLineTeeStream` and `ManagedEasyTransfer`
   needed no change.
@@ -43,7 +43,7 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
   `Record-CurlExchange.ps1` for HTTP and a throwaway PowerShell loopback FTP responder for FTP.
 - Criterion 1: the FTP case with zero body bytes is the directory URL; for a file URL, upstream itself writes
   the `-I` info lines to the write callback, so the tests pin upstream's lines there rather than zero
-  (matching platform curl wins, ADR-0777). The header callback gets FTP's replies with those lines between them,
+  (matching platform curl wins, ADR-0778). The header callback gets FTP's replies with those lines between them,
   as `-D` showed.
 - Results are platform-neutral (no paths, OS text or certificates), so CI on Linux and macOS should match. Engine
   tests 2255 passed, Libcurl 1340 passed, full fast run green apart from one assertion in the new test, since
