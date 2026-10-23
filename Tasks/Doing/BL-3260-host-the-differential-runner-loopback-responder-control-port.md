@@ -33,3 +33,4 @@ ADR-0782 ("Host"): the tests are `Integration` and return Inconclusive unless `C
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 0f1c33be 01c61342 566e31a4.
