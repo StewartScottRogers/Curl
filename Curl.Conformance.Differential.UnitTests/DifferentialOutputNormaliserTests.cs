@@ -38,6 +38,17 @@ public sealed class DifferentialOutputNormaliserTests
     }
 
     [TestMethod]
+    public void Normalise_VerboseProgressLinesAfterTraceLines_DifferingOnlyInSpeed_NormaliseEqual()
+    {
+        const string Prefix = "{ [3 bytes data]\r\n";
+        var ours = Normalise(Prefix + "\r100      3 100      3   0      0     11      0 --:--:-- --:--:-- --:--:--    11\r\n");
+        var theirs = Normalise(Prefix + "\r100      3 100      3   0      0    173      0 --:--:-- --:--:-- --:--:--   173\r\n");
+
+        Assert.AreEqual(theirs, ours);
+        Assert.AreEqual(Prefix + "<PROGRESS>\r\n", ours);
+    }
+
+    [TestMethod]
     public void Normalise_Run_NormalisesEveryOutput()
     {
         var bytes = Encoding.Latin1.GetBytes("after 3 ms");

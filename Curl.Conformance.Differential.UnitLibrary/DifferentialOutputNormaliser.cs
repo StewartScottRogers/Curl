@@ -22,6 +22,7 @@ public static class DifferentialOutputNormaliser
     private static readonly Regex LocalPort = new(@"from 127\.0\.0\.1 port [0-9]+", RegexOptions.CultureInvariant);
     private static readonly Regex Milliseconds = new(@"after [0-9]+ ms", RegexOptions.CultureInvariant);
     private static readonly Regex ProgressMeter = new(@"  % Total.*?Speed\r\n(\r[^\r\n]*)*", RegexOptions.CultureInvariant | RegexOptions.Singleline);
+    private static readonly Regex VerboseProgressLines = new(@"(\r *[0-9]+ +[0-9][^\r\n]*)+", RegexOptions.CultureInvariant);
     private static readonly Regex DebugBuildSendRecvLine = new(@"\* (sendrecv_dl|Curl_sendrecv)\(\) -> [0-9]+\r?\n", RegexOptions.CultureInvariant);
 
     /// <summary>Normalises one output.</summary>
@@ -47,6 +48,7 @@ public static class DifferentialOutputNormaliser
         text = LocalPort.Replace(text, "from 127.0.0.1 port N");
         text = Milliseconds.Replace(text, "after N ms");
         text = ProgressMeter.Replace(text, "<PROGRESS>");
+        text = VerboseProgressLines.Replace(text, "<PROGRESS>");
         text = DebugBuildSendRecvLine.Replace(text, string.Empty);
         return Encoding.Latin1.GetBytes(text);
     }

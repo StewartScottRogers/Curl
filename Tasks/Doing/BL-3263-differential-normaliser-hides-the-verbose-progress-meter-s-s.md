@@ -22,10 +22,12 @@ BL-3260's first host run (ADR-0785) of `-v {U}/echo` against curl 8.22.0 reporte
 
 ## Acceptance criteria
 
-- [ ] A unit test in `DifferentialOutputNormaliserTests` shows two `-v` outputs differing only in the progress lines' speed columns normalise to the same bytes.
-- [ ] Library gates hold (100% line and branch coverage); build clean and fast tests green.
+- [x] A unit test in `DifferentialOutputNormaliserTests` shows two `-v` outputs differing only in the progress lines' speed columns normalise to the same bytes.
+- [x] Library gates hold (100% line and branch coverage); build clean and fast tests green.
 
 ## Notes
+
+- Added a VerboseProgressLines regex (after ProgressMeter) replacing runs of ``-led meter lines anywhere in the output with `<PROGRESS>`. Measure-CodeQuality: 0 failing members.
 
 ## Log
 
