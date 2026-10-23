@@ -383,9 +383,34 @@ public sealed class TlsClientOptionsMappingTests
     }
 
     [TestMethod]
-    public void FromCommandLine_CertStatus_SetsRequireCertificateStatusOnly()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void FromCommandLine_CertStatusOnOpenSslBuild_SetsRequireCertificateStatusOnly()
     {
         Assert.AreEqual(Expect(new TlsClientOptions(RequireCertificateStatus: true)), Map("--cert-status", Url));
+    }
+
+    // curl 8.22.0's Schannel build ignores --cert-status: a server stapling no OCSP response
+    // answers exit 0 with its body (measured, ADR-0795).
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void FromCommandLine_CertStatusOnSchannelBuild_IsIgnored()
+    {
+        Assert.AreEqual(Expect(new TlsClientOptions()), Map("--cert-status", Url));
+    }
+
+    [TestMethod]
+    [DataRow(true, false, true)]
+    [DataRow(true, true, false)]
+    [DataRow(false, false, false)]
+    [DataRow(false, true, false)]
+    public void RequiresCertificateStatus_VerifyStatusAndBuild_RequiresItOnlyOutsideSchannel(bool verifyStatus, bool matchesSchannelBuild, bool expected)
+    {
+        Diagnostics.Arrange("verify status, Schannel build", $"{verifyStatus}, {matchesSchannelBuild}");
+
+        bool requires = TlsClientOptionsMapping.RequiresCertificateStatus(verifyStatus, matchesSchannelBuild);
+
+        Diagnostics.Act("requires certificate status", $"{requires}");
+        Assert.AreEqual(expected, requires);
     }
 
     [TestMethod]
