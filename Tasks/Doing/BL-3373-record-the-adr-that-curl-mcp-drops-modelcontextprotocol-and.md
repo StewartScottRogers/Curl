@@ -37,3 +37,4 @@ An ADR, "Decided by Claude under Stewart's delegation", records that `Curl.Mcp` 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: c9008b6d 4a746d80 f4255a76 5fa8bb51 2a504231.
