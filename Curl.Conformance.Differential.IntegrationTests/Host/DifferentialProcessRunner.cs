@@ -18,12 +18,19 @@ internal sealed partial class DifferentialProcessRunner(string rootDirectory, st
     /// <summary>Gets the working directory <paramref name="differentialCase"/> last ran in for the binary tagged <paramref name="tag"/>; every run gets a directory of its own.</summary>
     public string WorkingDirectoryOf(DifferentialCase differentialCase, string tag) => _directories[(tag, differentialCase.Name)];
 
-    /// <summary>Runs <paramref name="differentialCase"/> through the binary <paramref name="command"/> starts; the wire is left empty.</summary>
-    public async Task<DifferentialRunResult> RunAsync(IReadOnlyList<string> command, DifferentialCase differentialCase, string tag)
+    /// <summary>Creates, and remembers for <see cref="WorkingDirectoryOf"/>, a new working directory for <paramref name="differentialCase"/> under the binary tagged <paramref name="tag"/>; a run in process, with no child process, uses it too.</summary>
+    public string CreateWorkingDirectory(DifferentialCase differentialCase, string tag)
     {
         var workingDirectory = Directory.CreateDirectory(
             Path.Combine(rootDirectory, tag, $"{_runCount++}_{NonWordCharacter().Replace(differentialCase.Name, "_")}")).FullName;
         _directories[(tag, differentialCase.Name)] = workingDirectory;
+        return workingDirectory;
+    }
+    /// <summary>Runs <paramref name="differentialCase"/> through the binary <paramref name="command"/> starts; the wire is left empty.</summary>
+    public async Task<DifferentialRunResult> RunAsync(IReadOnlyList<string> command, DifferentialCase differentialCase, string tag)
+    {
+        var workingDirectory = CreateWorkingDirectory(differentialCase, tag);
+
         foreach (var (name, content) in differentialCase.Files)
         {
             var path = Path.Combine(workingDirectory, name);

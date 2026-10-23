@@ -27,6 +27,7 @@ internal sealed class ApiCaseRunner(DifferentialProcessRunner processRunner, str
         {
             var differentialCase = apiCase.ToDifferentialCase();
             await FetchControlAsync(control, "/reset");
+            processRunner.CreateWorkingDirectory(differentialCase, "A");
             var ours = await RunThroughApiAsync(apiCase.Request) with { Wire = await FetchControlAsync(control, "/log") };
             await FetchControlAsync(control, "/reset");
             var real = await processRunner.RunAsync(reference, differentialCase, "B") with { Wire = await FetchControlAsync(control, "/log") };

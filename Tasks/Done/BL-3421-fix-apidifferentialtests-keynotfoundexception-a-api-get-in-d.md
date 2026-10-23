@@ -8,7 +8,7 @@ depends-on: [BL-3405]
 touches: [Curl.Conformance.Differential.IntegrationTests/Host, Curl.Conformance.Differential.IntegrationTests/Api]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3421 — Fix ApiDifferentialTests KeyNotFoundException (A, api-get) in DifferentialProcessRunner.WorkingDirectoryOf when CURL_DIFFERENTIAL_REFERENCE is set
 
@@ -22,11 +22,14 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
+
+Task file was a stub. Cause: ApiCaseRunner never registered the in-process "A" working directory, so WorkingDirectoryOf threw KeyNotFoundException. Fix: DifferentialProcessRunner.CreateWorkingDirectory (shared with RunAsync), called by ApiCaseRunner before each API run. Verified ApiDifferentialTests passes against msys curl; build clean.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-23: Doing -> Done. ApiDifferentialTests no longer throws KeyNotFoundException for the in-process A run
