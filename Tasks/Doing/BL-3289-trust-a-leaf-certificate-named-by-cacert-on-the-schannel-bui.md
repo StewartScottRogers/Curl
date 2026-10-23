@@ -30,3 +30,4 @@ Found by BL-3235's CLI TLS differential run (case `tls-wrong-ca` in `Curl.Confor
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 88a772e1 c46ca32a.
