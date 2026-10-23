@@ -129,6 +129,32 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// A 1xx head followed by a line that is no status line - a bare <c>100</c> answering with
+    /// a body - ends the transfer with exit 8, and curl 8.22.0 has already written that head to
+    /// <c>-i</c>'s output (differential case status-100, measured, BL-3280).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_BodyAfterAnInformationalHeadWithHeaderOutput_WritesThatHead()
+    {
+        const string head = "HTTP/1.1 100 Status\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\n";
+        foreach (int chunkSize in ChunkSizes)
+        {
+            MemoryStream output = new();
+            Diagnostics.Arrange("chunk size", chunkSize);
+            Diagnostics.Arrange("scripted response", "100 with Content-Length and a body; header output is the output");
+
+            TransferResult result = await Handler(QueueConnector.For(Connection(head + "status 100\n", chunkSize)))
+                .ExecuteAsync(RefusedHeaderContext(output, output, string.Empty));
+
+            WriteResult(result);
+            Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
+            Diagnostics.Diff("output", OneLine(head), OneLine(Latin1(output.ToArray())));
+            Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.AreEqual(head, Latin1(output.ToArray()), $"Chunk size {chunkSize}");
+        }
+    }
+
     [TestMethod]
     [DataRow("Location: /a\r\nLocation: /a\r\n", DisplayName = "The same value twice")]
     [DataRow("Location: /a\r\nLocation:\r\n", DisplayName = "An empty value after it")]
