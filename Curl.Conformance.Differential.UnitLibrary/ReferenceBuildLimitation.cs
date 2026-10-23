@@ -36,4 +36,7 @@ public enum ReferenceBuildLimitation
 
     /// <summary>The reference lists more features in <c>--version</c> (zlib, brotli, libidn2 and others) than the platform's curl.</summary>
     DifferentFeatureList,
+
+    /// <summary>The platform's Schannel, not only the reference build, refuses every P12 client credential with <c>SEC_E_UNKNOWN_CREDENTIALS</c> (exit 35), so a P12 client certificate cannot be compared (ADR-0794).</summary>
+    SchannelRefusesP12Credential,
 }
