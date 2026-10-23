@@ -8,7 +8,7 @@ depends-on: [BL-3183, BL-3184, BL-3185, BL-3186, BL-3187, BL-3188]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitLibrary/ConsolePasswordPrompt.cs, Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs, Curl.Cli.UnitTests/CommandLineRefusalEmptyCommandLineTests.cs, Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs, Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerBare100Tests.cs, Curl.Output.UnitLibrary/WriteOutTransferInfo.cs, Curl.Output.UnitTests/WriteOutSpeedDownloadTests.cs, Curl.Mcp.UnitLibrary/McpTransferTool.cs, Curl.Mcp.UnitLibrary/McpTransferRequestCheck.cs, Curl.Mcp.UnitTests/McpTransferToolShapeTests.cs, Documentation/Planning/Decisions/ADR-0762-bare-curl-names-ai-help-in-its-try-help-line.md, Documentation/Wiki/Glossary.md]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-23
 ---
 # BL-3171 — A group of small conformance fixes
 
@@ -29,17 +29,19 @@ Filed on Stewart's behalf on 2026-10-22 as one task, one sub-criterion per fix. 
 
 ## Acceptance criteria
 
-- [ ] Item 1: a test in `Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs` runs every option that takes an argument with `''` and matches curl 8.22.0's measured accept/reject list (the list is quoted in Notes); `--proxy-key ''` has its own case.
-- [ ] Item 2: a test in `Curl.Protocol.Http.UnitTests/HttpProtocolHandlerBare100Tests.cs` shows `-i` output for a bare 100 response, and for a 100 followed by a 200, equal to the bytes curl 8.22.0 prints.
-- [ ] Item 3: tests in `Curl.Cli.UnitTests/CommandLineRefusalEmptyCommandLineTests.cs` pin the no-argument standard error and exit 2 per platform (Windows, and non-Windows via `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`) to curl 8.22.0's measured bytes, with no `--ai-help` in that line; `curl --help`'s footer still contains the `--ai-help` hint; `TryHelpLineNamingAiHelp` is gone; ADR-0762 is marked superseded citing Stewart's 2026-10-22 decision, the ADR index and Glossary agree, and `--ai-help` text still describes the options correctly.
-- [ ] Item 4: a test in `Curl.Output.UnitTests/WriteOutSpeedDownloadTests.cs` pins `%{speed_download}` for sizes and total times (including a sub-second total, zero total time and a large size) to the values curl 8.22.0 prints.
-- [ ] Item 5: a test in `Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs` (extend) pins the prompt text and the newline written after the entry to curl 8.22.0's bytes, for the Windows and non-Windows terminals where they differ.
-- [ ] Item 6: tests in `Curl.Mcp.UnitTests/McpTransferToolShapeTests.cs` send `headers` as an object and `body` as a string (and at least one more wrong shape each for `url`, `method` and `options`) and expect an error text naming the field and its expected shape; none yields `An error occurred invoking 'transfer'`, and the right shapes still work.
-- [ ] `dotnet build Curl.Cli.UnitLibrary Curl.Output.UnitLibrary Curl.Protocol.Http.UnitLibrary Curl.Mcp.UnitLibrary -warnaserror` is clean and the fast tests of the matching `.UnitTests` projects pass.
+- [x] Item 1: a test in `Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs` runs every option that takes an argument with `''` and matches curl 8.22.0's measured accept/reject list (the list is quoted in Notes); `--proxy-key ''` has its own case.
+- [x] Item 2: a test in `Curl.Protocol.Http.UnitTests/HttpProtocolHandlerBare100Tests.cs` shows `-i` output for a bare 100 response, and for a 100 followed by a 200, equal to the bytes curl 8.22.0 prints.
+- [x] Item 3: tests in `Curl.Cli.UnitTests/CommandLineRefusalEmptyCommandLineTests.cs` pin the no-argument standard error and exit 2 per platform (Windows, and non-Windows via `[OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]`) to curl 8.22.0's measured bytes, with no `--ai-help` in that line; `curl --help`'s footer still contains the `--ai-help` hint; `TryHelpLineNamingAiHelp` is gone; ADR-0762 is marked superseded citing Stewart's 2026-10-22 decision, the ADR index and Glossary agree, and `--ai-help` text still describes the options correctly.
+- [x] Item 4: a test in `Curl.Output.UnitTests/WriteOutSpeedDownloadTests.cs` pins `%{speed_download}` for sizes and total times (including a sub-second total, zero total time and a large size) to the values curl 8.22.0 prints.
+- [x] Item 5: a test in `Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs` (extend) pins the prompt text and the newline written after the entry to curl 8.22.0's bytes, for the Windows and non-Windows terminals where they differ.
+- [x] Item 6: tests in `Curl.Mcp.UnitTests/McpTransferToolShapeTests.cs` send `headers` as an object and `body` as a string (and at least one more wrong shape each for `url`, `method` and `options`) and expect an error text naming the field and its expected shape; none yields `An error occurred invoking 'transfer'`, and the right shapes still work.
+- [x] `dotnet build Curl.Cli.UnitLibrary Curl.Output.UnitLibrary Curl.Protocol.Http.UnitLibrary Curl.Mcp.UnitLibrary -warnaserror` is clean and the fast tests of the matching `.UnitTests` projects pass.
 
 ## Notes
 
 - 2026-10-22 (lane 6): Split for size before any code: six fixes across four libraries (Curl.Cli, Curl.Protocol.Http, Curl.Output, Curl.Mcp), each needing a curl 8.22.0 measurement and its own Measure-CodeQuality.ps1 run (30 to 45 minutes each), do not fit one run. Filed one subtask per item: BL-3183 (item 1), BL-3184 (item 2), BL-3185 (item 3), BL-3186 (item 4), BL-3187 (item 5), BL-3188 (item 6). Each carries its item's criterion verbatim. Prerequisite pass: every file named in Context exists; item 6 also needs `Curl.Mcp/CurlTransferTool.cs` (the SDK binds arguments there before the UnitLibrary sees them), so BL-3188 names it. curl 8.22.0 Schannel is on PATH here. When all six are Done, the next claim ticks this task's boxes from their results and runs the combined build and fast tests.
+
+- 2026-10-23 (lane 4): All six subtasks (BL-3183..BL-3188) are Done with every box ticked; their Notes hold each measurement (item 1 accept/reject list quoted in BL-3183, item 3 per-platform bytes and ADR-0769 superseding ADR-0762 in BL-3185). Checked here: the six named test files exist, `TryHelpLineNamingAiHelp` is gone from the code, ADR-0762 reads Superseded by ADR-0769. Combined gate: the four libraries build clean with -warnaserror; fast tests pass: Curl.Cli.UnitTests 4282, Curl.Output.UnitTests 789, Curl.Protocol.Http.UnitTests 2245, Curl.Mcp.UnitTests 499, 0 failed. No production code changed in this claim, so no quality run; CI on Linux and macOS is covered by the subtasks pinning per-platform answers with OSCondition.
 
 ## Log
 
@@ -47,3 +49,4 @@ Filed on Stewart's behalf on 2026-10-22 as one task, one sub-criterion per fix. 
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 1564fed0 4b320894 922672d5 458d0126 4890ae0e 47752f91 992fc681.
 - 2026-10-22: Doing -> Backlog. Split for size into BL-3183..BL-3188, one subtask per item; waits on them
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 1564fed0 4b320894 922672d5 458d0126 4890ae0e 47752f91 992fc681.
+- 2026-10-23: Doing -> Done. Six small conformance fixes (BL-3183..BL-3188) all landed; combined build and fast tests green
