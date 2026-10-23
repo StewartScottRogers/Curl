@@ -115,12 +115,13 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>
     /// The port a get gives: the one written, hidden under <c>CURLU_NO_DEFAULT_PORT</c> when it is the
-    /// scheme's default; with none written, the scheme's default under <c>CURLU_DEFAULT_PORT</c>.
+    /// scheme's default; with none written, the scheme's default under <c>CURLU_DEFAULT_PORT</c> (0 for <c>file</c>, as libcurl's file handler has).
     /// </summary>
     private static string? PortText(int? written, string? scheme, CurlUrlFlags flags)
     {
         int? defaultPort = scheme is null ? null : UrlHandleParts.DefaultPortOf(scheme);
-        int? shown = written is null ? DefaultPortShown(defaultPort, flags) : WrittenPortShown(written.Value, defaultPort, flags);
+        int? defaultShown = string.Equals(scheme, "file", StringComparison.OrdinalIgnoreCase) ? 0 : defaultPort;
+        int? shown = written is null ? DefaultPortShown(defaultShown, flags) : WrittenPortShown(written.Value, defaultPort, flags);
 
         return shown?.ToString(CultureInfo.InvariantCulture);
     }

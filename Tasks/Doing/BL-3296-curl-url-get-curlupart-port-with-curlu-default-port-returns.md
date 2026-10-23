@@ -22,10 +22,12 @@ Scenarios 744 to 806 (file:///c:/x, file://localhost/x, file:/x, file:///x/y?z#w
 
 ## Acceptance criteria
 
-- [ ] A ManagedCurlUrlHandle unit test pins "0" for a file URL with CURLU_DEFAULT_PORT.
-- [ ] The build is clean and the fast tests pass.
+- [x] A ManagedCurlUrlHandle unit test pins "0" for a file URL with CURLU_DEFAULT_PORT.
+- [x] The build is clean and the fast tests pass.
 
 ## Notes
+
+- File URLs give "0" under CURLU_DEFAULT_PORT (libcurl's file handler default port); the plain get still gives NoPort. Quality run for Curl.Engine.UnitLibrary: 0 failing members. Platform-neutral.
 
 ## Log
 

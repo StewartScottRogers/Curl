@@ -146,6 +146,15 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    public void Get_DefaultPortFlagForAFileUrl_ReturnsZero()
+    {
+        using ManagedCurlUrlHandle url = Parsed("file:///x");
+
+        Assert.AreEqual("0", GetOk(url, CurlUrlPart.Port, CurlUrlFlags.DefaultPort));
+        Assert.AreEqual(CurlUrlCode.NoPort, url.Get(CurlUrlPart.Port, CurlUrlFlags.None, out _));
+    }
+
+    [TestMethod]
     public void Get_DefaultPortFlagForASchemeWithoutOne_ReturnsNoPort()
     {
         using ManagedCurlUrlHandle url = Parsed("foo://h/", CurlUrlFlags.NonSupportScheme);
