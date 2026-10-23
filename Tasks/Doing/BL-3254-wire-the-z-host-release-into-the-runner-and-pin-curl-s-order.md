@@ -33,3 +33,4 @@ Split from BL-3189. BL-3253 gives `ParallelHostQueue`/`ParallelTransferQueue` th
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 3f9f3fbf 91e711c8 991c6e26.
