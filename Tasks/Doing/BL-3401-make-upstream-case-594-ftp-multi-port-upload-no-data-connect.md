@@ -32,3 +32,4 @@ Stewart (2026-10-23) wants every test passing. Case 594 is disabled upstream as 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 4d37ec2a e4e018ed 538f29c2 c5f8cef6.
