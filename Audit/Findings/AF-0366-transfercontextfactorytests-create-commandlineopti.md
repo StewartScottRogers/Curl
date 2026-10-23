@@ -3,8 +3,8 @@ id: AF-0366
 title: TransferContextFactoryTests.Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine fails on the unmutated tree: the parser refuses its command line
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/TransferContextFactoryTests.cs:Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine:failing-test
 reproduction: none
 task: BL-3219
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_0618.md
 ---
 # AF-0366 - TransferContextFactoryTests.Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine fails on the unmutated tree: the parser refuses its command line
 
@@ -42,7 +42,10 @@ dotnet test Curl.Engine.UnitTests --filter "FullyQualifiedName~TransferContextFa
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran dotnet test Curl.Engine.UnitTests --filter "FullyQualifiedName~TransferContextFactoryTests.Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine": Passed! Failed: 0, Passed: 1, Total: 1.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.

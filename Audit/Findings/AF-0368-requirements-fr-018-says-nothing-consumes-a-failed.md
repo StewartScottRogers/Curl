@@ -42,6 +42,8 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Output.UnitLibra
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the reproduction: the only match is WriteOutTransferInfo.cs:77 ('?? result.BytesTransferred'). Requirements.md no longer says 'nothing consumes it until'; FR-018 (line 51) now says '--write-out reads it (WriteOutTransferInfo)'.
+
 ## Log
 
 - 2026-10-22: filed proposed.

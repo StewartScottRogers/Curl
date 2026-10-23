@@ -3,8 +3,8 @@ id: AF-0369
 title: BL-3151 was claimed and requeued twice waiting on a shift-end merge it could not cause; the second claim came from a shift started for it during that merge's CI wait
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
 key: process:logs:BL-3151:redone-work
 reproduction: none
 task: BL-3222
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_0618.md
 ---
 # AF-0369 - BL-3151 was claimed and requeued twice waiting on a shift-end merge it could not cause; the second claim came from a shift started for it during that merge's CI wait
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the reproduction as given. Over the old window it still shows the historical incident: BL-3151 claims=2, outcome requeued, with claim/REQUEUE in DarkFactory-20261022-164804-L1.log:50/58, 'is claimable during the merge's CI wait; next shift started' at 164804.log:19, and claim/REQUEUE in 172108-L1.log:2/8. Re-audited by mechanism over this audit's window (127 tasks Done): the only 'claimable during the merge's CI wait' shift start is DarkFactory-20261022-192710.log:137 at 00:59:34, for BL-3196. BL-3196 was claimed at 00:59:58 (005934-L1) and reached DONE at 01:18:13 without a requeue. None of the window's 21 REQUEUE lines is a task waiting on a shift-end merge. The redone-work rule crossed only for other causes (BL-3312, BL-3263, BL-3204).
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
