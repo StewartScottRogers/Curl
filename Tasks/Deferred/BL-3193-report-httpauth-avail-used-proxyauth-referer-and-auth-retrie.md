@@ -40,3 +40,4 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 8442c290 2677bb42 ed48196a de830169 3639a5e6.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, held by BL-3195 (Doing); touches widened to it, HttpProtocolHandler.cs and TransferReport.cs
+- 2026-10-23: Backlog -> Deferred. Split over cost cap into BL-3256, BL-3257, BL-3258

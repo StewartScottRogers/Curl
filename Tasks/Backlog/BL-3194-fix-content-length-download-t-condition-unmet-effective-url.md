@@ -4,7 +4,7 @@ title: Fix CONTENT_LENGTH_DOWNLOAD_T, CONDITION_UNMET, EFFECTIVE_URL with CURLOP
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3193]
+depends-on: [BL-3256, BL-3257, BL-3258]
 touches: [Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Libcurl.UnitTests/Info/EasyInfoLengthAndConditionTests.cs]
 requirement: none
 created: 2026-10-22
