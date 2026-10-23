@@ -1,5 +1,5 @@
 ---
-id: BL-3314
+id: BL-3327
 title: CURLINFO_PRIMARY_PORT is -1 when no connection was made, and a failed redirect keeps the last response's code, IP and port
 priority: Normal
 assignee: Claude
