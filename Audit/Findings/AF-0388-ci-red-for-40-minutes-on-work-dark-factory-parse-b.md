@@ -3,8 +3,8 @@ id: AF-0388
 title: CI red for 40 minutes on work/dark-factory: Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason failed on Linux and macOS
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
