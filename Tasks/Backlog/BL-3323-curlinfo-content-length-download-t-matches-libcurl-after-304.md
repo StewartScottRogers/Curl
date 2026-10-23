@@ -1,5 +1,5 @@
 ---
-id: BL-3312
+id: BL-3323
 title: CURLINFO_CONTENT_LENGTH_DOWNLOAD_T matches libcurl after 304, conflicting lengths, resume, unmet time condition and aborts
 priority: Normal
 assignee: Claude

@@ -1,5 +1,5 @@
 ---
-id: BL-3313
+id: BL-3324
 title: CURLINFO_HTTPAUTH_USED reports Basic after a transfer that sent Basic credentials
 priority: Normal
 assignee: Claude
