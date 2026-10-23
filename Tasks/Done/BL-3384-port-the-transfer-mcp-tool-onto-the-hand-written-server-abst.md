@@ -8,7 +8,7 @@ depends-on: [BL-3375, BL-3378, BL-3374]
 touches: [Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp/Tools/TransferMcpToolJson.cs, Curl.Mcp.UnitTests/Tools/TransferMcpToolTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3384 — Port the transfer MCP tool onto the hand-written server abstractions
 
@@ -25,15 +25,20 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `TransferMcpTool` exists with the same name, description and annotations as `CurlTransferTool` and an input schema equal to the golden `transfer` schema as a JSON value.
-- [ ] Every test case of `CurlTransferToolTests.cs` and `McpTransferToolShapeTests.cs` has an equivalent in `TransferMcpToolTests.cs`, including each wrong-shape argument, defaults, a header with an empty value, base64 and text bodies, and cancellation reaching `McpTransferTool`.
-- [ ] A test proves the serialized result equals `CurlTransferTool`'s for the same `McpTransferToolResult`.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
-- [ ] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
+- [x] `TransferMcpTool` exists with the same name, description and annotations as `CurlTransferTool` and an input schema equal to the golden `transfer` schema as a JSON value.
+- [x] Every test case of `CurlTransferToolTests.cs` and `McpTransferToolShapeTests.cs` has an equivalent in `TransferMcpToolTests.cs`, including each wrong-shape argument, defaults, a header with an empty value, base64 and text bodies, and cancellation reaching `McpTransferTool`.
+- [x] A test proves the serialized result equals `CurlTransferTool`'s for the same `McpTransferToolResult`.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
+- [x] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
 
 ## Notes
 
+- Decided: a missing or `null` field takes the SDK signature's default; a missing `url` answers `Invalid url: it is empty.` (structured `InvalidRequest`) instead of the golden SDK binder's bare `An error occurred invoking 'transfer'.`, and `"method": null` sends a GET instead of being refused - deliberate differences, ADR-0804. Every other answer, the golden `tools-call-transfer-wrong-shape.json` refusal included, matches.
+- The golden schema check embeds `tools-list.json`'s `transfer` input schema in the test as a literal and compares it with `JsonElement.DeepEquals`: a unit test reading the IntegrationTests golden file would touch the repository's disk (ADR-0421).
+- The description text is copied, not taken from `CurlTransferTool.ToolDescription`, so the cut-over task can delete the old class; the test pins the two equal until then.
+- Measured: `Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members; `dotnet build Curl.Mcp.UnitTests -warnaserror` clean; 528 fast tests pass. The change is platform-neutral (no paths, OS errors or certificates), which meets the Linux and macOS side.
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: a0fcb2dc 52c3f2f5 a7cd6620 96ffe31b 6d2cec38.
+- 2026-10-23: Doing -> Done. TransferMcpTool serves the transfer tool on the hand-written MCP abstractions with the SDK tool's schema and results
