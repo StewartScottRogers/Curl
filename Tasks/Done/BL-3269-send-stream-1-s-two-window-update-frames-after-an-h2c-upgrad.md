@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Protocol.Http.UnitTests/Http2SessionTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3269 — Send stream 1's two WINDOW_UPDATE frames after an h2c upgrade as curl does
 
@@ -22,13 +22,16 @@ Found by BL-3207 (2026-10-23): `Record-CurlExchange.ps1 -Http2Origin h2c-upgrade
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Protocol.Http.UnitTests` pins the two stream-1 `WINDOW_UPDATE` frames after an h2c upgrade.
-- [ ] Re-running `Record-CurlExchange.ps1 -Http2Origin h2c-upgrade` with Curl gives the recording's frames.
-- [ ] Build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
+- [x] A unit test in `Curl.Protocol.Http.UnitTests` pins the two stream-1 `WINDOW_UPDATE` frames after an h2c upgrade.
+- [x] Re-running `Record-CurlExchange.ps1 -Http2Origin h2c-upgrade` with Curl gives the recording's frames.
+- [x] Build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
 
 ## Notes
+
+Stream 1's two WINDOW_UPDATEs now go out in StartUpgradedStreamAsync right after the preface (shared SendStreamWindowUpdatesAsync). Updated the h2c handler tests and trace test whose expected bytes/lines lacked them. Re-recorded h2c-upgrade with Curl: frames match the recording. Quality: 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f1e2decf 529878da 5ddedddc.
+- 2026-10-23: Doing -> Done. h2c upgrade now sends stream 1's two WINDOW_UPDATE frames as curl does

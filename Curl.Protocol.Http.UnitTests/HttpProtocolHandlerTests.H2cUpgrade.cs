@@ -67,10 +67,10 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(new Version(2, 0), result.Report.HttpVersion);
             Diagnostics.Diff(
                 "bytes written (hex)",
-                Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + ClosingGoAway,
+                Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + StreamOneWindowUpdates.ToUpperInvariant() + SettingsAcknowledgement + ClosingGoAway,
                 Convert.ToHexString(connection.Written));
             Assert.AreEqual(
-                Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + ClosingGoAway,
+                Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest)) + Http2Preface.ToUpperInvariant() + StreamOneWindowUpdates.ToUpperInvariant() + SettingsAcknowledgement + ClosingGoAway,
                 Convert.ToHexString(connection.Written),
                 $"Chunk size {chunkSize}: curl 8.18.0 sends no post-upgrade SETTINGS when no other stream opens (BL-970 Notes)");
             Diagnostics.Assert("connection marked reusable", true, connection.IsMarkedReusable);
@@ -247,14 +247,14 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Diff(
             "bytes written (hex)",
             Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest.Replace("48717", "48973", StringComparison.Ordinal).Replace("GET / ", "GET /a ", StringComparison.Ordinal)))
-                + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + Stream1ClosedReset + UpgradedStreamSettings
+                + Http2Preface.ToUpperInvariant() + StreamOneWindowUpdates.ToUpperInvariant() + SettingsAcknowledgement + Stream1ClosedReset + UpgradedStreamSettings
                 + "00002D0105000000038286418B089D5C0B8170DC69E7DD6704022F611F0888BA34188A73DF59BF7A8825B650C3CB85E5C153032A2F2A"
                 + Stream3WindowUpdate + Stream3WindowUpdate
                 + ClosingGoAway,
             Convert.ToHexString(connection.Written));
         Assert.AreEqual(
             Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest.Replace("48717", "48973", StringComparison.Ordinal).Replace("GET / ", "GET /a ", StringComparison.Ordinal)))
-                + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + Stream1ClosedReset + UpgradedStreamSettings
+                + Http2Preface.ToUpperInvariant() + StreamOneWindowUpdates.ToUpperInvariant() + SettingsAcknowledgement + Stream1ClosedReset + UpgradedStreamSettings
                 + "00002D0105000000038286418B089D5C0B8170DC69E7DD6704022F611F0888BA34188A73DF59BF7A8825B650C3CB85E5C153032A2F2A"
                 + Stream3WindowUpdate + Stream3WindowUpdate
                 + ClosingGoAway,
@@ -314,14 +314,14 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Diff(
             "bytes written (hex)",
             Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest.Replace("48717", "48866", StringComparison.Ordinal).Replace("GET / ", "GET /a ", StringComparison.Ordinal)))
-                + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + UpgradedStreamSettings
+                + Http2Preface.ToUpperInvariant() + StreamOneWindowUpdates.ToUpperInvariant() + SettingsAcknowledgement + UpgradedStreamSettings
                 + "0000220105000000038286418B089D5C0B8170DC69E79C7304022F627A8825B650C3CB85E5C153032A2F2A"
                 + Stream3WindowUpdate + Stream3WindowUpdate
                 + ClosingGoAway,
             Convert.ToHexString(wire.Written));
         Assert.AreEqual(
             Convert.ToHexString(Encoding.Latin1.GetBytes(UpgradeRequest.Replace("48717", "48866", StringComparison.Ordinal).Replace("GET / ", "GET /a ", StringComparison.Ordinal)))
-                + Http2Preface.ToUpperInvariant() + SettingsAcknowledgement + UpgradedStreamSettings
+                + Http2Preface.ToUpperInvariant() + StreamOneWindowUpdates.ToUpperInvariant() + SettingsAcknowledgement + UpgradedStreamSettings
                 + "0000220105000000038286418B089D5C0B8170DC69E79C7304022F627A8825B650C3CB85E5C153032A2F2A"
                 + Stream3WindowUpdate + Stream3WindowUpdate
                 + ClosingGoAway,

@@ -45,6 +45,23 @@ public sealed class Http2SessionTests
     }
 
     [TestMethod]
+    public async Task StartUpgradedAsync_SendsTheTwoStream1WindowUpdatesRightAfterThePreface()
+    {
+        ScriptedConnection connection = new([], 65536);
+        Http2Session session = new(connection);
+        Http2StreamConnection stream = (Http2StreamConnection)session.CreateStream("http", 0, ignoresBody: false);
+        Diagnostics.Arrange("upgraded stream", "stream 1 opened by the h2c upgrade, settings not yet acknowledged");
+
+        await stream.StartUpgradedAsync(CancellationToken.None);
+
+        string written = Convert.ToHexString(connection.Written);
+        const string StreamOneWindowUpdate = "000004080000000001009F0001";
+        Diagnostics.Act("bytes written (hex)", written);
+        Diagnostics.Assert("ends with the two stream 1 WINDOW_UPDATEs, increment 10420225", true, written.EndsWith(StreamOneWindowUpdate + StreamOneWindowUpdate, StringComparison.Ordinal));
+        Assert.IsTrue(written.EndsWith(StreamOneWindowUpdate + StreamOneWindowUpdate, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ReadAsync_TwoStreamsWhoseResponsesInterleave_EachReadsItsOwn()
     {
         HpackEncoder server = new();
