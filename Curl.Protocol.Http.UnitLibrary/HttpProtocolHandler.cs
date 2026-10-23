@@ -69,8 +69,8 @@ namespace Curl.Protocol.Http;
 /// it, while its head and trailers are still written to the header output (BL-179 Notes).
 /// </para>
 /// <para>
-/// <see cref="HttpRequestOptions.Compressed" /> sends <c>Accept-Encoding: deflate, gzip, br, zstd</c>
-/// (ADR-0287) and, unless <see cref="HttpRequestOptions.Raw" /> is set, decodes the body as
+/// <see cref="HttpRequestOptions.Compressed" /> sends <c>Accept-Encoding</c> with
+/// <see cref="HttpRequestOptions.AcceptEncoding" />, <c>deflate, gzip, br, zstd</c> by default (ADR-0287, ADR-0777) and, unless <see cref="HttpRequestOptions.Raw" /> is set, decodes the body as
 /// its Content-Encoding says (<see cref="HttpContentDecoder" />, BL-177 Notes).
 /// </para>
 /// <para>

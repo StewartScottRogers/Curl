@@ -68,7 +68,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="FollowLocation.None" /> as <see cref="HttpRequestOptions.FollowRedirects" />;
     /// <see cref="EasyHttpOptions.MaxRedirects" /> verbatim; <see cref="EasyHttpOptions.HttpVersion" /> as
     /// <see cref="HttpRequestOptions.Version" />, as <see cref="HttpVersionMapping.ToHttpVersionPreference" />
-    /// maps it; a set <see cref="EasyHttpOptions.AcceptEncoding" /> as <see cref="HttpRequestOptions.Compressed" />;
+    /// maps it; a set <see cref="EasyHttpOptions.AcceptEncoding" /> as <see cref="HttpRequestOptions.Compressed" />
+    /// and, when not empty, exactly as given as <see cref="HttpRequestOptions.AcceptEncoding" /> (ADR-0777);
     /// both decodings off (<c>--raw</c>) as <see cref="HttpRequestOptions.Raw" />;
     /// <see cref="EasyHttpOptions.TransferEncoding" />, <see cref="EasyHttpOptions.IgnoreContentLength" /> and
     /// <see cref="EasyHttpOptions.Http09Allowed" /> verbatim; and <see cref="EasyHttpOptions.Expect100Timeout" /> as
@@ -122,6 +123,7 @@ internal static class HttpRequestOptionsMapping
             HttpSignature = HttpSignatureSetup.Of(authentication).Settings,
             Version = HttpVersionMapping.ToHttpVersionPreference(http.HttpVersion),
             Compressed = http.AcceptEncoding is not null,
+            AcceptEncoding = http.AcceptEncoding is { Length: > 0 } given ? given : HttpRequestOptions.DefaultAcceptEncoding,
             TransferEncoding = http.TransferEncoding,
             Raw = !http.HttpContentDecoding && !http.HttpTransferDecoding,
             IgnoreContentLength = http.IgnoreContentLength,

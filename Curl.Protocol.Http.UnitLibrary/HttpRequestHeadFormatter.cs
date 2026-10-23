@@ -50,7 +50,7 @@ internal static class HttpRequestHeadFormatter
     /// The <c>Accept-Encoding</c> value <c>--compressed</c> sends: curl 8.21.0's, the same
     /// four tokens on the Schannel and OpenSSL builds (measured, BL-861 Notes; ADR-0287).
     /// </summary>
-    internal const string AcceptEncoding = "deflate, gzip, br, zstd";
+    internal const string AcceptEncoding = HttpRequestOptions.DefaultAcceptEncoding;
 
     private const string HostName = "Host";
 
@@ -247,7 +247,7 @@ internal static class HttpRequestHeadFormatter
         AppendUnlessOverridden(head, customHeaders, "User-Agent", HeadText(options.UserAgent, options) ?? DefaultUserAgent);
         AppendUnlessOverridden(head, customHeaders, "Accept", "*/*");
         AppendUnlessOverridden(head, customHeaders, "TE", options.TransferEncoding ? "gzip" : null);
-        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? AcceptEncoding : null);
+        AppendUnlessOverridden(head, customHeaders, "Accept-Encoding", options.Compressed ? options.AcceptEncoding : null);
         AppendUnlessOverridden(head, customHeaders, "Referer", HeadText(options.Referer, options));
     }
 

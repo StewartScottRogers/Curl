@@ -205,6 +205,19 @@ public sealed record HttpRequestOptions
     public bool Compressed { get; init; }
 
     /// <summary>
+    /// The <c>Accept-Encoding</c> value curl 8.22.0 sends for an empty <c>CURLOPT_ACCEPT_ENCODING</c> and
+    /// <c>--compressed</c>: every encoding it decodes, the same four on the Schannel and OpenSSL builds (ADR-0287).
+    /// </summary>
+    public const string DefaultAcceptEncoding = "deflate, gzip, br, zstd";
+
+    /// <summary>
+    /// Gets the <c>Accept-Encoding</c> value sent when <see cref="Compressed" /> is set: the
+    /// <c>CURLOPT_ACCEPT_ENCODING</c> string exactly as given, or <see cref="DefaultAcceptEncoding" />
+    /// (the default) for an empty one (ADR-0777).
+    /// </summary>
+    public string AcceptEncoding { get; init; } = DefaultAcceptEncoding;
+
+    /// <summary>
     /// Gets a value indicating whether <c>--tr-encoding</c> was given: send <c>TE: gzip</c>
     /// and decode a compressed Transfer-Encoding.
     /// </summary>
