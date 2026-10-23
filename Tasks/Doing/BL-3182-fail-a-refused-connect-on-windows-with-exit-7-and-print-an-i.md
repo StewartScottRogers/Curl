@@ -31,3 +31,4 @@ Found by BL-3173 on 2026-10-22 (Windows). curl 8.22.0 (`C:\Program Files\Git\ucr
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: f19261e5 f8cd11fa 81018761.
