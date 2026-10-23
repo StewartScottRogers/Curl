@@ -1,5 +1,5 @@
 ---
-id: BL-3304
+id: BL-3308
 title: curl_multi_poll and curl_multi_wait return at once with the busy transfer's socket ready, as libcurl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3304 — curl_multi_poll and curl_multi_wait return at once with the busy transfer's socket ready, as libcurl 8.22.0 does
+# BL-3308 — curl_multi_poll and curl_multi_wait return at once with the busy transfer's socket ready, as libcurl 8.22.0 does
 
 ## Goal
 

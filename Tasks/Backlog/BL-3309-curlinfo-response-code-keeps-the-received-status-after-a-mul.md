@@ -1,5 +1,5 @@
 ---
-id: BL-3305
+id: BL-3309
 title: CURLINFO_RESPONSE_CODE keeps the received status after a multi transfer ends in CURLE_OPERATION_TIMEDOUT, as libcurl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3305 — CURLINFO_RESPONSE_CODE keeps the received status after a multi transfer ends in CURLE_OPERATION_TIMEDOUT, as libcurl 8.22.0 does
+# BL-3309 — CURLINFO_RESPONSE_CODE keeps the received status after a multi transfer ends in CURLE_OPERATION_TIMEDOUT, as libcurl 8.22.0 does
 
 ## Goal
 
