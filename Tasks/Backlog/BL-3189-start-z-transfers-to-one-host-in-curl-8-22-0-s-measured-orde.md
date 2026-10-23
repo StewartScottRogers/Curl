@@ -1,5 +1,5 @@
 ---
-id: BL-3181
+id: BL-3189
 title: Start -Z transfers to one host in curl 8.22.0's measured order, one after another
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3181 — Start -Z transfers to one host in curl 8.22.0's measured order, one after another
+# BL-3189 — Start -Z transfers to one host in curl 8.22.0's measured order, one after another
 
 ## Goal
 

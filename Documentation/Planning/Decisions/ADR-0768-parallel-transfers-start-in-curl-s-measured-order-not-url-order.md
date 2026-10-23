@@ -37,12 +37,12 @@ the two slots; when `/echo` ends its slot goes to `/utf8`, which starts ahead of
    (CLAUDE.md, "Decisions"), and a script that compares output with curl's must see the same order.
 2. The order is made deterministic: transfers released together start one after another in that
    order, each having sent its request before the next begins, rather than racing on the thread pool.
-3. The work is BL-3181's (filed by BL-3178, which ran out of time after measuring); `-Z` with
+3. The work is BL-3189's (filed by BL-3178, which ran out of time after measuring); `-Z` with
    `--parallel-max 1` already matches and stays as it is.
 
 ## Consequences
 
 - BL-3178's criteria asking for URL order are replaced by ones pinning the measured order.
 - A keep-alive server was not measured: the recorder's `-Script` mode hung for 30 minutes on the
-  attempt (BL-3178 Notes). BL-3181 measures it first; if curl reuses the first connection for one
+  attempt (BL-3178 Notes). BL-3189 measures it first; if curl reuses the first connection for one
   waiter, the rule is extended to say which.

@@ -4,7 +4,7 @@ title: Start --parallel transfers in URL order and pick up waiting ones in URL o
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3181]
+depends-on: [BL-3189]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs, Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs]
 requirement: none
 created: 2026-10-22
@@ -23,7 +23,7 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
 ## Acceptance criteria
 
 - [x] Notes record the start order and stdout order of curl 8.22.0 for the repro, `--parallel-max 1` and `--parallel-max 2`.
-- [ ] BL-3181 is Done: its tests pin curl 8.22.0's measured order (ADR-0768) for the repro, `--parallel-max 1` and `--parallel-max 2`, in place of the URL order this task first asked for.
+- [ ] BL-3189 is Done: its tests pin curl 8.22.0's measured order (ADR-0768) for the repro, `--parallel-max 1` and `--parallel-max 2`, in place of the URL order this task first asked for.
 - [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; existing `-Z` tests unchanged.
 
 ## Notes
@@ -39,13 +39,13 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
     curl's own three-URL order. Decided in ADR-0768 to match curl's measured order (the first waiter
     on the host starts behind the transfers starting with it) and make it deterministic.
   - A keep-alive measurement through the recorder's `-Script` mode hung for 30 minutes and was
-    stopped; BL-3181 measures it with its own server.
-  - Requeued: the implementation is filed as BL-3181 (too little time left after measuring for the
+    stopped; BL-3189 measures it with its own server.
+  - Requeued: the implementation is filed as BL-3189 (too little time left after measuring for the
     change plus a 30 to 45 minute quality run). The three criteria that asked for URL order contradicted
-    the measurement and were replaced, after the move to Backlog, by one: BL-3181 is Done.
+    the measurement and were replaced, after the move to Backlog, by one: BL-3189 is Done.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 184a969c 65c3687b c7498130 cc00745f 34f328d9.
-- 2026-10-22: Doing -> Backlog. Waits for BL-3181: curl 8.22.0 measured not to start -Z transfers in URL order (ADR-0768); the implementation of its measured order is BL-3181
+- 2026-10-22: Doing -> Backlog. Waits for BL-3189: curl 8.22.0 measured not to start -Z transfers in URL order (ADR-0768); the implementation of its measured order is BL-3189
