@@ -1,5 +1,7 @@
 # Libcurl
 
+Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
+
 The libcurl-faithful programming interface to Curl (ADR-0506): the libcurl C API shaped for C#.
 It is named `Libcurl`, without the `Curl.` prefix, to match upstream's library name; with
 `Curl.Api`, `Curl.Config`, `Curl.Console` and `Curl.Mcp` it is a naming exception. The root namespace is `Libcurl`, and each

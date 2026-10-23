@@ -1,5 +1,7 @@
 # Curl.Api
 
+Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
+
 The .NET programming interface to Curl (ADR-0506): an async client over curl's engine, with
 `HttpClient`-shaped ergonomics where they fit and curl's own options where they do not. It is
 BCL only and native-AOT safe, and every member that waits takes a `CancellationToken`.

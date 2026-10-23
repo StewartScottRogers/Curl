@@ -10,7 +10,7 @@
     <PackageId>Libcurl</PackageId>
     <Version>0.2.0</Version>
     <Authors>Stewart Scott Rogers</Authors>
-    <Description>Curl's libcurl-shaped interface in C#: easy, multi, share and URL handles over the managed curl engine.</Description>
+    <Description>Curl's libcurl-shaped interface in C#: easy, multi, share and URL handles over the managed curl engine. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>
     <PackageTags>curl; libcurl; http; easy; multi</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
