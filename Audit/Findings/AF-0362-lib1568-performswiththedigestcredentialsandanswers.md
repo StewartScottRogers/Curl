@@ -3,8 +3,8 @@ id: AF-0362
 title: Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode never checks the Digest method or the credentials
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode:name-lies
 reproduction: none
 task: BL-3228
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_0618.md
 ---
 # AF-0362 - Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode never checks the Digest method or the credentials
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the Select-String: Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode now asserts performed == $"lib1568 testuser:testpass {HttpAuthenticationMethods.Digest}" and the LoginDenied exit code (lines 264-265).
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.

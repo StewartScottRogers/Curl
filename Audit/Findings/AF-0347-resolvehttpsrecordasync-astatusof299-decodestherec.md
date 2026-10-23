@@ -3,8 +3,8 @@ id: AF-0347
 title: ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord checks only that a record is not null
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTests.cs:ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord:weak-assertion
 reproduction: none
 task: BL-3127
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_0618.md
 ---
 # AF-0347 - ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord checks only that a record is not null
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitTests/DohDnsResolverHttpsRecordTraceTest
 ## Re-audits
 
 - 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the Select-String reproduction: ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord now also asserts record.Priority == 1 and ApplicationProtocols == ["h2"] (lines 248-249).
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the Select-String: ResolveHttpsRecordAsync_AStatusOf299_DecodesTheRecord now asserts record.Priority == 1 and ApplicationProtocols == ["h2"] after the IsNotNull (lines 248-249).
 
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.

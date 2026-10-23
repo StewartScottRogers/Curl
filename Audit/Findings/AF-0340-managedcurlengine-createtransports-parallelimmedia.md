@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Re-audits
 
 - 2026-10-22 | 2026-10-22_1902.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: ManagedCurlEngine.cs:318:false (CreateTransports) resolved to line 319 in the same member, outcome survived. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: site ManagedCurlEngine.cs:318:false resolved to line 337 in CreateTransports. The code now reads 'const bool RunsParallel = false;', which feeds both Parallel: and ParallelImmediate:. Mutating it to true survived. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

@@ -3,8 +3,8 @@ id: AF-0346
 title: Lib1582_PerformsWithNegotiateAndAnswersItsCode never checks that Negotiate is asked for
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1582_PerformsWithNegotiateAndAnswersItsCode:name-lies
 reproduction: none
 task: BL-3126
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_0618.md
 ---
 # AF-0346 - Lib1582_PerformsWithNegotiateAndAnswersItsCode never checks that Negotiate is asked for
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs -Pa
 ## Re-audits
 
 - 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the Select-String reproduction: Lib1582_PerformsWithNegotiateAndAnswersItsCode now asserts Assert.AreEqual(HttpAuthenticationMethods.Negotiate, performed?.HttpAuthentication) at line 401.
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the Select-String: Lib1582_PerformsWithNegotiateAndAnswersItsCode now asserts Assert.AreEqual(HttpAuthenticationMethods.Negotiate, performed?.HttpAuthentication) at line 401.
 
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_0618.md: the reproduction no longer reproduces.
