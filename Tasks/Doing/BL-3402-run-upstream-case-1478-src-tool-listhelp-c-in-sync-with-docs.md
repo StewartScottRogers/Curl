@@ -32,3 +32,4 @@ Stewart (2026-10-23) wants every test passing. ADR-0747 (BL-2850) kept 1478 off 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 1763a5d6 787e6612 2bca2820 c5f8cef6.
