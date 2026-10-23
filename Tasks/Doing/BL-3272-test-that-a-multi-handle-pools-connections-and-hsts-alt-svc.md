@@ -34,3 +34,4 @@ Split from BL-3204. Depends on the per-handle caches of BL-3271. `CreateMulti` i
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f252a655 b303fca0 32145c1a 1fbe56e5.
