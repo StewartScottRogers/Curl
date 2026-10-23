@@ -21,7 +21,7 @@ internal static class ManagedCurlVersion
     // The Schannel reference build's Features: line.
     private static readonly string[] WindowsFeatures =
     [
-        "alt-svc", "AsynchDNS", "brotli", "HSTS", "HTTPS-proxy", "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile",
+        "alt-svc", "AsynchDNS", "brotli", "HSTS", "HTTP2", "HTTPS-proxy", "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile",
         "libz", "NTLM", "PSL", "SPNEGO", "SSL", "SSPI", "threadsafe", "UnixSockets", "zstd",
     ];
 

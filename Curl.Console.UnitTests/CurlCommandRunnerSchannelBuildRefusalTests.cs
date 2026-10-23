@@ -7,7 +7,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins the runner reading a command line as curl's Windows Schannel build does (ADR-0397, audit finding
-/// AF-0022): <c>--http2</c> and <c>--ssl-sessions</c> are refused with exit 2 and
+/// AF-0022): <c>--ssl-sessions</c> is refused with exit 2 and
 /// <c>the installed libcurl version does not support this</c>, even under <c>-s</c>, and nothing is
 /// connected - measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel on 2026-10-02 (BL-1278).
 /// </summary>
@@ -21,7 +21,6 @@ public sealed class CurlCommandRunnerSchannelBuildRefusalTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow("--http2")]
     [DataRow("--ssl-sessions|f.txt")]
     public async Task RunAsync_OptionTheWindowsBuildLacks_ExitsTwoWithoutConnecting(string option)
     {

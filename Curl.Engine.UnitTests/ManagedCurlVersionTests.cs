@@ -35,6 +35,19 @@ public sealed class ManagedCurlVersionTests
     }
 
     [TestMethod]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(false, false)]
+    public void For_EachPlatform_ListsHttp2RightAfterHsts(bool isWindows, bool isMacOS)
+    {
+        IReadOnlyList<string> features = ManagedCurlVersion.For(isWindows, isMacOS).Features;
+
+        int hsts = features.ToList().IndexOf("HSTS");
+        Assert.IsGreaterThanOrEqualTo(0, hsts);
+        Assert.AreEqual("HTTP2", features[hsts + 1]);
+    }
+
+    [TestMethod]
     public void For_TwoCalls_GiveTwoInstances()
     {
         Assert.AreNotSame(ManagedCurlVersion.For(true, false), ManagedCurlVersion.For(true, false));

@@ -272,10 +272,9 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
-    /// build's libcurl has no HTTP/2 or SSL session export, so <c>--http2</c>, <c>--http2-prior-knowledge</c>,
-    /// <c>--proxy-http2</c> and <c>--ssl-sessions</c> are refused with
+    /// build's libcurl has no SSL session export, so <c>--ssl-sessions</c> is refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
-    /// ADR-0397). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
+    /// ADR-0397). The HTTP/2 options run on Windows as elsewhere (ADR-0786). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
     /// </summary>
     public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
 

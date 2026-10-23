@@ -159,8 +159,8 @@ public sealed class CommandLineOption
 
     /// <summary>
     /// Wraps <paramref name="apply"/> so it refuses when <paramref name="refuses"/> says the build lacks the
-    /// feature. curl 8.21.0 checks the feature before it reads the toggle, so the <c>--no-</c> spelling is
-    /// refused too (<c>--no-proxy-http2</c>).
+    /// feature. curl 8.21.0 checks the feature before it reads the toggle, so the <c>--no-</c> spelling of a
+    /// negatable row is refused too (measured with <c>--no-proxy-http2</c> before ADR-0786 turned HTTP/2 on).
     /// </summary>
     private static CommandLineOptionApplier Refusing(Func<CommandLineOptions, bool> refuses, CommandLineOptionApplier apply) =>
         (options, value, spelledOption, pathExists, dataFileReader) => refuses(options)
