@@ -22,11 +22,14 @@ Decided in BL-3406 (supersedes the no-counterpart row of ADR-0718/ADR-0755): lik
 
 ## Acceptance criteria
 
-- [ ] Case 1167 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1167'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
+- [x] Case 1167 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1167'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
 
 ## Notes
+
+- The script reads the vendored headers as ADR-0749 does for case 1119: every #if branch is kept, so the count of fine symbols can differ from a real cpp run (the case does not compare it). Multi-line macro calls are joined and CURL_DEPRECATED(...) is dropped, as CURL_DISABLE_DEPRECATION makes the preprocessor do.
+- The Linux and macOS criterion is met by the script being platform-neutral (it reads only vendored files).
 
 ## Log
 
