@@ -1,5 +1,5 @@
 ---
-id: BL-3264
+id: BL-3268
 title: List http/2 and h2c as upstream platform features on Windows now that --http2 runs there
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3264 — List http/2 and h2c as upstream platform features on Windows now that --http2 runs there
+# BL-3268 — List http/2 and h2c as upstream platform features on Windows now that --http2 runs there
 
 ## Goal
 

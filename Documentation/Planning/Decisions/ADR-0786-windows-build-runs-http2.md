@@ -31,4 +31,4 @@ Stewart decided to turn HTTP/2 on for Windows:
   accepted that in exchange for HTTP/2 on Windows.
 - `--ai-help` no longer carries the Windows refusal line for the three options; it follows the option
   table's `RefusedBySchannelBuild` rows.
-- The upstream case runner still reports `http/2` and `h2c` off Windows; BL-3264 turns them on.
+- The upstream case runner still reports `http/2` and `h2c` off Windows; BL-3268 turns them on.

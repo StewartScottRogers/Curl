@@ -1,5 +1,5 @@
 ---
-id: BL-3265
+id: BL-3269
 title: Send stream 1's two WINDOW_UPDATE frames after an h2c upgrade as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3265 — Send stream 1's two WINDOW_UPDATE frames after an h2c upgrade as curl does
+# BL-3269 — Send stream 1's two WINDOW_UPDATE frames after an h2c upgrade as curl does
 
 ## Goal
 
