@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3367 — Fix AF-0390: BL-3237 cost $4.08 (3.8x the median): a 71-turn Opus feature run plus two rebase-conflict resolve runs
 
@@ -41,12 +41,17 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (from the lane trace, DarkFactory-20261023-035126-L1.log): $3.64 of the $4.08 is the main Opus feature-pipeline run (71 turns, 29.7 min) on a task that replays Libcurl easy-handle cases in the differential run; feature runs on opus are the factory model rule, so that is the task's size, not waste. The two failed test turns (a grep path and one disallowed `cd` Bash command) each cost one retry turn. The two resolve runs ($0.31 and $0.44) were concurrent-lane rebase conflicts; the 19221 and 20742 fast-suite lines are the harness's own post-rebase verification (DarkFactory/Integrate.ps1), not resolver choice, and that check is required.
+- Verdict: unavoidable, no code fix. 3.8x the median is one large feature task plus two conflicts; nothing in RunDarkFactory.ps1 to change.
+- Build and fast tests: no code changed in this run; the previous commit on this branch was green (the shift verifies integration).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-23: Doing -> Done. AF-0390 cause named: one large Opus feature run plus two concurrent-lane rebase resolves, unavoidable, no fix needed
