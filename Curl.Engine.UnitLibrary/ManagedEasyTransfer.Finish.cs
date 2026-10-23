@@ -9,6 +9,7 @@ using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -175,6 +176,7 @@ internal sealed partial class ManagedEasyTransfer
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
+        info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl) };
         return toolState is null
             ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
@@ -190,6 +192,34 @@ internal sealed partial class ManagedEasyTransfer
     /// <returns>The response code.</returns>
     private long ResponseCodeOf(TransferInfo info, TransferResult result) =>
         result.Report is null ? Info.ResponseCode : info.ResponseCode;
+
+    /// <summary>
+    /// The <c>CURLINFO_NUM_CONNECTS</c> of a performed transfer: the report's, else 1 where libcurl 8.22.0 counts a
+    /// connection the report does not (BL-3316): a <c>tftp</c> transfer (its socket is the connection), a transfer under
+    /// <c>CURLOPT_FRESH_CONNECT</c> or <c>CURLOPT_FORBID_REUSE</c> that succeeded (libcurl always opens a new connection
+    /// for it; this engine does not yet, see BL-3316 Notes), and one a watchdog cut off after the response head came, as the
+    /// low-speed timeout does.
+    /// </summary>
+    /// <param name="info">The info with the report's count.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="requestUrl">The URL transferred.</param>
+    /// <returns>The number of connections.</returns>
+    internal static long NumConnectsOf(TransferInfo info, TransferResult result, EasyOptions options, string requestUrl)
+    {
+        if (info.NumConnects > 0)
+        {
+            return info.NumConnects;
+        }
+
+        return ForcesNewConnection(options.Network, result) || CutOffAfterHead(info, result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+    }
+
+    private static bool ForcesNewConnection(EasyNetworkOptions network, TransferResult result) =>
+        (network.FreshConnect || network.ForbidReuse) && result.ExitCode == CurlExitCode.Ok;
+
+    private static bool CutOffAfterHead(TransferInfo info, TransferResult result) =>
+        result.Report is null && result.ExitCode != CurlExitCode.Ok && info.ResponseCode > 0;
 
     /// <summary>
     /// The <c>CURLINFO_PRIMARY_PORT</c> of a performed transfer: -1 for a failed one that reached no peer, as libcurl
