@@ -33,3 +33,4 @@ Part of BL-3193. `CURLINFO_REFERER` is null even after `CURLOPT_REFERER` is set.
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e0ce4d5d 0abf45e2 3639a5e6.
