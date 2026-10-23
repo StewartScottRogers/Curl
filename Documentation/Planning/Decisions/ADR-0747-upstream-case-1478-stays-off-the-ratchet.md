@@ -1,6 +1,6 @@
 # ADR-0747 — Upstream case 1478 stays off the ratchet: it checks upstream's C source against upstream's docs
 
-- Status: Accepted
+- Status: Superseded by BL-3402 (the harness's `managen` interpretation carries out `listhelp`, so case 1478 is on the ratchet). Decided by Claude under Stewart's delegation: the interpretation can reproduce `listhelp` from the vendored docs, which makes 1478 a faithful check that upstream's docs and committed C file agree.
 - Date: 2026-10-21
 - Task: BL-2850
 - Decided by Claude under Stewart's delegation.
@@ -25,7 +25,7 @@ Curl has no `tool_listhelp.c`; its counterpart is `CurlHelpTable` in `Curl.Cli.U
 
 ## Decision
 
-- Case 1478 is not ported and stays off `PassingUpstreamCases.txt`. The harness registers a
+- (Superseded: 1478 is now on `PassingUpstreamCases.txt`.) Case 1478 was not ported and stayed off it. The harness registers a
   `managen` script (`UpstreamPerlCommandScripts.Managen.cs`), so it no longer skips 1478 as an
   unrun perl command; that script carries out only `mainpage` and `ascii`, not `listhelp`, so
   1478 does not pass and is left off the ratchet.
@@ -41,7 +41,7 @@ Curl has no `tool_listhelp.c`; its counterpart is `CurlHelpTable` in `Curl.Cli.U
 
 ## Consequences
 
-- The gap office's behaviour area keeps 1478 `excluded`, now for this reason
+- (Superseded by BL-3402.) The gap office's behaviour area kept 1478 `excluded`, for this reason
   (upstream-source-check: it compares two upstream files).
 - If upstream's `--help` text changes in a new targeted version, `CurlHelpTextTests` fails
   once the reference output is re-recorded, which is the signal 1478 gives upstream.

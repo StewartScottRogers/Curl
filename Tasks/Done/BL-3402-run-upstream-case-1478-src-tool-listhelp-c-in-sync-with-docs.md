@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Managen.cs, Curl.Conformance.UnitLibrary/UpstreamManagenScript.cs, Curl.Conformance.UnitTests/UpstreamManagenScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Documentation/Planning/Decisions/ADR-0747-upstream-case-1478-stays-off-the-ratchet.md]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3402 — Run upstream case 1478 (src/tool_listhelp.c in sync with docs/cmdline-opts) by giving the managen interpretation a listhelp mode
 
@@ -22,14 +22,18 @@ Stewart (2026-10-23) wants every test passing. ADR-0747 (BL-2850) kept 1478 off 
 
 ## Acceptance criteria
 
-- [ ] `UpstreamManagenScript` handles the `listhelp` argument and prints bytes equal to the vendored `src/tool_listhelp.c` for the vendored `docs/cmdline-opts/*.md`, with focused tests in `UpstreamManagenScriptTests` (one row per header field kind and one for the sort order), and 100% line and branch coverage kept on `Curl.Conformance.UnitLibrary`.
-- [ ] Case 1478 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1478'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] ADR-0747 gets a "Superseded by" note naming this task's decision and the reason (the interpretation can reproduce `listhelp` from the vendored docs), and its Consequences no longer say 1478 is excluded.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `UpstreamManagenScript` handles the `listhelp` argument and prints bytes equal to the vendored `src/tool_listhelp.c` for the vendored `docs/cmdline-opts/*.md`, with focused tests in `UpstreamManagenScriptTests` (one row per header field kind and one for the sort order), and 100% line and branch coverage kept on `Curl.Conformance.UnitLibrary`.
+- [x] Case 1478 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1478'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] ADR-0747 gets a "Superseded by" note naming this task's decision and the reason (the interpretation can reproduce `listhelp` from the vendored docs), and its Consequences no longer say 1478 is excluded.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- `listhelp` lives in `UpstreamManagenScript`: it expands `*.md` itself (the harness does not glob), sorts by Long, wraps categories at 79 columns, and wraps the httpsig-* and ipfs-gateway entries in `#ifndef CURL_DISABLE_*` (a fixed table, measured against the vendored C file).
+- Measure-CodeQuality.ps1 for Curl.Conformance.UnitLibrary: 0 failing members. Conformance fast tests green (4072 passed). Any other office's own exclusion list for 1478 is outside this task's touches.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 1763a5d6 787e6612 2bca2820 c5f8cef6.
+- 2026-10-23: Doing -> Done. managen listhelp mode runs case 1478 and it is on the ratchet
