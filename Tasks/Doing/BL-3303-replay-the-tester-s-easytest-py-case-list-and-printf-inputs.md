@@ -36,3 +36,4 @@ BL-3237 built the easy-handle runner (Curl.Conformance.Differential.UnitLibrary/
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: a81919c1 ebc469ce 0ac4089b.
 - 2026-10-23: Doing -> Backlog. Split for size into BL-3310 (easytest.py case list) and BL-3311 (printf replay); waits on both
+- 2026-10-23: Backlog -> Doing. Criteria at claim: a81919c1 ebc469ce 0ac4089b.
