@@ -42,8 +42,8 @@ internal static partial class EngineComposition
     {
         bool waitsForMultiplexing = WaitsForMultiplexing(tool);
         return runConnections is null
-            ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime }
-            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), ConnectToMappingsOf(network, featureMask)) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime };
+            ? new PoolingConnector(connector, timeProvider) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime, FreshConnect = network.FreshConnect, ForbidReuse = network.ForbidReuse }
+            : new PoolingConnector(connector, runConnections, OptionGroupConnectionSettings.Of(tool, network, tls, http, proxy), ConnectToMappingsOf(network, featureMask)) { WaitsForMultiplexing = waitsForMultiplexing, MaximumConnectionLifetime = network.MaxConnectionLifetime, FreshConnect = network.FreshConnect, ForbidReuse = network.ForbidReuse };
     }
 
     /// <summary>
