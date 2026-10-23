@@ -479,7 +479,8 @@ public sealed class HttpProtocolHandler(
     /// transfer's earlier hop picked (BL-1819).
     /// </summary>
     private static HttpAuthSchemes AuthSchemePickedBy(HttpRequestPlan plan) =>
-        plan.AuthorizationAnswersChallenge && SchemeOfAuthorization(plan.Authorization) is var scheme && scheme != HttpAuthSchemes.None
+        SchemeOfAuthorization(plan.Authorization) is var scheme && scheme != HttpAuthSchemes.None
+        && (plan.AuthorizationAnswersChallenge || scheme == HttpAuthSchemes.Basic)
             ? scheme
             : plan.Options.AuthSchemePicked;
 
