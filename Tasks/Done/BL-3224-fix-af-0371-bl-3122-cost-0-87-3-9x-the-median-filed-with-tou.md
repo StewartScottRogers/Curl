@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-22
 ---
 # BL-3224 — Fix AF-0371: BL-3122 cost $0.87 (3.9x the median): filed with touches naming only Curl.Networking.UnitLibrary, requeued behind BL-3127, then rerun on Opus
 
@@ -41,12 +41,17 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: BL-3122 was filed with `touches` naming only Curl.Networking.UnitLibrary; its test-only fix needed Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs, which BL-3127 held, so run 1 (8 turns, $0.296) widened touches and requeued, and run 2 (21 turns, $0.574) did the work. Two claims doubled the cost; the 10-minute push wait cost time, not dollars.
+- Run 2 ran on Opus because the factory's model rule picks opus when the task names HTTP/3; the rule is deliberate and keys on the task text, not on whether the change is test-only. Choosing sonnet would be a guess that risks a retried run costing more.
+- Unavoidable, no fix: the requeue was the correct response to a real file overlap found only by reading code (lane rules 3 and 4), a one-off for a Low task at $0.87 against a $0.662 bar. The refused Bash command and by-hand mutant check were small. No change to RunDarkFactory.ps1 is warranted.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. AF-0371 cost cause recorded as unavoidable (touches overlap requeue, Opus by HTTP/3 rule)
