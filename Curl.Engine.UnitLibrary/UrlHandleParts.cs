@@ -11,7 +11,7 @@ internal sealed record UrlHandleParts
     /// <summary>A new handle's parts: none set (<c>curl_url</c>).</summary>
     public static readonly UrlHandleParts Empty = new();
 
-    /// <summary>Gets the scheme in lower case, or <see langword="null" />.</summary>
+    /// <summary>Gets the scheme, in lower case when parsed and in the case given when set, or <see langword="null" />.</summary>
     public string? Scheme { get; init; }
 
     /// <summary>Gets a value indicating whether the scheme was guessed from the host (<c>CURLU_GUESS_SCHEME</c>).</summary>
@@ -44,6 +44,12 @@ internal sealed record UrlHandleParts
     /// <summary>Gets the fragment without its <c>#</c>: empty for a bare <c>#</c>, <see langword="null" /> with none.</summary>
     public string? Fragment { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether an empty <see cref="Fragment" /> was set rather than parsed: upstream
+    /// shows a set empty fragment as a bare <c>#</c> without <c>CURLU_GET_EMPTY</c> (BL-3197).
+    /// </summary>
+    public bool EmptyFragmentSet { get; init; }
+
     /// <summary>The parts of a URL <see cref="CurlUrl" /> parsed.</summary>
     /// <param name="url">The parsed URL.</param>
     /// <returns>Its parts; the scheme counts as guessed when the text does not start with it.</returns>
@@ -66,10 +72,10 @@ internal sealed record UrlHandleParts
     /// The default port of <paramref name="scheme" /> as Curl's URL parser knows it, or
     /// <see langword="null" /> for a scheme with none (<c>file</c>, or one curl does not know).
     /// </summary>
-    /// <param name="scheme">The scheme, in lower case.</param>
+    /// <param name="scheme">The scheme, in any case.</param>
     /// <returns>The port, or <see langword="null" />.</returns>
     public static int? DefaultPortOf(string scheme) =>
-        CurlUrl.TryParse(scheme + "://localhost/", pathAsIs: true, out CurlUrl? probe) && probe.Port >= 0
+        CurlUrl.TryParse(scheme.ToLowerInvariant() + "://localhost/", pathAsIs: true, out CurlUrl? probe) && probe.Port >= 0
             ? probe.Port
             : null;
 
@@ -77,9 +83,9 @@ internal sealed record UrlHandleParts
     /// Whether libcurl supports <paramref name="scheme" />: <c>file</c> or one with a default port in
     /// Curl's URL parser, as <c>Curl_get_scheme_handler</c> finds one.
     /// </summary>
-    /// <param name="scheme">The scheme, in lower case.</param>
+    /// <param name="scheme">The scheme, in any case.</param>
     /// <returns><see langword="true" /> when the scheme is supported.</returns>
-    public static bool IsSupportedScheme(string scheme) => scheme == "file" || DefaultPortOf(scheme) is not null;
+    public static bool IsSupportedScheme(string scheme) => string.Equals(scheme, "file", StringComparison.OrdinalIgnoreCase) || DefaultPortOf(scheme) is not null;
 
     /// <summary>
     /// These parts with every <c>%20</c> outside the host turned back into the space it stood for, as a
