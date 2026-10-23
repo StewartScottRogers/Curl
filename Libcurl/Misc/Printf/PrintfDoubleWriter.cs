@@ -59,10 +59,11 @@ internal static class PrintfDoubleWriter
         return Math.Max(precision > maxPrecision ? maxPrecision - 1 : precision, 0);
     }
 
+    // Infinity divided by ten stays infinity, so a value that is not finite has no integer digits to count.
     private static int CountTenfolds(double number)
     {
         int count = 0;
-        for (double value = number; value >= 10.0; value /= 10)
+        for (double value = double.IsFinite(number) ? number : 0; value >= 10.0; value /= 10)
         {
             count++;
         }
