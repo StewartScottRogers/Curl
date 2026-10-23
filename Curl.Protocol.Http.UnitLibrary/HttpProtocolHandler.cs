@@ -484,6 +484,16 @@ public sealed class HttpProtocolHandler(
             : plan.Options.AuthSchemePicked;
 
     /// <summary>
+    /// Gives every scheme <paramref name="head" />'s <paramref name="headerName" /> challenges
+    /// offer when its status is <paramref name="statusCode" />, the only status libcurl reads
+    /// them on; <see cref="HttpAuthSchemes.None" /> for any other status.
+    /// </summary>
+    private static HttpAuthSchemes SchemesChallengedBy(HttpResponseHead head, int statusCode, string headerName) =>
+        head.StatusLine.StatusCode == statusCode
+            ? ValuesOf(head, headerName).Aggregate(HttpAuthSchemes.None, (schemes, challenge) => schemes | SchemeOfAuthorization(challenge))
+            : HttpAuthSchemes.None;
+
+    /// <summary>
     /// Gives the scheme an <c>Authorization</c> value starts with, or
     /// <see cref="HttpAuthSchemes.None" /> for none or one this handler does not pick.
     /// </summary>
@@ -1321,6 +1331,9 @@ public sealed class HttpProtocolHandler(
             ThrowIfClosedBeforeContentLength(plan, actedOn, headReader);
             headReader.ReportHeaderHeldAtClose();
             ReportNoEndOfMessageIndicator(plan, actedOn, headReader);
+            plan.RecordSchemesOffered(actedOn);
+            exchange.AuthSchemesOffered = plan.AuthSchemesOffered;
+            exchange.ProxyAuthSchemesOffered = plan.ProxyAuthSchemesOffered;
             retry = await RetryOfAsync(plan, actedOn, bodyLeftUnsent, upload, cancellationToken).ConfigureAwait(false);
             headReader.ReleaseDeferredHeaders();
             ReportNtlmConnectionClosure(plan, actedOn);
@@ -2560,12 +2573,14 @@ public sealed class HttpProtocolHandler(
         EndUnchallengedAuthorizations(plan, head.StatusLine.StatusCode);
         if (await RetryProxyAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } proxyAuthorization)
         {
+            ThrowIfRedirectLimitReached(plan);
             RewindForResend(plan, upload);
             return plan.WithProxyAuthorization(proxyAuthorization, RepeatAuthorization(plan)).DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
         }
 
         if (await RetryWithAuthorizationAsync(plan, head, cancellationToken).ConfigureAwait(false) is { } authorized)
         {
+            ThrowIfRedirectLimitReached(plan);
             RewindForResend(plan, upload);
             return authorized.DowngradedAfter(head).FailingUploadRewind(upload.RewindFailure);
         }
@@ -3211,6 +3226,18 @@ public sealed class HttpProtocolHandler(
         internal HttpAuthSchemes ProxyAuthSchemePicked { get; init; }
 
         /// <summary>
+        /// Gets or sets every scheme a 401 offered during the transfer up to this exchange's
+        /// response, the report's <see cref="TransferReport.AuthSchemesOffered" /> (BL-3256).
+        /// </summary>
+        internal HttpAuthSchemes AuthSchemesOffered { get; set; }
+
+        /// <summary>
+        /// Gets or sets every scheme a 407 offered during the transfer up to this exchange's
+        /// response, the report's <see cref="TransferReport.ProxyAuthSchemesOffered" /> (BL-3256).
+        /// </summary>
+        internal HttpAuthSchemes ProxyAuthSchemesOffered { get; set; }
+
+        /// <summary>
         /// Gets the Digest value the exchange's request was sent with, the report's
         /// <see cref="TransferReport.DigestAuthorizationSent" /> (BL-2252).
         /// </summary>
@@ -3268,6 +3295,8 @@ public sealed class HttpProtocolHandler(
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
                 ProxyAuthSchemePicked = ProxyAuthSchemePicked,
+                AuthSchemesOffered = AuthSchemesOffered,
+                ProxyAuthSchemesOffered = ProxyAuthSchemesOffered,
                 DigestAuthorizationSent = DigestAuthorizationSent,
                 ProxyConnectResponseCode = connect.ProxyConnectResponseCode,
                 UsedProxy = UsedProxy,
@@ -3425,7 +3454,8 @@ public sealed class HttpProtocolHandler(
         /// <summary>
         /// Gets how many redirects the transfer has followed before this request: the chain's
         /// count (<see cref="HttpRequestOptions.RedirectsFollowed" />) and one for each resend
-        /// after a 417, as curl 8.21.0 counts them (BL-396 Notes).
+        /// after a 417 or in answer to a 401's or 407's challenge, as curl 8.21.0 and 8.22.0 count
+        /// them (BL-396 and BL-3256 Notes).
         /// </summary>
         public int RedirectsFollowed { get; init; }
 
@@ -3465,6 +3495,31 @@ public sealed class HttpProtocolHandler(
         }
 
         /// <summary>
+        /// Gets every scheme a 401's <c>WWW-Authenticate</c> challenges offered during the
+        /// transfer, up to and including this request's response (<see cref="RecordSchemesOffered" />).
+        /// </summary>
+        public HttpAuthSchemes AuthSchemesOffered { get; private set; }
+
+        /// <summary>
+        /// Gets every scheme a 407's <c>Proxy-Authenticate</c> challenges offered during the
+        /// transfer, up to and including this request's response (<see cref="RecordSchemesOffered" />).
+        /// </summary>
+        public HttpAuthSchemes ProxyAuthSchemesOffered { get; private set; }
+
+        /// <summary>
+        /// Adds the schemes <paramref name="head" /> offers to <see cref="AuthSchemesOffered" /> and
+        /// <see cref="ProxyAuthSchemesOffered" />, which every retry made from this plan carries, as
+        /// libcurl 8.22.0's <c>Curl_http_input_auth</c> ORs each 401 and 407 challenge into
+        /// <c>httpauthavail</c> and <c>proxyauthavail</c> (BL-3256).
+        /// </summary>
+        /// <param name="head">The response the request drew.</param>
+        public void RecordSchemesOffered(HttpResponseHead head)
+        {
+            AuthSchemesOffered |= SchemesChallengedBy(head, 401, "WWW-Authenticate");
+            ProxyAuthSchemesOffered |= SchemesChallengedBy(head, 407, "Proxy-Authenticate");
+        }
+
+        /// <summary>
         /// Gets the <c>-v</c> lines the authenticator reported while it made
         /// <see cref="Authorization" />, written just before the request each time it is sent:
         /// those of the value made before any challenge (BL-843), or of a value answering a
@@ -3489,7 +3544,7 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptProxyAuthorization">The <c>Proxy-Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithAuthorization(string authorization, IReadOnlyList<string> infoLines, string? keptProxyAuthorization) =>
-            WithAnswer(authorization, SentOnFreshConnection, RedirectsFollowed, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
+            WithAnswer(authorization, SentOnFreshConnection, RedirectsFollowed + 1, authorizationAnswersChallenge: true, keptProxyAuthorization, ProxyAuthorizationAnswersChallenge, infoLines);
 
         /// <summary>
         /// Gets the framing the probe (<see cref="HttpRequestFraming.AsAuthProbe" />) held back, sent
@@ -3540,7 +3595,7 @@ public sealed class HttpProtocolHandler(
         /// <param name="keptAuthorization">The <c>Authorization</c> value the retry keeps, as sent again (BL-869).</param>
         /// <returns>The retry's plan.</returns>
         public HttpRequestPlan WithProxyAuthorization(string proxyAuthorization, string? keptAuthorization) =>
-            WithAnswer(keptAuthorization, SentOnFreshConnection, RedirectsFollowed, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
+            WithAnswer(keptAuthorization, SentOnFreshConnection, RedirectsFollowed + 1, AuthorizationAnswersChallenge, proxyAuthorization, proxyAuthorizationAnswersChallenge: true);
 
         /// <summary>
         /// Makes the same request without curl's own <c>Expect</c> and without the wait for
@@ -3695,6 +3750,8 @@ public sealed class HttpProtocolHandler(
                 AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
                 HoldsDigestNonce = HoldsDigestNonce,
+                AuthSchemesOffered = AuthSchemesOffered,
+                ProxyAuthSchemesOffered = ProxyAuthSchemesOffered,
             };
     }
 

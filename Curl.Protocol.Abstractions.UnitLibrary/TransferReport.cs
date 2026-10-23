@@ -89,7 +89,8 @@ public sealed record TransferReport
 
     /// <summary>
     /// Gets the number of redirects followed, set by the redirect follower, the source of
-    /// <c>%{num_redirects}</c>; <c>0</c> from a handler.
+    /// <c>%{num_redirects}</c>; from the HTTP handler, the resends it made itself, after a 417 or
+    /// in answer to an authentication challenge (BL-396, BL-3256).
     /// </summary>
     public int RedirectCount { get; init; }
 
@@ -235,6 +236,22 @@ public sealed record TransferReport
     /// proxy challenge was answered, or for a transfer that is not HTTP.
     /// </summary>
     public HttpAuthSchemes ProxyAuthSchemePicked { get; init; }
+
+    /// <summary>
+    /// Gets every HTTP authentication scheme a server offered in a 401's <c>WWW-Authenticate</c>
+    /// challenges during the transfer, across its own authentication retries, as libcurl ORs each
+    /// challenge into <c>data->info.httpauthavail</c> (BL-3256); <see cref="HttpAuthSchemes.None" />
+    /// when no server offered one, or for a transfer that is not HTTP.
+    /// </summary>
+    public HttpAuthSchemes AuthSchemesOffered { get; init; }
+
+    /// <summary>
+    /// Gets every HTTP authentication scheme a forward proxy offered in a 407's
+    /// <c>Proxy-Authenticate</c> challenges during the transfer, across its own authentication
+    /// retries, as libcurl ORs each challenge into <c>data->info.proxyauthavail</c> (BL-3256);
+    /// <see cref="HttpAuthSchemes.None" /> when no proxy offered one, or for a transfer that is not HTTP.
+    /// </summary>
+    public HttpAuthSchemes ProxyAuthSchemesOffered { get; init; }
 
     /// <summary>
     /// Gets the RTSP session ID the server's first <c>Session</c> header gave, the source of
