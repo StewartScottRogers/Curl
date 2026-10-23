@@ -4,8 +4,8 @@ title: Accept --http2, --http2-prior-knowledge and --proxy-http2 on Windows and 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Libcurl/Misc/Version/CurlVersionFeatures.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-3209]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Libcurl/Misc/Version/CurlVersionFeatures.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Documentation/Planning/Decisions/README.md, Curl.Cli.UnitTests/CommandLineSchannelBuildRefusalTests.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Console.UnitTests/CurlCommandRunnerSchannelBuildRefusalTests.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs, Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs]
 requirement: none
 created: 2026-10-22
 completed:
@@ -32,7 +32,12 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Notes
 
+- 2026-10-22 (lane 7, first pass, no code edited): the conformance criterion cannot be met yet. `Record-CurlExchange.ps1` has an HTTP/2 proxy (`-Http2`) but no HTTP/2 origin, and no nghttp2-built curl 8.22.0 is on the machine (`/ucrt64/bin/curl` is 8.22.0 Schannel without nghttp2; WinGet's and WSL Ubuntu's curl are 8.18.0 with nghttp2). Filed BL-3209 for the recorder's HTTP/2 origin and the recordings; requeued behind it.
+- Plan for the next claim: drop `.RefusedBySchannelBuild()` from the `http2`, `http2-prior-knowledge` and `proxy-http2` rows in `CommandLineOptionTable.cs` (keep it on `ssl-sessions`); fix the doc comments in `CommandLineOption.cs`/`CommandLineOptions.cs` that name HTTP/2; add `HTTP2` after `HSTS` to `CurlVersionText.WindowsFeaturesLine` and `ManagedCurlVersion.WindowsFeatures` (`Libcurl/Misc/Version/CurlVersion.cs` already maps the name to `CurlVersionFeatures.Http2`, so `CurlVersionFeatures.cs` likely needs no change); `--ai-help` follows the row's `RefusedByWindowsSchannelBuild` automatically. Keep the Windows version line without `nghttp2/…` text, as the task says (System32's line has none).
+- Touches widened (no Doing task on origin/work/dark-factory names any of them): the existing tests that pin the Windows refusal and the Windows features line (`CommandLineSchannelBuildRefusalTests.cs`, `CurlVersionTextTests.cs`, `CurlCommandRunnerSchannelBuildRefusalTests.cs`, `ManagedCurlVersionTests.cs`, `Libcurl.UnitTests/.../CurlVersionTests.cs`), `CurlAiHelpText.cs` (its Schannel refusal line), and `Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs`, whose remarks say `http/2` and `h2c` are off on Windows (BL-2230): decide there whether to turn them on (it changes which upstream cases run on Windows) or file that as follow-up.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 6c603fd4 6eb56f1e 7ce332a1 5b6db80a 3639a5e6.
+- 2026-10-22: Doing -> Backlog. Waits on BL-3209: Record-CurlExchange.ps1 has no HTTP/2 origin and no nghttp2-built curl 8.22.0 is recorded, so the conformance criterion cannot be checked
