@@ -1,3 +1,6 @@
+using Curl.Api.Codes;
+using Curl.Api.EngineContracts.Url;
+
 namespace Curl.Engine.UnitTests;
 
 [TestClass]
@@ -33,6 +36,18 @@ public sealed class UrlPartTextTests
         string encoded = UrlPartText.UrlEncodeString("a b?c d", relative: true, (UrlEncodeQuery)query);
 
         Assert.AreEqual(expected, encoded);
+    }
+
+    [TestMethod]
+    [DataRow("a%g4b", "a%g4b")]
+    [DataRow("a%4", "a%4")]
+    [DataRow("a%", "a%")]
+    [DataRow("a%41b", "aAb")]
+    public void Transform_UrlDecode_LeavesAMalformedPercentEscapeAsItIs(string text, string expected)
+    {
+        UrlPartResult result = UrlPartText.Transform(text, CurlUrlFlags.UrlDecode, CurlUrlPart.Path);
+
+        Assert.AreEqual(UrlPartResult.Found(expected), result);
     }
 
     [TestMethod]

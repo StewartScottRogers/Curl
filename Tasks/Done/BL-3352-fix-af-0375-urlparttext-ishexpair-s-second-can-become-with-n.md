@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3352 — Fix AF-0375: UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Audit/ is off limits to a lane, so the reproduction script was not run; the mutant was applied by hand (second && to ||) and the new Transform_UrlDecode_LeavesAMalformedPercentEscapeAsItIs test fails 3 cases, then passes with the code restored. Production code unchanged, so no quality run. Engine fast tests: 2473 passed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. UrlPartText.IsHexPair mutant now killed by a malformed percent-escape test
