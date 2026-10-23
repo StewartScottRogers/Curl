@@ -12,7 +12,7 @@ using Curl.Api.Options.Protocols;
 namespace Curl.Engine;
 
 [TestClass]
-public sealed class ManagedCurlEngineTests
+public sealed partial class ManagedCurlEngineTests
 {
     [TestMethod]
     public async Task CreateEasy_ProductionEngine_GivesAHandleWithDefaultOptions()

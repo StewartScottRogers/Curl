@@ -331,11 +331,17 @@ public sealed class ManagedCurlEngine : ICurlEngine
         return ReferenceEquals(socketCallbacks, transports.TcpConnector) ? transports.PoolingConnector : transports.PoolingConnector.Over(socketCallbacks);
     }
 
-    private static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
+    /// <summary>
+    /// Creates a library handle's transports over the engine's caches. <c>CURLOPT_PIPEWAIT</c> stands where the
+    /// curl tool's <c>-Z</c> without <c>--parallel-immediate</c> does, so the pool waits for a connection being
+    /// opened to the same origin to show it multiplexes rather than opening another, as libcurl's does (BL-3351).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="shared">The engine's shared state.</param>
+    /// <returns>The transports.</returns>
+    internal static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
-        // One transfer at a time, so --parallel-immediate has nothing to decide: both flags share one value.
-        const bool RunsParallel = false;
-        EngineToolOptions tool = new(Parallel: RunsParallel, ParallelImmediate: RunsParallel, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
+        EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
         return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing);
     }
 }
