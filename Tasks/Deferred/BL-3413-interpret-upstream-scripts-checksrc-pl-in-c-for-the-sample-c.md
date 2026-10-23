@@ -38,3 +38,4 @@ completed:
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: fbecace0.
 - 2026-10-23: Doing -> Backlog. Run's cost cap ran low after the partial port; no prerequisite missing, see Notes for what is done and left
+- 2026-10-23: Backlog -> Deferred. Split into BL-3416, BL-3417, BL-3418, BL-3419 (over its cost cap)
