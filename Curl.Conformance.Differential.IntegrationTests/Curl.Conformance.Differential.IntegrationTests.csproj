@@ -14,6 +14,12 @@
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
     <!-- The Curl.Api cases call it in process (BL-3242, ADR-0790). -->
     <ProjectReference Include="..\Curl.Api\Curl.Api.csproj" />
+    <!-- Curl's Libcurl, which the Libcurl scenarios replay against beside the reference library (ADR-0791). -->
+    <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="LibcurlScenarios\LibcurlScenarios.json" LogicalName="LibcurlScenarios.json" />
   </ItemGroup>
 
 </Project>
