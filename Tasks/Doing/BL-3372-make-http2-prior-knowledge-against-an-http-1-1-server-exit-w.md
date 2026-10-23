@@ -31,3 +31,4 @@ Split from BL-3358 (audit finding AF-0381). In its differential run (seed 850517
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 5995922d 7997c3ba 9742157d.
