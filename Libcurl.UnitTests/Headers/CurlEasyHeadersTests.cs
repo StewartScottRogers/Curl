@@ -11,6 +11,8 @@ public sealed class CurlEasyHeadersTests
 {
     private static readonly CurlHeader ContentType = new("Content-Type", "text/plain", 1, 0, CurlHeaderOrigin.Header);
 
+    private const CurlHeaderOrigin MarkerBit = (CurlHeaderOrigin)(1 << 27);
+
     private static (CurlEasy Easy, FakeTransferHeaders Headers) NewHandle()
     {
         var transfer = new FakeHeadersTransfer();
@@ -28,7 +30,7 @@ public sealed class CurlEasyHeadersTests
         var code = easy.Header("content-type", 2, CurlHeaderOrigin.Header | CurlHeaderOrigin.Trailer, 1, out var header);
 
         Assert.AreEqual(CurlHeaderCode.Ok, code);
-        Assert.AreSame(ContentType, header);
+        Assert.AreEqual(ContentType with { Origin = CurlHeaderOrigin.Header | MarkerBit }, header);
         Assert.AreEqual(("content-type", 2, CurlHeaderOrigin.Header | CurlHeaderOrigin.Trailer, 1), headers.LastTryGet);
     }
 
@@ -92,8 +94,20 @@ public sealed class CurlEasyHeadersTests
 
         var next = easy.NextHeader(CurlHeaderOrigin.Informational, 0, previous);
 
-        Assert.AreSame(ContentType, next);
+        Assert.AreEqual(ContentType with { Origin = CurlHeaderOrigin.Header | MarkerBit }, next);
         Assert.AreEqual((CurlHeaderOrigin.Informational, 0, previous), headers.LastNext);
+    }
+
+    [TestMethod]
+    public void NextHeader_PreviousCarriesTheMarkerBit_PassesTheEnginesOwnHeaderBack()
+    {
+        var (easy, headers) = NewHandle();
+        headers.Header = ContentType;
+        var first = easy.NextHeader(CurlHeaderOrigin.Header, 0, null);
+
+        _ = easy.NextHeader(CurlHeaderOrigin.Header, 0, first);
+
+        Assert.AreSame(ContentType, headers.LastNext!.Value.Previous);
     }
 
     [TestMethod]

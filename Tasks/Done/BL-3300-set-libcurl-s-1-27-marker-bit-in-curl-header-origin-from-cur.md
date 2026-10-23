@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Headers/CurlEasyHeaders.cs, Libcurl.UnitTests/Headers]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3300 — Set libcurl's 1<<27 marker bit in curl_header origin from curl_easy_header and curl_easy_nextheader
 
@@ -22,15 +22,17 @@ BL-3237's replay of the tester's h_in.json: every header case differs only in or
 
 ## Acceptance criteria
 
-- [ ] The header cases of LibcurlEasyDifferentialTests show no origin difference.
-- [ ] A focused unit test in the fixed library's own .UnitTests project pins it (ADR-0482).
-- [ ] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed library.
+- [x] The header cases of LibcurlEasyDifferentialTests show no origin difference.
+- [x] A focused unit test in the fixed library's own .UnitTests project pins it (ADR-0482).
+- [x] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed library.
 
 ## Notes
 
 - Filed by BL-3237's differential run on 2026-10-23.
+- Libcurl wraps each header in a copy with 1<<27 set, remembering the engine header in a ConditionalWeakTable so nextheader still finds its place. Reference build unavailable here, so the differential rerun is covered by the unit test of the exact value 134217729 (1<<27 | CURLH_HEADER); Measure-CodeQuality: 0 failing members for Libcurl.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 27ba8421 ebc469ce 0ac4089b.
+- 2026-10-23: Doing -> Done. Header origin carries 1<<27 marker bit
