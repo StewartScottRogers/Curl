@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3219 — Fix AF-0366: TransferContextFactoryTests.Create_CommandLineOptions_AreCopiedFromTheParsedCommandLine fails on the unmutated tree: the parser refuses its command line
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-23 (lane 4): On this tree (fcb5f1e2d) the reproduction already gives the expected result, Passed: 1, Failed: 0, both run alone and in the full Curl.Engine.UnitTests run (2316 passed, 5 skipped). No option in the command line is refused now. The two-argument `CommandLineParser.Parse` overload the helper calls reads no default `.curlrc` (empty candidate list), and the process environment it reads (COLUMNS, CA variables off Windows) changes only refusal text, never whether a refusal happens. So the refusal the audit saw came from the tree or build it measured, and that cause is gone. I could not tell which option it was without reading `Audit/`, which a lane may not do.
+- Change (test code only, inside `touches`): the `Parse` helper in `TransferContextFactoryTests.cs` now logs the refusal and puts curl's refusal lines and exit code in the assertion message. If it fails again, the run names the refused option. No production code changed, so no Measure-CodeQuality run is needed.
+- Criterion 2: `dotnet build` gave 0 warnings and 0 errors; the fast tests passed in all 45 test assemblies, with none failing.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. The AF-0366 reproduction passes on the current tree, and the Parse helper now names any refusal it meets
