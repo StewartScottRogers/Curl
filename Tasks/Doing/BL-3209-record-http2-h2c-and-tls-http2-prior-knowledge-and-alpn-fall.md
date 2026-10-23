@@ -34,3 +34,4 @@ Write the recorded results (command lines, request bytes as hex or escaped text,
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a252bd00 6db5a716.
