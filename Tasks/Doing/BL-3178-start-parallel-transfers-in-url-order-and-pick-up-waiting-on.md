@@ -49,3 +49,4 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 184a969c 65c3687b c7498130 cc00745f 34f328d9.
 - 2026-10-22: Doing -> Backlog. Waits for BL-3189: curl 8.22.0 measured not to start -Z transfers in URL order (ADR-0768); the implementation of its measured order is BL-3189
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 184a969c 3567fe96 34f328d9.
