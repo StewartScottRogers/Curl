@@ -148,7 +148,7 @@ public sealed class CommandLineParserTests
     }
 
     [TestMethod]
-    public void Parse_EmptyCommandLine_RefusesWithTheTryHelpLineAloneAndExit2()
+    public void Parse_EmptyCommandLine_RefusesWithTheTryHelpLineNamingAiHelpAloneAndExit2()
     {
         CommandLineParseResult result = Parse([]);
 
@@ -157,7 +157,7 @@ public sealed class CommandLineParserTests
         Assert.IsNotNull(result.Refusal);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
         Assert.AreEqual(2, (int)result.Refusal.ExitCode);
-        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLine }, result.Refusal.StandardErrorLines.ToArray());
+        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLineNamingAiHelp }, result.Refusal.StandardErrorLines.ToArray());
     }
 
     [TestMethod]

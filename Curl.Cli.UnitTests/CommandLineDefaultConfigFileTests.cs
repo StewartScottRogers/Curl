@@ -66,10 +66,10 @@ public sealed class CommandLineDefaultConfigFileTests
 
         TestDiagnostics.For(TestContext).Assert("exit code", CurlExitCode.FailedInit, result.Refusal?.ExitCode);
         AssertWarningLines(BogusLineErrorLines, result);
-        AssertStandardErrorLines([TryHelp], result);
+        AssertStandardErrorLines([CommandLineRefusal.TryHelpLineNamingAiHelp], result);
         Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal!.ExitCode);
         CollectionAssert.AreEqual(BogusLineErrorLines, result.WarningLines.ToArray());
-        CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal.StandardErrorLines.ToArray());
+        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLineNamingAiHelp }, result.Refusal.StandardErrorLines.ToArray());
     }
 
     [TestMethod]
@@ -79,9 +79,9 @@ public sealed class CommandLineDefaultConfigFileTests
         CommandLineParseResult result = Parse([], "help\n");
 
         TestDiagnostics.For(TestContext).Assert("config file help subjects", "[null]", CommandLineParseDiagnostics.QuoteEach(result.ConfigFileHelpSubjects));
-        AssertStandardErrorLines([TryHelp], result);
+        AssertStandardErrorLines([CommandLineRefusal.TryHelpLineNamingAiHelp], result);
         CollectionAssert.AreEqual(new string?[] { null }, result.ConfigFileHelpSubjects.ToArray());
-        CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
+        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLineNamingAiHelp }, result.Refusal!.StandardErrorLines.ToArray());
     }
 
     [TestMethod]
@@ -89,9 +89,9 @@ public sealed class CommandLineDefaultConfigFileTests
     {
         CommandLineParseResult result = Parse([], new RecordingDataFileReader());
 
-        AssertStandardErrorLines([TryHelp], result);
+        AssertStandardErrorLines([CommandLineRefusal.TryHelpLineNamingAiHelp], result);
         AssertWarningLines([], result);
-        CollectionAssert.AreEqual(new[] { TryHelp }, result.Refusal!.StandardErrorLines.ToArray());
+        CollectionAssert.AreEqual(new[] { CommandLineRefusal.TryHelpLineNamingAiHelp }, result.Refusal!.StandardErrorLines.ToArray());
         Assert.IsEmpty(result.WarningLines);
     }
 
