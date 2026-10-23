@@ -72,7 +72,7 @@ public sealed class TlsClientOptionsTests
     }
 
     [TestMethod]
-    public void Constructor_WithNoArguments_LeavesTheTenOptionsOfAdr0151NotGiven()
+    public void Constructor_WithNoArguments_LeavesTheEightTlsClientOptionsFieldsOfAdr0151NotGiven()
     {
         Diagnostics.Arrange("options", "new TlsClientOptions()");
 
