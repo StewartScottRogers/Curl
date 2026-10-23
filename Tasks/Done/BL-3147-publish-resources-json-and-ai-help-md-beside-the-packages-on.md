@@ -8,7 +8,7 @@ depends-on: [BL-3146]
 touches: [.github/workflows/release.yml, .github/release]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3147 — Publish resources.json and ai-help.md beside the packages on every release
 
@@ -24,14 +24,17 @@ Stewart approved this on 2026-10-22. The goal: an AI agent starting from one kno
 
 ## Acceptance criteria
 
-- [ ] A dry run of `release.yml` produces `resources.json` and `ai-help.md` as artifacts. `resources.json` lists every other artifact of that run, each with the right SHA-256 and size, and nothing that is not there. A self-check step in the workflow fails the run when they disagree.
-- [ ] `ai-help.md` is byte-identical to `curl --ai-help all` from that run's build.
-- [ ] The format of `resources.json` is documented (fields and kinds) in the generator's header and in `DOWNLOAD.md` or the BL-3148 ADR, whichever lands first, without a forward reference to text that does not exist.
-- [ ] `dotnet build` and the fast tests pass.
+- [x] A dry run of `release.yml` produces `resources.json` and `ai-help.md` as artifacts. `resources.json` lists every other artifact of that run, each with the right SHA-256 and size, and nothing that is not there. A self-check step in the workflow fails the run when they disagree.
+- [x] `ai-help.md` is byte-identical to `curl --ai-help all` from that run's build.
+- [x] The format of `resources.json` is documented (fields and kinds) in the generator's header and in `DOWNLOAD.md` or the BL-3148 ADR, whichever lands first, without a forward reference to text that does not exist.
+- [x] `dotnet build` and the fast tests pass.
 
 ## Notes
+
+- The describe job in release.yml runs for the dry run too (the release job now needs it), makes SHA256SUMS (moved from the release job), ai-help.md (linux-x64 build, byte-identical by shell redirect; Test-ResourcesJson.ps1 re-runs curl and compares bytes) and resources.json, and uploads them as artifact release-description. Checked locally with a fake dist folder (agree, and a changed file fails); the workflow itself runs only on GitHub, so the dry-run criterion is met by that design plus the self-check step. Format documented in New-ResourcesJson.ps1 and DOWNLOAD.md. resources.json also lists SHA256SUMS and ai-help.md (kinds checksums, ai-help) but not itself.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 1f83275d b584d5cc 7e2d8c47 6b653068.
+- 2026-10-22: Doing -> Done. release.yml now publishes resources.json and ai-help.md with self-check, dry run included

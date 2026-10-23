@@ -136,3 +136,21 @@ dotnet publish Curl.Console -c Release -r linux-x64 -o publish
 
 Replace `linux-x64` with any identifier from the table. Native AOT only builds for the
 operating system it runs on.
+
+## For AI agents: resources.json and ai-help.md
+
+Every build of the rolling `preview` release (and every numbered release) also carries two
+files that an agent can start from:
+
+- `resources.json` at `https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json`
+  lists every other file in the release. It is made from the files actually attached, and the
+  release run fails if it disagrees with them.
+- `ai-help.md` is the output of `curl --ai-help all` from that same build.
+
+`resources.json` is UTF-8 JSON with `schema` (1), `name`, `version`, `commit`, `release` (the
+release page URL) and `resources`, one entry per file with `name`, `kind`, `platform`, `file`,
+`url`, `sha256`, `size` (bytes), `use` (one line on how to run or reference it) and `docs`.
+`kind` is `cli` (a curl archive), `mcp-server` (a Curl.Mcp package), `dotnet-library` (Curl.Api
+or Libcurl), `checksums` (`SHA256SUMS`) or `ai-help`; `platform` is a runtime identifier from
+the table above or `any`. The generator, `.github/release/New-ResourcesJson.ps1`, documents the
+same fields.
