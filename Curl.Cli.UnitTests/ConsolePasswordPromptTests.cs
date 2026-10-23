@@ -34,6 +34,29 @@ public sealed class ConsolePasswordPromptTests
         Assert.AreEqual("Enter host password for user 'bob':" + standardError.NewLine, standardError.ToString());
     }
 
+    /// <summary>
+    /// curl 8.22.0 Schannel's <c>getpass_r</c> writes <c>fputs("\n", tool_stderr)</c> after the
+    /// password on a text-mode stderr, so the bytes are CR LF (measured: its stderr turns every
+    /// <c>\n</c> into <c>0D 0A</c>).
+    /// </summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void ReadPassword_OnWindows_WritesThePromptThenCrLfAfterThePassword()
+    {
+        AssertPromptBytes("Enter host password for user 'bob':\r\n");
+    }
+
+    /// <summary>
+    /// On a POSIX terminal curl 8.22.0's <c>getpass_r</c> turns echo off and, once the password is
+    /// read, writes <c>fputs("\n", tool_stderr)</c>: a single LF.
+    /// </summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void ReadPassword_OffWindows_WritesThePromptThenLfAfterThePassword()
+    {
+        AssertPromptBytes("Enter host password for user 'bob':\n");
+    }
+
     [TestMethod]
     public void ReadPassword_ConsoleCannotBeRead_ReturnsWhatWasTyped()
     {
@@ -76,6 +99,19 @@ public sealed class ConsolePasswordPromptTests
 
         Diagnostics.Assert("password", string.Empty, password);
         Assert.AreEqual(string.Empty, password);
+    }
+
+    /// <summary>Reads <c>secret</c> then Enter through a prompt on a default <see cref="StringWriter"/> (whose line terminator is the platform's, as on <see cref="Console.Error"/>) and pins what went to stderr.</summary>
+    private void AssertPromptBytes(string expectedStandardError)
+    {
+        StringWriter standardError = new();
+        ConsolePasswordPrompt prompt = new(standardError, ScriptedKeys("secret\r"));
+
+        string password = ReadPassword(prompt, "Enter host password for user 'bob':", standardError);
+
+        Diagnostics.Diff("stderr", expectedStandardError, standardError.ToString());
+        Assert.AreEqual("secret", password);
+        Assert.AreEqual(expectedStandardError, standardError.ToString());
     }
 
     /// <summary>Returns each character of <paramref name="keys"/> as a key, then throws as an unreadable console does.</summary>
