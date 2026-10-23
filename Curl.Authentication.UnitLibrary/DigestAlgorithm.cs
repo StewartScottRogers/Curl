@@ -12,21 +12,25 @@ namespace Curl.Authentication;
 /// <see langword="true" /> for a <c>-sess</c> variant, whose A1 hashes in the nonce and the
 /// client nonce.
 /// </param>
-internal sealed class DigestAlgorithm(Func<byte[], byte[]> hash, bool isSession)
+/// <param name="isAnsweredBySspi">
+/// <see langword="true" /> for MD5 and MD5-sess, the only ones Windows SSPI answers; curl's
+/// Schannel build fails the others with exit 94 (BL-3281, ADR-0791).
+/// </param>
+internal sealed class DigestAlgorithm(Func<byte[], byte[]> hash, bool isSession, bool isAnsweredBySspi)
 {
     /// <summary>
     /// MD5, the algorithm when the challenge names none.
     /// </summary>
-    internal static readonly DigestAlgorithm Md5 = new(MD5.HashData, isSession: false);
+    internal static readonly DigestAlgorithm Md5 = new(MD5.HashData, isSession: false, isAnsweredBySspi: true);
 
     private static readonly (string Name, DigestAlgorithm Algorithm)[] Known =
     [
-        ("MD5-sess", new DigestAlgorithm(MD5.HashData, isSession: true)),
+        ("MD5-sess", new DigestAlgorithm(MD5.HashData, isSession: true, isAnsweredBySspi: true)),
         ("MD5", Md5),
-        ("SHA-256", new DigestAlgorithm(SHA256.HashData, isSession: false)),
-        ("SHA-256-SESS", new DigestAlgorithm(SHA256.HashData, isSession: true)),
-        ("SHA-512-256", new DigestAlgorithm(Sha512Slash256.HashData, isSession: false)),
-        ("SHA-512-256-SESS", new DigestAlgorithm(Sha512Slash256.HashData, isSession: true)),
+        ("SHA-256", new DigestAlgorithm(SHA256.HashData, isSession: false, isAnsweredBySspi: false)),
+        ("SHA-256-SESS", new DigestAlgorithm(SHA256.HashData, isSession: true, isAnsweredBySspi: false)),
+        ("SHA-512-256", new DigestAlgorithm(Sha512Slash256.HashData, isSession: false, isAnsweredBySspi: false)),
+        ("SHA-512-256-SESS", new DigestAlgorithm(Sha512Slash256.HashData, isSession: true, isAnsweredBySspi: false)),
     ];
 
     /// <summary>
@@ -34,6 +38,12 @@ internal sealed class DigestAlgorithm(Func<byte[], byte[]> hash, bool isSession)
     /// client nonce.
     /// </summary>
     internal bool IsSession { get; } = isSession;
+
+    /// <summary>
+    /// Gets whether Windows SSPI answers this algorithm: MD5 and MD5-sess only, as measured
+    /// from curl 8.21.0's Schannel build, which fails the SHA ones with exit 94 (BL-3281).
+    /// </summary>
+    internal bool IsAnsweredBySspi { get; } = isAnsweredBySspi;
 
     /// <summary>
     /// Finds the algorithm an <c>algorithm=</c> value names, compared in any case as curl
