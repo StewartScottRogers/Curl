@@ -1,5 +1,5 @@
 ---
-id: BL-3271
+id: BL-3276
 title: Keep -Z URL order when the host's first connection stays alive, as ADR-0786 decides
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3271 — Keep -Z URL order when the host's first connection stays alive, as ADR-0786 decides
+# BL-3276 — Keep -Z URL order when the host's first connection stays alive, as ADR-0786 decides
 
 ## Goal
 

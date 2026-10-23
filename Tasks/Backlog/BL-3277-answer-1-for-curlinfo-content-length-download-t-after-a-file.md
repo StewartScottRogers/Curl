@@ -1,5 +1,5 @@
 ---
-id: BL-3272
+id: BL-3277
 title: Answer -1 for CURLINFO_CONTENT_LENGTH_DOWNLOAD_T after a file:// upload
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3272 — Answer -1 for CURLINFO_CONTENT_LENGTH_DOWNLOAD_T after a file:// upload
+# BL-3277 — Answer -1 for CURLINFO_CONTENT_LENGTH_DOWNLOAD_T after a file:// upload
 
 ## Goal
 
