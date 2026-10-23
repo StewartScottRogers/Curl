@@ -9,7 +9,7 @@ touches: [Curl.Mcp/Tools/AiHelpMcpResourceProvider.cs, Curl.Mcp.UnitTests/Tools/
 model: sonnet
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3387 — Port the --ai-help MCP resources onto the hand-written server abstractions
 
@@ -24,14 +24,17 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `AiHelpMcpResourceProvider` exists, with list and read results equal to `CurlAiHelpResourceHandlers`' for every catalogue resource, asserted by a test while both exist.
-- [ ] Every test case of `CurlAiHelpResourceHandlersTests.cs` has an equivalent in `AiHelpMcpResourceProviderTests.cs`, including an unknown URI and an empty URI.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
-- [ ] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
+- [x] `AiHelpMcpResourceProvider` exists, with list and read results equal to `CurlAiHelpResourceHandlers`' for every catalogue resource, asserted by a test while both exist.
+- [x] Every test case of `CurlAiHelpResourceHandlersTests.cs` has an equivalent in `AiHelpMcpResourceProviderTests.cs`, including an unknown URI and an empty URI.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
+- [x] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
 
 ## Notes
+
+- Provider reads the catalogue directly; a null read result is the not-found signal the registry-backed handler turns into -32002. Quality run: 0 failing members. CI cross-platform: tests are platform-neutral.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 643a041a 5caa3672 96ffe31b 6d2cec38.
+- 2026-10-23: Doing -> Done. AiHelpMcpResourceProvider added with tests
