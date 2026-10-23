@@ -3,8 +3,8 @@ id: AF-0383
 title: RunDarkFactory.ps1 help says a run that reaches its cost cap sends its task to Blocked for Stewart; the shift splits it with Invoke-TaskSplit instead
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:RunDarkFactory.ps1:COST-CAP-help:false-help
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'go
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
