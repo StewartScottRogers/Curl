@@ -57,8 +57,9 @@ internal sealed partial class ManagedEasyTransfer
     /// asks for <c>Transfer-Encoding: chunked</c> (<see cref="AsksForChunked" />, upstream test1901, BL-2667); the stream joins <paramref name="reads" />, so its
     /// <c>CURL_READFUNC_ABORT</c> ends the perform. With no read callback and a <c>CURLOPT_POSTFIELDSIZE</c> of 0
     /// (<c>CURLOPT_POSTFIELDS</c> NULL), an empty body sent with <c>Content-Length: 0</c>, as libcurl 8.22.0 posts
-    /// (upstream test515, BL-2592). None when the curl tool's runner gave <paramref name="toolInputs" />, for a
-    /// <c>CURLOPT_UPLOAD</c>, or with no read callback and any other size.
+    /// (upstream test515, BL-2592), and any other size an empty chunked body, as libcurl 8.22.0 reads its default
+    /// read callback on an empty stdin (BL-3319). None when the curl tool's runner gave <paramref name="toolInputs" />
+    /// or for a <c>CURLOPT_UPLOAD</c>.
     /// </summary>
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>
     /// <param name="options">The handle's options.</param>
@@ -75,7 +76,7 @@ internal sealed partial class ManagedEasyTransfer
         long size = options.Http.PostFieldSize;
         if (options.Callbacks.Read is not { } read)
         {
-            return size == 0 ? new StreamBody(Stream.Null, 0, HttpRequestOptionsMapping.FormUrlEncoded) : null;
+            return new StreamBody(Stream.Null, size == 0 ? 0 : null, HttpRequestOptionsMapping.FormUrlEncoded);
         }
 
         CallbackReadStream content = CallbackUploadOf(read, options.Callbacks, PauseGateFor(url));
