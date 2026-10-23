@@ -39,3 +39,4 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b5861301 0971c3da 71053c5c 6e63725a 3639a5e6.
 - 2026-10-22: Doing -> Backlog. Split before any code: waits on BL-3210 (libcurl measurement harness), BL-3211, BL-3212, BL-3213, BL-3214 (the four fixes outside this task's touches)
+- 2026-10-23: Backlog -> Doing. Criteria at claim: b5861301 0971c3da 71053c5c 6e63725a 3639a5e6.
