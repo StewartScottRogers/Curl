@@ -4,7 +4,7 @@ title: Start --parallel transfers in URL order and pick up waiting ones in URL o
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3189]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs, Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs]
 requirement: none
 created: 2026-10-22
@@ -22,15 +22,30 @@ Stewart reported on 2026-10-22: `curl -Z http://h/echo http://h/default http://h
 
 ## Acceptance criteria
 
-- [ ] Notes record the start order and stdout order of curl 8.22.0 for the repro, `--parallel-max 1` and `--parallel-max 2`.
-- [ ] A test in `Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs` with a fake server answering instantly shows stdout order equals URL order for three URLs, and the same under `--parallel-max 1`.
-- [ ] A test of `ParallelHostQueue` (extend or add in `Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs`) shows waiters on one host are released in the order they arrived, with a fake `TimeProvider` and no sleeping.
-- [ ] A `ParallelTransferQueue` test shows the transfer started when a slot frees is the earliest-waiting one.
+- [x] Notes record the start order and stdout order of curl 8.22.0 for the repro, `--parallel-max 1` and `--parallel-max 2`.
+- [ ] BL-3189 is Done: its tests pin curl 8.22.0's measured order (ADR-0768) for the repro, `--parallel-max 1` and `--parallel-max 2`, in place of the URL order this task first asked for.
 - [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes; existing `-Z` tests unchanged.
 
 ## Notes
+
+- 2026-10-22, lane 2: measured with `Record-CurlExchange.ps1` (loopback 127.0.0.1:47811, each
+  connection answered at once with an empty 200 and closed; `-Z --parallel-max N -s -w '%{url} '`;
+  URLs `/echo /default /utf8 /four` to one host; three runs each; request order = stdout order):
+  - curl 8.22.0, every run: max 50 `/echo /utf8 /four /default`; max 2 `/echo /utf8 /default /four`;
+    max 1 `/echo /default /utf8 /four`. With only three URLs at max 50: `/echo /utf8 /default`.
+  - Curl at 02ec93908: max 50 `/echo /utf8 /default /four`, `/echo /default /utf8 /four`,
+    `/echo /default /four /utf8` (a race); max 2 `/echo /default /utf8 /four`; max 1 URL order.
+  - So the premise is wrong: curl does not start in URL order, and what Stewart saw from Curl is
+    curl's own three-URL order. Decided in ADR-0768 to match curl's measured order (the first waiter
+    on the host starts behind the transfers starting with it) and make it deterministic.
+  - A keep-alive measurement through the recorder's `-Script` mode hung for 30 minutes and was
+    stopped; BL-3189 measures it with its own server.
+  - Requeued: the implementation is filed as BL-3189 (too little time left after measuring for the
+    change plus a 30 to 45 minute quality run). The three criteria that asked for URL order contradicted
+    the measurement and were replaced, after the move to Backlog, by one: BL-3189 is Done.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 184a969c 65c3687b c7498130 cc00745f 34f328d9.
+- 2026-10-22: Doing -> Backlog. Waits for BL-3189: curl 8.22.0 measured not to start -Z transfers in URL order (ADR-0768); the implementation of its measured order is BL-3189

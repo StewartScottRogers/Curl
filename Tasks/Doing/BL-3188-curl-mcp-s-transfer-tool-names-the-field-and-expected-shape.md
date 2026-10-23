@@ -32,3 +32,4 @@ Split from BL-3171 (one sub-criterion per subtask); read BL-3171's Context for t
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 31e292f6 6361b4ee.
