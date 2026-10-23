@@ -479,6 +479,8 @@ internal sealed class HttpResponseHeadReader
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine)
             {
                 HeadBytesBeforeFailure = builder.HeadBytesSoFar(),
+                StatusLineBeforeFailure = headStatusLine,
+                ContentTypeBeforeFailure = builder.ContentType,
             };
         }
     }

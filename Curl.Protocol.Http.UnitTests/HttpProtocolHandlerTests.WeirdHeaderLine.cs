@@ -155,6 +155,27 @@ public sealed partial class HttpProtocolHandlerTests
         }
     }
 
+    /// <summary>
+    /// The same failure keeps the 1xx head's code, version, size and Content-Type in its report, as libcurl 8.22.0
+    /// answers <c>CURLINFO_RESPONSE_CODE</c>, <c>CURLINFO_HEADER_SIZE</c> and <c>CURLINFO_CONTENT_TYPE</c> after it
+    /// (differential case get/status/100, BL-3301).
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_BodyAfterAnInformationalHead_ReportsThatHeadsCodeSizeAndContentType()
+    {
+        const string head = "HTTP/1.1 100 Status\r\nContent-Type: text/plain\r\nContent-Length: 11\r\n\r\n";
+        Diagnostics.Arrange("scripted response", "100 with Content-Type and a body");
+
+        TransferResult result = await Handler(QueueConnector.For(Connection(head + "status 100\n", 1024)))
+            .ExecuteAsync(RefusedHeaderContext(new MemoryStream(), null, string.Empty));
+
+        WriteResult(result);
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual(100, result.Report!.ResponseCode);
+        Assert.AreEqual(head.Length, result.Report!.HeaderSize);
+        Assert.AreEqual("text/plain", result.Report!.ContentType);
+    }
+
     [TestMethod]
     [DataRow("Location: /a\r\nLocation: /a\r\n", DisplayName = "The same value twice")]
     [DataRow("Location: /a\r\nLocation:\r\n", DisplayName = "An empty value after it")]

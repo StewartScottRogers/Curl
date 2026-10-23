@@ -49,6 +49,12 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal HttpStatusLine? StatusLineBeforeFailure { get; set; }
 
     /// <summary>
+    /// Gets or sets the <c>Content-Type</c> of the 1xx head a failure came after, which libcurl 8.22.0 still reports as
+    /// <c>CURLINFO_CONTENT_TYPE</c> (BL-3301); <see langword="null" /> by default.
+    /// </summary>
+    internal string? ContentTypeBeforeFailure { get; set; }
+
+    /// <summary>
     /// Gets the operating system's error number of the socket error that failed a receive, the
     /// transfer's <c>CURLINFO_OS_ERRNO</c> as libcurl 8.22.0 sets it after a failed receive on a kept
     /// connection (BL-3329): the Winsock code on Windows (10054 or 10053), <c>errno</c> elsewhere;

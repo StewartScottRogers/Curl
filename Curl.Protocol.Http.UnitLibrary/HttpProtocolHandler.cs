@@ -1407,6 +1407,7 @@ public sealed class HttpProtocolHandler(
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
+                ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
 
     /// <summary>

@@ -35,6 +35,9 @@ internal sealed class HttpResponseHeadBuilder
     /// </summary>
     internal HttpResponseHeader LastHeader => headers[^1];
 
+    /// <summary>Gets the last <c>Content-Type</c> value of the current head, or <see langword="null" /> when it has none.</summary>
+    internal string? ContentType => headers.LastOrDefault(header => string.Equals(header.Name, "Content-Type", StringComparison.OrdinalIgnoreCase))?.Value;
+
     /// <summary>
     /// Gets the header the current head's last header line started, its continuation lines so
     /// far folded in, as it would be added were it whole now; valid once <see cref="AddLine" />
