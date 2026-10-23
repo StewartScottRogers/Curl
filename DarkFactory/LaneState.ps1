@@ -211,6 +211,24 @@ if ($TestHeartbeat) {
         $cases += ,@('a throwing, noisy poll still leaves the wait one hashtable', 'System.Collections.Hashtable', "$($okWait.GetType().FullName)")
         $cases += ,@('a throwing poll is tried again at the next interval', '2', "$($script:throwPolls)")
         $cases += ,@('the wait returns the run after a throwing poll', '7', "$($okWait.Run.databaseId)")
+        # A cancelled run and a newer head (BL-3155): after a hand-over, code commits since the
+        # original head stop the wait; board-only commits, or no hand-over, are followed (ADR-0693).
+        function Get-FollowWaitFailure {
+            param([bool]$HandedOver, [string]$CommitsSince, [string]$BoardCommitsSince)
+            $script:fakeNow = [datetime]'2026-10-22 14:20'
+            $script:newHeadAsked = 0
+            $script:commitsSince = $CommitsSince
+            $script:boardCommitsSince = $BoardCommitsSince
+            function gh { if ($args -contains 'run' -and $args -contains 'list') { if ($args -contains ('b' * 40)) { '[{"status":"in_progress","conclusion":null}]' } else { '[{"status":"completed","conclusion":"cancelled"}]' } } }
+            function git { $a = "$args"; if ($a -match 'rev-parse') { 'b' * 40 } elseif ($a -match '--grep') { $script:boardCommitsSince } elseif ($a -match 'rev-list') { $script:commitsSince } else { '' } }
+            function Get-Date { param($Format) $script:fakeNow }
+            function Start-Sleep { param($Seconds) $script:fakeNow = $script:fakeNow.AddSeconds($Seconds) }
+            try { (Wait-MergeCiRun -Branch 'factory/test' -Head ('a' * 40) -PollMinutes 5 -HandOver @{ Done = $HandedOver }).Failure }
+            finally { Remove-Item function:gh, function:git, function:Get-Date, function:Start-Sleep }
+        }
+        $cases += ,@('after a hand-over, a newer head with code commits is not followed', 'not merged: the next shift was handed over and pushed code to factory/test after aaaaaaa, so its work is not merged with this shift''s', "$(Get-FollowWaitFailure $true '3' '1')")
+        $cases += ,@('after a hand-over, a newer head of board commits only is followed', 'not merged: CI did not finish on bbbbbbb within 60 min', "$(Get-FollowWaitFailure $true '2' '2')")
+        $cases += ,@('without a hand-over, a newer head with code commits is followed', 'not merged: CI did not finish on bbbbbbb within 60 min', "$(Get-FollowWaitFailure $false '3' '1')")
         $failed = 0
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }

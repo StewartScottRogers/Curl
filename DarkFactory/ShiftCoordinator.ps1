@@ -474,7 +474,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             if ($poll.Action -eq 'start') { & $startNextShift "$($poll.Why) during the merge's CI wait" -Beside; $handOver.Done = $true }
         }
     }
-    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes }
+    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes -HandOver $handOver }
     Write-Trace '-' 'merge' $mergeLine 'Cyan'
     # The shift-end review (ADR-0710) runs below: beside the next shift when one starts, or
     # before deciding whether to start one when nothing is ready.

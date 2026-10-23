@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/ShiftEnd.ps1]
+touches: [DarkFactory/ShiftEnd.ps1, DarkFactory/ShiftCoordinator.ps1, DarkFactory/LaneState.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3155 — Stop the shift-end merge following a newer head the next shift pushed after a hand-over
 
@@ -29,13 +29,16 @@ When a newer push cancels the waiting CI run (ADR-0693), `Wait-MergeCiRun` follo
 
 ## Acceptance criteria
 
-- [ ] Once a hand-over has happened, `Wait-MergeCiRun` follows a newer head only if every commit since the original head is a `[skip ci]` board commit. Otherwise it returns a "not merged: ..." line naming the hand-over.
-- [ ] Without a hand-over, a newer head is followed as before (ADR-0693).
-- [ ] A test in the factory's test blocks covers both cases.
+- [x] Once a hand-over has happened, `Wait-MergeCiRun` follows a newer head only if every commit since the original head is a `[skip ci]` board commit. Otherwise it returns a "not merged: ..." line naming the hand-over.
+- [x] Without a hand-over, a newer head is followed as before (ADR-0693).
+- [x] A test in the factory's test blocks covers both cases.
 
 ## Notes
+
+- Added ShiftCoordinator.ps1 (passes its hand-over table as -HandOver) and LaneState.ps1 (the -TestHeartbeat test block holds the wait tests) to touches; no other Doing task names them. Verified with RunDarkFactory.ps1 -TestHeartbeat: all PASS.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 3f408fbf e80f142e 20efafd0.
+- 2026-10-22: Doing -> Done. Shift-end merge wait no longer follows a newer head with next-shift code after a hand-over
