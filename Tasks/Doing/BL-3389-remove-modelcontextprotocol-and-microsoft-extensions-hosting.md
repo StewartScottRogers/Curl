@@ -40,3 +40,4 @@ Neither `ModelContextProtocol` nor `Microsoft.Extensions.Hosting` is referenced 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f6c02ba2 f382b46d 97b19bc2 8d48f09f 7b643936 96ffe31b 6d2cec38.
