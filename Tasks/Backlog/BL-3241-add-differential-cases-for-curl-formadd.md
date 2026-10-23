@@ -1,16 +1,16 @@
 ---
-id: BL-3228
+id: BL-3241
 title: Add differential cases for curl_formadd
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3226]
+depends-on: [BL-3239]
 touches: [Curl.Conformance.Differential.UnitLibrary/Libcurl/Formadd, Curl.Conformance.Differential.UnitTests/Libcurl/Formadd, Curl.Conformance.Differential.IntegrationTests/LibcurlFormadd]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3228 — Add differential cases for curl_formadd
+# BL-3241 — Add differential cases for curl_formadd
 
 ## Goal
 
@@ -18,7 +18,7 @@ New differential cases exercise `curl_formadd`, `curl_formget` and `curl_formfre
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. The tester did not cover curl_formadd. Builds on BL-3226's MIME comparison.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. The tester did not cover curl_formadd. Builds on BL-3239's MIME comparison.
 
 ## Acceptance criteria
 

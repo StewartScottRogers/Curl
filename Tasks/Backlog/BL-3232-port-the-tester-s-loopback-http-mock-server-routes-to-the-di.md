@@ -1,16 +1,16 @@
 ---
-id: BL-3219
+id: BL-3232
 title: Port the tester's loopback HTTP mock server routes to the differential runner
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3218]
+depends-on: [BL-3231]
 touches: [Curl.Conformance.Differential.UnitLibrary/Http, Curl.Conformance.Differential.UnitTests/Http]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3219 — Port the tester's loopback HTTP mock server routes to the differential runner
+# BL-3232 — Port the tester's loopback HTTP mock server routes to the differential runner
 
 ## Goal
 
@@ -18,7 +18,7 @@ The differential runner's UnitLibrary holds a stream-based HTTP/1.1 responder th
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. Port `server.py` (288 lines, about 120 route branches) in C#, matching its response bytes exactly, including its fixed `Date: Thu, 01 Jan 2026 00:00:00 GMT`. The socket host that serves it is BL-3220's; keep this task to request parsing and response bytes so it is fully covered by unit tests.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. Port `server.py` (288 lines, about 120 route branches) in C#, matching its response bytes exactly, including its fixed `Date: Thu, 01 Jan 2026 00:00:00 GMT`. The socket host that serves it is BL-3233's; keep this task to request parsing and response bytes so it is fully covered by unit tests.
 
 ## Acceptance criteria
 

@@ -1,16 +1,16 @@
 ---
-id: BL-3227
+id: BL-3240
 title: Add differential cases for the curl_ws_* WebSocket API
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3224]
+depends-on: [BL-3237]
 touches: [Curl.Conformance.Differential.UnitLibrary/Libcurl/WebSocket, Curl.Conformance.Differential.UnitTests/Libcurl/WebSocket, Curl.Conformance.Differential.IntegrationTests/LibcurlWebSocket]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3227 — Add differential cases for the curl_ws_* WebSocket API
+# BL-3240 — Add differential cases for the curl_ws_* WebSocket API
 
 ## Goal
 
@@ -18,7 +18,7 @@ New differential cases exercise the `curl_ws_*` WebSocket API (`curl_ws_send`, `
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. The tester did not cover WebSocket. Measure libcurl 8.22.0 before pinning any value.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. The tester did not cover WebSocket. Measure libcurl 8.22.0 before pinning any value.
 
 ## Acceptance criteria
 

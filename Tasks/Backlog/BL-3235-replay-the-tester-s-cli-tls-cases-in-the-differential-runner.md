@@ -1,16 +1,16 @@
 ---
-id: BL-3222
+id: BL-3235
 title: Replay the tester's CLI TLS cases in the differential runner
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3220]
+depends-on: [BL-3233]
 touches: [Curl.Conformance.Differential.UnitLibrary/Tls, Curl.Conformance.Differential.UnitTests/Tls, Curl.Conformance.Differential.UnitLibrary/Cases/CliTls, Curl.Conformance.Differential.IntegrationTests/CliTls]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3222 — Replay the tester's CLI TLS cases in the differential runner
+# BL-3235 — Replay the tester's CLI TLS cases in the differential runner
 
 ## Goal
 
@@ -18,7 +18,7 @@ The differential runner replays the tester's CLI TLS cases (`cases_tls.py`, 70 c
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. Compare with `report_tls.txt`. Certificates are platform-sensitive: keep any unit test that loads one platform-neutral or pin each platform's answer.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. Compare with `report_tls.txt`. Certificates are platform-sensitive: keep any unit test that loads one platform-neutral or pin each platform's answer.
 
 ## Acceptance criteria
 

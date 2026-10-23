@@ -1,16 +1,16 @@
 ---
-id: BL-3226
+id: BL-3239
 title: Replay the tester's Libcurl MIME cases in the differential runner
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3224]
+depends-on: [BL-3237]
 touches: [Curl.Conformance.Differential.UnitLibrary/Libcurl/Mime, Curl.Conformance.Differential.UnitTests/Libcurl/Mime, Curl.Conformance.Differential.IntegrationTests/LibcurlMime]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3226 — Replay the tester's Libcurl MIME cases in the differential runner
+# BL-3239 — Replay the tester's Libcurl MIME cases in the differential runner
 
 ## Goal
 
@@ -18,7 +18,7 @@ The differential runner replays the tester's Libcurl MIME cases (`mimefile.json`
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. Drivers: `LibTest/MimeMode.cs`, `LibTest/PrintfMode.cs`; outputs `mimefile.txt`, `pf_out.txt`, `pf_report.txt`.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. Drivers: `LibTest/MimeMode.cs`, `LibTest/PrintfMode.cs`; outputs `mimefile.txt`, `pf_out.txt`, `pf_report.txt`.
 
 ## Acceptance criteria
 

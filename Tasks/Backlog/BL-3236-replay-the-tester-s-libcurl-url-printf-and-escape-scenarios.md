@@ -1,16 +1,16 @@
 ---
-id: BL-3223
+id: BL-3236
 title: Replay the tester's Libcurl URL, printf and escape scenarios (scen.json) in the differential runner
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3220]
+depends-on: [BL-3233]
 touches: [Curl.Conformance.Differential.UnitLibrary/Libcurl/Scenarios, Curl.Conformance.Differential.UnitTests/Libcurl/Scenarios, Curl.Conformance.Differential.IntegrationTests/LibcurlScenarios]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3223 — Replay the tester's Libcurl URL, printf and escape scenarios (scen.json) in the differential runner
+# BL-3236 — Replay the tester's Libcurl URL, printf and escape scenarios (scen.json) in the differential runner
 
 ## Goal
 
@@ -18,7 +18,7 @@ The differential runner replays the tester's Libcurl scenarios in `scen.json` (3
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. The tester's C# driver is the `LibTest` folder (`Program.cs` and its modes); its output is `lib_summary.txt` and `lib_diff.txt`. Decide how the reference libcurl DLL is loaded beside Curl's (the ADR from BL-3218 or a new one). Broken IDN in the reference build is a named exclusion.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. The tester's C# driver is the `LibTest` folder (`Program.cs` and its modes); its output is `lib_summary.txt` and `lib_diff.txt`. Decide how the reference libcurl DLL is loaded beside Curl's (the ADR from BL-3231 or a new one). Broken IDN in the reference build is a named exclusion.
 
 ## Acceptance criteria
 

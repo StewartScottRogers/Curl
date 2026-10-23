@@ -1,5 +1,5 @@
 ---
-id: BL-3218
+id: BL-3231
 title: Decide and scaffold the differential conformance runner: ADR, projects, case model, report writer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3218 — Decide and scaffold the differential conformance runner: ADR, projects, case model, report writer
+# BL-3231 — Decide and scaffold the differential conformance runner: ADR, projects, case model, report writer
 
 ## Goal
 

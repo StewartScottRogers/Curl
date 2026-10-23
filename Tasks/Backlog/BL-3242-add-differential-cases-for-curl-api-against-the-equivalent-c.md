@@ -1,24 +1,24 @@
 ---
-id: BL-3229
+id: BL-3242
 title: Add differential cases for Curl.Api against the equivalent curl command lines
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3220]
+depends-on: [BL-3233]
 touches: [Curl.Conformance.Differential.UnitLibrary/Api, Curl.Conformance.Differential.UnitTests/Api, Curl.Conformance.Differential.IntegrationTests/Api]
 requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3229 — Add differential cases for Curl.Api against the equivalent curl command lines
+# BL-3242 — Add differential cases for Curl.Api against the equivalent curl command lines
 
 ## Goal
 
-New differential cases run `Curl.Api` requests beside the equivalent curl 8.22.0 command lines on BL-3219's loopback routes and report where the wire bytes or results differ.
+New differential cases run `Curl.Api` requests beside the equivalent curl 8.22.0 command lines on BL-3232's loopback routes and report where the wire bytes or results differ.
 
 ## Context
 
-The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3218. The tester did not cover Curl.Api. Reuse BL-3220's CLI HTTP cases where a Curl.Api call expresses the same transfer.
+The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outside the repo; its Python scripts are a reference only - never commit or run Python). Parent task: BL-3217 (Stewart's 2026-10-22 prioritised findings list, "CI differential harness"); the runner's ADR comes from BL-3231. The tester did not cover Curl.Api. Reuse BL-3233's CLI HTTP cases where a Curl.Api call expresses the same transfer.
 
 ## Acceptance criteria
 
