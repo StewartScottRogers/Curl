@@ -3,8 +3,8 @@ id: AF-0394
 title: BL-3215 cost $3.29 (3.1x the median): a 67-turn, 48-minute Opus run plus a rebase-conflict resolve run
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3215:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
