@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ReusedConnectionOsErrno.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3343 — CURLINFO_OS_ERRNO keeps the socket error of a reused connection that died before its response when the retry on a fresh connection succeeds
 
@@ -22,12 +22,15 @@ Found by BL-3315's differential run (LibcurlEasyDifferentialTests, case reuse-id
 
 ## Acceptance criteria
 
-- [ ] A unit test in Curl.Protocol.Http.UnitTests (a reused connection whose receive throws a SocketException with ConnectionReset, then a fresh connection that answers 200) pins `TransferReport.OsErrno` as that exception's `NativeErrorCode`, platform-neutral.
-- [ ] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for Curl.Protocol.Http.UnitLibrary.
+- [x] A unit test in Curl.Protocol.Http.UnitTests (a reused connection whose receive throws a SocketException with ConnectionReset, then a fresh connection that answers 200) pins `TransferReport.OsErrno` as that exception's `NativeErrorCode`, platform-neutral.
+- [x] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for Curl.Protocol.Http.UnitLibrary.
 
 ## Notes
+
+- Fix: TransferReport.OsErrno now starts from the earlier attempt report (HttpExchange.Report), so the dead connection receive errno survives a successful fresh retry; a later receive failure still overrides it. Quality: 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: cb02d211 74c4d232.
+- 2026-10-23: Doing -> Done. Retry report keeps the dead connection's OsErrno

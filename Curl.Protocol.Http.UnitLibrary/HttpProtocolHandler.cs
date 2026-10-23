@@ -3303,6 +3303,7 @@ public sealed class HttpProtocolHandler(
                 DeliveredSize = body.BytesDelivered,
                 HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
                 ConnectionCount = ConnectionCountSoFar() + (newConnection ? 1 : 0),
+                OsErrno = earlier?.OsErrno ?? 0,
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,
