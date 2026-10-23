@@ -3,8 +3,8 @@ id: AF-0382
 title: curl -V on Windows lists HTTP2 and HTTPSRR, which the Schannel reference build's Features line does not
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--version:WindowsFeaturesLine:stdout
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release; (& 'C:\Program Files\Git\ucrt64\bin\curl.e
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
