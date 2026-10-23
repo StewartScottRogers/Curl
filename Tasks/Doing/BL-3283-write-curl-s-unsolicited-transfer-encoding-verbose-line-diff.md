@@ -30,3 +30,4 @@ BL-3233 differential case srv-te-gzip-chunked-v (-sv --compressed {U}/te-gzip-ch
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: a8d8ea8f 69edf767.
