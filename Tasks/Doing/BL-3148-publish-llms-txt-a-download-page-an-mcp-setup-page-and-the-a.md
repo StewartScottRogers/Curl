@@ -42,3 +42,4 @@ Record the layout in an ADR (next free number; "Decided by Claude under Stewart'
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: b35b054e a9347f29 3a37b744 a53fef86 e4b3dcd7 6b653068.
