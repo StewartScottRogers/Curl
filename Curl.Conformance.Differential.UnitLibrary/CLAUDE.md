@@ -1,6 +1,6 @@
 # Curl.Conformance.Differential.UnitLibrary
 
-The core of the differential conformance runner (ADR-0781): it runs one command line through
+The core of the differential conformance runner (ADR-0782): it runs one command line through
 Curl and through a reference curl 8.22.0 binary and reports every difference in the tester's
 `report.txt` shape. Namespace `Curl.Conformance.Differential`.
 

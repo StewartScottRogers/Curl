@@ -31,7 +31,7 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 ## Notes
 
 - Split out of BL-3217 by its lane-3 run on 2026-10-22.
-- Plan: core types in the UnitLibrary (case model, `DifferentialCaseFileReader` over `JsonDocument`, `CommandLineSplitter` with `shlex.split` rules, `DifferentialOutputNormaliser` porting `norm()` plus the debug-build `sendrecv_dl()`/`Curl_sendrecv()` exclusion, `DifferentialComparer`, `DifferentialReportWriter`, `PythonLiteral` for the `b'...'` repr). Real processes, servers and directories are left to `Curl.Conformance.Differential.IntegrationTests` (BL-3232 onward), decided in ADR-0781: on demand, not in CI; gated by `CURL_DIFFERENTIAL_REFERENCE`.
+- Plan: core types in the UnitLibrary (case model, `DifferentialCaseFileReader` over `JsonDocument`, `CommandLineSplitter` with `shlex.split` rules, `DifferentialOutputNormaliser` porting `norm()` plus the debug-build `sendrecv_dl()`/`Curl_sendrecv()` exclusion, `DifferentialComparer`, `DifferentialReportWriter`, `PythonLiteral` for the `b'...'` repr). Real processes, servers and directories are left to `Curl.Conformance.Differential.IntegrationTests` (BL-3232 onward), decided in ADR-0782: on demand, not in CI; gated by `CURL_DIFFERENTIAL_REFERENCE`.
 - Choices: the four case-level faults (ANSI arguments, 32-bit time_t, no HTTP/2, broken IDN) are `ReferenceBuildLimitation` tags that keep a case off the reference build; case `stdin` and `files` are UTF-8 text (no bytes form yet); the normaliser uses interpreted `Regex` fields, not `[GeneratedRegex]`, because the generated matcher code counted against the coverage and complexity gates.
 - Verified: `dotnet build Curl.slnx` 0 warnings; fast tests green (exit 0, 27 new tests); Measure-CodeQuality 100% line and branch, 0 failing members. Tests use no file system or OS text, so they are platform-neutral for Linux and macOS CI.
 
@@ -39,4 +39,4 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 7d61c82b 6f49e668 a1cb8068 ae951636 5e81fa96.
-- 2026-10-23: Doing -> Done. Differential runner core (case files, splitter, normaliser with reference-build exclusions, comparer, ### DIFF report writer) in Curl.Conformance.Differential.UnitLibrary, decided in ADR-0781
+- 2026-10-23: Doing -> Done. Differential runner core (case files, splitter, normaliser with reference-build exclusions, comparer, ### DIFF report writer) in Curl.Conformance.Differential.UnitLibrary, decided in ADR-0782

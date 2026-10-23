@@ -8,7 +8,7 @@ namespace Curl.Conformance.Differential;
 /// run (time stamps, ports, MIME boundaries, digest nonces, the working directory, the progress
 /// meter) compare equal, as the tester's <c>norm()</c> did, and removes the lines only the reference
 /// curl's debug build writes: its debug warnings and the <c>sendrecv_dl()</c> and
-/// <c>Curl_sendrecv()</c> trace lines (ADR-0781).
+/// <c>Curl_sendrecv()</c> trace lines (ADR-0782).
 /// </summary>
 public static class DifferentialOutputNormaliser
 {

@@ -2,7 +2,7 @@ namespace Curl.Conformance.Differential;
 
 /// <summary>
 /// A known limitation of the reference curl 8.22.0 build (Git for Windows' ucrt64 debug build) that
-/// makes a case's difference the reference's fault rather than Curl's (ADR-0781). A case tagged with
+/// makes a case's difference the reference's fault rather than Curl's (ADR-0782). A case tagged with
 /// one is not run against that build.
 /// </summary>
 public enum ReferenceBuildLimitation
