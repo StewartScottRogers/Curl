@@ -1,6 +1,68 @@
 # Curl
 
+## What Curl is
+
+Curl is a port of the open-source [curl](https://curl.se) command-line tool to C# on
+.NET 10, built to be a **drop-in replacement**: the same options, the same exit codes,
+the same bytes on stdout and stderr, so an existing script cannot tell which binary it
+invoked. It publishes as a single native-AOT executable with no runtime to install.
+
+The port is behavioural, not a line-by-line translation of curl's C source. curl's
+documentation, its manual page and its test suite are the specification; every protocol
+is reimplemented against its RFCs in its own class library, behind interfaces that can be
+driven from a unit test without touching a network. The only dependency of the curl port is
+the .NET base class library; the one exception is the MCP server host `Curl.Mcp`, which
+references the `ModelContextProtocol` and `Microsoft.Extensions.Hosting` NuGet packages
+(ADR-0548).
+
+
 <a href="https://stewartscottrogers.github.io/Curl/" target="_blank"><img src="https://github.com/StewartScottRogers/Curl/raw/gource/gource.gif" alt="Gource animation of Curl's commit history across every branch - click to watch in 4K, full screen" width="800"></a>
+
+## Download and use
+
+Every resource is a file of the rolling [`preview` release](https://github.com/StewartScottRogers/Curl/releases/tag/preview), listed with its URL and SHA-256 in [`resources.json`](https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json). Verify any download against the release's [`SHA256SUMS`](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS). Nothing is on nuget.org yet; the NuGet packages install from a folder. [DOWNLOAD.md](DOWNLOAD.md) has the commands.
+
+`Libcurl` is for porting C or libcurl code to .NET: the libcurl API one call for one call; `Curl.Api` is for new .NET work: an async, HttpClient-shaped client.
+
+| Resource | What it is | Download | Use |
+| --- | --- | --- | --- |
+| `curl` / `curl.exe` | The drop-in command-line tool, one native executable per platform | [Windows x64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-x64.zip), [Windows Arm64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-win-arm64.zip), [Linux x64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-x64.tar.gz), [Linux Arm64](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-linux-arm64.tar.gz), [macOS Apple silicon](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-arm64.tar.gz), [macOS Intel](https://github.com/StewartScottRogers/Curl/releases/download/preview/curl-osx-x64.tar.gz), or the one-line installer below | Extract and run `curl --version` |
+| [`Curl.Api`](Curl.Api) | New .NET work: an async, HttpClient-shaped client | `Curl.Api` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Curl.Api --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#curlapi-net-client-for-new-code)) |
+| [`Libcurl`](Libcurl) | Porting C or libcurl code to .NET: the libcurl API one call for one call | `Libcurl` `.nupkg` on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | `dotnet add package Libcurl --prerelease` from a folder source ([DOWNLOAD.md](DOWNLOAD.md#libcurl-libcurl-api-for-porting-c-code)) |
+| [`Curl.Mcp`](Curl.Mcp) | MCP server for AI agents | Seven `.nupkg` files on the [release page](https://github.com/StewartScottRogers/Curl/releases/tag/preview) | [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/), [DOWNLOAD.md](DOWNLOAD.md#curlmcp-mcp-server-for-ai-agents) |
+
+Which to use:
+
+| You are | Use |
+| --- | --- |
+| Writing new .NET code | `Curl.Api` |
+| Porting C or libcurl code, or needing a CURLOPT that `Curl.Api` lacks | `Libcurl` |
+| Running commands or scripts | `curl` / `curl.exe` |
+| An AI agent | `Curl.Mcp` or `curl --ai-help` |
+
+One-line installers for the command-line tool:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.sh | sh    # Linux, macOS
+```
+
+```powershell
+irm https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.ps1 | iex          # Windows
+```
+
+## For AI agents
+
+Start from one address and find everything:
+
+- [`llms.txt`](https://stewartscottrogers.github.io/Curl/llms.txt): a short map of every resource, for a language model.
+- [`resources.json`](https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json): every file in the release with `url`, `sha256`, `size`, `kind`, `platform` and how to use it. Pick by `kind` and `platform`.
+- [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/): configuration for each MCP client.
+- `curl --ai-help`: Markdown help for agents, built into the binary. `curl --ai-help` lists the categories and `curl --ai-help all` prints everything; the same text is [`ai-help.md`](https://github.com/StewartScottRogers/Curl/releases/download/preview/ai-help.md) on the release and a [page](https://stewartscottrogers.github.io/Curl/ai-help/).
+
+```sh
+curl --ai-help        # lists the categories
+curl --ai-help all    # every option, as Markdown
+```
 
 ### [▶ Watch in 4K, full screen](https://stewartscottrogers.github.io/Curl/)
 
@@ -35,22 +97,7 @@ is listed in the run's summary and on the badge but blocks nothing, until
 *The [live task board](https://stewartscottrogers.github.io/Curl/board/) shows every task
 by state and one card per dark factory lane, and refreshes itself every few minutes.*
 
-## What this is
-
-Curl is a port of the open-source [curl](https://curl.se) command-line tool to C# on
-.NET 10, built to be a **drop-in replacement**: the same options, the same exit codes,
-the same bytes on stdout and stderr, so an existing script cannot tell which binary it
-invoked. It publishes as a single native-AOT executable with no runtime to install.
-
-The port is behavioural, not a line-by-line translation of curl's C source. curl's
-documentation, its manual page and its test suite are the specification; every protocol
-is reimplemented against its RFCs in its own class library, behind interfaces that can be
-driven from a unit test without touching a network. The only dependency of the curl port is
-the .NET base class library; the one exception is the MCP server host `Curl.Mcp`, which
-references the `ModelContextProtocol` and `Microsoft.Extensions.Hosting` NuGet packages
-(ADR-0548).
-
-## Use it from .NET: `Libcurl` and `Curl.Api`
+## Use it from .NET: `Curl.Api` and `Libcurl`
 
 Curl is also becoming a library. Two public programming interfaces sit over one transfer
 engine, the same engine the `curl` executable runs, so a program gets the same behaviour
@@ -59,8 +106,8 @@ as the command line ([ADR-0506](Documentation/Planning/Decisions/ADR-0506-libcur
 
 | Project | What it is for |
 | --- | --- |
-| [`Libcurl`](Libcurl) | libcurl's API in C#, call for call: `CurlGlobal.Init()`, `CurlEasy` with `SetOption`, `Perform` and `GetInfo`, and the multi, share, URL, MIME, header and WebSocket interfaces. For code ported from C, and the future home of a native C ABI built with native AOT. Tested by `Libcurl.UnitTests`. |
-| [`Curl.Api`](Curl.Api) | The same engine written the way a .NET developer expects: `CurlClient`, `async` with `CancellationToken`, `Stream` bodies, exceptions, `IAsyncEnumerable` for WebSocket messages, and a `CurlHttpMessageHandler` for `HttpClient`. Tested by `Curl.Api.UnitTests`. |
+| [`Curl.Api`](Curl.Api) | For new .NET work: an async, HttpClient-shaped client. The same engine written the way a .NET developer expects: `CurlClient`, `async` with `CancellationToken`, `Stream` bodies, exceptions, `IAsyncEnumerable` for WebSocket messages, and a `CurlHttpMessageHandler` for `HttpClient`. Tested by `Curl.Api.UnitTests`. |
+| [`Libcurl`](Libcurl) | For porting C or libcurl code to .NET: the libcurl API one call for one call. libcurl's API in C#, call for call: `CurlGlobal.Init()`, `CurlEasy` with `SetOption`, `Perform` and `GetInfo`, and the multi, share, URL, MIME, header and WebSocket interfaces. For code ported from C, and the future home of a native C ABI built with native AOT. Tested by `Libcurl.UnitTests`. |
 | [`Curl.Api.UnitLibrary`](Curl.Api.UnitLibrary) | The seam both stand on: the engine contracts (`ICurlEngine`, `IEasyTransfer`), result codes (`CurlCode` and the rest), the option groups (`EasyHttpOptions`, `EasyTlsOptions` and the rest), `TransferInfo` and the callback delegates. Either API can be rewritten another way without touching the engine. |
 | [`Curl.Engine.UnitLibrary`](Curl.Engine.UnitLibrary) | The transfer engine, moved out of `Curl.Console` so the executable and both APIs share it. |
 | [`Curl.Mcp`](Curl.Mcp) | A Model Context Protocol server over stdio, so AI agents (GitHub Copilot, Claude and others) use Curl as a tool: `curl`, `transfer`, `parse_url`, `build_url` and `version`, plus the `--ai-help` text as resources. File access is confined to `CURL_MCP_ROOT`. Run it with `dnx Curl.Mcp`; setup is in [its README](Curl.Mcp/README.md). Tested by `Curl.Mcp.UnitTests` and `Curl.Mcp.IntegrationTests`. |
@@ -95,18 +142,6 @@ Code agents built for this one job, porting curl, and not a general-purpose codi
 
 The lights stay off; a person sets direction and answers blocked questions.
 
-## Download
-
-Native binaries for Windows, Linux and macOS, on x64 and Arm64, are on the
-[**download page**](DOWNLOAD.md), with one-line installers:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.sh | sh    # Linux, macOS
-```
-
-```powershell
-irm https://raw.githubusercontent.com/StewartScottRogers/Curl/master/install.ps1 | iex          # Windows
-```
 
 ## Build and test
 

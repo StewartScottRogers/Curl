@@ -1,13 +1,44 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    Packed as one platform-neutral package for the rolling preview release (BL-3146). The libraries
+    this project references are bundled into the package's lib folder when the release passes
+    -p:BundledProjectReferencesPrivateAssets=all (which keeps them out of its dependencies), so a consumer restores
+    nothing but this package.
+  -->
+  <PropertyGroup>
+    <PackageId>Libcurl</PackageId>
+    <Version>0.2.0</Version>
+    <Authors>Stewart Scott Rogers</Authors>
+    <Description>Curl's libcurl-shaped interface in C#: easy, multi, share and URL handles over the managed curl engine. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.</Description>
+    <PackageTags>curl; libcurl; http; easy; multi</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/StewartScottRogers/Curl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/StewartScottRogers/Curl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);BundleReferencedProjectAssemblies</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="..\LICENSE.txt" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="BundleReferencedProjectAssemblies" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' And '%(ReferenceCopyLocalPaths.Extension)' == '.dll'" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Curl.Conformance.UnitProgram.UnitLibrary" />
     <InternalsVisibleTo Include="Libcurl.UnitTests" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" />
-    <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Api.UnitLibrary\Curl.Api.UnitLibrary.csproj" PrivateAssets="$(BundledProjectReferencesPrivateAssets)" />
+    <ProjectReference Include="..\Curl.Engine.UnitLibrary\Curl.Engine.UnitLibrary.csproj" PrivateAssets="$(BundledProjectReferencesPrivateAssets)" />
   </ItemGroup>
 
 </Project>

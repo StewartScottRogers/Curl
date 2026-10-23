@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Download Curl</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:sans-serif;max-width:70rem;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:.3rem .5rem;text-align:left;vertical-align:top}code{word-break:break-all}</style></head>
+<body>
+<h1>Download Curl</h1>
+<p>Curl is a drop-in replacement for the <code>curl</code> command-line tool, written in C# on .NET 10. Every file is in the rolling <code>preview</code> pre-release. The table below is <a href="https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json">resources.json</a> (version {{VERSION}}, commit {{COMMIT}}); verify a download against its SHA-256 or with <a href="https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS">SHA256SUMS</a>.</p>
+<h2>Which .NET library</h2>
+<p>Curl.Api is for new .NET work: an async, HttpClient-shaped client. Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call.</p>
+<h2>Files</h2>
+<table>
+<tr><th>Name</th><th>Kind</th><th>Platform</th><th>File</th><th>Size (bytes)</th><th>SHA-256</th><th>Use</th></tr>
+{{ROWS}}
+</table>
+<p>See also: <a href="../llms.txt">llms.txt</a>, <a href="../mcp/">MCP setup</a>, <a href="../ai-help/">--ai-help reference</a>.</p>
+</body></html>

@@ -1,5 +1,7 @@
 # Libcurl
 
+Libcurl is for porting C or libcurl code to .NET: the libcurl API one call for one call; Curl.Api is for new .NET work: an async, HttpClient-shaped client.
+
 The libcurl-faithful programming interface to Curl (ADR-0506): the libcurl C API shaped for C#.
 It is named `Libcurl`, without the `Curl.` prefix, to match upstream's library name; with
 `Curl.Api`, `Curl.Config`, `Curl.Console` and `Curl.Mcp` it is a naming exception. The root namespace is `Libcurl`, and each
@@ -74,3 +76,7 @@ and a CRAP score at most 30, measured from the fast tests only. Its tests are in
 `Libcurl.UnitTests`, in the same folders. It depends on [`Curl.Api.UnitLibrary`](../Curl.Api.UnitLibrary/README.md) (result codes such as
 `CurlCode`) and `Curl.Engine.UnitLibrary` (the engine it drives), and the conformance runner
 `Curl.Conformance.UnitProgram.UnitLibrary` references it. Its .NET-idiomatic sibling over the same engine is [Curl.Api](../Curl.Api/README.md). See `CLAUDE.md` in this folder for the rules each area follows, and the [Glossary](../Documentation/Wiki/Glossary.md) for the terms.
+
+## Use the package from the preview release
+
+Download `Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Libcurl --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

@@ -196,6 +196,21 @@ if ($TestHeartbeat) {
         $cases += ,@('a pending merge wait polls the board every poll interval', '11', "$($script:polls)")
         $cases += ,@('the next shift starts once, at the second poll', '1', "$($script:started)")
         $cases += ,@('the merge wait still ends with its own line', 'not merged: CI did not finish on aaaaaaa within 60 min', "$($wait.Failure)")
+        # A poll that throws, or writes output, leaves the wait and its result intact (BL-3150).
+        $script:fakeNow = [datetime]'2026-10-22 14:20'
+        $script:throwPolls = 0
+        function Write-Trace { param($Id, $Kind, $Text, $Color) }
+        function gh { if ($script:fakeNow -ge [datetime]'2026-10-22 14:31') { '[{"status":"completed","conclusion":"success","databaseId":7}]' } else { '[{"status":"in_progress","conclusion":null}]' } }
+        function git { '' }
+        function Get-Date { param($Format) $script:fakeNow }
+        function Start-Sleep { param($Seconds) $script:fakeNow = $script:fakeNow.AddSeconds($Seconds) }
+        try {
+            $noisyPoll = { $script:throwPolls++; 'stray output'; if ($script:throwPolls -eq 1) { throw 'herdr said no' } }
+            $okWait = Wait-MergeCiRun -Branch 'factory/test' -Head ('a' * 40) -OnPoll $noisyPoll -PollMinutes 5
+        } finally { Remove-Item function:gh, function:git, function:Get-Date, function:Start-Sleep, function:Write-Trace }
+        $cases += ,@('a throwing, noisy poll still leaves the wait one hashtable', 'System.Collections.Hashtable', "$($okWait.GetType().FullName)")
+        $cases += ,@('a throwing poll is tried again at the next interval', '2', "$($script:throwPolls)")
+        $cases += ,@('the wait returns the run after a throwing poll', '7', "$($okWait.Run.databaseId)")
         $failed = 0
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
