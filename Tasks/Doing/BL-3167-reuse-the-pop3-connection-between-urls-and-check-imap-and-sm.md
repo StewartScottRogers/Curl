@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22: `curl -s pop3://h/1 pop3://h/2`. Upstream sends 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 1d893d7d 50de25b4 500464f5 b8889381 c47bcc15.
