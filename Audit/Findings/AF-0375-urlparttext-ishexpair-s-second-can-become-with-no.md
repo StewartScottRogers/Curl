@@ -3,8 +3,8 @@ id: AF-0375
 title: UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/UrlPartText.cs:IsHexPair-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartText.cs:133:&&
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
