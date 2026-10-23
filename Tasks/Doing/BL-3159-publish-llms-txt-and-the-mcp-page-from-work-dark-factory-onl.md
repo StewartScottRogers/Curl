@@ -47,3 +47,4 @@ Master's hourly run must still refresh `download/` and `ai-help/`. Those come fr
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 598cf571 dec10a34 b0d7dd2a 87f42a66.
