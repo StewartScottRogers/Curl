@@ -1,17 +1,17 @@
 ---
-id: BL-3346
+id: BL-3378
 title: Define the tool, tool-result and resource abstractions of the hand-written MCP server
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3344]
+depends-on: [BL-3376]
 touches: [Curl.Mcp.Protocol.UnitLibrary/Model, Curl.Mcp.Protocol.UnitTests/Model]
 model: opus
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3346 — Define the tool, tool-result and resource abstractions of the hand-written MCP server
+# BL-3378 — Define the tool, tool-result and resource abstractions of the hand-written MCP server
 
 ## Goal
 
@@ -20,7 +20,7 @@ completed:
 ## Context
 
 - This is the seam the port tasks implement, one file per tool; keep it small and stable.
-- The wire shapes must serialize exactly as the golden files of BL-3342 show: `tools/list` entries (`name`, `description`, `inputSchema`, `annotations` with `readOnlyHint`/`idempotentHint` as the SDK emitted them for `version`, `parse_url` and `build_url`); `CallToolResult` (`content` text blocks, `isError`); `resources/list` entries (`uri`, `name`, `description`, `mimeType`); `resources/read` `contents` (`uri`, `mimeType`, `text`). Optional properties are omitted when null or default exactly as the SDK omitted them. If BL-3342 is not Done yet, follow the MCP specification and leave the golden comparison to the final task.
+- The wire shapes must serialize exactly as the golden files of BL-3374 show: `tools/list` entries (`name`, `description`, `inputSchema`, `annotations` with `readOnlyHint`/`idempotentHint` as the SDK emitted them for `version`, `parse_url` and `build_url`); `CallToolResult` (`content` text blocks, `isError`); `resources/list` entries (`uri`, `name`, `description`, `mimeType`); `resources/read` `contents` (`uri`, `mimeType`, `text`). Optional properties are omitted when null or default exactly as the SDK omitted them. If BL-3374 is not Done yet, follow the MCP specification and leave the golden comparison to the final task.
 - The input schema is supplied per tool as raw JSON text (a constant), parsed once and validated to be a JSON object with `type: object` at registration; never reflected or generated from a method signature.
 - The registry is a plain class the host fills one `Add` per tool or provider; duplicates are refused. No reflection scanning anywhere.
 - Source-generated JSON, one context in its own file; tests in `Curl.Mcp.Protocol.UnitTests/Model/` assert literal JSON for each shape.

@@ -1,16 +1,16 @@
 ---
-id: BL-3352
+id: BL-3384
 title: Port the transfer MCP tool onto the hand-written server abstractions
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3343, BL-3346, BL-3342]
+depends-on: [BL-3375, BL-3378, BL-3374]
 touches: [Curl.Mcp/Tools/TransferMcpTool.cs, Curl.Mcp/Tools/TransferMcpToolJson.cs, Curl.Mcp.UnitTests/Tools/TransferMcpToolTests.cs]
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3352 — Port the transfer MCP tool onto the hand-written server abstractions
+# BL-3384 — Port the transfer MCP tool onto the hand-written server abstractions
 
 ## Goal
 
@@ -19,9 +19,9 @@ completed:
 ## Context
 
 - Read `Curl.Mcp/CurlTransferTool.cs`, `Curl.Mcp.UnitTests/CurlTransferToolTests.cs`, `McpTransferToolShapeTests.cs`, ADR-0593 and ADR-0771. Do not edit or delete the old class or tests (the cut-over task does). `McpTransferTool`, `McpTransferRequest` and `McpTransferRequestCheck` stay in `Curl.Mcp.UnitLibrary`.
-- The input schema is written by hand and must equal the golden one for `transfer` from BL-3342 as a JSON value: `url` required, `method`, `headers` (array of `{name, value}` objects, `McpTransferHeader`), `body` (`McpTransferBody` object with its fields, including `isBase64`), `followRedirects`, `timeoutSeconds`, `insecure`, `proxy`, `userAgent`, each with the descriptions of the current parameters.
+- The input schema is written by hand and must equal the golden one for `transfer` from BL-3374 as a JSON value: `url` required, `method`, `headers` (array of `{name, value}` objects, `McpTransferHeader`), `body` (`McpTransferBody` object with its fields, including `isBase64`), `followRedirects`, `timeoutSeconds`, `insecure`, `proxy`, `userAgent`, each with the descriptions of the current parameters.
 - No SDK binder exists any more, so the tool reads the `JsonElement` arguments itself: first `McpTransferRequestCheck.CheckArgumentShapes(arguments)` (its failure becomes the same `McpTransferToolResult.Failed` result the filter produced), then each field with the defaults of the current method signature (`method` "GET", `followRedirects` false, `insecure` false, headers empty). Small source-generated context in `TransferMcpToolJson.cs` for `McpTransferHeader[]`, `McpTransferBody` and the result; no reflection serialization (ADR-0621).
-- A missing or wrongly-typed `url`, and every other bad-shape case in `McpTransferToolShapeTests.cs`, must give the answer the golden files of BL-3342 show or a clearly better one listed in Notes as a deliberate difference.
+- A missing or wrongly-typed `url`, and every other bad-shape case in `McpTransferToolShapeTests.cs`, must give the answer the golden files of BL-3374 show or a clearly better one listed in Notes as a deliberate difference.
 
 ## Acceptance criteria
 

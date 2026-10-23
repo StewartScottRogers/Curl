@@ -1,17 +1,17 @@
 ---
-id: BL-3353
+id: BL-3385
 title: Port the parse_url and build_url MCP tools onto the hand-written server abstractions
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3343, BL-3346, BL-3342]
+depends-on: [BL-3375, BL-3378, BL-3374]
 touches: [Curl.Mcp/Tools/ParseUrlMcpTool.cs, Curl.Mcp/Tools/BuildUrlMcpTool.cs, Curl.Mcp/Tools/UrlMcpToolJson.cs, Curl.Mcp.UnitTests/Tools/ParseUrlMcpToolTests.cs, Curl.Mcp.UnitTests/Tools/BuildUrlMcpToolTests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3353 — Port the parse_url and build_url MCP tools onto the hand-written server abstractions
+# BL-3385 — Port the parse_url and build_url MCP tools onto the hand-written server abstractions
 
 ## Goal
 
@@ -20,7 +20,7 @@ completed:
 ## Context
 
 - Read `Curl.Mcp/CurlUrlTool.cs` and `Curl.Mcp.UnitTests/CurlUrlToolTests.cs`; do not edit or delete them (the cut-over task does). Logic stays in `McpUrlTool` (`Curl.Mcp.UnitLibrary`).
-- Copy the descriptions verbatim (`ParseDescription`, `BuildDescription`, and the shared flags description). Write both input schemas by hand to equal the golden `tools/list` entries of BL-3342 as JSON values (`parse_url`: `url` required, `flags` array of string; `build_url`: `scheme`, `user`, `password`, `options`, `host`, `port`, `path`, `query`, `fragment`, `zoneId`, `flags`, all optional).
+- Copy the descriptions verbatim (`ParseDescription`, `BuildDescription`, and the shared flags description). Write both input schemas by hand to equal the golden `tools/list` entries of BL-3374 as JSON values (`parse_url`: `url` required, `flags` array of string; `build_url`: `scheme`, `user`, `password`, `options`, `host`, `port`, `path`, `query`, `fragment`, `zoneId`, `flags`, all optional).
 - Fields are read from the `JsonElement` arguments; a wrong type or missing `url` answers as the golden files show, or the difference is listed in Notes. A small source-generated context in `UrlMcpToolJson.cs` holds the two result types.
 
 ## Acceptance criteria

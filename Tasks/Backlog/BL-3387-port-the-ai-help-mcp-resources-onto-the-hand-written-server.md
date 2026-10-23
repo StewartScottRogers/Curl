@@ -1,17 +1,17 @@
 ---
-id: BL-3355
+id: BL-3387
 title: Port the --ai-help MCP resources onto the hand-written server abstractions
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3343, BL-3346, BL-3342]
+depends-on: [BL-3375, BL-3378, BL-3374]
 touches: [Curl.Mcp/Tools/AiHelpMcpResourceProvider.cs, Curl.Mcp.UnitTests/Tools/AiHelpMcpResourceProviderTests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3355 — Port the --ai-help MCP resources onto the hand-written server abstractions
+# BL-3387 — Port the --ai-help MCP resources onto the hand-written server abstractions
 
 ## Goal
 
@@ -20,7 +20,7 @@ completed:
 ## Context
 
 - Read `Curl.Mcp/CurlAiHelpResourceHandlers.cs`, `Curl.Mcp.UnitTests/CurlAiHelpResourceHandlersTests.cs` and ADR-0589; do not edit or delete the old file or tests (the cut-over task does).
-- List: every catalogue resource with `uri`, `name`, `description` and `mimeType` `McpAiHelpResource.MimeType`. Read: the resource's Markdown as one text content with `uri` and the same MIME type; an unknown or empty URI is the not-found failure with the message `Resource not found: '<uri>'.` (the handler from the resources task turns it into code -32002). Golden files of BL-3342 decide anything ambiguous.
+- List: every catalogue resource with `uri`, `name`, `description` and `mimeType` `McpAiHelpResource.MimeType`. Read: the resource's Markdown as one text content with `uri` and the same MIME type; an unknown or empty URI is the not-found failure with the message `Resource not found: '<uri>'.` (the handler from the resources task turns it into code -32002). Golden files of BL-3374 decide anything ambiguous.
 
 ## Acceptance criteria
 

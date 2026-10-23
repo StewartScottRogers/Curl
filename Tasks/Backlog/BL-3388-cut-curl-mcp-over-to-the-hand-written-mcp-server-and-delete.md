@@ -1,21 +1,21 @@
 ---
-id: BL-3356
+id: BL-3388
 title: Cut Curl.Mcp over to the hand-written MCP server and delete the SDK-attributed tool classes
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3342, BL-3348, BL-3349, BL-3350, BL-3351, BL-3352, BL-3353, BL-3354, BL-3355]
+depends-on: [BL-3374, BL-3380, BL-3381, BL-3382, BL-3383, BL-3384, BL-3385, BL-3386, BL-3387]
 touches: [Curl.Mcp, Curl.Mcp.UnitTests, Curl.Mcp.IntegrationTests/CurlTransferToolIntegrationTests.cs]
 model: opus
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3356 — Cut Curl.Mcp over to the hand-written MCP server and delete the SDK-attributed tool classes
+# BL-3388 — Cut Curl.Mcp over to the hand-written MCP server and delete the SDK-attributed tool classes
 
 ## Goal
 
-`Curl.Mcp` runs on the hand-written server end to end: `Program` starts `McpStdioHost` with all five tools and the ai-help resources registered, no source file in `Curl.Mcp`, `Curl.Mcp.UnitTests` or `Curl.Mcp.IntegrationTests` uses `ModelContextProtocol` or `Microsoft.Extensions.*`, and the golden conversations of BL-3342 pass against it.
+`Curl.Mcp` runs on the hand-written server end to end: `Program` starts `McpStdioHost` with all five tools and the ai-help resources registered, no source file in `Curl.Mcp`, `Curl.Mcp.UnitTests` or `Curl.Mcp.IntegrationTests` uses `ModelContextProtocol` or `Microsoft.Extensions.*`, and the golden conversations of BL-3374 pass against it.
 
 ## Context
 

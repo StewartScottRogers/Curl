@@ -1,17 +1,17 @@
 ---
-id: BL-3345
+id: BL-3377
 title: Hand-write the newline-delimited stdio transport for the MCP server
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3344]
+depends-on: [BL-3376]
 touches: [Curl.Mcp.Protocol.UnitLibrary/Transport, Curl.Mcp.Protocol.UnitTests/Transport]
 model: opus
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3345 — Hand-write the newline-delimited stdio transport for the MCP server
+# BL-3377 — Hand-write the newline-delimited stdio transport for the MCP server
 
 ## Goal
 
@@ -19,8 +19,8 @@ completed:
 
 ## Context
 
-- MCP transport and message rules: https://modelcontextprotocol.io/specification (read the protocol revision the golden conversations recorded by BL-3342 show the SDK 2.2.0 server negotiating, and say which revision you read). Rules: messages are UTF-8, one per line, never containing an embedded newline; the server writes nothing but messages to its output stream.
-- Types: `IMcpTransport` (`ReadMessageAsync` returning `null` at end of input, `WriteMessageAsync`) and `StdioMcpTransport` over an input and an output `Stream` (the host passes `Console.OpenStandardInput()` and `OpenStandardOutput()`). No BOM; flush after each message; a write lock so concurrent responses never interleave; blank lines skipped; `\r\n` accepted; a final unterminated line at end of input still delivered; a maximum line length, with the number and reason in a doc comment, whose breach becomes an invalid-request message rather than a crash. Uses the JSON-RPC types of BL-3344.
+- MCP transport and message rules: https://modelcontextprotocol.io/specification (read the protocol revision the golden conversations recorded by BL-3374 show the SDK 2.2.0 server negotiating, and say which revision you read). Rules: messages are UTF-8, one per line, never containing an embedded newline; the server writes nothing but messages to its output stream.
+- Types: `IMcpTransport` (`ReadMessageAsync` returning `null` at end of input, `WriteMessageAsync`) and `StdioMcpTransport` over an input and an output `Stream` (the host passes `Console.OpenStandardInput()` and `OpenStandardOutput()`). No BOM; flush after each message; a write lock so concurrent responses never interleave; blank lines skipped; `\r\n` accepted; a final unterminated line at end of input still delivered; a maximum line length, with the number and reason in a doc comment, whose breach becomes an invalid-request message rather than a crash. Uses the JSON-RPC types of BL-3376.
 - Tests in `Curl.Mcp.Protocol.UnitTests/Transport/` over `MemoryStream` and in-memory pipe streams, no socket and no process: reads split in the middle of a multibyte character, many messages in one read, cancellation of a pending read, concurrent writers produce whole lines only. No `Thread.Sleep`; inject nothing time-based.
 
 ## Acceptance criteria

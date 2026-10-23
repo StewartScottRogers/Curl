@@ -1,17 +1,17 @@
 ---
-id: BL-3354
+id: BL-3386
 title: Port the version MCP tool onto the hand-written server abstractions
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3343, BL-3346, BL-3342]
+depends-on: [BL-3375, BL-3378, BL-3374]
 touches: [Curl.Mcp/Tools/VersionMcpTool.cs, Curl.Mcp/Tools/VersionMcpToolJson.cs, Curl.Mcp.UnitTests/Tools/VersionMcpToolTests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3354 — Port the version MCP tool onto the hand-written server abstractions
+# BL-3386 — Port the version MCP tool onto the hand-written server abstractions
 
 ## Goal
 
@@ -20,7 +20,7 @@ completed:
 ## Context
 
 - Read `Curl.Mcp/CurlVersionTool.cs` and `Curl.Mcp.UnitTests/CurlVersionToolTests.cs`; do not edit or delete them (the cut-over task does). Logic stays in `McpVersionTool`.
-- The tool takes no arguments; its schema is written by hand and must equal the golden `version` entry of BL-3342 as a JSON value (the SDK emits an object schema with no properties). Arguments supplied anyway are ignored as the golden files show. A tiny source-generated context in `VersionMcpToolJson.cs` holds `McpVersionToolResult`.
+- The tool takes no arguments; its schema is written by hand and must equal the golden `version` entry of BL-3374 as a JSON value (the SDK emits an object schema with no properties). Arguments supplied anyway are ignored as the golden files show. A tiny source-generated context in `VersionMcpToolJson.cs` holds `McpVersionToolResult`.
 
 ## Acceptance criteria
 
