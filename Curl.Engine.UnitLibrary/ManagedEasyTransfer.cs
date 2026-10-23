@@ -1620,10 +1620,22 @@ internal sealed partial class ManagedEasyTransfer(
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
+        info = info with { PrimaryPort = PrimaryPortOf(info, result) };
         return toolState is null
             ? info with { EffectiveUrl = UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
+
+    /// <summary>
+    /// The <c>CURLINFO_PRIMARY_PORT</c> of a performed transfer: -1 for a failed one that reached no peer, as libcurl
+    /// 8.22.0 answers after a refused connect or a failed name lookup (measured 2026-10-22, BL-3195 Notes), else the
+    /// port <paramref name="info" /> took from the report.
+    /// </summary>
+    /// <param name="info">The info from the report.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The port.</returns>
+    internal static long PrimaryPortOf(TransferInfo info, TransferResult result) =>
+        info.PrimaryPort == 0 && result.ExitCode != CurlExitCode.Ok ? -1 : info.PrimaryPort;
 
     /// <summary>
     /// The info of a transfer the curl tool's runner performed, with the answers its <c>-w</c> output prints in place of

@@ -1376,9 +1376,24 @@ public sealed class HttpProtocolHandler(
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
-        { Report = exchange.Report(body) };
+        { Report = WithHeadBeforeFailure(exchange.Report(body), failure) };
         return FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
     }
+
+    /// <summary>
+    /// Puts the response code, HTTP version and header size of the head a failure cut short on
+    /// <paramref name="report" />, as libcurl 8.22.0 keeps them after a header line it refuses (BL-3195);
+    /// <paramref name="report" /> itself when the head was read whole or the failure came before its status line.
+    /// </summary>
+    private static TransferReport WithHeadBeforeFailure(TransferReport report, HttpTransferException failure) =>
+        report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
+            ? report
+            : report with
+            {
+                ResponseCode = statusLine.StatusCode,
+                HttpVersion = statusLine.Version,
+                HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
+            };
 
     /// <summary>
     /// Reports a timed-out exchange's held header lines, and gives the attempt's outcome: exit

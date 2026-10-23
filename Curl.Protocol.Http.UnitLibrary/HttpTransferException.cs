@@ -39,4 +39,11 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     /// the header lines or after a 1xx head (upstream tests 158 and 415, BL-2867).
     /// </summary>
     internal byte[] HeadBytesBeforeFailure { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the status line of the head the failure cut short, or <see langword="null" /> when it came
+    /// before one: libcurl 8.22.0 still reports that response's code and version, and the bytes of
+    /// <see cref="HeadBytesBeforeFailure" /> as its header size, after a failure among its header lines (BL-3195).
+    /// </summary>
+    internal HttpStatusLine? StatusLineBeforeFailure { get; set; }
 }

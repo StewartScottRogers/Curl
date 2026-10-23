@@ -453,11 +453,11 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
 
     /// <summary>
     /// The <c>%{remote_port}</c> of <paramref name="info"/>: its primary port; <c>-1</c> when no
-    /// connection was made, which <see cref="TransferInfo.PrimaryPort"/> answers as <c>0</c>.
+    /// connection was made, which <see cref="TransferInfo.PrimaryPort"/> answers as <c>0</c> or, after a failed transfer, <c>-1</c> (BL-3195).
     /// </summary>
     private static long FindRemotePort(TransferInfo info)
     {
-        return info.PrimaryPort == 0 ? UnknownPort : info.PrimaryPort;
+        return info.PrimaryPort <= 0 ? UnknownPort : info.PrimaryPort;
     }
 
     /// <summary>
@@ -473,6 +473,6 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
             return info.LocalPort;
         }
 
-        return info.PrimaryPort == 0 ? UnknownPort : UnreportedLocalPort;
+        return info.PrimaryPort <= 0 ? UnknownPort : UnreportedLocalPort;
     }
 }
