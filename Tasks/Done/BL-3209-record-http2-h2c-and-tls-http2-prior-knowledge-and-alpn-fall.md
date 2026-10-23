@@ -8,7 +8,7 @@ depends-on: []
 touches: [Record-CurlExchange.ps1, Documentation/Product/Http2OriginRecordings.md]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3209 — Record --http2 (h2c and TLS), --http2-prior-knowledge and ALPN fallback against an nghttp2-built curl 8.22.0 with an HTTP/2 origin in Record-CurlExchange.ps1
 
@@ -26,12 +26,15 @@ Write the recorded results (command lines, request bytes as hex or escaped text,
 
 ## Acceptance criteria
 
-- [ ] `Record-CurlExchange.ps1` has a documented HTTP/2 origin mode covering h2c upgrade (accepted and ignored), prior knowledge, and TLS with ALPN `h2` or `http/1.1`.
-- [ ] `Documentation/Product/Http2OriginRecordings.md` records an nghttp2-built curl 8.22.0's request bytes, `%{http_version}`, `-v` lines and exit codes for `--http2` over h2c, `--http2` over TLS, `--http2-prior-knowledge`, and ALPN fallback to HTTP/1.1, naming the curl build used.
+- [x] `Record-CurlExchange.ps1` has a documented HTTP/2 origin mode covering h2c upgrade (accepted and ignored), prior knowledge, and TLS with ALPN `h2` or `http/1.1`.
+- [x] `Documentation/Product/Http2OriginRecordings.md` records an nghttp2-built curl 8.22.0's request bytes, `%{http_version}`, `-v` lines and exit codes for `--http2` over h2c, `--http2` over TLS, `--http2-prior-knowledge`, and ALPN fallback to HTTP/1.1, naming the curl build used.
 
 ## Notes
+
+- Added `-Http2Origin` (h2c-upgrade, h2c-upgrade-ignored, prior-knowledge, alpn) to the existing RecorderHttp2Proxy class. Recorded with curl-for-win 8.22.0_1 (LibreSSL, nghttp2/1.70.0). Only a script and a document changed, so no C# build or test applies.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: a252bd00 6db5a716.
+- 2026-10-22: Doing -> Done. Record-CurlExchange.ps1 -Http2Origin serves h2c/prior-knowledge/ALPN origins; nghttp2 curl 8.22.0 recorded in Http2OriginRecordings.md
