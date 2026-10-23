@@ -117,8 +117,18 @@ internal sealed partial class ManagedEasyTransfer
     /// <returns>The body, or <see langword="null" /> for none.</returns>
     internal static StreamBody? TrailerPostFieldsBodyOf(EngineToolTransferInputs? toolInputs, EasyOptions options, CurlUrl url) =>
         IsHandlesOwnHttpPost(toolInputs, options, url) && options.Callbacks.Trailer is { } trailer && options.Http.PostFields is { } fields
-            ? new StreamBody(new PostFieldsTrailerStream(fields.ToArray(), trailer), fields.Length, HttpRequestOptionsMapping.FormUrlEncoded)
+            ? new StreamBody(new PostFieldsTrailerStream(SizedFieldsOf(fields, options.Http.PostFieldSize), trailer), SizedFieldsOf(fields, options.Http.PostFieldSize).Length, HttpRequestOptionsMapping.FormUrlEncoded)
             : null;
+
+    /// <summary>
+    /// <paramref name="fields" /> cut to <paramref name="size" /> bytes when that is not negative and shorter, as a
+    /// plain post is (<c>CURLOPT_POSTFIELDSIZE</c>, BL-3201, ADR-0773); otherwise all of them.
+    /// </summary>
+    /// <param name="fields">The <c>CURLOPT_POSTFIELDS</c> data.</param>
+    /// <param name="size">The <c>CURLOPT_POSTFIELDSIZE</c>, or a negative number for all of the data.</param>
+    /// <returns>A copy of the bytes to send.</returns>
+    private static byte[] SizedFieldsOf(ReadOnlyMemory<byte> fields, long size) =>
+        (size < 0 || size >= fields.Length ? fields : fields[..(int)size]).ToArray();
 
     /// <summary>Whether a perform with no runner's pieces posts, not uploads, to an <c>http</c> or <c>https</c> URL.</summary>
     /// <param name="toolInputs">The runner's chosen pieces, or <see langword="null" /> for a handle's own.</param>

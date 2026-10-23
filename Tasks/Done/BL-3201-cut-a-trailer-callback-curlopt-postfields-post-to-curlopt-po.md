@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.PostBody.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.TrailerPost.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3201 — Cut a trailer-callback CURLOPT_POSTFIELDS post to CURLOPT_POSTFIELDSIZE
 
@@ -22,11 +22,14 @@ BL-3190 cut the plain post in `HttpRequestOptionsMapping.PostFieldsBodyOf` (ADR-
 
 ## Acceptance criteria
 
-- [ ] A test in `Curl.Engine.UnitTests/ManagedEasyTransferTests.TrailerPost.cs` posts `abcdef` with `PostFieldSize` 3 and the trailer callback set, and expects `Content-Length: 3` and body `abc`; build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
+- [x] A test in `Curl.Engine.UnitTests/ManagedEasyTransferTests.TrailerPost.cs` posts `abcdef` with `PostFieldSize` 3 and the trailer callback set, and expects `Content-Length: 3` and body `abc`; build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
 
 ## Notes
+
+- Cut inline in ManagedEasyTransfer.PostBody.cs (SizedFieldsOf) since HttpRequestOptionsMapping.SizedPostFieldsOf is private and outside touches. Engine tests 2290 passed; Measure-CodeQuality 0 failing members.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: c2d196e5.
+- 2026-10-22: Doing -> Done. Trailer-callback POSTFIELDS post is cut to POSTFIELDSIZE
