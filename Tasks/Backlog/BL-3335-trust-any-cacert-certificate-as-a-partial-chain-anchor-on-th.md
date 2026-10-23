@@ -1,5 +1,5 @@
 ---
-id: BL-3334
+id: BL-3335
 title: Trust any --cacert certificate as a partial-chain anchor on the OpenSSL build
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3334 — Trust any --cacert certificate as a partial-chain anchor on the OpenSSL build
+# BL-3335 — Trust any --cacert certificate as a partial-chain anchor on the OpenSSL build
 
 ## Goal
 
