@@ -37,3 +37,4 @@ Split from BL-3204 (report 29: handles of one library leak cookies and connectio
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 4692e370 e2e3b72c 3d88e88c 88324f4b d8d1f0e8 ecaac2b5.
