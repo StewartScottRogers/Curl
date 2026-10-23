@@ -36,3 +36,4 @@ Upstream curl 8.22.0 (curl-8_22_0) scripts/checksrc.pl, run for the sample C fil
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 63150620 8130eb23 3550c5ef 78e0a7b4.
