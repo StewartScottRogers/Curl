@@ -27,6 +27,27 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow(CurlUrlPart.Url)]
+    [DataRow(CurlUrlPart.Host)]
+    public void Get_PunycodeToIdnOnA255CharacterLabel_IsBadHostname(CurlUrlPart part)
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://" + new string('a', 255) + "/");
+
+        Assert.AreEqual(CurlUrlCode.BadHostname, url.Get(part, CurlUrlFlags.PunycodeToIdn, out string? value));
+        Assert.IsNull(value);
+    }
+
+    [TestMethod]
+    public void Get_PunycodeToIdnOnA63CharacterLabel_ReturnsTheHost()
+    {
+        string host = new('a', 63);
+        using ManagedCurlUrlHandle url = Parsed("http://" + host + "/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(CurlUrlPart.Host, CurlUrlFlags.PunycodeToIdn, out string? value));
+        Assert.AreEqual(host, value);
+    }
+
+    [TestMethod]
     [DataRow(CurlUrlPart.User, CurlUrlCode.NoUser)]
     [DataRow(CurlUrlPart.Password, CurlUrlCode.NoPassword)]
     [DataRow(CurlUrlPart.Options, CurlUrlCode.NoOptions)]
@@ -414,6 +435,25 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual("/a/../b", GetOk(asIs, CurlUrlPart.Path));
     }
 
+    // Scenarios 1730 and 2769 of the BL-3236 differential replay (BL-3297): libcurl prints a NULL path as (nil).
+    [TestMethod]
+    public void Get_FileSchemeSetOnAnEmptyHandle_ReturnsFileNil()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Scheme, "file", CurlUrlFlags.None));
+        Assert.AreEqual("file://(nil)", GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Get_FileUrlWithItsPathCleared_ReturnsFileNil()
+    {
+        using ManagedCurlUrlHandle url = Parsed("file:///x");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Path, null, CurlUrlFlags.None));
+        Assert.AreEqual("file://(nil)", GetOk(url, CurlUrlPart.Url));
+    }
+
     [TestMethod]
     public void Get_FileUrl_HasNoHostAndRebuildsFromThePath()
     {
@@ -572,6 +612,14 @@ public sealed partial class ManagedCurlUrlHandleTests
         using ManagedCurlUrlHandle url = Parsed("https://h/_%c0_");
 
         Assert.AreEqual("/_\uDCC0_", GetOk(url, CurlUrlPart.Path, CurlUrlFlags.UrlDecode));
+    }
+
+    [TestMethod]
+    public void Get_DecodedPathOfPercentFF_IsDcffNotReplacementCharacter()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://a/%FF");
+
+        Assert.AreEqual("/\uDCFF", GetOk(url, CurlUrlPart.Path, CurlUrlFlags.UrlDecode));
     }
 
     private static ManagedCurlUrlHandle Parsed(string text, CurlUrlFlags flags = CurlUrlFlags.None)

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3298 — curl_url_get with CURLU_PUNY2IDN fails with CURLUE_BAD_HOSTNAME on a host label over 63 characters, as libcurl does
 
@@ -22,11 +22,15 @@ Scenarios 1024-1044 (http:// plus 255 a's): Curl returns 0 and the host; libcurl
 
 ## Acceptance criteria
 
-- [ ] A ManagedCurlUrlHandle unit test pins the code for a 255-character label.
-- [ ] The build is clean and the fast tests pass.
+- [x] A ManagedCurlUrlHandle unit test pins the code for a 255-character label.
+- [x] The build is clean and the fast tests pass.
 
 ## Notes
+
+- Windows WinIDN/libcurl refuses any label over 63 characters under CURLU_PUNY2IDN, so the check sits in ManagedCurlUrlHandle (Get of Host and Url) and covers every host, not just xn-- ones. Pinned from the libcurl 8.22.0 differential finding; platform curl not re-measured.
 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 5afa8f96 c46ca32a.
+- 2026-10-23: Doing -> Done. curl_url_get with CURLU_PUNY2IDN returns CURLUE_BAD_HOSTNAME for a host label over 63 characters

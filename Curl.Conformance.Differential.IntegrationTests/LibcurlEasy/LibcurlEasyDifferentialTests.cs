@@ -7,9 +7,10 @@ using Libcurl.Global;
 namespace Curl.Conformance.Differential.IntegrationTests.LibcurlEasy;
 
 /// <summary>
-/// Replays the tester's Libcurl easy-handle cases (<c>LibcurlEasy/EasyRounds.json</c>, the
-/// tester's <c>e_in.json</c>; <c>LibcurlEasy/HeaderRound.json</c>, its <c>h_round.json</c>;
-/// and <see cref="LibcurlHeaderCases"/>, its <c>h_in.json</c>) through Curl's Libcurl and the
+/// Replays the tester's Libcurl easy-handle cases (<c>LibcurlEasy/HeaderRound.json</c>, its
+/// <c>h_round.json</c>;
+/// <see cref="LibcurlHeaderCases"/>, its <c>h_in.json</c>; and every named case of its
+/// <c>easytest.py</c>, <c>LibcurlEasyCases/EasyCases.json</c>) through Curl's Libcurl and the
 /// reference libcurl 8.22.0 against the loopback server, and writes the <c>easy_report.txt</c>
 /// report (ADR-0792). Inconclusive unless <c>CURL_DIFFERENTIAL_REFERENCE_LIBRARY</c> names the
 /// reference shared library; the report goes to <c>CURL_DIFFERENTIAL_REPORT</c> when it names a
@@ -43,18 +44,21 @@ public sealed class LibcurlEasyDifferentialTests
 
         IEnumerable<LibcurlEasyCase> cases =
         [
-            new("e_in", LibcurlEasyRoundReader.ReadEmbedded("LibcurlEasy/EasyRounds.json")),
             new("h_round", LibcurlEasyRoundReader.ReadEmbedded("LibcurlEasy/HeaderRound.json")),
             .. LibcurlHeaderCases.All,
+            .. LibcurlEasyNamedCaseReader.ReadEmbedded(),
         ];
         await using var server = StartOnFreePorts();
         cases = cases.Select(easyCase => OnPort(easyCase, server.Port));
+        // Each control request on a fresh connection: a pooled one sits idle while a slow case runs and the server may close it first.
         using var control = new HttpClient(new SocketsHttpHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(5) };
+        control.DefaultRequestHeaders.ConnectionClose = true;
         using var reference = new ReferenceLibcurlEasyDriver(referencePath);
         await using var library = CurlGlobal.Init();
         var outcomes = new List<LibcurlEasyCaseOutcome>();
         foreach (var easyCase in cases)
         {
+            TestContext.WriteLine(easyCase.Name);
             await ControlAsync(control, server, "/reset");
             var real = reference.Run(easyCase.Rounds);
             var realWire = await ControlAsync(control, server, "/log");
@@ -98,6 +102,20 @@ public sealed class LibcurlEasyDifferentialTests
             })],
         };
 
-    private async Task<byte[]> ControlAsync(HttpClient control, DifferentialLoopbackServer server, string path) =>
-        await control.GetByteArrayAsync(new Uri($"http://127.0.0.1:{server.ControlPort}{path}"), TestContext.CancellationToken);
+    /// <summary>Asks the control port for <paramref name="path"/>, trying again when the connection is reset before the answer arrives (the server faults stop the run instead).</summary>
+    private async Task<byte[]> ControlAsync(HttpClient control, DifferentialLoopbackServer server, string path)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await control.GetByteArrayAsync(new Uri($"http://127.0.0.1:{server.ControlPort}{path}"), TestContext.CancellationToken);
+            }
+            catch (HttpRequestException exception) when (attempt < 3)
+            {
+                server.ThrowIfFaulted();
+                TestContext.WriteLine($"control {path} attempt {attempt}: {exception.Message}");
+            }
+        }
+    }
 }

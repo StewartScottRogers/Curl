@@ -9,6 +9,7 @@ using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Network;
 using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -118,11 +119,28 @@ internal sealed partial class ManagedEasyTransfer
                 new TransferInfo { EffectiveUrl = transferUrl, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
         }
 
+        CurlCode code = result.ExitCode.ToCurlCode();
         return Finish(
-            result.ExitCode.ToCurlCode(),
-            result.ErrorMessage ?? string.Empty,
+            code,
+            ErrorTextOf(code, result.ErrorMessage),
             PerformedInfoOf(result, options, transferUrl, transferId, cookieList, connectionId, toolState));
     }
+
+    /// <summary>
+    /// The text a failed perform leaves as <see cref="ErrorText" />: the handler's message, except that for
+    /// <see cref="CurlCode.TooLarge" /> and <see cref="CurlCode.WriteError" /> a message that is only the code's stock
+    /// text is dropped, as libcurl 8.22.0 returns those codes (an oversized header, a failed gzip trailer write) with no
+    /// <c>failf</c>, leaving <c>CURLOPT_ERRORBUFFER</c> empty (BL-3318).
+    /// </summary>
+    /// <param name="code">The perform's code.</param>
+    /// <param name="message">The handler's message, or <see langword="null" />.</param>
+    /// <returns>The error text.</returns>
+    internal static string ErrorTextOf(CurlCode code, string? message) =>
+        message is null
+        || (code == CurlCode.TooLarge && message == "A value or data field grew larger than allowed")
+        || (code == CurlCode.WriteError && message == "Failed writing received data to disk/application")
+            ? string.Empty
+            : message;
 
     /// <summary>
     /// The <c>WWW-Authenticate</c> values of <paramref name="result" />'s last response when it is a 401, else none.
@@ -157,11 +175,51 @@ internal sealed partial class ManagedEasyTransfer
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
-        info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer };
+        info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
+        info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl) };
         return toolState is null
             ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
+
+    /// <summary>
+    /// The <c>CURLINFO_RESPONSE_CODE</c> of a performed transfer: the report's, else - for a transfer a watchdog cut off
+    /// with no report, such as a multi transfer's low-speed timeout - the status the header recording already put on the
+    /// handle's info, as libcurl 8.22.0 keeps the status it received (BL-3309).
+    /// </summary>
+    /// <param name="info">The info from the report.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The response code.</returns>
+    private long ResponseCodeOf(TransferInfo info, TransferResult result) =>
+        result.Report is null ? Info.ResponseCode : info.ResponseCode;
+
+    /// <summary>
+    /// The <c>CURLINFO_NUM_CONNECTS</c> of a performed transfer: the report's, else 1 where libcurl 8.22.0 counts a
+    /// connection the report does not (BL-3316): a <c>tftp</c> transfer (its socket is the connection), a transfer under
+    /// <c>CURLOPT_FRESH_CONNECT</c> or <c>CURLOPT_FORBID_REUSE</c> that succeeded (libcurl always opens a new connection
+    /// for it; this engine does not yet, see BL-3316 Notes), and one a watchdog cut off after the response head came, as the
+    /// low-speed timeout does.
+    /// </summary>
+    /// <param name="info">The info with the report's count.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="requestUrl">The URL transferred.</param>
+    /// <returns>The number of connections.</returns>
+    internal static long NumConnectsOf(TransferInfo info, TransferResult result, EasyOptions options, string requestUrl)
+    {
+        if (info.NumConnects > 0)
+        {
+            return info.NumConnects;
+        }
+
+        return ForcesNewConnection(options.Network, result) || CutOffAfterHead(info, result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+    }
+
+    private static bool ForcesNewConnection(EasyNetworkOptions network, TransferResult result) =>
+        (network.FreshConnect || network.ForbidReuse) && result.ExitCode == CurlExitCode.Ok;
+
+    private static bool CutOffAfterHead(TransferInfo info, TransferResult result) =>
+        result.Report is null && result.ExitCode != CurlExitCode.Ok && info.ResponseCode > 0;
 
     /// <summary>
     /// The <c>CURLINFO_PRIMARY_PORT</c> of a performed transfer: -1 for a failed one that reached no peer, as libcurl

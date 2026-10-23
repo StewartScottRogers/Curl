@@ -290,8 +290,36 @@ public sealed partial class ManagedEasyTransferTests
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.UrlMalformat, code);
-        Assert.AreEqual(ManagedEasyTransfer.MalformedUrlText, easy.ErrorText);
+        Assert.StartsWith("URL rejected: ", easy.ErrorText);
         Assert.AreEqual("http://[::1/", easy.Info.EffectiveUrl);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_PortPastTheRange_NamesTheBadPortAsLibcurlDoes()
+    {
+        await using IEasyTransfer easy = CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:99999/" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.UrlMalformat, code);
+        Assert.AreEqual("URL rejected: Port number was not a decimal number between 0 and 65535", easy.ErrorText);
+    }
+
+    [TestMethod]
+    [DataRow(CurlCode.TooLarge, "A value or data field grew larger than allowed")]
+    [DataRow(CurlCode.WriteError, "Failed writing received data to disk/application")]
+    public void ErrorTextOf_StockTextOfCodeLibcurlLeavesSilent_IsEmpty(CurlCode code, string stock)
+    {
+        Assert.AreEqual(string.Empty, ManagedEasyTransfer.ErrorTextOf(code, stock));
+    }
+
+    [TestMethod]
+    public void ErrorTextOf_OtherTextOrCode_KeepsTheMessage()
+    {
+        Assert.AreEqual("Failure writing output to destination, passed 5 returned 3", ManagedEasyTransfer.ErrorTextOf(CurlCode.WriteError, "Failure writing output to destination, passed 5 returned 3"));
+        Assert.AreEqual("A value or data field grew larger than allowed", ManagedEasyTransfer.ErrorTextOf(CurlCode.RecvError, "A value or data field grew larger than allowed"));
+        Assert.AreEqual(string.Empty, ManagedEasyTransfer.ErrorTextOf(CurlCode.TooLarge, null));
     }
 
     [TestMethod]

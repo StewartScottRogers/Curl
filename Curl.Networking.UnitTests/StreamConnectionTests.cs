@@ -178,7 +178,7 @@ public sealed class StreamConnectionTests
         await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
         {
             ReportsAbortedReadAsReset = true,
-            HasUnreadBytesBeforeWrite = _ => true,
+            HasUnreadBytesOrEndBeforeWrite = _ => true,
         };
 
         Diagnostics.Arrange("read failure, reports abort as reset, unread bytes before write", "ConnectionAborted, true, true");
@@ -193,13 +193,38 @@ public sealed class StreamConnectionTests
     }
 
     [TestMethod]
+    public async Task ReadAsync_WhenTheServerClosedTheKeptConnectionBeforeTheWriteAndTheReadIsAborted_FailsWithTheAbort()
+    {
+        // BL-3304: a reused kept connection whose server had sent its FIN; curl 8.22.0 Schannel
+        // prints "Recv failure: Connection was aborted" for it.
+        var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
+        bool peersFinUnread = true;
+        await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
+        {
+            ReportsAbortedReadAsReset = true,
+            HasUnreadBytesOrEndBeforeWrite = _ => peersFinUnread,
+        };
+
+        Diagnostics.Arrange("read failure, reports abort as reset, peer's FIN unread before write", "ConnectionAborted, true, true");
+
+        await connection.WriteAsync(new byte[] { 0x47 }, CancellationToken.None);
+        var failure = await Assert.ThrowsExactlyAsync<IOException>(() => connection.ReadAsync(new byte[8], CancellationToken.None).AsTask());
+        string words = Curl.Protocol.Abstractions.CurlSocketErrorText.ReceiveFailure(failure, isWindows: true)!;
+
+        Diagnostics.Act("words", words);
+        Diagnostics.Assert("words", "Recv failure: Connection was aborted", words);
+
+        Assert.AreEqual("Recv failure: Connection was aborted", words);
+    }
+
+    [TestMethod]
     public async Task ReadAsync_WhenNoBytesWereUnreadBeforeTheWriteAndTheReadIsAborted_FailsWithConnectionReset()
     {
         var aborted = new IOException("Unable to read data.", new SocketException((int)SocketError.ConnectionAborted));
         await using var connection = new StreamConnection(new ReadFailingStream(aborted), null)
         {
             ReportsAbortedReadAsReset = true,
-            HasUnreadBytesBeforeWrite = _ => false,
+            HasUnreadBytesOrEndBeforeWrite = _ => false,
         };
 
         Diagnostics.Arrange("read failure, reports abort as reset, unread bytes before write", "ConnectionAborted, true, false");

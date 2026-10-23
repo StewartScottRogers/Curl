@@ -720,10 +720,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate;
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
-        ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
+        ? TlsFailureMessages.SchannelSslConnectError(failure, _options.MaximumVersion)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
-
-    private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     // Cancellation is the one exception ITlsProvider lets escape; its stack trace is kept.
     private static void RethrowIfCancellation(Exception failure)

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.UnitLibrary/ReferenceBuildLimitation.cs, Curl.Conformance.Differential.UnitLibrary/Cases/CliTls/CliTlsCases.json]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3313 — Tag tls-mtls-p12 as a Schannel P12 credential limitation in the differential runner
 
@@ -22,11 +22,15 @@ BL-3290 measured that curl 8.22.0 (ucrt64) and curl 8.21.0 (System32) on Windows
 
 ## Acceptance criteria
 
-- [ ] `ReferenceBuildLimitation` has a documented member for the Schannel P12 credential refusal and `tls-mtls-p12` carries it in `CliTlsCases.json`.
-- [ ] The build is clean and the fast tests pass.
+- [x] `ReferenceBuildLimitation` has a documented member for the Schannel P12 credential refusal and `tls-mtls-p12` carries it in `CliTlsCases.json`.
+- [x] The build is clean and the fast tests pass.
 
 ## Notes
+
+- Member named SchannelRefusesP12Credential; tls-mtls-p12-badpw left untagged. Build clean; Differential.UnitTests 590 passed; quality run 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 1abf7f6d c46ca32a.
+- 2026-10-23: Doing -> Done. tls-mtls-p12 tagged SchannelRefusesP12Credential in the differential runner

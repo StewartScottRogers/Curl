@@ -1,4 +1,3 @@
-using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Url;
 using Curl.Conformance.Differential.Libcurl.Scenarios;
@@ -36,12 +35,8 @@ internal sealed class ManagedLibcurlScenarioTarget(CurlLibrary library) : ILibcu
     {
         public int Set(int part, string? value, int flags) => (int)handle.Set((CurlUrlPart)part, value, (CurlUrlFlags)flags);
 
-        public int Get(int part, int flags, out byte[]? value)
-        {
-            var code = handle.Get((CurlUrlPart)part, (CurlUrlFlags)flags, out var text);
-            value = text is null ? null : Encoding.UTF8.GetBytes(text);
-            return (int)code;
-        }
+        public int Get(int part, int flags, out byte[]? value) =>
+            (int)handle.GetBytes((CurlUrlPart)part, (CurlUrlFlags)flags, out value);
 
         public void Dispose() => handle.Dispose();
     }

@@ -18,6 +18,8 @@ namespace Curl.Engine;
 internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 {
     private const string FileScheme = "file";
+    private const string NilPath = "(nil)";
+    private const int MaxHostLabelLength = 63;
 
     /// <summary>The longest string a set accepts for any part (upstream's <c>CURL_MAX_INPUT_LENGTH</c>).</summary>
     private const int MaximumInputLength = 8_000_000;
@@ -133,7 +135,20 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         flags.HasFlag(CurlUrlFlags.NoDefaultPort) && defaultPort == written ? null : written;
 
     private static UrlPartResult Transformed(string? value, CurlUrlCode missing, CurlUrlFlags flags, CurlUrlPart part) =>
-        value is null ? UrlPartResult.Failed(missing) : UrlPartText.Transform(value, flags, part);
+        value is null ? UrlPartResult.Failed(missing)
+        : part == CurlUrlPart.Host && RefusedByIdn(value, flags)
+            ? UrlPartResult.Failed(CurlUrlCode.BadHostname)
+            : UrlPartText.Transform(value, flags, part);
+
+    /// <summary>
+    /// Whether <c>CURLU_PUNY2IDN</c> (without <c>CURLU_PUNYCODE</c>, <c>CURLU_URLDECODE</c> or
+    /// <c>CURLU_URLENCODE</c>) meets a name with a label over 63 characters, which libcurl 8.22.0's IDN
+    /// conversion refuses as <see cref="CurlUrlCode.BadHostname" />.
+    /// </summary>
+    private static bool RefusedByIdn(string host, CurlUrlFlags flags) =>
+        flags.HasFlag(CurlUrlFlags.PunycodeToIdn)
+        && (flags & (CurlUrlFlags.Punycode | CurlUrlFlags.UrlDecode | CurlUrlFlags.UrlEncode)) == 0
+        && host.Split('.').Any(label => label.Length > MaxHostLabelLength);
 
     private static UrlPartResult ReadScheme(UrlHandleParts parts, CurlUrlFlags flags) =>
         flags.HasFlag(CurlUrlFlags.NoGuessScheme) && parts.SchemeGuessed
@@ -165,7 +180,8 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         string tail = TailOf(parts, flags);
         if (string.Equals(parts.Scheme, FileScheme, StringComparison.OrdinalIgnoreCase))
         {
-            return UrlPartResult.Found("file://" + tail);
+            // A file URL with no path prints libcurl's NULL %s: "(nil)", measured on libcurl 8.22.0.
+            return UrlPartResult.Found("file://" + (parts.Path is null ? NilPath + tail[1..] : tail));
         }
 
         if (parts.Host is null)
@@ -215,7 +231,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
         return flags.HasFlag(CurlUrlFlags.UrlEncode)
             ? UrlPartResult.Found(UrlPartText.Escape(host))
-            : UrlPartText.Punycode(host, flags);
+            : RefusedByIdn(host, flags) ? UrlPartResult.Failed(CurlUrlCode.BadHostname) : UrlPartText.Punycode(host, flags);
     }
 
     /// <summary>

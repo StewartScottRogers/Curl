@@ -56,8 +56,6 @@ internal sealed partial class ManagedEasyTransfer(
     /// <summary>The RTSP <c>CSeq</c> counter and session the handle keeps from perform to perform (BL-2704).</summary>
     private readonly HandleRtspSession rtspSession = new();
 
-    /// <summary>libcurl's <c>CURLE_URL_MALFORMAT</c> text for a URL it cannot parse.</summary>
-    internal const string MalformedUrlText = "URL rejected: Malformed input to a URL function";
 
     /// <summary>
     /// Gets or sets every option of the handle (<c>curl_easy_setopt</c>). A <c>CURLOPT_SHARE</c> naming another

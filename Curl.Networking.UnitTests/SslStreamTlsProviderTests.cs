@@ -369,7 +369,35 @@ public sealed partial class SslStreamTlsProviderTests
         Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
         Assert.AreEqual(
-            "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - The message received was unexpected or badly formatted.",
+            "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.",
+            result.Result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithTls12CeilingAgainstATls13OnlyServerInTheSchannelBuildOnWindows_ReportsTheMeasuredUnsupportedFunction()
+    {
+        // curl 8.22.0 (Schannel) --tls-max 1.2 against a TLS 1.3-only server (BL-3235's tls-max-1.2-vs-1.3 case).
+        Diagnostics.Arrange("platform", "Windows only");
+        Diagnostics.Act("running on Windows", OperatingSystem.IsWindows());
+        Diagnostics.Assert("running on Windows", true, OperatingSystem.IsWindows());
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Inconclusive("Only Windows' Schannel returns a security status; other platforms have no Win32Exception to name.");
+        }
+
+        await AssertTls13IsAvailableAsync();
+
+        var result = await HandshakeAsync(
+            new TlsClientOptions(Insecure: true, MaximumVersion: TlsVersion.Tls12),
+            CertificateHost,
+            SslProtocols.Tls13,
+            SchannelBuild);
+
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.Result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.Result.ExitCode);
+        Diagnostics.Assert("error message", "SEC_E_UNSUPPORTED_FUNCTION line", result.Result.ErrorMessage);
+        Assert.AreEqual(
+            "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported",
             result.Result.ErrorMessage);
     }
 

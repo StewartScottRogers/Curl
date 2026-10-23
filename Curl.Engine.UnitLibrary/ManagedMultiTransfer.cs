@@ -718,6 +718,7 @@ internal sealed class ManagedMultiTransfer(
             return;
         }
 
+        entry.SocketReadyUntilNextPerform = false;
         QueueDoneMessageWhenFinished(entry);
     }
 
@@ -741,6 +742,7 @@ internal sealed class ManagedMultiTransfer(
         if (CanStart(entry))
         {
             entry.Perform = Start(entry);
+            entry.SocketReadyUntilNextPerform = true;
         }
     }
 
@@ -855,7 +857,7 @@ internal sealed class ManagedMultiTransfer(
         TimeSpan limit = WaitLimit(timeout);
         while (true)
         {
-            int ready = MarkReadySockets(extraSockets.Span) + entries.Count(IsFinishedUnreported);
+            int ready = CountReady(extraSockets.Span);
             TimeSpan left = limit - timeProvider.GetElapsedTime(start);
             if (ready > 0 || WaitEnds(left, extraSockets.Length, poll))
             {
@@ -865,6 +867,16 @@ internal sealed class ManagedMultiTransfer(
             await WaitForEventAsync(left, extraSockets.Length > 0, poll, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Whether libcurl's socket for the transfer reports an event now: the perform that started it only began
+    /// a non-blocking connect, so until the next perform the socket is writable and a wait or poll returns
+    /// at once with it counted (BL-3308).
+    /// </summary>
+    private static bool HasSocketReadyUntilNextPerform(MultiEntry entry) => entry.SocketReadyUntilNextPerform && !entry.Done;
+
+    private int CountReady(Span<CurlWaitSocket> extraSockets) =>
+        MarkReadySockets(extraSockets) + entries.Count(IsFinishedUnreported) + entries.Count(HasSocketReadyUntilNextPerform);
 
     private TimeSpan WaitLimit(TimeSpan timeout)
     {
@@ -1000,6 +1012,8 @@ internal sealed class ManagedMultiTransfer(
         public long StartTimestamp { get; set; }
 
         public bool Done { get; set; }
+
+        public bool SocketReadyUntilNextPerform { get; set; }
 
         public CurlSocket? Number { get; set; }
 

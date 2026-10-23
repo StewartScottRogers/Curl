@@ -29,7 +29,7 @@
     {"name":"tls-mtls-none","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke https://{MTLS}/echo","compareWire":false},
     {"name":"tls-mtls-pem","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke --cert {PKI}/client.pem --key {PKI}/client.key https://{MTLS}/echo","compareWire":false},
     {"name":"tls-mtls-pem-combined-missing-key","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke --cert {PKI}/client.pem https://{MTLS}/echo","compareWire":false},
-    {"name":"tls-mtls-p12","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke --cert {PKI}/client.p12:pw --cert-type P12 https://{MTLS}/echo","compareWire":false},
+    {"name":"tls-mtls-p12","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke --cert {PKI}/client.p12:pw --cert-type P12 https://{MTLS}/echo","compareWire":false,"limitations":["SchannelRefusesP12Credential"]},
     {"name":"tls-mtls-p12-badpw","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke --cert {PKI}/client.p12:no --cert-type P12 https://{MTLS}/echo","compareWire":false},
     {"name":"tls-sni","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke --resolve localhost:18100:127.0.0.1 https://localhost:18100/echo -H 'X: 1'","compareWire":false},
     {"name":"tls-post","command":"-sS --cacert {PKI}/ca.pem --ssl-no-revoke -d a=b https://{T}/echo","compareWire":false},

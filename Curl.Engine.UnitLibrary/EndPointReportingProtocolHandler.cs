@@ -31,7 +31,7 @@ internal sealed class EndPointReportingProtocolHandler(IProtocolHandler handler,
     /// <returns>The handler's result, with the end points on its report.</returns>
     public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
     {
-        recorder.Clear();
+        recorder.Clear(context.Http?.RedirectsFollowed > 0);
         TransferResult result = await handler.ExecuteAsync(context).ConfigureAwait(false);
 
         return recorder.ReportOn(result);
