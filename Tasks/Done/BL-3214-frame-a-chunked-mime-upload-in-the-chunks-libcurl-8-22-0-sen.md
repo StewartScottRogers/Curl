@@ -8,7 +8,7 @@ depends-on: [BL-3210]
 touches: [Curl.Core.UnitLibrary/Multipart/ConcatenatedReadStream.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Core.UnitTests/Multipart/ConcatenatedReadStreamChunkReadTests.cs, Curl.Protocol.Http.UnitTests/HttpRequestBodyWriterMimeChunkTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3214 — Frame a chunked MIME upload in the chunks libcurl 8.22.0 sends, with no empty chunk before a part
 
@@ -22,13 +22,16 @@ Split from BL-3208. Decided by Claude under Stewart's delegation (BL-3208): matc
 
 ## Acceptance criteria
 
-- [ ] `Curl.Core.UnitTests/Multipart/ConcatenatedReadStreamChunkReadTests.cs` pins that a read spans segment boundaries and never returns an empty read before the end.
-- [ ] `Curl.Protocol.Http.UnitTests/HttpRequestBodyWriterMimeChunkTests.cs` pins the chunk framing BL-3210 recorded for case 4.
-- [ ] Build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members for the changed libraries.
+- [x] `Curl.Core.UnitTests/Multipart/ConcatenatedReadStreamChunkReadTests.cs` pins that a read spans segment boundaries and never returns an empty read before the end.
+- [x] `Curl.Protocol.Http.UnitTests/HttpRequestBodyWriterMimeChunkTests.cs` pins the chunk framing BL-3210 recorded for case 4.
+- [x] Build clean, fast tests pass, Measure-CodeQuality.ps1 0 failing members for the changed libraries.
 
 ## Notes
+
+Decided by Claude under Stewarts delegation: ConcatenatedReadStream now fills every read across segments (as libcurl mime_read does), not only bodies with callback or file segments; a segment failing after bytes of the same fill defers the failure to the next read so bytes before a refused byte still go out (7bit tests). Writer needed no change: it already makes one chunk per read. Existing tests expecting one-segment reads updated. Measure-CodeQuality Curl.Core.UnitLibrary: 0 failing. CI platform criteria met by platform-neutral tests.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 65404b0d ddbbe993 491059de.
+- 2026-10-22: Doing -> Done. Chunked MIME upload bodies now fill each read across segments, so no empty chunk precedes a part
