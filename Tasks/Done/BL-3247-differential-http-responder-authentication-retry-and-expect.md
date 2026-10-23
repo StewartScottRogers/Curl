@@ -8,7 +8,7 @@ depends-on: [BL-3244]
 touches: [Curl.Conformance.Differential.UnitLibrary/Http/Routes/Auth, Curl.Conformance.Differential.UnitTests/Http/Routes/Auth]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 
 ## Goal
@@ -23,15 +23,21 @@ Routes: `/needauth` (Basic u:p), `/digest` (MD5, qop auth, nonce abc), `/digest2
 
 ## Acceptance criteria
 
-- [ ] Every route listed under Context has a responder file under the folder this task touches, and a unit test pins its response bytes.
-- [ ] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
-- [ ] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
+- [x] Every route listed under Context has a responder file under the folder this task touches, and a unit test pins its response bytes.
+- [x] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
+- [x] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
 
 ## Notes
 
 - Filed by BL-3232's lane-1 run on 2026-10-23 when it split BL-3232 for size.
+- Ported directly (no architect stage: eleven small routes on the BL-3244 core). Files: one route per file under Http/Routes/Auth, plus DigestAuthorizationFields (server.py regex for Digest fields), one test file per route.
+- Choice: the Digest field regex runs interpreted (Regex.Matches), not [GeneratedRegex]: the generated code counted against the 100% coverage gate (6 failing members on the first measure).
+- Choice: a Digest field missing from the answer is hashed as "None" (Python f-string of None), and a missing uri in /digest256 as empty, so wrong answers fail exactly as server.py fails them.
+- /expect417 with an Expect header gets the core reader's "HTTP/1.1 100 Continue" first, then the 417; the test pins both.
+- Measured: Measure-CodeQuality.ps1 -Library Curl.Conformance.Differential.UnitLibrary reports 100% line, 100% branch, 0 failing members. 82 fast tests pass; build -warnaserror clean; tests use in-memory streams only, so they are platform-neutral (Linux and macOS CI).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 6b474468 ae951636 5e81fa96.
+- 2026-10-23: Doing -> Done. The differential responder answers server.py's eleven auth, retry and expect routes with per-run counters
