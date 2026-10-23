@@ -225,10 +225,10 @@ public static class CommandLineOptionTable
         CommandLineOption.Value("proxy-cacert", null, SettingExistingFile("--proxy-cacert", (options, file) => options.ProxyCaCertificateFile = file)),
         CommandLineOption.FileName("proxy-capath", null, (options, directory) => options.ProxyCaCertificateDirectory = directory),
         CommandLineOption.FileName("proxy-cert", null, (options, certificate) => options.ProxyClientCertificate = certificate),
-        CommandLineOption.FileName("proxy-key", null, (options, key) => options.ProxyPrivateKey = key),
+        CommandLineOption.Value("proxy-key", null, SetProxyPrivateKey),
         CommandLineOption.Text("proxy-cert-type", null, (options, type) => options.ProxyClientCertificateType = type),
         CommandLineOption.Text("proxy-key-type", null, (options, type) => options.ProxyPrivateKeyType = type),
-        CommandLineOption.Text("proxy-pass", null, (options, passphrase) => options.ProxyPassphrase = passphrase),
+        CommandLineOption.Value("proxy-pass", null, SetProxyPassphrase),
         CommandLineOption.Text("proxy-ciphers", null, (options, ciphers) => options.ProxyCiphers = ciphers),
         CommandLineOption.Text("proxy-tls13-ciphers", null, (options, ciphers) => options.ProxyTls13Ciphers = ciphers),
         CommandLineOption.Value("proxy-crlfile", null, SettingExistingFile("--proxy-crlfile", (options, file) => options.ProxyCertificateRevocationListFile = file)),
@@ -643,6 +643,28 @@ public static class CommandLineOptionTable
         }
 
         options.FtpSslCccMode = FtpClearCommandChannel.Passive;
+    }
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.ProxyPrivateKey"/> from <c>--proxy-key</c>. curl 8.22.0 takes it as a file
+    /// name that may be blank (measured 2026-10-22, BL-3183 Notes): an empty value is stored as it is, and a value
+    /// that looks like a flag warns as a <see cref="CommandLineOption.FileName"/> row's does.
+    /// </summary>
+    private static CommandLineRefusal? SetProxyPrivateKey(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
+        options.ProxyPrivateKey = value;
+        return null;
+    }
+
+    /// <summary>
+    /// Sets <see cref="CommandLineOptions.ProxyPassphrase"/> from <c>--proxy-pass</c>; an empty value is stored as it
+    /// is, since curl 8.22.0 accepts it (measured 2026-10-22, BL-3183 Notes).
+    /// </summary>
+    private static CommandLineRefusal? SetProxyPassphrase(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader)
+    {
+        options.ProxyPassphrase = value;
+        return null;
     }
 
     /// <summary>
