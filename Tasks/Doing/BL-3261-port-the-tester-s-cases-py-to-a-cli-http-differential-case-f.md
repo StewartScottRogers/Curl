@@ -32,3 +32,4 @@ The tester's files are in `Z:\repos\Curl.difftest\2026-10-22\` (reference only: 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e32b2b1c 566e31a4.
