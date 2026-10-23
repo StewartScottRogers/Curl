@@ -30,3 +30,4 @@ Found by BL-3315's differential run (LibcurlEasyDifferentialTests, case reuse-id
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: cb02d211 74c4d232.
