@@ -40,3 +40,4 @@ Port, under `Curl.Conformance.Differential.UnitLibrary/Http/Core`:
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 7ca41420 5c45b8f1 ae951636 5e81fa96.
