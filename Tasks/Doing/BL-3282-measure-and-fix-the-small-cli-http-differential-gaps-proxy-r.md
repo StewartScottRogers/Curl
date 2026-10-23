@@ -30,3 +30,4 @@ From BL-3233's run: proxy-tunnel and proxy-connect-fail (-sS -p -x http://127.0.
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: a8d1b4cd 69edf767.
