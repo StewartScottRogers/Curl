@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22: a server sends 10 bytes, waits 3 s, sends 10 mor
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: eb8085c5 9619539a f29434cd d1579f1b df3c3df4.
