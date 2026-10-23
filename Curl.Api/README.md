@@ -307,4 +307,4 @@ no I/O) and `Curl.Engine.UnitLibrary` (the engine it sends through); `Curl.Api` 
 
 ## Use the package from the preview release
 
-Download `Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Curl.Api --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Download `Curl.Api.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Curl.Api --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

@@ -79,4 +79,4 @@ and a CRAP score at most 30, measured from the fast tests only. Its tests are in
 
 ## Use the package from the preview release
 
-Download `Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Libcurl --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.
+Download `Libcurl.<version>.nupkg` (and check it against `SHA256SUMS`) from https://github.com/StewartScottRogers/Curl/releases/tag/preview into a folder, then add it from that folder with `dotnet add package Libcurl --prerelease --source <folder>`. The package bundles the Curl libraries it needs, so it restores nothing else. It is not on nuget.org.

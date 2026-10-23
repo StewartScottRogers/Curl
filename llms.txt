@@ -7,15 +7,15 @@ Which .NET library to use: Curl.Api is for new .NET work: an async, HttpClient-s
 ## Start here
 
 - [resources.json](https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json): every file in the release, one entry each with `name`, `kind`, `platform`, `url`, `sha256`, `size`, `use` and `docs`. Choose by `kind` and `platform`.
-- [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS): verify a download with `sha256sum --check SHA256SUMS` (each line is `<sha256>  <file>`), or compare the file's `sha256` in resources.json.
+- [SHA256SUMS](https://github.com/StewartScottRogers/Curl/releases/download/preview/SHA256SUMS): verify a download with `sha256sum --check --ignore-missing SHA256SUMS` (each line is `<sha256>  <file>`), or compare the file's `sha256` in resources.json.
 - [Download page](https://stewartscottrogers.github.io/Curl/download/): the same table as resources.json, as plain HTML.
 
 ## Resources (kinds in resources.json)
 
 - curl command-line tool (kind `cli`): one native archive per platform (Windows, Linux, macOS); extract it and run `curl`. The download page names the file for your platform.
-- Curl.Mcp (kind `mcp-server`): the MCP server, as NuGet packages; run it over stdio with `dnx Curl.Mcp --add-source <folder>`. Setup for each client: [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/).
-- Curl.Api (kind `dotnet-library`): the .NET client for new code; use the folder holding the nupkg as a package source, then `dotnet add package Curl.Api`.
-- Libcurl (kind `dotnet-library`): the libcurl API for .NET, for porting C code; `dotnet add package Libcurl` from the same folder.
+- Curl.Mcp (kind `mcp-server`): the MCP server, as NuGet packages; run it over stdio with `dnx Curl.Mcp --yes --prerelease --add-source <folder>`. Setup for each client: [MCP setup](https://stewartscottrogers.github.io/Curl/mcp/).
+- Curl.Api (kind `dotnet-library`): the .NET client for new code; use the folder holding the nupkg as a package source, then `dotnet add package Curl.Api --prerelease`.
+- Libcurl (kind `dotnet-library`): the libcurl API for .NET, for porting C code; `dotnet add package Libcurl --prerelease` from the same folder.
 - SHA256SUMS (kind `checksums`): the checksums above.
 - ai-help.md (kind `ai-help`): see below.
 

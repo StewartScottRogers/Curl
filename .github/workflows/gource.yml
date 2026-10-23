@@ -2,7 +2,9 @@
 # https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (a 4K
 # adaptive stream with a full-screen viewer page, and the GIF the README shows) and the
 # code coverage report (coverage/index.html, and coverage/badge.svg for the README), and
-# llms.txt with the download, MCP setup and --ai-help pages, and
+# llms.txt with the download, MCP setup and --ai-help pages (llms.txt and mcp/ are published
+# from work/dark-factory only; download/ and ai-help/ also from master's hourly run, because
+# they come from the preview release), and
 # the live task board page (board/index.html, served at .../Curl/board/), and the gap
 # dashboard (gaps/index.html and gaps/data.json, served at .../Curl/gaps/).
 #
@@ -263,9 +265,17 @@ jobs:
             "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gource/gaps/data.json" -o gaps/data.json || rm -f gaps/data.json
           # The pages the site-pages job committed: llms.txt, download/, mcp/ and ai-help/.
           mkdir -p download mcp ai-help
+          # Only a 404 means the page is not on the branch yet; any other failure (5xx, rate limit,
+          # DNS) would publish the branch without the page, so retry and then fail the step.
           for f in llms.txt download/index.html mcp/index.html ai-help/index.html ai-help/index.md ai-help/ai-help.md; do
-            curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gource/$f" -o "$f" || rm -f "$f"
+            code=$(curl -sSL --retry 3 -H "Authorization: Bearer ${GITHUB_TOKEN}" -w '%{http_code}' \
+              "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gource/$f" -o "$f") || code=000
+            if [ "$code" = 404 ]; then
+              rm -f "$f"
+            elif [ "$code" != 200 ]; then
+              echo "::error::could not fetch $f from the gource branch (HTTP $code); not publishing the branch without it"
+              exit 1
+            fi
           done
           extra=$( [ -f coverage/index.html ] && echo coverage || true )
           [ -f board/index.html ] && extra="$extra board"
@@ -340,8 +350,14 @@ jobs:
           for try in 1 2 3; do
             dir="$RUNNER_TEMP/board-$try"
             # Sparse and blob-less: the branch also holds hundreds of MB of video this job never needs.
+            # ls-remote exits 2 for a missing branch; any other failure is transient and retried.
+            git ls-remote -q --exit-code --heads "$url" gource > /dev/null && lsrc=0 || lsrc=$?
+            if [ "$lsrc" = 2 ]; then
+              echo 'no gource branch to publish onto'
+              exit 1
+            fi
             git clone -q --depth 1 --filter=blob:none --sparse --branch gource "$url" "$dir" \
-              || { echo 'no gource branch to publish onto'; exit 1; }
+              || { echo "::warning::clone of the gource branch failed (attempt $try)"; continue; }
             git -C "$dir" sparse-checkout set board
             if cmp -s "$source" "$dir/board/index.html"; then
               echo 'board/index.html on gource is already this page; nothing to publish'
@@ -358,7 +374,7 @@ jobs:
               exit 0
             fi
           done
-          echo 'push to gource kept being refused'
+          echo 'cloning or pushing to gource kept failing'
           exit 1
 
       # A push made with GITHUB_TOKEN does not start a Pages build by itself; ask for one.
@@ -414,8 +430,14 @@ jobs:
           for try in 1 2 3; do
             dir="$RUNNER_TEMP/gaps-$try"
             # Sparse and blob-less: the branch also holds hundreds of MB of video this job never needs.
+            # ls-remote exits 2 for a missing branch; any other failure is transient and retried.
+            git ls-remote -q --exit-code --heads "$url" gource > /dev/null && lsrc=0 || lsrc=$?
+            if [ "$lsrc" = 2 ]; then
+              echo 'no gource branch to publish onto'
+              exit 1
+            fi
             git clone -q --depth 1 --filter=blob:none --sparse --branch gource "$url" "$dir" \
-              || { echo 'no gource branch to publish onto'; exit 1; }
+              || { echo "::warning::clone of the gource branch failed (attempt $try)"; continue; }
             git -C "$dir" sparse-checkout set gaps
             # data.json differs on every export in its "generated" stamp alone; compare
             # without that line so an unchanged dashboard is not republished.
@@ -434,7 +456,7 @@ jobs:
               exit 0
             fi
           done
-          echo 'push to gource kept being refused'
+          echo 'cloning or pushing to gource kept failing'
           exit 1
 
       # A push made with GITHUB_TOKEN does not start a Pages build by itself; ask for one.
@@ -449,8 +471,11 @@ jobs:
   # llms.txt and .github/site/; resources.json and ai-help.md are fetched from the rolling
   # `preview` release (BL-3147) and turned into download/index.html (the same table as
   # resources.json) and ai-help/ (index.html, index.md and ai-help.md). Each file is committed
-  # onto the gource branch without force and only when it changed. Never gated on `decide`; the
-  # hourly run on master picks up a new release.
+  # onto the gource branch without force and only when it changed. Never gated on `decide`.
+  # Which branch publishes which page: llms.txt and mcp/index.html come from the checkout, so
+  # only work/dark-factory publishes them (master trails it by up to a shift and its hourly run
+  # would put older copies back); download/ and ai-help/ come from the preview release, so both
+  # work/dark-factory and master publish them, and master's hourly run picks up a new release.
   site-pages:
     # Pushes to other branches carry older copies of the sources and would put them back.
     if: github.ref == 'refs/heads/work/dark-factory' || github.ref == 'refs/heads/master'
@@ -473,16 +498,32 @@ jobs:
         run: |
           out="$RUNNER_TEMP/site"
           mkdir -p "$out/download" "$out/mcp" "$out/ai-help"
-          cp "$GITHUB_WORKSPACE/llms.txt" "$out/llms.txt"
-          cp "$GITHUB_WORKSPACE/.github/site/mcp/index.html" "$out/mcp/index.html"
+          # llms.txt and mcp/ come from the checked-out sources. Master trails work/dark-factory by
+          # up to a shift, so only work/dark-factory publishes them; master (and its hourly runs)
+          # would put older copies back, as BL-1206 stopped for board-page. Master still refreshes
+          # the release-derived download/ and ai-help/.
+          if [ "$GITHUB_REF" = refs/heads/work/dark-factory ]; then
+            cp "$GITHUB_WORKSPACE/llms.txt" "$out/llms.txt"
+            cp "$GITHUB_WORKSPACE/.github/site/mcp/index.html" "$out/mcp/index.html"
+          else
+            rmdir "$out/mcp"
+          fi
           release="https://github.com/${GITHUB_REPOSITORY}/releases/download/preview"
-          if curl -fsSL -o "$RUNNER_TEMP/resources.json" "$release/resources.json"; then
+          # Only an HTTP 404 means "not in the preview release yet"; any other failure fails the step.
+          fetch_release_file() {
+            code=$(curl -sSL --retry 3 -w '%{http_code}' -o "$2" "$release/$1") || code=000
+            [ "$code" = 200 ] && return 0
+            [ "$code" = 404 ] && return 1
+            echo "::error::could not fetch $1 from the preview release (HTTP $code)"
+            exit 1
+          }
+          if fetch_release_file resources.json "$RUNNER_TEMP/resources.json"; then
             pwsh -NoProfile -File "$GITHUB_WORKSPACE/.github/site/New-DownloadPage.ps1" -ResourcesJson "$RUNNER_TEMP/resources.json" -OutFile "$out/download/index.html"
           else
             echo 'no resources.json in the preview release yet; download/ not published'
             rmdir "$out/download"
           fi
-          if curl -fsSL -o "$out/ai-help/ai-help.md" "$release/ai-help.md"; then
+          if fetch_release_file ai-help.md "$out/ai-help/ai-help.md"; then
             cp "$out/ai-help/ai-help.md" "$out/ai-help/index.md"
             { echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Curl --ai-help</title></head><body><p>Raw Markdown: <a href="ai-help.md">ai-help.md</a>. See <a href="../llms.txt">llms.txt</a>.</p><pre style="white-space:pre-wrap">'
               sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$out/ai-help/ai-help.md"
@@ -495,8 +536,14 @@ jobs:
           for try in 1 2 3; do
             dir="$RUNNER_TEMP/site-$try"
             # Sparse and blob-less: the branch also holds hundreds of MB of video this job never needs.
+            # ls-remote exits 2 for a missing branch; any other failure is transient and retried.
+            git ls-remote -q --exit-code --heads "$url" gource > /dev/null && lsrc=0 || lsrc=$?
+            if [ "$lsrc" = 2 ]; then
+              echo 'no gource branch to publish onto'
+              exit 1
+            fi
             git clone -q --depth 1 --filter=blob:none --sparse --branch gource "$url" "$dir" \
-              || { echo 'no gource branch to publish onto'; exit 1; }
+              || { echo "::warning::clone of the gource branch failed (attempt $try)"; continue; }
             git -C "$dir" sparse-checkout set --no-cone /llms.txt /download /mcp /ai-help
             changed=no
             while IFS= read -r file; do
@@ -520,7 +567,7 @@ jobs:
               exit 0
             fi
           done
-          echo 'push to gource kept being refused'
+          echo 'cloning or pushing to gource kept failing'
           exit 1
 
       # A push made with GITHUB_TOKEN does not start a Pages build by itself; ask for one.
