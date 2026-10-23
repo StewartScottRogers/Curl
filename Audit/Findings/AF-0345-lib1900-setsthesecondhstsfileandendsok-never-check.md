@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1649To1906Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the Select-String reproduction: Lib1900_SetsTheSecondHstsFileAndEndsOk now asserts Assert.AreEqual(Lib1900.SecondHstsFile, engine.CreatedEasies[0].Options.Http.Hsts) at line 263.
+
 ## Log
 
 - 2026-10-22: filed proposed.

@@ -3,8 +3,8 @@ id: AF-0344
 title: OpenSslCipherSuites.Find's ignoreCase: false can become true with no test failing, so cipher names in the wrong case are accepted
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs:Find-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs:156:false
 task: BL-3124
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: mechanical
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0344 - OpenSslCipherSuites.Find's ignoreCase: false can become true with no test failing, so cipher names in the wrong case are accepted
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the -Site reproduction: OpenSslCipherSuites.cs:156:false (Find), resolvedLine 156, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

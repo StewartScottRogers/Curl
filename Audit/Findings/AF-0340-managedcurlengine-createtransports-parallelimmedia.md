@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction: ManagedCurlEngine.cs:318:false (CreateTransports) resolved to line 319 in the same member, outcome survived. Runner's targeted mutation rerun on the clean audited commit: survived.
+
 ## Log
 
 - 2026-10-22: filed proposed.
