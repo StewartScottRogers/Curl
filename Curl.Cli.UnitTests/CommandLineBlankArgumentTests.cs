@@ -59,8 +59,13 @@ public sealed class CommandLineBlankArgumentTests
         "happy-eyeballs-timeout-ms", "ip-tos", "keepalive-cnt", "keepalive-time", "knownhosts", "limit-rate",
         "local-port", "max-filesize", "max-redirs", "max-time", "netrc-file", "parallel-max", "parallel-max-host",
         "proxy-cacert", "proxy-crlfile", "rate", "retry", "retry-delay", "retry-max-time", "speed-limit",
-        "speed-time", "ssl-sessions", "tftp-blksize", "tls-max", "upload-flags", "vlan-priority",
+        "speed-time", "tftp-blksize", "tls-max", "upload-flags", "vlan-priority",
     ];
+
+    // The Schannel build has no TLS session export, so it refuses --ssl-sessions as not supported whatever
+    // the value; the OpenSSL build on Linux and macOS reads it with getstr(..., DENY_BLANK) and refuses an
+    // empty one as blank (BL-3203). Each platform's answer is pinned in its own test.
+    private const string SslSessions = "ssl-sessions";
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -105,6 +110,20 @@ public sealed class CommandLineBlankArgumentTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Parse_BlankSslSessionsOnWindows_IsNotRefusedAsBlankAsTheSchannelBuildRefusesItAsUnsupported()
+    {
+        Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason(SslSessions);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_BlankSslSessionsOnLinuxAndMacOs_IsRefusedAsBlankAsTheOpenSslBuildRefusesIt()
+    {
+        Parse_BlankArgument_IsRefusedAsBlankWhereCurlRefusesIt(SslSessions);
+    }
+
+    [TestMethod]
     public void Parse_BlankProxyKey_IsAcceptedAsCurlAcceptsIt()
     {
         CommandLineParseResult result = ParseWithBlankArgument("proxy-key");
@@ -116,7 +135,7 @@ public sealed class CommandLineBlankArgumentTests
     [TestMethod]
     public void Lists_EveryArgumentTakingRowInTheTable_IsMeasured()
     {
-        string[] measured = [.. RefusedAsBlank, .. RefusedAsBlankByCAresAndEchBuild, .. AcceptedWhenBlank, .. RefusedForAnotherReason, .. CurlOnly];
+        string[] measured = [.. RefusedAsBlank, .. RefusedAsBlankByCAresAndEchBuild, .. AcceptedWhenBlank, .. RefusedForAnotherReason, .. CurlOnly, SslSessions];
         string[] unmeasured = CommandLineOptionTable.Rows
             .Where(row => row.TakesValue && !measured.Contains(row.LongName))
             .Select(row => row.LongName)
