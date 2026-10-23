@@ -1,7 +1,12 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Authentication;
 using Curl.Core;
 using Curl.Engine;
+using Curl.Networking;
+using Curl.Protocol.Abstractions;
 using Curl.Protocol.Http;
 using Curl.Testing;
 
@@ -52,10 +57,34 @@ public sealed class CurlCommandRunnerUrlRejectionTests
         Assert.IsEmpty(server.Targets);
     }
 
-    private async Task<int> RunAsync(params string[] arguments)
+    /// <summary>
+    /// curl 8.22.0 names a refused zone-ID host without its zone: <c>http://[::1%25lo]:9/</c> ->
+    /// <c>curl: (7) Failed to connect to ::1:9 after 9 ms: Could not connect to server</c>, with
+    /// <c>[http://[::1%25lo]:9/][[::1]][9]</c> written out (measured 2026-10-22, BL-3173 Notes).
+    /// </summary>
+    [TestMethod]
+    public async Task RunAsync_RefusedZoneIdUrl_Exits7NamingTheHostWithoutItsZone()
+    {
+        const string url = "http://[::1%25lo]:9/";
+        TcpConnector refusing = new(new IPv6LoopbackDnsResolver(), new RefusingTcpDialer(), new PassThroughTlsProvider(), TimeProvider.System);
+
+        int exitCode = await RunAsync(refusing, "-sS", "-w", WriteOut, url);
+
+        Diagnostics.Assert("exit code", 7, exitCode);
+        Assert.AreEqual(7, exitCode);
+        StringAssert.Matches(StandardErrorText, new Regex(@"^curl: \(7\) Failed to connect to ::1:9 after \d+ ms: Could not connect to server" + Regex.Escape(NewLine) + "$"));
+        Assert.AreEqual("[" + url + "][[::1]][9]", StandardOutputText);
+    }
+
+    private Task<int> RunAsync(params string[] arguments)
     {
         server = new ScriptedConnector([]);
-        HttpProtocolHandler http = new(server, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
+        return RunAsync(server, arguments);
+    }
+
+    private async Task<int> RunAsync(IConnector connector, params string[] arguments)
+    {
+        HttpProtocolHandler http = new(connector, new BasicAndBearerAuthenticator(CredentialEncoding.ForPlatform(isWindows: false)));
         InMemoryFileSystem outputFiles = new();
 
         Diagnostics.Arrange("command line", string.Join(" ", arguments));
@@ -77,5 +106,25 @@ public sealed class CurlCommandRunnerUrlRejectionTests
         Diagnostics.Bytes("stdout", standardOutput.ToArray());
         Diagnostics.Bytes("stderr", standardError.ToArray());
         return exitCode;
+    }
+
+    /// <summary>A resolver that answers <c>::1</c> for any name.</summary>
+    private sealed class IPv6LoopbackDnsResolver : IDnsResolver
+    {
+        public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<IPAddress>>([IPAddress.IPv6Loopback]);
+    }
+
+    /// <summary>A dialer every dial of which, TCP or Unix socket, is refused.</summary>
+    private sealed class RefusingTcpDialer : ITcpDialer
+    {
+        public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken) =>
+            throw new SocketException((int)SocketError.ConnectionRefused);
+
+        public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+            throw new SocketException((int)SocketError.ConnectionRefused);
+
+        public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken) =>
+            throw new SocketException((int)SocketError.ConnectionRefused);
     }
 }
