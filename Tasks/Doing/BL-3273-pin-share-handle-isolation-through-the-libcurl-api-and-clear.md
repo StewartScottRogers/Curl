@@ -34,3 +34,4 @@ Split from BL-3204. Depends on BL-3271 and BL-3272. Libcurl-level tests in `Libc
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 23e02afb b0167963 2f085cce 4102ab87.
