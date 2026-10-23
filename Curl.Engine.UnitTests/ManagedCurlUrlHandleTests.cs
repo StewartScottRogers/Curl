@@ -614,6 +614,14 @@ public sealed partial class ManagedCurlUrlHandleTests
         Assert.AreEqual("/_\uDCC0_", GetOk(url, CurlUrlPart.Path, CurlUrlFlags.UrlDecode));
     }
 
+    [TestMethod]
+    public void Get_DecodedPathOfPercentFF_IsDcffNotReplacementCharacter()
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://a/%FF");
+
+        Assert.AreEqual("/\uDCFF", GetOk(url, CurlUrlPart.Path, CurlUrlFlags.UrlDecode));
+    }
+
     private static ManagedCurlUrlHandle Parsed(string text, CurlUrlFlags flags = CurlUrlFlags.None)
     {
         ManagedCurlUrlHandle url = new();

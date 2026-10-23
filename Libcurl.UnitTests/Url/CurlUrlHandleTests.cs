@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Url;
+using Curl.Engine;
 using Libcurl.Global;
 using Libcurl.UnitTests.Global;
 using Libcurl.Url;
@@ -49,6 +50,27 @@ public sealed class CurlUrlHandleTests
         using var url = new CurlUrlHandle(new FakeCurlUrlHandle { Result = CurlUrlCode.NoQuery });
 
         Assert.AreEqual(CurlUrlCode.NoQuery, url.Get(CurlUrlPart.Query, CurlUrlFlags.None, out var value));
+        Assert.IsNull(value);
+    }
+
+    [TestMethod]
+    public void GetBytes_DecodedPercentFF_IsTheRawByteAsLibcurlGivesIt()
+    {
+        using var url = new CurlUrlHandle(new ManagedCurlUrlHandle());
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, "http://a/%FF", CurlUrlFlags.None));
+
+        var code = url.GetBytes(CurlUrlPart.Path, CurlUrlFlags.UrlDecode, out var value);
+
+        Assert.AreEqual(CurlUrlCode.Ok, code);
+        CollectionAssert.AreEqual(new byte[] { (byte)'/', 0xFF }, value);
+    }
+
+    [TestMethod]
+    public void GetBytes_TheEngineHasNoSuchPart_AnswersItsCodeAndNull()
+    {
+        using var url = new CurlUrlHandle(new FakeCurlUrlHandle { Result = CurlUrlCode.NoQuery });
+
+        Assert.AreEqual(CurlUrlCode.NoQuery, url.GetBytes(CurlUrlPart.Query, CurlUrlFlags.None, out var value));
         Assert.IsNull(value);
     }
 

@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Url;
+using Curl.Protocol.Abstractions;
 using Libcurl.Misc.ErrorText;
 
 namespace Libcurl.Url;
@@ -45,6 +46,24 @@ public sealed class CurlUrlHandle : IDisposable
     /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
     public CurlUrlCode Get(CurlUrlPart part, CurlUrlFlags flags, out string? value) =>
         LiveHandle().Get(part, flags, out value);
+
+    /// <summary>
+    /// <c>curl_url_get</c> as the C ABI returns it: one part of the URL as the bytes of its
+    /// <c>char *</c>, so a byte <c>CURLU_URLDECODE</c> decodes that is not UTF-8 (<c>%FF</c>) is that
+    /// byte, as libcurl 8.22.0 gives it, not U+FFFD (ADR-0796).
+    /// </summary>
+    /// <param name="part"><c>what</c>: the part to get.</param>
+    /// <param name="flags"><c>flags</c>: how to return it.</param>
+    /// <param name="value"><c>part</c>: the part's bytes, or <see langword="null"/> when the call fails.</param>
+    /// <returns>The call's result; a <c>CURLUE_NO_*</c> code such as <see cref="CurlUrlCode.NoQuery"/> when the part is not set.</returns>
+    /// <exception cref="ObjectDisposedException">The handle has been cleaned up.</exception>
+    public CurlUrlCode GetBytes(CurlUrlPart part, CurlUrlFlags flags, out byte[]? value)
+    {
+        CurlUrlCode code = Get(part, flags, out string? text);
+        value = text is null ? null : UrlByteText.ToBytes(text);
+
+        return code;
+    }
 
     /// <summary><c>curl_url_set</c>: sets or clears one part of the URL, as the engine's handle does.</summary>
     /// <param name="part"><c>what</c>: the part to set; <see cref="CurlUrlPart.Url"/> parses a whole URL, relative ones against the current one.</param>

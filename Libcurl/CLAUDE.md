@@ -178,7 +178,8 @@ either clears `CURLOPT_NOBODY`.
 
 `Url` holds `CurlUrlHandle`, the URL handle `CurlLibrary.UrlInit` (`curl_url`) returns over the
 engine's `ICurlUrlHandle` (ADR-0587): `Get` and `Set` (`curl_url_get`, `_set`) pass through to the
-engine and answer its code, `Duplicate` (`curl_url_dup`) wraps the engine's copy in a new handle, and
+engine and answer its code, `GetBytes` answering `Get`'s part as the C ABI's raw bytes (a decoded `%FF`
+the byte 0xFF, ADR-0796), `Duplicate` (`curl_url_dup`) wraps the engine's copy in a new handle, and
 `ErrorText` is `curl_url_strerror` over `CurlErrorText.Url`. `Dispose` is `curl_url_cleanup` and
 disposes the engine handle once; a member used afterwards throws `ObjectDisposedException`. The internal
 `EngineHandle` is what `CURLOPT_CURLU` stores (ADR-0590).
