@@ -34,3 +34,4 @@ lowspeed (/slowbody, low-speed abort, BL-3321 fixed code, header and request siz
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
