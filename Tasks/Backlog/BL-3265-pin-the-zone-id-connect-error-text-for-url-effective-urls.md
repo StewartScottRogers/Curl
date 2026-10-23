@@ -4,7 +4,7 @@ title: Pin the zone-ID connect-error text for url_effective URLs
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3182, BL-3264]
+depends-on: [BL-3182, BL-3266]
 touches: [Curl.Console.UnitTests/CurlCommandRunnerUrlRejectionTests.cs]
 requirement: none
 created: 2026-10-23
@@ -18,7 +18,7 @@ The connect-error text for a zone-ID URL such as `http://[::1%25lo]:9/` is pinne
 
 ## Context
 
-Split from BL-3173 (over its cost cap). Needs BL-3182 (refused-connect fix in `Curl.Networking.UnitLibrary/TcpConnector.cs`) so Curl exits 7 as curl does, and BL-3264 (URL normalisation). Real curl 8.22.0 prints `Failed to connect to ::1:9 after 9 ms: Could not connect to server` with `%{url_effective}` `http://[::1%25lo]:9/`, `%{url.host}` `[::1]`, `%{url.port}` `9`.
+Split from BL-3173 (over its cost cap). Needs BL-3182 (refused-connect fix in `Curl.Networking.UnitLibrary/TcpConnector.cs`) so Curl exits 7 as curl does, and BL-3266 (URL normalisation). Real curl 8.22.0 prints `Failed to connect to ::1:9 after 9 ms: Could not connect to server` with `%{url_effective}` `http://[::1%25lo]:9/`, `%{url.host}` `[::1]`, `%{url.port}` `9`.
 
 ## Acceptance criteria
 

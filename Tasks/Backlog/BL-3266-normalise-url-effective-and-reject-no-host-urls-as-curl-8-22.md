@@ -1,5 +1,5 @@
 ---
-id: BL-3264
+id: BL-3266
 title: Normalise %{url_effective} and reject no-host URLs as curl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3264 — Normalise %{url_effective} and reject no-host URLs as curl 8.22.0 does
+# BL-3266 — Normalise %{url_effective} and reject no-host URLs as curl 8.22.0 does
 
 ## Goal
 

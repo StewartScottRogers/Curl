@@ -62,4 +62,4 @@ Stewart reported on 2026-10-22. Measured with `-w '%{url_effective}'` against a 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 3debb382 9eefc518 e6155fdf dd37067d 92579dca.
 - 2026-10-22: Doing -> Backlog. Waits on BL-3182: zone-ID connect-error text needs TcpConnector's refused-connect fix (TcpConnector.cs held by BL-3172); normalisation, no-host and rejected-URL work done and stashed
-- 2026-10-23: Backlog -> Deferred. Split over cost cap into BL-3264 and BL-3265
+- 2026-10-23: Backlog -> Deferred. Split over cost cap into BL-3266 and BL-3265
