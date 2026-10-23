@@ -67,4 +67,27 @@ public sealed class ParallelTransferQueueTests
 
         await all;
     }
+
+    [TestMethod]
+    public async Task WaitForFreeSlotAsync_SlotFrees_StartsTheEarliestWaitingTransferBeforeTheHostQueueFreedOnes()
+    {
+        Diagnostics.Arrange("queue", "maximum 1, one unfinished transfer; the next waits for its slot, the host queue's freed ones wait for BeforeEachWait");
+        ParallelTransferQueue queue = new(1);
+        List<string> events = [];
+        queue.BeforeEachWait = () => events.Add("host queue starts its freed transfers");
+        TaskCompletionSource first = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        queue.Add(first.Task);
+
+        Task slot = queue.WaitForFreeSlotAsync();
+        first.SetResult();
+        await slot;
+        events.Add("slot's waiting transfer starts");
+        queue.Add(Task.CompletedTask);
+        await queue.WhenAllEndedAsync();
+        Diagnostics.Act("events", string.Join(" | ", events));
+
+        string expected = "host queue starts its freed transfers | slot's waiting transfer starts | host queue starts its freed transfers";
+        Diagnostics.Assert("events", expected, string.Join(" | ", events));
+        Assert.AreEqual(expected, string.Join(" | ", events));
+    }
 }

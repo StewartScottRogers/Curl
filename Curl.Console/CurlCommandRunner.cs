@@ -1262,14 +1262,18 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="options">The first option group.</param>
     /// <returns>The run.</returns>
-    private ParallelRun NewParallelRun(CommandLineOptions options) =>
-        new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
+    private ParallelRun NewParallelRun(CommandLineOptions options)
+    {
+        ParallelRun run = new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
         {
             Transfers = new ParallelTransferMulti(engine.MultiInit()),
             ProgressMeter = writesProgressMeter && !options.Silent && !options.ProgressMeterOff
                 ? new ParallelProgressMeter(timeProvider, writeGate, WriteParallelProgressMeter)
                 : null,
         };
+        run.Queue.BeforeEachWait = run.Hosts.StartReleased;
+        return run;
+    }
 
     /// <summary>
     /// Writes text of a <c>-Z</c> run's combined progress meter to standard error and flushes it, holding
