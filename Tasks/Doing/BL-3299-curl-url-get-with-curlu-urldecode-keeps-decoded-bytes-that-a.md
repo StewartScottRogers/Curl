@@ -30,3 +30,4 @@ Scenarios 1080-1100 (http://a/%FF, %C0%AF, %ED%A0%80): Curl's CurlUrlHandle.Get 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: ba969c52 c46ca32a.
