@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Documentation/Planning/Decisions/ADR-0798-curl-mcp-drops-its-two-packages-for-a-hand-written-server.md, Documentation/Planning/Decisions/ADR-0548-curl-mcp-an-mcp-server-over-the-api-seam-on-microsofts-sdk.md, Documentation/Planning/Decisions/README.md]
+touches: [Documentation/Planning/Decisions/ADR-0799-curl-mcp-drops-its-two-packages-for-a-hand-written-server.md, Documentation/Planning/Decisions/ADR-0548-curl-mcp-an-mcp-server-over-the-api-seam-on-microsofts-sdk.md, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-23
 completed:
@@ -26,13 +26,15 @@ An ADR, "Decided by Claude under Stewart's delegation", records that `Curl.Mcp` 
 
 ## Acceptance criteria
 
-- [ ] The ADR file `Documentation/Planning/Decisions/ADR-0798-curl-mcp-drops-its-two-packages-for-a-hand-written-server.md` exists (use the next free ADR number if 0798 is taken, and rename the touches entry), is marked "Decided by Claude under Stewart's delegation", and states decisions (1) to (6) above with the reason for each.
-- [ ] The ADR names the follow-up tasks by ID (the plan filed alongside this task) and says the packages leave only when the final task proves the golden conversations unchanged.
-- [ ] ADR-0548 gains a status note that its decision 1 (packages) and the SDK wording in decisions 2 and 5 are superseded in intent by the new ADR, with a link; the rest of ADR-0548 is untouched.
-- [ ] `Documentation/Planning/Decisions/README.md` lists the new ADR in the same form as its neighbours.
-- [ ] Every statement in the ADR is true of the repository as it is now, or is written as intent.
+- [x] The ADR file `Documentation/Planning/Decisions/ADR-0799-curl-mcp-drops-its-two-packages-for-a-hand-written-server.md` exists (use the next free ADR number if 0798 is taken, and rename the touches entry), is marked "Decided by Claude under Stewart's delegation", and states decisions (1) to (6) above with the reason for each.
+- [x] The ADR names the follow-up tasks by ID (the plan filed alongside this task) and says the packages leave only when the final task proves the golden conversations unchanged.
+- [x] ADR-0548 gains a status note that its decision 1 (packages) and the SDK wording in decisions 2 and 5 are superseded in intent by the new ADR, with a link; the rest of ADR-0548 is untouched.
+- [x] `Documentation/Planning/Decisions/README.md` lists the new ADR in the same form as its neighbours.
+- [x] Every statement in the ADR is true of the repository as it is now, or is written as intent.
 
 ## Notes
+
+ADR-0798 was taken (openssl cacert), so the ADR is ADR-0799; touches renamed.
 
 ## Log
 
