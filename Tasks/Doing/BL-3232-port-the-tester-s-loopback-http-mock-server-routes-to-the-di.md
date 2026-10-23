@@ -36,3 +36,4 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 - 2026-10-22: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 52267cc6 ae951636 5e81fa96.
 - 2026-10-23: Doing -> Backlog. Split for size: waits on BL-3244 to BL-3250 (responder core and six route groups)
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 52267cc6 ae951636 5e81fa96.
