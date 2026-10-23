@@ -32,3 +32,4 @@ Stewart reported on 2026-10-22: write to a path that fails (exit 23); upstream s
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: ff73b229 26b6e74e 9d4e79dd 6168a654.
