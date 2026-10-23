@@ -31,3 +31,4 @@ Split from BL-3208. Decided by Claude under Stewart's delegation (BL-3208): matc
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 65404b0d ddbbe993 491059de.
