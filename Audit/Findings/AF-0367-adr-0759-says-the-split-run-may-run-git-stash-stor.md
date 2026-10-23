@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0759-a-task-over-its-cost-cap-is-split-by-one-bounded-run.md:SplitForbidden:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-3220
+tasks: BL-3220
 found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md

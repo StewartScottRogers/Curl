@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3228
+tasks: BL-3228
 found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md

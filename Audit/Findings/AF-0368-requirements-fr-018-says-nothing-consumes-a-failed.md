@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Product/Requirements.md:FR-018:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-3221
+tasks: BL-3221
 found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md

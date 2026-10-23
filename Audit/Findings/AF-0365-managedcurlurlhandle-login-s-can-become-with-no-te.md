@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:Login-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:225:||
-task: none
-tasks:
+task: BL-3218
+tasks: BL-3218
 found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
