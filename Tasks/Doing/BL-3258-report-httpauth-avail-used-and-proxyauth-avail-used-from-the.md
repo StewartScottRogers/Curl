@@ -33,3 +33,4 @@ Part of BL-3193. `TransferInfoFromReport.WithCounts` already maps `AuthSchemePic
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 8442c290 2677bb42 3639a5e6.
