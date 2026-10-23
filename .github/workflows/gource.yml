@@ -2,7 +2,9 @@
 # https://stewartscottrogers.github.io/Curl/: a Gource video of Curl's history (a 4K
 # adaptive stream with a full-screen viewer page, and the GIF the README shows) and the
 # code coverage report (coverage/index.html, and coverage/badge.svg for the README), and
-# llms.txt with the download, MCP setup and --ai-help pages, and
+# llms.txt with the download, MCP setup and --ai-help pages (llms.txt and mcp/ are published
+# from work/dark-factory only; download/ and ai-help/ also from master's hourly run, because
+# they come from the preview release), and
 # the live task board page (board/index.html, served at .../Curl/board/), and the gap
 # dashboard (gaps/index.html and gaps/data.json, served at .../Curl/gaps/).
 #
@@ -469,8 +471,11 @@ jobs:
   # llms.txt and .github/site/; resources.json and ai-help.md are fetched from the rolling
   # `preview` release (BL-3147) and turned into download/index.html (the same table as
   # resources.json) and ai-help/ (index.html, index.md and ai-help.md). Each file is committed
-  # onto the gource branch without force and only when it changed. Never gated on `decide`; the
-  # hourly run on master picks up a new release.
+  # onto the gource branch without force and only when it changed. Never gated on `decide`.
+  # Which branch publishes which page: llms.txt and mcp/index.html come from the checkout, so
+  # only work/dark-factory publishes them (master trails it by up to a shift and its hourly run
+  # would put older copies back); download/ and ai-help/ come from the preview release, so both
+  # work/dark-factory and master publish them, and master's hourly run picks up a new release.
   site-pages:
     # Pushes to other branches carry older copies of the sources and would put them back.
     if: github.ref == 'refs/heads/work/dark-factory' || github.ref == 'refs/heads/master'

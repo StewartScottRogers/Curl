@@ -15,7 +15,11 @@ right file, verify it and use it. The site is the `gource` branch, written only 
 
 1. A `site-pages` job, beside those two, with its own concurrency group `gource-site`, on
    `work/dark-factory` and `master`, never gated on `decide`. It commits without force, only
-   the files that changed, then asks for a Pages build.
+   the files that changed, then asks for a Pages build. Branch rule: `llms.txt` and `mcp/index.html`
+   are copied from the checkout, so only a run on `work/dark-factory` publishes them (master trails
+   it by up to a shift, and its hourly run would put older copies back, as BL-1206 stopped for
+   `board-page`). `download/` and `ai-help/` come from the `preview` release, so runs on both
+   branches publish them, and master's hourly run is how a new release is picked up.
 2. Sources: the repository-root `llms.txt` (the single copy; the job copies it to the site
    root), `.github/site/mcp/index.html`, and `.github/site/download/index.html.template`.
 3. `download/index.html` is rendered by `.github/site/New-DownloadPage.ps1` from the preview
