@@ -32,3 +32,4 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 0934129b 3639a5e6.
