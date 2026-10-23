@@ -3,8 +3,8 @@ id: AF-0364
 title: TransferCredentialLookup.HasControlCode's >= 0 can become > 0 with no test failing, so a credential starting with a control code is accepted
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:HasControlCode-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/TransferCredentialLookup.cs:238:>=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
