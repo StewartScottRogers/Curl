@@ -34,3 +34,4 @@ Routes: `/r301`..`/r308` (regex `^/r30[1-8]$`), `/rloop`, `/rrel`, `/rabs`, `/ro
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 6b474468 ae951636 5e81fa96.
