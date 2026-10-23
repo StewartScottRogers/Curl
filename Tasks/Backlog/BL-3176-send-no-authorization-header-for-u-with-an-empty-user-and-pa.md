@@ -1,0 +1,34 @@
+---
+id: BL-3176
+title: Send no Authorization header for -u : with an empty user and password
+priority: Normal
+assignee: Claude
+pipeline: protocol
+depends-on: []
+touches: [Curl.Authentication.UnitLibrary/BasicAndBearerAuthenticator.cs, Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs, Curl.Authentication.UnitTests/BasicAuthEmptyCredentialsTests.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerEmptyCredentialsTests.cs]
+requirement: none
+created: 2026-10-22
+completed:
+---
+# BL-3176 — Send no Authorization header for -u : with an empty user and password
+
+## Goal
+
+`curl -u : http://host/` sends no `Authorization` header and prints no `Server auth` line, as upstream does.
+
+## Context
+
+Stewart reported on 2026-10-22: `curl -v -u : http://host/`. Upstream sends no Authorization header and no `* Server auth using Basic with user ''` line; Curl sends `Authorization: Basic Og==` (base64 of `:`). With an empty user and an empty password nothing is sent. Measure curl 8.22.0 with `Record-CurlExchange.ps1` for `-u :`, `-u ''`, `-u user:` (empty password: upstream does send `Basic dXNlcjo=`), `-u :pass` (empty user), and the proxy equivalent `-U :` (`--proxy-user`), and pin each. The Basic header is built in `Curl.Authentication.UnitLibrary/BasicAndBearerAuthenticator.cs` (line 41); the "using" verbose line is in `Curl.Protocol.Http.UnitLibrary/HttpAuthUsingLines.cs`; credentials reach them via `Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs`. Do the check where one decision keeps both the header and the verbose line silent (the authenticator's applicability, not two separate checks).
+
+## Acceptance criteria
+
+- [ ] `Curl.Authentication.UnitTests/BasicAuthEmptyCredentialsTests.cs` shows empty user and empty password give no Basic value, `user:` and `:pass` still do, with the measured values for curl 8.22.0 noted.
+- [ ] A wire-level test in `Curl.Protocol.Http.UnitTests/HttpProtocolHandlerEmptyCredentialsTests.cs` captures the request bytes for `-u :` and asserts there is no `Authorization` header line, and that `-v` output has no `Server auth` line.
+- [ ] The same test class pins `-U :` for the proxy-authorization header and its verbose line as curl 8.22.0 measures.
+- [ ] `dotnet build Curl.Authentication.UnitLibrary Curl.Protocol.Http.UnitLibrary -warnaserror` is clean and the fast tests of both `.UnitTests` projects pass.
+
+## Notes
+
+## Log
+
+- 2026-10-22: Created.
