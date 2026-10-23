@@ -30,3 +30,4 @@ Scenarios 591, 598, 605: Curl returns 4 for all three; libcurl returns 0 (https:
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 41f99f44 c46ca32a.
