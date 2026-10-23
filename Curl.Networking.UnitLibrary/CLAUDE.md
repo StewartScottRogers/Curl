@@ -551,8 +551,10 @@ Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`
 (BL-1450) on Windows it reports a read failing with `SocketError.ConnectionAborted` as
 `ConnectionReset` (`ReportsAbortedReadAsReset`), since Windows gives a receive issued a few
 milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees WSAECONNRESET; per
-ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesBeforeWrite`),
-as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort. `UdpDatagramConnector` opens channels
+ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesOrEndBeforeWrite`),
+as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort,
+nor per ADR-0796 (BL-3304) when it found the peer's unread FIN, as on a kept connection the server
+closed and curl reused. `UdpDatagramConnector` opens channels
 through an internal seam, so its tests need no socket. `UdpDatagramChannelTests` opens,
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over
