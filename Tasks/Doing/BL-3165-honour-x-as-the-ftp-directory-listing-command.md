@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22: `curl -X NLST ftp://host/` must send `NLST`, and
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 73ac7c58 f42410c0 57934567 e017a1c1 4be569d0.
