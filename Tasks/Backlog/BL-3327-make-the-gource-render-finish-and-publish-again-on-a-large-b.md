@@ -1,5 +1,5 @@
 ---
-id: BL-3314
+id: BL-3327
 title: Make the Gource render finish and publish again on a large, busy repository
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3314 — Make the Gource render finish and publish again on a large, busy repository
+# BL-3327 — Make the Gource render finish and publish again on a large, busy repository
 
 ## Goal
 
