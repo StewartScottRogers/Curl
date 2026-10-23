@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-22
 ---
 # BL-3223 — Fix AF-0370: BL-3121 cost $1.23 (5.6x the median) because it was filed with touches naming only Curl.Networking.UnitLibrary, so its first Opus run found BL-3127 holding the test project and requeued
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause (AF-0370): BL-3121 was filed with touches naming only Curl.Networking.UnitLibrary; its first run ($0.30, 11 turns) found BL-3127 holding Curl.Networking.UnitTests and requeued. The requeue entry in the Log then made DarkFactory/ModelChoice.ps1 route the retry to Opus ("retry after a run that came back", a deliberate rule from BL-1705 because retries came back on Opus too), and that run took 28 turns and $0.93. Recorded as unavoidable here: the filing gap is a one-off (the board already widens touches on requeue, commit 8ea47c96c), the Opus retry rule is deliberate, and no change to RunDarkFactory.ps1 is warranted. No code changed; build and tests are unaffected.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cause named in Notes; recorded as unavoidable, no code change.
