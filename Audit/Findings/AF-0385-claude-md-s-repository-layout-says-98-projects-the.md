@@ -3,8 +3,8 @@ id: AF-0385
 title: CLAUDE.md's repository layout says 98 projects; the tree has 101 project directories with a .csproj plus 5 shared projects
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:project-count:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path CLAUDE.md -Pattern '98 projects' | ForEach-Object { '{0}:{1}
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
