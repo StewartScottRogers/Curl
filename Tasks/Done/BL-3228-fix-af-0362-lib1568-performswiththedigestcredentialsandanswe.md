@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.LibTest.UnitTests]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-22
 ---
 # BL-3228 — Fix AF-0362: Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode never checks the Digest method or the credentials
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only fix, so the feature pipeline was cut to its test stage: the fake engine now captures User-Agent, `Authentication.UserPassword` and `Authentication.HttpAuthentication` in one string, asserted as `lib1568 testuser:testpass Digest`, so dropping the credentials or switching to Basic fails the test. No production code changed, so no Measure-CodeQuality run was needed.
+- Verified: the reproduction's 10 lines of context now show the Digest and credentials assert; `dotnet build` 0 warnings, 0 errors; fast tests green in all 44 test projects (Curl.Conformance.LibTest.UnitTests 1185 passed). The change is platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-22: Doing -> Done. Lib1568's perform test now asserts Digest auth and the testuser:testpass credentials
