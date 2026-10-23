@@ -1,5 +1,5 @@
 ---
-id: BL-3334
+id: BL-3342
 title: PoolingConnector keeps a new connection's earlier failed address socket error for CURLINFO_OS_ERRNO
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3334 — PoolingConnector keeps a new connection's earlier failed address socket error for CURLINFO_OS_ERRNO
+# BL-3342 — PoolingConnector keeps a new connection's earlier failed address socket error for CURLINFO_OS_ERRNO
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-3335
+id: BL-3343
 title: CURLINFO_OS_ERRNO keeps the socket error of a reused connection that died before its response when the retry on a fresh connection succeeds
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3335 — CURLINFO_OS_ERRNO keeps the socket error of a reused connection that died before its response when the retry on a fresh connection succeeds
+# BL-3343 — CURLINFO_OS_ERRNO keeps the socket error of a reused connection that died before its response when the retry on a fresh connection succeeds
 
 ## Goal
 
