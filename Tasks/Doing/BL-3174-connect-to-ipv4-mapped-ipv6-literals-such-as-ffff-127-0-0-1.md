@@ -34,3 +34,4 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
 - 2026-10-22: Doing -> Backlog. Lane 1 could not integrate: rebase conflict the resolver could not settle. The work is on branch factory/BL-3174-lane-1-20261022-192710; start with git cherry-pick --no-commit factory/BL-3174-lane-1-20261022-192710 and fix it.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
