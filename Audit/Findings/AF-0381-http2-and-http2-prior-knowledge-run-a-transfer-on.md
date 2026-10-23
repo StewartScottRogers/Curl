@@ -1,0 +1,47 @@
+---
+id: AF-0381
+title: --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
+auditor: conformance
+severity: High
+status: proposed
+reason:
+key: conformance:--http2:RefusedBySchannelBuild:exit-code
+reproduction: none
+task: none
+tasks:
+found: 2026-10-23
+found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
+scorecard: 2026-10-23_0618.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0381 - --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
+
+## Summary
+
+High finding from the conformance auditor at `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:338`: --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2.
+
+## Evidence
+
+Location: `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:338`
+
+Reference: curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel zlib/1.3.2 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.5 libssh2/1.11.1 WinLDAP (no HTTP2 in Features; inbox C:\Windows\System32\curl.exe 8.21.0 Schannel has none either). Differential seed 850517410, cases 38, 98, 206, 229, 259 and 262. Reduced to `--http2 http://127.0.0.1:PORT/`: curl prints `curl: option --http2: the installed libcurl version does not support this` and the try line, exits 2 and sends nothing. Curl sends `GET / HTTP/1.1` with `Upgrade: h2c` and `HTTP2-Settings` and exits 0. Reduced to `--http2-prior-knowledge http://127.0.0.1:PORT/`: curl exits 2 the same way. Curl sends the h2 preface and exits 56 (`Recv failure: Connection was reset`) in cases 38, 229, 259 and the reduced run, and 16 (`nghttp2 shuts down connection with error 6: FRAME_SIZE_ERROR`) in case 206, so the same command line also gives different exit codes from run to run. Case 98 differs only because curl refuses --http2-prior-knowledge before it checks the blank --ciphers. Rows 338-339 (`Flag("http2"...)`, `Flag("http2-prior-knowledge"...)`) have no .RefusedBySchannelBuild(), unlike ssl-sessions at line 268. Phase 2: explained by ADR-0786 (2026-10-23, Stewart's decision, recorded by Claude in BL-3207): 'The Windows build runs HTTP/2 and lists HTTP2 in curl -V', superseding the HTTP/2 part of ADR-0397. The ADR accepts that 'a Windows script that relied on the refusal (exit 2) now sees a transfer'. The run-to-run 16/56 exit on --http2-prior-knowledge against an HTTP/1.1 server is not covered by that ADR.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+dotnet build Curl.Console -c Release; $c=(Resolve-Path Curl.Console\bin\Release\net10.0\curl.exe).Path; & .\Record-CurlExchange.ps1 -Port 51894 -OutDirectory $env:TEMP\af-h2\curl -CurlArgs @('--http2','http://127.0.0.1:51894/') | Out-Null; & .\Record-CurlExchange.ps1 -Port 51894 -Curl $c -OutDirectory $env:TEMP\af-h2\cand -CurlArgs @('--http2','http://127.0.0.1:51894/') | Out-Null; Get-Content $env:TEMP\af-h2\curl\exitcode.txt,$env:TEMP\af-h2\cand\exitcode.txt
+```
+
+- Expected: 2 and 2 (curl: option --http2: the installed libcurl version does not support this; nothing sent)
+- Actual: 2 then 0 (Curl sends GET / HTTP/1.1 with Upgrade: h2c and completes the transfer)
+
+## Re-audits
+
+## Log
+
+- 2026-10-23: filed proposed.

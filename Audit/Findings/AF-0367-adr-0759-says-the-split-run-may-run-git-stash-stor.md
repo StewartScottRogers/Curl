@@ -42,6 +42,8 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0759-*.md, DarkFactory/
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the reproduction: the only match is Prompts.ps1:435 ($SplitForbidden's 'git stash store'). ADR-0759 no longer contains 'except `list` and `store`'; its line 21 now says the split run is denied 'every git stash subcommand except list', which agrees with $SplitForbidden.
+
 ## Log
 
 - 2026-10-22: filed proposed.

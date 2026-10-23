@@ -1,0 +1,47 @@
+---
+id: AF-0376
+title: EchOffer.SourceLines' Length > 0 can become >= 0 with no test failing, so an empty ECHConfigList from DNS writes the wrong -v ECH lines
+auditor: quality
+severity: High
+status: proposed
+reason:
+key: quality:Curl.Networking.UnitLibrary/EchOffer.cs:SourceLines-gt:surviving-mutant
+reproduction: mutation Curl.Networking.UnitLibrary/EchOffer.cs:92:>
+task: none
+tasks:
+found: 2026-10-23
+found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
+scorecard: 2026-10-23_0618.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0376 - EchOffer.SourceLines' Length > 0 can become >= 0 with no test failing, so an empty ECHConfigList from DNS writes the wrong -v ECH lines
+
+## Summary
+
+High finding from the quality auditor at `Curl.Networking.UnitLibrary/EchOffer.cs:92`: EchOffer.SourceLines' Length > 0 can become >= 0 with no test failing, so an empty ECHConfigList from DNS writes the wrong -v ECH lines.
+
+## Evidence
+
+Location: `Curl.Networking.UnitLibrary/EchOffer.cs:92`
+
+Invoke-MutationTest.ps1 -Library Curl.Networking.UnitLibrary -MaxMutants 40 -Seed 0 reported this mutant as survived. Original: : encoded is not { Length: > 0 } ? [NoListLine]; mutated: { Length: >= 0 }. SourceLines writes curl's ECH: setup lines, which go to -v (EchOffer.InfoLines). With the mutant, an HTTPS record whose ech value is present but empty no longer writes NoListLine. It writes DnsListLine plus either 'ECH: imported ECHConfigList of length 0' or DnsListFailedLine. The -v output of an --ech transfer then differs, and no test covers an empty, non-null list from DNS.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Networking.UnitLibrary/EchOffer.cs:92:> -Member SourceLines -ExcludeBaselineFailures -TimeoutSeconds 600
+```
+
+- Expected: outcome killed
+- Actual: outcome survived
+
+## Re-audits
+
+## Log
+
+- 2026-10-23: filed proposed.

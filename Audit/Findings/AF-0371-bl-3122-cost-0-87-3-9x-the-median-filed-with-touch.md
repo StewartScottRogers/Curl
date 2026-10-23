@@ -3,8 +3,8 @@ id: AF-0371
 title: BL-3122 cost $0.87 (3.9x the median): filed with touches naming only Curl.Networking.UnitLibrary, requeued behind BL-3127, then rerun on Opus
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-23_0618.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3224) are Done at 32b1dda228a5, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-3122:cost-outlier
 reproduction: none
 task: BL-3224
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: task-done-historical
+closed-by: 2026-10-23_0618.md
 ---
 # AF-0371 - BL-3122 cost $0.87 (3.9x the median): filed with touches naming only Curl.Networking.UnitLibrary, requeued behind BL-3127, then rerun on Opus
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Audit 2026-10-23_0618.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3224) are Done at 32b1dda228a5, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
