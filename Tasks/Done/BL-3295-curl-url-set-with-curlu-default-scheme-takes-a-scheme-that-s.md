@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.Set.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3295 — curl_url_set with CURLU_DEFAULT_SCHEME takes a scheme that starts with a digit or dash as a host, as libcurl does
 
@@ -22,12 +22,15 @@ Scenarios 591, 598, 605: Curl returns 4 for all three; libcurl returns 0 (https:
 
 ## Acceptance criteria
 
-- [ ] A ManagedCurlUrlHandle unit test pins the three set codes and the URL libcurl gives.
-- [ ] The build is clean and the fast tests pass.
+- [x] A ManagedCurlUrlHandle unit test pins the three set codes and the URL libcurl gives.
+- [x] The build is clean and the fast tests pass.
 
 ## Notes
+
+Measured libcurl 8.22.0 per the BL-3236 replay (scenarios 591, 598, 605). Cause: under CURLU_DEFAULT_SCHEME upstream sets the scheme before reading the host, so "1ab:" is host 1ab with an empty port (accepted with a scheme); Curl parsed the text without a scheme first and rejected the empty port (BadPortNumber). ManagedCurlUrlHandle.ParseWithoutScheme now parses https:// plus the text under DEFAULT_SCHEME; Accept lost its now-unreachable default-scheme branch. "+ab://a" gives 21 through the same path. No ADR needed: a bug fix to match measured libcurl.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 41f99f44 c46ca32a.
+- 2026-10-23: Doing -> Done. Default-scheme set parses https:// plus the text, as libcurl; tests pin 1ab, -ab, +ab

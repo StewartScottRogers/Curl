@@ -330,10 +330,19 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     /// <c>MAX_SCHEME_LEN</c>) is <see cref="CurlUrlCode.BadScheme" /> unless <c>CURLU_GUESS_SCHEME</c> or
     /// <c>CURLU_DEFAULT_SCHEME</c> is set, as upstream's <c>parseurl</c> answers before reading a host.
     /// </summary>
-    private CurlUrlCode ParseWithoutScheme(string value, CurlUrlFlags flags) =>
-        (flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) == 0
-            ? CurlUrlCode.BadScheme
+    private CurlUrlCode ParseWithoutScheme(string value, CurlUrlFlags flags)
+    {
+        if ((flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) == 0)
+        {
+            return CurlUrlCode.BadScheme;
+        }
+
+        // Under CURLU_DEFAULT_SCHEME upstream's parseurl has the default scheme before it reads the host, so
+        // text such as 1ab://a is the host 1ab with an empty port (BL-3295).
+        return flags.HasFlag(CurlUrlFlags.DefaultScheme)
+            ? Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme)
             : Parse(value, flags);
+    }
 
     /// <summary>
     /// Parses a whole URL with <see cref="CurlUrl" /> under <c>CURLU_PATH_AS_IS</c> and
@@ -353,7 +362,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         bool spaced = !ReferenceEquals(text, value) && !value.Contains("%20", StringComparison.Ordinal);
         newParts = spaced ? newParts.WithSpaces() : newParts;
 
-        return Accept(value, flags, flags.HasFlag(CurlUrlFlags.UrlEncode) ? newParts.UrlEncoded() : newParts);
+        return Accept(flags, flags.HasFlag(CurlUrlFlags.UrlEncode) ? newParts.UrlEncoded() : newParts);
     }
 
     /// <summary>
@@ -374,24 +383,16 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             out rejection);
 
     /// <summary>
-    /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
-    /// <c>CURLU_GUESS_SCHEME</c>, the only other way a URL with no scheme gets here (<see cref="ParseWithoutScheme" />
-    /// asks for one of the two, and <see cref="ParseAbsolute" /> refuses text with no <c>/</c> after its scheme's
-    /// colon, such as <c>http:80/x</c>, with <see cref="CurlUrlCode.BadSlashes" /> first); with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
+    /// A parsed URL: one with a guessed scheme (under <c>CURLU_GUESS_SCHEME</c>; <see cref="ParseWithoutScheme" />
+    /// parses <c>CURLU_DEFAULT_SCHEME</c>'s text with <c>https://</c> in front) is kept; one with a scheme libcurl
+    /// does not support is <see cref="CurlUrlCode.UnsupportedScheme" /> unless
     /// <c>CURLU_NON_SUPPORT_SCHEME</c>.
     /// </summary>
-    private CurlUrlCode Accept(string value, CurlUrlFlags flags, UrlHandleParts newParts)
+    private CurlUrlCode Accept(CurlUrlFlags flags, UrlHandleParts newParts)
     {
-        if (!newParts.SchemeGuessed)
-        {
-            bool supported = flags.HasFlag(CurlUrlFlags.NonSupportScheme) || UrlHandleParts.IsSupportedScheme(newParts.Scheme!);
+        bool supported = newParts.SchemeGuessed || flags.HasFlag(CurlUrlFlags.NonSupportScheme) || UrlHandleParts.IsSupportedScheme(newParts.Scheme!);
 
-            return supported ? Keep(newParts) : CurlUrlCode.UnsupportedScheme;
-        }
-
-        return flags.HasFlag(CurlUrlFlags.DefaultScheme)
-            ? Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme)
-            : Keep(newParts);
+        return supported ? Keep(newParts) : CurlUrlCode.UnsupportedScheme;
     }
 
     /// <summary>
