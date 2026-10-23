@@ -31,3 +31,4 @@ get*/hugehdr: both return 100 (CURLE_TOO_LARGE), libcurl leaves CURLOPT_ERRORBUF
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
