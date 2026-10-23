@@ -92,6 +92,12 @@ public sealed class EasyInfoReadersLongsTests
     }
 
     [TestMethod]
+    public void GetInfo_PrimaryPortOfATransferThatMadeNoConnection_IsMinusOne()
+    {
+        Assert.AreEqual(-1L, Read(new TransferInfo(), CurlInfo.PrimaryPort));
+    }
+
+    [TestMethod]
     [DataRow(1L << 30)]
     [DataRow(1L << 31)]
     [DataRow(1L << 32)]

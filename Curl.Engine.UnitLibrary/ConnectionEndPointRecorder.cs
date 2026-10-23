@@ -46,9 +46,29 @@ internal sealed class ConnectionEndPointRecorder
     /// <summary>Why the last failed SOCKS proxy handshake failed, or <see cref="CurlProxyCode.Ok" />.</summary>
     private CurlProxyCode proxyError;
 
-    /// <summary>Forgets what the previous transfer recorded.</summary>
-    internal void Clear()
+    /// <summary>The local end of the redirect hop before this one, or <see langword="null" />.</summary>
+    private IPEndPoint? earlierLocalEndPoint;
+
+    /// <summary>The remote end of the redirect hop before this one, or <see langword="null" />.</summary>
+    private IPEndPoint? earlierRemoteEndPoint;
+
+    /// <summary>The status code the redirect hop before this one received, or <c>0</c>.</summary>
+    private int earlierResponseCode;
+
+    /// <summary>The status code the report of the hop being run carried, or <c>0</c>.</summary>
+    private int responseCode;
+
+    /// <summary>
+    /// Forgets what the previous transfer recorded, or - for a redirect's next hop - sets it aside as the earlier hop's,
+    /// which a hop that fails before it connects reports in its place as libcurl 8.22.0 keeps them (BL-3314).
+    /// </summary>
+    /// <param name="followingRedirect">Whether the transfer about to run is a redirect's next hop.</param>
+    internal void Clear(bool followingRedirect = false)
     {
+        earlierLocalEndPoint = followingRedirect ? localEndPoint ?? earlierLocalEndPoint : null;
+        earlierRemoteEndPoint = followingRedirect ? remoteEndPoint ?? earlierRemoteEndPoint : null;
+        earlierResponseCode = followingRedirect ? Math.Max(responseCode, earlierResponseCode) : 0;
+        responseCode = 0;
         connectionRecorded = false;
         localEndPoint = null;
         remoteEndPoint = null;
@@ -136,7 +156,28 @@ internal sealed class ConnectionEndPointRecorder
     /// without a report. <paramref name="result" /> itself when nothing was recorded or the
     /// handler reported an end point.
     /// </returns>
-    internal TransferResult ReportOn(TransferResult result) => WithEndPoints(WithConnectFailure(result));
+    internal TransferResult ReportOn(TransferResult result)
+    {
+        responseCode = result.Report?.ResponseCode ?? 0;
+        return WithEarlierHop(WithEndPoints(WithConnectFailure(result)));
+    }
+
+    /// <summary>
+    /// Puts the earlier redirect hop's status code and end points on the report of a hop that failed before it connected.
+    /// </summary>
+    private TransferResult WithEarlierHop(TransferResult result)
+    {
+        if (connectionRecorded || result.IsSuccess || earlierRemoteEndPoint is null)
+        {
+            return result;
+        }
+
+        TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
+        return result with
+        {
+            Report = report with { ResponseCode = earlierResponseCode, LocalEndPoint = earlierLocalEndPoint, RemoteEndPoint = earlierRemoteEndPoint },
+        };
+    }
 
     /// <summary>
     /// Puts the recorded <see cref="TransferReport.OsErrno" /> and <see cref="TransferReport.ProxyError" />
