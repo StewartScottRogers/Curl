@@ -46,7 +46,7 @@ public sealed partial class UpstreamConformanceTests
                 Http2Server);
             UpstreamCaseOutcome outcome = await runner.RunAsync(testNumber, testFile, logDirectory.FullName, certificateDirectory: CertificateFolder.Value);
 
-            // test471 needs http/2, which the Schannel build Curl matches on Windows lacks (ADR-0488, BL-2230).
+            // A case may still need a feature only another platform has (ADR-0488); http/2 runs on every platform since BL-3268.
             if (outcome.RunsOnlyOnAnotherPlatform)
             {
                 Assert.Inconclusive(outcome.Detail);

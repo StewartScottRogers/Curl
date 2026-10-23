@@ -13,6 +13,7 @@ internal static class UpstreamPlatformFeatureTable
         .. UpstreamCurlVersionLineFeatures.Names,
         .. UpstreamToolFeatures.Names,
         .. UpstreamHarnessFeatures.Names,
+        .. UpstreamHttp2Features.Names,
     ];
 
     /// <summary>The features only Windows reports.</summary>

@@ -30,9 +30,9 @@ namespace Curl.Conformance;
 /// the locale, so the harness stands in for a UTF-8 locale on every platform (BL-2861); <c>large_file</c>;
 /// <c>local-http</c> (the harness's server is at <c>127.0.0.1</c>); <c>win32</c> on Windows, as
 /// <c>runtests.pl</c> sets it there; the TLS backend; <c>xattr</c> off Windows, where curl
-/// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> off Windows only, since the
-/// Schannel build Curl once matched there had no <c>HTTP2</c> and refused <c>--http2</c> (BL-2230); Curl runs
-/// <c>--http2</c> on Windows since ADR-0786, and turning them on there is BL-3264.
+/// cannot write extended attributes; <c>http/2</c> and <c>h2c</c> on every platform (BL-3268): the
+/// Schannel build Curl once matched had no <c>HTTP2</c> and refused <c>--http2</c> (BL-2230), but Curl runs
+/// <c>--http2</c> on Windows since ADR-0786, and BL-3268 turned them on there.
 /// <c>http/3</c> is listed on no platform: Curl refuses <c>--http3</c> and <c>--http3-only</c> on
 /// every reference build, none of which has a QUIC library (ADR-0540), so upstream's <c>runtests.pl</c>
 /// skips the cases that need it, as it does for the reference curl (BL-2370, GF-0094).
