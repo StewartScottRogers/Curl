@@ -1,0 +1,46 @@
+{
+  "name": "tools-call-transfer-missing-url",
+  "exchanges": [
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"golden\",\"version\":\"1.0\"}}}",
+      "response": {
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "logging": {},
+            "resources": {},
+            "tools": {
+              "listChanged": true
+            }
+          },
+          "serverInfo": {
+            "name": "Curl.Mcp",
+            "version": "0.1.0.0"
+          }
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+      "response": null
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"transfer\",\"arguments\":{}}}",
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "An error occurred invoking 'transfer'."
+            }
+          ],
+          "isError": true
+        },
+        "id": 2,
+        "jsonrpc": "2.0"
+      }
+    }
+  ]
+}

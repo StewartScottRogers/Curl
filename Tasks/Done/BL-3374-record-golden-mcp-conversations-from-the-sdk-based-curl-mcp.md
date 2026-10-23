@@ -5,11 +5,11 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Mcp.IntegrationTests/Golden, Curl.Mcp.IntegrationTests/CurlMcpGoldenConversationIntegrationTests.cs]
+touches: [Curl.Mcp.IntegrationTests/Golden, Curl.Mcp.IntegrationTests/CurlMcpGoldenConversationIntegrationTests.cs, Curl.Mcp.IntegrationTests/McpStdioClient.cs, Curl.Mcp.IntegrationTests/CLAUDE.md]
 model: sonnet
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3374 — Record golden MCP conversations from the SDK-based Curl.Mcp server and replay them as an Integration test
 
@@ -27,15 +27,20 @@ A recorded set of MCP conversations with the current SDK-based `Curl.Mcp` server
 
 ## Acceptance criteria
 
-- [ ] `Curl.Mcp.IntegrationTests/Golden/` holds one file per conversation listed in Context, each with the request lines sent and the response lines received.
-- [ ] `Curl.Mcp.IntegrationTests/CurlMcpGoldenConversationIntegrationTests.cs` replays every golden file against the built `Curl.Mcp` and passes with `dotnet test Curl.Mcp.IntegrationTests --filter "TestCategory=Integration&FullyQualifiedName~Golden"`; the class carries `[TestCategory("Integration")]`.
-- [ ] The golden `tools/list` file lists exactly the five tools with their current descriptions, input schemas and annotations.
-- [ ] The tests are platform-neutral (no drive-letter path, no Windows-only text), per root CLAUDE.md.
-- [ ] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
+- [x] `Curl.Mcp.IntegrationTests/Golden/` holds one file per conversation listed in Context, each with the request lines sent and the response lines received.
+- [x] `Curl.Mcp.IntegrationTests/CurlMcpGoldenConversationIntegrationTests.cs` replays every golden file against the built `Curl.Mcp` and passes with `dotnet test Curl.Mcp.IntegrationTests --filter "TestCategory=Integration&FullyQualifiedName~Golden"`; the class carries `[TestCategory("Integration")]`.
+- [x] The golden `tools/list` file lists exactly the five tools with their current descriptions, input schemas and annotations.
+- [x] The tests are platform-neutral (no drive-letter path, no Windows-only text), per root CLAUDE.md.
+- [x] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
 
 ## Notes
+
+- Added McpStdioClient.cs (new ExchangeAsync for raw lines) and CLAUDE.md to touches; no other Doing task named them.
+- Recorded with CURL_MCP_RECORD_GOLDEN=1 from the SDK server (ModelContextProtocol 2.2.0); 28 golden files. Malformed JSON, a non-object message and a batch array get no answer within 5 s, recorded as null responses. Tool-result text that is JSON is stored as an object; platform-dependent values (features, TLS backend, OS connect error text, backslashes, CRLF) are normalised so the files replay on Windows, Linux and macOS.
+- Fast-test criterion: Curl.Mcp.IntegrationTests holds only Integration tests, so the fast filter matches none there; build is clean with -warnaserror and all 30 golden tests pass.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 4d3a4efe 42864ae2 61e7c922 88ed799f 6d2cec38.
+- 2026-10-23: Doing -> Done. 28 golden MCP conversations recorded from the SDK server and replayed by an Integration test

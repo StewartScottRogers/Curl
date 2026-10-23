@@ -1,0 +1,93 @@
+{
+  "name": "tools-call-transfer-success",
+  "exchanges": [
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"golden\",\"version\":\"1.0\"}}}",
+      "response": {
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "logging": {},
+            "resources": {},
+            "tools": {
+              "listChanged": true
+            }
+          },
+          "serverInfo": {
+            "name": "Curl.Mcp",
+            "version": "0.1.0.0"
+          }
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+      "response": null
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"transfer\",\"arguments\":{\"url\":\"http://127.0.0.1:{port}/item\",\"headers\":[{\"name\":\"X-Test\",\"value\":\"yes\"}]}}}",
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": {
+                "statusCode": 200,
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "text/plain"
+                  },
+                  {
+                    "name": "Content-Length",
+                    "value": "5"
+                  },
+                  {
+                    "name": "Connection",
+                    "value": "close"
+                  }
+                ],
+                "body": {
+                  "content": "hello",
+                  "isBase64": false,
+                  "totalBytes": 5,
+                  "returnedBytes": 5,
+                  "isTruncated": false,
+                  "truncationNote": null
+                },
+                "info": {
+                  "totalTimeSeconds": "<TIMING>",
+                  "nameLookupTimeSeconds": "<TIMING>",
+                  "connectTimeSeconds": "<TIMING>",
+                  "appConnectTimeSeconds": "<TIMING>",
+                  "startTransferTimeSeconds": "<TIMING>",
+                  "effectiveUrl": "http://127.0.0.1:<PORT>/item",
+                  "effectiveMethod": "GET",
+                  "redirectCount": 0,
+                  "contentType": "text/plain",
+                  "sizeDownload": 5,
+                  "sizeUpload": 0,
+                  "headerSize": 83,
+                  "requestSize": 71,
+                  "speedDownload": "<TIMING>",
+                  "speedUpload": "<TIMING>",
+                  "httpVersion": "1.1",
+                  "primaryIp": "127.0.0.1",
+                  "primaryPort": "<PLATFORM>"
+                },
+                "failure": null,
+                "isError": false,
+                "isBodyTruncated": false
+              }
+            }
+          ],
+          "isError": false
+        },
+        "id": 2,
+        "jsonrpc": "2.0"
+      }
+    }
+  ]
+}

@@ -148,6 +148,30 @@ internal sealed class McpStdioClient : IAsyncDisposable
         }
     }
 
+    /// <summary>Sends one raw line and reads the next line the server writes, whatever its id.</summary>
+    /// <param name="line">The line to send, as it is, so it may be malformed JSON.</param>
+    /// <param name="wait">How long to wait for the answer, or <see langword="null" /> to send without reading one.</param>
+    /// <returns>The line read, or <see langword="null" /> when none was asked for or none arrived within <paramref name="wait" />.</returns>
+    internal async Task<string?> ExchangeAsync(string line, TimeSpan? wait)
+    {
+        await process.StandardInput.WriteLineAsync(line);
+        await process.StandardInput.FlushAsync();
+        if (wait is null)
+        {
+            return null;
+        }
+
+        using CancellationTokenSource timeout = new(wait.Value);
+        try
+        {
+            return await process.StandardOutput.ReadLineAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Closes standard input, so the server stops, and kills it if it has not exited within ten seconds.</summary>
     /// <returns>A task that completes when the process has exited.</returns>
     public async ValueTask DisposeAsync()

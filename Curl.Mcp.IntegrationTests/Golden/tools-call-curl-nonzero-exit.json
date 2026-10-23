@@ -1,0 +1,72 @@
+{
+  "name": "tools-call-curl-nonzero-exit",
+  "exchanges": [
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"golden\",\"version\":\"1.0\"}}}",
+      "response": {
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "logging": {},
+            "resources": {},
+            "tools": {
+              "listChanged": true
+            }
+          },
+          "serverInfo": {
+            "name": "Curl.Mcp",
+            "version": "0.1.0.0"
+          }
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+      "response": null
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"curl\",\"arguments\":{\"args\":[\"-sS\",\"http://127.0.0.1:{port}/\"]}}}",
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": {
+                "exitCode": 7,
+                "standardOutput": {
+                  "content": "",
+                  "isBase64": false,
+                  "totalBytes": 0,
+                  "returnedBytes": 0,
+                  "isTruncated": false,
+                  "truncationNote": null
+                },
+                "standardError": {
+                  "content": "curl: (7) Failed to connect to 127.0.0.1:<PORT> after <TIMING> ms: <OS-ERROR>\n",
+                  "isBase64": false,
+                  "totalBytes": "<LENGTH>",
+                  "returnedBytes": "<LENGTH>",
+                  "isTruncated": false,
+                  "truncationNote": null
+                },
+                "failure": {
+                  "kind": "CurlExit",
+                  "text": "curl: (7) Failed to connect to 127.0.0.1:<PORT> after <TIMING> ms: <OS-ERROR>\ncurl exit code 7 (CouldntConnect)",
+                  "exitCode": 7
+                },
+                "isError": true,
+                "isStandardOutputTruncated": false,
+                "isStandardErrorTruncated": false
+              }
+            }
+          ],
+          "isError": true
+        },
+        "id": 2,
+        "jsonrpc": "2.0"
+      }
+    }
+  ]
+}
