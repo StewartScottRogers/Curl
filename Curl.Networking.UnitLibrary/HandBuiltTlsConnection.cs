@@ -102,6 +102,14 @@ internal sealed class HandBuiltTlsConnection(
         }
     }
 
+    /// <inheritdoc />
+    /// <remarks>Sends <c>close_notify</c>, then ends the TCP send side under it.</remarks>
+    public async ValueTask ShutDownSendingAsync(CancellationToken cancellationToken)
+    {
+        await ShutdownAsync(tlsStream, cancellationToken).ConfigureAwait(false);
+        await plaintext.ShutDownSendingAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await tlsStream.DisposeAsync().ConfigureAwait(false);

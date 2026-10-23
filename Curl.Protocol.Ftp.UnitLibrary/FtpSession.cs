@@ -2282,7 +2282,28 @@ internal sealed class FtpSession(
     {
         IConnection? data = dataConnection;
         dataConnection = null;
-        await DisposeIfOpenAsync(data).ConfigureAwait(false);
+        if (data is not null)
+        {
+            await ShutDownSendingQuietlyAsync(data).ConfigureAwait(false);
+            await data.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Ends the data connection's send side gracefully - TLS <c>close_notify</c>, then FIN - so
+    /// the close is not a reset, which servers such as Rebex answer with <c>426</c> (BL-3179,
+    /// ADR-0770). A peer already gone leaves nothing to end, as curl ignores a failed shutdown.
+    /// </summary>
+    private async ValueTask ShutDownSendingQuietlyAsync(IConnection data)
+    {
+        try
+        {
+            await data.ShutDownSendingAsync(control.CancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The peer ended the connection first.
+        }
     }
 
     /// <summary>
