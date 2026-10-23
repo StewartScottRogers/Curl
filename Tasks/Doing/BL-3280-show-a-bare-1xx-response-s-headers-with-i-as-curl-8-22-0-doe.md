@@ -30,3 +30,4 @@ BL-3233 differential case status-100 (-si {U}/status/100, route in Curl.Conforma
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: a7bb6b68 69edf767.
