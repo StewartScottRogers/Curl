@@ -36,3 +36,4 @@ Split from BL-3173 (over its cost cap). The URL model is `Curl.Protocol.Abstract
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e58ff96f f6df622b 18168d82 796ab2d5 9d48b5c4.
