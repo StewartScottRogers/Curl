@@ -1,5 +1,5 @@
 ---
-id: BL-3263
+id: BL-3267
 title: Differential normaliser hides the verbose progress meter's speed columns
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed: 2026-10-23
 ---
-# BL-3263 — Differential normaliser hides the verbose progress meter's speed columns
+# BL-3267 — Differential normaliser hides the verbose progress meter's speed columns
 
 ## Goal
 
