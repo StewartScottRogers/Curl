@@ -74,6 +74,12 @@ public sealed class TransferInfoLengthAndConditionTests
     public void Of_FailedFileTransfer_AnswersMinusOne() =>
         Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.FileCouldntReadFile, 0), FileUrl).ContentLengthDownload);
 
+
+    /// <summary>libcurl 8.22.0 (lib/file.c, file_upload) never sets a download size, so it stays -1 after an upload (BL-3277).</summary>
+    [TestMethod]
+    public void Of_FileUpload_AnswersMinusOne() =>
+        Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 30), FileUrl, false, new ManualTimeProvider(), uploaded: true).ContentLengthDownload);
+
     [TestMethod]
     public void WithoutPortOverride_PortOverAUrlWithItsOwnPort_AnswersTheUrlAsSet() =>
         Assert.AreEqual(

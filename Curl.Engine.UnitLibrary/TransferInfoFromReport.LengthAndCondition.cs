@@ -11,10 +11,10 @@ internal static partial class TransferInfoFromReport
     /// The info with the response's <c>Content-Length</c> and whether a time condition was unmet: libcurl 8.22.0
     /// answers <c>CURLINFO_CONDITION_UNMET</c> 1 for every 304, a time condition set or not (BL-3194).
     /// </summary>
-    private static TransferInfo WithLengthAndCondition(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl) => info with
+    private static TransferInfo WithLengthAndCondition(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, bool uploaded) => info with
     {
         ConditionUnmet = result.TimeConditionUnmet || report.ResponseCode == 304 ? 1 : 0,
-        ContentLengthDownload = SchemeOf(effectiveUrl) == FileScheme ? FileLengthOf(result, report) : ContentLengthOf(result, report),
+        ContentLengthDownload = SchemeOf(effectiveUrl) == FileScheme ? FileLengthOf(result, report, uploaded) : ContentLengthOf(result, report),
     };
 
     /// <summary>
@@ -41,9 +41,9 @@ internal static partial class TransferInfoFromReport
 
     /// <summary>
     /// A <c>file://</c> transfer's length, which libcurl's <c>file_do</c> sets from the file's size: the
-    /// <c>Content-Length</c> its <c>-I</c> pseudo-headers carry, else the bytes a successful transfer moved; -1 after a failure.
+    /// <c>Content-Length</c> its <c>-I</c> pseudo-headers carry, else the bytes a successful download moved; -1 after a failure and after an upload, whose <c>file_upload</c> sets no download size (libcurl 8.22.0 lib/file.c).
     /// </summary>
-    private static long FileLengthOf(TransferResult result, TransferReport report)
+    private static long FileLengthOf(TransferResult result, TransferReport report, bool uploaded)
     {
         string? length = HeaderValues(report.PseudoHeaders, "Content-Length").LastOrDefault();
         if (length is not null)
@@ -51,7 +51,7 @@ internal static partial class TransferInfoFromReport
             return LengthOf(length);
         }
 
-        return result.IsSuccess ? result.BytesTransferred : -1;
+        return result.IsSuccess && !uploaded ? result.BytesTransferred : -1;
     }
 
     private static IEnumerable<string> HeaderValues(IReadOnlyList<KeyValuePair<string, string>> headers, string name) =>

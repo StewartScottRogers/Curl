@@ -150,7 +150,7 @@ internal sealed partial class ManagedEasyTransfer
     private TransferInfo PerformedInfoOf(TransferResult result, EasyOptions options, string transferUrl, long transferId, IReadOnlyList<string> cookieList, long connectionId, EngineTransferState? toolState)
     {
         string requestUrl = toolState?.RequestUrl ?? transferUrl;
-        TransferInfo info = TransferInfoFromReport.Of(result, requestUrl, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo) with
+        TransferInfo info = TransferInfoFromReport.Of(result, requestUrl, options.Transfer.FileTime, shared.TimeProvider, options.Tls.GatherCertificateInfo, options.Transfer.Upload) with
         {
             TransferId = transferId,
             ConnectionId = connectionId,

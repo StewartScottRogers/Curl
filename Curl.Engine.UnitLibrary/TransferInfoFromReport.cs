@@ -23,12 +23,13 @@ internal static partial class TransferInfoFromReport
     /// <param name="fileTimeRequested">Whether <c>CURLOPT_FILETIME</c> asked for the remote file's time, without which libcurl answers -1.</param>
     /// <param name="timeProvider">The provider that took the report's <see cref="TransferTimings" />.</param>
     /// <param name="certificateInfoRequested">Whether <c>CURLOPT_CERTINFO</c> asked for the peer certificates' records, without which libcurl's <c>CURLINFO_CERTINFO</c> is empty.</param>
+    /// <param name="uploaded">Whether the transfer was a <c>CURLOPT_UPLOAD</c>, whose <c>file://</c> answer for the download length is -1 (libcurl's <c>file_upload</c> sets none).</param>
     /// <returns>The info.</returns>
-    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false)
+    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false, bool uploaded = false)
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
-        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl) with
+        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl, uploaded) with
         {
             FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
         };
@@ -41,7 +42,7 @@ internal static partial class TransferInfoFromReport
         };
     }
 
-    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl) => WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl) with
+    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, bool uploaded) => WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl, uploaded) with
     {
         RtspClientCSeq = report.RtspClientSequenceNumber,
         RtspServerCSeq = report.RtspServerSequenceNumber,
