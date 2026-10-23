@@ -1,5 +1,5 @@
 ---
-id: BL-3308
+id: BL-3310
 title: Port the tester's easytest.py case list to named JSON cases and replay them in the libcurl easy differential runner
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3308 — Port the tester's easytest.py case list to named JSON cases and replay them in the libcurl easy differential runner
+# BL-3310 — Port the tester's easytest.py case list to named JSON cases and replay them in the libcurl easy differential runner
 
 ## Goal
 

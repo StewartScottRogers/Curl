@@ -1,5 +1,5 @@
 ---
-id: BL-3309
+id: BL-3311
 title: Replay the tester's printf inputs (t1.json, pf_in.json) against Curl's curl_msnprintf and libcurl 8.22.0 in the differential runner
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3309 — Replay the tester's printf inputs (t1.json, pf_in.json) against Curl's curl_msnprintf and libcurl 8.22.0 in the differential runner
+# BL-3311 — Replay the tester's printf inputs (t1.json, pf_in.json) against Curl's curl_msnprintf and libcurl 8.22.0 in the differential runner
 
 ## Goal
 
