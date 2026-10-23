@@ -34,3 +34,4 @@ emptyurl (CURLOPT_URL ""): both return CURLE_URL_MALFORMAT (3), but libcurl's er
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
