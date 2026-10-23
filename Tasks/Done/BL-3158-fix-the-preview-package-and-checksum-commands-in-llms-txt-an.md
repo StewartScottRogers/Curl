@@ -8,7 +8,7 @@ depends-on: []
 touches: [llms.txt, Curl.Api/README.md, Libcurl/README.md, .github/site/mcp/index.html]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3158 — Fix the preview package and checksum commands in llms.txt and the Curl.Api and Libcurl READMEs
 
@@ -29,14 +29,17 @@ Found by the shift-end review (ADR-0710) of 76d4c7a87..2f68618ca (BL-3146, BL-31
 
 ## Acceptance criteria
 
-- [ ] The four `dotnet add package` commands above include `--prerelease`.
-- [ ] `llms.txt`'s `dnx` command includes `--yes`, and `--prerelease` where `dnx` needs it (measured, and the same on `mcp/index.html`).
-- [ ] `llms.txt`'s checksum command is `sha256sum --check --ignore-missing SHA256SUMS`.
-- [ ] `grep -rn "dotnet add package" llms.txt Curl.Api/README.md Libcurl/README.md` shows no command without `--prerelease`.
+- [x] The four `dotnet add package` commands above include `--prerelease`.
+- [x] `llms.txt`'s `dnx` command includes `--yes`, and `--prerelease` where `dnx` needs it (measured, and the same on `mcp/index.html`).
+- [x] `llms.txt`'s checksum command is `sha256sum --check --ignore-missing SHA256SUMS`.
+- [x] `grep -rn "dotnet add package" llms.txt Curl.Api/README.md Libcurl/README.md` shows no command without `--prerelease`.
 
 ## Notes
+
+- `dotnet dnx --help` lists `--prerelease` (default false), so a rolling `0.2.0-rolling.N` needs it: added `--yes --prerelease` to llms.txt and `--prerelease` to mcp/index.html (both occurrences were checked: the claude mcp add line is a launch line too, fixed by the same replace). Checksum command uses `--ignore-missing`.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 51d2381a 958c76ab d0ad3cb6 37ee4cd6.
+- 2026-10-22: Doing -> Done. Preview install, dnx and checksum commands fixed in llms.txt, Curl.Api and Libcurl READMEs and mcp page
