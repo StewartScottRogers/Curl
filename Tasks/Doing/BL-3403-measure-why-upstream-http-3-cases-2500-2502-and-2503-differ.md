@@ -32,3 +32,4 @@ Stewart (2026-10-23) wants every test passing on Windows. The HTTP/3 cases 2500 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f4f89f15 19d14a3f 90a10b16 c5f8cef6.
