@@ -1,5 +1,5 @@
 ---
-id: BL-3218
+id: BL-3252
 title: Report an unreachable revocation responder on Windows with the Schannel build's exit 35 text
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3218 — Report an unreachable revocation responder on Windows with the Schannel build's exit 35 text
+# BL-3252 — Report an unreachable revocation responder on Windows with the Schannel build's exit 35 text
 
 ## Goal
 
