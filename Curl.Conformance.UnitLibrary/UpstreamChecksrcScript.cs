@@ -13,7 +13,7 @@ namespace Curl.Conformance;
 /// <see cref="UpstreamChecksrcRun"/>'s seam (BL-3417, BL-3418). Lines lose a trailing CR LF or LF on every
 /// platform (the script's Windows rule). A path that does not start with <c>./</c> or <c>../</c> gets the <c>-D</c>
 /// directory in front, an absolute one too, since the harness's <c>%LOGDIR</c> is absolute where runtests.pl's is
-/// relative (ADR-0806); an absolute path is opened as it is. <c>COPYRIGHTYEAR</c>, which asks git about the file, never
+/// relative (ADR-0807); an absolute path is opened as it is. <c>COPYRIGHTYEAR</c>, which asks git about the file, never
 /// warns: the case's file is in no git repository. Files are read as Latin-1, a missing file throws, and so does a
 /// <c>.checksrc</c> line the script dies on.
 /// </remarks>
