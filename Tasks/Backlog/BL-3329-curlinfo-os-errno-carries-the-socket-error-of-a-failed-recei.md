@@ -1,5 +1,5 @@
 ---
-id: BL-3326
+id: BL-3329
 title: CURLINFO_OS_ERRNO carries the socket error of a failed receive on a kept connection
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3326 — CURLINFO_OS_ERRNO carries the socket error of a failed receive on a kept connection
+# BL-3329 — CURLINFO_OS_ERRNO carries the socket error of a failed receive on a kept connection
 
 ## Goal
 

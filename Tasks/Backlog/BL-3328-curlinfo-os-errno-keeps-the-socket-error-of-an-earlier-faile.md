@@ -1,5 +1,5 @@
 ---
-id: BL-3325
+id: BL-3328
 title: CURLINFO_OS_ERRNO keeps the socket error of an earlier failed connect attempt when a later address connects
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3325 — CURLINFO_OS_ERRNO keeps the socket error of an earlier failed connect attempt when a later address connects
+# BL-3328 — CURLINFO_OS_ERRNO keeps the socket error of an earlier failed connect attempt when a later address connects
 
 ## Goal
 
