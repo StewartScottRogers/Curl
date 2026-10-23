@@ -31,3 +31,4 @@ Found by BL-3238's differential run (ADR-0793): m_in.json case 34 (runfor ending
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: fb11aa1b 5275a37f b08b61f0.
