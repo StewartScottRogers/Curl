@@ -3,8 +3,8 @@ id: AF-0376
 title: EchOffer.SourceLines' Length > 0 can become >= 0 with no test failing, so an empty ECHConfigList from DNS writes the wrong -v ECH lines
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/EchOffer.cs:SourceLines-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/EchOffer.cs:92:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
