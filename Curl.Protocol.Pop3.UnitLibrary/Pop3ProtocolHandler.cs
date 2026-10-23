@@ -7,7 +7,9 @@ namespace Curl.Protocol.Pop3;
 /// the capabilities with <c>CAPA</c>, upgrades with <c>STLS</c> as <c>--ssl</c> and
 /// <c>--ssl-reqd</c> ask, logs in with SASL <c>AUTH</c>, <c>APOP</c> or <c>USER</c>/<c>PASS</c>,
 /// lists the maildrop with <c>LIST</c>, retrieves the URL's message with <c>RETR</c> or sends
-/// <c>-X</c>'s command, and closes with <c>QUIT</c>, as curl 8.21.0 does (BL-547 to BL-550).
+/// <c>-X</c>'s command, and closes with <c>QUIT</c>, as curl 8.21.0 does (BL-547 to BL-550); a
+/// successful transfer leaves the connection logged in for the next URL with the same login
+/// instead, which sends <c>QUIT</c> only when the run ends (<see cref="Pop3KeptConnection" />, BL-3167).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -84,7 +86,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
     private static bool HasControlByte(string? value) => value is not null && value.Any(character => character < ' ');
 
     /// <summary>
-    /// Connects, runs the session and writes the lines <c>-v</c> ends the transfer with.
+    /// Refuses credentials holding a control byte, then connects and transfers.
     /// </summary>
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
     {
@@ -94,6 +96,15 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, Pop3SessionMessages.CredentialsHaveControlCode);
         }
 
+        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Connects, or reuses a kept connection for the same login, runs the session on it and
+    /// writes the lines <c>-v</c> ends the transfer with.
+    /// </summary>
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
         var connectEvents = new ConnectionOpenedCapturingTransferEvents(context.Events);
@@ -102,8 +113,10 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             Proxy = context.Proxy,
             Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
+            PoolScheme = url.Scheme,
         };
-        ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        string loginKey = Pop3KeptConnection.LoginKeyOf(context);
+        ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
             return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage)
@@ -114,8 +127,10 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
+            Pop3KeptConnection? reused = connected.IsReused ? connection.Session as Pop3KeptConnection : null;
+            Pop3KeptConnection kept = reused ?? new Pop3KeptConnection(connection, loginKey, context.TimeProvider);
             var session = new Pop3Session(
-                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened);
+                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened, kept, reused is not null);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {
@@ -125,6 +140,23 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             ReportConnectionEnd(context.Events, result, session.IsOpen, target, connected.ConnectionNumber);
             return result;
         }
+    }
+
+    /// <summary>
+    /// Connects, which the run's connection cache may serve from a connection a previous URL
+    /// left logged in (BL-3167); one kept for another login is closed, with its <c>QUIT</c>, and
+    /// the connect tried again, as curl reuses a POP3 connection only for the same login.
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
+    {
+        ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        while (connected is { IsReused: true, Connection: { Session: Pop3KeptConnection kept } connection } && !kept.Serves(loginKey))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+
+        return connected;
     }
 
     /// <summary>
