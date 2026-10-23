@@ -35,3 +35,4 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
 - 2026-10-23: Doing -> Backlog. Split: OS_ERRNO needs Abstractions/Networking/Engine/Http work, filed as BL-3328 and BL-3329 (after BL-3304); this task re-verifies the cases afterwards
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
