@@ -4,7 +4,7 @@ title: Replay the tester's CLI non-HTTP protocol and proxy cases in the differen
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3233]
+depends-on: [BL-3233, BL-3235, BL-3284, BL-3285, BL-3286, BL-3287, BL-3288]
 touches: [Curl.Conformance.Differential.UnitLibrary/Protocols, Curl.Conformance.Differential.UnitTests/Protocols, Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols, Curl.Conformance.Differential.IntegrationTests/CliProtocols]
 requirement: none
 created: 2026-10-22
@@ -29,8 +29,13 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 ## Notes
 
 - Split out of BL-3217 by its lane-3 run on 2026-10-22.
+- 2026-10-23 lane-3 sizing pass, before any code: the three Python scripts hold 12 servers (FTP, SMTP, POP3, IMAP, DICT, Gopher, Telnet, RTSP, WebSocket, MQTT, TFTP over UDP, HTTP proxy), more than one run. Split the server ports into BL-3284 (FTP plus the shared line reader, wire log, control responder and CliProtocols TCP host), BL-3285 (mail), BL-3286 (DICT, Gopher, Telnet, RTSP), BL-3287 (WebSocket, MQTT, TFTP) and BL-3288 (proxy). This task stays the last step: write the CliProtocols case files from `cases_proto.py`, `cases_proto2.py` and `cases_proxy.py`, add the integration test that runs them, and record the report.
+- Default taken: one shared wire log and one control port for the whole suite instead of one per server (the Python `ctl=` port per case). Cases run one at a time, so this gives the same log and needs no change to `DifferentialCase` or `Host/DifferentialCaseRunner` (which BL-3274 holds).
+- Depends on BL-3235 too: three `cases_proxy.py` cases use `{PKI}` (`--cacert {PKI}/ca.pem`), and the test PKI and its placeholder come from BL-3235's TLS work.
+- `cases_proxy.py`'s `proxy-tunnel-*` cases use `{U}`, so the suite also starts BL-3233's HTTP loopback server (`DifferentialLoopbackServer`) as the tunnel target.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 1f83bf22 ae951636 5e81fa96.
+- 2026-10-23: Doing -> Backlog. Waiting on BL-3284 to BL-3288 (the protocol and proxy server ports, split out for size) and BL-3235 (the test PKI the proxy https cases need)
