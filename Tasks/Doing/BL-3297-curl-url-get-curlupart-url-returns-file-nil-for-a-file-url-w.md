@@ -30,3 +30,4 @@ Scenarios 1730-1733, 2023-2026, 2902-2905 (set CURLUPART_SCHEME "file" on an emp
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: b40ffbeb c46ca32a.
