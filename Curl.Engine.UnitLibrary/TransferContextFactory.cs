@@ -444,7 +444,8 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
 
     /// <summary>
     /// Gets the <c>-z</c> condition the handlers read from <see cref="EasyTransferOptions.TimeCondition" /> and
-    /// the whole seconds of <see cref="EasyTransferOptions.TimeValue" />, or <see langword="null" /> for none.
+    /// the whole seconds of <see cref="EasyTransferOptions.TimeValue" />, or <see langword="null" /> for none;
+    /// <c>CURL_TIMECOND_LASTMOD</c> compares as if-modified-since and is sent as <c>Last-Modified</c> (ADR-0781).
     /// </summary>
     /// <param name="transfer">The transfer's options.</param>
     /// <returns>The context's <see cref="TransferContext.TimeCondition" />.</returns>
@@ -452,7 +453,10 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     {
         EasyTimeCondition.None => null,
         EasyTimeCondition.IfUnmodifiedSince => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfUnmodifiedSince),
-        _ => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfModifiedSince),
+        _ => TimeCondition.FromUnixSeconds(transfer.TimeValue, TimeConditionKind.IfModifiedSince) with
+        {
+            SentAsLastModified = transfer.TimeCondition == EasyTimeCondition.LastModified,
+        },
     };
 
     /// <summary>

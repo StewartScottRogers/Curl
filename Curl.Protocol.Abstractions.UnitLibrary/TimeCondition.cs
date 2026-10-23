@@ -28,6 +28,15 @@ public sealed record TimeCondition(DateTimeOffset Value, TimeConditionKind Kind)
     public long ValueUnixSeconds { get; init; } = Value.ToUnixTimeSeconds();
 
     /// <summary>
+    /// Gets a value indicating whether the condition came from libcurl's
+    /// <c>CURL_TIMECOND_LASTMOD</c>: an HTTP request then carries the time as a
+    /// <c>Last-Modified</c> header rather than <c>If-Modified-Since</c>, while every handler
+    /// still compares it as <see cref="TimeConditionKind.IfModifiedSince" />, the default
+    /// branch of libcurl 8.22.0's <c>Curl_meets_timecondition</c> (ADR-0781).
+    /// </summary>
+    public bool SentAsLastModified { get; init; }
+
+    /// <summary>
     /// Gets the timestamp, the <see cref="DateTimeOffset" /> view of
     /// <see cref="ValueUnixSeconds" />, clamped to <see cref="DateTimeOffset.MaxValue" /> or
     /// <see cref="DateTimeOffset.MinValue" /> when it falls outside
