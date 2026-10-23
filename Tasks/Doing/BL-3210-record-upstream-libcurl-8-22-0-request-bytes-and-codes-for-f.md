@@ -32,3 +32,4 @@ Cases: (1) a part `curl_mime_filedata(part, "nope.txt")` plus a data part; (2) a
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 5ef7e827 6f47a55a.
