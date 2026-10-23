@@ -27,6 +27,27 @@ public sealed partial class ManagedCurlUrlHandleTests
     }
 
     [TestMethod]
+    [DataRow(CurlUrlPart.Url)]
+    [DataRow(CurlUrlPart.Host)]
+    public void Get_PunycodeToIdnOnA255CharacterLabel_IsBadHostname(CurlUrlPart part)
+    {
+        using ManagedCurlUrlHandle url = Parsed("http://" + new string('a', 255) + "/");
+
+        Assert.AreEqual(CurlUrlCode.BadHostname, url.Get(part, CurlUrlFlags.PunycodeToIdn, out string? value));
+        Assert.IsNull(value);
+    }
+
+    [TestMethod]
+    public void Get_PunycodeToIdnOnA63CharacterLabel_ReturnsTheHost()
+    {
+        string host = new('a', 63);
+        using ManagedCurlUrlHandle url = Parsed("http://" + host + "/");
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Get(CurlUrlPart.Host, CurlUrlFlags.PunycodeToIdn, out string? value));
+        Assert.AreEqual(host, value);
+    }
+
+    [TestMethod]
     [DataRow(CurlUrlPart.User, CurlUrlCode.NoUser)]
     [DataRow(CurlUrlPart.Password, CurlUrlCode.NoPassword)]
     [DataRow(CurlUrlPart.Options, CurlUrlCode.NoOptions)]
