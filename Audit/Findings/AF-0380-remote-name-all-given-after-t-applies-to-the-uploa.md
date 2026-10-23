@@ -3,8 +3,8 @@ id: AF-0380
 title: --remote-name-all given after -T applies to the upload URL: Curl warns 'No remote filename' and writes curl_response where curl does neither
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:--remote-name-all:upload-file-order:stderr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release; $r=(Get-Location).Path; foreach ($n in 'cu
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
