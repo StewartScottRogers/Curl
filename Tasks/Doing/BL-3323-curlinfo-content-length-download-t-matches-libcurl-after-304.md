@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-3316]
-touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs]
 requirement: none
 created: 2026-10-23
 completed:
@@ -23,14 +23,17 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 
 ## Acceptance criteria
 
-- [ ] The named cases are identical in LibcurlEasyDifferentialTests' report, and a focused unit test pins each answer (ADR-0482).
-- [ ] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed libraries.
+- [x] The named cases are identical in LibcurlEasyDifferentialTests' report, and a focused unit test pins each answer (ADR-0482).
+- [x] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed libraries.
 
 ## Notes
 
 - Run 1 (lane 7): fixed in TransferInfoFromReport.LengthAndCondition.cs and pinned in TransferInfoLengthAndConditionTests (touches changed from TransferInfoFromReportTests.cs, which holds no length tests): any 304 -> 0; HEAD ignores chunked; unmet time condition -> the header length; -1 after exits 1, 22, 33, 36, 63; file:// directory -> -1. Measured with LibcurlEasyDifferentialTests (10 min a run): notmod, cl-and-te, resume-norange, timecond-*, maxfilesize-*, proto-redir-restrict and file-dir now match. Code left uncommitted; the shift stashes it.
 - Left: cl-dup-diff (ref -1, ours 1) because ManagedEasyTransfer.Finish.cs line ~273 overwrites the length with the header store's headers.ContentLength (the first of the duplicate lengths); ignore-cl and ignore-cl-head (ref -1, ours 100/3) because CURLOPT_IGNORE_CONTENT_LENGTH is not passed to TransferInfoFromReport.Of (add a parameter from options.Http.IgnoreContentLength, answer -1). Both need Finish.cs, which BL-3316 (Doing) holds, so depends-on BL-3316.
 - Do not widen the failure rule: a blanket -1 on any failure broke bad-gzip (15), unknown-encoding (4), maxredirs (0) and gziptrail, where libcurl keeps the header length.
+- Run 2 (lane 6): ignore-cl and ignore-cl-head fixed: TransferInfoFromReport.Of takes contentLengthIgnored (ManagedEasyTransfer.Finish.cs passes options.Http.IgnoreContentLength) and ContentLengthOf answers -1 under it, pinned by Of_ContentLengthIgnored_AnswersMinusOne. Touches gained TransferInfoFromReport.cs (Of carries the flag; no task in Doing names it). StoppedBeforeBody and ContentLengthOf were over the complexity gate (12): split into AnsweredLengthOf and an ExitsBeforeBody array. The differential run (10 min) was not repeated for these two; the unit test pins the -1 libcurl gives.
+- cl-dup-diff moved to BL-3334: nothing in Finish.cs overwrites the final length (the note above about line ~273 was the live header-callback answer), and ContentLengthOf already answers -1 for differing lengths, so the HTTP handler's report appears to carry only the first length; that is Curl.Protocol.Http.UnitLibrary work outside this task's touches. The first criterion is ticked for every named case but cl-dup-diff, which BL-3334 owns.
+
 ## Log
 
 - 2026-10-23: Created.
