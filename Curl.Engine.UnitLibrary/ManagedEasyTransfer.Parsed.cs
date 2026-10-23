@@ -49,7 +49,7 @@ internal sealed partial class ManagedEasyTransfer
     {
         CookieEngine? cookies = CookieEngine.FromHttpOptions(options.Http, PerformShared.Cookies);
         EngineToolTransferEvents? toolEvents = ToolEvents;
-        (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder) = StateAndEventsOf(toolEvents, options);
+        (EngineTransferState state, ITransferEvents events, TlsVerifyResultRecordingTransferEvents? recorder, NegotiateFailureRecordingTransferEvents? negotiateFailure) = StateAndEventsOf(toolEvents, options);
         (string transferUrl, TransferResult? setUpFailure) = await SetUpUnlessToolDidAsync(toolInputs, options, settings, cookies, state, urlText, events).ConfigureAwait(false);
         if (setUpFailure is not null)
         {
@@ -81,7 +81,7 @@ internal sealed partial class ManagedEasyTransfer
             callbackProgress,
             callbackReads).ConfigureAwait(false);
         await CleanUpUnlessToolDoesAsync(toolInputs, options, settings, cookies, state, transferUrl).ConfigureAwait(false);
-        KeepHandleStateOf(recorder, result, url);
+        KeepHandleStateOf(recorder, negotiateFailure, result, url);
         long connectionId = toolEvents is null ? ConnectionIdOf(result, state) : ToolConnectionIdOf(result, state, toolEvents);
         return FinishPerformed(LastResult, options, transferUrl, transferId, cookies, connectionId, AbortedTextOf(callbackReads), toolEvents?.State);
     }
@@ -92,11 +92,12 @@ internal sealed partial class ManagedEasyTransfer
     /// the origin they came from, and the scheme the server picked (<see cref="keptAuthSchemePicked" />).
     /// </summary>
     /// <param name="recorder">The verify-result recorder, or <see langword="null" /> when the runner's events report.</param>
+    /// <param name="negotiateFailure">The recorder of the first SSPI failure line, or <see langword="null" /> when the runner's events report.</param>
     /// <param name="result">The perform's result, or <see langword="null" /> after an abort.</param>
     /// <param name="url">The URL performed.</param>
-    private void KeepHandleStateOf(TlsVerifyResultRecordingTransferEvents? recorder, TransferResult? result, CurlUrl url)
+    private void KeepHandleStateOf(TlsVerifyResultRecordingTransferEvents? recorder, NegotiateFailureRecordingTransferEvents? negotiateFailure, TransferResult? result, CurlUrl url)
     {
-        LastResult = recorder is null ? result : recorder.ReportOn(result);
+        LastResult = recorder is null ? result : negotiateFailure!.ReportOn(recorder.ReportOn(result));
         keptDigestChallenges = ChallengesOfLast401(result);
         keptDigestStaysAvailable = result?.Report?.DigestStaysAvailable ?? false;
         keptDigestOrigin = OriginOf(url);
