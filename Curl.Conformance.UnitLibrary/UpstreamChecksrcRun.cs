@@ -193,9 +193,12 @@ internal sealed class UpstreamChecksrcRun
         }
     }
 
-    /// <summary>The script's checks of script lines 532-900 for one line (BL-3417); none yet.</summary>
+    /// <summary>
+    /// The script's checks of script lines 532-900 for one line (<see cref="UpstreamChecksrcScanFirstChecks"/>); a
+    /// preprocessor line leaves <see cref="FileScan.Preprocessor"/> set for the script's <c>goto preproc</c>.
+    /// </summary>
     /// <param name="scan">The file being scanned, its current line in <see cref="FileScan.Text"/>.</param>
-    internal static void CheckLineFirstHalf(FileScan scan) => ArgumentNullException.ThrowIfNull(scan);
+    internal void CheckLineFirstHalf(FileScan scan) => UpstreamChecksrcScanFirstChecks.Check(this, scan);
 
     /// <summary>The script's checks of script lines 900-1268 for one line (BL-3418); none yet.</summary>
     /// <param name="scan">The file being scanned, its current line in <see cref="FileScan.Text"/>.</param>
