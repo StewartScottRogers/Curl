@@ -42,3 +42,4 @@ The shift-end review of the 2026-10-22 shift (ADR-0710) found this. Two reviewer
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 26b4ce28 3469d3df a75ba0f2 03efe9c1.
