@@ -36,3 +36,4 @@ Part 2, the top-level guard: `Curl.Console/Program.cs` `Main` has no handler. Ad
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: a5477d9d d4af9781 3ec186c5 9cedf5fd.
