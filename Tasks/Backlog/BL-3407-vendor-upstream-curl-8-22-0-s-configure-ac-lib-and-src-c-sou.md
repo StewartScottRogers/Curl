@@ -30,3 +30,4 @@ completed:
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-23: Doing -> Backlog. Lane 2 could not integrate: rebase failed. The work is on branch factory/BL-3407-lane-2-20261023-110315; start with git cherry-pick --no-commit factory/BL-3407-lane-2-20261023-110315 and fix it.
