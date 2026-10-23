@@ -37,13 +37,45 @@ public sealed class TransferInfoLengthAndConditionTests
         Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.HttpReturnedError, 0) { Report = ReportOf(404, ("Content-Length", "5")) }, HttpUrl).ContentLengthDownload);
 
     [TestMethod]
+    public void Of_ChunkedHeadResponse_AnswersTheContentLength() =>
+        Assert.AreEqual(3, Of(new TransferResult(CurlExitCode.Ok, 0) { Report = ReportOf(200, ("Content-Length", "3"), ("Transfer-Encoding", "chunked")) with { Method = "HEAD" } }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_TimeConditionUnmetOnA200_AnswersTheContentLength() =>
+        Assert.AreEqual(8, Of(new TransferResult(CurlExitCode.Ok, 0) { Report = ReportOf(200, ("Content-Length", "8")), TimeConditionUnmet = true }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_TimeConditionUnmetOnA304WithALength_AnswersTheContentLength() =>
+        Assert.AreEqual(8, Of(new TransferResult(CurlExitCode.Ok, 0) { Report = ReportOf(304, ("Content-Length", "8")), TimeConditionUnmet = true }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_FailureBeforeTheBody_AnswersMinusOne() =>
+        Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.FilesizeExceeded, 0) { Report = ReportOf(200, ("Content-Length", "3000000")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_BadContentEncoding_AnswersTheContentLength() =>
+        Assert.AreEqual(15, Of(new TransferResult(CurlExitCode.BadContentEncoding, 0) { Report = ReportOf(200, ("Content-Length", "15")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_ShortBody_AnswersTheContentLength() =>
+        Assert.AreEqual(100, Of(new TransferResult(CurlExitCode.PartialFile, 5) { Report = ReportOf(200, ("Content-Length", "100")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_FileDirectoryListing_AnswersMinusOne() =>
+        Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.Ok, 1199), "file:///dir/").ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_ContentLengthIgnored_AnswersMinusOne() =>
+        Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 100) { Report = ReportOf(200, ("Content-Length", "100")) }, HttpUrl, false, new ManualTimeProvider(), contentLengthIgnored: true).ContentLengthDownload);
+
+    [TestMethod]
     public void Of_NoContentResponse_AnswersZero() => Assert.AreEqual(0, LengthOf(204));
 
     [TestMethod]
     public void Of_NotModifiedWithALength_AnswersZero() => Assert.AreEqual(0, LengthOf(304, ("Content-Length", "5")));
 
     [TestMethod]
-    public void Of_NotModifiedWithNoLength_AnswersMinusOne() => Assert.AreEqual(-1, LengthOf(304));
+    public void Of_NotModifiedWithNoLength_AnswersZero() => Assert.AreEqual(0, LengthOf(304));
 
     [TestMethod]
     public void Of_NotModifiedWithNoTimeCondition_AnswersConditionUnmet() =>

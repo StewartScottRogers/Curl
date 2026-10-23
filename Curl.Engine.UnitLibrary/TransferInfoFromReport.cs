@@ -24,12 +24,13 @@ internal static partial class TransferInfoFromReport
     /// <param name="timeProvider">The provider that took the report's <see cref="TransferTimings" />.</param>
     /// <param name="certificateInfoRequested">Whether <c>CURLOPT_CERTINFO</c> asked for the peer certificates' records, without which libcurl's <c>CURLINFO_CERTINFO</c> is empty.</param>
     /// <param name="uploaded">Whether the transfer was a <c>CURLOPT_UPLOAD</c>, whose <c>file://</c> answer for the download length is -1 (libcurl's <c>file_upload</c> sets none).</param>
+    /// <param name="contentLengthIgnored">Whether <c>CURLOPT_IGNORE_CONTENT_LENGTH</c> was set, under which libcurl answers -1 for the download length (BL-3323).</param>
     /// <returns>The info.</returns>
-    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false, bool uploaded = false)
+    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false, bool uploaded = false, bool contentLengthIgnored = false)
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
-        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl, uploaded) with
+        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl, (uploaded, contentLengthIgnored)) with
         {
             FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
         };
@@ -41,6 +42,6 @@ internal static partial class TransferInfoFromReport
         };
     }
 
-    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, bool uploaded) =>
-        WithProxyError(WithOsErrno(WithRtsp(WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl, uploaded), report), report), report);
+    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, (bool Uploaded, bool ContentLengthIgnored) request) =>
+        WithProxyError(WithOsErrno(WithRtsp(WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl, request), report), report), report);
 }
