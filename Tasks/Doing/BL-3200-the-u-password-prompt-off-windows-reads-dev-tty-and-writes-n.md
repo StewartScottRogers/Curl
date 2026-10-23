@@ -30,3 +30,4 @@ Found by BL-3187. Upstream 8.22.0 `src/tool_getpass.c` (non-Windows): `fd = open
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 0f02880e 60a3084c.
