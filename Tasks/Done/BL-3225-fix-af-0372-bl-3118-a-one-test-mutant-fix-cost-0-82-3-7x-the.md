@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-22
 ---
 # BL-3225 — Fix AF-0372: BL-3118, a one-test mutant fix, cost $0.82 (3.7x the median) on Opus with a refused Bash command and a by-hand mutate and revert
 
@@ -41,12 +41,15 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+Cause: BL-3118 was a feature-pipeline task whose title names "security" (a hard-work marker in DarkFactory/ModelChoice.ps1), so auto routing chose Opus ("feature pipeline, names security"); Opus costs several times Sonnet per token. The run itself was 18 turns, 6 min, one test: one Bash call refused by the permission rules (a compound `head; git ...` command), and a by-hand mutate-and-revert to prove the new test fails against a mutant, which is exactly what a mutant-fix task asks for. Cost 0.82 vs bar 0.66 is Opus pricing on a small task, not wasted turns.
+Decision: unavoidable. The routing rule is deliberate (security-named work goes to Opus, BL-1705/BL-3001) and a refused compound Bash command costs one turn. Widening the routine-title list would need ModelChoice.ps1, outside this task's touches, and would risk sending real security work to Sonnet; no change made. build and fast tests green.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-22: Doing -> Done. Cost cause named (Opus routing for security-named feature task); recorded as unavoidable
