@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3368 — Fix AF-0391: BL-3236 cost $3.68 (3.5x the median): a 73-turn Opus feature run plus a rebase-conflict resolve run
 
@@ -41,12 +41,17 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (AF-0391): turn count on Opus. BL-3236 was a differential-replay port on the feature pipeline, so ModelChoice.ps1 routed it to Opus (Get-FeatureModelChoice: only routine titles get Sonnet); 73 turns at Opus rates gave $3.32, plus a $0.36 rebase-conflict resolve run. Both are inherent to a large port.
+- The "ran all 45 test projects" step is already addressed: Get-AffectedTestProjects (BL-2967, DarkFactory/AffectedTests.ps1) selects only affected *.UnitTests projects, and IntegrationTests are not run under the fast filter. All-projects runs only when a shared build file or .csproj changed.
+- Recorded as unavoidable; no avoidable waste found, no code changed. The raw logs/BL-3236 log is not in this checkout, so this rests on the finding and the routing code. Build clean, 46 fast-test projects passed, none failed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-23: Doing -> Done. AF-0391 cost cause named (Opus turn count on a large feature port); recorded unavoidable, selective test run already in place
