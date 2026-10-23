@@ -33,3 +33,4 @@ First part of BL-3193. Upstream ORs every challenge seen into `data->info.httpau
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 30d14345 fba1d735 3639a5e6.
