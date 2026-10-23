@@ -8,7 +8,7 @@ depends-on: [BL-3231]
 touches: [Curl.Conformance.Differential.UnitLibrary/Http/Core, Curl.Conformance.Differential.UnitTests/Http/Core]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 
 ## Goal
@@ -28,16 +28,22 @@ Port, under `Curl.Conformance.Differential.UnitLibrary/Http/Core`:
 
 ## Acceptance criteria
 
-- [ ] Request reading, response writing, the registry, per-run state, the request log and the control responder are under Curl.Conformance.Differential.UnitLibrary/Http/Core, unit tested over in-memory streams.
-- [ ] The `/status/<n>`, `/echo`, `/`, `CONNECT` and default routes each have a responder file and a unit test pinning their response bytes.
-- [ ] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
-- [ ] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
+- [x] Request reading, response writing, the registry, per-run state, the request log and the control responder are under Curl.Conformance.Differential.UnitLibrary/Http/Core, unit tested over in-memory streams.
+- [x] The `/status/<n>`, `/echo`, `/`, `CONNECT` and default routes each have a responder file and a unit test pinning their response bytes.
+- [x] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
+- [x] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
 
 ## Notes
 
+- Routes register from a [ModuleInitializer] in their own file into DifferentialRoutes (the pattern UpstreamPerlCommandScripts already uses); CA2255 is suppressed for the Curl.Conformance.Differential.Http namespace in Http/Core/RouteRegistrationSuppressions.cs. Order: DifferentialRouteRank (Specific, Connect, Default), stable by registration order within a rank.
+- Sensible defaults taken: a route returns true to close the connection (server.py's return True); a request server.py would throw on (non-hex chunk size, non-numeric Content-Length, non-numeric /status/ segment, request line without a target) ends the connection as the Python exception did; resp's head is UTF-8 encoded like str.encode(); DifferentialResponderOptions carries Port and TimeProvider for BL-3250's delays.
+- Fall-through routes live in Http/Core (StatusCodeRoute, EchoRoute, ConnectRoute, DefaultRoute), the folder this task touches.
+- Checks: Curl.Conformance.Differential.UnitTests 65 passed with -warnaserror; dotnet format clean; Measure-CodeQuality.ps1 -Library Curl.Conformance.Differential.UnitLibrary: 100% line, 100% branch, 0 failing members. Tests use only in-memory streams and no paths, so they are platform-neutral (Linux and macOS CI).
+- Not changed: the library's CLAUDE.md Shape list (outside touches); a docs follow-up can add Http/Core to it.
 - Filed by BL-3232's lane-1 run on 2026-10-23 when it split BL-3232 for size.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 7ca41420 5c45b8f1 ae951636 5e81fa96.
+- 2026-10-23: Doing -> Done. Differential HTTP responder core: request reader, resp writer, route registry, state, control responder and fall-through routes, unit tested over in-memory streams
