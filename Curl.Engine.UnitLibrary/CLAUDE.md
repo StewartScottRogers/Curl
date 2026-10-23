@@ -457,7 +457,7 @@ A perform from the options with no `ToolInputs`, `EasyHttpOptions.Post` set, no 
 
 ## CURLOPT_PORT (BL-2606)
 
-A perform from the options with a non-zero `EasyNetworkOptions.Port` transfers `UrlPortOverride.Apply`'s URL: the URL set with that port written in through a `ManagedCurlUrlHandle`, as curl 8.22.0's `parse_remote_port` sets `CURLUPART_PORT`, so the connect, the request target (a proxy's absolute one too), the `Host` header and `Info.EffectiveUrl` carry it (upstream tests 521 to 523); a URL that does not parse is left for the perform's malformed-URL answer (ADR-0672). Its tests are `UrlPortOverrideTests` and `ManagedEasyTransferTests.Port.cs`.
+A perform from the options with a non-zero `EasyNetworkOptions.Port` transfers `UrlPortOverride.Apply`'s URL: the URL set with that port written in through a `ManagedCurlUrlHandle`, as curl 8.22.0's `parse_remote_port` sets `CURLUPART_PORT`, so the connect, the request target (a proxy's absolute one too), and the `Host` header carry it (upstream tests 521 to 523); `Info.EffectiveUrl` carries it only for a `CURLOPT_CURLU` URL, a `CURLOPT_URL` one keeping its own form (`UrlEffective.WithoutPortOverride`, BL-3194, ADR-0787); a URL that does not parse is left for the perform's malformed-URL answer (ADR-0672). Its tests are `UrlPortOverrideTests` and `ManagedEasyTransferTests.Port.cs`.
 
 ## CURLOPT_CURLU (BL-2628)
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Curl.Api.Options.Network;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -58,6 +59,21 @@ internal static class UrlEffective
 
         return parsed.Scheme + "://" + authority + parsed.AbsolutePath + query + fragment;
     }
+
+    /// <summary>
+    /// Returns the URL set with <c>CURLOPT_URL</c>, normalised, in place of <paramref name="effectiveUrl" /> when that
+    /// is the URL <c>CURLOPT_PORT</c> wrote its port into and the transfer followed no redirect: libcurl 8.22.0 fixes the
+    /// effective URL before <c>parse_remote_port</c> sets the port on its URL handle, so the port is not shown (report 23,
+    /// BL-3194). A URL from <c>CURLOPT_CURLU</c> keeps the port, as upstream test1906 shows.
+    /// </summary>
+    /// <param name="effectiveUrl">The normalised effective URL.</param>
+    /// <param name="transferUrl">The URL the perform transferred, with <c>CURLOPT_PORT</c> written in.</param>
+    /// <param name="network">The handle's network options, as set.</param>
+    /// <returns>The effective URL <c>CURLINFO_EFFECTIVE_URL</c> answers.</returns>
+    internal static string WithoutPortOverride(string effectiveUrl, string transferUrl, EasyNetworkOptions network) =>
+        network is { Port: > 0, UrlHandle: null, Url: { } setUrl } && effectiveUrl == Normalize(transferUrl, network.PathAsIs)
+            ? Normalize(setUrl, network.PathAsIs)
+            : effectiveUrl;
 
     /// <summary>
     /// Returns the authority of <paramref name="url" /> as typed: the text after its scheme,

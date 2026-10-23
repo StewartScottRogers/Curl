@@ -159,7 +159,7 @@ internal sealed partial class ManagedEasyTransfer
         };
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer };
         return toolState is null
-            ? info with { EffectiveUrl = UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs) }
+            ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
 
