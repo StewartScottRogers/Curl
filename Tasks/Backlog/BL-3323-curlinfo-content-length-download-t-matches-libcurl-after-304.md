@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-3316]
-touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Curl.Engine.UnitTests/TransferInfoLengthAndConditionTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs]
 requirement: none
 created: 2026-10-23
 completed:

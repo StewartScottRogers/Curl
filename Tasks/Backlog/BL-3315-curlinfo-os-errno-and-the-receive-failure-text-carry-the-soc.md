@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-3328, BL-3329]
-touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.OsErrno.cs, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs]
 requirement: none
 created: 2026-10-23
 completed:

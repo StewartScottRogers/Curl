@@ -10,8 +10,8 @@ namespace Curl.Engine;
 /// <c>CURLINFO_*</c> the engine measures, the part the <c>-w</c> variables read filled by
 /// <c>Curl.Output</c>'s <see cref="WriteOutTransferInfo" />, the rest worked out here. A value the report does not hold
 /// keeps <see cref="TransferInfo" />'s fresh-handle default. Each kind of value is worked out in its own partial file
-/// (<c>TransferInfoFromReport.Auth.cs</c>, <c>.CertInfo.cs</c>, <c>.LengthAndCondition.cs</c>, <c>.RetryAfter.cs</c>,
-/// <c>.Scheme.cs</c>), so a change to one touches only that file (BL-3251).
+/// (<c>TransferInfoFromReport.Auth.cs</c>, <c>.CertInfo.cs</c>, <c>.LengthAndCondition.cs</c>, <c>.OsErrno.cs</c>,
+/// <c>.ProxyError.cs</c>, <c>.RetryAfter.cs</c>, <c>.Rtsp.cs</c>, <c>.Scheme.cs</c>), so a change to one touches only that file (BL-3251).
 /// </summary>
 internal static partial class TransferInfoFromReport
 {
@@ -42,12 +42,6 @@ internal static partial class TransferInfoFromReport
         };
     }
 
-    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, bool uploaded) => WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl, uploaded) with
-    {
-        RtspClientCSeq = report.RtspClientSequenceNumber,
-        RtspServerCSeq = report.RtspServerSequenceNumber,
-        RtspCSeqReceived = report.RtspSequenceNumberReceived,
-        OsErrno = report.OsErrno,
-        ProxyError = (long)report.ProxyError,
-    };
+    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, bool uploaded) =>
+        WithProxyError(WithOsErrno(WithRtsp(WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl, uploaded), report), report), report);
 }

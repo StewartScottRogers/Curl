@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Curl.Engine.UnitTests/TransferInfoFromReportTests.cs]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.Scheme.cs, Curl.Engine.UnitTests/TransferInfoFromReportTests.cs]
 requirement: none
 created: 2026-10-23
 completed:
