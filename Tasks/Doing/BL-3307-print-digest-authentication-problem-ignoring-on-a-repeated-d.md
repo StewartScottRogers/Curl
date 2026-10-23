@@ -30,3 +30,4 @@ Found by BL-3282 (differential case auth-all-challenges-v, -sv --anyauth -u u:p 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e3ec11d1 69edf767.
