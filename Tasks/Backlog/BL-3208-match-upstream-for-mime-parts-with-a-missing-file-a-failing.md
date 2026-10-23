@@ -4,7 +4,7 @@ title: Match upstream for MIME parts with a missing file, a failing 7bit encoder
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3210, BL-3211, BL-3212, BL-3213, BL-3214]
 touches: [Curl.Engine.UnitLibrary/ManagedMimeBuilder.cs, Curl.Engine.UnitLibrary/ManagedMimePartBuilder.cs, Curl.Engine.UnitLibrary/MimeCallbackReadStream.cs, Curl.Engine.UnitTests/MimeUpstreamEdgeCaseTests.cs]
 requirement: none
 created: 2026-10-22
@@ -32,7 +32,10 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Notes
 
+- 2026-10-22 (lane 5, first pass before any code): split. The four fixes do not land in this task's `touches`: the body is built by `Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs` (missing file, 7bit, base64 over subparts) and chunk framing by `Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs` over `ConcatenatedReadStream`. No tool measures libcurl itself: the curl 8.22.0 tool exits 26 before connecting for `-F a=@nope.txt` and for a `7bit` part over non-ASCII, and applies no encoder to a `=(` part, so the values need a P/Invoke harness over `/ucrt64/bin/libcurl-4.dll`. Measured with the tool: `-H "Transfer-Encoding: chunked" -F a=b` sends the 0x95-byte body as one chunk then `0\r\n\r\n`. Filed BL-3210 (harness and recordings), BL-3211 (missing file), BL-3212 (7bit), BL-3213 (base64 over subparts), BL-3214 (chunk framing); this task keeps only the end-to-end `MimeUpstreamEdgeCaseTests.cs` once they are Done.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: b5861301 0971c3da 71053c5c 6e63725a 3639a5e6.
+- 2026-10-22: Doing -> Backlog. Split before any code: waits on BL-3210 (libcurl measurement harness), BL-3211, BL-3212, BL-3213, BL-3214 (the four fixes outside this task's touches)
