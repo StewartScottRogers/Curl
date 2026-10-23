@@ -4,7 +4,7 @@ title: Normalise %{url_effective}, url.host and url.port as curl 8.22.0 does and
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3181]
+depends-on: [BL-3182]
 touches: [Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlParser.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlIPv4Address.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs, Curl.Core.UnitLibrary/UrlSchemeGuesser.cs, Curl.Engine.UnitTests/UrlEffectiveNormalizationTests.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostPortTableTests.cs, Curl.Console.UnitTests/CurlCommandRunnerUrlRejectionTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Core.UnitTests/UrlSchemeGuesserTests.cs]
 requirement: none
 created: 2026-10-22
@@ -54,11 +54,11 @@ Stewart reported on 2026-10-22. Measured with `-w '%{url_effective}'` against a 
 - Curl already printed every url.host and url.port right; only url_effective and the no-host text differed.
 - Done in this run (left uncommitted for the shift's stash, as the task is requeued): `UrlEffective.Normalize(url, typedUrl, pathAsIs)` rebuilds the authority with the user info and a host name as typed, an IPv4 address dotted-quad, an IPv6 address normalised with its typed zone id, and the port in decimal (dropped when typed empty), and returns the typed URL when curl rejects it; `UrlSchemeGuesser.AddScheme` leaves a URL starting with `/` alone so the parser rejects it as `No host present`; `CurlCommandRunner.WriteOutRequestUrl` passes the given URL. Tests written: `UrlEffectiveNormalizationTests` (20 rows), `CurlUrlHostPortTableTests`, `CurlCommandRunnerUrlRejectionTests` (5 rows) - all pass with Curl.Engine, Curl.Protocol.Abstractions and Curl.Core fast tests green (2256, 929, 1792 passed).
 - Touches widened by `Curl.Console/CurlCommandRunner.cs` (the -w URL for a rejected URL must be the given one, not the guessed one; no Doing task names it) and `Curl.Core.UnitTests/UrlSchemeGuesserTests.cs` (a row for the `/` branch, still to add).
-- Requeued for BL-3181: the zone-ID connect-error text cannot be pinned here. On Windows Curl's refused connect times out (exit 28) instead of exit 7, and the text is built in `Curl.Networking.UnitLibrary/TcpConnector.cs`, which BL-3172 holds. Left for the next claim: once BL-3181 is Done, pin the zone-ID connect text (`Failed to connect to ::1:9`), add a `UrlSchemeGuesserTests` row for `/x` staying unchanged, run the Curl.Console fast tests, run `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Core.UnitLibrary,Curl.Console`, tick the boxes and commit.
+- Requeued for BL-3182: the zone-ID connect-error text cannot be pinned here. On Windows Curl's refused connect times out (exit 28) instead of exit 7, and the text is built in `Curl.Networking.UnitLibrary/TcpConnector.cs`, which BL-3172 holds. Left for the next claim: once BL-3182 is Done, pin the zone-ID connect text (`Failed to connect to ::1:9`), add a `UrlSchemeGuesserTests` row for `/x` staying unchanged, run the Curl.Console fast tests, run `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Core.UnitLibrary,Curl.Console`, tick the boxes and commit.
 - Decision (sensible default): a URL with no scheme that starts with `/` is not given a guessed scheme, because curl 8.22.0 rejects all such URLs with `No host present` and prints them as typed.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 3debb382 9eefc518 e6155fdf dd37067d 92579dca.
-- 2026-10-22: Doing -> Backlog. Waits on BL-3181: zone-ID connect-error text needs TcpConnector's refused-connect fix (TcpConnector.cs held by BL-3172); normalisation, no-host and rejected-URL work done and stashed
+- 2026-10-22: Doing -> Backlog. Waits on BL-3182: zone-ID connect-error text needs TcpConnector's refused-connect fix (TcpConnector.cs held by BL-3172); normalisation, no-host and rejected-URL work done and stashed

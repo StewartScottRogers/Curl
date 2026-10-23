@@ -1,5 +1,5 @@
 ---
-id: BL-3181
+id: BL-3182
 title: Fail a refused connect on Windows with exit 7 and print an IPv6 zone-ID host as curl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3181 — Fail a refused connect on Windows with exit 7 and print an IPv6 zone-ID host as curl 8.22.0 does
+# BL-3182 — Fail a refused connect on Windows with exit 7 and print an IPv6 zone-ID host as curl 8.22.0 does
 
 ## Goal
 
