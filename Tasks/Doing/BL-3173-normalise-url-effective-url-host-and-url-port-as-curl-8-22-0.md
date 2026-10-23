@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22. Measured with `-w '%{url_effective}'` against a 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 3debb382 9eefc518 e6155fdf dd37067d 92579dca.
