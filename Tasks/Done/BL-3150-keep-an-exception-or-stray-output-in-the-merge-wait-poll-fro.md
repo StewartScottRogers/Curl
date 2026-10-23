@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/ShiftEnd.ps1, DarkFactory/ShiftCoordinator.ps1]
+touches: [DarkFactory/ShiftEnd.ps1, DarkFactory/ShiftCoordinator.ps1, DarkFactory/LaneState.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3150 — Keep an exception or stray output in the merge-wait poll from aborting the shift-end merge
 
@@ -30,16 +30,20 @@ The shift-end review of the 2026-10-22 shift (ADR-0710) found this. Two reviewer
 
 ## Acceptance criteria
 
-- [ ] `Wait-MergeCiRun` runs `-OnPoll` inside a try/catch that traces the exception and goes on waiting. It discards the poll's output (`| Out-Null`).
-- [ ] `$handOver.Done` becomes true only after `$startNextShift` returns, so a hand-over that throws is tried again on the next poll.
-- [ ] A `-TestCiWatch` / `-TestHeartbeat` (or equivalent self-test) case covers both:
+- [x] `Wait-MergeCiRun` runs `-OnPoll` inside a try/catch that traces the exception and goes on waiting. It discards the poll's output (`| Out-Null`).
+- [x] `$handOver.Done` becomes true only after `$startNextShift` returns, so a hand-over that throws is tried again on the next poll.
+- [x] A `-TestCiWatch` / `-TestHeartbeat` (or equivalent self-test) case covers both:
   - a throwing `-OnPoll`: the wait still returns the run;
   - an `-OnPoll` that writes output: `Wait-MergeCiRun` still returns a single hashtable whose `.Run` is the run.
-- [ ] All the `RunDarkFactory.ps1 -Test*` self-tests that the change touches pass.
+- [x] All the `RunDarkFactory.ps1 -Test*` self-tests that the change touches pass.
 
 ## Notes
+
+- Added DarkFactory/LaneState.ps1 to touches: the -TestHeartbeat merge-wait self-test lives there. No other Doing task names it.
+- Poll failures are traced and the wait goes on; Done is set after the hand-over returns.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 26b4ce28 3469d3df a75ba0f2 03efe9c1.
+- 2026-10-22: Doing -> Done. merge-wait poll exceptions and output no longer abort the merge; failed hand-over retried

@@ -471,7 +471,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
             $claimable = Get-ClaimableTaskId
             $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped
-            if ($poll.Action -eq 'start') { $handOver.Done = $true; & $startNextShift "$($poll.Why) during the merge's CI wait" -Beside }
+            if ($poll.Action -eq 'start') { & $startNextShift "$($poll.Why) during the merge's CI wait" -Beside; $handOver.Done = $true }
         }
     }
     $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes }

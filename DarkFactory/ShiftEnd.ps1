@@ -40,7 +40,11 @@ function Wait-MergeCiRun {
             if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
         }
         if ((Get-Date) -ge $deadline) { return @{ Failure = "not merged: CI did not finish on $short within $MergeCiWaitMinutes min" } }
-        if ($OnPoll -and (Get-Date) -ge $nextPoll) { $nextPoll = (Get-Date).AddMinutes($PollMinutes); & $OnPoll }
+        if ($OnPoll -and (Get-Date) -ge $nextPoll) {
+            $nextPoll = (Get-Date).AddMinutes($PollMinutes)
+            # A poll that throws or writes output must not abort the merge wait or corrupt its result (BL-3150).
+            try { & $OnPoll | Out-Null } catch { Write-Trace '-' 'shift' "merge-wait poll failed, waiting on: $($_.Exception.Message)" 'Yellow' }
+        }
         Start-Sleep -Seconds 30
     }
     return @{ Run = $run; Head = $head }
