@@ -39,7 +39,7 @@ Stewart reported on 2026-10-22; measured the same day with the preview build and
   - Extra probes for the rule: `127.0.0.1:/` and `127.0.0.1:` exit 3 (bad port), while
     `http://127.0.0.1:/` connects to port 80 (exit 7) and `http://h:` resolves `h` (exit 6). So an
     empty port is rejected only when the scheme was not in the URL (`Curl_parse_port`'s `has_scheme`).
-- Decision (ADR-0765): `UrlSchemeGuesser.AddScheme` leaves such a URL without a scheme (unless the
+- Decision (ADR-0767): `UrlSchemeGuesser.AddScheme` leaves such a URL without a scheme (unless the
   scheme to add is `file`), and the transfer URL parser, which already rejects an empty port with no
   scheme, reports it; `CurlUrlParser.cs` and the runner needed no change. `h://` is a drive prefix
   only on Windows, so its tests carry `[OSCondition(OperatingSystems.Windows)]`; elsewhere `h` is a
