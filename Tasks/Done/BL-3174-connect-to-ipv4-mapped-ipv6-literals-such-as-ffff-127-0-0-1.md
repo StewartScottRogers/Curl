@@ -37,7 +37,7 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
   exit 0, body `hello`, `Established connection to [::ffff:127.0.0.1] (::ffff:127.0.0.1 port 18174) from
   ::ffff:127.0.0.1 port 51971`, `Host: [::ffff:127.0.0.1]:18174`. Its local end is the mapped address, so
   curl uses a dual-stack IPv6 socket.
-- Decision (ADR-0771): `TcpDialer.ApplySocketOptions` sets `DualMode = true` on every IPv6 socket;
+- Decision (ADR-0773): `TcpDialer.ApplySocketOptions` sets `DualMode = true` on every IPv6 socket;
   `TcpConnector` is unchanged and dials the literal as written, so the reported end points stay curl's.
   Linux and macOS default to dual-stack too, and setting it explicitly also covers `bindv6only=1` hosts.
 - Criterion 1: the loopback dialer test connects and closes without sending a byte, since ADR-0421 makes a
@@ -56,4 +56,4 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
-- 2026-10-22: Doing -> Done. IPv6 sockets are dual-stack (ADR-0771), so [::ffff:127.0.0.1] reaches an IPv4 server as in curl 8.22.0
+- 2026-10-22: Doing -> Done. IPv6 sockets are dual-stack (ADR-0773), so [::ffff:127.0.0.1] reaches an IPv4 server as in curl 8.22.0
