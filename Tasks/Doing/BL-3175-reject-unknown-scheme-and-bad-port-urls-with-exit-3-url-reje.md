@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22; measured the same day with the preview build and
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: d303a9d8 a559ec65 9ac6387e 2d4aaa8e 23f252f2.
