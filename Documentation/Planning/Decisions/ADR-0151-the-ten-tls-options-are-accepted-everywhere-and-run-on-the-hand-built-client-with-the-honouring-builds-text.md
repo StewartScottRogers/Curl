@@ -1,6 +1,6 @@
 # ADR-0151 — The ten TLS options are accepted everywhere and run on the hand-built client with the honouring build's text
 
-- **Status:** Accepted
+- **Status:** Accepted; the Schannel build's `--curves` and `--sigalgs` part superseded by [ADR-0793](ADR-0793-the-schannel-build-ignores-curves-and-sigalgs.md)
 - **Date:** 2026-09-28
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-617.
