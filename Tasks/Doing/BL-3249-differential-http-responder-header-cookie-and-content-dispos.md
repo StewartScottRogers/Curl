@@ -34,3 +34,4 @@ Routes: `/setcookie`, `/cookies2` (`uni=é` sent as Latin-1), `/dupheaders`, `/m
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 6b474468 ae951636 5e81fa96.
