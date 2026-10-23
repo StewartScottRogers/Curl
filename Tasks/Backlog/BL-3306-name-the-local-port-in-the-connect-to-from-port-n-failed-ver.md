@@ -1,5 +1,5 @@
 ---
-id: BL-3302
+id: BL-3306
 title: Name the --local-port in the 'connect to ... from ... port N failed' verbose line
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3302 — Name the --local-port in the 'connect to ... from ... port N failed' verbose line
+# BL-3306 — Name the --local-port in the 'connect to ... from ... port N failed' verbose line
 
 ## Goal
 

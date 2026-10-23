@@ -1,5 +1,5 @@
 ---
-id: BL-3301
+id: BL-3305
 title: Ignore an unknown --curves value in the Schannel build profile as curl 8.22.0 Schannel does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3301 — Ignore an unknown --curves value in the Schannel build profile as curl 8.22.0 Schannel does
+# BL-3305 — Ignore an unknown --curves value in the Schannel build profile as curl 8.22.0 Schannel does
 
 ## Goal
 

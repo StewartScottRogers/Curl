@@ -1,5 +1,5 @@
 ---
-id: BL-3303
+id: BL-3307
 title: Print 'Digest authentication problem, ignoring.' on a repeated Digest challenge under --anyauth
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3303 — Print 'Digest authentication problem, ignoring.' on a repeated Digest challenge under --anyauth
+# BL-3307 — Print 'Digest authentication problem, ignoring.' on a repeated Digest challenge under --anyauth
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-3300
+id: BL-3304
 title: Word a receive on a server-closed kept connection 'Connection was aborted' as the Schannel build does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3300 — Word a receive on a server-closed kept connection 'Connection was aborted' as the Schannel build does
+# BL-3304 — Word a receive on a server-closed kept connection 'Connection was aborted' as the Schannel build does
 
 ## Goal
 
