@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3296 — curl_url_get CURLUPART_PORT with CURLU_DEFAULT_PORT returns 0 for a file URL, as libcurl does
 
@@ -33,3 +33,4 @@ Scenarios 744 to 806 (file:///c:/x, file://localhost/x, file:/x, file:///x/y?z#w
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: bb20f7e3 c46ca32a.
+- 2026-10-23: Doing -> Done. file URL get of the port with CURLU_DEFAULT_PORT gives 0; unit test added
