@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ChunkedUploadSize.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3331 — CURLINFO_HEADER_SIZE of a chunked POSTFIELDS upload to /echo counts as libcurl does (post-chunked-header)
 
@@ -37,3 +37,4 @@ Found by BL-3320's run of LibcurlEasyDifferentialTests (CURL_DIFFERENTIAL_REFERE
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 37e91894 db93e725.
+- 2026-10-23: Doing -> Done. Request size counts chunk framing as libcurl does
