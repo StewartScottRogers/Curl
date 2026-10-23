@@ -66,8 +66,9 @@
     BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more). Once
     those runs leave less than $2 of the cap (AF-0326: a $1.02 claim of BL-2970 only requeued), a fresh claim is not run but
     goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
-    reaches the cap stops; like a timed-out run, its partial work is stashed and the task
-    goes to Blocked for Stewart, since it is too big for one run and wants splitting.
+    reaches the cap stops; like a timed-out run, its partial work is stashed, and one bounded
+    split run (BL-3091, ADR-0759) files smaller tasks and defers the original. The task goes
+    to Blocked only when that split is skipped (offered once already) or fails.
     A task Blocked by that refusal ("so it was not run again") comes back by itself
     (BL-2117): before every claim, the shift's first included, the requeue that returns
     tasks whose blockers are Done also moves it to Backlog once its runs of the last 24

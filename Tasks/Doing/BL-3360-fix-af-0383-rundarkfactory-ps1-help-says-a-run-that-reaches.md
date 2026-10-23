@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Rewrote the COST CAP help paragraph to describe the bounded split run (BL-3091, ADR-0759); Blocked only when the split is skipped or fails. Reproduction now matches only ShiftRunner.ps1:195.
 
 ## Log
 
