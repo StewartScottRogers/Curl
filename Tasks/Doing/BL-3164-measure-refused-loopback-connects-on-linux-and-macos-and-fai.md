@@ -35,3 +35,4 @@ Step one is to measure, not to code: compare Curl with the OpenSSL reference cur
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 3bdd64aa 0462b33e 3b94aea2 554ae46e a627db4e.
