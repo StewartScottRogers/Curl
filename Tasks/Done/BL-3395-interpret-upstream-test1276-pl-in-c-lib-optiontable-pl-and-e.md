@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3406, BL-3391]
-touches: [Curl.Conformance.UnitLibrary/UpstreamTest1276Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1276.cs, Curl.Conformance.UnitTests/UpstreamTest1276ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitLibrary/UpstreamTest1276Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1276.cs, Curl.Conformance.UnitTests/UpstreamTest1276ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3395 — Interpret upstream test1276.pl in C#: lib/optiontable.pl and easyoptions.c agree with curl.h (case 1276)
 
@@ -22,13 +22,16 @@ Decided in BL-3406 (supersedes the no-counterpart row of ADR-0718/ADR-0755): lik
 
 ## Acceptance criteria
 
-- [ ] Case 1276 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1276'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
+- [x] Case 1276 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1276'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
 
 ## Notes
+
+- Added Curl.Conformance.UnitTests.csproj to touches: the vendored lib/ files (optiontable.pl, easyoptions.c) were not copied to the output, neither beside the tests nor beside UpstreamTestData where %SRCDIR/.. looks. No other Doing task names it.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 4c7c77e1 c9ef8a5b b41964f0.
+- 2026-10-23: Doing -> Done. Case 1276 passes through a C# interpretation of test1276.pl and optiontable.pl over the vendored files, on the ratchet
