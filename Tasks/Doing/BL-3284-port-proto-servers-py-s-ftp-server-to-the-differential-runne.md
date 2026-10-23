@@ -34,3 +34,4 @@ The tester's reference scripts are in `Z:\repos\Curl.difftest\2026-10-22\` (outs
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: bda70747 6f3fdd20 ae951636 5e81fa96.
