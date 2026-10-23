@@ -60,10 +60,27 @@ public sealed class CurlTransferTool(McpTransferTool tool)
             UserAgent = userAgent,
         };
         McpTransferToolResult result = await tool.RunAsync(request, cancellationToken).ConfigureAwait(false);
-        return new CallToolResult
-        {
-            IsError = result.IsError,
-            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(result, CurlMcpJsonContext.Default.McpTransferToolResult) }],
-        };
+        return ToCallToolResult(result);
     }
+
+    /// <summary>
+    /// The call-tool filter that checks a <c>transfer</c> call's argument shapes before the SDK binds them
+    /// (ADR-0771): a wrong shape answers with a tool error naming the field and the shape it must have, as
+    /// any other invalid field does, where binding would have thrown and the SDK answered only
+    /// <c>An error occurred invoking 'transfer'</c>. Any other call, and a call whose shapes are right,
+    /// goes on to <paramref name="next" />.
+    /// </summary>
+    /// <param name="next">The handler the call goes on to.</param>
+    /// <returns>The filtering handler.</returns>
+    public static McpRequestHandler<CallToolRequestParams, CallToolResult> RefuseWrongArgumentShapes(McpRequestHandler<CallToolRequestParams, CallToolResult> next) =>
+        (context, cancellationToken) =>
+            context.Params?.Name == "transfer" && McpTransferRequestCheck.CheckArgumentShapes(context.Params.Arguments) is McpToolFailure failure
+                ? ValueTask.FromResult(ToCallToolResult(McpTransferToolResult.Failed(failure)))
+                : next(context, cancellationToken);
+
+    private static CallToolResult ToCallToolResult(McpTransferToolResult result) => new()
+    {
+        IsError = result.IsError,
+        Content = [new TextContentBlock { Text = JsonSerializer.Serialize(result, CurlMcpJsonContext.Default.McpTransferToolResult) }],
+    };
 }

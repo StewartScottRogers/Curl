@@ -57,6 +57,7 @@ internal static class CurlMcpHost
             .WithTools<CurlTransferTool>(CurlMcpJsonContext.ToolOptions)
             .WithTools<CurlVersionTool>(CurlMcpJsonContext.ToolOptions)
             .WithTools<CurlUrlTool>(CurlMcpJsonContext.ToolOptions)
+            .WithRequestFilters(filters => filters.AddCallToolFilter(CurlTransferTool.RefuseWrongArgumentShapes))
             .WithListResourcesHandler(CurlAiHelpResourceHandlers.ListAsync)
             .WithReadResourceHandler(CurlAiHelpResourceHandlers.ReadAsync);
         return builder.Build();
