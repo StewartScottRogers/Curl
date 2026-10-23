@@ -49,7 +49,9 @@ internal static class UpstreamTest1173Script
 
     private static readonly Regex Blank = new("^ *$", Options, UpstreamRegex.MatchTimeout);
 
-    private static readonly Regex TrailingComma = new(@".*(, *)\z", Options, UpstreamRegex.MatchTimeout);
+    // The patterns that start with .* are anchored with ^, which finds the same matches in a line (no line holds a
+    // line feed): unanchored, a line with no match is tried again from every position, quadratic in its length (BL-3420).
+    private static readonly Regex TrailingComma = new(@"^.*(, *)\z", Options, UpstreamRegex.MatchTimeout);
 
     private static readonly Regex RawNewline = new(@"[^\\]\\n", Options, UpstreamRegex.MatchTimeout);
 
@@ -63,15 +65,15 @@ internal static class UpstreamTest1173Script
 
     private static readonly Regex BareReference = new(@"\\f([BI])((libcurl|CURLOPT_|CURLSHOPT_|CURLINFO_|CURLMOPT_|curl_easy_|curl_multi_|curl_url|curl_mime|curl_global|curl_share)[a-zA-Z_0-9-]+)(.)", Options, UpstreamRegex.MatchTimeout);
 
-    private static readonly Regex OtherFont = new(@"(.*)\\f([^BIP])", Options, UpstreamRegex.MatchTimeout);
+    private static readonly Regex OtherFont = new(@"^(.*)\\f([^BIP])", Options, UpstreamRegex.MatchTimeout);
 
     private static readonly Regex ProseSection = new("^(DESCRIPTION|RETURN VALUE|AVAILABILITY)", Insensitive, UpstreamRegex.MatchTimeout);
 
-    private static readonly Regex UnreferencedCallPattern = new("(.*)((curl_multi|curl_easy|curl_url|curl_global|curl_url|curl_share)[a-zA-Z_0-9-]+)", Options, UpstreamRegex.MatchTimeout);
+    private static readonly Regex UnreferencedCallPattern = new("^(.*)((curl_multi|curl_easy|curl_url|curl_global|curl_url|curl_share)[a-zA-Z_0-9-]+)", Options, UpstreamRegex.MatchTimeout);
 
     private static readonly Regex ExcludedSection = new("^(SYNOPSIS|EXAMPLE|NAME|SEE ALSO)", Insensitive, UpstreamRegex.MatchTimeout);
 
-    private static readonly Regex OptionSymbol = new("(.*)(CURL(OPT_|MOPT_|INFO_|SHOPT_)[A-Z0-9_]*)", Options, UpstreamRegex.MatchTimeout);
+    private static readonly Regex OptionSymbol = new("^(.*)(CURL(OPT_|MOPT_|INFO_|SHOPT_)[A-Z0-9_]*)", Options, UpstreamRegex.MatchTimeout);
 
     private static readonly Regex TrailingSpace = new("[ \t]+$", Options, UpstreamRegex.MatchTimeout);
 

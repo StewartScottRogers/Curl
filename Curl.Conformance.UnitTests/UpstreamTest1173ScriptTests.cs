@@ -41,6 +41,14 @@ public sealed class UpstreamTest1173ScriptTests
     }
 
     [TestMethod]
+    public void Scan_LongLineMatchingNoPattern_FinishesInsideTheMatchTimeout()
+    {
+        string[] page = [".SH DESCRIPTION", new string('a', 200_000)];
+
+        Assert.AreEqual((0, "ok\n"), Scan(("opts/CURLOPT_OLD.3", page)));
+    }
+
+    [TestMethod]
     public void Scan_TextMistakes_ReportsEachInTheScriptsWords()
     {
         string[] page =
