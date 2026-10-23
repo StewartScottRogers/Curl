@@ -32,3 +32,4 @@ Stewart (2026-10-23) wants the 11 differential tests in `Curl.Conformance.Differ
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: aed42974 b76ba8db c7df4582 01205bb2.
