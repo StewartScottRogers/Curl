@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -6,7 +7,8 @@ namespace Curl.Engine;
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> unchanged and keeps what libcurl still reports after a
 /// transfer ends with <c>CURLE_OPERATION_TIMEDOUT</c> because it was too slow: the last response code, the bytes
-/// of the response heads, the bytes of the request heads and the connections opened. The handler that was
+/// of the response heads, the bytes of the request heads, the body bytes received, the connections opened and
+/// the end points of the first. The handler that was
 /// cancelled returns no report, so <see cref="ReportOn" /> builds one from these (BL-3321).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
@@ -17,7 +19,10 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     private int responseCode;
     private long headerSize;
     private long requestSize;
+    private long downloadSize;
     private int connectionCount;
+    private IPEndPoint? firstLocalEndPoint;
+    private IPEndPoint? firstRemoteEndPoint;
 
     /// <summary>
     /// The finished transfer, given a report of what was recorded when it ended with
@@ -26,7 +31,7 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     /// <param name="result">The finished transfer, or <see langword="null" /> when a callback aborted it.</param>
     /// <returns>The transfer with the report, or <paramref name="result" /> as it is.</returns>
     internal TransferResult? ReportOn(TransferResult? result) =>
-        result is { ExitCode: CurlExitCode.OperationTimedOut, Report: null } && connectionCount + requestSize + headerSize > 0
+        result is { ExitCode: CurlExitCode.OperationTimedOut, Report: null } && connectionCount + requestSize + headerSize + downloadSize > 0
             ? result with
             {
                 Report = new TransferReport
@@ -34,7 +39,10 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
                     ResponseCode = responseCode,
                     HeaderSize = headerSize,
                     RequestSize = requestSize,
+                    DownloadSize = downloadSize,
                     ConnectionCount = connectionCount,
+                    LocalEndPoint = firstLocalEndPoint,
+                    RemoteEndPoint = firstRemoteEndPoint,
                 },
             }
             : result;
@@ -46,6 +54,12 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
         connectionCount++;
+        if (connectionCount == 1)
+        {
+            firstLocalEndPoint = opened.LocalEndPoint;
+            firstRemoteEndPoint = opened.RemoteEndPoint;
+        }
+
         inner.ReportConnectionOpened(opened);
     }
 
@@ -94,7 +108,11 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     public void ReportDataSent(ReadOnlySpan<byte> bytes) => inner.ReportDataSent(bytes);
 
     /// <inheritdoc />
-    public void ReportDataReceived(ReadOnlySpan<byte> bytes) => inner.ReportDataReceived(bytes);
+    public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+    {
+        downloadSize += bytes.Length;
+        inner.ReportDataReceived(bytes);
+    }
 
     /// <summary>The status of a status line (<c>HTTP/1.1 200 OK</c>), or <see langword="null" /> for any other header bytes.</summary>
     private static int? StatusCodeOf(ReadOnlySpan<byte> bytes)

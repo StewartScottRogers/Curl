@@ -14,15 +14,15 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+A transfer ended by the low-speed abort still reports the first connection's local and remote end points and the body bytes received, as libcurl does.
 
 ## Context
 
-<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+Follows BL-3321: `AbortedHeadRecordingTransferEvents` builds the report of a `CURLE_OPERATION_TIMEDOUT` transfer whose handler was cancelled.
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] The report of a low-speed abort carries LocalEndPoint, RemoteEndPoint (first connection) and DownloadSize, covered by unit tests in AbortedHeadRecordingTransferEventsTests.
 
 ## Notes
 

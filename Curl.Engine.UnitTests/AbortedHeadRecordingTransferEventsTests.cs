@@ -33,6 +33,34 @@ public sealed class AbortedHeadRecordingTransferEventsTests
     }
 
     [TestMethod]
+    public void ReportOn_TooSlowAfterTheHead_ReportsTheFirstConnectionEndPointsAndTheBodyBytes()
+    {
+        AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
+        events.ReportConnectionOpened(Opened);
+        events.ReportConnectionOpened(Opened with { LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 50001), ConnectionNumber = 2 });
+        events.ReportDataReceived(new byte[3]);
+        events.ReportDataReceived(new byte[4]);
+
+        TransferReport report = events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!;
+
+        Assert.AreEqual(7, report.DownloadSize);
+        Assert.AreEqual(Opened.LocalEndPoint, report.LocalEndPoint);
+        Assert.AreEqual(Opened.RemoteEndPoint, report.RemoteEndPoint);
+    }
+
+    [TestMethod]
+    public void ReportOn_OnlyBodyBytes_StillGetsAReport()
+    {
+        AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
+        events.ReportDataReceived(new byte[3]);
+
+        TransferReport report = events.ReportOn(new TransferResult(CurlExitCode.OperationTimedOut, 0))!.Report!;
+
+        Assert.AreEqual(3, report.DownloadSize);
+        Assert.IsNull(report.LocalEndPoint);
+    }
+
+    [TestMethod]
     public void ReportOn_NothingRecorded_ReturnsTheResultUnchanged()
     {
         AbortedHeadRecordingTransferEvents events = new(NoTransferEvents.Instance);
