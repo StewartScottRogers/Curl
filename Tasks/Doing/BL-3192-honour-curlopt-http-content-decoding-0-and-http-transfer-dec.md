@@ -34,3 +34,4 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: f92e5f0f 6fd8289f 6c282f2c 3639a5e6.
