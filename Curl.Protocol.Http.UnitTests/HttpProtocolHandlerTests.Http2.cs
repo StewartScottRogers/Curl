@@ -225,6 +225,29 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ExecuteAsync_Http2PriorKnowledgeAgainstHttp11Server_FailsWithExit55WhetherOrNotItResets(bool resetsAfterReply)
+    {
+        byte[] reply = Encoding.Latin1.GetBytes("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        ScriptedConnection connection = resetsAfterReply
+            ? new(reply, 65536, failureAfterResponse: new IOException("Connection reset."))
+            : new(reply, 65536);
+
+        Diagnostics.Arrange("url", "http://example.com/");
+        Diagnostics.Arrange("server", "HTTP/1.1, answers the h2 preface with a 400 (resets: " + resetsAfterReply + ")");
+
+        TransferResult result = await Handler(QueueConnector.For(connection))
+            .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
+
+        WriteResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("error message", HttpTransferMessages.Http2SettingsExpected, result.ErrorMessage);
+        Assert.AreEqual("Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.", result.ErrorMessage);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_Http2GoAwayWithAnErrorMidBody_FailsWithExit56()
     {
         HpackEncoder server = new();

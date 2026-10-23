@@ -419,6 +419,14 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             receiver!.FrameLog.ResetReceived(reset);
             throw;
         }
+        catch (Http2ProtocolException error) when (!wasSettingsReceived && error.ErrorCode == Http2ErrorCode.FrameSizeError)
+        {
+            // An HTTP/1.1 reply's first bytes read as a huge frame length; nghttp2 checks the
+            // frame type first and curl gives exit 55 whichever bytes or reset arrive (BL-3372).
+            HttpTransferException notHttp2 = new(CurlExitCode.SendError, HttpTransferMessages.Http2SettingsExpected);
+            connectionFailure = ExceptionDispatchInfo.Capture(notHttp2);
+            throw notHttp2;
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             connectionFailure = ExceptionDispatchInfo.Capture(exception);
