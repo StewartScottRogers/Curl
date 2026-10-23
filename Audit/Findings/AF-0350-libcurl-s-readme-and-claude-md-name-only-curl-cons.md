@@ -3,8 +3,8 @@ id: AF-0350
 title: Libcurl's README and CLAUDE.md name only Curl.Console and Curl.Api beside it as naming exceptions; Curl.Config and Curl.Mcp are too
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.
 key: truthfulness:Libcurl/README.md:Libcurl:false-statement
 reproduction: none
 task: BL-3130
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0350 - Libcurl's README and CLAUDE.md name only Curl.Console and Curl.Api beside it as naming exceptions; Curl.Config and Curl.Mcp are too
 
@@ -42,7 +42,10 @@ Select-String -Path Libcurl/README.md, Libcurl/CLAUDE.md -Pattern 'naming except
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the reproduction: README.md:7 names `Curl.Api`, `Curl.Config`, `Curl.Console` and `Curl.Mcp`, and CLAUDE.md:4 says 'A naming exception, with `Curl.Api`, `Curl.Config`, `Curl.Console` and `Curl.Mcp`.' The directory scan lists Curl.Api, Curl.Config, Curl.Console, Curl.Mcp and Libcurl, so the docs now name every other exception.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.

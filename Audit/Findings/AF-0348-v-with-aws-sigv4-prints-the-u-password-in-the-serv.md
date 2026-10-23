@@ -3,8 +3,8 @@ id: AF-0348
 title: -v with --aws-sigv4 prints the -u password in the 'Server auth using AWS_SIGV4' line; curl prints only the user
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.
 key: conformance:--aws-sigv4:auth-using-line-password:stderr
 reproduction: none
 task: BL-3128
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-22
+closed-how: reliable-reaudit
+closed-by: 2026-10-22_1902.md
 ---
 # AF-0348 - -v with --aws-sigv4 prints the -u password in the 'Server auth using AWS_SIGV4' line; curl prints only the user
 
@@ -42,7 +42,10 @@ dotnet build Curl.Console -c Release -nologo | Out-Null; $r=(Get-Location).Path;
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the reproduction as given against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel: 'curl: * Server auth using AWS_SIGV4 with user 'AKID'' and 'candidate: * Server auth using AWS_SIGV4 with user 'AKID'': the line is identical and the -u password 'secret' is no longer printed.
+
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-22: accepted -> closed. Re-audit 2026-10-22_1902.md: the reproduction no longer reproduces.

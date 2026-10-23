@@ -42,6 +42,8 @@ dotnet test Curl.Engine.UnitTests --filter "FullyQualifiedName~AwsSigV4HttpAuthe
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran dotnet test Curl.Engine.UnitTests --filter FullyQualifiedName~AwsSigV4HttpAuthenticatorTests: Passed 12, Failed 0, Total 12.
+
 ## Log
 
 - 2026-10-22: filed proposed.

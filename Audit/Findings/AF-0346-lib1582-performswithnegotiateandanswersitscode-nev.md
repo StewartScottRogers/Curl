@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-10-22 | 2026-10-22_1902.md | reproduces: no | Ran the Select-String reproduction: Lib1582_PerformsWithNegotiateAndAnswersItsCode now asserts Assert.AreEqual(HttpAuthenticationMethods.Negotiate, performed?.HttpAuthentication) at line 401.
+
 ## Log
 
 - 2026-10-22: filed proposed.
