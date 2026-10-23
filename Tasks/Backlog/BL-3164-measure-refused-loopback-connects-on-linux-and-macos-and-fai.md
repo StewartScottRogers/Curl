@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: protocol
 depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Core.UnitLibrary/TransferRetrier.cs, Curl.Networking.UnitTests/TcpConnectorRefusedConnectTests.cs]
+lane: no
 requirement: none
 created: 2026-10-22
 completed:
@@ -32,7 +33,10 @@ Step one is to measure, not to code: compare Curl with the OpenSSL reference cur
 
 ## Notes
 
+- 2026-10-22 (lane 5): Interactive only. The first criterion and the decision whether any product code changes both rest on Linux and macOS timings of curl 8.22.0 and Curl for `curl -sS http://127.0.0.1:9/` and the `--retry-connrefused` command; a dark factory lane runs only on Windows, cannot see CI and may not read the gap office's runs. Code read on Windows found no delay on a refused connect: `TcpDialer.ConnectAsync` calls `Socket.ConnectAsync` once (macOS `connectx` only under `--tcp-fastopen`), `AddressFamilyRace` waits only for a second family, and nothing in Curl.Networking or Curl.Core emulates the Windows SYN retry, so the Linux 2.1 s must be measured to be explained. The retry count looks like a consequence of the delay (the first attempt uses up `--retry-max-time 1`), not of `TransferRetrier`. Remove lane: no once an interactive session has recorded those four Linux and four macOS timings (curl 8.22.0 and Curl, single request and retry command) here.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 3bdd64aa 0462b33e 3b94aea2 554ae46e a627db4e.
+- 2026-10-22: Doing -> Backlog. Interactive only: needs Linux and macOS timings of curl 8.22.0 and Curl (CI or gap-platforms), which a Windows lane cannot take or see
