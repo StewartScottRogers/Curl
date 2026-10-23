@@ -83,3 +83,4 @@ Keep the change in `CurlCommandRunner.cs` small; put the logic in the Parallel* 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 6f5978ca e910298d 9f090ed0 11871184 f2813a19.
 - 2026-10-22: Doing -> Backlog. Ran out of time: -Z order work stashed; the order test needs a holding fake handler and a -Z test now hangs (see Notes); next claim finishes it and runs Measure-CodeQuality
+- 2026-10-23: Backlog -> Deferred. Over its cost cap; split into BL-3253, BL-3254, BL-3255

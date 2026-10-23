@@ -4,7 +4,7 @@ title: Start --parallel transfers in URL order and pick up waiting ones in URL o
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3189]
+depends-on: [BL-3253, BL-3254, BL-3255]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs, Curl.Console.UnitTests/ParallelHostQueueOrderTests.cs]
 requirement: none
 created: 2026-10-22
