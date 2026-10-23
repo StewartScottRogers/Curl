@@ -86,6 +86,10 @@
     with its tests in /<Group>/<Area>/: Hosts, CommandLine, Transfer, Wire and Security.
   -->
   <Folder Name="/Conformance/" />
+  <Folder Name="/Conformance/Differential/">
+    <Project Path="Curl.Conformance.Differential.UnitLibrary/Curl.Conformance.Differential.UnitLibrary.csproj" />
+    <Project Path="Curl.Conformance.Differential.UnitTests/Curl.Conformance.Differential.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Conformance/Harness/">
     <Project Path="Curl.Conformance.UnitLibrary/Curl.Conformance.UnitLibrary.csproj" />
     <Project Path="Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj" />
