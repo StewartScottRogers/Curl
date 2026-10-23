@@ -30,6 +30,8 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Notes
 
+Split into partial-class files by concern (.Perform, .Preparation, .PostBody, .Parsed, .SetUp, .Finish, .Lifecycle, .Context) beside the existing .SslSessions; a pure move. Narrowed BL-3193 (.Finish), BL-3196 (.Parsed), BL-3201 (.PostBody); BL-3195 and BL-3199 were already Done. hotspots reports none. Build clean, Engine fast tests 2288 passed, quality 0 failing members.
+
 ## Log
 
 - 2026-10-22: Created.
