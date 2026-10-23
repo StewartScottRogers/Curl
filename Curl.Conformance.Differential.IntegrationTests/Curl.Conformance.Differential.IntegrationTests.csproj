@@ -12,6 +12,8 @@
     <ProjectReference Include="..\Curl.Conformance.Differential.UnitLibrary\Curl.Conformance.Differential.UnitLibrary.csproj" />
     <!-- Builds the Curl under test into this project's output (ADR-0785). -->
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+    <!-- The Curl.Api cases call it in process (BL-3242, ADR-0790). -->
+    <ProjectReference Include="..\Curl.Api\Curl.Api.csproj" />
   </ItemGroup>
 
 </Project>
