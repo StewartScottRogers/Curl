@@ -30,3 +30,4 @@ Found by BL-3282. Measured: real curl 8.22.0 Schannel (Git ucrt64) with -sSk --c
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 96be729b 69edf767.
