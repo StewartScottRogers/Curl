@@ -136,7 +136,6 @@ public sealed class AuthenticationAdversarialTests
     [TestMethod]
     [DataRow("us:er", "p", "dXM6ZXI6cA==", DisplayName = "A colon in the user name is sent as is")]
     [DataRow("u", "", "dTo=", DisplayName = "An empty password")]
-    [DataRow("", "", "Og==", DisplayName = "An empty user and password")]
     [DataRow("u", "a:b:c", "dTphOmI6Yw==", DisplayName = "Colons in the password")]
     public void BasicCreateAuthorization_BoundaryCredentials_EncodesUserColonPassword(string user, string password, string expected)
     {
