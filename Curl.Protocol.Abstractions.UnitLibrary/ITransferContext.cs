@@ -496,7 +496,8 @@ public interface ITransferContext
     /// An HTTP handler treats <see langword="null" /> exactly as
     /// <c>new HttpRequestOptions()</c>, every member at its default; every other handler
     /// ignores it (ADR-0014), but for the FTP handler, which reads
-    /// <see cref="HttpRequestOptions.IgnoreContentLength" /> to skip <c>SIZE</c> (BL-1982).
+    /// <see cref="HttpRequestOptions.IgnoreContentLength" /> to skip <c>SIZE</c> (BL-1982)
+    /// and <see cref="HttpRequestOptions.CustomMethod" /> as its listing command (BL-3165).
     /// </remarks>
     HttpRequestOptions? Http { get; }
 

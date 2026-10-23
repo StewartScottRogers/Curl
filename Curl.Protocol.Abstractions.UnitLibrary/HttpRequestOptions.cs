@@ -17,7 +17,9 @@ public sealed record HttpRequestOptions
 {
     /// <summary>
     /// Gets the method from <c>-X</c>/<c>--request</c>, verbatim, or
-    /// <see langword="null" /> to let the handler choose GET, HEAD, POST or PUT.
+    /// <see langword="null" /> to let the handler choose GET, HEAD, POST or PUT. The FTP
+    /// handler sends it in place of <c>LIST</c> or <c>NLST</c> for a directory listing
+    /// (BL-3165).
     /// </summary>
     public string? CustomMethod { get; init; }
 

@@ -1046,7 +1046,7 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// The listing command: <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise, with the
+    /// The listing command: <see cref="ListVerb" />, with the
     /// directory as its argument under <c>--ftp-method nocwd</c>.
     /// </summary>
     private string ListCommand(FtpUrlPath path) =>
@@ -1056,8 +1056,13 @@ internal sealed class FtpSession(
     private string DownloadPretArgument(FtpUrlPath path, bool listing) =>
         listing ? ListVerb : "RETR " + path.FileName;
 
-    /// <summary>The listing verb: <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise.</summary>
-    private string ListVerb => typeCode.ListOnly ? "NLST" : "LIST";
+    /// <summary>
+    /// The listing verb: <c>-X</c>'s command when one was given, as upstream's
+    /// <c>ftp_state_list</c> sends <c>CURLOPT_CUSTOMREQUEST</c> in its place (BL-3165);
+    /// otherwise <c>NLST</c> under <c>-l</c>, <c>LIST</c> otherwise. A file download keeps
+    /// <c>RETR</c> whatever <c>-X</c> says.
+    /// </summary>
+    private string ListVerb => context.Http?.CustomMethod ?? (typeCode.ListOnly ? "NLST" : "LIST");
 
     /// <summary>
     /// Uploads <paramref name="upload" /> to the file <paramref name="path" /> names: exit 3,
