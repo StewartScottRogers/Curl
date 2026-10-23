@@ -29,3 +29,4 @@ s CURLINFO_OS_ERRNO after a receive that fails on a kept connection is the socke
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing.
