@@ -38,3 +38,4 @@ When a newer push cancels the waiting CI run (ADR-0693), `Wait-MergeCiRun` follo
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 3f408fbf e80f142e 20efafd0.
