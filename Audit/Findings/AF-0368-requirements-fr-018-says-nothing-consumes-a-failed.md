@@ -3,8 +3,8 @@ id: AF-0368
 title: Requirements FR-018 says nothing consumes a failed transfer's byte count until --write-out exists; --write-out exists and reads it
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Product/Requirements.md:FR-018:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Output.UnitLibra
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
