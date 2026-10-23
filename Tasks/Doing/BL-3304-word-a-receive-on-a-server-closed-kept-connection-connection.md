@@ -30,3 +30,4 @@ Found by BL-3282. Record-CurlExchange.ps1 -Connections 3 with a 401 carrying Neg
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f84b09c6 69edf767.
