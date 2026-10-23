@@ -3,8 +3,8 @@ id: AF-0370
 title: BL-3121 cost $1.23 (5.6x the median) because it was filed with touches naming only Curl.Networking.UnitLibrary, so its first Opus run found BL-3127 holding the test project and requeued
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3121:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
