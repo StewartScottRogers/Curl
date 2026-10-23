@@ -57,3 +57,4 @@ BL-3148 could not check live URLs in a lane before its change was integrated. `d
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d171494f 49e82b27.
 - 2026-10-22: Doing -> Backlog. Waiting for the shift-end merge to put BL-3147 (fb690a3b1) on master, so release.yml publishes resources.json and ai-help.md to the preview release, and for the next render; llms.txt and mcp/ are live (200)
+- 2026-10-22: Backlog -> Doing. Criteria at claim: d171494f 49e82b27.
