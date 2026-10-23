@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpDialerMappedIPv4Tests.cs, Curl.Console.IntegrationTests/CurlMappedIPv4LiteralIntegrationTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3174 — Connect to IPv4-mapped IPv6 literals such as [::ffff:127.0.0.1]
 
@@ -61,3 +61,4 @@ Stewart reported on 2026-10-22: `curl http://[::ffff:127.0.0.1]:18080/echo`; ups
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
 - 2026-10-22: Doing -> Backlog. Lane 1 could not integrate: rebase conflict the resolver could not settle. The work is on branch factory/BL-3174-lane-1-20261022-192710; start with git cherry-pick --no-commit factory/BL-3174-lane-1-20261022-192710 and fix it.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d4457215 81057b64 52b179ac d7d8ce4c.
+- 2026-10-22: Doing -> Done. IPv6 sockets are dual-stack (ADR-0776), so [::ffff:127.0.0.1] reaches an IPv4 server as in curl 8.22.0
