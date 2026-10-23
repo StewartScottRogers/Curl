@@ -26,10 +26,28 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 {
     private const string PemCertificateBegin = "-----BEGIN CERTIFICATE-----";
 
+    private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 when, checked against the system store, a
+    /// certificate in the server's chain is revoked (curl 8.22.0, measured, BL-3215).
+    /// </summary>
+    internal const string SchannelCertificateRevoked =
+        "schannel: next InitializeSecurityContext failed: CRYPT_E_REVOKED (0x80092010) - The certificate is revoked.";
+
+    /// <summary>
+    /// Reads a chain's <see cref="X509Chain.ChainStatus" />, none without a chain, for
+    /// <see cref="SchannelRevocationRefusal" />. A test seam: a revoked status cannot be built
+    /// without a revocation server, so tests replace it.
+    /// </summary>
+    internal Func<X509Chain?, X509ChainStatus[]> ReadChainStatus { get; init; } = chain => chain?.ChainStatus ?? [];
+
     /// <summary>
     /// Reads the roots the chain may lead to. The chain policy replaces the system store,
-    /// from <c>--cacert</c>; <see langword="null" /> verifies against the system store, with
-    /// the <c>--capath</c> roots trusted beside it when there is no <c>--cacert</c>. With
+    /// from <c>--cacert</c>; without <c>--cacert</c> the chain is verified against the system
+    /// store, with the <c>--capath</c> roots trusted beside it, and the chain policy is the
+    /// Schannel build's revocation check (online, every certificate but the root, ADR-0783),
+    /// or <see langword="null" /> under <c>--ssl-no-revoke</c> and in the OpenSSL build. With
     /// <c>--cacert</c> the Schannel build checks revocation below the root unless
     /// <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, so a private CA with no
     /// revocation endpoint fails with exit 60 as in curl (ADR-0321); the OpenSSL build never
@@ -79,7 +97,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         var directoryAnchors = ReadCaCertificateDirectory();
         if (!options.HasCaCertificates)
         {
-            return (null, directoryAnchors);
+            return (SystemStoreChainPolicy(), directoryAnchors);
         }
 
         var chainPolicy = new X509ChainPolicy
@@ -92,6 +110,25 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         chainPolicy.CustomTrustStore.AddRange(ReadCaCertificates());
         chainPolicy.CustomTrustStore.AddRange(directoryAnchors);
         return (chainPolicy, []);
+    }
+
+    // The Schannel build checks the system store chain for revocation as Schannel's default
+    // flags do: online, CRL distribution points and OCSP, every certificate but the root,
+    // unless --ssl-no-revoke (ADR-0783). The OpenSSL build checks none: SslStream's default.
+    private X509ChainPolicy? SystemStoreChainPolicy()
+    {
+        if (!matchesSchannelBuild || options.SkipRevocationCheck)
+        {
+            return null;
+        }
+
+        var chainPolicy = new X509ChainPolicy
+        {
+            RevocationMode = X509RevocationMode.Online,
+            RevocationFlag = X509RevocationFlag.ExcludeRoot,
+        };
+        chainPolicy.ApplicationPolicy.Add(ServerAuthentication);
+        return chainPolicy;
     }
 
     // The build's message for exit 77: the --cacert file cannot be used.
@@ -211,7 +248,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         }
 
         return matchesSchannelBuild
-            ? SchannelPeerVerificationFailure(errors, chain, targetHost)
+            ? SchannelRefusal(errors, chain, targetHost)
             : (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslPeerFailedVerification(errors, chain, targetHost));
     }
 
@@ -230,7 +267,43 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         && chainStatus.All(status =>
             (status.Status & ~(X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation)) == 0);
 
-    // The Schannel build's answer for a certificate SslStream found fault with.
+    /// <summary>
+    /// Whether the Schannel build, checking against the system store, fails the handshake
+    /// with <see cref="SchannelCertificateRevoked" /> (exit 35): the host name matches and the
+    /// chain's only fault, beside a revocation status that could not be fetched for another
+    /// certificate, is that one of its certificates, the server's own or an intermediate, is
+    /// revoked.
+    /// </summary>
+    /// <param name="errors">What the verification found wrong.</param>
+    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
+    /// <returns><see langword="true" /> when Schannel reports <c>CRYPT_E_REVOKED</c>.</returns>
+    internal static bool IsSchannelCertificateRevoked(SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
+        errors == SslPolicyErrors.RemoteCertificateChainErrors
+        && (chainStatus.Aggregate(X509ChainStatusFlags.NoError, (all, next) => all | next.Status)
+            & ~(X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation))
+            == X509ChainStatusFlags.Revoked;
+
+    /// <summary>
+    /// The Schannel build's refusal of a chain checked against the system store, unless
+    /// <c>--ssl-no-revoke</c>, in which a certificate is revoked: exit 35 with
+    /// <see cref="SchannelCertificateRevoked" />. <c>--ssl-revoke-best-effort</c> does not
+    /// tolerate it; the OpenSSL build never checks revocation there.
+    /// </summary>
+    /// <param name="errors">What the verification found wrong.</param>
+    /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
+    /// <returns>The exit code and message, or <see langword="null" /> when this is not the refusal.</returns>
+    internal (CurlExitCode ExitCode, string Message)? SchannelRevocationRefusal(SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
+        matchesSchannelBuild && !options.HasCaCertificates && !options.SkipRevocationCheck
+        && IsSchannelCertificateRevoked(errors, chainStatus)
+            ? (CurlExitCode.SslConnectError, SchannelCertificateRevoked)
+            : null;
+
+    // The Schannel build's answer for a certificate SslStream found fault with: a revoked
+    // chain is the handshake's failure, anything else the peer verification's.
+    private (CurlExitCode ExitCode, string Message) SchannelRefusal(SslPolicyErrors errors, X509Chain? chain, string targetHost) =>
+        SchannelRevocationRefusal(errors, ReadChainStatus(chain)) ?? SchannelPeerVerificationFailure(errors, chain, targetHost);
+
+    // The Schannel build's answer for a certificate SslStream found fault with, but revocation.
     private (CurlExitCode ExitCode, string Message) SchannelPeerVerificationFailure(
         SslPolicyErrors errors,
         X509Chain? chain,

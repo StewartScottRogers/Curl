@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs, Curl.Networking.UnitTests/ServerCertificateRevocationTests.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-23
 ---
 # BL-3215 — Reject a revoked server certificate on Windows with exit 35 as the Schannel build does
 
@@ -24,10 +24,10 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Acceptance criteria
 
-- [ ] `Curl.Networking.UnitTests/ServerCertificateRevocationTests.cs` (Windows `[OSCondition]`) shows a default-store chain with a revoked leaf fails with exit 35 and the Schannel text above, and a revoked intermediate the same.
-- [ ] The same chain with `--ssl-no-revoke` succeeds; with `--ssl-revoke-best-effort` and an unreachable responder it succeeds, and with a reachable responder saying revoked it fails.
-- [ ] A test pins that Linux and macOS (OpenSSL build behaviour) do not check revocation by default.
-- [ ] Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members; no test touches the network.
+- [x] `Curl.Networking.UnitTests/ServerCertificateRevocationTests.cs` (Windows `[OSCondition]`) shows a default-store chain with a revoked leaf fails with exit 35 and the Schannel text above, and a revoked intermediate the same.
+- [x] The same chain with `--ssl-no-revoke` succeeds; with `--ssl-revoke-best-effort` and an unreachable responder it succeeds, and with a reachable responder saying revoked it fails.
+- [x] A test pins that Linux and macOS (OpenSSL build behaviour) do not check revocation by default.
+- [x] Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members; no test touches the network.
 
 ## Notes
 
@@ -35,3 +35,4 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 4d69c08f 44c021ef 29136f89 a2f56bec.
+- 2026-10-23: Doing -> Done. On Windows the Schannel build checks revocation online for a system store chain and refuses a revoked leaf or intermediate with exit 35 CRYPT_E_REVOKED
