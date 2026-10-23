@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3153 — Keep Complete-ClaimSplit from dropping a reset-failed split's stash copies while its commit stays to be pushed
 
@@ -31,14 +31,17 @@ The trace at line 232 is also wrong in two cases:
 
 ## Acceptance criteria
 
-- [ ] On `reset-failed`, a refused push is retried after `pull --rebase` (with `rebase --abort` only when a rebase is in progress), as the `failed` branch does.
-- [ ] Stash copies are dropped only when the split commit is no longer in the lane's history. Otherwise they are kept, and the trace says the split commit is still waiting to be integrated.
-- [ ] When the subject is not recognised, the trace says so and drops nothing. The "dropped" trace names only the entries that were actually removed.
-- [ ] `Claim.ps1`'s self-test (`-TestClaimDuplicates`) has a case for each of these, and they pass.
+- [x] On `reset-failed`, a refused push is retried after `pull --rebase` (with `rebase --abort` only when a rebase is in progress), as the `failed` branch does.
+- [x] Stash copies are dropped only when the split commit is no longer in the lane's history. Otherwise they are kept, and the trace says the split commit is still waiting to be integrated.
+- [x] When the subject is not recognised, the trace says so and drops nothing. The "dropped" trace names only the entries that were actually removed.
+- [x] `Claim.ps1`'s self-test (`-TestClaimDuplicates`) has a case for each of these, and they pass.
 
 ## Notes
+
+On reset-failed the push is retried after pull --rebase (rebase --abort only while rebasing). The subject is read before pushing; stash copies are dropped only when the split commit is absent from origin/branch..HEAD, and the trace names only removed IDs. Trace texts are short because Write-Trace cuts lines at 118 characters. Self-test: 3 new cases in -TestClaimDuplicates, all pass.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 636e48fb a38c9b2e 188efd23 ffaf3fa6.
+- 2026-10-22: Doing -> Done. Complete-ClaimSplit keeps stash copies while the reset-failed split commit awaits integration

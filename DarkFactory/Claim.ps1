@@ -219,17 +219,35 @@ function Complete-ClaimSplit {
     if ($SplitResult -ne 'reset-failed') { return '' }
     $lock = Enter-Lock
     try {
-        if (& $Git @('push', '-q', 'origin', "HEAD:$Branch")) {
+        $subject = "$(& git -C $Root log -1 --format=%s 2>$null)"
+        $pushed = [bool](& $Git @('push', '-q', 'origin', "HEAD:$Branch"))
+        if (-not $pushed) {
+            if (& $Git @('pull', '-q', '--rebase', 'origin', $Branch)) { $pushed = [bool](& $Git @('push', '-q', 'origin', "HEAD:$Branch")) }
+            elseif (Test-Rebasing) { & $Git @('rebase', '--abort') | Out-Null }
+        }
+        if ($pushed) {
             Write-Trace $Id 'split' 'the split commit could not be reset, so it was pushed' 'Yellow'
             return 'pushed'
         }
-        $subject = "$(& git -C $Root log -1 --format=%s 2>$null)"
-        $newIds = if ($subject -match '^chore\(tasks\): split \S+ into (.+?) - over') { @($Matches[1] -split ', ') } else { @() }
+        if ($subject -notmatch '^chore\(tasks\): split \S+ into (.+?) - over') {
+            Write-Trace $Id 'split' "split subject not recognised; dropped no stash copies" 'Red'
+            return 'subject-unrecognised'
+        }
+        $newIds = @($Matches[1] -split ', ')
+        $waiting = @(& git -C $Root log --format=%s "origin/$Branch..HEAD" 2>$null) -contains $subject
+        if ($waiting) {
+            Write-Trace $Id 'split' "split commit still waiting to be integrated; kept stash copies of $($newIds -join ', ')" 'Red'
+            return 'stash-kept'
+        }
+        $removed = @()
         foreach ($newId in $newIds) {
             $sha = Get-TaskStashSha $newId
-            if ($sha) { Remove-TaskStashEntries @($sha) -Id $newId }
+            if ($sha) {
+                Remove-TaskStashEntries @($sha) -Id $newId
+                if (-not (Get-TaskStashSha $newId)) { $removed += $newId }
+            }
         }
-        Write-Trace $Id 'split' "the split commit could not be reset or pushed; dropped the stash copies of $($newIds -join ', ') that origin never saw" 'Red'
+        Write-Trace $Id 'split' "split commit gone; dropped stash copies of $(if ($removed) { $removed -join ', ' } else { 'no task' }) that origin never saw" 'Red'
         return 'stash-dropped'
     } finally { $lock.Dispose() }
 }
@@ -385,7 +403,19 @@ if ($TestClaimDuplicates) {
         git -C $repo add stashed.txt 2>&1 | Out-Null
         git -C $repo stash push -q -m 'darkfactory BL-777 20260101-000000' 2>&1 | Out-Null
         git -C $repo commit -q --allow-empty -m 'chore(tasks): split BL-011 into BL-777 - over its cost cap' 2>&1 | Out-Null
-        $dropped = Complete-ClaimSplit 'BL-011' 'over its cost cap' 'reset-failed' -Git $dropGit
+        $pullCalls = [System.Collections.Generic.List[string]]::new()
+        $keepGit = { param([string[]]$GitArgs) $pullCalls.Add($GitArgs[0]); if ($GitArgs[0] -eq 'push') { $false } else { Invoke-Git $GitArgs } }
+        $kept = Complete-ClaimSplit 'BL-011' 'over its cost cap' 'reset-failed' -Git $keepGit
+        $keptStashes = @(git -C $repo stash list).Count
+        $goneGit = { param([string[]]$GitArgs) if ($GitArgs[0] -eq 'pull') { git -C $repo reset -q --hard HEAD~1 2>&1 | Out-Null; $false } elseif ($GitArgs[0] -eq 'push') { $false } else { Invoke-Git $GitArgs } }
+        $dropped = Complete-ClaimSplit 'BL-011' 'over its cost cap' 'reset-failed' -Git $goneGit
+        $droppedStashes = @(git -C $repo stash list).Count
+        Set-Content -Path (Join-Path $repo 'stashed2.txt') -Value 'y'
+        git -C $repo add stashed2.txt 2>&1 | Out-Null
+        git -C $repo stash push -q -m 'darkfactory BL-778 20260101-000000' 2>&1 | Out-Null
+        git -C $repo commit -q --allow-empty -m 'something else entirely' 2>&1 | Out-Null
+        $unrecognised = Complete-ClaimSplit 'BL-011' 'over its cost cap' 'reset-failed' -Git $dropGit
+        $unrecognisedStashes = @(git -C $repo stash list).Count
         $headBefore = "$(git -C $repo rev-parse HEAD)"
         $skipped = Complete-ClaimSplit 'BL-009' 'over its cost cap' 'skipped' -Git $dropGit
         $skippedInBacklog = [bool](Get-ChildItem (Join-Path $repo 'Tasks\Backlog') -Filter 'BL-009-*.md') -and "$(git -C $repo rev-parse HEAD)" -eq $headBefore
@@ -400,7 +430,9 @@ if ($TestClaimDuplicates) {
             ,@('a split that was skipped leaves the task in Backlog with no commit', "True ''", "$skippedInBacklog '$skipped'")
             ,@('a refused pull aborts the rebase and the block is traced as refused', 'blocked push pull rebase True', "$refused $($gitCalls | Where-Object { $_ -in 'push', 'pull', 'rebase' }) $(@($trace | Where-Object { $_ -match 'BL-009.*blocked, but the push was refused' }).Count -eq 1)")
             ,@('a split that returned reset-failed is pushed and traced', 'True', "$(@($trace | Where-Object { $_ -match 'BL-011.*could not be reset, so it was pushed' }).Count -eq 1)")
-            ,@('an unpushable reset-failed split drops its stash copies and says so', 'stash-dropped 0 True', "$dropped $(@(git -C $repo stash list).Count) $(@($trace | Where-Object { $_ -match 'dropped the stash copies of BL-777' }).Count -eq 1)")
+            ,@('a refused push is retried after pull --rebase, and a split commit still waiting keeps its stash copies', 'stash-kept 1 push pull push True', "$kept $keptStashes $($pullCalls | Where-Object { $_ -in 'push', 'pull', 'rebase' }) $(@($trace | Where-Object { $_ -match 'BL-011.*still waiting to be integrated; kept stash copies of BL-777' }).Count -eq 1)")
+            ,@('a split commit gone from the checkout drops its stash copies and names only the ones removed', 'stash-dropped 0 True', "$dropped $droppedStashes $(@($trace | Where-Object { $_ -match 'dropped stash copies of BL-777 that origin never saw' }).Count -eq 1)")
+            ,@('an unrecognised split subject drops nothing and says so', 'subject-unrecognised 1 True', "$unrecognised $unrecognisedStashes $(@($trace | Where-Object { $_ -match 'not recognised; dropped no stash copies' }).Count -eq 1)")
             ,@('a duplicate ID is renumbered and the claim goes on', 'claimed', $(if ($claim.Id) { 'claimed' } else { "waited: $($claim.Why)" }))
             ,@('no ID is left naming two tasks on the shared branch', '5 tasks, 5 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
             ,@('the first task to be filed keeps its ID', 'True', "$(@($shared | Where-Object { $_ -match 'BL-001-first' }).Count -eq 1)")
