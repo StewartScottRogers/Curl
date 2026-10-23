@@ -71,3 +71,4 @@ Stewart's standing rule closes them too.
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 159ebb77 0ff2b8d1 1fec11b5 dd137bf7 a41668cd 6956f3d4.
