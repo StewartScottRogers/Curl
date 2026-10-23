@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.UnitLibrary/DifferentialOutputNormaliser.cs, Curl.Conformance.Differential.UnitTests/DifferentialOutputNormaliserTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3263 — Differential normaliser hides the verbose progress meter's speed columns
 
@@ -33,3 +33,4 @@ BL-3260's first host run (ADR-0785) of `-v {U}/echo` against curl 8.22.0 reporte
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 082cab35 fe680ad5.
+- 2026-10-23: Doing -> Done. Differential normaliser reduces the verbose progress meter lines wherever they appear (moved by hand: the board script refused over duplicate ID BL-3263 with a Backlog task).
