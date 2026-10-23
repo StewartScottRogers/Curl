@@ -29,7 +29,7 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 ## Notes
 
 - Differential run (LibcurlEasyDifferentialTests, Git ucrt64 libcurl 8.22.0): 0x20001A now matches in lowspeed, fresh-connect, forbid-reuse and tftp-bad; lowspeed still differs in 20000B, 20000C, 100020 and 200028, other tasks.
-- Decision: ManagedEasyTransfer.NumConnectsOf counts 1 where the report holds none for a tftp transfer, a successful transfer under FRESH_CONNECT or FORBID_REUSE, and a watchdog cut-off after the response head. The engine does not yet open a new connection for those two options (filed as BL-3325); Linux and macOS: change is platform-neutral, unit tests only.
+- Decision: ManagedEasyTransfer.NumConnectsOf counts 1 where the report holds none for a tftp transfer, a successful transfer under FRESH_CONNECT or FORBID_REUSE, and a watchdog cut-off after the response head. The engine does not yet open a new connection for those two options (filed as BL-3326); Linux and macOS: change is platform-neutral, unit tests only.
 
 ## Log
 

@@ -1,5 +1,5 @@
 ---
-id: BL-3325
+id: BL-3326
 title: Honour CURLOPT_FRESH_CONNECT and CURLOPT_FORBID_REUSE in the engine's connection pool
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3325 — Honour CURLOPT_FRESH_CONNECT and CURLOPT_FORBID_REUSE in the engine's connection pool
+# BL-3326 — Honour CURLOPT_FRESH_CONNECT and CURLOPT_FORBID_REUSE in the engine's connection pool
 
 ## Goal
 
