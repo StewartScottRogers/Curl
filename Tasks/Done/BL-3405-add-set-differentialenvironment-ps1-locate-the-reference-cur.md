@@ -8,7 +8,7 @@ depends-on: [BL-3404]
 touches: [Set-DifferentialEnvironment.ps1, Documentation/Wiki/Differential-Testing.md]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3405 — Add Set-DifferentialEnvironment.ps1: locate the reference curl 8.22.0 and libcurl and set the CURL_DIFFERENTIAL_* variables for local runs
 
@@ -22,14 +22,18 @@ Stewart (2026-10-23) wants the 11 differential tests in `Curl.Conformance.Differ
 
 ## Acceptance criteria
 
-- [ ] On this machine, `. .\Set-DifferentialEnvironment.ps1` sets all four variables to paths that exist and `curl -V` of the first reports 8.22.0; with no 8.22.0 curl found it exits non-zero with the message above (shown by running it with `-ReferenceCurl` pointing at a nonexistent file).
-- [ ] After running it, `dotnet test Curl.Conformance.Differential.IntegrationTests --filter "TestCategory=Integration"` reports no test Inconclusive because a variable is unset; state in Notes the count run and any that still skip, with the reason.
-- [ ] `Documentation/Wiki/Differential-Testing.md` states the four variables, the script and both commands, and every statement in it is true of the script as filed.
-- [ ] `Gap/` is unchanged.
+- [x] On this machine, `. .\Set-DifferentialEnvironment.ps1` sets all four variables to paths that exist and `curl -V` of the first reports 8.22.0; with no 8.22.0 curl found it exits non-zero with the message above (shown by running it with `-ReferenceCurl` pointing at a nonexistent file).
+- [x] After running it, `dotnet test Curl.Conformance.Differential.IntegrationTests --filter "TestCategory=Integration"` reports no test Inconclusive because a variable is unset; state in Notes the count run and any that still skip, with the reason.
+- [x] `Documentation/Wiki/Differential-Testing.md` states the four variables, the script and both commands, and every statement in it is true of the script as filed.
+- [x] `Gap/` is unchanged.
 
 ## Notes
+
+- Ran the Integration filter per test class (150 s cap each; a whole-project run hung 50 min). None is Inconclusive for an unset variable. Of 11: 8 passed (CliTls, Formadd, Mime, Multi, Printf, Scenario, WebSocket, Host); ApiDifferentialTests failed (KeyNotFoundException in DifferentialProcessRunner.WorkingDirectoryOf, filed BL-3416); CliHttp and LibcurlEasy ran past 150 s and were killed (filed BL-3417). The script found the reference at Git for Windows ucrt64bin (curl 8.22.0 Schannel, Debug libcurl).
+- Changed .ps1 and .md only, no .cs, so the dotnet build and fast tests were not rerun.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: aed42974 b76ba8db c7df4582 01205bb2.
+- 2026-10-23: Doing -> Done. Set-DifferentialEnvironment.ps1 sets the four CURL_DIFFERENTIAL variables; wiki page added; 8 of 11 differential tests pass
