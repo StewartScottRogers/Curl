@@ -30,3 +30,4 @@ The engine ignores EasyNetworkOptions.FreshConnect and ForbidReuse. BL-3316 only
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: ea2c0bb5 db93e725.
