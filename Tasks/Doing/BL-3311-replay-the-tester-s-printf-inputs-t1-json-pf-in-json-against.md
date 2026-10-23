@@ -31,3 +31,4 @@ Split from BL-3303 for size. Inputs: Z:\repos\Curl.difftest\2026-10-22\t1.json a
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 9c23666e 62eca1dd 0ac4089b.
