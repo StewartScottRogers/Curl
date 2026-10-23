@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/Multipart/ConcatenatedReadStream.cs, Curl.Core.UnitTests/Multipart]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3263 — Clear ConcatenatedReadStream's deferred segment failure when the stream seeks
 
@@ -32,14 +32,17 @@ Failure scenario: a `curl_mime_data_cb` read callback, or a file segment, fails 
 
 ## Acceptance criteria
 
-- [ ] `MoveTo` clears `deferredFailure`, so a read after `Seek` or `Position = 0` returns the stream's bytes from the new position.
-- [ ] The deferred failure is rethrown with `ExceptionDispatchInfo.Capture(...).Throw()` (or an equivalent) so it keeps its original stack trace, and it is thrown once, not on every later read.
-- [ ] A new test in `Curl.Core.UnitTests/Multipart` (its own file) defers a failure behind a partial fill, seeks to 0, and asserts that the next read returns the first segment's bytes. The test fails without the fix.
-- [ ] `Curl.Core.UnitLibrary` stays at 100% line and branch coverage. `dotnet build` and the fast tests pass.
+- [x] `MoveTo` clears `deferredFailure`, so a read after `Seek` or `Position = 0` returns the stream's bytes from the new position.
+- [x] The deferred failure is rethrown with `ExceptionDispatchInfo.Capture(...).Throw()` (or an equivalent) so it keeps its original stack trace, and it is thrown once, not on every later read.
+- [x] A new test in `Curl.Core.UnitTests/Multipart` (its own file) defers a failure behind a partial fill, seeks to 0, and asserts that the next read returns the first segment's bytes. The test fails without the fix.
+- [x] `Curl.Core.UnitLibrary` stays at 100% line and branch coverage. `dotnet build` and the fast tests pass.
 
 ## Notes
+
+- Quality run (Curl.Core.UnitLibrary): 0 failing members. The deferred failure is now cleared when thrown (once) and in MoveTo.
 
 ## Log
 
 - 2026-10-23: Created by the shift-end review of 9f0bbb58c.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 6b5f6d6a 4daaf31a df065aa6 2ca7f145.
+- 2026-10-23: Doing -> Done. ConcatenatedReadStream drops its deferred segment failure on seek and throws it once with its stack

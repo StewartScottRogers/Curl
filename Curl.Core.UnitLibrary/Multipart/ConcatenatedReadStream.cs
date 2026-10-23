@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace Curl.Core.Multipart;
 
 /// <summary>
@@ -176,10 +178,14 @@ internal sealed class ConcatenatedReadStream : Stream
     /// <summary>Throws the failure a fill deferred behind its bytes, if one did.</summary>
     private void ThrowDeferredFailure()
     {
-        if (deferredFailure is not null)
+        Exception? failure = deferredFailure;
+        deferredFailure = null;
+        if (failure is null)
         {
-            throw deferredFailure;
+            return;
         }
+
+        ExceptionDispatchInfo.Throw(failure);
     }
 
     /// <summary>One buffer fill: its byte count, and whether an encoded segment stopped it.</summary>
@@ -312,6 +318,7 @@ internal sealed class ConcatenatedReadStream : Stream
             remaining -= offset;
         }
 
+        deferredFailure = null;
         current = 0;
     }
 
