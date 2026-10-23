@@ -9,7 +9,7 @@ touches: [Curl.Mcp/Tools/CurlCommandMcpTool.cs, Curl.Mcp/Tools/CurlCommandMcpToo
 model: sonnet
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3383 — Port the curl MCP tool onto the hand-written server abstractions
 
@@ -26,15 +26,19 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `CurlCommandMcpTool` exists, `Name == "curl"`, the description and annotations equal `CurlCommandTool`'s, and its input schema equals the golden `tools/list` schema for `curl` as a JSON value (test reads the golden file or a copy).
-- [ ] Every test case of `CurlCommandToolTests.cs` has an equivalent in `CurlCommandMcpToolTests.cs`; the existing old tests still pass untouched.
-- [ ] Wrong-typed or missing `args` is answered as the golden file shows, or the difference is listed in Notes.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
-- [ ] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
+- [x] `CurlCommandMcpTool` exists, `Name == "curl"`, the description and annotations equal `CurlCommandTool`'s, and its input schema equals the golden `tools/list` schema for `curl` as a JSON value (test reads the golden file or a copy).
+- [x] Every test case of `CurlCommandToolTests.cs` has an equivalent in `CurlCommandMcpToolTests.cs`; the existing old tests still pass untouched.
+- [x] Wrong-typed or missing `args` is answered as the golden file shows, or the difference is listed in Notes.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
+- [x] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
 
 ## Notes
+
+- Missing or wrong-typed `args` (and a wrong-typed `stdin`, or non-object arguments) answer the golden `tools-call-curl-missing-args` text `An error occurred invoking 'curl'.` with isError true; no difference from golden. The schema test uses an inline copy of the golden `curl` schema.
+- Criteria ticked: tests 512 pass; Measure-CodeQuality for Curl.Mcp,Curl.Mcp.UnitLibrary reports 0 failing members; build clean with warnings as errors.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 07b739c3 c926e650 1bf915eb 96ffe31b 6d2cec38.
+- 2026-10-23: Doing -> Done. CurlCommandMcpTool ports the curl tool onto IMcpTool with golden schema and identical results
