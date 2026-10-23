@@ -1400,13 +1400,21 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static TransferReport WithHeadBeforeFailure(TransferReport report, HttpTransferException failure) =>
         report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
-            ? report
-            : report with
+            ? WithReceiveErrno(report, failure)
+            : WithReceiveErrno(report, failure) with
             {
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
             };
+
+    /// <summary>
+    /// Puts the socket error number of a failed receive on <paramref name="report" /> as its
+    /// <see cref="TransferReport.OsErrno" />, as libcurl 8.22.0 keeps it (BL-3329);
+    /// <paramref name="report" /> itself when no socket error failed the receive.
+    /// </summary>
+    private static TransferReport WithReceiveErrno(TransferReport report, HttpTransferException failure) =>
+        failure.OsErrno == 0 ? report : report with { OsErrno = failure.OsErrno };
 
     /// <summary>
     /// Reports a timed-out exchange's held header lines, and gives the attempt's outcome: exit

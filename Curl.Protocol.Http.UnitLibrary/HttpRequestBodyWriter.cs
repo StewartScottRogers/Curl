@@ -535,7 +535,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         }
         catch (IOException failure)
         {
-            return new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailure(failure));
+            return HttpTransferException.OfReceiveFailure(failure);
         }
     }
 

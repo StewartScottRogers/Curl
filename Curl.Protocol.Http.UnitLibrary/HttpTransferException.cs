@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -46,4 +47,33 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     /// <see cref="HeadBytesBeforeFailure" /> as its header size, after a failure among its header lines (BL-3195).
     /// </summary>
     internal HttpStatusLine? StatusLineBeforeFailure { get; set; }
+
+    /// <summary>
+    /// Gets the operating system's error number of the socket error that failed a receive, the
+    /// transfer's <c>CURLINFO_OS_ERRNO</c> as libcurl 8.22.0 sets it after a failed receive on a kept
+    /// connection (BL-3329): the Winsock code on Windows (10054 or 10053), <c>errno</c> elsewhere;
+    /// <c>0</c> when no socket error failed it.
+    /// </summary>
+    internal long OsErrno { get; init; }
+
+    /// <summary>
+    /// Builds the exit 56 failure of a receive that threw <paramref name="exception" />, carrying
+    /// the message <see cref="HttpTransferMessages.ReceiveFailure" /> words and the socket error's
+    /// operating system error number.
+    /// </summary>
+    /// <param name="exception">The failure the receive threw.</param>
+    /// <returns>The failure.</returns>
+    internal static HttpTransferException OfReceiveFailure(IOException exception)
+    {
+        Exception? current = exception;
+        while (current is not null and not SocketException)
+        {
+            current = current.InnerException;
+        }
+
+        return new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailure(exception))
+        {
+            OsErrno = (current as SocketException)?.NativeErrorCode ?? 0,
+        };
+    }
 }
