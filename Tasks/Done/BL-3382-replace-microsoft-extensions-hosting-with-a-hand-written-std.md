@@ -8,7 +8,7 @@ depends-on: [BL-3377, BL-3379]
 touches: [Curl.Mcp/McpStdioHost.cs, Curl.Mcp/McpStandardErrorLog.cs, Curl.Mcp.UnitTests/McpStdioHostTests.cs, Curl.Mcp.UnitTests/McpStandardErrorLogTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3382 — Replace Microsoft.Extensions.Hosting with a hand-written stdio host for Curl.Mcp
 
@@ -26,15 +26,21 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] `McpStdioHost` and `McpStandardErrorLog` exist in `Curl.Mcp`, with XML doc comments, and neither references `Microsoft.Extensions.*`.
-- [ ] Tests cover the cases in Context; no `Thread.Sleep`, time through `TimeProvider`.
-- [ ] `dotnet build Curl.Mcp -warnaserror` is clean and `dotnet publish Curl.Mcp -r win-x64 -p:PublishAot=true` (with vswhere on PATH) adds no new IL or trim warning.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
-- [ ] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
+- [x] `McpStdioHost` and `McpStandardErrorLog` exist in `Curl.Mcp`, with XML doc comments, and neither references `Microsoft.Extensions.*`.
+- [x] Tests cover the cases in Context; no `Thread.Sleep`, time through `TimeProvider`.
+- [x] `dotnet build Curl.Mcp -warnaserror` is clean and `dotnet publish Curl.Mcp -r win-x64 -p:PublishAot=true` (with vswhere on PATH) adds no new IL or trim warning.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary` reports 0 failing members (100% line, 100% branch, complexity at most 10, CRAP at most 30), measured from the fast tests only.
+- [x] `dotnet build` of every project named in touches is clean with `-warnaserror`, and `dotnet test --filter "TestCategory!=Integration"` passes for the test projects named in touches, with no test deleted, skipped or weakened.
 
 ## Notes
+
+- Plan: `McpStdioHost` (constructor injection of server info, handler factory over `McpConfinementRoot` and `McpResponseCap`, streams, `McpStandardErrorLog`, environment reader, `TimeProvider`, stop-signal registration) runs `McpServer` on `StdioMcpTransport`; decisions in ADR-0805.
+- Decided: SIGINT (Ctrl+C), SIGQUIT, SIGTERM and SIGHUP all through `PosixSignalRegistration`, as the generic host's console lifetime did, instead of `Console.CancelKeyPress`: one mechanism, and SIGINT is Ctrl+C on every platform. Shutdown timeout 30 seconds, the generic host's default; exit 1 when it is outlived or the input read fails.
+- Measured: Curl.Mcp.UnitTests 551 passed; `dotnet publish Curl.Mcp -r win-x64 -p:PublishAot=true` printed no IL or trim warning; Measure-CodeQuality for Curl.Mcp and Curl.Mcp.UnitLibrary: 0 failing members (Curl.Mcp 100% line, 100% branch).
+- Platform: the tests use in-memory streams, a manual clock and a temp folder restored afterwards, with no path or OS text pinned, so they hold on Linux and macOS.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b69e910b 5ce2cc77 15c7a409 96ffe31b 6d2cec38.
+- 2026-10-23: Doing -> Done. Curl.Mcp has a hand-written McpStdioHost and McpStandardErrorLog, fully covered, ready for the cut-over
