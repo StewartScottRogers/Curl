@@ -178,6 +178,32 @@ public sealed class EasyAuthenticationOptionsReadingTests
         Assert.IsNull(failure);
     }
 
+    [TestMethod]
+    [DataRow("http://zz@h/", "zz", "")]
+    [DataRow("http://:x@h/", "", "x")]
+    public void TryLookUp_NoNetrcAndUrlGivesOnlyOneHalf_SendsItWithTheOtherHalfEmpty(string url, string user, string password)
+    {
+        Diagnostics.Arrange("url", url);
+
+        bool looked = Lookup().TryLookUp(new EasyAuthenticationOptions(), CurlUrl.Parse(url), out NetworkCredential? credentials, out _);
+        Diagnostics.Act("looked / credentials", $"{looked} / {credentials?.UserName}:{credentials?.Password}");
+
+        Assert.IsTrue(looked);
+        Assert.IsNotNull(credentials);
+        Assert.AreEqual(user, credentials.UserName);
+        Assert.AreEqual(password, credentials.Password);
+    }
+
+    [TestMethod]
+    public void TryLookUp_NoNetrcAndUrlWithEmptyUserInformation_SendsNoCredentials()
+    {
+        bool looked = Lookup().TryLookUp(new EasyAuthenticationOptions(), CurlUrl.Parse("http://@h/"), out NetworkCredential? credentials, out _);
+        Diagnostics.Act("looked / credentials", $"{looked} / {credentials?.UserName}");
+
+        Assert.IsTrue(looked);
+        Assert.IsNull(credentials);
+    }
+
     private static TransferCredentialLookup Lookup(InMemoryDataFileReader? reader = null) =>
         new(ReadFileOf(reader ?? ReaderWithNetrc()), _ => null, runsOnWindows: false);
 

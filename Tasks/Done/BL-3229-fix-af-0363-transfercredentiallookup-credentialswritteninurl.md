@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs]
+touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitTests/EasyAuthenticationOptionsReadingTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3229 — Fix AF-0363: TransferCredentialLookup.CredentialsWrittenInUrl's && can become || with no test failing, so http://zz@host/ sends no credentials
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Engine.UnitTests/EasyAuthenticationOptionsReadingTests.cs` to touches: the fix is a test (the production code was right; only the test was missing). No other task in Doing on origin/work/dark-factory names it.
+- Added `TryLookUp_NoNetrcAndUrlGivesOnlyOneHalf_SendsItWithTheOtherHalfEmpty` (`http://zz@h/` sends `zz:`, `http://:x@h/` sends `:x`) and `TryLookUp_NoNetrcAndUrlWithEmptyUserInformation_SendsNoCredentials`.
+- A lane may not run `Audit/Tools`, so the reproduction was checked by hand: with the `&&` changed to `||` in `CredentialsWrittenInUrl`, both DataRows of the new test fail (mutant killed), and they pass once it is put back. The tests are pure computation with no paths, so they are platform-neutral. The build is clean and the fast tests are green.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. Unit tests pin URL credentials with only a user or only a password, killing the && to || mutant
