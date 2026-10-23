@@ -32,3 +32,4 @@ Upstream cases 1279 (`test1135.pl --heading=EXPORTS`, checks `lib/libcurl.def`),
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 0f15bee3 d5165c2a f294e1a9 c5f8cef6.
