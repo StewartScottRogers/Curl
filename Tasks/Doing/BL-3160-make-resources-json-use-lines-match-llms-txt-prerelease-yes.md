@@ -40,3 +40,4 @@ BL-3158 (commit 396caeaa2) fixed the install and checksum commands in `llms.txt`
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 68df6651 e53a5abf 9eac453c 3804208d.
