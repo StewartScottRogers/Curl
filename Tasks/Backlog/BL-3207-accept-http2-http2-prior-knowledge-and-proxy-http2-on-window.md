@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3209]
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Libcurl/Misc/Version/CurlVersionFeatures.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Documentation/Planning/Decisions/README.md, Curl.Cli.UnitTests/CommandLineSchannelBuildRefusalTests.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Console.UnitTests/CurlCommandRunnerSchannelBuildRefusalTests.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs, Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Libcurl/Misc/Version/CurlVersionFeatures.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Curl.Cli.UnitTests/CommandLineSchannelBuildRefusalTests.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Console.UnitTests/CurlCommandRunnerSchannelBuildRefusalTests.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs, Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs]
 requirement: none
 created: 2026-10-22
 completed:

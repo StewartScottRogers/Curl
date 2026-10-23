@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3231, BL-3232]
-touches: [Curl.Conformance.Differential.IntegrationTests, Curl.Conformance.Differential.UnitLibrary/Cases/CliHttp, Curl.Conformance.Differential.UnitTests/Cases/CliHttp, Curl.slnx, Documentation/Planning/Decisions/README.md]
+touches: [Curl.Conformance.Differential.IntegrationTests, Curl.Conformance.Differential.UnitLibrary/Cases/CliHttp, Curl.Conformance.Differential.UnitTests/Cases/CliHttp, Curl.slnx]
 requirement: none
 created: 2026-10-22
 completed:
