@@ -3,8 +3,8 @@ id: AF-0362
 title: Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode never checks the Digest method or the credentials
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs:Lib1568_PerformsWithTheDigestCredentialsAndAnswersItsCode:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1564To1588Tests.cs -Pa
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
