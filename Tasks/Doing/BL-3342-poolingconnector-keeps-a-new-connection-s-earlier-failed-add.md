@@ -30,3 +30,4 @@ BL-3328 made `TcpConnector` put the earlier failed address's socket error on `Co
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: ac4ea91c de10e31e.
