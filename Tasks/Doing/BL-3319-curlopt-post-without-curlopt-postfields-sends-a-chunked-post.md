@@ -31,3 +31,4 @@ post-flag-only (CURLOPT_POST 1 only): libcurl sends POST /echo with Transfer-Enc
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
