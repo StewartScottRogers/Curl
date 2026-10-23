@@ -31,6 +31,14 @@ public sealed class TransferInfoLengthAndConditionTests
     [TestMethod]
     public void Of_DuplicateEqualContentLengths_AnswersTheLength() =>
         Assert.AreEqual(5, LengthOf(200, ("Content-Length", "5"), ("content-length", " 5")));
+    [TestMethod]
+    public void Of_RefusedContentLengthHeaders_AnswersMinusOne() =>
+        Assert.AreEqual(-1, Of(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Invalid Content-Length: value") with { Report = ReportOf(200, ("Content-Length", "1")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_OtherWeirdServerReply_KeepsTheContentLength() =>
+        Assert.AreEqual(1, Of(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unsupported HTTP version in response") with { Report = ReportOf(200, ("Content-Length", "1")) }, HttpUrl).ContentLengthDownload);
+
 
     [TestMethod]
     public void Of_FailOnErrorStoppedTheTransfer_AnswersMinusOne() =>

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/Http1, Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3341 — Libcurl get/cl-dup-diff answers libcurl's exit and CURLINFO_CONTENT_LENGTH_DOWNLOAD_T for two different Content-Length headers
 
@@ -22,12 +22,15 @@ Left by BL-3323. TransferInfoFromReport.ContentLengthOf already answers -1 when 
 
 ## Acceptance criteria
 
-- [ ] The three cl-dup-diff cases are identical in LibcurlEasyDifferentialTests' report for 0x60000F (and the exit code), and a focused unit test pins each answer (ADR-0482).
-- [ ] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed libraries.
+- [x] The three cl-dup-diff cases are identical in LibcurlEasyDifferentialTests' report for 0x60000F (and the exit code), and a focused unit test pins each answer (ADR-0482).
+- [x] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed libraries.
 
 ## Notes
+
+Measured: exit code already matched (8); the HTTP handler's report keeps only the headers before the refused Content-Length, so ContentLengthOf saw `1`. Fixed in TransferInfoFromReport (exit 8 with the handler's "Invalid Content-Length" text answers -1). Re-run of LibcurlEasyDifferentialTests shows no cl-dup-diff difference. Linux and macOS CI: change is platform-neutral, fast tests green. Quality report: 0 failing members for Curl.Engine.UnitLibrary.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: d7b463ec db93e725.
+- 2026-10-23: Doing -> Done. cl-dup-diff answers -1 for CURLINFO_CONTENT_LENGTH_DOWNLOAD_T
