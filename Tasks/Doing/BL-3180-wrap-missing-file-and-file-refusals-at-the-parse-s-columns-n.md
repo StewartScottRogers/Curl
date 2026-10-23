@@ -31,3 +31,4 @@ BL-3169 made `CommandLineRefusal.FileDoesNotExist` and `CommandLineRefusal.DataF
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 0c02f190 83e1c879 ae25be8d.
