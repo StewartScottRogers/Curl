@@ -8,7 +8,7 @@ depends-on: [BL-3253]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3254 — Wire the -Z host release into the runner and pin curl's order with a holding fake server
 
@@ -37,3 +37,4 @@ Split from BL-3189. BL-3253 gives `ParallelHostQueue`/`ParallelTransferQueue` th
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 3f9f3fbf 91e711c8 991c6e26.
+- 2026-10-23: Doing -> Done. -Z against one instant host writes curl 8.22.0's order for /echo /default /utf8 /four at default, 2 and 1 --parallel-max; full Console fast run ends
