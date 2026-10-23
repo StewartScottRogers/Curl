@@ -188,6 +188,27 @@ public sealed class CommandLineRemoteNameOptionTests
     }
 
     [TestMethod]
+    public void Parse_RemoteNameAllAfterUploadFile_DoesNotApplyToTheUrlTheUploadPairsWith()
+    {
+        CommandLineParseResult result = Parse(["-T", "f.txt", "--remote-name-all", Url, OtherUrl]);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsFalse(result.Options.UrlOutputs[0].UsesRemoteName);
+        Assert.IsTrue(result.Options.UrlOutputs[1].UsesRemoteName);
+    }
+
+    [TestMethod]
+    public void Parse_RemoteNameAllBeforeUploadFile_AppliesToTheUrlTheUploadPairsWith()
+    {
+        CommandLineParseResult result = Parse(["--remote-name-all", "-T", "f.txt", Url]);
+
+        Diagnostics.Assert("accepted", true, result.IsAccepted);
+        Assert.IsTrue(result.IsAccepted);
+        Assert.IsTrue(result.Options.UrlOutputs.Single().UsesRemoteName);
+    }
+
+    [TestMethod]
     public void Parse_RemoteNameAllWithOutput_KeepsTheOutputFileName()
     {
         CommandLineParseResult result = Parse(["--remote-name-all", Url, "-o", "x"]);

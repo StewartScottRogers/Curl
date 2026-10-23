@@ -17,6 +17,8 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> uploadFiles = [];
+
+    private readonly List<bool> remoteNameAllAtEachUploadFile = [];
     private readonly List<string> telnetOptions = [];
     private readonly List<string> mailRecipients = [];
     private readonly List<string> quoteCommands = [];
@@ -2289,9 +2291,19 @@ public sealed class CommandLineOptions
             ? CommandLineRefusal.EtagOptionsWithSeveralUrls(spelledOption, ErrorsHidden)
             : null;
 
-    /// <summary>Appends <paramref name="uploadFile"/> to <see cref="UploadFiles"/>; nothing is opened.</summary>
+    /// <summary>
+    /// Appends <paramref name="uploadFile"/> to <see cref="UploadFiles"/>; nothing is opened. The Nth
+    /// <c>-T</c> pairs with the Nth entry of <see cref="UrlOutputs"/>, so when that entry does not exist yet,
+    /// it is later made with the <see cref="RemoteNameAll"/> in force at this <c>-T</c>, as curl 8.22.0
+    /// makes it: <c>-T f --remote-name-all u/</c> sends the body to standard output, while
+    /// <c>--remote-name-all -T f u/</c> saves it as <c>curl_response</c> (AF-0380).
+    /// </summary>
     /// <param name="uploadFile">A <c>-T</c> / <c>--upload-file</c> value, which may be empty.</param>
-    internal void AddUploadFile(string uploadFile) => uploadFiles.Add(uploadFile);
+    internal void AddUploadFile(string uploadFile)
+    {
+        uploadFiles.Add(uploadFile);
+        remoteNameAllAtEachUploadFile.Add(RemoteNameAll);
+    }
 
     /// <summary>
     /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is
@@ -2351,7 +2363,8 @@ public sealed class CommandLineOptions
 
     private UrlOutput AddUrlOutput()
     {
-        UrlOutput output = new(RemoteNameAll);
+        int index = urlOutputs.Count;
+        UrlOutput output = new(index < remoteNameAllAtEachUploadFile.Count ? remoteNameAllAtEachUploadFile[index] : RemoteNameAll);
         urlOutputs.Add(output);
         return output;
     }

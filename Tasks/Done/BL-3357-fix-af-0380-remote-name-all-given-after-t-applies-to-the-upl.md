@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3357 — Fix AF-0380: --remote-name-all given after -T applies to the upload URL: Curl warns 'No remote filename' and writes curl_response where curl does neither
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The Nth `-T` pairs with the Nth UrlOutput, as curl's `-T` claims the Nth getout. When that entry does not exist yet, `AddUrlOutput` now makes it with the `RemoteNameAll` in force at that `-T` (`CommandLineOptions.remoteNameAllAtEachUploadFile`), not the one in force when the URL arrives. No ADR: this only matches curl 8.22.0's measured behaviour. I ran the pipeline directly because a parser fix this small needs no architect stage.
+- Verified: the finding's reproduction now gives curl and cand warning=False curl_response=False. Two new tests are in `CommandLineRemoteNameOptionTests`. `dotnet build` is clean, every fast test project passes, and `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary` reports 0 failing members. The change is platform-neutral (parser only).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. -T now pairs its URL output with the --remote-name-all in force at the -T, as curl does
