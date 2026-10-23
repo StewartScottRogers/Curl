@@ -8,7 +8,7 @@ depends-on: [BL-3244]
 touches: [Curl.Conformance.Differential.UnitLibrary/Http/Routes/Bodies, Curl.Conformance.Differential.UnitTests/Http/Routes/Bodies]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 
 ## Goal
@@ -23,15 +23,22 @@ Routes: `/utf8`, `/ctype`, `/jsonish`, `/bom`, `/nul`, `/crlf-body`, `/binary`, 
 
 ## Acceptance criteria
 
-- [ ] Every route listed under Context has a responder file under the folder this task touches, and a unit test pins its response bytes.
-- [ ] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
-- [ ] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
+- [x] Every route listed under Context has a responder file under the folder this task touches, and a unit test pins its response bytes.
+- [x] Projects build clean with -warnaserror and their fast tests pass on Windows; every test is platform-neutral (Linux and macOS CI).
+- [x] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
 
 ## Notes
 
 - Filed by BL-3232's lane-1 run on 2026-10-23 when it split BL-3232 for size.
+- Delivered directly rather than through the full /feature agent stages: 21 small, fixed routes over the BL-3244 core, under the run's cost cap.
+- One file per route under Http/Routes/Bodies; two shared bases: `FixedPathRoute` (one path, one `resp` answer, `ClosesConnection`) and `InterimResponseRoute` (raw 103/100 then 200). `/range`, `/slowbody` implement `IDifferentialRoute` directly.
+- `/range` parses `bytes=a-b` by hand, not with `[GeneratedRegex]`: the generated runner counts as production code in Measure-CodeQuality and failed the coverage and complexity gates. Default taken: a number past 64 bits ends the connection unanswered (Python would take it); no client sends one.
+- Delays wait on `Task.Delay(delay, TimeProvider)`; tests use a fake clock whose timers fire at once and record each delay with the bytes written before it, so they pin where each wait falls without sleeping.
+- Tests compare Latin-1 strings of the written bytes, no paths or OS text, so they are platform-neutral (Linux and macOS CI).
+- Measure-CodeQuality for Curl.Conformance.Differential.UnitLibrary: 100% line, 100% branch, 196 members, 0 failing; unit tests 98/98.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 6b474468 ae951636 5e81fa96.
+- 2026-10-23: Doing -> Done. The differential responder answers server.py's 21 body, range, conditional and timing routes, each pinned by a unit test
