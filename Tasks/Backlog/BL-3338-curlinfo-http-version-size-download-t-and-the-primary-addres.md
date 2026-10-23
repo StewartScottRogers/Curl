@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl/Info, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Libcurl.UnitTests/Info]
+touches: [Libcurl/Info, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs, Libcurl.UnitTests/Info]
 requirement: none
 created: 2026-10-23
 completed:
