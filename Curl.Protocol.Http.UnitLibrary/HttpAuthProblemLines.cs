@@ -11,7 +11,10 @@ namespace Curl.Protocol.Http;
 /// offering the Basic or Bearer scheme the request sent, in any case, even when an <c>-H</c>
 /// value replaced the sent value (measured, BL-1040 Notes);</item>
 /// <item><c>Digest authentication problem, ignoring.</c> for the head's first Digest challenge
-/// when the request sent a Digest answer and the challenge does not carry <c>stale=true</c>,
+/// when libcurl's Digest state still holds a nonce from an earlier head of the transfer and the
+/// challenge does not carry <c>stale=true</c>: the request sent a Digest answer, or it sent any
+/// answer under several allowed schemes such as <c>--anyauth</c>, whose first request goes out
+/// without one so that an earlier 401 was read (BL-3307),
 /// and <c>Ignoring duplicate digest auth header.</c> for each later Digest challenge of the head,
 /// whatever the request sent (measured, BL-1175 Notes).</item>
 /// </list>
@@ -43,22 +46,34 @@ internal sealed class HttpAuthProblemLines
         }
 
         string? sentScheme = authorization?.Split(' ', 2)[0];
+        bool digestNonceHeld = sentScheme == Digest || (sentScheme is not null && AllowsSeveralSchemes(request));
         string[] challenges = header.Value.Split(',');
         List<string> lines = [];
         for (int index = 0; index < challenges.Length; index++)
         {
-            AddChallengeLine(lines, sentScheme, challenges, index);
+            AddChallengeLine(lines, sentScheme, digestNonceHeld, challenges, index);
         }
 
         return lines;
     }
 
     /// <summary>
+    /// Decides whether the request allows more than one scheme, as <c>--anyauth</c> does: libcurl
+    /// then sends its first request without an answer and picks one from a 401's challenges, so a
+    /// request that sent an answer follows a head whose Digest challenge left its nonce behind.
+    /// </summary>
+    private static bool AllowsSeveralSchemes(HttpAuthRequest request)
+    {
+        HttpAuthSchemes schemes = request.AllowedSchemes;
+        return (schemes & (schemes - 1)) != 0;
+    }
+
+    /// <summary>
     /// Adds the line curl writes for the challenge at <paramref name="index" />: the Basic or
     /// Bearer problem line when it offers <paramref name="sentScheme" />, or a Digest line when it
-    /// offers Digest.
+    /// offers Digest, the problem line only while <paramref name="digestNonceHeld" />.
     /// </summary>
-    private void AddChallengeLine(List<string> lines, string? sentScheme, string[] challenges, int index)
+    private void AddChallengeLine(List<string> lines, string? sentScheme, bool digestNonceHeld, string[] challenges, int index)
     {
         string challenge = challenges[index].TrimStart(' ', '\t');
         if (sentScheme is "Basic" or "Bearer" && Offers(challenge, sentScheme))
@@ -67,7 +82,7 @@ internal sealed class HttpAuthProblemLines
         }
         else if (Offers(challenge, Digest))
         {
-            AddDigestLine(lines, sentScheme == Digest, string.Join(',', challenges[index..]).TrimStart(' ', '\t'));
+            AddDigestLine(lines, digestNonceHeld, string.Join(',', challenges[index..]).TrimStart(' ', '\t'));
         }
     }
 
@@ -89,10 +104,10 @@ internal sealed class HttpAuthProblemLines
 
     /// <summary>
     /// Adds the line curl writes for a Digest challenge: the duplicate line after the head's
-    /// first, otherwise the problem line when a Digest answer was sent and
-    /// <paramref name="rest" />, the challenge to the header's end, is not stale.
+    /// first, otherwise the problem line when libcurl's Digest state holds an earlier head's nonce
+    /// and <paramref name="rest" />, the challenge to the header's end, is not stale.
     /// </summary>
-    private void AddDigestLine(List<string> lines, bool sentDigest, string rest)
+    private void AddDigestLine(List<string> lines, bool digestNonceHeld, string rest)
     {
         if (digestSeen)
         {
@@ -101,7 +116,7 @@ internal sealed class HttpAuthProblemLines
         }
 
         digestSeen = true;
-        if (sentDigest && !HttpDigestStaleChallenge.IsOfferedIn([rest]))
+        if (digestNonceHeld && !HttpDigestStaleChallenge.IsOfferedIn([rest]))
         {
             lines.Add("Digest authentication problem, ignoring.");
         }
