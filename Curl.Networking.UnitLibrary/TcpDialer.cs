@@ -401,7 +401,9 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// names it when <see cref="TcpSocketOptions.FastOpen" /> is set, and <c>SO_KEEPALIVE</c> from
     /// <see cref="TcpSocketOptions.KeepAlive" />, with the probe time and interval
     /// <see cref="TcpSocketOptions.KeepAliveSeconds" /> and the probe count
-    /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on.
+    /// <see cref="TcpSocketOptions.KeepAliveProbeCount" /> when it is on. An IPv6 socket is made dual-stack
+    /// (<see cref="Socket.DualMode" />), so an IPv4-mapped address such as <c>[::ffff:127.0.0.1]</c> reaches an
+    /// IPv4 listener, as curl 8.22.0 does (BL-3174, ADR-0778).
     /// </summary>
     /// <remarks>
     /// A timer the platform refuses is left at the platform's value and the connection goes ahead,
@@ -412,6 +414,11 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     internal void ApplySocketOptions(Socket socket)
     {
         socket.NoDelay = SocketOptions.NoDelay;
+        if (socket.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            socket.DualMode = true;
+        }
+
         var platform = QualityOfServiceSocketOptions.CurrentPlatform;
         foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, platform).Concat(FastOpenSocketOption.For(SocketOptions, platform)))
         {
