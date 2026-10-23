@@ -1,5 +1,5 @@
 ---
-id: BL-3146
+id: BL-3150
 title: Keep an exception or stray output in the merge-wait poll from aborting the shift-end merge
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3146 — Keep an exception or stray output in the merge-wait poll from aborting the shift-end merge
+# BL-3150 — Keep an exception or stray output in the merge-wait poll from aborting the shift-end merge
 
 ## Goal
 
