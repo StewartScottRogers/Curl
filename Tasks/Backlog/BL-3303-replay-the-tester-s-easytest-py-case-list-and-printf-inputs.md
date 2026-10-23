@@ -1,5 +1,5 @@
 ---
-id: BL-3287
+id: BL-3303
 title: Replay the tester's easytest.py case list and printf inputs (t1.json, pf_in.json) in the differential runner
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3287 — Replay the tester's easytest.py case list and printf inputs (t1.json, pf_in.json) in the differential runner
+# BL-3303 — Replay the tester's easytest.py case list and printf inputs (t1.json, pf_in.json) in the differential runner
 
 ## Goal
 

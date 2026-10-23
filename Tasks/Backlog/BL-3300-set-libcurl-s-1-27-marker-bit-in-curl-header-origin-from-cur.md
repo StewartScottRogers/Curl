@@ -1,5 +1,5 @@
 ---
-id: BL-3284
+id: BL-3300
 title: Set libcurl's 1<<27 marker bit in curl_header origin from curl_easy_header and curl_easy_nextheader
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3284 — Set libcurl's 1<<27 marker bit in curl_header origin from curl_easy_header and curl_easy_nextheader
+# BL-3300 — Set libcurl's 1<<27 marker bit in curl_header origin from curl_easy_header and curl_easy_nextheader
 
 ## Goal
 

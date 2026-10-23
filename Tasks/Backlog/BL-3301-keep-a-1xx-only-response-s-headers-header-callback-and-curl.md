@@ -1,5 +1,5 @@
 ---
-id: BL-3285
+id: BL-3301
 title: Keep a 1xx-only response's headers: header callback and curl_easy_header after a failed /status/100 transfer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3285 — Keep a 1xx-only response's headers: header callback and curl_easy_header after a failed /status/100 transfer
+# BL-3301 — Keep a 1xx-only response's headers: header callback and curl_easy_header after a failed /status/100 transfer
 
 ## Goal
 

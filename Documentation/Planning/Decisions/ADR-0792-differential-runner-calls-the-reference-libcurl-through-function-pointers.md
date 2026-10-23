@@ -38,4 +38,4 @@ BL-3236, which might have settled how the reference library is loaded, had not l
 The runner works wherever the reference library is an x64 build; an Arm64 reference would need
 the variadic arguments passed on the stack, which this does not do. `t1.json` is a printf input
 (`LibTest printf`), not an easy-handle one, and is left with the rest of `easytest.py`'s case
-list to BL-3287.
+list to BL-3303.

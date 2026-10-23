@@ -1,5 +1,5 @@
 ---
-id: BL-3286
+id: BL-3302
 title: Count the attempted connection in CURLINFO_NUM_CONNECTS after a connect timeout
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3286 — Count the attempted connection in CURLINFO_NUM_CONNECTS after a connect timeout
+# BL-3302 — Count the attempted connection in CURLINFO_NUM_CONNECTS after a connect timeout
 
 ## Goal
 
