@@ -3,8 +3,8 @@ id: AF-0379
 title: ReadFirst_KeyOf255Characters_IsRead asserts only that a challenge is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Authentication.UnitTests/DigestChallengeTests.cs:ReadFirst_KeyOf255Characters_IsRead:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Authentication.UnitTests/DigestChallengeTests.cs -Patte
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
