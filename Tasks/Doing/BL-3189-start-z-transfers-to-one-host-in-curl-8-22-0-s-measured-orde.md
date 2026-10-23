@@ -49,3 +49,4 @@ Keep the change in `CurlCommandRunner.cs` small; put the logic in the Parallel* 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 6f5978ca e910298d 9f090ed0 11871184 f2813a19.
