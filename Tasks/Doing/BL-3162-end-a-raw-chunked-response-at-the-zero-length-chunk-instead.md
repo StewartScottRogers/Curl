@@ -33,3 +33,4 @@ Stewart reported on 2026-10-22: serve `5\r\nhello\r\n0\r\n\r\n` keep-alive (with
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 289d73d8 ff5392bf d228a04e 11884a2b 10ca7151.

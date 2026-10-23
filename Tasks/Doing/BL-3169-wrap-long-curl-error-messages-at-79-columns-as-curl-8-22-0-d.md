@@ -36,3 +36,4 @@ Also note: on the same run real Windows curl 8.21 printed `curl: try 'curl --hel
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 6af107f0 d3cdbed2 0471c273 d1212222 61cabad7 ae25be8d.
