@@ -20,8 +20,8 @@ curl's relative paths resolve inside it (ADR-0575).
 Standard output is the protocol channel: nothing else may write to it. Every log line goes to
 standard error through `McpStandardErrorLog`.
 
-No source file uses the MCP SDK packages any more; their two PackageReference lines are removed by
-the task after BL-3388, as its own commit. No other project may reference them.
+The server is hand-written (ADR-0799): the protocol core is `Curl.Mcp.Protocol.UnitLibrary`, the tool
+adapters are in `Tools/` and the host is `McpStdioHost`. This project references no package.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests live in `Curl.Mcp.UnitTests`,
 which tests both this project and `Curl.Mcp.UnitLibrary`; tests that send bytes over a socket

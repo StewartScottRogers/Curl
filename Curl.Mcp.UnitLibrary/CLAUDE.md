@@ -25,8 +25,7 @@ unchanged and the platform's first `CurlVersionText` line. `McpUrlTool` is the l
 is an `McpToolFailure.UrlRefused` naming the `CurlUrlCode`; it answers with an
 `McpParseUrlToolResult` or `McpBuildUrlToolResult`. The later tasks of `Documentation/Planning/Curl-Mcp.md` add the rest.
 
-Base class library only. Only `Curl.Mcp` may take the MCP SDK packages (`ModelContextProtocol`
-and `Microsoft.Extensions.Hosting`); this library references no package. Reference
+Base class library only; this library references no package. Reference
 `Curl.Api.UnitLibrary`, and `Curl.Cli.UnitLibrary` for its option table's rows (ADR-0564);
 never reference `Curl.Mcp`.
 

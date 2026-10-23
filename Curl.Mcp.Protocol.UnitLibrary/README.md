@@ -10,9 +10,9 @@ read and written with source-generated JSON, and the server logic over them.
 (`JsonRpcRequest`, `JsonRpcNotification`, `JsonRpcInvalidMessage`, `JsonRpcRequestId`, the
 responses and `JsonRpcError`), the error codes in `JsonRpcErrorCodes`, `JsonRpcMessageParser`,
 which reads one line, and `JsonRpcResponseWriter`, which writes a response, through the
-source-generated `JsonRpcJsonContext`. The later tasks of the plan that replaced the
-`ModelContextProtocol` and `Microsoft.Extensions.Hosting` packages add the Model Context Protocol
-types and server logic here, and [`Curl.Mcp`](../Curl.Mcp) will use them in place of those packages.
+source-generated `JsonRpcJsonContext`. The Model Context Protocol
+types and server logic live here, and [`Curl.Mcp`](../Curl.Mcp) uses them; they replaced the
+`ModelContextProtocol` and `Microsoft.Extensions.Hosting` packages (ADR-0799).
 
 ## Rules
 
