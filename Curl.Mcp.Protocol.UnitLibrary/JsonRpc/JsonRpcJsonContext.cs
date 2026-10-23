@@ -5,7 +5,7 @@ namespace Curl.Mcp.Protocol.JsonRpc;
 
 /// <summary>
 /// The source-generated JSON contracts of the JSON-RPC 2.0 responses, so no response is serialized by
-/// reflection. The library's only context, never combined with another resolver (ADR-0621).
+/// reflection. Used on its own, never combined with another resolver (ADR-0621).
 /// </summary>
 [ExcludeFromCodeCoverage(Justification = "ADR-0575: the JSON source generator writes these members; the tests reach them through JsonRpcResponseWriter.")]
 [JsonSourceGenerationOptions(GenerationMode = JsonSourceGenerationMode.Serialization)]
