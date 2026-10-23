@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: direct
 depends-on: []
 touches: [.github/workflows/gource.yml, .github/gource/render.sh, .github/gource/make-log.cs, .github/gource/make-master-playlist.cs, .github/gource/site/index.html]
+lane: no
 requirement: none
 created: 2026-10-23
 completed:
@@ -39,16 +40,18 @@ Update gource.yml's header comment and render.sh's header so they say what the w
 
 ## Acceptance criteria
 
-- [ ] In `gource.yml`, `decide` has no `concurrency`, `coverage` has its own group, and `render` has `needs: decide` only, with its own `gource-render` group and `cancel-in-progress: false`.
-- [ ] The publish step retries the force push up to 3 times, re-fetching the carried-over files before each retry, and fails with an `::error::` naming the last rejection after the third.
-- [ ] `decide` renders on `workflow_dispatch`; when there is no previous fingerprint or the last render is at least 86400 s old; on a push to `master` with a changed fingerprint; and otherwise only when the fingerprint changed and the last render is at least 10800 s old. Its log line shows which rule applied.
-- [ ] `render.sh` encodes AV1 at 2160p and 1080p and H.264 at 1080p only. `gource.mp4` is the 1080p H.264 remux. The master playlists and `site/index.html` reference only rungs that exist, and the download button is labelled 1080p.
-- [ ] `make-log.cs` leaves out paths under `Tasks/Done/<timestamp>/`. A check in Notes, `dotnet run --file .github/gource/make-log.cs` on this repository, shows no such path while `Tasks/Backlog/` paths remain.
+- [x] In `gource.yml`, `decide` has no `concurrency`, `coverage` has its own group, and `render` has `needs: decide` only, with its own `gource-render` group and `cancel-in-progress: false`.
+- [x] The publish step retries the force push up to 3 times, re-fetching the carried-over files before each retry, and fails with an `::error::` naming the last rejection after the third.
+- [x] `decide` renders on `workflow_dispatch`; when there is no previous fingerprint or the last render is at least 86400 s old; on a push to `master` with a changed fingerprint; and otherwise only when the fingerprint changed and the last render is at least 10800 s old. Its log line shows which rule applied.
+- [x] `render.sh` encodes AV1 at 2160p and 1080p and H.264 at 1080p only. `gource.mp4` is the 1080p H.264 remux. The master playlists and `site/index.html` reference only rungs that exist, and the download button is labelled 1080p.
+- [x] `make-log.cs` leaves out paths under `Tasks/Done/<timestamp>/`. A check in Notes, `dotnet run --file .github/gource/make-log.cs` on this repository, shows no such path while `Tasks/Backlog/` paths remain.
 - [ ] A `workflow_dispatch` run of `gource.yml` on `work/dark-factory` after the change publishes. Notes record: the run's render job succeeds, the new `rendered-at.txt`, the site size (expected about 450 MB), the size of `gource.mp4`, and that `https://stewartscottrogers.github.io/Curl/` plays. If the lane cannot dispatch or wait for it, leave this unticked with the run link and set `lane: no` for an interactive session to finish.
-- [ ] The header comments of `gource.yml` and `render.sh` describe the new jobs, cadence, rungs and log filter.
+- [x] The header comments of `gource.yml` and `render.sh` describe the new jobs, cadence, rungs and log filter.
 
 ## Notes
+- 2026-10-23 (lane 1): workflow, render.sh, make-log.cs and index.html changed as specified (make-master-playlist.cs needed no change: it lists whichever rung directories exist). make-log check: dotnet run --file .github/gource/make-log.cs gives 104225 lines, 0 under /Tasks/Done/20..., 12878 under /Tasks/Backlog/. render.sh passes bash -n; not run end to end (needs gource and ffmpeg). Dispatch criterion left unticked: a lane never pushes, so it cannot dispatch gource.yml on work/dark-factory. Remove lane: no once the shift has merged these changes to work/dark-factory; then dispatch gource.yml there and record the run link, rendered-at.txt, site size, gource.mp4 size and that the site plays.
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 137f4a65 da86baa8 e818b190 425c647f bd9fbc09 b590f4b4 d187ee2f.
+- 2026-10-23: Doing -> Backlog. Interactive only: the dispatch criterion needs gource.yml run on work/dark-factory after the shift merges these changes; code criteria done
