@@ -30,3 +30,4 @@ Found by BL-3235's CLI TLS differential run (live-network cases, also in the tes
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: f80c8b28 c46ca32a.
