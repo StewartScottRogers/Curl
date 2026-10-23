@@ -122,7 +122,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
                 events,
                 cancellationToken).ConfigureAwait(false);
 
-            socket = await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
+            socket = await ConnectFromBoundEndAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -186,7 +186,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
                 BindLocalEnd(socket, bindTo, localPortCount, events);
             }
 
-            socket = await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
+            socket = await ConnectFromBoundEndAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -195,6 +195,25 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         }
 
         return Connected(socket, endPoint);
+    }
+
+    /// <summary>
+    /// Connects <paramref name="socket" /> to <paramref name="endPoint" /> through <see cref="ConnectAsync" />,
+    /// and when the socket was bound to a local port (<c>--local-port</c>) throws a failure as a
+    /// <see cref="BoundConnectFailedException" /> naming that end, as curl's failed-connect line does (BL-3306).
+    /// </summary>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private async ValueTask<Socket> ConnectFromBoundEndAsync(Socket socket, IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        var boundEnd = socket.LocalEndPoint as IPEndPoint;
+        try
+        {
+            return await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SocketException exception) when (boundEnd is { Port: not 0 })
+        {
+            throw new BoundConnectFailedException(exception.SocketErrorCode, exception.Message, boundEnd);
+        }
     }
 
     /// <summary>

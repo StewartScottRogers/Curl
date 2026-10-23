@@ -289,7 +289,9 @@ internal sealed class AddressFamilyRace(
     /// <summary>
     /// curl 8.21.0's line for one failed dial, such as <c>connect to 127.0.0.1 port 1 from
     /// 0.0.0.0 port 56585 failed: Connection refused</c>. A failed dial reports no local end
-    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100). A dial
+    /// point, so it names the unspecified address of the family and port <c>0</c> (ADR-0100), or, from a
+    /// socket bound to a <c>--local-port</c>, the end it was bound to, as in <c>from 0.0.0.0 port 49000</c>
+    /// (<see cref="BoundConnectFailedException" />, measured, BL-3306). A dial
     /// whose local end could not be bound names no local address at all and errno 0's reason, as in
     /// <c>connect to 127.0.0.1 port 47599 from  port 0 failed: No error</c> (measured, BL-600 Notes).
     /// </summary>
@@ -300,9 +302,11 @@ internal sealed class AddressFamilyRace(
             return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from  port 0 failed: {LocalBindException.ReasonText(OperatingSystem.IsWindows())}";
         }
 
-        var unspecified = remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any;
+        var localEnd = exception is BoundConnectFailedException bound
+            ? bound.LocalEndPoint
+            : new IPEndPoint(remoteEndPoint.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
         var reason = ConnectFailureReason.Describe(exception, OperatingSystem.IsWindows());
-        return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from {unspecified} port 0 failed: {reason}";
+        return $"connect to {remoteEndPoint.Address} port {remoteEndPoint.Port} from {localEnd.Address} port {localEnd.Port} failed: {reason}";
     }
 
     /// <summary>One dial in flight: where it goes, the family it belongs to, and its outcome.</summary>
