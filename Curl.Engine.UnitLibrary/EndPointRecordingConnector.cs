@@ -25,6 +25,7 @@ internal sealed class EndPointRecordingConnector(IConnector connector, Connectio
         if (connect.Connection is { } connection)
         {
             recorder.Record(connect.LocalEndPoint, connection.RemoteEndPoint);
+            recorder.RecordFailedConnect(connect.LastSocketError);
         }
         else
         {

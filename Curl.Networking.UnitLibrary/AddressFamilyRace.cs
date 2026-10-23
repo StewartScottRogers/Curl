@@ -115,7 +115,7 @@ internal sealed class AddressFamilyRace(
             _running.Remove(attempt);
             if (await OutcomeOfAsync(attempt).ConfigureAwait(false) is { } dialed)
             {
-                return (dialed, attempt.RemoteEndPoint, SocketError.Success, null);
+                return (dialed, attempt.RemoteEndPoint, _lastError, null);
             }
 
             secondFamilyDue = StartAfterFailure(attempt.Family, second, secondFamilyDue, raceToken);

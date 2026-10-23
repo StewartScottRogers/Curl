@@ -2045,7 +2045,8 @@ public sealed partial class TcpConnector(
                 opened.MappedHost,
                 opened.MappedPort,
                 headerCount,
-                headBytes)
+                headBytes,
+                lastSocketError: opened.LastSocketError)
             : opened;
 
     private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
@@ -2256,7 +2257,8 @@ public sealed partial class TcpConnector(
             applicationProtocol,
             unixSocketPath: dialed.UnixSocketPath,
             mappedHost: dialed.MappedDestination?.Host,
-            mappedPort: dialed.MappedDestination?.Port ?? 0);
+            mappedPort: dialed.MappedDestination?.Port ?? 0,
+            lastSocketError: dialed.EarlierSocketError);
     }
 
     // A forward proxy is the target itself, so its handshake runs through the proxy's
@@ -2407,7 +2409,7 @@ public sealed partial class TcpConnector(
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)
-            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true, TracesTcpFilter = trace?.TracesTcp == true }, SocketError.Success, null);
+            : (new DialedSocket(dialed.Connection, dialed.LocalEndPoint, hostName, remoteEndPoint) { TracesHappyEyeballsFilter = trace?.TracesHappyEyeballs == true, TracesTcpFilter = trace?.TracesTcp == true, EarlierSocketError = lastError }, SocketError.Success, null);
     }
 
     /// <summary>
@@ -2511,6 +2513,13 @@ public sealed partial class TcpConnector(
         /// line (BL-975); <see langword="null" /> when the socket went to the target itself or a proxy.
         /// </summary>
         public ConnectDestination? MappedDestination { get; init; }
+
+        /// <summary>
+        /// Gets the socket error of an earlier address's failed attempt that this address then
+        /// outdid, which curl keeps as <c>CURLINFO_OS_ERRNO</c> after the connect succeeds (BL-3328);
+        /// <see cref="SocketError.Success" /> when no attempt failed first.
+        /// </summary>
+        public SocketError EarlierSocketError { get; init; }
 
         /// <summary>
         /// Gets a value indicating whether the socket was dialled with the <c>[HAPPY-EYEBALLS]</c>

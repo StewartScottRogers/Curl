@@ -182,6 +182,31 @@ public sealed class EndPointRecordingConnectorTests
             ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.Proxy, "cannot complete SOCKS5 connection to h. (5)", null, proxyError: CurlProxyCode.ReplyConnectionRefused));
     }
 
+    [TestMethod]
+    public async Task ConnectAsync_ConnectedAfterAnEarlierAddressFailed_RecordsTheEarlierOsErrno()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        EndPointRecordingConnector connector = new(new ConnectedAfterFailureConnector(), recorder);
+        Diagnostics.Arrange("inner connector", "connects after a refused address");
+
+        ConnectResult connect = await connector.ConnectAsync(Target, CancellationToken.None);
+
+        TransferReport report = recorder.ReportOn(TransferResult.Success(0)).Report!;
+        Diagnostics.Assert("os errno", ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused), report.OsErrno);
+        Assert.AreEqual(ConnectionEndPointRecorder.OsErrnoOf(SocketError.ConnectionRefused), report.OsErrno);
+        Assert.IsNotNull(connect.Connection);
+    }
+
+    /// <summary>A connector whose first address was refused and whose second connected.</summary>
+    private sealed class ConnectedAfterFailureConnector : IConnector
+    {
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ConnectResult.Connected(
+                new SessionOverQuic(new IPEndPoint(IPAddress.Loopback, 21)),
+                null,
+                lastSocketError: SocketError.ConnectionRefused));
+    }
+
     /// <summary>A connector whose every connect the peer refuses.</summary>
     private sealed class RefusingConnector : IConnector
     {

@@ -105,6 +105,24 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenALaterAddressConnectsAfterAnEarlierOneFailed_CarriesTheEarlierSocketError()
+    {
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = endPoint => endPoint.Address.Equals(Loopback)
+                ? throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused)
+                : new FakeConnection(),
+        };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback, IPAddress.Parse("127.0.0.2")), dialer, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 1, UseTls: false));
+
+        Assert.IsNotNull(result.Connection);
+        Diagnostics.Assert("last socket error", System.Net.Sockets.SocketError.ConnectionRefused, result.LastSocketError);
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionRefused, result.LastSocketError);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheLastAddressFailsForAnotherReason_CarriesThatSocketError()
     {
         var dialer = new FakeTcpDialer { DialOutcome = _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.NetworkUnreachable) };

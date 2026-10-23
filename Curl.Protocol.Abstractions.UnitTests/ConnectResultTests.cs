@@ -469,6 +469,18 @@ public sealed class ConnectResultTests
     }
 
     [TestMethod]
+    public void Connected_WithALastSocketError_CarriesIt()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("last socket error", SocketError.ConnectionRefused);
+
+        var result = ConnectResult.Connected(new UnusedConnection(), null, lastSocketError: SocketError.ConnectionRefused);
+
+        diagnostics.Assert("last socket error", SocketError.ConnectionRefused, result.LastSocketError);
+        Assert.AreEqual(SocketError.ConnectionRefused, result.LastSocketError);
+    }
+
+    [TestMethod]
     public void Failed_WithALastSocketError_CarriesIt()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
