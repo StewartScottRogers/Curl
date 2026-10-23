@@ -41,3 +41,4 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 - 2026-10-22: Backlog -> Doing. Criteria at claim: e1d22e45 7a673b40 f5b1d08b 42f0e3f4.
 - 2026-10-22: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs (ProgressStartingWatchdogsOf), which BL-3195 in Doing holds
 - 2026-10-22: Priority Normal -> High and a multi-handle criterion added, from Stewart's prioritised findings list (P1, reports 3 and 25: "easy, multi and CLI").
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e1d22e45 7a673b40 f5b1d08b 70ccd994 42f0e3f4.
