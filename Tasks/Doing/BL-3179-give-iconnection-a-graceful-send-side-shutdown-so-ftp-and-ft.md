@@ -31,3 +31,4 @@ Follow-up of BL-3161, which moved the data-connection close ahead of the end-of-
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: c8dde9bd 617e8d20 965dd23c.
