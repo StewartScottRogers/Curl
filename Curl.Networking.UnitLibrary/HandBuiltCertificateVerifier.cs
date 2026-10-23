@@ -17,7 +17,7 @@ namespace Curl.Networking;
 /// both paths.
 /// </summary>
 /// <param name="verification">The shared judgement.</param>
-/// <param name="chainPolicy">The <c>--cacert</c> chain policy, or <see langword="null" /> for the system store.</param>
+/// <param name="chainPolicy">The <c>--cacert</c> chain policy; in the Schannel build without <c>--ssl-no-revoke</c> the system store's online-revocation policy (<c>ServerCertificateVerification.SystemStoreChainPolicy</c>); or <see langword="null" /> for the system store with no revocation check.</param>
 /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
 /// <param name="revocationLists">The <c>--crlfile</c> lists, or <see langword="null" /> when none are checked.</param>
 /// <param name="targetHost">The host the certificate is checked against, IPv6 brackets and all.</param>

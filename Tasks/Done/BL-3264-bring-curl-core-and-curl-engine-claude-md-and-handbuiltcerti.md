@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/CLAUDE.md, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3264 — Bring Curl.Core and Curl.Engine CLAUDE.md and HandBuiltCertificateVerifier's chainPolicy doc in line with the code
 
@@ -30,14 +30,17 @@ The shift-end review (ADR-0710) found these. The code-reviewer reported them, an
 
 ## Acceptance criteria
 
-- [ ] `Curl.Core.UnitLibrary/CLAUDE.md` says that every multipart body read fills its buffer across segments. It keeps the read-once rules for callback and file segments, and no longer says any body reads one segment per read.
-- [ ] `Curl.Engine.UnitLibrary/CLAUDE.md` names `PassesContentCoding` and `PassesTransferCoding`, each set on its own from `HttpContentDecoding` and `HttpTransferDecoding`, and no longer mentions a `Raw` property of `HttpRequestOptions`.
-- [ ] The `chainPolicy` `<param>` in `HandBuiltCertificateVerifier.cs` names all three cases: the `--cacert` policy, the Schannel build's system-store revocation policy, and `null` for the system store with no revocation check.
-- [ ] `dotnet build` and the fast tests pass.
+- [x] `Curl.Core.UnitLibrary/CLAUDE.md` says that every multipart body read fills its buffer across segments. It keeps the read-once rules for callback and file segments, and no longer says any body reads one segment per read.
+- [x] `Curl.Engine.UnitLibrary/CLAUDE.md` names `PassesContentCoding` and `PassesTransferCoding`, each set on its own from `HttpContentDecoding` and `HttpTransferDecoding`, and no longer mentions a `Raw` property of `HttpRequestOptions`.
+- [x] The `chainPolicy` `<param>` in `HandBuiltCertificateVerifier.cs` names all three cases: the `--cacert` policy, the Schannel build's system-store revocation policy, and `null` for the system store with no revocation check.
+- [x] `dotnet build` and the fast tests pass.
 
 ## Notes
+
+- Three doc-only edits; build clean, fast tests green (no failures).
 
 ## Log
 
 - 2026-10-23: Created by the shift-end review of 9f0bbb58c.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: ec6ecc5b 1b8749e3 e1496eac 6b653068.
+- 2026-10-23: Doing -> Done. Core and Engine CLAUDE.md and HandBuiltCertificateVerifier chainPolicy doc match the code
