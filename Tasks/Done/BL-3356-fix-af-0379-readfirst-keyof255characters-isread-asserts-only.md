@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitTests]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3356 — Fix AF-0379: ReadFirst_KeyOf255Characters_IsRead asserts only that a challenge is not null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts the nonce "n" read after the 255-character key (diagnostics too), so a reader that lost or garbled the nonce fails. Test name kept: it still says what it checks and the finding's reproduction greps for it. Build clean; fast tests green (Curl.Authentication.UnitTests 928 passed, 6 skipped; whole solution no failures).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. ReadFirst_KeyOf255Characters_IsRead asserts the nonce read after the long key
