@@ -41,3 +41,4 @@ The trace at line 232 is also wrong in two cases:
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 636e48fb a38c9b2e 188efd23 ffaf3fa6.
