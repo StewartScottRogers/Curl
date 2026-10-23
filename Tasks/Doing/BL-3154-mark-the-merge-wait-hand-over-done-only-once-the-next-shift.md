@@ -41,3 +41,4 @@ So a `-Continuous` factory stops silently with exit 0, and a CI failure on the s
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: b63c3000 036e81f0 83391103 6565a75d.
