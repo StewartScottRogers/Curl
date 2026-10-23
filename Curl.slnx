@@ -87,6 +87,7 @@
   -->
   <Folder Name="/Conformance/" />
   <Folder Name="/Conformance/Differential/">
+    <Project Path="Curl.Conformance.Differential.IntegrationTests/Curl.Conformance.Differential.IntegrationTests.csproj" />
     <Project Path="Curl.Conformance.Differential.UnitLibrary/Curl.Conformance.Differential.UnitLibrary.csproj" />
     <Project Path="Curl.Conformance.Differential.UnitTests/Curl.Conformance.Differential.UnitTests.csproj" />
   </Folder>

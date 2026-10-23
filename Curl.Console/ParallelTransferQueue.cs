@@ -3,7 +3,9 @@ namespace Curl.Console;
 /// <summary>
 /// Keeps at most <c>--parallel-max</c> transfers running under <c>-Z</c>: the runner waits for a free
 /// slot before it starts the next transfer in command-line order, and a slot frees as any running
-/// transfer ends (ADR-0127, decision 1).
+/// transfer ends (ADR-0127, decision 1). Each time before it waits for a transfer to end, it runs
+/// <see cref="BeforeEachWait" />, so that the transfers the run's host queue freed start after any the
+/// freed slot started (ADR-0768).
 /// </summary>
 /// <param name="maxRunning">The most transfers running at once, at least 1.</param>
 internal sealed class ParallelTransferQueue(int maxRunning)
@@ -23,13 +25,20 @@ internal sealed class ParallelTransferQueue(int maxRunning)
     /// <summary>Gets a value indicating whether any transfer has been started.</summary>
     internal bool HasStartedAny => started.Count > 0;
 
+    /// <summary>
+    /// Gets or sets what runs each time before the queue waits for a transfer to end, once the caller has
+    /// started every transfer it can for now: the run starts the transfers its host queue freed there
+    /// (<see cref="ParallelHostQueue.StartReleased" />).
+    /// </summary>
+    internal Action BeforeEachWait { get; set; } = static () => { };
+
     /// <summary>Waits until fewer than the maximum transfers are running.</summary>
     /// <returns>A task that completes when a transfer may start.</returns>
     internal async Task WaitForFreeSlotAsync()
     {
         while (running.Count >= maxRunning)
         {
-            running.Remove(await Task.WhenAny(running).ConfigureAwait(false));
+            await WaitForOneToEndAsync().ConfigureAwait(false);
         }
     }
 
@@ -43,5 +52,20 @@ internal sealed class ParallelTransferQueue(int maxRunning)
 
     /// <summary>Waits for every started transfer to end.</summary>
     /// <returns>A task that completes when they have, faulted if one did.</returns>
-    internal Task WhenAllEndedAsync() => Task.WhenAll(started);
+    internal async Task WhenAllEndedAsync()
+    {
+        while (running.Count > 0)
+        {
+            await WaitForOneToEndAsync().ConfigureAwait(false);
+        }
+
+        await Task.WhenAll(started).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs <see cref="BeforeEachWait" />, then waits for a running transfer to end and stops counting it.</summary>
+    private async Task WaitForOneToEndAsync()
+    {
+        BeforeEachWait();
+        running.Remove(await Task.WhenAny(running).ConfigureAwait(false));
+    }
 }

@@ -179,7 +179,18 @@ if ($TestHeartbeat) {
             ,@('usage over the stop threshold stops', 'stop', (& $poll $now 'session tokens 86% used, reset 04:00' 'BL-3011' @()))
             ,@('only cost-capped tasks waits', 'wait', (& $poll $now '' '' @('BL-2969')))
         )
-        # The same poll during the shift-end merge's CI wait (BL-3142): CI stays pending, a task
+        # The merge-wait poll leaves out what this shift requeued (AF-0369): BL-3151 is ready
+        # but was sent back by a lane of this shift, so BL-3152 is offered; with BL-3151 alone
+        # nothing is claimable, and a task nobody requeued stays claimable.
+        $offerReady = { param([string[]]$s) $i = @('BL-3151', 'BL-3152') | Where-Object { $s -notcontains $_ } | Select-Object -First 1; if ($i) { "$i  pipeline: direct  Tasks\Backlog\$i-x.md" } else { 'No task is ready.' } }
+        $offerOne = { param([string[]]$s) if ($s -contains 'BL-3151') { 'No task is ready.' } else { 'BL-3151  pipeline: direct  Tasks\Backlog\BL-3151-x.md' } }
+        $freshOffer = Get-MergeWaitClaimableTaskId -OfferNext $offerReady -NotClaimableWhy { '' }
+        Add-ShiftRequeued 'BL-3151'
+        $skipOffer = Get-MergeWaitClaimableTaskId -OfferNext $offerReady -NotClaimableWhy { '' }
+        $skipOnly = Get-MergeWaitClaimableTaskId -OfferNext $offerOne -NotClaimableWhy { '' }
+        $cases += ,@('with nothing requeued the merge wait offers the first ready task', 'BL-3151', "$($freshOffer.Id)")
+        $cases += ,@('the merge wait skips a task this shift requeued', 'BL-3152', "$($skipOffer.Id)")
+        $cases += ,@('the merge wait finds nothing when only a requeued task is ready', '', "$($skipOnly.Id)")        # The same poll during the shift-end merge's CI wait (BL-3142): CI stays pending, a task
         # is claimable at the second poll, and the next shift starts once while the wait goes
         # on to its own end. gh, git, Get-Date and Start-Sleep are stubbed with a fake clock.
         $script:fakeNow = [datetime]'2026-10-22 14:20'

@@ -107,6 +107,8 @@ public sealed partial class HttpProtocolHandlerTests
             "* [HTTP/2] [0] created h2 session (via h1 upgrade)",
             "* [HTTP/2] [0] -> FRAME[SETTINGS, len=18]",
             "* [HTTP/2] [0] -> FRAME[WINDOW_UPDATE, incr=1048510465]",
+            "* [HTTP/2] [1] -> FRAME[WINDOW_UPDATE, incr=10420225]",
+            "* [HTTP/2] [1] -> FRAME[WINDOW_UPDATE, incr=10420225]",
             "* [HTTP/2] [0] <- FRAME[SETTINGS, len=0]",
             "* [HTTP/2] [0] MAX_CONCURRENT_STREAMS: -1",
             "* [HTTP/2] [0] ENABLE_PUSH: TRUE",

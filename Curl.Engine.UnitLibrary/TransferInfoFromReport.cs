@@ -28,18 +28,20 @@ internal static partial class TransferInfoFromReport
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
-        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report);
+        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl) with
+        {
+            FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
+        };
         return result.Report is null ? info : info with
         {
             Scheme = SchemeOf(effectiveUrl),
             Protocol = ProtocolOf(effectiveUrl),
-            FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
             RetryAfter = RetryAfterOf(report, timeProvider),
             CertInfo = CertInfoOf(report, certificateInfoRequested),
         };
     }
 
-    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report) => WithLengthAndCondition(WithAuth(info, report), result, report) with
+    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl) => WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl) with
     {
         RtspClientCSeq = report.RtspClientSequenceNumber,
         RtspServerCSeq = report.RtspServerSequenceNumber,

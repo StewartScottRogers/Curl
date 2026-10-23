@@ -5,9 +5,9 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins the options curl's Windows Schannel build refuses because its libcurl was built without the
-/// feature (ADR-0397, audit finding AF-0022): <c>--http2</c>, <c>--http2-prior-knowledge</c>, <c>--http3</c>,
-/// <c>--http3-only</c>, <c>--proxy-http2</c> and <c>--ssl-sessions</c> (the TLS-SRP options only warn since
-/// curl 8.22.0, ADR-0480). Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
+/// feature (ADR-0397, audit finding AF-0022): <c>--http3</c>, <c>--http3-only</c> and <c>--ssl-sessions</c>
+/// (the TLS-SRP options only warn since curl 8.22.0, ADR-0480; the HTTP/2 options run on Windows since
+/// ADR-0786, see <see cref="Http2OnWindowsTests"/>). Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
 /// <c>http://127.0.0.1:1/</c> on 2026-10-02 (BL-1278). Each test parses as the Windows build explicitly,
 /// so it runs on every platform.
 /// </summary>
@@ -36,11 +36,8 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("--http2")]
-    [DataRow("--http2-prior-knowledge")]
     [DataRow("--http3")]
     [DataRow("--http3-only")]
-    [DataRow("--http2=x")]
     public void Parse_HttpVersionTheSchannelBuildLacks_IsRefusedAsNotSupported(string spelling)
     {
         AssertRefused(ParseAsWindowsBuild(["-s", spelling, Url]), $"curl: option {spelling}: {NotSupported}");
@@ -65,12 +62,6 @@ public sealed class CommandLineSchannelBuildRefusalTests
     public void Parse_OptionTheSchannelBuildLacksAsTheLastArgument_IsRefusedAsRequiringAParameter(string spelledOption)
     {
         AssertRefused(ParseAsWindowsBuild(["-s", spelledOption]), $"curl: option {spelledOption}: requires parameter");
-    }
-
-    [TestMethod]
-    public void Parse_Http2BeforeAnotherVersion_IsRefusedAtTheHttp2Option()
-    {
-        AssertRefused(ParseAsWindowsBuild(["--http2", "--http1.1", Url]), $"curl: option --http2: {NotSupported}");
     }
 
     [TestMethod]
@@ -158,11 +149,20 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("--proxy-http2")]
-    [DataRow("--no-proxy-http2")]
-    public void Parse_ProxyHttp2OnTheSchannelBuild_IsRefusedAsNotSupported(string spelling)
+    public void RefusedBySchannelBuild_NegatableRow_RefusesItsNoSpellingOnTheSchannelBuild()
     {
-        AssertRefused(ParseAsWindowsBuild(["-s", spelling, Url]), $"curl: option {spelling}: {NotSupported}");
+        bool? setTo = null;
+        CommandLineOption option = CommandLineOption.NegatableFlag("example", null, (_, on) => setTo = on).RefusedBySchannelBuild();
+        CommandLineOptions options = ParseAsWindowsBuild([Url]).Options!;
+        Diagnostics.Arrange("spelled option", "--no-example");
+
+        CommandLineRefusal? refusal = option.Negate!(options, string.Empty, "--no-example", _ => false, new RecordingDataFileReader());
+        Diagnostics.Act("refusal lines", refusal is null ? "(none)" : string.Join(" | ", refusal.StandardErrorLines));
+
+        Diagnostics.Assert("set to", null, setTo);
+        Assert.IsNotNull(refusal);
+        Assert.AreEqual($"curl: option --no-example: {NotSupported}", refusal.StandardErrorLines[0]);
+        Assert.IsNull(setTo);
     }
 
     [TestMethod]
@@ -217,10 +217,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     [TestMethod]
-    [DataRow("## --http2\n")]
-    [DataRow("## --http2-prior-knowledge\n")]
     [DataRow("## --ssl-sessions\n")]
-    [DataRow("## --proxy-http2\n")]
     public void AiHelp_SectionOfAnOptionTheSchannelBuildLacks_SaysWindowsRefusesIt(string heading)
     {
         string section = AiHelpSection(heading);

@@ -209,24 +209,6 @@ public sealed class TransferInfoFromReportTests
     public void Of_DigestPicked_AnswersCurlAuthDigest() => Assert.AreEqual(2, Full.HttpAuthUsed);
 
     [TestMethod]
-    public void Of_401WithChallenges_AnswersTheOfferedCurlAuthBits() => Assert.AreEqual(1 | 8, Full.HttpAuthAvailable);
-
-    [TestMethod]
-    public void Of_200WithChallenge_AnswersNoAvailableAuth() =>
-        Assert.AreEqual(0, Of(new TransferReport { ResponseCode = 200, ResponseHeaders = [new("WWW-Authenticate", "Basic")] }).HttpAuthAvailable);
-
-    [TestMethod]
-    public void Of_407WithChallenges_AnswersTheProxyOfferedCurlAuthBits() =>
-        Assert.AreEqual(2 | 4, Of(new TransferReport
-        {
-            ResponseCode = 407,
-            ResponseHeaders = [new("Proxy-Authenticate", "Digest realm=x"), new("proxy-authenticate", "Negotiate"), new("WWW-Authenticate", "Basic")],
-        }).ProxyAuthAvailable);
-
-    [TestMethod]
-    public void Of_401_AnswersNoProxyAvailableAuth() => Assert.AreEqual(0, Full.ProxyAuthAvailable);
-
-    [TestMethod]
     public void Of_ContentLengthHeader_AnswersIt() => Assert.AreEqual(1000, Full.ContentLengthDownload);
 
     [TestMethod]

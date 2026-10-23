@@ -16,6 +16,20 @@ function Get-IdlePollDecision {
     return [pscustomobject]@{ Action = 'wait'; Why = $why }
 }
 
+function Get-MergeWaitClaimableTaskId {
+    # Get-ClaimableTaskId for the poll during the shift-end merge's CI wait (BL-3142), leaving
+    # out the tasks this shift's lanes sent back to Backlog (Get-ShiftRequeued): a lane requeues
+    # one that waits for this very merge to put another task's commit on master, so it is not
+    # claimable until the merge lands, and starting a shift for it only repeats the wasted run
+    # (AF-0369: BL-3151 was claimed twice). The next shift tries it afresh. -OfferNext and
+    # -NotClaimableWhy pass through to Get-ClaimableTaskId.
+    param([scriptblock]$OfferNext, [scriptblock]$NotClaimableWhy)
+    $ask = @{ Skip = @(Get-ShiftRequeued) }
+    if ($OfferNext) { $ask.OfferNext = $OfferNext }
+    if ($NotClaimableWhy) { $ask.NotClaimableWhy = $NotClaimableWhy }
+    return Get-ClaimableTaskId @ask
+}
+
 function Start-NextShiftDetached {
     # Starts the next shift with Start-Detached and says whether it really started: Started is
     # true only when a herdr tab or a process came back. A start that throws, or returns neither,
@@ -485,7 +499,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         {
             if ($handOver.Done) { return }
             if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
-            $claimable = Get-ClaimableTaskId
+            $claimable = Get-MergeWaitClaimableTaskId
             $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped
             if ($poll.Action -eq 'start' -and @(& $startNextShift "$($poll.Why) during the merge's CI wait" -Beside)[-1]) { $handOver.Done = $true }
         }

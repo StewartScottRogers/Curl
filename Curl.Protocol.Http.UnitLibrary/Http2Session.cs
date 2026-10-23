@@ -237,7 +237,9 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             await Frames.SendPrefaceAsync(cancellationToken).ConfigureAwait(false);
             isPrefaceSent = true;
             isUpgradeSettingsDue = true;
-            return Register(Frames.OpenUpgradedStream(), receiver);
+            int streamId = Register(Frames.OpenUpgradedStream(), receiver);
+            await SendStreamWindowUpdatesAsync(streamId, cancellationToken).ConfigureAwait(false);
+            return streamId;
         }
         finally
         {
@@ -260,15 +262,20 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            int initialWindowSize = Frames.IsClientSettingsAcknowledged ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
-            for (int sent = 0; sent < StreamWindowUpdateCount; sent++)
-            {
-                await Frames.IncreaseStreamReceiveWindowAsync(streamId, StreamReceiveWindowSize - initialWindowSize, cancellationToken).ConfigureAwait(false);
-            }
+            await SendStreamWindowUpdatesAsync(streamId, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             frameLock.Release();
+        }
+    }
+
+    private async ValueTask SendStreamWindowUpdatesAsync(int streamId, CancellationToken cancellationToken)
+    {
+        int initialWindowSize = Frames.IsClientSettingsAcknowledged ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
+        for (int sent = 0; sent < StreamWindowUpdateCount; sent++)
+        {
+            await Frames.IncreaseStreamReceiveWindowAsync(streamId, StreamReceiveWindowSize - initialWindowSize, cancellationToken).ConfigureAwait(false);
         }
     }
 

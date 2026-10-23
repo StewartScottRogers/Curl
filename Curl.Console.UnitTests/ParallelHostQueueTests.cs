@@ -26,6 +26,7 @@ public sealed class ParallelHostQueueTests
         await queue.WaitForHostAsync(url, CancellationToken.None);
         Task second = queue.WaitForHostAsync(url, CancellationToken.None);
         queue.Leave(url);
+        queue.StartReleased();
         Diagnostics.Act("second wait completed", second.IsCompleted);
 
         Diagnostics.Assert("second wait completed", true, second.IsCompleted);
@@ -46,6 +47,7 @@ public sealed class ParallelHostQueueTests
         Diagnostics.Assert("second completed before the first left", false, second.IsCompleted);
         Assert.IsFalse(second.IsCompleted);
         queue.Leave("http://h/1");
+        queue.StartReleased();
         await Task.WhenAll(second, third);
 
         Task fourth = queue.WaitForHostAsync("http://h/4", CancellationToken.None);
@@ -125,10 +127,12 @@ public sealed class ParallelHostQueueTests
         Assert.IsFalse(second.IsCompleted);
 
         queue.Leave("http://h/1");
+        queue.StartReleased();
         await second;
         Diagnostics.Assert("third completed while the second runs", false, third.IsCompleted);
         Assert.IsFalse(third.IsCompleted);
         queue.Leave("http://h/2");
+        queue.StartReleased();
         await third;
     }
 
@@ -144,12 +148,14 @@ public sealed class ParallelHostQueueTests
         Task third = queue.WaitForHostAsync("http://h/3", CancellationToken.None);
         Task fourth = queue.WaitForHostAsync("http://h/4", CancellationToken.None);
         queue.Leave("http://h/1");
+        queue.StartReleased();
         await Task.WhenAll(second, third);
         Diagnostics.Act("fourth completed while two run", fourth.IsCompleted);
 
         Diagnostics.Assert("fourth completed while two run", false, fourth.IsCompleted);
         Assert.IsFalse(fourth.IsCompleted);
         queue.Leave("http://h/2");
+        queue.StartReleased();
         await fourth;
     }
 
@@ -167,6 +173,7 @@ public sealed class ParallelHostQueueTests
         Diagnostics.Assert("aborted wait throws", nameof(OperationCanceledException), "thrown below");
         await Assert.ThrowsAsync<OperationCanceledException>(() => second);
         queue.Leave("http://h/1");
+        queue.StartReleased();
 
         bool third = queue.WaitForHostAsync("http://h/3", CancellationToken.None).IsCompleted;
         Diagnostics.Act("third completed", third);

@@ -21,7 +21,7 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.AreEqual(8990, connector.Targets.Single().Port);
         Assert.AreEqual("GET /522 HTTP/1.1\r\nHost: 127.0.0.1:8990\r\nAccept: */*\r\n\r\n", Encoding.ASCII.GetString(connector.Written));
-        Assert.AreEqual("http://127.0.0.1:8990/522", easy.Info.EffectiveUrl);
+        Assert.AreEqual("http://127.0.0.1/522", easy.Info.EffectiveUrl);
     }
 
     [TestMethod]

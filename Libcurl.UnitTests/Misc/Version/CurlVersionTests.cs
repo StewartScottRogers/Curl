@@ -164,6 +164,7 @@ public sealed class CurlVersionTests
 
         Assert.AreEqual(expectedBits, info.Features);
         Assert.AreNotEqual(CurlVersionFeatures.None, info.Features & CurlVersionFeatures.Ssl);
+        Assert.AreNotEqual(CurlVersionFeatures.None, info.Features & CurlVersionFeatures.Http2);
     }
 
     [TestMethod]

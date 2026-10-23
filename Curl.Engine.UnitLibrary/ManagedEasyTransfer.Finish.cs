@@ -137,7 +137,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <summary>
     /// The info of a transfer that performed: what <see cref="TransferInfoFromReport.Of" /> fills from its report, the
     /// curl tool's runner's request URL standing in for the URL set when it gave one, with its IDs, cookie list and
-    /// declared upload size, and the runner's answers (<see cref="WithToolAnswers" />) when it gave <paramref name="toolState" />.
+    /// declared upload size, the <c>Referer</c> the last request was sent with else <c>CURLOPT_REFERER</c> (BL-3257), and the runner's answers (<see cref="WithToolAnswers" />) when it gave <paramref name="toolState" />.
     /// </summary>
     /// <param name="result">The attempt's result.</param>
     /// <param name="options">The handle's options.</param>
@@ -157,9 +157,9 @@ internal sealed partial class ManagedEasyTransfer
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
-        info = info with { PrimaryPort = PrimaryPortOf(info, result) };
+        info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer };
         return toolState is null
-            ? info with { EffectiveUrl = UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs) }
+            ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
 
@@ -177,7 +177,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <summary>
     /// The info of a transfer the curl tool's runner performed, with the answers its <c>-w</c> output prints in place of
     /// the report's (BL-2495): the scheme of <paramref name="requestUrl" /> (<see cref="TransferInfoFromReport.RequestSchemeOf" />),
-    /// the <c>Referer</c> the last request was sent with else <c>CURLOPT_REFERER</c>, and the verify results and early
+    /// and the verify results and early
     /// data the runner's recorder kept on <paramref name="toolState" />.
     /// </summary>
     /// <param name="info">The info from the report.</param>
@@ -190,7 +190,6 @@ internal sealed partial class ManagedEasyTransfer
         info with
         {
             Scheme = TransferInfoFromReport.RequestSchemeOf(requestUrl, result),
-            Referer = info.Referer ?? options.Http.Referer,
             SslVerifyResult = toolState.SslVerifyResult,
             ProxySslVerifyResult = toolState.ProxySslVerifyResult,
             EarlyDataSent = toolState.TlsEarlyDataSent,

@@ -904,7 +904,7 @@ public sealed class UpstreamCaseScreeningTests
     // ADR-0497: a feature the harness stands in for (Debug) is met on every platform, so a case needing it
     // and another platform's feature is skipped here for that feature only.
     [TestMethod]
-    [DataRow("Debug\nhttp/2\nSSL", "MSWin32", "Curl lacks the feature http/2")]
+    [DataRow("Debug\nOpenSSL\nSSL", "MSWin32", "Curl lacks the feature OpenSSL")]
     [DataRow("Schannel\nDebug", "linux", "Curl lacks the feature Schannel")]
     [DataRow("Debug\nhttp/2\nSSL", "linux", null)]
     public void FindFeatureOfAnotherPlatform_PlatformWithTheDebugStandIn_CountsDebugAsMetEverywhere(string caseFeatures, string operatingSystemName, string? expected)

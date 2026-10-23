@@ -65,6 +65,24 @@ public sealed class UrlSchemeGuesserTests
     }
 
     [TestMethod]
+    [DataRow("/x")]
+    [DataRow("//127.0.0.1:18080/echo")]
+    public void AddScheme_UrlStartsWithASlash_IsUnchangedForTheParserToRejectAsNoHost(string url)
+    {
+        string result = UrlSchemeGuesser.AddScheme(url, defaultScheme: null);
+
+        Assert.AreEqual(url, result);
+    }
+
+    [TestMethod]
+    public void AddScheme_UrlStartsWithASlashUnderDefaultSchemeFile_GetsTheFileScheme()
+    {
+        string result = UrlSchemeGuesser.AddScheme("/x", "file");
+
+        Assert.AreEqual("file:///x", result);
+    }
+
+    [TestMethod]
     [DataRow("localhost:1")]
     [DataRow("1host://x")]
     [DataRow("ho_st://x")]

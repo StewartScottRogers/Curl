@@ -90,9 +90,12 @@ gateway or not: `curl: Failed to extract a filename from the URL to use for stor
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
 `%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
 (BL-240 Notes). `%{url_effective}` prints the URL `Curl.Engine`'s `UrlEffective` rebuilds: the scheme in
-lower case, the authority as typed, and the path as curl sends it - `/` when empty, dot
-segments removed unless `--path-as-is` - before the query and fragment; a URL curl rejects
-prints as typed, as curl 8.21.0 does (BL-371 and BL-444 Notes).
+lower case, the user info and host name as typed, an IP address and the port as curl 8.22.0
+holds them (`0x7f.1:09` prints `127.0.0.1:9`, an empty port is dropped), and the path as curl
+sends it - `/` when empty, dot segments removed unless `--path-as-is` - before the query and
+fragment; a URL curl rejects prints as it was given, before a scheme was guessed for it, and a
+URL starting with `/` gets no guessed scheme, so it is rejected with `No host present`
+(BL-371, BL-444 and BL-3173 Notes).
 
 Before each transfer connects, `--etag-compare` reads its file through the `IFileSystem` (every CR
 and LF dropped; `""` for a missing or empty file, after `Warning: Failed to open <file>: <reason>`)

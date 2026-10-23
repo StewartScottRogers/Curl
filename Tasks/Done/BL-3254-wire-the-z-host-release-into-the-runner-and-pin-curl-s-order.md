@@ -1,0 +1,40 @@
+---
+id: BL-3254
+title: Wire the -Z host release into the runner and pin curl's order with a holding fake server
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: [BL-3253]
+touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/ParallelHostQueue.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs]
+requirement: none
+created: 2026-10-23
+completed: 2026-10-23
+---
+# BL-3254 — Wire the -Z host release into the runner and pin curl's order with a holding fake server
+
+## Goal
+
+`curl -Z` against one instant server writes stdout in curl 8.22.0's order for `/echo /default /utf8 /four`, and the full fast run of Curl.Console.UnitTests ends.
+
+## Context
+
+Split from BL-3189. BL-3253 gives `ParallelHostQueue`/`ParallelTransferQueue` the one-at-a-time release. Here `CurlCommandRunner.NewParallelRun` sets `BeforeEachWait` to `run.Hosts.StartReleased` (keep the runner change small). Curl 8.22.0 gives `/echo /utf8 /four /default` at the default `--parallel-max`, `/echo /utf8 /default /four` at 2, URL order at 1. The earlier test failed at 50 and 2 because `ScriptedResultHandler` answers synchronously, so `/echo` ended before `/default` waited on the host: the test needs a handler that holds `/echo` until the other three are waiting on the host (or started), then answers the rest at once. Also known: the full fast run of Curl.Console.UnitTests hung over an hour with the stashed work; first suspect is a freed transfer waiting for `StartReleased` while the runner is not inside a `ParallelTransferQueue` wait. Find it with `--blame-hang-timeout 60s` and the Sequence file's last test.
+
+## Acceptance criteria
+
+- [x] A test in `Curl.Console.UnitTests/CurlCommandRunnerParallelOrderTests.cs` with a fake server answering instantly after holding `/echo` shows stdout order `/echo /utf8 /four /default` at the default `--parallel-max`, `/echo /utf8 /default /four` at 2 and URL order at 1, for `/echo /default /utf8 /four`.
+- [x] `dotnet build Curl.Console -warnaserror` is clean.
+- [x] `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes, finishes without hanging, with the existing `-Z` tests unchanged.
+
+## Notes
+
+- Split from BL-3189 (over its cost cap). Depends on BL-3253, which holds the stashed work; take the hang's cause into account when wiring.
+- The runner wiring (`NewParallelRun` setting `BeforeEachWait = run.Hosts.StartReleased`) already landed with BL-3253 (f232fb4df); this run adds no production change, so no Measure-CodeQuality run was needed.
+- The test signals "every transfer it can is started" through the progress meter's first draw (stderr's first write): the runner draws when the queue is full or at `EndAsync`, both after the waiting transfers have joined the host queue, so no sleep or polling is needed. Chose this over adding a hook to the runner to keep production unchanged.
+- Full fast run of Curl.Console.UnitTests with `--blame-hang-timeout 120s`: 2850 passed, 25 skipped, ended in 4 s; no hang with BL-3253's committed release. Existing `-Z` tests unchanged. Change is platform-neutral (no paths, OS text or timing), so CI on Linux and macOS is covered by the green run here.
+
+## Log
+
+- 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 3f9f3fbf 91e711c8 991c6e26.
+- 2026-10-23: Doing -> Done. -Z against one instant host writes curl 8.22.0's order for /echo /default /utf8 /four at default, 2 and 1 --parallel-max; full Console fast run ends

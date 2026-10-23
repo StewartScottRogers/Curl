@@ -7,7 +7,11 @@ namespace Curl.Console;
 /// <c>http://</c> transfer to it waits. curl 8.21.0 waits there for the first connection to show whether
 /// it can multiplex, which an HTTP/1.1 connection over plain TCP only shows once its transfer ends
 /// (measured 2026-09-28, BL-520 Notes). A waiting transfer keeps its <c>--parallel-max</c> slot, as it
-/// does in curl, and waiting transfers start in the order they began to wait.
+/// does in curl, and waiting transfers start in the order they began to wait, except that when a host's
+/// first transfer ends, the first to wait for it (curl's pending transfer) starts after the others, as
+/// curl 8.22.0 does against a server that closes each connection (ADR-0768). The transfers a
+/// <see cref="Leave" /> frees start only at <see cref="StartReleased" />, one after another, so that
+/// they start in that order every run rather than racing.
 /// </summary>
 /// <param name="maxPerHost">The <c>--parallel-max-host</c> limit; zero for none.</param>
 /// <param name="parallelImmediate">Whether <c>--parallel-immediate</c> was given.</param>
@@ -15,6 +19,9 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
 {
     /// <summary>The transfers to each host, by <c>host:port</c>.</summary>
     private readonly Dictionary<string, HostTransfers> hosts = new(StringComparer.Ordinal);
+
+    /// <summary>The transfers <see cref="Leave" /> freed that have not started yet, in the order they start.</summary>
+    private readonly LinkedList<WaitingTransfer> released = [];
 
     /// <summary>
     /// Waits until the transfer of <paramref name="url" /> may start talking to its host, then counts it
@@ -59,8 +66,9 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     }
 
     /// <summary>
-    /// Counts the transfer of <paramref name="url" /> as no longer running at its host, and starts the
-    /// transfers waiting for it that may now start.
+    /// Counts the transfer of <paramref name="url" /> as no longer running at its host, and frees the
+    /// transfers waiting for it that may now start, for <see cref="StartReleased" /> to start. When it is the
+    /// host's first to end, the first transfer to wait for the host is freed after the others (ADR-0768).
     /// </summary>
     /// <param name="url">The URL <see cref="WaitForHostAsync(string, CancellationToken)" /> was given.</param>
     internal void Leave(string url)
@@ -74,19 +82,67 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
         {
             HostTransfers transfers = hosts[destination.Host];
             transfers.Running--;
+            WaitingTransfer? pending = transfers.FirstHasEnded ? null : transfers.Waiting.First?.Value;
             transfers.FirstHasEnded = true;
-            while (transfers.Waiting.First is { } next && transfers.MayStart(next.Value, maxPerHost))
+            FreeWaiting(transfers, pending);
+        }
+    }
+
+    /// <summary>
+    /// Frees, in the order they waited, the transfers waiting at a host that may now start, except that
+    /// <paramref name="pending" />, when freed, goes behind the others freed in this step (ADR-0768).
+    /// </summary>
+    /// <param name="transfers">The host's transfers.</param>
+    /// <param name="pending">The first transfer to wait for the host, when its first transfer just ended.</param>
+    private void FreeWaiting(HostTransfers transfers, WaitingTransfer? pending)
+    {
+        LinkedListNode<WaitingTransfer>? pendingNode = null;
+        while (transfers.Waiting.First is { } next && transfers.MayStart(next.Value, maxPerHost))
+        {
+            transfers.Waiting.RemoveFirst();
+            transfers.Running++;
+            released.AddLast(next);
+            pendingNode = ReferenceEquals(next.Value, pending) ? next : pendingNode;
+        }
+
+        if (pendingNode is not null)
+        {
+            released.Remove(pendingNode);
+            released.AddLast(pendingNode);
+        }
+    }
+
+    /// <summary>
+    /// Starts the transfers <see cref="Leave" /> freed, one after another in the order it freed them: each
+    /// runs on this thread until its first wait, such as for its connection, before the next is started.
+    /// </summary>
+    internal void StartReleased()
+    {
+        while (TakeReleased() is { } next)
+        {
+            next.Turn.TrySetResult();
+        }
+    }
+
+    /// <summary>Takes the next transfer <see cref="Leave" /> freed, or <see langword="null" /> when none is left.</summary>
+    private WaitingTransfer? TakeReleased()
+    {
+        lock (hosts)
+        {
+            if (released.First is not { } next)
             {
-                transfers.Waiting.RemoveFirst();
-                transfers.Running++;
-                next.Value.Turn.SetResult();
+                return null;
             }
+
+            released.RemoveFirst();
+            return next.Value;
         }
     }
 
     /// <summary>
     /// Waits for a queued transfer's turn; when <paramref name="abortToken" /> is cancelled first, the
-    /// transfer leaves the queue and the wait throws.
+    /// transfer leaves the queue, or gives back its count at the host when it was freed and not yet
+    /// started, and the wait throws.
     /// </summary>
     private async Task WaitForTurnAsync(HostTransfers transfers, WaitingTransfer transfer, CancellationToken abortToken)
     {
@@ -96,6 +152,7 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
             {
                 transfer.Turn.TrySetCanceled(abortToken);
                 transfers.Waiting.Remove(transfer);
+                transfers.Running -= Convert.ToInt32(released.Remove(transfer));
             }
         });
         await transfer.Turn.Task.ConfigureAwait(false);
@@ -154,7 +211,10 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
         /// <summary>Gets a value indicating whether it waits for the host's first transfer to end.</summary>
         internal bool WaitsForFirstToEnd { get; } = waitsForFirstToEnd;
 
-        /// <summary>Gets the signal set when it may start, or cancelled when its wait is abandoned.</summary>
-        internal TaskCompletionSource Turn { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        /// <summary>
+        /// Gets the signal set when it may start, or cancelled when its wait is abandoned. Its waiter resumes
+        /// on the thread that sets it, so <see cref="StartReleased" /> starts one transfer at a time.
+        /// </summary>
+        internal TaskCompletionSource Turn { get; } = new();
     }
 }

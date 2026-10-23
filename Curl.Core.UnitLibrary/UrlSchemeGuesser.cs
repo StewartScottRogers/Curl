@@ -54,7 +54,8 @@ public static class UrlSchemeGuesser
     /// <para>
     /// A default scheme replaces the guess outright, as curl 8.21.0 does: with
     /// <c>--proto-default dict</c>, <c>ftp.localhost:1/</c> becomes <c>dict://ftp.localhost:1/</c>
-    /// (measured on Windows, 2026-09-28).
+    /// (measured on Windows, 2026-09-28). A URL starting with <c>/</c> names no host, so unless its scheme is <c>file</c> it is returned
+    /// as it is, for the parser to reject with curl 8.22.0's <c>No host present</c> (BL-3173 Notes).
     /// </para>
     /// <para>
     /// curl 8.22.0's <c>Curl_parse_port</c> accepts an empty port only in a URL that named its own
@@ -80,7 +81,7 @@ public static class UrlSchemeGuesser
 
         string scheme = defaultScheme ?? GuessScheme(url);
 
-        return scheme != FileScheme && HostAndPort(url).EndsWith(':') ? url : scheme + "://" + url;
+        return scheme != FileScheme && (url.StartsWith('/') || HostAndPort(url).EndsWith(':')) ? url : scheme + "://" + url;
     }
 
     /// <summary>Tells whether <paramref name="url" /> starts with a scheme and <c>:/</c>.</summary>
