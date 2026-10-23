@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3406, BL-3391]
-touches: [Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1544.cs, Curl.Conformance.UnitTests/UpstreamTest1544ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1544.cs, Curl.Conformance.UnitTests/UpstreamTest1544ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3396 — Interpret upstream test1544.pl in C#: the OS/400 wrapper translates every string option (case 1544)
 
@@ -22,13 +22,17 @@ Decided in BL-3406 (supersedes the no-counterpart row of ADR-0718/ADR-0755): lik
 
 ## Acceptance criteria
 
-- [ ] Case 1544 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1544'` on Windows and is on `PassingUpstreamCases.txt`.
-- [ ] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
+- [x] Case 1544 ends `Passed` with `$env:CURL_UPSTREAM_CASE='1544'` on Windows and is on `PassingUpstreamCases.txt`.
+- [x] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
 
 ## Notes
+
+- Case 1544 passes with CURL_UPSTREAM_CASE=1544 on Windows and is listed. The script prints its differences in hash order; the interpretation sorts them (ordinal) so output is deterministic. The case has no expected stdout, only the exit code (1 when anything is reported).
+- Added Curl.Conformance.UnitTests.csproj to touches: it now copies UpstreamTestData/projects/OS400/ccsidcurl.c beside the tests (no other Doing task touches it). Tests break the input deliberately (missing, ghost and unsorted options). Measure-CodeQuality for Curl.Conformance.UnitLibrary: 0 failing members; fast tests green; platform-neutral (no OS paths), so CI on Linux and macOS holds.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 260e5d5a c9ef8a5b b41964f0.
+- 2026-10-23: Doing -> Done. Case 1544 (test1544.pl OS/400 wrapper string options) interpreted in C# and on the ratchet
