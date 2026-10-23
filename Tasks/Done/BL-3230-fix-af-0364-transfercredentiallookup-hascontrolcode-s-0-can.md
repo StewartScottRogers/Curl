@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs]
+touches: [Curl.Engine.UnitLibrary/TransferCredentialLookup.cs, Curl.Engine.UnitTests/EasyAuthenticationOptionsReadingTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3230 — Fix AF-0364: TransferCredentialLookup.HasControlCode's >= 0 can become > 0 with no test failing, so a credential starting with a control code is accepted
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Engine.UnitTests/EasyAuthenticationOptionsReadingTests.cs` to touches: the fix is a test, and no other Doing task on origin/work/dark-factory names that file.
+- The production code was already right; `TryCheckUrlCredentials_ControlCodeInUrlUser_FailsUnlessAUserNameWins` became `..._ControlCodeInUrlCredentials_...` with DataRows putting `%01` first in the user name (`ftp://%01u:p@h/`) and first in the password (`ftp://u:%01p@h/`). A lane may not run `Audit/Tools`, so I applied the mutant `>= 0` to `> 0` by hand: both new rows failed (killed), and then I put the code back. The audit tool's re-run is left to the re-audit.
+- Build clean; `Curl.Engine.UnitTests` fast tests 2321 passed, 5 skipped. Only that test project changed, so no other project's tests can change. No production code changed, so no Measure-CodeQuality run was needed.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. HasControlCode's >= 0 site is now pinned by URL credentials with the control code at index 0, so the > 0 mutant is killed

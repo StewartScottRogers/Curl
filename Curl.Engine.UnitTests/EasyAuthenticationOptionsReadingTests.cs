@@ -151,9 +151,13 @@ public sealed class EasyAuthenticationOptionsReadingTests
     }
 
     [TestMethod]
-    public void TryCheckUrlCredentials_ControlCodeInUrlUser_FailsUnlessAUserNameWins()
+    [DataRow("ftp://a%01b@h/")]
+    [DataRow("ftp://%01u:p@h/")]
+    [DataRow("ftp://u:%01p@h/")]
+    public void TryCheckUrlCredentials_ControlCodeInUrlCredentials_FailsUnlessAUserNameWins(string text)
     {
-        CurlUrl url = CurlUrl.Parse("ftp://a%01b@h/");
+        // The control code first (index 0) as well as inside, in the user name and in the password (AF-0364).
+        CurlUrl url = CurlUrl.Parse(text);
         Diagnostics.Arrange("url", url);
 
         bool refused = !TransferCredentialLookup.TryCheckUrlCredentials(new EasyAuthenticationOptions(), url, out TransferResult? failure);
