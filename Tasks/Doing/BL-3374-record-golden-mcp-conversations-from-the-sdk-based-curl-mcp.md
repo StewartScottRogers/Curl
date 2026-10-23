@@ -38,3 +38,4 @@ A recorded set of MCP conversations with the current SDK-based `Curl.Mcp` server
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 4d3a4efe 42864ae2 61e7c922 88ed799f 6d2cec38.
