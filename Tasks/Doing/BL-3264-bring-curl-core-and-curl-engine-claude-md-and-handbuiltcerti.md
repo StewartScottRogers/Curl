@@ -40,3 +40,4 @@ The shift-end review (ADR-0710) found these. The code-reviewer reported them, an
 ## Log
 
 - 2026-10-23: Created by the shift-end review of 9f0bbb58c.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: ec6ecc5b 1b8749e3 e1496eac 6b653068.
