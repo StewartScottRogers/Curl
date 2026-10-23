@@ -14,7 +14,8 @@ namespace Curl.Engine.UnitTests;
 
 /// <summary>
 /// Two library easy handles of one engine share no cookies, connections, DNS, TLS sessions or HSTS unless a share handle
-/// links them for exactly the kinds it shares, while a multi handle pools its handles' connections (BL-3204).
+/// links them for exactly the kinds it shares, while a multi handle pools its handles' connections (BL-3204); alt-svc
+/// entries stay the handle's whatever is shared, as libcurl has no share kind for them (BL-3272).
 /// </summary>
 [TestClass]
 public sealed class EasyHandleIsolationTests
@@ -24,6 +25,10 @@ public sealed class EasyHandleIsolationTests
     private const string SetsSecondCookie = "HTTP/1.1 200 OK\r\nSet-Cookie: z=9\r\nContent-Length: 0\r\n\r\n";
 
     private const string Echo = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+
+    private const string LearnsHsts = "HTTP/1.1 200 OK\r\nStrict-Transport-Security: max-age=31536000\r\nContent-Length: 0\r\n\r\n";
+
+    private const string LearnsAltSvc = "HTTP/1.1 200 OK\r\nAlt-Svc: h1=\"alt:8080\"; ma=3600\r\nContent-Length: 0\r\n\r\n";
 
     private static readonly EasyOptions CookieEngineOn = new()
     {
@@ -98,9 +103,9 @@ public sealed class EasyHandleIsolationTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_TwoHandlesInOneMulti_ReuseTheMultisConnection()
+    public async Task PerformAsync_TwoHandlesInOneMulti_ReuseTheMultisConnectionAndSendNoCookieOfEachOther()
     {
-        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Echo), Encoding.ASCII.GetBytes(Echo)]) { ReusesTheFirstConnection = true };
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(SetsCookie), Encoding.ASCII.GetBytes(Echo)]) { ReusesTheFirstConnection = true };
         await using ManagedCurlEngine engine = CreateEngine(connector);
         await using ManagedMultiTransfer multi = (ManagedMultiTransfer)engine.CreateMulti();
         await using IEasyTransfer first = engine.CreateEasy();
@@ -110,11 +115,69 @@ public sealed class EasyHandleIsolationTests
 
         multi.Add(first);
         await PerformUntilDoneAsync(multi);
+        int written = connector.Written.Length;
         multi.Add(second);
         await PerformUntilDoneAsync(multi);
 
         Assert.HasCount(1, connector.Targets);
         Assert.AreEqual(0, second.Info.NumConnects);
+        Assert.DoesNotContain("Cookie:", Encoding.ASCII.GetString(connector.Written[written..]));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HstsLearnedByAnUnsharedHandle_IsNotUsedByAnother()
+    {
+        IReadOnlyList<ConnectTarget> targets = await PerformLearningHstsTwiceAsync(sharesHsts: false);
+
+        Assert.AreEqual(80, targets[1].Port);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_HstsLearnedByAHandleSharingHsts_SwitchesTheOtherToHttps()
+    {
+        IReadOnlyList<ConnectTarget> targets = await PerformLearningHstsTwiceAsync(sharesHsts: true);
+
+        Assert.AreEqual(443, targets[1].Port);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_AltSvcLearnedByOneHandle_RoutesOnlyThatHandle()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(LearnsAltSvc), Encoding.ASCII.GetBytes(Echo), Encoding.ASCII.GetBytes(Echo)]);
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" }, Http = new EasyHttpOptions { AltSvc = string.Empty } };
+        await using ManagedEasyTransfer first = (ManagedEasyTransfer)engine.CreateEasy();
+        await using ManagedEasyTransfer second = (ManagedEasyTransfer)engine.CreateEasy();
+        foreach (ManagedEasyTransfer handle in new[] { first, second })
+        {
+            handle.Options = options;
+            handle.Host = EasyTransferHost.Library with { AltSvcUsesOverHttp = true };
+        }
+
+        await first.PerformAsync(CancellationToken.None);
+        await second.PerformAsync(CancellationToken.None);
+        await first.PerformAsync(CancellationToken.None);
+
+        Assert.IsNull(connector.Targets[1].AltSvcRoute);
+        Assert.IsNotNull(connector.Targets[2].AltSvcRoute);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TwoUnsharedHandles_ResumeNoTlsSessionOfEachOther()
+    {
+        (ManagedEngineSharedState first, ManagedEngineSharedState second, _) = await PerformRecordingStatesAsync(sharesTlsSessions: false);
+
+        Assert.AreNotSame(first.TlsSessions, second.TlsSessions);
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_TwoHandlesSharingTlsSessions_ResumeTheSharesSessions()
+    {
+        (ManagedEngineSharedState first, ManagedEngineSharedState second, ManagedShareHandle? share) = await PerformRecordingStatesAsync(sharesTlsSessions: true);
+
+        Assert.AreSame(share!.TlsSessions, first.TlsSessions);
+        Assert.AreSame(first.TlsSessions, second.TlsSessions);
+        Assert.AreNotSame(first.Hsts, second.Hsts);
     }
 
     [TestMethod]
@@ -217,16 +280,66 @@ public sealed class EasyHandleIsolationTests
         return (connector, Encoding.ASCII.GetString(connector.Written[written..]), second.Info.NumConnects);
     }
 
+    private static async Task<IReadOnlyList<ConnectTarget>> PerformLearningHstsTwiceAsync(bool sharesHsts)
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(LearnsHsts), Encoding.ASCII.GetBytes(Echo)]);
+        await using ManagedCurlEngine engine = CreateEngine(connector);
+        EasyOptions options = new() { Network = new EasyNetworkOptions { Url = "http://h/x" }, Http = new EasyHttpOptions { HstsControl = HstsControl.Enable } };
+        if (sharesHsts)
+        {
+            IShareHandle share = engine.CreateShare();
+            share.Share(CurlLockData.Hsts);
+            options = options with { Behaviour = options.Behaviour with { Share = share } };
+        }
+
+        await using IEasyTransfer first = engine.CreateEasy();
+        await using IEasyTransfer second = engine.CreateEasy();
+        first.Options = options with { Network = new EasyNetworkOptions { Url = "https://h/x" } };
+        second.Options = options;
+        await first.PerformAsync(CancellationToken.None);
+        await second.PerformAsync(CancellationToken.None);
+        return connector.Targets;
+    }
+
+    private static async Task<(ManagedEngineSharedState First, ManagedEngineSharedState Second, ManagedShareHandle? Share)> PerformRecordingStatesAsync(bool sharesTlsSessions)
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Echo), Encoding.ASCII.GetBytes(Echo)]);
+        List<ManagedEngineSharedState> states = [];
+        await using ManagedCurlEngine engine = CreateEngine(connector, recordState: states.Add);
+        EasyOptions options = CookieEngineOn;
+        ManagedShareHandle? share = null;
+        if (sharesTlsSessions)
+        {
+            share = (ManagedShareHandle)engine.CreateShare();
+            share.Share(CurlLockData.SslSession);
+            options = Attached(share);
+        }
+
+        await using IEasyTransfer first = engine.CreateEasy();
+        await using IEasyTransfer second = engine.CreateEasy();
+        first.Options = options;
+        second.Options = options;
+        await first.PerformAsync(CancellationToken.None);
+        await second.PerformAsync(CancellationToken.None);
+        return (states[0], states[1], share);
+    }
+
     private static EasyOptions Attached(IShareHandle share) =>
         CookieEngineOn with { Behaviour = CookieEngineOn.Behaviour with { Share = share } };
 
-    private static ManagedCurlEngine CreateEngine(ScriptedConnector connector) =>
-        new(TimeProvider.System, (_, shared, cookies) => new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
+    private static ManagedCurlEngine CreateEngine(ScriptedConnector connector, Action<ManagedEngineSharedState>? recordState = null) =>
+        new(TimeProvider.System, (_, shared, cookies) => DispatcherOf(connector, shared, cookies, recordState));
+
+    private static ProtocolDispatcher DispatcherOf(ScriptedConnector connector, ManagedEngineSharedState shared, ICookieStore? cookies, Action<ManagedEngineSharedState>? recordState)
+    {
+        recordState?.Invoke(shared);
+        return new ProtocolDispatcher(EngineComposition.CreateProtocolHandlers(
             new PoolingConnector(connector, shared.Connections, configuration: null),
             new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "Failed to connect to h port 80 after 0 ms: Could not connect to server"),
             new PassThroughTlsProvider(),
             new LoopbackDnsResolver(),
-            cookies)));
+            cookies));
+    }
 
     /// <summary>Gives the one connection it was made with.</summary>
     private sealed class OneConnectionConnector(QueuedConnection connection) : IConnector
