@@ -18,6 +18,7 @@ namespace Curl.Engine;
 internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 {
     private const string FileScheme = "file";
+    private const string NilPath = "(nil)";
 
     /// <summary>The longest string a set accepts for any part (upstream's <c>CURL_MAX_INPUT_LENGTH</c>).</summary>
     private const int MaximumInputLength = 8_000_000;
@@ -165,7 +166,8 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         string tail = TailOf(parts, flags);
         if (string.Equals(parts.Scheme, FileScheme, StringComparison.OrdinalIgnoreCase))
         {
-            return UrlPartResult.Found("file://" + tail);
+            // A file URL with no path prints libcurl's NULL %s: "(nil)", measured on libcurl 8.22.0.
+            return UrlPartResult.Found("file://" + (parts.Path is null ? NilPath + tail[1..] : tail));
         }
 
         if (parts.Host is null)

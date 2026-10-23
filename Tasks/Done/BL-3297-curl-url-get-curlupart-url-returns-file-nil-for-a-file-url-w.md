@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs, Curl.Engine.UnitTests/ManagedCurlUrlHandleTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3297 — curl_url_get CURLUPART_URL returns file://(nil) for a file URL with no path, as libcurl does
 
@@ -22,12 +22,15 @@ Scenarios 1730-1733, 2023-2026, 2902-2905 (set CURLUPART_SCHEME "file" on an emp
 
 ## Acceptance criteria
 
-- [ ] A ManagedCurlUrlHandle unit test pins file://(nil) for both scenarios.
-- [ ] The build is clean and the fast tests pass.
+- [x] A ManagedCurlUrlHandle unit test pins file://(nil) for both scenarios.
+- [x] The build is clean and the fast tests pass.
 
 ## Notes
+
+- File URL with no path now prints libcurl's "(nil)" in ReadUrl; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members. Fast ManagedCurlUrlHandle tests pass (248).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b40ffbeb c46ca32a.
+- 2026-10-23: Doing -> Done. curl_url_get CURLUPART_URL gives file://(nil) for a file URL with no path
