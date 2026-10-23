@@ -33,3 +33,4 @@ Reference (never run or commit Python): `Z:\repos\Curl.difftest\2026-10-22\proxy
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 8c1939d6 ae951636 5e81fa96.
