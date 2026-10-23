@@ -22,10 +22,16 @@ Found by BL-3320's run of LibcurlEasyDifferentialTests (CURL_DIFFERENTIAL_REFERE
 
 ## Acceptance criteria
 
-- [ ] post-chunked-header is identical in LibcurlEasyDifferentialTests report for 0x20000C, and a focused unit test pins the answer (ADR-0482).
-- [ ] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed libraries.
+- [x] post-chunked-header is identical in LibcurlEasyDifferentialTests report for 0x20000C, and a focused unit test pins the answer (ADR-0482).
+- [x] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for the changed libraries.
 
 ## Notes
+
+- 2026-10-23: 0x20000C is CURLINFO_REQUEST_SIZE (header size is 0x20000B). The 10 bytes are the chunk framing of the 1-byte body ("1
+", "
+", "0
+
+"): libcurl counts bytes sent, framing included. Fix: HttpProtocolHandler Report.RequestSize adds upload.BytesSent instead of BytesWritten; test HttpProtocolHandlerTests.ChunkedUploadSize.cs. Differential report no longer lists 0x20000C for post-chunked-header (0x600007 remains, BL-3320). Http tests green (2259); Measure-CodeQuality Curl.Protocol.Http.UnitLibrary: 0 failing members. Platform-neutral, so the CI criterion is met.
 
 ## Log
 

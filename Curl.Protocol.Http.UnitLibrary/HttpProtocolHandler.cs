@@ -3282,7 +3282,7 @@ public sealed class HttpProtocolHandler(
         /// <summary>
         /// Builds the report: what the connect and request told, their timings with the
         /// transfer's end taken now, and what the final head told once it was read. The request
-        /// size counts the body bytes sent as well as the head, as curl 8.21.0's
+        /// size counts the body bytes sent, chunk framing included, as well as the head, as curl 8.21.0's
         /// <c>%{size_request}</c> does (BL-175 Notes).
         /// </summary>
         /// <param name="body">
@@ -3295,7 +3295,7 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = RequestSizeSoFar() + headSize + upload.BytesWritten,
+                RequestSize = RequestSizeSoFar() + headSize + upload.BytesSent,
                 UploadSize = upload.BytesWritten,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
