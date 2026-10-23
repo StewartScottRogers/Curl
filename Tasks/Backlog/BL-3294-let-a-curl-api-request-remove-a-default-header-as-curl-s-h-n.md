@@ -1,5 +1,5 @@
 ---
-id: BL-3289
+id: BL-3294
 title: Let a Curl.Api request remove a default header as curl's -H 'Name:' does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3289 — Let a Curl.Api request remove a default header as curl's -H 'Name:' does
+# BL-3294 — Let a Curl.Api request remove a default header as curl's -H 'Name:' does
 
 ## Goal
 

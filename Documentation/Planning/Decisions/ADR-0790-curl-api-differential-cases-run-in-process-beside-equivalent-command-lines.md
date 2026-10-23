@@ -36,6 +36,6 @@ results are a `CurlResponse` or a `CurlException`, not standard output and an ex
 ## Consequences
 
 - An empty-valued `CurlRequest` header is `Name;` (sent with no value), so its equivalent is
-  `-H 'Name;'`; `Curl.Api` cannot remove a default header as `-H 'Name:'` does, filed as BL-3289.
+  `-H 'Name;'`; `Curl.Api` cannot remove a default header as `-H 'Name:'` does, filed as BL-3294.
 - New request shapes are new lines in `ApiDifferentialCases.All`, and new properties on
   `ApiDifferentialRequest` with their mapping in `ApiRequestMapping`.
