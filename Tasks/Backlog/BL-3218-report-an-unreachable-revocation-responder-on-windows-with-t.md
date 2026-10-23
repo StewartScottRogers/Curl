@@ -18,7 +18,7 @@ On Windows, a server whose system store chain has a revocation status that canno
 
 ## Context
 
-BL-3215 (ADR-0781) made the Schannel build check revocation online against the system store and pinned a revoked chain as exit 35 `CRYPT_E_REVOKED`. An unknown or offline status without best effort still falls through to `ServerCertificateVerification.SchannelPeerVerificationFailure` (exit 60 with the untrusted-root style text); Schannel is expected to fail the handshake with exit 35 and `CRYPT_E_NO_REVOCATION_CHECK (0x80092012)` or `CRYPT_E_REVOCATION_OFFLINE (0x80092013)`. Measure curl 8.22.0 (Schannel) first with `Record-CurlExchange.ps1` against a server whose certificate names an unreachable CRL/OCSP endpoint, then map it beside `SchannelRevocationRefusal`. Tests use the `ReadChainStatus` seam or a chain whose distribution points name missing files; no network.
+BL-3215 (ADR-0783) made the Schannel build check revocation online against the system store and pinned a revoked chain as exit 35 `CRYPT_E_REVOKED`. An unknown or offline status without best effort still falls through to `ServerCertificateVerification.SchannelPeerVerificationFailure` (exit 60 with the untrusted-root style text); Schannel is expected to fail the handshake with exit 35 and `CRYPT_E_NO_REVOCATION_CHECK (0x80092012)` or `CRYPT_E_REVOCATION_OFFLINE (0x80092013)`. Measure curl 8.22.0 (Schannel) first with `Record-CurlExchange.ps1` against a server whose certificate names an unreachable CRL/OCSP endpoint, then map it beside `SchannelRevocationRefusal`. Tests use the `ReadChainStatus` seam or a chain whose distribution points name missing files; no network.
 
 ## Acceptance criteria
 
