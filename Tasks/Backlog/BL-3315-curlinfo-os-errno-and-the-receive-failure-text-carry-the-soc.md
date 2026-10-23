@@ -4,7 +4,7 @@ title: CURLINFO_OS_ERRNO and the receive failure text carry the socket error as 
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: []
+depends-on: [BL-3325, BL-3326]
 touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs]
 requirement: none
 created: 2026-10-23
@@ -28,7 +28,10 @@ Found by BL-3310's run of the easytest.py case list through Curl.Conformance.Dif
 
 ## Notes
 
+- 2026-10-23 (lane 5): Measured with the differential run (10 min): 0x200019 differs in six cases by two causes, both outside this task's touches. (1) get-follow/rother, userpwd-unrestricted, userpwd-redirect-other: localhost tries ::1 (refused, 10061) then 127.0.0.1 connects; libcurl keeps 10061, Curl has no errno on a successful ConnectResult. Filed as BL-3325. (2) reuse-idle-close (10054) and proxy-tunnel-http (10053): a failed receive sets the errno; filed as BL-3326, which waits on BL-3304 (the "Connection was aborted" text). What is left here: rerun LibcurlEasyDifferentialTests once both land, confirm the named cases are identical, tick the criteria.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: f5b2f496 db93e725.
+- 2026-10-23: Doing -> Backlog. Split: OS_ERRNO needs Abstractions/Networking/Engine/Http work, filed as BL-3325 and BL-3326 (after BL-3304); this task re-verifies the cases afterwards
