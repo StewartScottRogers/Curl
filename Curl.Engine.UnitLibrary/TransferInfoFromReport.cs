@@ -33,10 +33,9 @@ internal static partial class TransferInfoFromReport
         {
             FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
         };
+        info = WithSchemeAndProtocol(info, result, requestUrl, effectiveUrl);
         return result.Report is null ? info : info with
         {
-            Scheme = SchemeOf(effectiveUrl),
-            Protocol = ProtocolOf(effectiveUrl),
             RetryAfter = RetryAfterOf(report, timeProvider),
             CertInfo = CertInfoOf(report, certificateInfoRequested),
         };
