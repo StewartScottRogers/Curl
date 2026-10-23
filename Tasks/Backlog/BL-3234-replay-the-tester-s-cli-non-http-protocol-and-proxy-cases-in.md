@@ -4,7 +4,7 @@ title: Replay the tester's CLI non-HTTP protocol and proxy cases in the differen
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3233, BL-3235, BL-3284, BL-3285, BL-3286, BL-3287, BL-3288]
+depends-on: [BL-3233, BL-3235, BL-3284, BL-3285, BL-3286, BL-3287, BL-3288, BL-3334]
 touches: [Curl.Conformance.Differential.UnitLibrary/Protocols, Curl.Conformance.Differential.UnitTests/Protocols, Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols, Curl.Conformance.Differential.IntegrationTests/CliProtocols]
 requirement: none
 created: 2026-10-22
@@ -33,6 +33,7 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 - Default taken: one shared wire log and one control port for the whole suite instead of one per server (the Python `ctl=` port per case). Cases run one at a time, so this gives the same log and needs no change to `DifferentialCase` or `Host/DifferentialCaseRunner` (which BL-3274 holds).
 - Depends on BL-3235 too: three `cases_proxy.py` cases use `{PKI}` (`--cacert {PKI}/ca.pem`), and the test PKI and its placeholder come from BL-3235's TLS work.
 - `cases_proxy.py`'s `proxy-tunnel-*` cases use `{U}`, so the suite also starts BL-3233's HTTP loopback server (`DifferentialLoopbackServer`) as the tunnel target.
+- 2026-10-23 lane-1 prerequisite pass, before any code: every server port is in place except the SOCKS4/SOCKS5 half of `proxy_server.py` (BL-3288 ported the HTTP half only), which eleven `cases_proxy.py` cases need (`px-socks*`, `px-preproxy`). Filed BL-3334 for it. Checked the rest: `runner.py` strips proxy variables from the environment and sets none per case, so `DifferentialCase` needs no environment field; `{PKI}` and the 18100 TLS server come from `Tls/DifferentialTlsEndpoints` and `CliTls/DifferentialTlsLoopbackServer`; responder constructors are `FtpResponder(log, IPassiveDataListenerOpener)`, `HttpProxyResponder(log, IProxyTunnelConnector, requiresAuthentication)`, `TelnetResponder(log, TimeProvider)`, the rest `(log)`; the host needs a TcpClient `IProxyTunnelConnector` in `IntegrationTests/CliProtocols`. About 200 cases in all (proto about 130, proto2 about 50, proxy 35); generate the JSON with a PowerShell script, not by hand.
 
 ## Log
 
@@ -40,3 +41,4 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 1f83bf22 ae951636 5e81fa96.
 - 2026-10-23: Doing -> Backlog. Waiting on BL-3284 to BL-3288 (the protocol and proxy server ports, split out for size) and BL-3235 (the test PKI the proxy https cases need)
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 1f83bf22 ae951636 5e81fa96.
+- 2026-10-23: Doing -> Backlog. Waiting on BL-3334 (the SOCKS4/SOCKS5 half of proxy_server.py, needed by the px-socks* and px-preproxy cases)
