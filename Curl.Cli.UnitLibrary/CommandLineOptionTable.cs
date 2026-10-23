@@ -1061,7 +1061,7 @@ public static class CommandLineOptionTable
 
         return dataFileReader.TryReadFile(file, out contents)
             ? null
-            : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden);
+            : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
     }
 
     /// <summary>
@@ -1155,7 +1155,7 @@ public static class CommandLineOptionTable
             CommandLineOption.WarnWhenFileNameLooksLikeFlag(options, value);
             if (!pathExists(value))
             {
-                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value, options.ErrorsHidden);
+                return CommandLineRefusal.FileDoesNotExist(spelledOption, longOption, value, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
             }
 
             set(options, value);

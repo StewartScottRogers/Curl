@@ -1,3 +1,5 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Cli;
 
 /// <summary>
@@ -59,5 +61,28 @@ public sealed class CommandLineRefusalWrappingTests
                 CommandLineRefusal.TryHelpLine,
             },
             refusal.StandardErrorLines.ToArray());
+    }
+
+    [TestMethod]
+    public void Parse_CacertMissingLongFileWithColumns40InParseEnvironment_WrapsAt40()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(
+            ["--cacert", LongPath, "http://example.com/"],
+            _ => false,
+            new UnexpectedPasswordPrompt(),
+            new RecordingDataFileReader(),
+            new DefaultConfigFileSearch(_ => null, false, null, null),
+            false,
+            name => name == "COLUMNS" ? "40" : null);
+
+        CollectionAssert.AreEqual(
+            "curl: The file \ncurl: '/some/very/long/missing/path/that\ncurl: /goes/on/and/on/for/a/while/certif\ncurl: icate-authority-bundle.pem' \ncurl: provided to --cacert does not \ncurl: exist"
+                .Split('\n').Append("curl: option --cacert: is badly used here").Append(CommandLineRefusal.TryHelpLine).ToArray(),
+            result.Refusal!.StandardErrorLines.ToArray());
+    }
+
+    private sealed class UnexpectedPasswordPrompt : IPasswordPrompt
+    {
+        public string ReadPassword(string prompt) => throw new AssertFailedException("No password prompt was expected.");
     }
 }
