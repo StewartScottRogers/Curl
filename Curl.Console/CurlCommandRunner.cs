@@ -2273,7 +2273,7 @@ internal sealed class CurlCommandRunner(
         await transferPerformer.OpenAltSvcCacheAsync(Running, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, diagnosticLog, altSvcUsesOverHttp).ConfigureAwait(false);
         transferUrl = await TransferPerformer.SwitchToHttpsForHstsAsync(Hsts, EasyOptionsFromCommandLine.TransferSettingsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), http, transferUrl, fileSystem, eventsBeforeConnecting).ConfigureAwait(false);
         Running.TransferId = transfer.TransferId;
-        Running.RequestUrl = WriteOutRequestUrl(options, transferUrl);
+        Running.RequestUrl = WriteOutRequestUrl(options, transferUrl, givenUrl);
         TransferResult result = await TransferWithHeaderOutputAsync(dispatch, options, transfer, transferUrl, uploadFile)
             .ConfigureAwait(false);
         return (result, givenUrl, transferUrl);
@@ -2820,13 +2820,19 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// The URL a transfer of <paramref name="transferUrl" /> requests, which <c>%{url_effective}</c> prints when the
     /// report names no other and whose scheme <c>%{scheme}</c> prints: with any <c>-G</c> / <c>--url-query</c> query,
-    /// normalized.
+    /// normalized; a URL curl rejects prints as it was given, before its scheme was guessed (BL-3173), and an empty
+    /// transfer URL (an upload URL or IPFS gateway that could not be resolved) prints empty.
     /// </summary>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transferUrl">The URL transferred.</param>
+    /// <param name="givenUrl">The URL as it was given, before a scheme was guessed for it.</param>
     /// <returns>The request URL.</returns>
-    private static string WriteOutRequestUrl(CommandLineOptions options, string transferUrl) =>
-        UrlEffective.Normalize(QueryUrl.Append(transferUrl, options), options.PathAsIs);
+    private static string WriteOutRequestUrl(CommandLineOptions options, string transferUrl, string givenUrl)
+    {
+        string url = QueryUrl.Append(transferUrl, options);
+
+        return UrlEffective.Normalize(url, transferUrl.Length == 0 ? url : QueryUrl.Append(givenUrl, options), options.PathAsIs);
+    }
 
     /// <summary>
     /// The libcurl values <c>-w</c> prints for a transfer its easy handle's answers do not describe - a <c>-Z</c>
@@ -2847,7 +2853,7 @@ internal sealed class CurlCommandRunner(
         TransferResult result,
         long connectionId)
     {
-        string requestUrl = WriteOutRequestUrl(options, transferUrl);
+        string requestUrl = WriteOutRequestUrl(options, transferUrl, transfer.Url);
         Api.Info.TransferInfo info = WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider);
         return info with
         {
