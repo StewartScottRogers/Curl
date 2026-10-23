@@ -8,7 +8,7 @@ depends-on: [BL-3209]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Libcurl/Misc/Version/CurlVersionFeatures.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Curl.Cli.UnitTests/CommandLineSchannelBuildRefusalTests.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Console.UnitTests/CurlCommandRunnerSchannelBuildRefusalTests.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs, Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-23
 ---
 # BL-3207 — Accept --http2, --http2-prior-knowledge and --proxy-http2 on Windows and list HTTP2 in curl -V
 
@@ -24,11 +24,11 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Acceptance criteria
 
-- [ ] `Curl.Cli.UnitTests/Http2OnWindowsTests.cs` (Windows `[OSCondition]`) shows the three options parse and select HTTP/2 instead of exit 2.
-- [ ] `curl -V` on Windows lists `HTTP2` in Features in upstream's position, and `curl_version_info` sets CURL_VERSION_HTTP2; a test pins each.
-- [ ] A conformance test or recorded comparison against an nghttp2-built curl 8.22.0 covers `--http2` over h2c and TLS, `--http2-prior-knowledge`, and ALPN fallback, with matching request bytes, `%{http_version}` and exit codes.
-- [ ] The new ADR records Stewart's decision, supersedes ADR-0397's HTTP/2 part, and is in the ADR index; `--ai-help` and `--help` entries for the three options are right.
-- [ ] Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
+- [x] `Curl.Cli.UnitTests/Http2OnWindowsTests.cs` (Windows `[OSCondition]`) shows the three options parse and select HTTP/2 instead of exit 2.
+- [x] `curl -V` on Windows lists `HTTP2` in Features in upstream's position, and `curl_version_info` sets CURL_VERSION_HTTP2; a test pins each.
+- [x] A conformance test or recorded comparison against an nghttp2-built curl 8.22.0 covers `--http2` over h2c and TLS, `--http2-prior-knowledge`, and ALPN fallback, with matching request bytes, `%{http_version}` and exit codes.
+- [x] The new ADR records Stewart's decision, supersedes ADR-0397's HTTP/2 part, and is in the ADR index; `--ai-help` and `--help` entries for the three options are right.
+- [x] Build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 0 failing members.
 
 ## Notes
 
@@ -36,9 +36,15 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 - Plan for the next claim: drop `.RefusedBySchannelBuild()` from the `http2`, `http2-prior-knowledge` and `proxy-http2` rows in `CommandLineOptionTable.cs` (keep it on `ssl-sessions`); fix the doc comments in `CommandLineOption.cs`/`CommandLineOptions.cs` that name HTTP/2; add `HTTP2` after `HSTS` to `CurlVersionText.WindowsFeaturesLine` and `ManagedCurlVersion.WindowsFeatures` (`Libcurl/Misc/Version/CurlVersion.cs` already maps the name to `CurlVersionFeatures.Http2`, so `CurlVersionFeatures.cs` likely needs no change); `--ai-help` follows the row's `RefusedByWindowsSchannelBuild` automatically. Keep the Windows version line without `nghttp2/…` text, as the task says (System32's line has none).
 - Touches widened (no Doing task on origin/work/dark-factory names any of them): the existing tests that pin the Windows refusal and the Windows features line (`CommandLineSchannelBuildRefusalTests.cs`, `CurlVersionTextTests.cs`, `CurlCommandRunnerSchannelBuildRefusalTests.cs`, `ManagedCurlVersionTests.cs`, `Libcurl.UnitTests/.../CurlVersionTests.cs`), `CurlAiHelpText.cs` (its Schannel refusal line), and `Curl.Conformance.UnitLibrary/UpstreamCurlPlatform.cs`, whose remarks say `http/2` and `h2c` are off on Windows (BL-2230): decide there whether to turn them on (it changes which upstream cases run on Windows) or file that as follow-up.
 
+- 2026-10-23 (lane 1): Done. Dropped `.RefusedBySchannelBuild()` from the `http2`, `http2-prior-knowledge` and `proxy-http2` rows (`ssl-sessions` keeps it); `HTTP2` follows `HSTS` in `CurlVersionText.WindowsFeaturesLine` and `ManagedCurlVersion.WindowsFeatures`, so `curl_version_info` sets CURL_VERSION_HTTP2 on Windows (`Libcurl/Misc/Version/CurlVersion.cs` already maps the name; `CurlVersionFeatures.cs` unchanged). ADR-0786 records Stewart's decision and supersedes ADR-0397's HTTP/2 part and ADR-0450. `--ai-help` drops the Windows refusal line on its own (pinned in `Http2OnWindowsTests`); `--help` never named the refusal. Added a test that `RefusedBySchannelBuild` still refuses a negatable row's `--no-` spelling, since `proxy-http2` was the only row covering that branch.
+- Conformance (recorded comparison, 2026-10-23): ran the built `curl.exe` through `Record-CurlExchange.ps1 -Http2Origin` in all five BL-3209 modes with the recording's flags. Exit codes (all 0), `%{http_version}` (2, 1.1, 2, 2, 1.1), stdout bodies, request bytes (upgrade request incl. `HTTP2-Settings: AAMAAABkAAQAAQAAAAIAAAAA`, prior-knowledge/ALPN HEADERS frames, plain 1.1 on ALPN fallback), ALPN lines, `Received 101` and `[HTTP/2] [1]` lines match curl 8.22.0 nghttp2. One difference: after the h2c upgrade Curl sends no `WINDOW_UPDATE stream 1` frames (curl sends two); filed BL-3265. The Windows version line keeps no `nghttp2/...` text.
+- `UpstreamCurlPlatform` still lists `http/2`/`h2c` off Windows: turning them on changes which upstream cases run there, so filed BL-3264 rather than doing it here; its remark now says so.
+- Platform check: `Http2OnWindowsTests` is Windows-only; the other changed tests parse as the Windows build explicitly or read every platform's features line, so they hold on Linux and macOS. Build -warnaserror clean, fast tests 0 failed, Measure-CodeQuality (Curl.Cli.UnitLibrary, Curl.Engine.UnitLibrary) 0 failing members.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 6c603fd4 6eb56f1e 7ce332a1 5b6db80a 3639a5e6.
 - 2026-10-22: Doing -> Backlog. Waits on BL-3209: Record-CurlExchange.ps1 has no HTTP/2 origin and no nghttp2-built curl 8.22.0 is recorded, so the conformance criterion cannot be checked
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 6c603fd4 6eb56f1e 7ce332a1 5b6db80a 3639a5e6.
+- 2026-10-23: Doing -> Done. --http2, --http2-prior-knowledge and --proxy-http2 run on Windows; curl -V and curl_version_info list HTTP2 (ADR-0786)
