@@ -486,7 +486,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($Beside) { $handOver.Tab = $next.Tab; return $true }
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
         # The next shift has its own tab; this one has only notes, and they are in the log.
-        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' | Out-Null }
+        if ($next.Tab) { Close-FinishedHerdrTabsAndTrace; Close-OwnHerdrTab 'shift handed over to the next one' | Out-Null }
         return $true
     }
     # What master held before the merge, so the shift-end review reads only what this shift merged.
@@ -520,7 +520,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($handOver.Done) {
         foreach ($r in @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
-        if ($handOver.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
+        if ($handOver.Tab) { Close-FinishedHerdrTabsAndTrace; Close-OwnHerdrTab 'shift handed over to the next one' }
         exit 0
     }
     # Those tasks were pushed from the ci-watch worktree; pull them here too, or the board
@@ -569,6 +569,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         Write-Heartbeat 'finished'
         Publish-BoardStatus -Branch $branch -State 'ended'
     }
+    Close-FinishedHerdrTabsAndTrace
     if ($reasons.Count -gt 0) { Set-OwnTabLabel 'ALARM, read'; Invoke-Alarm -Reasons $reasons; exit 2 }
     try { $Host.UI.RawUI.WindowTitle = 'Dark factory - shift complete' } catch { }
     Close-OwnHerdrTab 'shift complete with nothing waiting on Stewart'

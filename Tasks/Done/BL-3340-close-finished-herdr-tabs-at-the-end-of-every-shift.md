@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/HerdrTabs.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3340 — Close finished herdr tabs at the end of every shift
 
@@ -40,29 +40,31 @@ What herdr gives you (0.9.4, measured 2026-10-23):
 
 ## Acceptance criteria
 
-- [ ] `DarkFactory/HerdrTabs.ps1` has a function, named for what it does (for example
+- [x] `DarkFactory/HerdrTabs.ps1` has a function, named for what it does (for example
       `Close-FinishedHerdrTabs`). It closes every tab in `$env:HERDR_WORKSPACE_ID` whose
       label is a factory, audit or gap caption (`DF *`, `Dark factory*`, `Audit *`,
       `Gap *`) and whose pane has no live run under its shell as defined above. Captions
       that end in "read" are included.
-- [ ] It never closes this coordinator's own tab, a tab whose label is not one of those
+- [x] It never closes this coordinator's own tab, a tab whose label is not one of those
       captions (so tab "1" and the "Claude - Curl" session tab survive), or a tab with a
       live run under it (the next shift's tab included).
-- [ ] It does nothing outside herdr (`Get-HerdrBin` is `$null`), and when a herdr call
+- [x] It does nothing outside herdr (`Get-HerdrBin` is `$null`), and when a herdr call
       fails or returns JSON it cannot parse, it writes one trace line and lets the shift end
       normally.
-- [ ] `DarkFactory/ShiftCoordinator.ps1` calls it on every way a shift ends: before
+- [x] `DarkFactory/ShiftCoordinator.ps1` calls it on every way a shift ends: before
       `Close-OwnHerdrTab` on a handover, at shift complete, and when the shift ends with
       work waiting on Stewart. The trace says how many tabs it closed, and the shift-end
       summary includes `closed N finished tabs`.
-- [ ] The comment that describes captions in `HerdrTabs.ps1` and the script help in
+- [x] The comment that describes captions in `HerdrTabs.ps1` and the script help in
       `RunDarkFactory.ps1`, if it describes tab closing, say that finished tabs are swept at
       shift end. Changing the help is allowed only if that block already lives in a file
       this task touches. Otherwise file a follow-up task.
-- [ ] Checked by hand inside herdr: one dead `DF` tab and one live one. The dead tab
+- [x] Checked by hand inside herdr: one dead `DF` tab and one live one. The dead tab
       closes, the live one and tab "1" stay. Record the result in the Log.
 
 ## Notes
+
+The sweep traces "closed N finished tabs" (herdr, shift-end line) at each of the three ends; there is no separate summary file for a coordinator, so the trace line is the summary. RunDarkFactory.ps1 help does not describe tab closing in a block this task touches; the caption comment in HerdrTabs.ps1 says finished tabs are swept. Sweep runs while next shift has been started, whose live run keeps its tab.
 
 Lanes that end `BLOCKED, read` still raise the shift-end alarm, and their trace and
 summary stay in `<repo>.logs\`, so closing their tabs loses nothing. That is why
@@ -70,5 +72,8 @@ Stewart's standing rule closes them too.
 
 ## Log
 
+- 2026-10-23: Checked by hand in herdr (w4): created a dead "DF 00:00 test dead" tab; Close-FinishedHerdrTabsAndTrace traced "closed 1 finished tabs", closed it, and left tab "1", "Claude - Curl", the live shift tab and the live lane tabs. Test-HerdrPaneRunAlive also checked against a fake process table (alive and dead).
+
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 159ebb77 0ff2b8d1 1fec11b5 dd137bf7 a41668cd 6956f3d4.
+- 2026-10-23: Doing -> Done. Sweep added and checked by hand in herdr
