@@ -359,6 +359,14 @@ public sealed class TransferInfoFromReportTests
         Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport() }, RequestUrl, true, new ManualTimeProvider()).FileTime);
 
     [TestMethod]
+    public void Of_FileTimeNotRequestedForAFileUrl_TakesTheSourceTime() =>
+        Assert.AreEqual(1711956244, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 0) { SourceLastWriteUnixSeconds = 1711956244 }, "file:///dir/x", false, new ManualTimeProvider()).FileTime);
+
+    [TestMethod]
+    public void Of_FileTimeNotRequestedForAFileUrlThatFailed_AnswersMinusOne() =>
+        Assert.AreEqual(-1, TransferInfoFromReport.Of(TransferResult.Failure(CurlExitCode.FileCouldntReadFile, "x"), "file:///dir/nope.txt", false, new ManualTimeProvider()).FileTime);
+
+    [TestMethod]
     public void Of_FileTimeNotRequested_AnswersMinusOne() =>
         Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 0, null, DateTimeOffset.UnixEpoch.AddSeconds(5)) { Report = new TransferReport() }, RequestUrl, false, new ManualTimeProvider()).FileTime);
 

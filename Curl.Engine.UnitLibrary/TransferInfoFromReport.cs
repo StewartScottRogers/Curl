@@ -20,7 +20,7 @@ internal static partial class TransferInfoFromReport
     /// </summary>
     /// <param name="result">The finished transfer.</param>
     /// <param name="requestUrl">The URL the transfer was given, the effective URL when the report names no other.</param>
-    /// <param name="fileTimeRequested">Whether <c>CURLOPT_FILETIME</c> asked for the remote file's time, without which libcurl answers -1.</param>
+    /// <param name="fileTimeRequested">Whether <c>CURLOPT_FILETIME</c> asked for the remote file's time, without which libcurl answers -1 for every scheme but <c>file://</c>, whose handler stores the stat time unasked (BL-3337).</param>
     /// <param name="timeProvider">The provider that took the report's <see cref="TransferTimings" />.</param>
     /// <param name="certificateInfoRequested">Whether <c>CURLOPT_CERTINFO</c> asked for the peer certificates' records, without which libcurl's <c>CURLINFO_CERTINFO</c> is empty.</param>
     /// <param name="uploaded">Whether the transfer was a <c>CURLOPT_UPLOAD</c>, whose <c>file://</c> answer for the download length is -1 (libcurl's <c>file_upload</c> sets none).</param>
@@ -32,7 +32,7 @@ internal static partial class TransferInfoFromReport
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
         TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl, (uploaded, contentLengthIgnored)) with
         {
-            FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
+            FileTime = fileTimeRequested || SchemeOf(effectiveUrl) == FileScheme ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
         };
         info = WithSchemeAndProtocol(info, result, requestUrl, effectiveUrl);
         return result.Report is null ? info : info with
