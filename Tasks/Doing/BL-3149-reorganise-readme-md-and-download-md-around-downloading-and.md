@@ -35,3 +35,4 @@ The "For AI agents" section links to `llms.txt`, `resources.json`, `--ai-help` (
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 53b11a1f 7d7e1556 719e1223 b0913bc2 6b653068.
