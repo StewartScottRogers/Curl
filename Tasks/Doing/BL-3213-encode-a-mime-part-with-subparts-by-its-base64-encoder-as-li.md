@@ -30,3 +30,4 @@ Split from BL-3208. Stewart's harness gave 449 bytes upstream, 297 ours: libcurl
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: cad4ed1b 491059de.
