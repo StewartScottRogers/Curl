@@ -33,3 +33,4 @@ BL-3237's replay: /status/100 and '/status/100 follow' both end rc=8 in both lib
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 124ad975 ebc469ce 0ac4089b.
