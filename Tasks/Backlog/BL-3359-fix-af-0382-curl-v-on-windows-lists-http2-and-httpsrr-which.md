@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Curl.Engine.UnitTests/ManagedCurlVersionTests.cs, Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs]
 requirement: none
 created: 2026-10-23
 completed:
@@ -46,7 +46,12 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
+- 2026-10-23 (lane 5): Decided (ADR-0801, by Claude under Stewart's delegation, since Stewart accepted AF-0382 after reading ADR-0786's explanation): drop HTTP2 and HTTPSRR from `CurlVersionText.WindowsFeaturesLine` only; `--http2` still runs on Windows and the Linux/macOS line is unchanged. Done in the stash: the constant and doc comments, `CurlVersionTextTests` and `Http2OnWindowsTests` literals, ADR-0801 and its README row.
+- Still to do: `ManagedCurlVersion` (Windows list, line 24) must drop HTTP2 and HTTPSRR too, because `ManagedCurlVersionTests` asserts `curl_version_info` matches `CurlVersionText.Lines` (its line 47 pins HTTP2 after HSTS); check `CURL_VERSION_HTTP2`/`HTTPSRR` bits on Windows in `Libcurl.UnitTests/Misc/Version/CurlVersionTests.cs` follow. Touches widened to those files for that reason.
+- Requeued: BL-3301 (Doing) holds the whole Curl.Engine.UnitLibrary, which `ManagedCurlVersion.cs` is in.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, which BL-3301 (Doing) holds as the whole Curl.Engine.UnitLibrary
