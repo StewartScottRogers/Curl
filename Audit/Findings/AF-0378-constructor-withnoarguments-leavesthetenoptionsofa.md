@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitTests/TlsClientOptionsTests.cs:Constructor_WithNoArguments_LeavesTheTenOptionsOfAdr0151NotGiven:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3355
+tasks: BL-3355
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md

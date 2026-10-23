@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/EchOffer.cs:SourceLines-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/EchOffer.cs:92:>
-task: none
-tasks:
+task: BL-3353
+tasks: BL-3353
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md

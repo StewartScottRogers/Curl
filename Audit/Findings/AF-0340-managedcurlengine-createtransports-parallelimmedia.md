@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedCurlEngine.cs:CreateTransports-false:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedCurlEngine.cs:318:false
-task: BL-3120
-tasks: BL-3120
+task: BL-3351
+tasks: BL-3120, BL-3351
 found: 2026-10-22
 found-at: 608a755586679cf34031a0e5b137f01b9d7fb329
 scorecard: 2026-10-22_1120.md
