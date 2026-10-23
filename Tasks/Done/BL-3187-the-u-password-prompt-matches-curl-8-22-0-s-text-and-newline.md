@@ -32,7 +32,7 @@ Split from BL-3171 (one sub-criterion per subtask); read BL-3171's Context for t
 - Measured curl 8.22.0 (x86_64-w64-mingw32, Schannel) with Record-CurlExchange.ps1 -NoServer. `-u,bob,bogus://x` blocks in `_getch` on the console, which the recorder cannot feed keys to, so it was stopped. The run on `-u bob bogus://x` showed curl's stderr is text mode: each `"...\n"` error line came out as `0D 0A`. Upstream 8.22.0 `tool_getpass.c` writes `fputs("\n", tool_stderr)` after the entry (always on Windows; on POSIX only when echo was turned off), so the bytes are CR LF on Windows and LF on a POSIX terminal. The prompt text is `Enter %s password for user '%s':` (`tool_paramhlp.c` `checkpasswd`).
 - `ConsolePasswordPrompt` already writes `TextWriter.NewLine` (Environment.NewLine on Console.Error), and `CommandLineOptions.cs` already has the right text (pinned by CommandLinePasswordPromptTests), so no production change and BL-3183's file is untouched. Added two OSCondition tests pinning the literal bytes: `...':\r\n` on Windows and `...':\n` off Windows. CI off Windows is covered by keeping the tests platform-split; fast tests green here (4129 passed).
 - Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary: 0 failing members.
-- Filed BL-3190: off Windows, curl reads /dev/tty and writes no LF when echo was not turned off (redirected input, no terminal). The port always writes it.
+- Filed BL-3200: off Windows, curl reads /dev/tty and writes no LF when echo was not turned off (redirected input, no terminal). The port always writes it.
 
 ## Log
 

@@ -1,5 +1,5 @@
 ---
-id: BL-3190
+id: BL-3200
 title: The -u password prompt off Windows reads /dev/tty and writes no newline when echo was not disabled, as curl 8.22.0
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-22
 completed:
 ---
-# BL-3190 — The -u password prompt off Windows reads /dev/tty and writes no newline when echo was not disabled, as curl 8.22.0
+# BL-3200 — The -u password prompt off Windows reads /dev/tty and writes no newline when echo was not disabled, as curl 8.22.0
 
 ## Goal
 
