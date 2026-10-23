@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Curl.Engine.UnitTests/TransferInfoAuthAndRefererTests.cs, Libcurl.UnitTests/Info/EasyInfoAuthAndRefererTests.cs]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.cs, Curl.Engine.UnitTests/TransferInfoAuthAndRefererTests.cs, Libcurl.UnitTests/Info/EasyInfoAuthAndRefererTests.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferReport.cs]
 requirement: none
 created: 2026-10-22
 completed:
@@ -32,7 +32,11 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 
 ## Notes
 
+- 2026-10-22 (lane 4): First pass, no code changed. `TransferInfoFromReport.WithCounts` already maps `AuthSchemePicked`/`ProxyAuthSchemePicked` to HTTPAUTH_USED/PROXYAUTH_USED, but HTTPAUTH_AVAIL/PROXYAUTH_AVAIL are read only from the *final* response's `WWW-Authenticate`/`Proxy-Authenticate` when it is a 401/407, so after an auth retry that ends 200 they are 0. Upstream ORs every challenge seen into `data->info.httpauthavail` (`Curl_http_input_auth`), so the HTTP handler must carry the offered bits across its own retry onto `TransferReport` (new field, e.g. `AuthSchemesOffered`/`ProxyAuthSchemesOffered`), which is why `HttpProtocolHandler.cs` and `TransferReport.cs` were added to touches. The handler already counts an auth retry in `RedirectsFollowed` (`HttpProtocolHandler.cs` ~3541, report `RedirectCount` ~1465): check the count is right before changing it. CURLINFO_REFERER for a library handle needs `CURLOPT_REFERER` as a fallback when the report carries none; that lands in `ManagedEasyTransfer.cs` (where `Info` is built; the ToolEvents path already falls back), hence its addition to touches.
+- 2026-10-22 (lane 4): Measuring: `Record-CurlExchange.ps1` with two `-Response` values and no `-Connections` hung for 30 min (--anyauth 401 then 200); next run should pass `-Connections 2` or a short `-HoldOpenMilliseconds`, and run it with a timeout. Real curl here is 8.22.0 Schannel (debug build).
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 8442c290 2677bb42 ed48196a de830169 3639a5e6.
+- 2026-10-22: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, held by BL-3195 (Doing); touches widened to it, HttpProtocolHandler.cs and TransferReport.cs
