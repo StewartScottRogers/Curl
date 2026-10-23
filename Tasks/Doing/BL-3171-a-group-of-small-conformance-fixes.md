@@ -42,3 +42,4 @@ Filed on Stewart's behalf on 2026-10-22 as one task, one sub-criterion per fix. 
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 1564fed0 4b320894 922672d5 458d0126 4890ae0e 47752f91 992fc681.
