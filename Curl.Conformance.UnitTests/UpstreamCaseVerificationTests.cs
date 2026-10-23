@@ -409,6 +409,16 @@ public sealed class UpstreamCaseVerificationTests
     // The sentence naming the first difference; the line diff after it is pinned in UpstreamLineDifferenceTests.
     private static string? FirstLine(string? difference) => difference?.Split('\n')[0];
 
+    [TestMethod]
+    public void FindFirstDifference_StdoutWithLoadfile_ExpectsTheNamedFileInPlaceOfTheBody()
+    {
+        string path = TemporaryFile("one\ntwo\n").Replace('\\', '/');
+        string sections = $"<verify>\n<stdout loadfile=\"{path}\">\n</stdout>\n</verify>\n";
+
+        Assert.IsNull(Verify(sections, Run(standardOutput: "one\ntwo\n")));
+        ExpectPresent(Verify(sections, Run(standardOutput: "one\n")));
+    }
+
     private static string Neutral(string? text) =>
         (text ?? "(none)").Replace(Path.GetTempPath().Replace('\\', '/'), "<temp>/");
 

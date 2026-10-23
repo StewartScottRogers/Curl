@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3406, BL-3391]
-touches: [Curl.Conformance.UnitLibrary/UpstreamTest1135Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1135.cs, Curl.Conformance.UnitTests/UpstreamTest1135ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
+touches: [Curl.Conformance.UnitLibrary/UpstreamTest1135Script.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1135.cs, Curl.Conformance.UnitTests/UpstreamTest1135ScriptTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Conformance.UnitLibrary/UpstreamCaseVerification.cs, Curl.Conformance.UnitTests/UpstreamCaseVerificationTests.cs, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3393 — Interpret upstream test1135.pl in C#: CURL_EXTERN order in the headers and the libcurl.def exports (cases 1135 and 1279)
 
@@ -22,13 +22,18 @@ Decided in BL-3406 (supersedes the no-counterpart row of ADR-0718/ADR-0755): lik
 
 ## Acceptance criteria
 
-- [ ] Cases 1135 and 1279 each end `Passed` with `$env:CURL_UPSTREAM_CASE` set to them on Windows and are on `PassingUpstreamCases.txt`.
-- [ ] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
-- [ ] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
+- [x] Cases 1135 and 1279 each end `Passed` with `$env:CURL_UPSTREAM_CASE` set to them on Windows and are on `PassingUpstreamCases.txt`.
+- [x] The script class has focused unit tests in `Curl.Conformance.UnitTests` that pass on the vendored files, and fail (shown by a deliberately broken input) for at least one violation the script reports.
+- [x] `dotnet build Curl.slnx -warnaserror` is clean, `dotnet test --filter "TestCategory!=Integration"` passes, and `Curl.Conformance.UnitLibrary` keeps 100% line and branch coverage and complexity at most 10 per method.
 
 ## Notes
+
+- touches widened (no other Doing task names these): case 1279 uses `<stdout loadfile=...>`, which UpstreamCaseVerification did not support (now reads the named file, with a unit test), and `lib/libcurl.def` had to be copied beside UpstreamTestData in the test csproj, as docs/include/src are.
+
+- Cases 1135 and 1279 pass on Windows and are listed; focused tests show the list changing with the header content (order, sorting, two-line declarations); Curl.Conformance.UnitLibrary measured 100%/100%, complexity within 10. Platform-neutral (no paths or OS text).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 0ae8cf1b c9ef8a5b b41964f0.
+- 2026-10-23: Doing -> Done. Cases 1135 and 1279 pass via a C# test1135.pl interpretation and loadfile support
