@@ -31,3 +31,4 @@ Decided in BL-3406 (supersedes the no-counterpart row of ADR-0718/ADR-0755): lik
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 260e5d5a c9ef8a5b b41964f0.
