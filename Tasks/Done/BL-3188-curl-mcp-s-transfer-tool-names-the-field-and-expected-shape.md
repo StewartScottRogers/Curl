@@ -29,10 +29,10 @@ Split from BL-3171 (one sub-criterion per subtask); read BL-3171's Context for t
 
 ## Notes
 
-- Plan (ADR-0770): the SDK binds arguments to `TransferAsync`'s typed parameters before any of our code runs, and a throw there is answered only "An error occurred invoking 'transfer'." Taking raw `JsonElement`s would empty the published input schema (pinned by CurlMcpHostTests), so the typed parameters stay and `CurlMcpHost` registers a call-tool request filter, `CurlTransferTool.RefuseWrongArgumentShapes`, that checks the raw arguments with `McpTransferRequestCheck.CheckArgumentShapes` first and answers `Invalid <field>: it must be <shape>, not <kind>.` as a tool error.
+- Plan (ADR-0771): the SDK binds arguments to `TransferAsync`'s typed parameters before any of our code runs, and a throw there is answered only "An error occurred invoking 'transfer'." Taking raw `JsonElement`s would empty the published input schema (pinned by CurlMcpHostTests), so the typed parameters stay and `CurlMcpHost` registers a call-tool request filter, `CurlTransferTool.RefuseWrongArgumentShapes`, that checks the raw arguments with `McpTransferRequestCheck.CheckArgumentShapes` first and answers `Invalid <field>: it must be <shape>, not <kind>.` as a tool error.
 - Touches widened to `Curl.Mcp/CurlMcpHost.cs` (the filter is registered there) and `Curl.Mcp/CLAUDE.md` (it lists what the host project holds); no task in Doing on origin/work/dark-factory names either.
 - "options" in the criterion read as the option fields (`followRedirects`, `timeoutSeconds`, `insecure`, `proxy`, `userAgent`): the tool has no field called `options`. Each has a wrong-shape test.
-- No curl measurement: the MCP tool's argument contract has no curl counterpart (recorded in ADR-0770).
+- No curl measurement: the MCP tool's argument contract has no curl counterpart (recorded in ADR-0771).
 - Platform check: the tests are pure JSON and in-memory; nothing depends on paths, OS errors or certificates.
 - Measured: `dotnet build Curl.Mcp.UnitTests -warnaserror` clean (builds Curl.Mcp and Curl.Mcp.UnitLibrary); Curl.Mcp.UnitTests fast tests 499 passed; Measure-CodeQuality.ps1 -Library Curl.Mcp,Curl.Mcp.UnitLibrary: both 100% line and branch, 0 failing members, worst CRAP 10.
 
