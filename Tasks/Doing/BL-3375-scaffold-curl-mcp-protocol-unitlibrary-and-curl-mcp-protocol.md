@@ -37,3 +37,4 @@ The projects `Curl.Mcp.Protocol.UnitLibrary` and `Curl.Mcp.Protocol.UnitTests` e
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 55930721 4c43dc30 81e501b3 a508f334 6d2cec38.
