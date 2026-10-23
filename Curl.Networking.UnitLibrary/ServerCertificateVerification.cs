@@ -29,6 +29,20 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
 
     /// <summary>
+    /// The Schannel build's message for exit 35 when a revocation status could not be fetched
+    /// and the chain is flagged offline (BL-3252; Windows' own text for 0x80092013).
+    /// </summary>
+    internal const string SchannelRevocationOffline =
+        "schannel: next InitializeSecurityContext failed: CRYPT_E_REVOCATION_OFFLINE (0x80092013) - The revocation function was unable to check revocation because the revocation server was offline.";
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 when a revocation status could not be fetched
+    /// (BL-3252; Windows' own text for 0x80092012).
+    /// </summary>
+    internal const string SchannelNoRevocationCheck =
+        "schannel: next InitializeSecurityContext failed: CRYPT_E_NO_REVOCATION_CHECK (0x80092012) - The revocation function was unable to check revocation for the certificate.";
+
+    /// <summary>
     /// The Schannel build's message for exit 35 when, checked against the system store, a
     /// certificate in the server's chain is revoked (curl 8.22.0, measured, BL-3215).
     /// </summary>
@@ -293,10 +307,23 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// <param name="chainStatus">The chain's <see cref="X509Chain.ChainStatus" />.</param>
     /// <returns>The exit code and message, or <see langword="null" /> when this is not the refusal.</returns>
     internal (CurlExitCode ExitCode, string Message)? SchannelRevocationRefusal(SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
-        matchesSchannelBuild && !options.HasCaCertificates && !options.SkipRevocationCheck
-        && IsSchannelCertificateRevoked(errors, chainStatus)
-            ? (CurlExitCode.SslConnectError, SchannelCertificateRevoked)
-            : null;
+        !matchesSchannelBuild || options.HasCaCertificates || options.SkipRevocationCheck
+            ? null
+            : IsSchannelCertificateRevoked(errors, chainStatus)
+                ? (CurlExitCode.SslConnectError, SchannelCertificateRevoked)
+                : SchannelRevocationUnavailableRefusal(errors, chainStatus);
+
+    // Without --ssl-revoke-best-effort, Schannel fails the handshake when a revocation status
+    // could not be fetched: CRYPT_E_REVOCATION_OFFLINE when the chain is flagged offline,
+    // CRYPT_E_NO_REVOCATION_CHECK otherwise (BL-3252; texts are Windows' own).
+    private (CurlExitCode ExitCode, string Message)? SchannelRevocationUnavailableRefusal(
+        SslPolicyErrors errors, X509ChainStatus[] chainStatus) =>
+        errors != SslPolicyErrors.RemoteCertificateChainErrors || !HasOnlyUnavailableRevocationStatus(chainStatus)
+            ? null
+            : (CurlExitCode.SslConnectError,
+                chainStatus.Any(status => status.Status.HasFlag(X509ChainStatusFlags.OfflineRevocation))
+                    ? SchannelRevocationOffline
+                    : SchannelNoRevocationCheck);
 
     // The Schannel build's answer for a certificate SslStream found fault with: a revoked
     // chain is the handshake's failure, anything else the peer verification's.

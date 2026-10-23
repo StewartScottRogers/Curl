@@ -122,12 +122,74 @@ public sealed class ServerCertificateRevocationTests
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
-    public void VerifyPeer_SystemStoreChainWithAnUnreachableResponderInTheSchannelBuild_Refuses()
+    public void VerifyPeer_SystemStoreChainWithAnOfflineRevocationStatusInTheSchannelBuild_IsExit35CryptERevocationOffline()
+    {
+        var failure = VerifyChainWithStatus(
+            new TlsClientOptions(),
+            [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.OfflineRevocation }]);
+
+        Diagnostics.Assert("failure", (CurlExitCode.SslConnectError, ServerCertificateVerification.SchannelRevocationOffline), failure);
+        Assert.AreEqual((CurlExitCode.SslConnectError, ServerCertificateVerification.SchannelRevocationOffline), failure);
+        Assert.AreEqual(
+            "schannel: next InitializeSecurityContext failed: CRYPT_E_REVOCATION_OFFLINE (0x80092013) - The revocation function was unable to check revocation because the revocation server was offline.",
+            failure!.Value.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void VerifyPeer_SystemStoreChainWithAnUnknownRevocationStatusInTheSchannelBuild_IsExit35CryptENoRevocationCheck()
+    {
+        var failure = VerifyChainWithStatus(new TlsClientOptions(), [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }]);
+
+        Diagnostics.Assert("failure", (CurlExitCode.SslConnectError, ServerCertificateVerification.SchannelNoRevocationCheck), failure);
+        Assert.AreEqual((CurlExitCode.SslConnectError, ServerCertificateVerification.SchannelNoRevocationCheck), failure);
+        Assert.AreEqual(
+            "schannel: next InitializeSecurityContext failed: CRYPT_E_NO_REVOCATION_CHECK (0x80092012) - The revocation function was unable to check revocation for the certificate.",
+            failure!.Value.Message);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void VerifyPeer_SystemStoreChainWithAnUnknownRevocationStatusAndRevokeBestEffort_Accepts()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(RevocationCheckBestEffort: true), SchannelBuild, TimeProvider.System)
+        {
+            ReadChainStatus = _ => [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }],
+        };
+
+        // Best effort strips the unavailable status before the Schannel refusal is asked.
+        Assert.IsNull(verification.SchannelRevocationRefusal(SslPolicyErrors.None, []));
+        Assert.IsNull(verification.SchannelRevocationRefusal(SslPolicyErrors.RemoteCertificateNameMismatch, [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }]));
+    }
+
+    [TestMethod]
+    public void SchannelRevocationRefusal_UnknownStatusWithSslNoRevoke_IsNone()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(SkipRevocationCheck: true), SchannelBuild, TimeProvider.System);
+
+        Assert.IsNull(verification.SchannelRevocationRefusal(
+            SslPolicyErrors.RemoteCertificateChainErrors, [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown }]));
+    }
+
+    [TestMethod]
+    public void SchannelRevocationRefusal_UnknownStatusBesideAnUntrustedRoot_IsNone()
+    {
+        var verification = new ServerCertificateVerification(new TlsClientOptions(), SchannelBuild, TimeProvider.System);
+
+        Assert.IsNull(verification.SchannelRevocationRefusal(
+            SslPolicyErrors.RemoteCertificateChainErrors,
+            [new() { Status = X509ChainStatusFlags.RevocationStatusUnknown | X509ChainStatusFlags.UntrustedRoot }]));
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void VerifyPeer_SystemStoreChainWithAnUnreachableResponderInTheSchannelBuild_IsExit35BecauseNoRevocationStatusWasFetched()
     {
         var failure = VerifyWithUnreachableRevocationLists(new TlsClientOptions(), SchannelBuild);
 
-        Diagnostics.Assert("failure", "a refusal", failure);
-        Assert.IsNotNull(failure);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, failure?.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslConnectError, failure?.ExitCode);
+        StringAssert.StartsWith(failure!.Value.Message, "schannel: next InitializeSecurityContext failed: CRYPT_E_");
     }
 
     [TestMethod]
