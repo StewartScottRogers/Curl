@@ -35,7 +35,7 @@ Stewart reported on 2026-10-22: `curl -X NLST ftp://host/` must send `NLST`, and
   sends `NLST`, `-X 'LIST -a'` sends `LIST -a`, `-l -X 'LIST -a'` sends `LIST -a`, nocwd
   sends `NLST sub`, `--ftp-pret` sends `PRET NLST`, and `-X NLST` on `file.txt` sends
   `SIZE file.txt` and `RETR file.txt`. All after `TYPE A` (`TYPE I` for the file).
-- Decision (ADR-0764): no contract change. The engine already fills
+- Decision (ADR-0765): no contract change. The engine already fills
   `ITransferContext.Http.CustomMethod` from `-X` for every scheme, and FTP already reads
   `Http.IgnoreContentLength`, so `FtpSession.ListVerb` uses `Http.CustomMethod` when it is set.
   That one change also covers `PRET`.
