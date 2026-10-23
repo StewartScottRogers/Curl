@@ -36,3 +36,4 @@ Split from BL-3189. Curl races today: `ParallelHostQueue.Leave` releases every w
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: e910298d 9f090ed0 d86ddc33 8aba9703.
