@@ -29,3 +29,4 @@ s CURLINFO_OS_ERRNO after a connect that failed on one address and succeeded on 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing.
