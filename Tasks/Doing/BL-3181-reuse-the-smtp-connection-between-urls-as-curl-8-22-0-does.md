@@ -31,3 +31,4 @@ Found by BL-3167. Measured 2026-10-22 with `Record-CurlExchange.ps1 -Smtp`, curl
 ## Log
 
 - 2026-10-22: Created.
+- 2026-10-22: Backlog -> Doing. Criteria at claim: 31cd83eb b29df304 8d230ff5.
