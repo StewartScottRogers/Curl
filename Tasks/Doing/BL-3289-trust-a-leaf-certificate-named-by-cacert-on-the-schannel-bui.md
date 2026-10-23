@@ -36,3 +36,4 @@ Found by BL-3235's CLI TLS differential run (case `tls-wrong-ca` in `Curl.Confor
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 88a772e1 c46ca32a.
 - 2026-10-23: Doing -> Backlog. Fix lands in Curl.Networking.UnitLibrary/ServerCertificateVerification.cs with tests in Curl.Networking.UnitTests, which BL-3282 holds; criteria and touches corrected from Curl.Tls
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 760e5ee9 c46ca32a.
