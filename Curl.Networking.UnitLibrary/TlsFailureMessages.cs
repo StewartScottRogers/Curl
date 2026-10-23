@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
 using Curl.Tls;
@@ -138,8 +139,20 @@ internal static class TlsFailureMessages
         [OpenSslVerifyResult.KeyUsageDoesNotIncludeCrlSigning] = "key usage does not include CRL signing",
     }.ToFrozenDictionary();
 
+    private const int SecEIllegalMessage = unchecked((int)0x80090326);
+
+    // How SslStream names a received protocol_version alert in its AuthenticationException.
+    private const string ProtocolVersionAlertNamed = "TLS alert: 'ProtocolVersion'";
+
+    // What curl 8.22.0's Schannel build reports for --tls-max 1.2 against a TLS 1.3-only
+    // server (BL-3235's tls-max-1.2-vs-1.3 case, BL-3292).
+    private const string SchannelUnsupportedFunction =
+        "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported";
+
     // What curl's Schannel build reports when the server sends a fatal alert during the
-    // handshake (measured against a handshake_failure alert, ADR-0140).
+    // handshake (measured against a handshake_failure alert, ADR-0140), and for every
+    // SEC_E_ILLEGAL_MESSAGE, whose system text curl's schannel.c replaces with its own
+    // (BL-3235's tls12-server-tls13only and badssl cases, BL-3292).
     private const string SchannelFatalAlertReceived =
         "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
 
@@ -371,9 +384,37 @@ internal static class TlsFailureMessages
         }
 
         var code = securityStatus.NativeErrorCode;
+        if (code == SecEIllegalMessage)
+        {
+            return SchannelFatalAlertReceived;
+        }
+
         var name = SecurityStatusNames.GetValueOrDefault(code, "Unknown error");
         return $"schannel: next InitializeSecurityContext failed: {name} (0x{code:X8}) - {securityStatus.Message}";
     }
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 from <see cref="System.Net.Security.SslStream" />'s
+    /// failure and the <c>--tls-max</c> ceiling: as <see cref="SchannelSslConnectError(Exception, bool)" />
+    /// gives it, except that with a TLS 1.2 ceiling a server refusing the version with a
+    /// <c>protocol_version</c> alert is <c>SEC_E_UNSUPPORTED_FUNCTION</c>, as curl 8.22.0's
+    /// Schannel build reported <c>--tls-max 1.2</c> against a TLS 1.3-only server (BL-3235's
+    /// <c>tls-max-1.2-vs-1.3</c> case, ADR-0796), where <see cref="System.Net.Security.SslStream" />
+    /// returns <c>SEC_E_ILLEGAL_MESSAGE</c>.
+    /// </summary>
+    /// <param name="exception">What the handshake threw.</param>
+    /// <param name="maximumVersion">The highest version offered, <c>--tls-max</c>.</param>
+    /// <returns>The message curl prints.</returns>
+    public static string SchannelSslConnectError(Exception exception, TlsVersion maximumVersion) =>
+        maximumVersion == TlsVersion.Tls12 && IsProtocolVersionRefusal(exception)
+            ? SchannelUnsupportedFunction
+            : SchannelSslConnectError(exception, maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11);
+
+    // SslStream's exception for a protocol_version alert: SEC_E_ILLEGAL_MESSAGE under an
+    // AuthenticationException naming the alert.
+    private static bool IsProtocolVersionRefusal(Exception exception) =>
+        FindInnerException<Win32Exception>(exception)?.NativeErrorCode == SecEIllegalMessage
+        && FindInnerException<AuthenticationException>(exception)?.Message.Contains(ProtocolVersionAlertNamed, StringComparison.Ordinal) == true;
 
     /// <summary>
     /// The OpenSSL build's message for exit 35: the handshake failed for a reason other
