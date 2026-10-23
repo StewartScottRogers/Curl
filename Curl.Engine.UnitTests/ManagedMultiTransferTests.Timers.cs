@@ -120,6 +120,7 @@ public sealed partial class ManagedMultiTransferTests
         ControlledEasyTransfer transfer = new();
         multi.Add(transfer);
         await multi.PerformAsync(CancellationToken.None);
+        await multi.PerformAsync(CancellationToken.None);
 
         ValueTask<(CurlMultiCode Code, int ReadySockets)> wait = multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromSeconds(10), CancellationToken.None);
         bool completedBeforeFinish = wait.IsCompleted;
@@ -135,6 +136,7 @@ public sealed partial class ManagedMultiTransferTests
         TimerManualTimeProvider time = new();
         await using ManagedMultiTransfer multi = NewMulti(time);
         multi.Add(new ControlledEasyTransfer());
+        await multi.PerformAsync(CancellationToken.None);
         await multi.PerformAsync(CancellationToken.None);
 
         ValueTask<(CurlMultiCode Code, int ReadySockets)> wait = multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromMilliseconds(1000), CancellationToken.None);
@@ -152,6 +154,7 @@ public sealed partial class ManagedMultiTransferTests
         TimerManualTimeProvider time = new();
         await using ManagedMultiTransfer multi = NewMulti(time);
         multi.Add(WithTimeout(TimeSpan.FromMilliseconds(300)));
+        await multi.PerformAsync(CancellationToken.None);
         await multi.PerformAsync(CancellationToken.None);
 
         ValueTask<(CurlMultiCode Code, int ReadySockets)> wait = multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromSeconds(10), CancellationToken.None);
@@ -177,6 +180,7 @@ public sealed partial class ManagedMultiTransferTests
     {
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
         multi.Add(new ControlledEasyTransfer());
+        await multi.PerformAsync(CancellationToken.None);
         await multi.PerformAsync(CancellationToken.None);
         using CancellationTokenSource cancellation = new();
 

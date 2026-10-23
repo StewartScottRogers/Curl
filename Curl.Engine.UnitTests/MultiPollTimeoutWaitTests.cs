@@ -77,6 +77,7 @@ public sealed class MultiPollTimeoutWaitTests
         await using ManagedMultiTransfer multi = NewMulti(time);
         multi.Add(new TimedTransfer(TimeSpan.FromMilliseconds(300)));
         await multi.PerformAsync(CancellationToken.None);
+        await multi.PerformAsync(CancellationToken.None);
 
         ValueTask<(CurlMultiCode Code, int ReadySockets)> poll = multi.PollAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromSeconds(10), CancellationToken.None);
         time.Advance(299);
@@ -94,6 +95,7 @@ public sealed class MultiPollTimeoutWaitTests
         await using ManagedMultiTransfer multi = NewMulti(time);
         TimedTransfer transfer = new(TimeSpan.FromMilliseconds(300));
         multi.Add(transfer);
+        await multi.PerformAsync(CancellationToken.None);
         await multi.PerformAsync(CancellationToken.None);
         time.Advance(300);
 
@@ -116,6 +118,7 @@ public sealed class MultiPollTimeoutWaitTests
         TimerManualTimeProvider time = new();
         await using ManagedMultiTransfer multi = NewMulti(time);
         multi.Add(new TimedTransfer(TimeSpan.FromMilliseconds(300)));
+        await multi.PerformAsync(CancellationToken.None);
         await multi.PerformAsync(CancellationToken.None);
         time.Advance(300);
 
