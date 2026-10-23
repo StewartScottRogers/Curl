@@ -18,7 +18,7 @@ A `CURLOPT_POSTFIELDS` post with the trailer callback set sends only `CURLOPT_PO
 
 ## Context
 
-BL-3190 cut the plain post in `HttpRequestOptionsMapping.PostFieldsBodyOf` (ADR-0769); `ManagedEasyTransfer.TrailerPostFieldsBodyOf` still builds its `PostFieldsTrailerStream` over the whole `PostFields` with `fields.Length`. Apply the same cut there.
+BL-3190 cut the plain post in `HttpRequestOptionsMapping.PostFieldsBodyOf` (ADR-0771); `ManagedEasyTransfer.TrailerPostFieldsBodyOf` still builds its `PostFieldsTrailerStream` over the whole `PostFields` with `fields.Length`. Apply the same cut there.
 
 ## Acceptance criteria
 

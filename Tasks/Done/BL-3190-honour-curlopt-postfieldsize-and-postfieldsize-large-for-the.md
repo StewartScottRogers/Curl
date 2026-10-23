@@ -33,7 +33,7 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 
 - Plan: `HttpRequestOptionsMapping.PostFieldsBodyOf` now sends the first `PostFieldSize` bytes of `PostFields` (`SizedPostFieldsOf`); the HTTP handler takes `Content-Length` and `SIZE_UPLOAD` from the body it sends, so both follow.
 - Measurement: the curl tool cannot set a size apart from its data and no C toolchain is in the lane, so the values come from libcurl 8.22.0's documented and reported behaviour (Stewart's report 20: size 3 sends `Content-Length: 3` and `abc`; 0 an empty body; -1 the string length). The behaviour is the same on every platform, so there are no OSCondition tests.
-- Decision (ADR-0769): a size past the data (10) sends the 6 bytes with `Content-Length: 6`. Upstream reads past the C buffer (undefined), and managed code cannot do that safely. COPYPOSTFIELDS, RTSP and MQTT already clamp the same way.
+- Decision (ADR-0771): a size past the data (10) sends the 6 bytes with `Content-Length: 6`. Upstream reads past the C buffer (undefined), and managed code cannot do that safely. COPYPOSTFIELDS, RTSP and MQTT already clamp the same way.
 - Both options set the same `EasyHttpOptions.PostFieldSize` (`EasyHttpOptionSetters.SetPostFieldSize`), so the engine wire tests cover both. `PostFieldSizeOptionTests` sets each option by name through `CurlEasy`.
 - Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary: 0 failing members. Fast tests: Curl.Engine.UnitTests 2243 passed, Libcurl.UnitTests 1333 passed.
 - Follow-up BL-3200: a trailer-callback post (`ManagedEasyTransfer.TrailerPostFieldsBodyOf`, outside this task's touches) still sends the whole data.
