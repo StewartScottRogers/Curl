@@ -33,3 +33,4 @@ ADR-0782's Consequences: "a case that needs arbitrary bytes needs a new property
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 0097e498 0bd19de4 61bbcf39.
