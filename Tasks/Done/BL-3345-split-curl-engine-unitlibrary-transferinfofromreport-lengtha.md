@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3345 — Split Curl.Engine.UnitLibrary/TransferInfoFromReport.LengthAndCondition.cs so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 86030196 64b9654f a0b49a29.
+- 2026-10-23: Doing -> Done. LengthAndCondition.cs split into one file per unit; hotspots empty
