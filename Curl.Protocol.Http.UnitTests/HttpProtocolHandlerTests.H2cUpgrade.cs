@@ -360,12 +360,11 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ExecuteAsync_Http2UpgradeAnsweredHttp2101ThenHttp11200_FailsWithVersionMismatchAndNoBody()
     {
-        // Upstream test1704 (GF-0083, BL-2715): curl's OpenSSL build fails at the HTTP/2 101 line
-        // with "Version mismatch (from HTTP/1 to HTTP/2)" (measured, BL-2715 Notes). The Schannel
-        // build has no h2c, and Curl refuses --http2 there, so the case is not Windows'.
+        // Upstream test1704 (GF-0083, BL-2715, BL-3270): an HTTP/2-built curl fails at the HTTP/2 101
+        // line with "Version mismatch (from HTTP/1 to HTTP/2)" on every platform (measured on Linux,
+        // BL-2715 Notes, and on Windows, BL-3270 Notes).
         const string Response = "HTTP/2 101 OK\r\n\r\nHTTP/1.1 200 OK\r\nDate: Tue, 09 Nov 2010 14:49:00 GMT\r\nContent-Length: 6\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n-maa-\n";
         foreach (int chunkSize in ChunkSizes)
         {

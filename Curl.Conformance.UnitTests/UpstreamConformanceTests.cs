@@ -97,7 +97,7 @@ public sealed partial class UpstreamConformanceTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
-        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber)) && IsHeldOnThisPlatform(testFile) && IsHeldOnThisPlatform(testNumber);
+        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber)) && IsHeldOnThisPlatform(testFile);
         diagnostics.Arrange("upstream case number", testNumber);
         diagnostics.Arrange("case is on the passing list", isListed);
         UpstreamCaseOutcome outcome;

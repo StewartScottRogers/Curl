@@ -194,17 +194,6 @@ internal sealed class HttpResponseHeadReader
     internal bool IsThroughHttpProxy { get; init; }
 
     /// <summary>
-    /// Gets a value indicating whether a status line naming HTTP/2 or HTTP/3 over HTTP/1.x
-    /// (<see cref="HttpStatusLine.NamesHttp2OrHttp3" />), interim or final, fails before it is
-    /// reported - <c>HTTP/2 101</c> with exit 8, <c>Version mismatch (from HTTP/1 to HTTP/2)</c>,
-    /// <c>HTTP/3 200</c> with exit 1 (<see cref="HttpStatusLine.RefusalOverHttp1" />) - as curl's
-    /// OpenSSL build on Linux and macOS does (upstream test1704, measured, BL-2715 Notes),
-    /// rather than being taken as an assumed <c>HTTP/1.0 200</c>. By default it is so everywhere
-    /// but Windows, whose Schannel build takes the line as an assumed <c>HTTP/1.0 200</c>.
-    /// </summary>
-    internal bool RefusesHttp2StatusLines { get; init; } = !OperatingSystem.IsWindows();
-
-    /// <summary>
     /// Gets what tells, before each status line is parsed, whether the connection has switched
     /// to HTTP/2 after an h2c upgrade's <c>101</c> (<see cref="HttpH2cUpgradeConnection.IsUpgraded" />),
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
@@ -492,7 +481,8 @@ internal sealed class HttpResponseHeadReader
 
     /// <summary>
     /// Parses a status line as an HTTP/2 or HTTP/3 stream's when the heads are one's; else fails
-    /// one naming HTTP/2 or HTTP/3 when <see cref="RefusesHttp2StatusLines" />; and else parses
+    /// one naming HTTP/2 or HTTP/3 over HTTP/1.x (<see cref="HttpStatusLine.NamesHttp2OrHttp3" />) as an HTTP/2-built
+    /// curl does on every platform (upstream test1704, measured, BL-2715 and BL-3270 Notes); and else parses
     /// it as HTTP/1.x.
     /// </summary>
     /// <exception cref="HttpTransferException">The line is refused or malformed.</exception>
@@ -508,7 +498,7 @@ internal sealed class HttpResponseHeadReader
             return HttpStatusLine.Http200Alias();
         }
 
-        return RefusesHttp2StatusLines && HttpStatusLine.NamesHttp2OrHttp3(line)
+        return HttpStatusLine.NamesHttp2OrHttp3(line)
             ? throw HttpStatusLine.RefusalOverHttp1(line)
             : HttpStatusLine.Parse(line);
     }

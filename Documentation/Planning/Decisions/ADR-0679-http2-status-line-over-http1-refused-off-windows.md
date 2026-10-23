@@ -1,6 +1,6 @@
 # ADR-0679 — An `HTTP/2` or `HTTP/3` status line over HTTP/1.x is refused off Windows
 
-- **Status:** Accepted; supersedes ADR-0517
+- **Status:** Accepted; supersedes ADR-0517; amended by ADR-0788 (Windows too)
 - **Date:** 2026-10-17
 
 **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions"), for BL-2715
