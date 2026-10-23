@@ -1,5 +1,5 @@
 ---
-id: BL-3308
+id: BL-3312
 title: Make curl_ws_meta answer NULL outside a write callback
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3308 — Make curl_ws_meta answer NULL outside a write callback
+# BL-3312 — Make curl_ws_meta answer NULL outside a write callback
 
 ## Goal
 
