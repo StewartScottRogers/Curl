@@ -8,7 +8,7 @@ depends-on: []
 touches: [CLAUDE.md]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3362 — Fix AF-0385: CLAUDE.md's repository layout says 98 projects; the tree has 101 project directories with a .csproj plus 5 shared projects
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Reworded CLAUDE.md:297 to state no project count, so it cannot go stale. Build clean, fast tests green.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-23: Doing -> Done. CLAUDE.md layout no longer states a stale project count
