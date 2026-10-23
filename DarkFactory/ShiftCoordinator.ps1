@@ -16,6 +16,20 @@ function Get-IdlePollDecision {
     return [pscustomobject]@{ Action = 'wait'; Why = $why }
 }
 
+function Start-NextShiftDetached {
+    # Starts the next shift with Start-Detached and says whether it really started: Started is
+    # true only when a herdr tab or a process came back. A start that throws, or returns neither,
+    # leaves Started false and Failure saying why (BL-3154), so a hand-over is never counted
+    # for a shift that is not running.
+    param([string]$Label, [string]$Dir, [string[]]$ScriptArgs)
+    $next = $null
+    $failure = $null
+    try { $next = @(Start-Detached -Label $Label -Dir $Dir -ScriptArgs $ScriptArgs | Where-Object { $_ -is [hashtable] })[-1] }
+    catch { $failure = "$($_.Exception.Message)" }
+    if (-not $failure -and -not ($next -and ($next.Tab -or $next.Process))) { $failure = 'neither a herdr tab nor a process was started' }
+    return @{ Started = (-not $failure); Tab = $(if ($next) { $next.Tab }); Process = $(if ($next) { $next.Process }); Failure = $failure }
+}
+
 function Write-IdlePollHeartbeat {
     # The heartbeat of a coordinator polling an idle board: phase 'idle', step 'polling'. A
     # coordinator writes none while it has lanes; once they have ended it writes this one, as
@@ -451,13 +465,15 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
-        $next = Start-Detached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
+        $next = Start-NextShiftDetached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
+        if (-not $next.Started) { Write-Trace '-' 'shift' "$Why; the next shift did not start: $($next.Failure)" 'Red'; return $false }
         Write-Trace '-' 'shift' "$Why; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
         # The review runs beside the next shift, which claims what it files (ADR-0710).
-        if ($Beside) { $handOver.Tab = $next.Tab; return }
+        if ($Beside) { $handOver.Tab = $next.Tab; return $true }
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
         # The next shift has its own tab; this one has only notes, and they are in the log.
-        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' }
+        if ($next.Tab) { Close-OwnHerdrTab 'shift handed over to the next one' | Out-Null }
+        return $true
     }
     # What master held before the merge, so the shift-end review reads only what this shift merged.
     git -C $Root fetch -q origin master 2>&1 | Out-Null
@@ -471,10 +487,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
             if (-not $moved) { git -C $Root pull -q --ff-only origin $branch 2>&1 | Out-Null }
             $claimable = Get-ClaimableTaskId
             $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $claimable.Id -CappedIds $claimable.Capped
-            if ($poll.Action -eq 'start') { & $startNextShift "$($poll.Why) during the merge's CI wait" -Beside; $handOver.Done = $true }
+            if ($poll.Action -eq 'start' -and @(& $startNextShift "$($poll.Why) during the merge's CI wait" -Beside)[-1]) { $handOver.Done = $true }
         }
     }
-    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes }
+    $mergeLine = if ($auditCadence.HoldMerge) { $auditCadence.MergeMessage } else { Invoke-MergeToMaster -Branch $branch -OnPoll $pollDuringMerge -PollMinutes $IdlePollMinutes -HandOver $handOver }
     Write-Trace '-' 'merge' $mergeLine 'Cyan'
     # The shift-end review (ADR-0710) runs below: beside the next shift when one starts, or
     # before deciding whether to start one when nothing is ready.
@@ -515,8 +531,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($end.Trace) { Write-Trace '-' 'shift' $end.Trace 'Yellow' }
     if ($end.Continue) {
         foreach ($r in $reasons) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
-        & $startNextShift 'work is still ready'
-        exit 0
+        if (@(& $startNextShift 'work is still ready')[-1]) { exit 0 }
     }
     # -Continuous with nothing claimable: poll the board every -IdlePollMinutes (the merge's CI wait
     # above polls it the same way, BL-3142) and start the
@@ -530,7 +545,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         while ($true) {
             Write-IdlePollHeartbeat
             $poll = Get-IdlePollDecision -Now (Get-Date) -Deadline $shiftEnd -UsageStop (Get-UsageStop) -ClaimableId $stillReady.Id -CappedIds $stillReady.Capped
-            if ($poll.Action -eq 'start') { & $startNextShift $poll.Why; exit 0 }
+            if ($poll.Action -eq 'start' -and @(& $startNextShift $poll.Why)[-1]) { exit 0 }
             if ($poll.Action -eq 'stop') { Write-Trace '-' 'shift' "polling stopped: $($poll.Why)" 'Yellow'; break }
             # The heartbeat is refreshed every minute of the wait, as a lane's is.
             foreach ($minute in 1..$IdlePollMinutes) { Start-Sleep -Seconds 60; Write-Heartbeat }

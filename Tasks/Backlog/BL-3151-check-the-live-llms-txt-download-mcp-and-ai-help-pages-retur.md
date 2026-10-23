@@ -7,6 +7,7 @@ pipeline: feature
 depends-on: []
 touches: [Tasks]
 requirement: none
+lane: no
 created: 2026-10-22
 completed:
 ---
@@ -51,9 +52,20 @@ BL-3148 could not check live URLs in a lane before its change was integrated. `d
 - Requeue: claim this again only once `git branch -r --contains fb690a3b1` lists origin/master
   and `curl -sI -L https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json`
   returns 200. Then re-run the commands above; that takes about 5 turns.
+- 2026-10-22 (lane 1, second claim): the requeue condition still does not hold.
+  `git branch -r --contains fb690a3b1` lists only origin/work/dark-factory; preview
+  `resources.json` and `ai-help.md` still 404; `/Curl/download/` and `/Curl/ai-help/` 404;
+  `/Curl/llms.txt`, `/Curl/mcp/`, `/Curl/`, `board/`, `gaps/`, `coverage/`,
+  `integration/badge.svg` 200. The board re-offered the task because nothing on it gates the
+  wait, so this claim sets `lane: no` to stop further empty claims. Remove lane: no once
+  `git branch -r --contains fb690a3b1` lists origin/master and
+  `curl -sI -L https://github.com/StewartScottRogers/Curl/releases/download/preview/resources.json`
+  returns 200 (the shift-end merge to master runs release.yml).
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: d171494f 49e82b27.
 - 2026-10-22: Doing -> Backlog. Waiting for the shift-end merge to put BL-3147 (fb690a3b1) on master, so release.yml publishes resources.json and ai-help.md to the preview release, and for the next render; llms.txt and mcp/ are live (200)
+- 2026-10-22: Backlog -> Doing. Criteria at claim: d171494f 49e82b27.
+- 2026-10-22: Doing -> Backlog. Still waiting for the shift-end merge to put BL-3147 (fb690a3b1) on master so release.yml publishes preview resources.json and ai-help.md; download/ and ai-help/ still 404. Set lane: no until that holds

@@ -15,8 +15,11 @@ $MergeCiWaitMinutes = 60
 function Wait-MergeCiRun {
     # Waits for the CI run on -Head, following a newer branch head when a push replaced it, and
     # calls -OnPoll every -PollMinutes meanwhile. Returns Run, Head and, when the wait failed,
-    # Failure: the "not merged: ..." line for the trace.
-    param([string]$Branch, [string]$Head, [scriptblock]$OnPoll, [int]$PollMinutes = 5)
+    # Failure: the "not merged: ..." line for the trace. -HandOver is the coordinator's hash table
+    # whose Done is $true once the next shift has started beside this wait (BL-3142): from then
+    # on its lanes push code to -Branch, so a newer head is followed only when every commit
+    # since the current one is a [skip ci] board commit (BL-3155).
+    param([string]$Branch, [string]$Head, [scriptblock]$OnPoll, [int]$PollMinutes = 5, [hashtable]$HandOver)
     $head = $Head
     $short = $head.Substring(0, 7)
     # Wait for the run on this exact commit. A run on the branch in progress always finishes
@@ -35,6 +38,11 @@ function Wait-MergeCiRun {
             git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
             $newer = (git -C $Root rev-parse "origin/$Branch").Trim()
             if ($newer -eq $head) { return @{ Failure = "not merged: CI cancelled on $short" } }
+            if ($HandOver -and $HandOver.Done) {
+                $since = [int](git -C $Root rev-list --count "$head..$newer")
+                $boardOnly = [int](git -C $Root rev-list --count --grep '\[skip ci\]' "$head..$newer")
+                if ($boardOnly -ne $since) { return @{ Failure = "not merged: the next shift was handed over and pushed code to $Branch after $short, so its work is not merged with this shift's" } }
+            }
             $head = $newer
             $short = $head.Substring(0, 7)
             if ("$(git -C $Root log -1 --format=%B $head)" -match '\[skip ci\]') { gh workflow run CI --ref $Branch 2>&1 | Out-Null }
@@ -56,13 +64,13 @@ function Invoke-MergeToMaster {
     # platform, for the exact commit being merged. Returns a line for the trace.
     # -OnPoll, when given, runs every -PollMinutes of the CI wait (BL-3142), so a -Continuous
     # coordinator can start the next shift while the merge waits.
-    param([string]$Branch, [scriptblock]$OnPoll, [int]$PollMinutes = 5)
+    param([string]$Branch, [scriptblock]$OnPoll, [int]$PollMinutes = 5, [hashtable]$HandOver)
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { return 'not merged: gh is not installed' }
     git -C $Root fetch -q origin master $Branch 2>&1 | Out-Null
     if ([int](git -C $Root rev-list --count "origin/master..origin/$Branch") -eq 0) { return "nothing on $Branch to merge" }
     $head = (git -C $Root rev-parse "origin/$Branch").Trim()
     $short = $head.Substring(0, 7)
-    $wait = Wait-MergeCiRun -Branch $Branch -Head $head -OnPoll $OnPoll -PollMinutes $PollMinutes
+    $wait = Wait-MergeCiRun -Branch $Branch -Head $head -OnPoll $OnPoll -PollMinutes $PollMinutes -HandOver $HandOver
     if ($wait.Failure) { return $wait.Failure }
     $run = $wait.Run
     $head = $wait.Head
