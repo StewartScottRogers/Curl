@@ -626,7 +626,8 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             mappedHost: entry.MappedHost,
             mappedPort: entry.MappedPort,
             connectReplyHeadersStored: connect.ConnectReplyHeadersStored,
-            proxyConnectHeaderBytes: connect.ProxyConnectHeaderBytes);
+            proxyConnectHeaderBytes: connect.ProxyConnectHeaderBytes,
+            lastSocketError: connect.LastSocketError);
     }
 
     private ConnectResult Reuse(ConnectTarget target, PoolEntry entry)

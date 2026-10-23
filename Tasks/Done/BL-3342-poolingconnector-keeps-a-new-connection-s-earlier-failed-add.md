@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitTests/PoolingConnectorTests.cs]
+touches: [Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitTests/PoolingConnectorTests.cs, Curl.Networking.UnitTests/Fakes/FakeConnector.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3342 — PoolingConnector keeps a new connection's earlier failed address socket error for CURLINFO_OS_ERRNO
 
@@ -22,12 +22,15 @@ BL-3328 made `TcpConnector` put the earlier failed address's socket error on `Co
 
 ## Acceptance criteria
 
-- [ ] `PoolingConnector.ConnectAsync` returns a new connection's `ConnectResult` with the wrapped connector's `LastSocketError`, pinned by a unit test in Curl.Networking.UnitTests; a reused connection's result has `SocketError.Success`.
-- [ ] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for Curl.Networking.UnitLibrary.
+- [x] `PoolingConnector.ConnectAsync` returns a new connection's `ConnectResult` with the wrapped connector's `LastSocketError`, pinned by a unit test in Curl.Networking.UnitTests; a reused connection's result has `SocketError.Success`.
+- [x] Projects build clean with -warnaserror, fast tests pass, Measure-CodeQuality.ps1 reports 0 failing members for Curl.Networking.UnitLibrary.
 
 ## Notes
+
+- Added `LastSocketError` to the test fake FakeConnector (same project) so the pooled result can be pinned; added it to touches. Measure-CodeQuality.ps1 for Curl.Networking.UnitLibrary: 0 failing members; fast tests 3442 passed. Linux/macOS CI: change is platform-neutral (uses SocketError values only).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: ac4ea91c de10e31e.
+- 2026-10-23: Doing -> Done. PoolingConnector keeps a new connection's earlier failed address socket error (CURLINFO_OS_ERRNO); reuse stays Success

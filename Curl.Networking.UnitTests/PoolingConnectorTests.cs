@@ -210,6 +210,26 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ForANewConnectionThenAReuse_KeepsTheEarlierSocketErrorOnlyOnTheNewConnection()
+    {
+        _inner.LastSocketError = System.Net.Sockets.SocketError.ConnectionRefused;
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Assert(
+            "opened, reused last socket error",
+            (System.Net.Sockets.SocketError.ConnectionRefused, System.Net.Sockets.SocketError.Success),
+            (opened.LastSocketError, reused.LastSocketError));
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionRefused, opened.LastSocketError);
+        Assert.AreEqual(System.Net.Sockets.SocketError.Success, reused.LastSocketError);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ForANewConnectionThenAReuse_PassesTheConnectReplyHeadBytesOnOnlyOnce()
     {
         _inner.ProxyConnectHeaderBytes = 61;

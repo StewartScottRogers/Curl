@@ -43,6 +43,9 @@ public sealed class FakeConnector : IConnector
     /// <summary>Gets or sets how many CONNECT reply head bytes every connection reports.</summary>
     public long ProxyConnectHeaderBytes { get; set; }
 
+    /// <summary>Gets or sets the earlier failed address's socket error every connection reports.</summary>
+    public System.Net.Sockets.SocketError LastSocketError { get; set; }
+
     /// <inheritdoc />
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
@@ -70,6 +73,7 @@ public sealed class FakeConnector : IConnector
             mappedHost: MappedHost,
             mappedPort: MappedPort,
             connectReplyHeadersStored: ConnectReplyHeadersStored,
-            proxyConnectHeaderBytes: ProxyConnectHeaderBytes));
+            proxyConnectHeaderBytes: ProxyConnectHeaderBytes,
+            lastSocketError: LastSocketError));
     }
 }
