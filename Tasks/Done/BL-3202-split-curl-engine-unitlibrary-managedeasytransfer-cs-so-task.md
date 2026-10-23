@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3202 — Split Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs so tasks touching it can run in parallel
 
@@ -24,9 +24,9 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-3193, BL-3195, BL-3196, BL-3199, BL-3201) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-3193, BL-3195, BL-3196, BL-3199, BL-3201) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 91373e82 c92c6032 a0b49a29.
+- 2026-10-22: Doing -> Done. ManagedEasyTransfer split into per-concern partial files; hotspot cleared

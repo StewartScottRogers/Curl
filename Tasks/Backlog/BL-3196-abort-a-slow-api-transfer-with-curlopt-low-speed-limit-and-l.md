@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/TransferTimers.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/LowSpeedLimitTests.cs, Libcurl.UnitTests/Options/LowSpeedOptionTests.cs]
+touches: [Curl.Engine.UnitLibrary/TransferTimers.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs, Curl.Engine.UnitTests/LowSpeedLimitTests.cs, Libcurl.UnitTests/Options/LowSpeedOptionTests.cs]
 requirement: none
 created: 2026-10-22
 completed:
@@ -32,7 +32,7 @@ Measure upstream libcurl 8.22.0 behaviour before pinning values (a small C or li
 ## Notes
 
 - Cause (2026-10-22, lane 7): `Libcurl`'s setters already put `CURLOPT_LOW_SPEED_LIMIT`/`TIME` on `EasyTransferOptions.LowSpeedLimit`/`LowSpeedTime`, and the engine already has the watchdog path BL-3163 fixed (`TransferPerformer.StartLowSpeedWatchdog` -> `LowSpeedWatchdog.StartFromCommandLine`, wired by `TransferContextFactory.WatchedOutput`/`WatchedProgress`/`TokenOf`, and mapped to exit 28 by `TransferPerformer.FollowWatchingSpeedAsync`). But `ManagedEasyTransfer.ProgressStartingWatchdogsOf` (about line 1171) returns before starting any watchdog when `toolProgress` is null, so a library handle never gets one. The fix: start the low-speed watchdog there for a library handle too (keep the `-m` one as it is unless measured otherwise). `TransferTimers.cs` is not the seam: it only gives the `[TIMER]` trace lines.
-- Added `Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs` to touches, since that method is where the fix lands. BL-3195 (in Doing on origin/work/dark-factory) holds that file, so the task went back to Backlog until they no longer overlap. No code was changed.
+- Added `Curl.Engine.UnitLibrary/ManagedEasyTransfer.Parsed.cs` to touches, since that method is where the fix lands. BL-3195 (in Doing on origin/work/dark-factory) holds that file, so the task went back to Backlog until they no longer overlap. No code was changed.
 
 ## Log
 

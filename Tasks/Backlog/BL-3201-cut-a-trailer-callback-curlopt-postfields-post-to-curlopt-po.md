@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.TrailerPost.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.PostBody.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.TrailerPost.cs]
 requirement: none
 created: 2026-10-22
 completed:
