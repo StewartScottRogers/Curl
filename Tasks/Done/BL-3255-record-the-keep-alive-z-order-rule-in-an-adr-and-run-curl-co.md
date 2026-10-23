@@ -8,7 +8,7 @@ depends-on: [BL-3253, BL-3254]
 touches: [Documentation/Planning/Decisions]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3255 — Record the keep-alive -Z order rule in an ADR and run Curl.Console's quality gates
 
@@ -22,15 +22,17 @@ Split from BL-3189. Measured against curl 8.22.0 with a keep-alive loopback serv
 
 ## Acceptance criteria
 
-- [ ] A new ADR amending ADR-0768 states the keep-alive extension and the measured orders, marked "Decided by Claude under Stewart's delegation".
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` shows Curl.Console inside every gate.
-- [ ] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
+- [x] A new ADR amending ADR-0768 states the keep-alive extension and the measured orders, marked "Decided by Claude under Stewart's delegation".
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` shows Curl.Console inside every gate.
+- [x] `dotnet build Curl.Console -warnaserror` is clean and `dotnet test Curl.Console.UnitTests --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Split from BL-3189 (over its cost cap).
+- ADR-0786 written (0785 was taken by three ADRs; the resolver renumbers on a clash). Measure-CodeQuality -Library Curl.Console: 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 31901186 6a0116a9 4c1375d3.
+- 2026-10-23: Doing -> Done. ADR-0786 records the keep-alive -Z order rule; Curl.Console inside every gate
