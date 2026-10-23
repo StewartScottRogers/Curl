@@ -30,3 +30,4 @@ Scenarios 1024-1044 (http:// plus 255 a's): Curl returns 0 and the host; libcurl
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 5afa8f96 c46ca32a.
