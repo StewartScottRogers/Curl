@@ -2673,10 +2673,12 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Ends the transfer with exit 47 when one more resend would pass
-    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl 8.21.0 counts each resend after a
-    /// 417 as a followed redirect, with or without <c>-L</c>, sharing the count with the hops
-    /// <c>-L</c> followed before this request, and <c>--max-redirs 0</c> refuses even the first
-    /// (measured, BL-396 Notes). The 417's head is written first.
+    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl counts each resend after a
+    /// 417 and each authentication retry after a 401 or 407 as a followed redirect, with or
+    /// without <c>-L</c>, sharing the count with the hops <c>-L</c> followed before this
+    /// request, and <c>--max-redirs 0</c> refuses even the first (417: measured, BL-396 Notes;
+    /// 401 and 407: curl 8.22.0, <c>--max-redirs 0</c> with <c>--digest</c> or <c>--anyauth</c>
+    /// ends with exit 47). The refused response's head is written first.
     /// </summary>
     /// <exception cref="HttpTransferException">The limit is reached (exit 47).</exception>
     private static void ThrowIfRedirectLimitReached(HttpRequestPlan plan)

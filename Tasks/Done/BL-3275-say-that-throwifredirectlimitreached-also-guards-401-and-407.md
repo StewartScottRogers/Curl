@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferReport.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3275 — Say that ThrowIfRedirectLimitReached also guards 401 and 407 retries
 
@@ -24,13 +24,16 @@ The diff made the 401 and 407 retries (`HttpProtocolHandler.cs` around lines 257
 
 ## Acceptance criteria
 
-- [ ] `ThrowIfRedirectLimitReached`'s doc comment names every kind of resend it guards: redirects, 417 resends, and 401/407 authentication retries.
-- [ ] `TransferReport.RedirectCount`'s doc states that authentication resends are counted, with the curl 8.22.0 behaviour it matches.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `ThrowIfRedirectLimitReached`'s doc comment names every kind of resend it guards: redirects, 417 resends, and 401/407 authentication retries.
+- [x] `TransferReport.RedirectCount`'s doc states that authentication resends are counted, with the curl 8.22.0 behaviour it matches.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+Doc comments only (no code change): Measure-CodeQuality skipped as metrics cannot change. Build clean, Abstractions fast tests 927 pass.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 38d4d21d 207edf4a 3d836d5e.
+- 2026-10-23: Doing -> Done. ThrowIfRedirectLimitReached and TransferReport.RedirectCount docs now name 401/407 retries
