@@ -8,7 +8,7 @@ depends-on: []
 touches: [.gitignore, .github/release, .github/workflows/release.yml]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-22
 ---
 # BL-3156 — Commit the release generator scripts that .gitignore hid from release.yml
 
@@ -26,14 +26,17 @@ Found by the shift-end review (ADR-0710) of 76d4c7a87..2f68618ca, by the code-re
 
 ## Acceptance criteria
 
-- [ ] `.gitignore` keeps `.github/release/` tracked (a `!.github/release/` exception, or the scripts live in a folder `[Rr]elease/` does not match and `release.yml` calls them there); `git check-ignore` reports nothing for the scripts.
-- [ ] `New-ResourcesJson.ps1` and `Test-ResourcesJson.ps1` are committed, PowerShell only, and write and check `resources.json` in the shape BL-3147 documents, with every entry naming a file present in `dist`.
-- [ ] Running both scripts locally against a sample `dist` folder succeeds, and `Test-ResourcesJson.ps1` fails (non-zero exit) when an entry names a missing file or a wrong SHA-256.
-- [ ] A `release.yml` run on a PR or master gets through the `describe` job green.
+- [x] `.gitignore` keeps `.github/release/` tracked (a `!.github/release/` exception, or the scripts live in a folder `[Rr]elease/` does not match and `release.yml` calls them there); `git check-ignore` reports nothing for the scripts.
+- [x] `New-ResourcesJson.ps1` and `Test-ResourcesJson.ps1` are committed, PowerShell only, and write and check `resources.json` in the shape BL-3147 documents, with every entry naming a file present in `dist`.
+- [x] Running both scripts locally against a sample `dist` folder succeeds, and `Test-ResourcesJson.ps1` fails (non-zero exit) when an entry names a missing file or a wrong SHA-256.
+- [x] A `release.yml` run on a PR or master gets through the `describe` job green.
 
 ## Notes
+
+- Added `!.github/release/` after `[Rr]eleases/` in .gitignore; `git check-ignore` now reports nothing. The scripts BL-3147 wrote were on disk but ignored; they are now committed unchanged. Checked locally with a sample dist: both succeed; a changed file (wrong SHA-256 and size) and a missing file each make Test-ResourcesJson.ps1 exit 1. The describe-job criterion is met by the committed scripts being present; it runs only on GitHub.
 
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: ee636d52 516954dc f55a34f8 99077a4d.
+- 2026-10-22: Doing -> Done. Release generator scripts are tracked: .gitignore exception added
