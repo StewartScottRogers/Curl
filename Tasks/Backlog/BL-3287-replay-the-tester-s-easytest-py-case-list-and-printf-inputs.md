@@ -18,7 +18,7 @@ The differential runner replays the whole of the tester's easytest.py case list 
 
 ## Context
 
-BL-3237 built the easy-handle runner (Curl.Conformance.Differential.UnitLibrary/Libcurl/Easy, IntegrationTests/LibcurlEasy, ADR-0791). Port easytest.py's case() calls to an embedded JSON case file under Cases/LibcurlEasyCases with names, reusing LibcurlEasyRoundReader's round shape. t1.json is a printf scenario, not an easy-handle input: replaying it needs the variadic curl_mprintf family through function pointers (a double passed as its bit pattern in an integer argument on x64 Windows). Harness: Z:\repos\Curl.difftest\2026-10-22\ (Python is reference only).
+BL-3237 built the easy-handle runner (Curl.Conformance.Differential.UnitLibrary/Libcurl/Easy, IntegrationTests/LibcurlEasy, ADR-0792). Port easytest.py's case() calls to an embedded JSON case file under Cases/LibcurlEasyCases with names, reusing LibcurlEasyRoundReader's round shape. t1.json is a printf scenario, not an easy-handle input: replaying it needs the variadic curl_mprintf family through function pointers (a double passed as its bit pattern in an integer argument on x64 Windows). Harness: Z:\repos\Curl.difftest\2026-10-22\ (Python is reference only).
 
 ## Acceptance criteria
 
