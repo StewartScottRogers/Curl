@@ -3,8 +3,8 @@ id: AF-0365
 title: ManagedCurlUrlHandle.Login's || can become && with no test failing, so a URL with only a password loses its login when read back
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:Login-or:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedCurlUrlHandle.cs:225:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-22: filed proposed.
+- 2026-10-22: proposed -> accepted.
