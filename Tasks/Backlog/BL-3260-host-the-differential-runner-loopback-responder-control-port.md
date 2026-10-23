@@ -1,5 +1,5 @@
 ---
-id: BL-3254
+id: BL-3260
 title: Host the differential runner: loopback responder, control port and two-binary process runner
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3254 — Host the differential runner: loopback responder, control port and two-binary process runner
+# BL-3260 — Host the differential runner: loopback responder, control port and two-binary process runner
 
 ## Goal
 

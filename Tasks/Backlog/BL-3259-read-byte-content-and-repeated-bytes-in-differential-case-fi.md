@@ -1,5 +1,5 @@
 ---
-id: BL-3253
+id: BL-3259
 title: Read byte content and repeated bytes in differential case files
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3253 — Read byte content and repeated bytes in differential case files
+# BL-3259 — Read byte content and repeated bytes in differential case files
 
 ## Goal
 

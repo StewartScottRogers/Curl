@@ -1,16 +1,16 @@
 ---
-id: BL-3256
+id: BL-3262
 title: Port the HTTP cases of the tester's cases_more.py to a CLI HTTP differential case file
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3253]
+depends-on: [BL-3259]
 touches: [Curl.Conformance.Differential.UnitLibrary/Cases/CliHttp/CliHttpMoreCases.json, Curl.Conformance.Differential.UnitTests/Cases/CliHttp/CliHttpMoreCasesTests.cs]
 requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3256 — Port the HTTP cases of the tester's cases_more.py to a CLI HTTP differential case file
+# BL-3262 — Port the HTTP cases of the tester's cases_more.py to a CLI HTTP differential case file
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-The tester's files are in `Z:\repos\Curl.difftest\2026-10-22\` (reference only: never run or commit Python; a PowerShell or C# file-based converter is fine, or port by hand). Each `case(name, cmd, stdin, files, timeout, skip_wire, cmp_err, ctl)` becomes one JSON case: `name`, `command` (with `{U}` and `{CWD}` kept), `stdin`, `files`, `timeoutSeconds`, `compareWire` = not skip_wire, `compareStderr`; byte content uses BL-3253's properties. Names built in loops with `re.sub(r"\W", "_", ...)` are expanded literally. Tag a case that only shows a reference-build fault with `limitations` (ADR-0782). Split out of BL-3233, which runs the file against both binaries.
+The tester's files are in `Z:\repos\Curl.difftest\2026-10-22\` (reference only: never run or commit Python; a PowerShell or C# file-based converter is fine, or port by hand). Each `case(name, cmd, stdin, files, timeout, skip_wire, cmp_err, ctl)` becomes one JSON case: `name`, `command` (with `{U}` and `{CWD}` kept), `stdin`, `files`, `timeoutSeconds`, `compareWire` = not skip_wire, `compareStderr`; byte content uses BL-3259's properties. Names built in loops with `re.sub(r"\W", "_", ...)` are expanded literally. Tag a case that only shows a reference-build fault with `limitations` (ADR-0782). Split out of BL-3233, which runs the file against both binaries.
 
 ## Acceptance criteria
 
