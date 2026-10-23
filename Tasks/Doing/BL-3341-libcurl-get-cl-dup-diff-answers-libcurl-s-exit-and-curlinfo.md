@@ -30,3 +30,4 @@ Left by BL-3323. TransferInfoFromReport.ContentLengthOf already answers -1 when 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: d7b463ec db93e725.
