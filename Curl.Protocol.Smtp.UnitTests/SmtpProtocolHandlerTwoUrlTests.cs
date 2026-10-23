@@ -10,7 +10,7 @@ namespace Curl.Protocol.Smtp;
 /// 2026-10-22 with <c>Record-CurlExchange.ps1 -Smtp</c>, curl (Schannel) running
 /// <c>-sS --mail-from a@x --mail-rcpt b@x -T mail.txt smtp://127.0.0.1:18118/ -T mail.txt smtp://127.0.0.1:18118/</c>:
 /// one connection carrying <c>EHLO</c>, both envelopes and one <c>QUIT</c>. Curl opens and quits a
-/// connection per URL today; BL-3172 makes it reuse one and removes the <c>[Ignore]</c>.
+/// connection per URL before BL-3181; now it keeps one for the same login.
 /// </summary>
 [TestClass]
 public sealed class SmtpProtocolHandlerTwoUrlTests
@@ -21,7 +21,6 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         "MAIL FROM:<a@x> SIZE=3\r\nRCPT TO:<b@x>\r\nDATA\r\nx\r\n.\r\nQUIT\r\n";
 
     [TestMethod]
-    [Ignore("BL-3172: the SMTP handler does not keep its connection between URLs yet.")]
     public async Task ExecuteAsync_TwoUploadsToTheSameServer_SendEhloAndQuitOnceAsCurlDoes()
     {
         var connection = new PoolingConnection(
@@ -39,8 +38,124 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         Assert.AreEqual(MeasuredTwoUrlLog, connection.SentText);
     }
 
-    private static TransferContext Context() => new()
+    [TestMethod]
+    public async Task ExecuteAsync_SecondUploadForAnotherUser_QuitsTheKeptConnectionAndGreetsOnANewOne()
     {
+        var first = new PoolingConnection(
+            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("250 OK\r\n"), Read("250 OK\r\n"), Read("354 Go\r\n"), Read("250 OK\r\n"), Read("221 Bye\r\n"));
+        var second = new PoolingConnection(
+            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("250 OK\r\n"), Read("250 OK\r\n"), Read("354 Go\r\n"), Read("250 OK\r\n"));
+        var connector = new QueuedConnector(
+            ConnectResult.Connected(first, null), ConnectResult.Connected(first, null, isReused: true), ConnectResult.Connected(second, null, connectionNumber: 1));
+        var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
+
+        await handler.ExecuteAsync(Context("u"));
+        TransferResult result = await handler.ExecuteAsync(Context("v"));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(first.IsClosed);
+        Assert.AreEqual(Envelope + "QUIT\r\n", first.SentText);
+        Assert.AreEqual(Envelope, second.SentText);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_FirstUploadFails_QuitsAndKeepsNoConnection()
+    {
+        var connection = new PoolingConnection(
+            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("550 No\r\n"), Read("221 Bye\r\n"));
+        var connector = new QueuedConnector(ConnectResult.Connected(connection, null));
+        var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
+
+        TransferResult failed = await handler.ExecuteAsync(Context());
+
+        Assert.AreNotEqual(CurlExitCode.Ok, failed.ExitCode);
+        Assert.IsTrue(connection.IsClosed);
+        Assert.IsNull(connection.Session);
+        Assert.AreEqual("EHLO mail.txt\r\nMAIL FROM:<a@x>\r\nQUIT\r\n", connection.SentText);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ReusedConnectionHoldingNoSmtpSession_GreetsAgain()
+    {
+        var connection = new PoolingConnection(
+            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("250 OK\r\n"), Read("250 OK\r\n"), Read("354 Go\r\n"), Read("250 OK\r\n"));
+        var connector = new QueuedConnector(ConnectResult.Connected(connection, null, isReused: true));
+        var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
+
+        TransferResult result = await handler.ExecuteAsync(Context());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(Envelope, connection.SentText);
+        Assert.IsInstanceOfType<SmtpKeptConnection>(connection.Session);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UploadOnAKeptConnectionFails_QuitsThenAndNotAgainWhenClosed()
+    {
+        var connection = new PoolingConnection(
+            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("250 OK\r\n"), Read("250 OK\r\n"), Read("354 Go\r\n"), Read("250 OK\r\n"),
+            Read("550 No\r\n"), Read("221 Bye\r\n"));
+        var connector = new QueuedConnector(ConnectResult.Connected(connection, null), ConnectResult.Connected(connection, null, isReused: true));
+        var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
+
+        await handler.ExecuteAsync(Context());
+        TransferResult failed = await handler.ExecuteAsync(Context());
+
+        Assert.AreNotEqual(CurlExitCode.Ok, failed.ExitCode);
+        Assert.IsTrue(connection.IsClosed);
+        Assert.AreEqual(Envelope + "MAIL FROM:<a@x>\r\nQUIT\r\n", connection.SentText);
+    }
+
+    [TestMethod]
+    public async Task ShutDownAsync_ServerHangsUpBeforeReplying_EndsQuietly()
+    {
+        var connection = new ScriptedConnection();
+        var kept = new SmtpKeptConnection(connection, string.Empty, TimeProvider.System) { QuitsOnShutDown = true };
+
+        await kept.ShutDownAsync(CancellationToken.None);
+
+        Assert.AreEqual("QUIT\r\n", Encoding.ASCII.GetString(connection.Sent));
+    }
+
+    [TestMethod]
+    public async Task ShutDownAsync_ReplyWithoutALineEnd_StopsAfter64KiB()
+    {
+        var connection = new ScriptedConnection(new byte[64 * 1024], Read("221 Bye\r\n"));
+        var kept = new SmtpKeptConnection(connection, string.Empty, TimeProvider.System) { QuitsOnShutDown = true };
+
+        await kept.ShutDownAsync(CancellationToken.None);
+
+        Assert.AreEqual(1, connection.ReadCount);
+    }
+
+    [TestMethod]
+    public async Task ShutDownAsync_QuitCannotBeSent_EndsQuietly()
+    {
+        var connection = new ScriptedConnection { WritesBeforeFailure = 0 };
+        var kept = new SmtpKeptConnection(connection, string.Empty, TimeProvider.System) { QuitsOnShutDown = true };
+
+        await kept.ShutDownAsync(CancellationToken.None);
+
+        Assert.IsEmpty(connection.Sent);
+    }
+
+    [TestMethod]
+    public async Task ShutDownAsync_WaitCancelled_EndsQuietly()
+    {
+        var connection = new ScriptedConnection(Read("221 Bye\r\n")) { WritesBeforeFailure = 0, WriteFailure = new OperationCanceledException() };
+        var kept = new SmtpKeptConnection(connection, string.Empty, TimeProvider.System) { QuitsOnShutDown = true };
+
+        await kept.ShutDownAsync(CancellationToken.None);
+
+        Assert.AreEqual(0, connection.ReadCount);
+    }
+
+    /// <summary>One upload's commands after <c>EHLO</c>, to a server that advertises no <c>SIZE</c>.</summary>
+    private const string Envelope = "EHLO mail.txt\r\nMAIL FROM:<a@x>\r\nRCPT TO:<b@x>\r\nDATA\r\nx\r\n.\r\n";
+
+    private static TransferContext Context(string? user = null) => new()
+    {
+        Credentials = user is null ? null : new NetworkCredential(user, "p"),
         Url = CurlUrl.Parse("smtp://127.0.0.1:18118/mail.txt"),
         Output = Stream.Null,
         Upload = new MemoryStream(Encoding.Latin1.GetBytes("x\r\n")),
@@ -62,6 +177,8 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         private IConnectionSession? session;
 
         public string SentText => Encoding.Latin1.GetString(inner.Sent);
+
+        public bool IsClosed { get; private set; }
 
         public bool IsSecure => false;
 
@@ -91,6 +208,7 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
             }
 
             session = null;
+            IsClosed = true;
         }
 
         public async ValueTask DisposeAsync()

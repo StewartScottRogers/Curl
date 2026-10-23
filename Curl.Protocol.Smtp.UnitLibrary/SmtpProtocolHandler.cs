@@ -6,7 +6,9 @@ namespace Curl.Protocol.Smtp;
 /// <summary>
 /// Serves the <c>smtp</c> and <c>smtps</c> schemes: connects, reads the greeting, greets
 /// with <c>EHLO</c> (or <c>HELO</c>), upgrades with <c>STARTTLS</c> as <c>--ssl</c> and
-/// <c>--ssl-reqd</c> ask, and closes with <c>QUIT</c>, as curl 8.21.0 does (BL-540).
+/// <c>--ssl-reqd</c> ask, and closes with <c>QUIT</c>, as curl 8.21.0 does (BL-540); a
+/// successful transfer leaves the connection greeted for the next URL with the same login
+/// instead, which sends <c>QUIT</c> only when the run ends (<see cref="SmtpKeptConnection" />, BL-3181).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -187,8 +189,10 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             Proxy = context.Proxy,
             Events = connectEvents,
             DiagnosticLog = context.DiagnosticLog,
+            PoolScheme = url.Scheme,
         };
-        ConnectResult connected = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+        string loginKey = SmtpKeptConnection.LoginKeyOf(context);
+        ConnectResult connected = await ConnectAsync(target, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
             return new TransferResult(connected.ExitCode, 0, connected.ErrorMessage)
@@ -207,7 +211,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
             // curl decodes the path once connected, so a malformed one still costs a connect.
             TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain
-                ? await RunSessionAsync(channel, context, domain, implicitTls, connectEvents.Opened).ConfigureAwait(false)
+                ? await RunSessionAsync(channel, context, domain, implicitTls, connectEvents.Opened, KeptConnectionOf(connected, loginKey, context)).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
             ReportConnectionEnd(context.Events, result, channel, target, connected.ConnectionNumber);
             return result;
@@ -257,10 +261,35 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     private static bool WritesFailureLine(TransferResult result)
         => result.ErrorMessage is not (SmtpSessionMessages.LoginDenied or SmtpSessionMessages.SendFailed);
 
-    private async ValueTask<TransferResult> RunSessionAsync(
-        SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls, ConnectionOpenedEvent? opened)
+    /// <summary>
+    /// Connects, which the run's connection cache may serve from a connection a previous URL
+    /// left greeted (BL-3181); one kept for another login is closed, with its <c>QUIT</c>, and
+    /// the connect tried again, as curl reuses an SMTP connection only for the same login.
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
     {
-        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls, commandLineText, opened);
+        ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        while (connected is { IsReused: true, Connection: { Session: SmtpKeptConnection kept } connection } && !kept.Serves(loginKey))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+
+        return connected;
+    }
+
+    /// <summary>
+    /// The session a reused connection holds, or a new one for a connection opened for this URL.
+    /// </summary>
+    private static SmtpKeptConnection KeptConnectionOf(ConnectResult connected, string loginKey, ITransferContext context)
+        => connected is { IsReused: true, Connection.Session: SmtpKeptConnection reused }
+            ? reused
+            : new SmtpKeptConnection(connected.Connection!, loginKey, context.TimeProvider);
+
+    private async ValueTask<TransferResult> RunSessionAsync(
+        SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls, ConnectionOpenedEvent? opened, SmtpKeptConnection kept)
+    {
+        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls, commandLineText, opened, kept);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);

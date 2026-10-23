@@ -184,14 +184,34 @@ internal sealed class SmtpControlChannel(
     }
 
     /// <summary>
-    /// Sends <c>QUIT</c> and reads its reply, ignoring whatever it says and a reply line that
-    /// is too long or holds a NUL byte, and a <c>QUIT</c> that cannot be sent, as curl does once
-    /// the session is open. Neither is reported, and nothing
-    /// is after them: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c> does
-    /// not see it.
+    /// Gets or sets the session that keeps the connection for the next URL after a success
+    /// (BL-3181), or <see langword="null" /> for a connection that always ends with <c>QUIT</c>.
     /// </summary>
-    /// <returns>A task that completes once the reply is read or the connection has closed.</returns>
-    public async ValueTask QuitAsync()
+    public SmtpKeptConnection? KeptConnection { get; set; }
+
+    /// <summary>
+    /// Hands the connection to the run's connection cache, sending no <c>QUIT</c>, when
+    /// <paramref name="succeeded" /> is set and <see cref="KeptConnection" /> can keep it, as curl
+    /// keeps a connection its <c>smtp_done</c> leaves valid (BL-3181); otherwise sends <c>QUIT</c>
+    /// and reads its reply, ignoring whatever it says and a reply line that is too long or holds
+    /// a NUL byte, and a <c>QUIT</c> that cannot be sent, as curl does once the session is open.
+    /// Neither is reported, and nothing is after them: curl sends <c>QUIT</c> once the transfer
+    /// is over, where <c>-v</c> does not see it.
+    /// </summary>
+    /// <param name="succeeded">Whether the transfer succeeded.</param>
+    /// <returns>A task that completes once the connection is kept or <c>QUIT</c>'s reply is read.</returns>
+    public async ValueTask QuitOrKeepAsync(bool succeeded)
+    {
+        if (succeeded && KeptConnection is { } kept && kept.TryKeep(connection))
+        {
+            return;
+        }
+
+        await QuitAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Sends <c>QUIT</c> and reads its reply as <see cref="QuitOrKeepAsync" /> describes.</summary>
+    private async ValueTask QuitAsync()
     {
         reporting = NoTransferEvents.Instance;
         dumping = null;
