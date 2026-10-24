@@ -45,6 +45,14 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 
 ## Notes
 
+- 2026-10-23 (lane 4): To meet criteria 1-4, Curl would have to refuse `--http2`, `--http2-prior-knowledge`,
+  `--proxy-http2` and `--no-proxy-http2` on Windows. That is ADR-0397's old behaviour, which Stewart
+  himself superseded in ADR-0786 ("parse and run on Windows as on Linux and macOS"). ADR-0809 already
+  covers this conflict for GF-0098 (BL-3431, Blocked on the same question). Reversing Stewart's own
+  decision is outside the delegation, so no code was changed. The finding's own suggestion favours
+  route (a): re-measure against an HTTP/2-built reference, or exclude these facets. That work belongs to the gap office.
+  Remove the block once Stewart rejects GF-0099 (then close as won't-change) or reverses ADR-0786.
+
 ## Log
 
 - 2026-10-23: Created.
