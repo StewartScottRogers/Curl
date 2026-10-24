@@ -32,3 +32,4 @@ Split from BL-3412, which hit its cost cap. Covers BL-3412's last two criteria; 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 13ae43a4 34c8894d.
