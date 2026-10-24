@@ -3,8 +3,8 @@ id: AF-0395
 title: TlsReader.Take has no bounds check, so truncated TLS input throws and about 30 fast tests across three projects fail unmutated
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-baseline
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
