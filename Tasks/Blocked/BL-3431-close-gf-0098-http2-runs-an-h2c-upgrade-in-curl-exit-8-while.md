@@ -42,7 +42,15 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary alre
 
 ## Notes
 
+- 2026-10-23 (lane 4): To meet criterion 1, Curl would have to refuse `--http2` on Windows. Stewart decided
+  the opposite himself in ADR-0786, and ADR-0808 kept it. Reversing his own decision is outside the
+  delegation, so no code was changed. ADR-0809 records this and recommends the gap office's fix: rule 4 of
+  ConvertTo-BehaviourMeasurement.ps1 should also exclude cases the harness ran whose `<features>` (h2c)
+  the reference's `-V` lacks. Curl already answers upstream's `<verify>` (exit 8, ADR-0788).
+  Remove the block once Stewart rejects GF-0098 (then close as won't-change) or reverses ADR-0786.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: bbcffc50 1fd5de8c 28346828.
+- 2026-10-23: Doing -> Blocked. Stewart: GF-0098 needs --http2 refused on Windows, reversing your ADR-0786; reject the finding (and fix the gap measurement's rule 4, ADR-0809) or reverse ADR-0786?
