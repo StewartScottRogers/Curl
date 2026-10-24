@@ -213,6 +213,11 @@
     green and its commit contains the filing of a Backlog "Fix CI failure", "Fix CI build" or
     "Fix flaky CI test" task, the watch moves that task to Deferred, "already fixed, CI green
     on <sha>", pushed the same way (ADR-0756); a task in Doing is left to its lane.
+    It also reads the run still running once one of its jobs has failed, from that job's
+    log, so a Linux test failure is filed when its job ends rather than when the Quality
+    gates job lets the run end; and while the newest finished run is red, it cancels the
+    running run when the run waiting behind it carries a CI-fix task into Tasks/Done that
+    the running commit lacks, so the fix is tested at once (ADR-0811).
     It files nothing while a Backlog, Doing or Blocked
     task names the test, or when a finished task names it and the failing run predates that
     task's last commit. The task is committed in a detached worktree,

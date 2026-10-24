@@ -343,6 +343,8 @@ function Get-CiRuns {
     if ($null -eq $json) { Write-CiRunLine -Key 'list' -Line "cannot list the CI runs on $Branch with gh"; return $null }
     try { $listed = @($json | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.databaseId }) }
     catch { Write-CiRunLine -Key 'list' -Line "cannot read gh's list of CI runs on $Branch"; return $null }
+    # Kept for Get-CiRunningRun and Stop-CiRunWithoutFix, which read the runs not finished yet.
+    $script:CiWatch.Listed = $listed
     $runs = @()
     foreach ($listedRun in $listed) {
         if ($runs.Count -ge $CiWindowRuns) { break }
@@ -373,6 +375,107 @@ function Get-CiRuns {
         $runs += [pscustomobject]@{ Id = $id; Sha = $sha; FinishedAt = $finished; Failures = $failures }
     }
     return , $runs
+}
+
+function ConvertTo-CiDateTime {
+    # gh's timestamp as local time, whether ConvertFrom-Json made it a [datetime] (PowerShell 7)
+    # or left it a string (Windows PowerShell).
+    param($Value)
+    if ($Value -is [datetime]) { return $Value.ToLocalTime() }
+    return [datetime]::Parse("$Value", [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal).ToLocalTime()
+}
+
+function Get-CiRunningRun {
+    # The CI run on the branch that is still running, as a run Get-CiVerdicts reads (Id, Sha,
+    # FinishedAt, Failures), once a job of it has failed with a failing test or build error in
+    # its log; $null otherwise. A Build and test job fails minutes before the Quality gates job
+    # lets the run finish (run 40034290028: test1173 failed at 22:48, the run ended at 22:57), so
+    # the watch files the failure that much sooner and its fix can land before the red run ends
+    # (BL-3454). Only tests and build errors count: a job's own key names a step, which the
+    # finished run's --log-failed names differently. FinishedAt is the last failed job's end.
+    # -Listed is gh's run list, newest first (Get-CiRuns keeps it). -ListJobs (a run id ->
+    # `gh run view --json jobs` JSON) and -ReadJobLog (a job id -> its log lines, $null when
+    # unreadable) stand in for gh in -TestCiWatch.
+    param([object[]]$Listed, [scriptblock]$ListJobs, [scriptblock]$ReadJobLog)
+    $running = @($Listed | Where-Object { $_ -and $_.status -eq 'in_progress' })[0]
+    if (-not $running) { return $null }
+    if (-not $ListJobs) {
+        $ListJobs = { param([string]$Id) $json = (gh run view $Id --json jobs 2>$null) -join "`n"; if ($LASTEXITCODE -ne 0) { return $null }; return $json }
+    }
+    if (-not $ReadJobLog) {
+        # gh run view --log-failed waits for the whole run; a finished job's log is readable at once.
+        $ReadJobLog = {
+            param([string]$Id)
+            $log = @(gh api "repos/{owner}/{repo}/actions/jobs/$Id/logs" 2>$null | ForEach-Object { "$_" })
+            if ($LASTEXITCODE -ne 0) { return $null }
+            return , $log
+        }
+    }
+    $id = "$($running.databaseId)"
+    $json = & $ListJobs $id
+    if (-not $json) { return $null }
+    try { $failed = @(($json | ConvertFrom-Json).jobs | Where-Object { $_ -and $_.status -eq 'completed' -and $_.conclusion -eq 'failure' }) }
+    catch { return $null }
+    if (-not $failed.Count) { return $null }
+    $cacheKey = "running $id $(@($failed | ForEach-Object { $_.databaseId } | Sort-Object) -join ',')"
+    if (-not $script:CiWatch.Failures.ContainsKey($cacheKey)) {
+        $lines = @()
+        foreach ($job in $failed) {
+            $log = & $ReadJobLog "$($job.databaseId)"
+            if ($null -eq $log) { return $null }
+            $lines += @($log | ForEach-Object { "$($job.name)`tlog`t$(("$_").TrimStart([char]0xFEFF))" })
+        }
+        $script:CiWatch.Failures[$cacheKey] = @(Get-CiFailures $lines | Where-Object { $_.Kind -in 'test', 'build' })
+    }
+    $failures = @($script:CiWatch.Failures[$cacheKey])
+    if (-not $failures.Count) { return $null }
+    $finished = @($failed | ForEach-Object { ConvertTo-CiDateTime $_.completedAt } | Sort-Object)[-1]
+    return [pscustomobject]@{ Id = $id; Sha = "$($running.headSha)"; FinishedAt = $finished; Failures = $failures }
+}
+
+function Get-CiFixTasksBetween {
+    # The CI-fix tasks ("Fix CI failure ...", "Fix CI build ...", "Fix flaky CI test ...") that
+    # reached Tasks/Done between commit -From and commit -To in -Repo, by file name; a task
+    # already under Tasks/Done at -From and only archived since is not one. $null when git cannot
+    # compare the two commits.
+    param([string]$Repo, [string]$From, [string]$To)
+    $added = @(git -C $Repo diff --no-renames --name-only --diff-filter=A $From $To -- Tasks/Done 2>$null | ForEach-Object { "$_" })
+    if ($LASTEXITCODE -ne 0) { return $null }
+    $before = @{}
+    foreach ($path in @(git -C $Repo ls-tree -r --name-only $From -- Tasks/Done 2>$null)) { $before[(Split-Path "$path" -Leaf)] = $true }
+    return @($added | ForEach-Object { Split-Path $_ -Leaf } |
+        Where-Object { $_ -match '^BL-\d+-fix-(?:ci-failure|ci-build|flaky-ci-test)-' -and -not $before.ContainsKey($_) } |
+        ForEach-Object { $_ -replace '^(BL-\d+).*$', '$1' })
+}
+
+function Stop-CiRunWithoutFix {
+    # Cancels the CI run running on the branch when the run waiting behind it has a CI fix the
+    # running commit lacks, so the fix is tested at once. On work/dark-factory a running run
+    # always finishes (ADR-0693), so a fix that landed after a red run waited behind a run
+    # doomed to fail the same way, and green came a whole run later: 37 to 77 minutes red where
+    # the fix took 10 (AF-0388, AF-0407 to AF-0410; ADR-0811). Only while the newest finished run
+    # of -Runs is red, so the red spell is already on record and the cancelled run hides none.
+    # -Listed is gh's run list, newest first; -Repo a checkout that holds both commits;
+    # -CancelRun (a run id -> whether gh cancelled it) stands in for gh in -TestCiWatch.
+    # Returns the cancelled run's id, or ''.
+    param([object[]]$Listed, [object[]]$Runs, [string]$Repo, [scriptblock]$CancelRun)
+    $newest = @($Runs)[0]
+    if (-not $newest -or -not @($newest.Failures | Where-Object { $_ }).Count) { return '' }
+    $running = @($Listed | Where-Object { $_ -and $_.status -eq 'in_progress' })[0]
+    $waiting = @($Listed | Where-Object { $_ -and $_.status -in 'queued', 'pending', 'waiting', 'requested' })[0]
+    if (-not $running -or -not $waiting) { return '' }
+    $id = "$($running.databaseId)"
+    $decided = "cancel $id $($waiting.databaseId)"
+    if ($script:CiWatch.Logged.ContainsKey($decided)) { return '' }
+    $fixes = Get-CiFixTasksBetween -Repo $Repo -From "$($running.headSha)" -To "$($waiting.headSha)"
+    if ($null -eq $fixes) { return '' }
+    $script:CiWatch.Logged[$decided] = 'looked'
+    if (-not @($fixes).Count) { return '' }
+    if (-not $CancelRun) { $CancelRun = { param([string]$Id) gh run cancel $Id 2>&1 | Out-Null; return ($LASTEXITCODE -eq 0) } }
+    $on = "$($running.headSha)".Substring(0, [math]::Min(8, "$($running.headSha)".Length))
+    if (-not (& $CancelRun $id)) { Write-Trace '-' 'ci' "cannot cancel run $id on $on with gh run cancel" 'DarkYellow'; return '' }
+    Write-Trace '-' 'ci' "cancelled run $id on ${on}: it lacks the CI fix $(@($fixes) -join ', ') that waiting run $($waiting.databaseId) carries" 'Yellow'
+    return $id
 }
 
 function Write-CiRunLine {
@@ -427,6 +530,15 @@ function Invoke-CiWatch {
     }
     $runs = Get-CiRuns -Branch $Branch
     if ($null -eq $runs) { return }
+    $listed = @($script:CiWatch.Listed)
+    $cancelled = ''
+    if (@($listed | Where-Object { $_ -and $_.status -in 'queued', 'pending', 'waiting', 'requested' }).Count) {
+        git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+        $cancelled = Stop-CiRunWithoutFix -Listed $listed -Runs $runs -Repo $Root
+    }
+    # A failure in a job of the run still running is read now, not when the run ends (BL-3454).
+    $running = if (-not $cancelled) { Get-CiRunningRun -Listed $listed }
+    if ($running) { $runs = @($running) + @($runs) }
     $confirm = if ($Final) { 0 } else { $CiConfirmMinutes }
     $all = @(Get-CiVerdicts -Runs $runs -ConfirmMinutes $confirm)
     $verdicts = @($all | Where-Object { -not $script:CiWatch.Settled.ContainsKey("$($_.Key)|$($_.RunId)") })
@@ -931,6 +1043,45 @@ if ($TestCiWatch) {
     $script:CiWatch.AuditTasks = @{ 'BL-2001' = "Revert the dark factory's change to Audit/Findings/x.md" }
     & $check 'end report names an open audit task' "BL-2001 AUDIT    needs an interactive session: Revert the dark factory's change to Audit/Findings/x.md" `
         ((@(Get-OpenAuditTaskLines) | Where-Object { $_ -like 'BL-2001 *' }) -join '|')
+    # BL-3454: a failed job of the run still running is read before the run ends.
+    $listedRunning = @([pscustomobject]@{ databaseId = 77; status = 'in_progress'; conclusion = ''; headSha = 'abcdef1234' })
+    $jobsJson = '{"jobs":[{"databaseId":501,"name":"Build and test (ubuntu-latest)","status":"completed","conclusion":"failure","completedAt":"2026-10-23T22:50:02Z"},{"databaseId":502,"name":"Quality gates (windows-latest)","status":"in_progress","conclusion":"","completedAt":"0001-01-01T00:00:00Z"},{"databaseId":503,"name":"Build and test (macos-latest)","status":"completed","conclusion":"success","completedAt":"2026-10-23T22:50:33Z"}]}'
+    $jobLog = { param([string]$Id) if ($Id -ne '501') { return $null }; return , @("$([char]0xFEFF)2026-10-23T22:43:43.9183474Z Current runner version", '2026-10-23T22:48:58.5989616Z   Failed test1173: Man page syntax checks [40 s]', '2026-10-23T22:48:58.6Z   Error Message:', '2026-10-23T22:48:58.7Z    man page broke') }
+    $early = Get-CiRunningRun -Listed $listedRunning -ListJobs { param($Id) $jobsJson } -ReadJobLog $jobLog
+    & $check 'a running run with a failed job is read now' "77|abcdef1234|test1173:|Linux|man page broke|$(([datetime]'2026-10-23T22:50:02Z').ToUniversalTime().ToString('HH:mm'))" `
+        "$($early.Id)|$($early.Sha)|$(($early.Failures | ForEach-Object { "$($_.Key)|$($_.Platforms -join '+')|$($_.Message)" }) -join ';')|$($early.FinishedAt.ToUniversalTime().ToString('HH:mm'))"
+    & $check 'a running run with no failed job is not read' 'True' "$($null -eq (Get-CiRunningRun -Listed $listedRunning -ListJobs { param($Id) '{"jobs":[{"databaseId":9,"name":"x","status":"in_progress","conclusion":""}]}' } -ReadJobLog $jobLog))"
+    & $check 'no running run, nothing read' 'True' "$($null -eq (Get-CiRunningRun -Listed @([pscustomobject]@{ databaseId = 1; status = 'completed'; conclusion = 'failure'; headSha = 'x' }) -ListJobs { param($Id) throw 'not called' } -ReadJobLog $jobLog))"
+    # BL-3456: a running run without the CI fix a waiting run carries is cancelled, only while CI is red.
+    $fixTemp = Join-Path ([IO.Path]::GetTempPath()) "df-ci-cancel-$PID"
+    try {
+        New-Item -ItemType Directory -Force -Path (Join-Path $fixTemp 'Tasks\Done\2026-10-22') | Out-Null
+        git init -q -b work $fixTemp 2>&1 | Out-Null
+        git -C $fixTemp config user.email t@t; git -C $fixTemp config user.name t
+        Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\2026-10-22\BL-0001-fix-ci-failure-old-on-linux.md') -Value 'old'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m one 2>&1 | Out-Null
+        $shaRunning = "$(git -C $fixTemp rev-parse HEAD)".Trim()
+        New-Item -ItemType Directory -Force -Path (Join-Path $fixTemp 'Tasks\Done\2026-10-23') | Out-Null
+        git -C $fixTemp mv Tasks/Done/2026-10-22/BL-0001-fix-ci-failure-old-on-linux.md Tasks/Done/2026-10-23/BL-0001-fix-ci-failure-old-on-linux.md 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0002-add-a-feature.md') -Value 'feature'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m two 2>&1 | Out-Null
+        $shaNoFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
+        Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0003-fix-ci-failure-test1173-on-linux-and-macos.md') -Value 'fix'
+        git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m three 2>&1 | Out-Null
+        $shaFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
+        & $check 'a CI fix reaching Done counts; an archived one and another task do not' 'BL-0003' ((@(Get-CiFixTasksBetween -Repo $fixTemp -From $shaRunning -To $shaFix)) -join ',')
+        $redRuns = @([pscustomobject]@{ Id = '70'; Sha = $shaRunning; FinishedAt = $now; Failures = @(& $f A @('Linux')) })
+        $greenRuns = @([pscustomobject]@{ Id = '70'; Sha = $shaRunning; FinishedAt = $now; Failures = @() })
+        $pair = { param([string]$WaitingSha, [string]$WaitingId = '79') @([pscustomobject]@{ databaseId = [long]$WaitingId; status = 'pending'; headSha = $WaitingSha }, [pscustomobject]@{ databaseId = 78; status = 'in_progress'; headSha = $shaRunning }) }
+        $script:cancelledIds = @()
+        $cancel = { param([string]$Id) $script:cancelledIds += $Id; return $true }
+        & $check 'red, and the waiting run carries the fix: the running run is cancelled' '78' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        & $check 'the same pair is decided once' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        & $check 'the waiting run carries no CI fix: nothing cancelled' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaNoFix '80') -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        & $check 'green: nothing cancelled, the red spell would be hidden' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix '81') -Runs $greenRuns -Repo $fixTemp -CancelRun $cancel)
+        & $check 'no waiting run: nothing cancelled' '' (Stop-CiRunWithoutFix -Listed @((& $pair $shaFix '82')[1]) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        & $check 'gh cancelled only run 78' '78' ($script:cancelledIds -join ',')
+    } finally { Remove-Item -Recurse -Force -Path $fixTemp -ErrorAction SilentlyContinue }
     exit $(if ($script:ciTestFailed) { 1 } else { 0 })
 }
 
