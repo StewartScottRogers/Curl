@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"tftp-w","command":"-s -o NUL -w '%{size_download}' tftp://127.0.0.1:18460/file.txt","files":{"up.txt":"tftp upload data\n"}}
+  ]
+}

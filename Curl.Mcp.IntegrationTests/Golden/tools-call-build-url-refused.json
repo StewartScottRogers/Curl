@@ -1,0 +1,54 @@
+{
+  "name": "tools-call-build-url-refused",
+  "exchanges": [
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"golden\",\"version\":\"1.0\"}}}",
+      "response": {
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "logging": {},
+            "resources": {},
+            "tools": {
+              "listChanged": true
+            }
+          },
+          "serverInfo": {
+            "name": "Curl.Mcp",
+            "version": "0.1.0.0"
+          }
+        },
+        "id": 1,
+        "jsonrpc": "2.0"
+      }
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}",
+      "response": null
+    },
+    {
+      "request": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"build_url\",\"arguments\":{\"scheme\":\"https\",\"port\":\"notaport\",\"host\":\"example.com\"}}}",
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": {
+                "url": null,
+                "failure": {
+                  "kind": "UrlRefused",
+                  "text": "The URL parser refused port: CURLUcode 4 (BadPortNumber)",
+                  "exitCode": null
+                },
+                "isError": true
+              }
+            }
+          ],
+          "isError": true
+        },
+        "id": 2,
+        "jsonrpc": "2.0"
+      }
+    }
+  ]
+}

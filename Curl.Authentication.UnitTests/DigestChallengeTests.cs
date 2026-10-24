@@ -156,9 +156,10 @@ public sealed class DigestChallengeTests
 
         DigestChallenge? challenge = DigestChallenge.ReadFirst(["Digest " + new string('k', 255) + "=v, nonce=n"]);
 
-        diagnostics.Act("challenge read", challenge is not null);
-        diagnostics.Assert("challenge read", true, challenge is not null);
+        diagnostics.Act("nonce", challenge?.Nonce);
+        diagnostics.Assert("nonce", "n", challenge?.Nonce);
         Assert.IsNotNull(challenge);
+        Assert.AreEqual("n", challenge.Nonce);
     }
 
     [TestMethod]

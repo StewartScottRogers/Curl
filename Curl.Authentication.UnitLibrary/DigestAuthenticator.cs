@@ -10,7 +10,8 @@ namespace Curl.Authentication;
 /// builds in its own Digest code, the one the OpenSSL build uses (ADR-0025), or laid out as its
 /// Schannel build's SSPI lays it out (<c>matchesSspiBuild</c>): MD5, SHA-256
 /// and SHA-512-256, their <c>-sess</c> variants, <c>qop=auth</c> and <c>auth-int</c>, and
-/// <c>userhash</c>.
+/// <c>userhash</c>. Matching the Schannel build, a SHA-256 or SHA-512-256 challenge fails
+/// with exit 94, as SSPI answers only MD5 and MD5-sess (ADR-0791).
 /// </summary>
 /// <param name="credentialEncoding">
 /// The encoding the user name and password are hashed and sent in; see
@@ -48,6 +49,10 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
     private const uint FirstNonceCount = 1;
 
     /// <inheritdoc />
+    /// <exception cref="HttpAuthenticationFailedException">
+    /// <c>matchesSspiBuild</c> is set and the challenge names a SHA-256 or SHA-512-256
+    /// algorithm, which SSPI does not answer: exit 94, as curl's Schannel build (ADR-0791).
+    /// </exception>
     public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -62,6 +67,12 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
 
     private string CreateFirstAnswer(DigestChallenge challenge, NetworkCredential credential, HttpAuthRequest request)
     {
+        if (matchesSspiBuild && !challenge.Algorithm.IsAnsweredBySspi)
+        {
+            log.Failed(SchemeName, CurlExitCode.AuthError, NtlmHttpAuthenticator.AuthErrorMessage);
+            throw new HttpAuthenticationFailedException(CurlExitCode.AuthError, NtlmHttpAuthenticator.AuthErrorMessage);
+        }
+
         log.DigestParametersChosen(challenge.AlgorithmName, challenge.Qop);
         return SchemeName + " " + CreateResponse(challenge, credential, request, createClientNonce(), FirstNonceCount);
     }

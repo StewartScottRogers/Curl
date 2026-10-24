@@ -3,5 +3,14 @@ COPYING -text
 certs/* -text
 data/* -text
 docs/** -text
-src/* -text
+src/** -text
 include/** -text
+lib/** -text
+projects/** -text
+**/*.md -text
+*.md -text
+configure.ac -text
+CMakeLists.txt -text
+m4/** -text
+tests/** -text
+.github/** -text

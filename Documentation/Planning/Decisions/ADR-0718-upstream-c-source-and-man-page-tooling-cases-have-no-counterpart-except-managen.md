@@ -1,6 +1,6 @@
 # ADR-0718 — Upstream's C-source and man-page tooling cases have no counterpart, except the manual generator
 
-- Status: Accepted
+- Status: Accepted (superseded in part by ADR-0803)
 - Date: 2026-10-19
 - Task: BL-2852
 - Decided by Claude under Stewart's delegation.

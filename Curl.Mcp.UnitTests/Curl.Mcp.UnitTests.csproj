@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Curl.Cli.UnitLibrary\Curl.Cli.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Mcp\Curl.Mcp.csproj" />
+    <ProjectReference Include="..\Curl.Mcp.Protocol.UnitLibrary\Curl.Mcp.Protocol.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Mcp.UnitLibrary\Curl.Mcp.UnitLibrary.csproj" />
   </ItemGroup>
 

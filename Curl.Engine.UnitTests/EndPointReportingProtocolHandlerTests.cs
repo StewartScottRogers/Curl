@@ -43,7 +43,7 @@ public sealed class EndPointReportingProtocolHandlerTests
             recorder);
         Diagnostics.Arrange("end points the handler records", $"{Local} -> {Remote}");
 
-        TransferResult result = await handler.ExecuteAsync(null!);
+        TransferResult result = await handler.ExecuteAsync(ContextOf(0));
         Diagnostics.Act("reported local end point", result.Report?.LocalEndPoint?.ToString() ?? "null");
         Diagnostics.Act("reported remote end point", result.Report?.RemoteEndPoint?.ToString() ?? "null");
 
@@ -62,7 +62,7 @@ public sealed class EndPointReportingProtocolHandlerTests
         Diagnostics.Arrange("end points recorded before the transfer", $"{Local} -> {Remote}");
         Diagnostics.Arrange("handler fails with", CurlExitCode.CouldntConnect);
 
-        TransferResult result = await handler.ExecuteAsync(null!);
+        TransferResult result = await handler.ExecuteAsync(ContextOf(0));
         Diagnostics.Act("report", result.Report?.ToString() ?? "null");
 
         Diagnostics.Assert("report", "null", result.Report?.ToString() ?? "null");
@@ -83,4 +83,25 @@ public sealed class EndPointReportingProtocolHandlerTests
         Assert.AreSame(built, handler.Handler);
         Assert.AreSame(lazy, handler.GivenHandler);
     }
+
+    [TestMethod]
+    public async Task ExecuteAsync_RedirectHopFailsBeforeConnecting_ReportsTheEarlierHopsEndPoints()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.Record(Local, Remote);
+        recorder.ReportOn(TransferResult.Success(0));
+        EndPointReportingProtocolHandler handler = new(RecordingProtocolHandler.Failing("dict", CurlExitCode.CouldntConnect, "x"), recorder);
+        Diagnostics.Arrange("first hop connected to", Remote);
+
+        TransferResult result = await handler.ExecuteAsync(ContextOf(1));
+
+        Assert.AreEqual(Remote, result.Report!.RemoteEndPoint);
+    }
+
+    private static TransferContext ContextOf(int redirectsFollowed) => new()
+    {
+        Url = CurlUrl.Parse("http://127.0.0.1/"),
+        Output = new MemoryStream(),
+        Http = new Curl.Protocol.Abstractions.HttpRequestOptions { RedirectsFollowed = redirectsFollowed },
+    };
 }

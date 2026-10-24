@@ -79,16 +79,22 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task PerformAsync_PostWithNoReadCallback_SendsNoBody()
+    public async Task PerformAsync_PostWithNoReadCallbackAndNoPostFields_PostsAnEmptyChunkedBody()
     {
-        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        // libcurl's default read callback reads an empty stdin: a chunked POST that asks for 100-continue (BL-3319).
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes("HTTP/1.1 100 Continue\r\n\r\n"), Encoding.ASCII.GetBytes(Response)]);
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(connector).CreateEasy();
         easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/p" }, Http = new EasyHttpOptions { Post = true } };
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
 
+        string written = Encoding.ASCII.GetString(connector.Written);
         Assert.AreEqual(CurlCode.Ok, code);
-        StringAssert.EndsWith(Encoding.ASCII.GetString(connector.Written), "\r\n\r\n");
+        StringAssert.StartsWith(written, "POST /p HTTP/1.1\r\n");
+        StringAssert.Contains(written, "Transfer-Encoding: chunked\r\n");
+        StringAssert.Contains(written, "Content-Type: application/x-www-form-urlencoded\r\n");
+        StringAssert.Contains(written, "Expect: 100-continue\r\n");
+        StringAssert.EndsWith(written, "\r\n\r\n0\r\n\r\n");
     }
 
     [TestMethod]

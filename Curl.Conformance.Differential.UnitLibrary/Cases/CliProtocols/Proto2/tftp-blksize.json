@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"tftp-blksize","command":"-s --tftp-blksize 1024 tftp://127.0.0.1:18460/file.txt","files":{"up.txt":"tftp upload data\n"}}
+  ]
+}

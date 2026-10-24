@@ -86,7 +86,7 @@ internal static class TlsClientOptionsMapping
             tls.EncryptedClientHelloConfigList,
             sslSessionsFile,
             tls.Engine,
-            tls.VerifyStatus,
+            RequiresCertificateStatus(tls.VerifyStatus, OperatingSystem.IsWindows()),
             origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
             origin.PinnedPublicKey,
             origin.RevocationListFile,
@@ -148,6 +148,16 @@ internal static class TlsClientOptionsMapping
     /// <param name="peer">The origin's or the proxy's verification settings.</param>
     /// <returns><see langword="true" /> when <see cref="TlsPeerOptions.VerifyPeer" /> is off and <see cref="TlsPeerOptions.VerifyHost" /> on.</returns>
     internal static bool ChecksHostNameWhenInsecure(TlsPeerOptions peer) => !peer.VerifyPeer && peer.VerifyHost;
+
+    /// <summary>
+    /// Whether the stapled certificate status is asked for and checked: <c>--cert-status</c>
+    /// (<c>CURLOPT_SSL_VERIFYSTATUS</c>) on the OpenSSL build only. curl 8.22.0's Schannel build
+    /// ignores it, a server stapling no OCSP response completing the transfer (measured, ADR-0795).
+    /// </summary>
+    /// <param name="verifyStatus"><see cref="EasyTlsOptions.VerifyStatus" />.</param>
+    /// <param name="matchesSchannelBuild">Whether the platform's curl is the Schannel build (Windows).</param>
+    /// <returns><see langword="true" /> when <paramref name="verifyStatus" /> is set outside the Schannel build.</returns>
+    internal static bool RequiresCertificateStatus(bool verifyStatus, bool matchesSchannelBuild) => verifyStatus && !matchesSchannelBuild;
 
     /// <summary>
     /// Maps the TLS options that reach the DNS-over-HTTPS server onto the <see cref="TlsClientOptions" />

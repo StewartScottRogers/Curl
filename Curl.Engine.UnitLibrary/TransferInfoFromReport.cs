@@ -10,8 +10,8 @@ namespace Curl.Engine;
 /// <c>CURLINFO_*</c> the engine measures, the part the <c>-w</c> variables read filled by
 /// <c>Curl.Output</c>'s <see cref="WriteOutTransferInfo" />, the rest worked out here. A value the report does not hold
 /// keeps <see cref="TransferInfo" />'s fresh-handle default. Each kind of value is worked out in its own partial file
-/// (<c>TransferInfoFromReport.Auth.cs</c>, <c>.CertInfo.cs</c>, <c>.LengthAndCondition.cs</c>, <c>.RetryAfter.cs</c>,
-/// <c>.Scheme.cs</c>), so a change to one touches only that file (BL-3251).
+/// (<c>TransferInfoFromReport.Auth.cs</c>, <c>.CertInfo.cs</c>, <c>.LengthAndCondition.cs</c>, <c>.OsErrno.cs</c>,
+/// <c>.ProxyError.cs</c>, <c>.RetryAfter.cs</c>, <c>.Rtsp.cs</c>, <c>.Scheme.cs</c>), so a change to one touches only that file (BL-3251).
 /// </summary>
 internal static partial class TransferInfoFromReport
 {
@@ -20,33 +20,28 @@ internal static partial class TransferInfoFromReport
     /// </summary>
     /// <param name="result">The finished transfer.</param>
     /// <param name="requestUrl">The URL the transfer was given, the effective URL when the report names no other.</param>
-    /// <param name="fileTimeRequested">Whether <c>CURLOPT_FILETIME</c> asked for the remote file's time, without which libcurl answers -1.</param>
+    /// <param name="fileTimeRequested">Whether <c>CURLOPT_FILETIME</c> asked for the remote file's time, without which libcurl answers -1 for every scheme but <c>file://</c>, whose handler stores the stat time unasked (BL-3337).</param>
     /// <param name="timeProvider">The provider that took the report's <see cref="TransferTimings" />.</param>
     /// <param name="certificateInfoRequested">Whether <c>CURLOPT_CERTINFO</c> asked for the peer certificates' records, without which libcurl's <c>CURLINFO_CERTINFO</c> is empty.</param>
+    /// <param name="uploaded">Whether the transfer was a <c>CURLOPT_UPLOAD</c>, whose <c>file://</c> answer for the download length is -1 (libcurl's <c>file_upload</c> sets none).</param>
+    /// <param name="contentLengthIgnored">Whether <c>CURLOPT_IGNORE_CONTENT_LENGTH</c> was set, under which libcurl answers -1 for the download length (BL-3323).</param>
     /// <returns>The info.</returns>
-    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false)
+    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false, bool uploaded = false, bool contentLengthIgnored = false)
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
-        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl) with
+        TransferInfo info = WithCounts(WriteOutTransferInfo.FromReport(result, requestUrl, timeProvider), result, report, effectiveUrl, (uploaded, contentLengthIgnored)) with
         {
-            FileTime = fileTimeRequested ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
+            FileTime = fileTimeRequested || SchemeOf(effectiveUrl) == FileScheme ? result.SourceLastWriteUnixSeconds ?? -1 : -1,
         };
+        info = WithSchemeAndProtocol(info, result, requestUrl, effectiveUrl);
         return result.Report is null ? info : info with
         {
-            Scheme = SchemeOf(effectiveUrl),
-            Protocol = ProtocolOf(effectiveUrl),
             RetryAfter = RetryAfterOf(report, timeProvider),
             CertInfo = CertInfoOf(report, certificateInfoRequested),
         };
     }
 
-    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl) => WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl) with
-    {
-        RtspClientCSeq = report.RtspClientSequenceNumber,
-        RtspServerCSeq = report.RtspServerSequenceNumber,
-        RtspCSeqReceived = report.RtspSequenceNumberReceived,
-        OsErrno = report.OsErrno,
-        ProxyError = (long)report.ProxyError,
-    };
+    private static TransferInfo WithCounts(TransferInfo info, TransferResult result, TransferReport report, string effectiveUrl, (bool Uploaded, bool ContentLengthIgnored) request) =>
+        WithProxyError(WithOsErrno(WithRtsp(WithLengthAndCondition(WithAuth(info, report), result, report, effectiveUrl, request), report), report), report);
 }

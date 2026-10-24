@@ -249,6 +249,34 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
+    [DataRow("HTTP/1.0 200 OK", 1L)]
+    [DataRow("HTTP/1.1 200 OK", 2L)]
+    [DataRow("HTTP/2 200", 3L)]
+    [DataRow("HTTP/3 200", 30L)]
+    [DataRow("HTTP/4 200", 0L)]
+    public void HttpVersion_StatusLine_IsItsCurlHttpVersionNumber(string statusLine, long expected)
+    {
+        TransferHeaderStore store = StoreOf(statusLine);
+
+        Assert.AreEqual(expected, store.HttpVersion);
+    }
+
+    [TestMethod]
+    public void HttpVersion_ConnectReplyHeadThenClear_StaysZero()
+    {
+        TransferHeaderStore store = new();
+        store.MarkConnectReplyHead();
+        store.RecordLine("HTTP/1.0 200 Connection established");
+        Assert.AreEqual(0L, store.HttpVersion);
+
+        store.RecordLine(string.Empty);
+        store.RecordLine("HTTP/1.1 200 OK");
+        store.Clear();
+
+        Assert.AreEqual(0L, store.HttpVersion);
+    }
+
+    [TestMethod]
     public void ResponseCodeAndContentLength_FinalHead_AreItsStatusAndLength()
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 100 Continue", "Content-Length: 99", string.Empty, "HTTP/1.1 200 OK", "Content-Length: 7");

@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-list-dirs-only","command":"-s -l ftp://127.0.0.1:18200/"}
+  ]
+}

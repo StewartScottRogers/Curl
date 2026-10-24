@@ -479,7 +479,8 @@ public sealed class HttpProtocolHandler(
     /// transfer's earlier hop picked (BL-1819).
     /// </summary>
     private static HttpAuthSchemes AuthSchemePickedBy(HttpRequestPlan plan) =>
-        plan.AuthorizationAnswersChallenge && SchemeOfAuthorization(plan.Authorization) is var scheme && scheme != HttpAuthSchemes.None
+        SchemeOfAuthorization(plan.Authorization) is var scheme && scheme != HttpAuthSchemes.None
+        && (plan.AuthorizationAnswersChallenge || scheme == HttpAuthSchemes.Basic)
             ? scheme
             : plan.Options.AuthSchemePicked;
 
@@ -1400,13 +1401,22 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static TransferReport WithHeadBeforeFailure(TransferReport report, HttpTransferException failure) =>
         report.ResponseCode != 0 || failure.StatusLineBeforeFailure is not { } statusLine
-            ? report
-            : report with
+            ? WithReceiveErrno(report, failure)
+            : WithReceiveErrno(report, failure) with
             {
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
+                ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
+
+    /// <summary>
+    /// Puts the socket error number of a failed receive on <paramref name="report" /> as its
+    /// <see cref="TransferReport.OsErrno" />, as libcurl 8.22.0 keeps it (BL-3329);
+    /// <paramref name="report" /> itself when no socket error failed the receive.
+    /// </summary>
+    private static TransferReport WithReceiveErrno(TransferReport report, HttpTransferException failure) =>
+        failure.OsErrno == 0 ? report : report with { OsErrno = failure.OsErrno };
 
     /// <summary>
     /// Reports a timed-out exchange's held header lines, and gives the attempt's outcome: exit
@@ -2673,10 +2683,12 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Ends the transfer with exit 47 when one more resend would pass
-    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl 8.21.0 counts each resend after a
-    /// 417 as a followed redirect, with or without <c>-L</c>, sharing the count with the hops
-    /// <c>-L</c> followed before this request, and <c>--max-redirs 0</c> refuses even the first
-    /// (measured, BL-396 Notes). The 417's head is written first.
+    /// <see cref="HttpRequestOptions.MaxRedirects" />: curl counts each resend after a
+    /// 417 and each authentication retry after a 401 or 407 as a followed redirect, with or
+    /// without <c>-L</c>, sharing the count with the hops <c>-L</c> followed before this
+    /// request, and <c>--max-redirs 0</c> refuses even the first (417: measured, BL-396 Notes;
+    /// 401 and 407: curl 8.22.0, <c>--max-redirs 0</c> with <c>--digest</c> or <c>--anyauth</c>
+    /// ends with exit 47). The refused response's head is written first.
     /// </summary>
     /// <exception cref="HttpTransferException">The limit is reached (exit 47).</exception>
     private static void ThrowIfRedirectLimitReached(HttpRequestPlan plan)
@@ -3272,8 +3284,9 @@ public sealed class HttpProtocolHandler(
         /// <summary>
         /// Builds the report: what the connect and request told, their timings with the
         /// transfer's end taken now, and what the final head told once it was read. The request
-        /// size counts the body bytes sent as well as the head, as curl 8.21.0's
-        /// <c>%{size_request}</c> does (BL-175 Notes).
+        /// size counts the body bytes sent, chunk framing included, as well as the head, as curl 8.21.0's
+        /// <c>%{size_request}</c> does (BL-175 Notes); the upload size counts the chunk framing too, as
+        /// libcurl 8.22.0's <c>CURLINFO_SIZE_UPLOAD_T</c> does (BL-3320).
         /// </summary>
         /// <param name="body">
         /// The body reader, whose bytes accepted before and after content decoding are
@@ -3285,12 +3298,13 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = RequestSizeSoFar() + headSize + upload.BytesWritten,
-                UploadSize = upload.BytesWritten,
+                RequestSize = RequestSizeSoFar() + headSize + upload.BytesSent,
+                UploadSize = upload.BytesSent,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
                 HeaderSize = earlier?.HeaderSize ?? connect.ProxyConnectHeaderBytes,
                 ConnectionCount = ConnectionCountSoFar() + (newConnection ? 1 : 0),
+                OsErrno = earlier?.OsErrno ?? 0,
                 RedirectCount = RedirectCount,
                 ResponseHeadersStored = body.HeadersStored,
                 AuthSchemePicked = AuthSchemePicked,

@@ -18,6 +18,8 @@ namespace Curl.Engine;
 internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 {
     private const string FileScheme = "file";
+    private const string NilPath = "(nil)";
+    private const int MaxHostLabelLength = 63;
 
     /// <summary>The longest string a set accepts for any part (upstream's <c>CURL_MAX_INPUT_LENGTH</c>).</summary>
     private const int MaximumInputLength = 8_000_000;
@@ -115,12 +117,13 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
     /// <summary>
     /// The port a get gives: the one written, hidden under <c>CURLU_NO_DEFAULT_PORT</c> when it is the
-    /// scheme's default; with none written, the scheme's default under <c>CURLU_DEFAULT_PORT</c>.
+    /// scheme's default; with none written, the scheme's default under <c>CURLU_DEFAULT_PORT</c> (0 for <c>file</c>, as libcurl's file handler has).
     /// </summary>
     private static string? PortText(int? written, string? scheme, CurlUrlFlags flags)
     {
         int? defaultPort = scheme is null ? null : UrlHandleParts.DefaultPortOf(scheme);
-        int? shown = written is null ? DefaultPortShown(defaultPort, flags) : WrittenPortShown(written.Value, defaultPort, flags);
+        int? defaultShown = string.Equals(scheme, "file", StringComparison.OrdinalIgnoreCase) ? 0 : defaultPort;
+        int? shown = written is null ? DefaultPortShown(defaultShown, flags) : WrittenPortShown(written.Value, defaultPort, flags);
 
         return shown?.ToString(CultureInfo.InvariantCulture);
     }
@@ -132,7 +135,20 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         flags.HasFlag(CurlUrlFlags.NoDefaultPort) && defaultPort == written ? null : written;
 
     private static UrlPartResult Transformed(string? value, CurlUrlCode missing, CurlUrlFlags flags, CurlUrlPart part) =>
-        value is null ? UrlPartResult.Failed(missing) : UrlPartText.Transform(value, flags, part);
+        value is null ? UrlPartResult.Failed(missing)
+        : part == CurlUrlPart.Host && RefusedByIdn(value, flags)
+            ? UrlPartResult.Failed(CurlUrlCode.BadHostname)
+            : UrlPartText.Transform(value, flags, part);
+
+    /// <summary>
+    /// Whether <c>CURLU_PUNY2IDN</c> (without <c>CURLU_PUNYCODE</c>, <c>CURLU_URLDECODE</c> or
+    /// <c>CURLU_URLENCODE</c>) meets a name with a label over 63 characters, which libcurl 8.22.0's IDN
+    /// conversion refuses as <see cref="CurlUrlCode.BadHostname" />.
+    /// </summary>
+    private static bool RefusedByIdn(string host, CurlUrlFlags flags) =>
+        flags.HasFlag(CurlUrlFlags.PunycodeToIdn)
+        && (flags & (CurlUrlFlags.Punycode | CurlUrlFlags.UrlDecode | CurlUrlFlags.UrlEncode)) == 0
+        && host.Split('.').Any(label => label.Length > MaxHostLabelLength);
 
     private static UrlPartResult ReadScheme(UrlHandleParts parts, CurlUrlFlags flags) =>
         flags.HasFlag(CurlUrlFlags.NoGuessScheme) && parts.SchemeGuessed
@@ -164,7 +180,8 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         string tail = TailOf(parts, flags);
         if (string.Equals(parts.Scheme, FileScheme, StringComparison.OrdinalIgnoreCase))
         {
-            return UrlPartResult.Found("file://" + tail);
+            // A file URL with no path prints libcurl's NULL %s: "(nil)", measured on libcurl 8.22.0.
+            return UrlPartResult.Found("file://" + (parts.Path is null ? NilPath + tail[1..] : tail));
         }
 
         if (parts.Host is null)
@@ -214,7 +231,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
 
         return flags.HasFlag(CurlUrlFlags.UrlEncode)
             ? UrlPartResult.Found(UrlPartText.Escape(host))
-            : UrlPartText.Punycode(host, flags);
+            : RefusedByIdn(host, flags) ? UrlPartResult.Failed(CurlUrlCode.BadHostname) : UrlPartText.Punycode(host, flags);
     }
 
     /// <summary>
@@ -330,10 +347,19 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     /// <c>MAX_SCHEME_LEN</c>) is <see cref="CurlUrlCode.BadScheme" /> unless <c>CURLU_GUESS_SCHEME</c> or
     /// <c>CURLU_DEFAULT_SCHEME</c> is set, as upstream's <c>parseurl</c> answers before reading a host.
     /// </summary>
-    private CurlUrlCode ParseWithoutScheme(string value, CurlUrlFlags flags) =>
-        (flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) == 0
-            ? CurlUrlCode.BadScheme
+    private CurlUrlCode ParseWithoutScheme(string value, CurlUrlFlags flags)
+    {
+        if ((flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) == 0)
+        {
+            return CurlUrlCode.BadScheme;
+        }
+
+        // Under CURLU_DEFAULT_SCHEME upstream's parseurl has the default scheme before it reads the host, so
+        // text such as 1ab://a is the host 1ab with an empty port (BL-3295).
+        return flags.HasFlag(CurlUrlFlags.DefaultScheme)
+            ? Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme)
             : Parse(value, flags);
+    }
 
     /// <summary>
     /// Parses a whole URL with <see cref="CurlUrl" /> under <c>CURLU_PATH_AS_IS</c> and
@@ -353,7 +379,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
         bool spaced = !ReferenceEquals(text, value) && !value.Contains("%20", StringComparison.Ordinal);
         newParts = spaced ? newParts.WithSpaces() : newParts;
 
-        return Accept(value, flags, flags.HasFlag(CurlUrlFlags.UrlEncode) ? newParts.UrlEncoded() : newParts);
+        return Accept(flags, flags.HasFlag(CurlUrlFlags.UrlEncode) ? newParts.UrlEncoded() : newParts);
     }
 
     /// <summary>
@@ -374,24 +400,16 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
             out rejection);
 
     /// <summary>
-    /// A parsed URL with no scheme: <c>https</c> under <c>CURLU_DEFAULT_SCHEME</c>, the guessed one under
-    /// <c>CURLU_GUESS_SCHEME</c>, the only other way a URL with no scheme gets here (<see cref="ParseWithoutScheme" />
-    /// asks for one of the two, and <see cref="ParseAbsolute" /> refuses text with no <c>/</c> after its scheme's
-    /// colon, such as <c>http:80/x</c>, with <see cref="CurlUrlCode.BadSlashes" /> first); with one libcurl does not support, <see cref="CurlUrlCode.UnsupportedScheme" /> unless
+    /// A parsed URL: one with a guessed scheme (under <c>CURLU_GUESS_SCHEME</c>; <see cref="ParseWithoutScheme" />
+    /// parses <c>CURLU_DEFAULT_SCHEME</c>'s text with <c>https://</c> in front) is kept; one with a scheme libcurl
+    /// does not support is <see cref="CurlUrlCode.UnsupportedScheme" /> unless
     /// <c>CURLU_NON_SUPPORT_SCHEME</c>.
     /// </summary>
-    private CurlUrlCode Accept(string value, CurlUrlFlags flags, UrlHandleParts newParts)
+    private CurlUrlCode Accept(CurlUrlFlags flags, UrlHandleParts newParts)
     {
-        if (!newParts.SchemeGuessed)
-        {
-            bool supported = flags.HasFlag(CurlUrlFlags.NonSupportScheme) || UrlHandleParts.IsSupportedScheme(newParts.Scheme!);
+        bool supported = newParts.SchemeGuessed || flags.HasFlag(CurlUrlFlags.NonSupportScheme) || UrlHandleParts.IsSupportedScheme(newParts.Scheme!);
 
-            return supported ? Keep(newParts) : CurlUrlCode.UnsupportedScheme;
-        }
-
-        return flags.HasFlag(CurlUrlFlags.DefaultScheme)
-            ? Parse(DefaultScheme + "://" + value, flags & ~CurlUrlFlags.DefaultScheme)
-            : Keep(newParts);
+        return supported ? Keep(newParts) : CurlUrlCode.UnsupportedScheme;
     }
 
     /// <summary>

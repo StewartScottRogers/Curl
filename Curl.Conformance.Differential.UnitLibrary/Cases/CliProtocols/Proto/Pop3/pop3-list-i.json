@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"pop3-list-i","command":"-si pop3://127.0.0.1:18220/"}
+  ]
+}

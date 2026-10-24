@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-fetch-mailindex","command":"-s 'imap://127.0.0.1:18230/INBOX;MAILINDEX=2'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

@@ -1,9 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using ModelContextProtocol.Protocol;
+using Curl.Mcp.Protocol.Model;
 
 namespace Curl.Mcp;
 
@@ -24,16 +22,16 @@ public sealed class CurlTransferToolIntegrationTests
         listener.Start();
         int port = ((IPEndPoint)listener.LocalEndpoint).Port;
         Task<string> served = LoopbackHttpResponder.ServeOneResponseAsync(listener, "HTTP/1.1 201 Created\r\nContent-Type: text/plain\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello");
-        using IHost host = CurlMcpHost.Build([], _ => null);
-        CurlTransferTool tool = new(host.Services.GetRequiredService<McpTransferTool>());
+        IMcpTool tool = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, new McpResponseCap(McpResponseCap.DefaultMaxBytes)).FindTool("transfer")!;
 
-        CallToolResult result = await tool.TransferAsync($"http://127.0.0.1:{port}/item", headers: [new McpTransferHeader("X-Test", "yes")]);
+        using JsonDocument arguments = JsonDocument.Parse($$"""{"url":"http://127.0.0.1:{{port}}/item","headers":[{"name":"X-Test","value":"yes"}]}""");
+        McpToolCallResult result = await tool.CallAsync(arguments.RootElement, CancellationToken.None);
 
         string request = await served;
-        Assert.IsFalse(result.IsError, ((TextContentBlock)result.Content.Single()).Text);
+        Assert.IsFalse(result.IsError, result.Content.Single().Text);
         StringAssert.StartsWith(request, "GET /item HTTP/1.1\r\n");
         StringAssert.Contains(request, "\r\nX-Test: yes\r\n");
-        using JsonDocument json = JsonDocument.Parse(((TextContentBlock)result.Content.Single()).Text);
+        using JsonDocument json = JsonDocument.Parse(result.Content.Single().Text);
         Assert.AreEqual(201, json.RootElement.GetProperty("statusCode").GetInt64());
         Assert.AreEqual("hello", json.RootElement.GetProperty("body").GetProperty("content").GetString());
         Assert.AreEqual("text/plain", json.RootElement.GetProperty("info").GetProperty("contentType").GetString());

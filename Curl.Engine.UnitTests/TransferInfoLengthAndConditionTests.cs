@@ -31,10 +31,50 @@ public sealed class TransferInfoLengthAndConditionTests
     [TestMethod]
     public void Of_DuplicateEqualContentLengths_AnswersTheLength() =>
         Assert.AreEqual(5, LengthOf(200, ("Content-Length", "5"), ("content-length", " 5")));
+    [TestMethod]
+    public void Of_RefusedContentLengthHeaders_AnswersMinusOne() =>
+        Assert.AreEqual(-1, Of(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Invalid Content-Length: value") with { Report = ReportOf(200, ("Content-Length", "1")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_OtherWeirdServerReply_KeepsTheContentLength() =>
+        Assert.AreEqual(1, Of(TransferResult.Failure(CurlExitCode.WeirdServerReply, "Unsupported HTTP version in response") with { Report = ReportOf(200, ("Content-Length", "1")) }, HttpUrl).ContentLengthDownload);
+
 
     [TestMethod]
     public void Of_FailOnErrorStoppedTheTransfer_AnswersMinusOne() =>
         Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.HttpReturnedError, 0) { Report = ReportOf(404, ("Content-Length", "5")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_ChunkedHeadResponse_AnswersTheContentLength() =>
+        Assert.AreEqual(3, Of(new TransferResult(CurlExitCode.Ok, 0) { Report = ReportOf(200, ("Content-Length", "3"), ("Transfer-Encoding", "chunked")) with { Method = "HEAD" } }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_TimeConditionUnmetOnA200_AnswersTheContentLength() =>
+        Assert.AreEqual(8, Of(new TransferResult(CurlExitCode.Ok, 0) { Report = ReportOf(200, ("Content-Length", "8")), TimeConditionUnmet = true }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_TimeConditionUnmetOnA304WithALength_AnswersTheContentLength() =>
+        Assert.AreEqual(8, Of(new TransferResult(CurlExitCode.Ok, 0) { Report = ReportOf(304, ("Content-Length", "8")), TimeConditionUnmet = true }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_FailureBeforeTheBody_AnswersMinusOne() =>
+        Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.FilesizeExceeded, 0) { Report = ReportOf(200, ("Content-Length", "3000000")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_BadContentEncoding_AnswersTheContentLength() =>
+        Assert.AreEqual(15, Of(new TransferResult(CurlExitCode.BadContentEncoding, 0) { Report = ReportOf(200, ("Content-Length", "15")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_ShortBody_AnswersTheContentLength() =>
+        Assert.AreEqual(100, Of(new TransferResult(CurlExitCode.PartialFile, 5) { Report = ReportOf(200, ("Content-Length", "100")) }, HttpUrl).ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_FileDirectoryListing_AnswersMinusOne() =>
+        Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.Ok, 1199), "file:///dir/").ContentLengthDownload);
+
+    [TestMethod]
+    public void Of_ContentLengthIgnored_AnswersMinusOne() =>
+        Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 100) { Report = ReportOf(200, ("Content-Length", "100")) }, HttpUrl, false, new ManualTimeProvider(), contentLengthIgnored: true).ContentLengthDownload);
 
     [TestMethod]
     public void Of_NoContentResponse_AnswersZero() => Assert.AreEqual(0, LengthOf(204));
@@ -43,7 +83,7 @@ public sealed class TransferInfoLengthAndConditionTests
     public void Of_NotModifiedWithALength_AnswersZero() => Assert.AreEqual(0, LengthOf(304, ("Content-Length", "5")));
 
     [TestMethod]
-    public void Of_NotModifiedWithNoLength_AnswersMinusOne() => Assert.AreEqual(-1, LengthOf(304));
+    public void Of_NotModifiedWithNoLength_AnswersZero() => Assert.AreEqual(0, LengthOf(304));
 
     [TestMethod]
     public void Of_NotModifiedWithNoTimeCondition_AnswersConditionUnmet() =>
@@ -73,6 +113,12 @@ public sealed class TransferInfoLengthAndConditionTests
     [TestMethod]
     public void Of_FailedFileTransfer_AnswersMinusOne() =>
         Assert.AreEqual(-1, Of(new TransferResult(CurlExitCode.FileCouldntReadFile, 0), FileUrl).ContentLengthDownload);
+
+
+    /// <summary>libcurl 8.22.0 (lib/file.c, file_upload) never sets a download size, so it stays -1 after an upload (BL-3277).</summary>
+    [TestMethod]
+    public void Of_FileUpload_AnswersMinusOne() =>
+        Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 30), FileUrl, false, new ManualTimeProvider(), uploaded: true).ContentLengthDownload);
 
     [TestMethod]
     public void WithoutPortOverride_PortOverAUrlWithItsOwnPort_AnswersTheUrlAsSet() =>

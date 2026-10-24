@@ -1,6 +1,6 @@
 # ADR-0755 — Upstream cases 745 and 1276 check C-only header tooling and have no counterpart
 
-- Status: Accepted
+- Status: Accepted (superseded in part by ADR-0803)
 - Date: 2026-10-21
 - Task: BL-2851
 - Decided by Claude under Stewart's delegation.

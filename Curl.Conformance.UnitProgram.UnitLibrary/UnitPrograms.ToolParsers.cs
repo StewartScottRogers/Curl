@@ -1,4 +1,5 @@
 using Curl.Conformance.UnitProgram.ToolParsers;
+using Curl.Conformance.UnitProgram.Wildcards;
 
 namespace Curl.Conformance.UnitProgram;
 
@@ -7,6 +8,7 @@ public sealed partial class UnitPrograms
     /// <summary>The ported unit programs of the ToolParsers area (BL-2842 to BL-2848); its port task appends here and nowhere else.</summary>
     private static IUnitProgram[] ToolParsersPrograms =>
     [
+        new Unit1307Fnmatch(),
         new Tool1604SanitizeFileName(),
         new Tool1621StripCredentials(),
         new Tool1622ProgressFields(),

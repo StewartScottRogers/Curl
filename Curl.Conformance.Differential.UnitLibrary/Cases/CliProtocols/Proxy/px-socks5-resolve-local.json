@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-socks5-resolve-local","command":"-s --socks5 127.0.0.1:18300 http://localhost:18080/echo"}
+  ]
+}

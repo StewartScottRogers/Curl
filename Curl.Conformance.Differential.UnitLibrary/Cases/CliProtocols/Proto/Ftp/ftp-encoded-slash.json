@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-encoded-slash","command":"-sS 'ftp://127.0.0.1:18200/%2Fa.txt'"}
+  ]
+}

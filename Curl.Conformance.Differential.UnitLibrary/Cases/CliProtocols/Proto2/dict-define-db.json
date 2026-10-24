@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"dict-define-db","command":"-s dict://127.0.0.1:18400/d:word:web1913"}
+  ]
+}

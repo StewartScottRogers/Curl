@@ -1,9 +1,6 @@
-using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using ModelContextProtocol.Server;
+using System.Text;
+using Curl.Mcp.Protocol.Model;
+using Curl.Mcp.Protocol.Server;
 
 namespace Curl.Mcp;
 
@@ -11,159 +8,83 @@ namespace Curl.Mcp;
 [DoNotParallelize]
 public sealed class CurlMcpHostTests
 {
+    private static readonly McpResponseCap Cap = new(McpResponseCap.DefaultMaxBytes);
+
     [TestMethod]
-    public void Build_RegistersExactlyTheCurlTransferVersionAndUrlTools()
+    public void ServerInfo_IsTheAssemblyNameAndVersion()
     {
-        using IHost host = CurlMcpHost.Build([], _ => null);
+        Assert.AreEqual("Curl.Mcp", CurlMcpHost.ServerInfo.Name);
+        Assert.AreEqual(typeof(CurlMcpHost).Assembly.GetName().Version!.ToString(), CurlMcpHost.ServerInfo.Version);
+    }
+
+    [TestMethod]
+    public void CreateRegistry_RegistersExactlyTheFiveToolsInTheGoldenOrder()
+    {
+        McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap);
+
+        CollectionAssert.AreEqual(
+            new[] { "parse_url", "transfer", "curl", "build_url", "version" },
+            registry.ToolEntries.Select(entry => entry.Name).ToArray());
+    }
+
+    [TestMethod]
+    public void CreateRegistry_RegistersEveryAiHelpResource()
+    {
+        McpServerRegistry registry = CurlMcpHost.CreateRegistry(McpConfinementRoot.NotConfigured, Cap);
+
+        CollectionAssert.AreEqual(
+            McpAiHelpResourceCatalogue.Resources.Select(resource => resource.Uri).ToArray(),
+            registry.Resources.Select(resource => resource.Uri).ToArray());
+    }
+
+    [TestMethod]
+    public void CreateHandlers_AnswersTheToolResourceAndLoggingMethods()
+    {
+        IEnumerable<IMcpMethodHandler> handlers = CurlMcpHost.CreateHandlers(McpConfinementRoot.NotConfigured, Cap);
 
         CollectionAssert.AreEquivalent(
-            new[] { "curl", "transfer", "version", "parse_url", "build_url" },
-            host.Services.GetServices<McpServerTool>().Select(tool => tool.ProtocolTool.Name).ToArray());
+            new[] { "tools/list", "tools/call", "resources/list", "resources/read", "logging/setLevel" },
+            handlers.Select(handler => handler.Method).ToArray());
     }
 
     [TestMethod]
-    public void Build_RegistersTheVersionToolWithItsDescriptionAndNoArguments()
+    public async Task Build_ServesInitializeAndToolsListOnOutputAndLogsOnlyToError()
     {
-        using IHost host = CurlMcpHost.Build([], _ => null);
+        const string Requests =
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}""" + "\n"
+            + """{"jsonrpc":"2.0","method":"notifications/initialized"}""" + "\n"
+            + """{"jsonrpc":"2.0","id":2,"method":"tools/list"}""" + "\n";
+        using MemoryStream input = new(Encoding.UTF8.GetBytes(Requests));
+        using MemoryStream output = new();
+        using StringWriter error = new();
+        string directory = Directory.GetCurrentDirectory();
 
-        McpServerTool tool = host.Services.GetServices<McpServerTool>().Single(tool => tool.ProtocolTool.Name == "version");
-        Assert.AreEqual(CurlVersionTool.ToolDescription, tool.ProtocolTool.Description);
-        StringAssert.Contains(tool.ProtocolTool.Description, "curl -V");
-        Assert.IsFalse(tool.ProtocolTool.InputSchema.TryGetProperty("properties", out JsonElement properties) && properties.EnumerateObject().Any());
-        Assert.IsNotNull(host.Services.GetRequiredService<McpVersionTool>());
+        using McpStdioHost host = CurlMcpHost.Build(_ => null, input, output, error);
+        int exitCode = await host.RunAsync(CancellationToken.None);
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(directory, Directory.GetCurrentDirectory());
+        string written = Encoding.UTF8.GetString(output.ToArray());
+        StringAssert.Contains(written, "\"serverInfo\":{\"name\":\"Curl.Mcp\"");
+        StringAssert.Contains(written, "\"name\":\"build_url\"");
+        StringAssert.Contains(error.ToString(), "Curl.Mcp stopped.");
+        Assert.IsFalse(written.Contains("Curl.Mcp stopped.", StringComparison.Ordinal));
     }
 
     [TestMethod]
-    public void Build_RegistersTheUrlToolsWithTheirDescriptionsAndArguments()
+    public async Task Build_WithABadResponseCap_RefusesToServe()
     {
-        using IHost host = CurlMcpHost.Build([], _ => null);
+        using StringWriter error = new();
+        using McpStdioHost host = CurlMcpHost.Build(name => name == McpResponseCap.VariableName ? "lots" : null, Stream.Null, Stream.Null, error);
 
-        McpServerTool[] tools = host.Services.GetServices<McpServerTool>().ToArray();
-        McpServerTool parse = tools.Single(tool => tool.ProtocolTool.Name == "parse_url");
-        McpServerTool build = tools.Single(tool => tool.ProtocolTool.Name == "build_url");
-        Assert.AreEqual(CurlUrlTool.ParseDescription, parse.ProtocolTool.Description);
-        Assert.AreEqual(CurlUrlTool.BuildDescription, build.ProtocolTool.Description);
-        CollectionAssert.AreEqual(new[] { "url" }, parse.ProtocolTool.InputSchema.GetProperty("required").EnumerateArray().Select(name => name.GetString()).ToArray());
-        CollectionAssert.AreEquivalent(
-            new[] { "scheme", "user", "password", "options", "host", "port", "path", "query", "fragment", "zoneId", "flags" },
-            build.ProtocolTool.InputSchema.GetProperty("properties").EnumerateObject().Select(property => property.Name).ToArray());
-        Assert.IsNotNull(host.Services.GetRequiredService<McpUrlTool>());
+        await Assert.ThrowsExactlyAsync<McpConfigurationException>(() => host.RunAsync(CancellationToken.None));
     }
 
     [TestMethod]
-    public void Build_RegistersTheTransferToolWithItsDescriptionAndUrlRequired()
+    public void Build_OverTheProcess_BuildsAHost()
     {
-        using IHost host = CurlMcpHost.Build([], _ => null);
+        using McpStdioHost host = CurlMcpHost.Build();
 
-        McpServerTool tool = host.Services.GetServices<McpServerTool>().Single(tool => tool.ProtocolTool.Name == "transfer");
-        Assert.AreEqual(CurlTransferTool.ToolDescription, tool.ProtocolTool.Description);
-        StringAssert.Contains(tool.ProtocolTool.Description, "Prefer it to the `curl` tool");
-
-        JsonElement schema = tool.ProtocolTool.InputSchema;
-        JsonElement properties = schema.GetProperty("properties");
-        CollectionAssert.AreEquivalent(
-            new[] { "url", "method", "headers", "body", "followRedirects", "timeoutSeconds", "insecure", "proxy", "userAgent" },
-            properties.EnumerateObject().Select(property => property.Name).ToArray());
-        Assert.AreEqual("string", properties.GetProperty("url").GetProperty("type").GetString());
-        StringAssert.Contains(properties.GetProperty("headers").GetRawText(), "\"name\"");
-        StringAssert.Contains(properties.GetProperty("body").GetRawText(), "\"isBase64\"");
-        CollectionAssert.AreEqual(new[] { "url" }, schema.GetProperty("required").EnumerateArray().Select(name => name.GetString()).ToArray());
-    }
-
-    [TestMethod]
-    public void Build_RegistersTheCurlToolWithItsDescriptionAndArgumentSchema()
-    {
-        using IHost host = CurlMcpHost.Build([], _ => null);
-
-        McpServerTool tool = host.Services.GetServices<McpServerTool>().Single(tool => tool.ProtocolTool.Name == "curl");
-        McpServerOptions options = host.Services.GetRequiredService<IOptions<McpServerOptions>>().Value;
-        Assert.AreEqual(5, options.ToolCollection?.Count ?? 5);
-        Assert.AreEqual("curl", tool.ProtocolTool.Name);
-        Assert.AreEqual(CurlCommandTool.ToolDescription, tool.ProtocolTool.Description);
-        StringAssert.Contains(tool.ProtocolTool.Description, "without the program name");
-        StringAssert.Contains(tool.ProtocolTool.Description, "CURL_MCP_ROOT");
-        StringAssert.Contains(tool.ProtocolTool.Description, "--ai-help");
-
-        JsonElement schema = tool.ProtocolTool.InputSchema;
-        JsonElement properties = schema.GetProperty("properties");
-        Assert.AreEqual("array", properties.GetProperty("args").GetProperty("type").GetString());
-        Assert.AreEqual("string", properties.GetProperty("args").GetProperty("items").GetProperty("type").GetString());
-        Assert.AreEqual(2, properties.EnumerateObject().Count());
-        StringAssert.Contains(properties.GetProperty("stdin").GetProperty("type").GetRawText(), "string");
-        CollectionAssert.AreEqual(new[] { "args" }, schema.GetProperty("required").EnumerateArray().Select(name => name.GetString()).ToArray());
-    }
-
-    [TestMethod]
-    public void Build_WithNoRoot_LeavesTheCurrentDirectoryAsItWas()
-    {
-        string before = Directory.GetCurrentDirectory();
-
-        using IHost host = CurlMcpHost.Build([], _ => null);
-
-        Assert.AreEqual(before, Directory.GetCurrentDirectory());
-    }
-
-    [TestMethod]
-    public void Build_WithARoot_MakesTheResolvedRootTheCurrentDirectory()
-    {
-        string before = Directory.GetCurrentDirectory();
-        string root = Directory.CreateTempSubdirectory("curl-mcp-host-").FullName;
-        try
-        {
-            using IHost host = CurlMcpHost.Build([], name => name == McpConfinementRoot.VariableName ? root : null);
-
-            Assert.AreEqual(
-                Path.TrimEndingDirectorySeparator(new McpConfinementRoot(root).ResolvedRoot!),
-                Path.TrimEndingDirectorySeparator(Directory.GetCurrentDirectory()));
-        }
-        finally
-        {
-            Directory.SetCurrentDirectory(before);
-            Directory.Delete(root, recursive: true);
-        }
-    }
-
-    [TestMethod]
-    public void Build_WithABadResponseCap_RefusesToBuild()
-    {
-        Assert.ThrowsExactly<McpConfigurationException>(() => CurlMcpHost.Build([], name => name == McpResponseCap.VariableName ? "lots" : null));
-    }
-
-    [TestMethod]
-    public void Build_OverTheProcessEnvironment_BuildsAHost()
-    {
-        using IHost host = CurlMcpHost.Build([]);
-
-        Assert.IsNotNull(host.Services.GetRequiredService<McpCurlTool>());
-        Assert.IsNotNull(host.Services.GetRequiredService<McpTransferTool>());
-    }
-
-    [TestMethod]
-    public void Build_SendsEveryLogLineToStandardErrorAndNothingToStandardOutput()
-    {
-        TextWriter originalOut = System.Console.Out;
-        TextWriter originalError = System.Console.Error;
-        using StringWriter standardOutput = new();
-        using StringWriter standardError = new();
-        System.Console.SetOut(standardOutput);
-        System.Console.SetError(standardError);
-        try
-        {
-            using (IHost host = CurlMcpHost.Build([], _ => null))
-            {
-                ILogger logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Curl.Mcp.Test");
-                logger.LogInformation("information line");
-                logger.LogCritical("critical line");
-            }
-
-            Assert.AreEqual(string.Empty, standardOutput.ToString());
-            StringAssert.Contains(standardError.ToString(), "information line");
-            StringAssert.Contains(standardError.ToString(), "critical line");
-        }
-        finally
-        {
-            System.Console.SetOut(originalOut);
-            System.Console.SetError(originalError);
-        }
+        Assert.IsNotNull(host);
     }
 }

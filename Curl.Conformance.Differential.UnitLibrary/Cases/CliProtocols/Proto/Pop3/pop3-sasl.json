@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"pop3-sasl","command":"-s -u u:p --login-options AUTH=PLAIN pop3://127.0.0.1:18220/1"}
+  ]
+}

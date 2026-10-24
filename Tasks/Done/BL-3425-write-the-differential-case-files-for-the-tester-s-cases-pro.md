@@ -1,0 +1,38 @@
+---
+id: BL-3425
+title: Write the differential case files for the tester's cases_proto2.py cases
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: [BL-3233, BL-3235, BL-3284, BL-3285, BL-3286, BL-3287, BL-3288, BL-3334]
+touches: [Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols/Proto2, Curl.Conformance.Differential.UnitTests/Protocols/Proto2]
+requirement: none
+created: 2026-10-23
+completed: 2026-10-23
+---
+# BL-3425 — Write the differential case files for the tester's cases_proto2.py cases
+
+## Goal
+
+The tester's `cases_proto2.py` cases (about 50) exist as differential case files under `Cases/CliProtocols/Proto2`.
+
+## Context
+
+Reference: `Z:\repos\Curl.difftest\2026-10-22\cases_proto2.py` (Python is a reference only; never commit or run it). Server ports from BL-3284 to BL-3287 are in place. Generate the case JSON with a PowerShell script, not by hand. Parent: BL-3234, BL-3217.
+
+## Acceptance criteria
+
+- [x] One case file per `cases_proto2.py` case exists under `Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols/Proto2`, with the same name, arguments and expected server behaviour as the tester's case.
+- [x] A unit test in `Curl.Conformance.Differential.UnitTests/Protocols/Proto2` loads every case file and checks the count and that each parses; it is platform-neutral.
+- [x] Projects build clean with -warnaserror and their fast tests pass on Windows.
+- [x] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
+
+## Notes
+
+- Split from BL-3234 (over its cost cap) on 2026-10-23.
+
+## Log
+
+- 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 973eb9fe 57c655f4 1f9665bb 5e81fa96.
+- 2026-10-23: Doing -> Done. The tester's 52 cases_proto2.py cases exist as differential case files under Cases/CliProtocols/Proto2, checked by Proto2CasesTests

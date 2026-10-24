@@ -46,3 +46,31 @@ With that check off, as in the OpenSSL build Curl matches on Linux and macOS, al
 - The gap office's scorecard is unaffected: the reference curl still lacks `http/3`, so the cases stay
   `excluded` there.
 - A change that breaks HTTP/3 over the stand-in turns CI red on Linux and macOS.
+
+## Addendum (2026-10-23, BL-3403): why 2500, 2502 and 2503 stay unheld on Windows
+
+Decided by Claude under Stewart's delegation. Measured on Windows with `CURL_UPSTREAM_CASE` and
+`CURL_UPSTREAM_KEEP_LOGS=1` after ADR-0797 and ADR-0798:
+
+| Case | First difference | Curl's exit and stderr |
+| --- | --- | --- |
+| 2500 | `<protocol>` line 1: expected `GET https://localhost:9019/2500 HTTP/1.1`, got the end | 60, `curl: (60) schannel: the revocation status is unknown` |
+| 2502 | `<protocol>` line 1: expected `GET https://localhost:9019/path/25020001 HTTP/1.1`, got the end | no request reaches the stand-in: `lib2502` sets `CURLOPT_CAINFO` to `test-ca.cacert` (the same CA) with `CURL_HTTP_VERSION_3ONLY`, so its QUIC handshake meets the same verification as 2500 (its kept log folder was not readable from the lane, so the stderr line is not quoted here) |
+| 2503 | `<stdout>` line 1: expected `HTTP/3 200 `, got `{` (the empty `%{header_json}`) | 60, `curl: (60) schannel: the revocation status is unknown` |
+
+The trace of 2500 shows the QUIC handshake reaching certificate verification (`CAfile: .../test-ca.crt`)
+and failing there (`QUIC connect to 127.0.0.1 port 9019 failed: SSL peer certificate or SSH remote key
+was not OK`); the h2 fallback then finds no TCP listener. The generated test CA and its server
+certificate name no revocation endpoint, so the Schannel build's chain revocation check ends "status
+unknown". ADR-0797's leaf-anchor rule does not apply: the fault is the revocation status, which it
+leaves failing.
+
+The reference curl 8.22.0 (Schannel, `C:\Program Files\Git\ucrt64\bin\curl.exe`) refuses `--http3`
+(`option --http3: the installed libcurl version does not support this`, ADR-0540), so it cannot run
+these cases. Over HTTPS with the same kind of trust - `Record-CurlExchange.ps1 -Tls
+-TlsRootCertificateFile root.pem`, a private root naming no revocation endpoint, and
+`curl -sS --cacert root.pem https://localhost:18519/2500` - it exits 60 with
+`curl: (60) schannel: the revocation status is unknown`, the answer Curl gives in 2500 and 2503. The
+difference is the Schannel reference's own behaviour, not Curl's or the stand-in's, so the cases keep
+their arguments, stay listed for Linux and macOS, and stay `Inconclusive` on Windows, with a reason
+that names this cause ahead of the first difference (`Http3CaseNotHeldOnWindowsReason`).

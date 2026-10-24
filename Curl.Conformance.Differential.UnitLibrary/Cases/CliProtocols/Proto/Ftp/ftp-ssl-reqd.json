@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-ssl-reqd","command":"-sS --ssl-reqd ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

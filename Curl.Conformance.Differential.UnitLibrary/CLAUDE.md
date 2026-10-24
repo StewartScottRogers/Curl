@@ -21,3 +21,7 @@ coverage; starting the binaries, the loopback servers and the working directorie
   outputs as Python `repr()` literals (`PythonLiteral`).
 - `ReferenceBuildLimitation` names a known fault of the reference build; a case tagged with
   one is not run against it (`DifferentialCase.RunsAgainstReferenceBuild`).
+- `Api/` (ADR-0790): `ApiDifferentialCases.All`, each an `ApiDifferentialCase` pairing an
+  `ApiDifferentialRequest` (a `Curl.Api` request described without referencing `Curl.Api`) with
+  its equivalent curl command line; `ApiDifferentialOutput` writes the `Curl.Api` side's body and
+  response code as that command line's `-w '\n%{response_code}'` does.

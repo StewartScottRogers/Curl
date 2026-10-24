@@ -210,8 +210,10 @@ internal static class UpstreamCaseVerification
 
     // A verify part holding only %EMPTY expects nothing (test2012 to test2014): the part has to
     // exist to be checked, and an empty one would not mark it as meant to be empty.
+    // A part with a loadfile attribute expects the named file's bytes, as getpart.pm's loadfile does (test1279).
     private static byte[] Body(UpstreamTestSection part) =>
-        part.Content.Span.SequenceEqual("%EMPTY\n"u8) ? [] : part.Content.ToArray();
+        part.GetAttribute("loadfile") is { } loadFile ? File.ReadAllBytes(UpstreamUtf8Words.AsSystemText(loadFile))
+        : part.Content.Span.SequenceEqual("%EMPTY\n"u8) ? [] : part.Content.ToArray();
 
     private static byte[] Normalized(byte[] body, UpstreamTestSection? part) =>
         part?.GetAttribute("mode") switch

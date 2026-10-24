@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -9,11 +10,13 @@ using Curl.Protocol.Ws;
 namespace Curl.Engine;
 
 /// <summary>
-/// What every easy handle of one <see cref="ManagedCurlEngine" /> shares, as the curl tool's transfers
-/// share it across one run (ADR-0542): the connection, TLS session and DNS caches, the cookies, the HSTS
-/// cache, and the <see cref="TransferPerformer" /> that numbers the transfers' <c>%{xfer_id}</c> and holds
-/// curl's easy error text. None of it is static, so two engines in one process share nothing, except through
-/// a <see cref="ManagedShareHandle" />, whose caches a transfer attached to it runs over (ADR-0606).
+/// The caches a transfer runs over - connections, TLS sessions, resolved names, cookies and HSTS - with what every
+/// easy handle of one <see cref="ManagedCurlEngine" /> shares: the clock, the multi owners and the
+/// <see cref="TransferPerformer" /> that numbers the transfers' <c>%{xfer_id}</c> and holds curl's easy error text.
+/// The engine's own state (<see cref="EngineWide" />) holds the caches the curl tool's transfers share across one run
+/// (ADR-0542); each library handle and each multi handle runs over caches of its own (<see cref="WithOwnCaches" />,
+/// BL-3204), so two handles share none unless a <see cref="ManagedShareHandle" /> links them (ADR-0606).
+/// None of it is static, so two engines in one process share nothing.
 /// </summary>
 internal sealed class ManagedEngineSharedState
 {
@@ -44,7 +47,11 @@ internal sealed class ManagedEngineSharedState
         TlsSessions = new TlsSessionCache(timeProvider);
         DnsCache = new DnsCache();
         Cookies = new CookieStore();
+        this.learnsHstsOverHttp = learnsHstsOverHttp;
         Hsts = new HstsTransferPolicy(timeProvider, learnsOverHttp: learnsHstsOverHttp);
+        EngineWide = this;
+        MultiCaches = new ConditionalWeakTable<ManagedMultiTransfer, ManagedEngineSharedState>();
+        OwnConnectionCaches = new ConditionalWeakTable<ConnectionCache, ConnectionCache>();
         ConnectionIdsByPoolNumber = new ConcurrentDictionary<long, long>();
         MultiOwners = new ConcurrentDictionary<Api.EngineContracts.IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance);
         SocketHandles = new CurlSocketHandles();
@@ -76,6 +83,10 @@ internal sealed class ManagedEngineSharedState
         DnsCache = dnsCache;
         Cookies = cookies;
         Hsts = hsts;
+        learnsHstsOverHttp = engine.learnsHstsOverHttp;
+        EngineWide = engine.EngineWide;
+        MultiCaches = engine.MultiCaches;
+        OwnConnectionCaches = engine.OwnConnectionCaches;
         ConnectionIdsByPoolNumber = engine.ConnectionIdsByPoolNumber;
         MultiOwners = engine.MultiOwners;
         SocketHandles = engine.SocketHandles;
@@ -88,6 +99,55 @@ internal sealed class ManagedEngineSharedState
         FtpPwdStop = engine.FtpPwdStop;
         CreateFormBoundary = engine.CreateFormBoundary;
     }
+
+    /// <summary>Whether a new HSTS cache learns <c>Strict-Transport-Security</c> over plain <c>http</c>, as the engine's does.</summary>
+    private readonly bool learnsHstsOverHttp;
+
+    /// <summary>
+    /// Creates a state with the engine's clock, numbering, multi owners, performer and resolved names and caches of its own,
+    /// all empty: what a library easy handle (<c>curl_easy_init</c>, <c>curl_easy_duphandle</c>) or a multi handle runs over,
+    /// as upstream gives each its own connection pool, TLS sessions, cookies and HSTS (BL-3204). The resolved names stay
+    /// this state's, so a handle finds a name another handle's <c>CURLOPT_RESOLVE</c> added, as libcurl 8.22.0's do
+    /// (upstream test1512, ADR-0789). The engine keeps the new pool, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
+    /// </summary>
+    /// <returns>The new state.</returns>
+    internal ManagedEngineSharedState WithOwnCaches()
+    {
+        ConnectionCache connections = new(TimeProvider);
+        OwnConnectionCaches.Add(connections, connections);
+        return new(this, connections, new TlsSessionCache(TimeProvider), DnsCache, new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp));
+    }
+
+    /// <summary>
+    /// Creates the state a <c>curl_easy_duphandle</c> copy runs over: caches of its own (<see cref="WithOwnCaches" />) whose
+    /// HSTS cache starts with this state's entries, as upstream's duphandle copies the HSTS cache (upstream test1922).
+    /// </summary>
+    /// <returns>The new state.</returns>
+    internal ManagedEngineSharedState DuplicatedWithOwnCaches()
+    {
+        ManagedEngineSharedState duplicate = EngineWide.WithOwnCaches();
+        // No expiry is later than long.MaxValue, so the text is never null (HstsCache.FormatFile).
+        duplicate.Hsts.ReadFile(Hsts.FormatFile("\n", long.MaxValue)!);
+        return duplicate;
+    }
+
+    /// <summary>Gets the pools of the engine's library easy handles and multi handles, which the engine closes when it is disposed (ADR-0789).</summary>
+    internal ConditionalWeakTable<ConnectionCache, ConnectionCache> OwnConnectionCaches { get; }
+
+    /// <summary>
+    /// Creates the state a handle performing in a multi handle runs over: the multi's connections, TLS sessions and resolved
+    /// names, as upstream's multi handle pools them, with this state's cookies and HSTS (BL-3204).
+    /// </summary>
+    /// <param name="multi">The multi handle's caches (<see cref="MultiCaches" />).</param>
+    /// <returns>The new state.</returns>
+    internal ManagedEngineSharedState InMulti(ManagedEngineSharedState multi) =>
+        new(this, multi.Connections, multi.TlsSessions, multi.DnsCache, Cookies, Hsts);
+
+    /// <summary>Gets the engine's own state, whose caches the curl tool's transfers share across one run (ADR-0542).</summary>
+    internal ManagedEngineSharedState EngineWide { get; }
+
+    /// <summary>Gets the caches of each of the engine's multi handles, which the handles performing in it pool (BL-3204).</summary>
+    internal ConditionalWeakTable<ManagedMultiTransfer, ManagedEngineSharedState> MultiCaches { get; }
 
     /// <summary>
     /// Gets what gives every handle's <c>CURLOPT_MIMEPOST</c> bodies their boundary: the conformance harness's stand-in for
@@ -138,19 +198,19 @@ internal sealed class ManagedEngineSharedState
     /// <summary>Gets the clock the engine's transfers run on.</summary>
     internal TimeProvider TimeProvider { get; }
 
-    /// <summary>Gets the pooled connections every handle's transfers connect through.</summary>
+    /// <summary>Gets the pooled connections the transfers running over this state connect through.</summary>
     internal ConnectionCache Connections { get; }
 
-    /// <summary>Gets the TLS sessions every handle's handshakes resume.</summary>
+    /// <summary>Gets the TLS sessions the handshakes running over this state resume.</summary>
     internal TlsSessionCache TlsSessions { get; }
 
-    /// <summary>Gets the resolved names every handle's transfers look up first.</summary>
+    /// <summary>Gets the resolved names the transfers running over this state look up first.</summary>
     internal DnsCache DnsCache { get; }
 
-    /// <summary>Gets the cookies every handle with the cookie engine on sends and keeps.</summary>
+    /// <summary>Gets the cookies the transfers running over this state send and keep with the cookie engine on.</summary>
     internal CookieStore Cookies { get; }
 
-    /// <summary>Gets the HSTS cache every handle's transfers learn from and switch by.</summary>
+    /// <summary>Gets the HSTS cache the transfers running over this state learn from and switch by.</summary>
     internal HstsTransferPolicy Hsts { get; }
 
     /// <summary>Gets the <c>%{conn_id}</c> of each connection a handle's transfer opened, by the pool's number for it, which a later transfer reusing it takes (<see cref="EngineConnectionIdTransferEvents" />).</summary>

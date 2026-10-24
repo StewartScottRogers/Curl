@@ -517,6 +517,99 @@ public sealed class DigestAuthenticatorTests
         StringAssert.EndsWith(second, ",qop=\"auth\",userhash=true", StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The differential case auth-digest256 on Windows, where the engine matches the SSPI build:
+    /// curl 8.21.0 and 8.22.0 (Schannel) send one request and exit 94 (ADR-0791).
+    /// </summary>
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void CreateAuthorization_Sha256ChallengeOnWindows_FailsWithExit94()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c", matchesSspiBuild: OperatingSystem.IsWindows());
+        diagnostics.Arrange("challenges", string.Join(" | ", Digest256Challenges));
+
+        HttpAuthenticationFailedException failure = Assert.ThrowsExactly<HttpAuthenticationFailedException>(
+            () => authenticator.CreateAuthorization(Request(new NetworkCredential("u", "p"), "/digest256", HttpAuthSchemes.Digest), Digest256Challenges));
+
+        diagnostics.Act("exit", failure.ExitCode);
+        diagnostics.Assert("exit", CurlExitCode.AuthError, failure.ExitCode);
+        Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
+        Assert.AreEqual("An authentication function returned an error", failure.Message);
+    }
+
+    /// <summary>
+    /// The differential case auth-digest256 off Windows, where curl's OpenSSL build answers
+    /// SHA-256 with its own Digest code and the server says <c>sha256 ok</c> (ADR-0791).
+    /// </summary>
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void CreateAuthorization_Sha256ChallengeOffWindows_AnswersSha256()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c", matchesSspiBuild: OperatingSystem.IsWindows());
+        diagnostics.Arrange("challenges", string.Join(" | ", Digest256Challenges));
+
+        string? value = authenticator.CreateAuthorization(Request(new NetworkCredential("u", "p"), "/digest256", HttpAuthSchemes.Digest), Digest256Challenges);
+
+        const string expected = "Digest username=\"u\", realm=\"r\", nonce=\"abc\", uri=\"/digest256\", cnonce=\"c\", nc=00000001, qop=auth, "
+            + "response=\"0695d54a643da17474003a7f14392dd61f7db3c5de1785179291409ffbc859c8\", algorithm=SHA-256";
+        diagnostics.Act("Authorization", value);
+        diagnostics.Assert("Authorization", expected, value);
+        Assert.AreEqual(expected, value);
+    }
+
+    /// <summary>
+    /// SSPI answers only MD5 and MD5-sess: measured from curl 8.21.0's Schannel build, every
+    /// SHA algorithm, in any case, fails with exit 94 after one request (BL-3281).
+    /// </summary>
+    [TestMethod]
+    [DataRow("SHA-256")]
+    [DataRow("sha-256")]
+    [DataRow("SHA-256-sess")]
+    [DataRow("SHA-512-256")]
+    [DataRow("SHA-512-256-sess")]
+    public void CreateAuthorization_SspiBuildShaAlgorithm_FailsWithExit94(string algorithm)
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        var log = new Fakes.RecordingDiagnosticLog(DiagnosticLogLevel.Verbose);
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c", log, matchesSspiBuild: true);
+        string challenge = "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", algorithm=" + algorithm;
+        diagnostics.Arrange("challenge", challenge);
+
+        HttpAuthenticationFailedException failure = Assert.ThrowsExactly<HttpAuthenticationFailedException>(
+            () => authenticator.CreateAuthorization(Request(new NetworkCredential("u", "p"), "/x", HttpAuthSchemes.Digest), [challenge]));
+
+        diagnostics.Act("exit", failure.ExitCode);
+        diagnostics.Assert("exit", CurlExitCode.AuthError, failure.ExitCode);
+        Assert.AreEqual(CurlExitCode.AuthError, failure.ExitCode);
+        Assert.IsNotEmpty(log.Lines);
+    }
+
+    /// <summary>
+    /// MD5-sess is one SSPI answers: curl 8.21.0's Schannel build sends it on the second request.
+    /// </summary>
+    [TestMethod]
+    public void CreateAuthorization_SspiBuildMd5Sess_Answers()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c", matchesSspiBuild: true);
+        const string challenge = "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", algorithm=MD5-sess";
+        diagnostics.Arrange("challenge", challenge);
+
+        string? value = authenticator.CreateAuthorization(Request(new NetworkCredential("u", "p"), "/x", HttpAuthSchemes.Digest), [challenge]);
+
+        diagnostics.Act("Authorization", value);
+        diagnostics.Assert("algorithm", true, value?.Contains(",algorithm=MD5-sess,", StringComparison.Ordinal));
+        StringAssert.Contains(value, ",algorithm=MD5-sess,", StringComparison.Ordinal);
+    }
+
+    private static readonly string[] Digest256Challenges =
+    [
+        "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", algorithm=SHA-256",
+        "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\", algorithm=MD5",
+    ];
+
     private static string? Answer(string user, string password, string target, string clientNonce, params string[] challenges)
     {
         DigestAuthenticator authenticator = new(Encoding.UTF8, () => clientNonce);

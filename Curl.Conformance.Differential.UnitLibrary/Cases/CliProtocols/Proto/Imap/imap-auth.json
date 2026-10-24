@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-auth","command":"-s -u u:p 'imap://127.0.0.1:18230/INBOX;UID=1'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

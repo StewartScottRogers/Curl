@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-range","command":"-s -r 2-4 ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

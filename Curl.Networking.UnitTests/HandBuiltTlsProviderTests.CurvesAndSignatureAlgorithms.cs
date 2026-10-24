@@ -8,10 +8,11 @@ using Curl.Tls;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins <c>--curves</c> and <c>--sigalgs</c> in the hand-built client on every platform
-/// (BL-709, ADR-0151, ADR-0284): the ClientHello's <c>supported_groups</c>, <c>key_share</c>
-/// and <c>signature_algorithms</c> for each value, as Ubuntu's curl 8.18.0 with OpenSSL 3.5.5
-/// sent them (captured 2026-09-30), in both builds' profiles, and the measured failures.
+/// Pins <c>--curves</c> and <c>--sigalgs</c> in the hand-built client (BL-709, ADR-0151,
+/// ADR-0284): the ClientHello's <c>supported_groups</c>, <c>key_share</c> and
+/// <c>signature_algorithms</c> for each value, as Ubuntu's curl 8.18.0 with OpenSSL 3.5.5 sent
+/// them (captured 2026-09-30), and the measured failures, in the OpenSSL build; the Schannel
+/// build ignores both, as curl 8.22.0 Schannel does (BL-3305, ADR-0793).
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests
 {
@@ -40,8 +41,6 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(OpenSslBuild, "brainpoolP512r1tls13", new ushort[] { 0x0021 }, new ushort[] { 0x0021 })]
     [DataRow(OpenSslBuild, "X25519:MLKEM768", new ushort[] { 0x001d, 0x0201 }, new ushort[] { 0x001d })]
     [DataRow(OpenSslBuild, "MLKEM1024:brainpoolP512r1tls13:*SecP256r1MLKEM768", new ushort[] { 0x0202, 0x0021, 0x11eb }, new ushort[] { 0x11eb })]
-    [DataRow(SchannelBuild, "X25519", new ushort[] { 0x001d }, new ushort[] { 0x001d })]
-    [DataRow(SchannelBuild, "P-384:X25519", new ushort[] { 0x0018, 0x001d }, new ushort[] { 0x0018 })]
     public async Task AuthenticateAsClientAsync_WithCurves_OffersTheMeasuredGroupsAndKeyShares(bool matchesSchannelBuild, string curves, ushort[] groups, ushort[] keyShares)
     {
         Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
@@ -110,7 +109,6 @@ public sealed partial class HandBuiltTlsProviderTests
     // With TLS 1.3 alone the hello drops every --curves group TLS 1.3 cannot key-share, such as
     // brainpoolP256r1 (0x001a), which a hello beside TLS 1.2 keeps (BL-1086, AF-0208).
     [TestMethod]
-    [DataRow(SchannelBuild)]
     [DataRow(OpenSslBuild)]
     public async Task AuthenticateAsClientAsync_WithCurvesAndATls13Minimum_OffersOnlyTheGroupsTls13CanShare(bool matchesSchannelBuild)
     {
@@ -143,7 +141,6 @@ public sealed partial class HandBuiltTlsProviderTests
     [DataRow(OpenSslBuild, "ecdsa_brainpoolP384r1tls13_sha384", new ushort[] { 0x081b })]
     [DataRow(OpenSslBuild, "ecdsa_brainpoolP512r1tls13_sha512", new ushort[] { 0x081c })]
     [DataRow(OpenSslBuild, "ed25519:mldsa65", new ushort[] { 0x0807, 0x0905 })]
-    [DataRow(SchannelBuild, "ECDSA+SHA256", new ushort[] { 0x0403 })]
     public async Task AuthenticateAsClientAsync_WithSigalgs_OffersTheMeasuredSchemesAndTheProfilesGroups(bool matchesSchannelBuild, string signatureAlgorithms, ushort[] schemes)
     {
         Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
@@ -169,7 +166,6 @@ public sealed partial class HandBuiltTlsProviderTests
 
     // Measured with --tls-max 1.2: --curves X25519 offers [x25519], --sigalgs ECDSA+SHA256 [0x0403].
     [TestMethod]
-    [DataRow(SchannelBuild)]
     [DataRow(OpenSslBuild)]
     public async Task AuthenticateAsClientAsync_WithCurvesAndSigalgsUnderATls12Ceiling_OffersThemInTheTls12Hello(bool matchesSchannelBuild)
     {
@@ -247,20 +243,15 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     // The failures come before a ClientHello is sent, in the OpenSSL build's order (measured;
-    // stars on TLS 1.2-only groups alone, BL-1082, measured 2026-10-01), and are
-    // the same on every platform.
+    // stars on TLS 1.2-only groups alone, BL-1082, measured 2026-10-01); the Schannel build
+    // has none, ignoring both lists (ADR-0793).
     [TestMethod]
-    [DataRow(SchannelBuild, "bogus", null, CurlExitCode.SslCipher, "failed setting curves list: 'bogus'")]
     [DataRow(OpenSslBuild, "bogus", null, CurlExitCode.SslCipher, "failed setting curves list: 'bogus'")]
     [DataRow(OpenSslBuild, "bogus", "bogus", CurlExitCode.SslCipher, "failed setting curves list: 'bogus'")]
-    [DataRow(SchannelBuild, null, "bogus", CurlExitCode.SslCipher, "failed setting signature algorithms: 'bogus'")]
     [DataRow(OpenSslBuild, "?bogus", "bogus", CurlExitCode.SslCipher, "failed setting signature algorithms: 'bogus'")]
-    [DataRow(SchannelBuild, "?bogus", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
     [DataRow(OpenSslBuild, "-X25519", "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
-    [DataRow(SchannelBuild, null, "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm")]
     [DataRow(OpenSslBuild, "X25519", "RSA+SHA1", CurlExitCode.SslConnectError, "TLS connect error: error:0A000076:SSL routines::no suitable signature algorithm")]
     [DataRow(OpenSslBuild, "*brainpoolP256r1:P-384", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
-    [DataRow(SchannelBuild, "*brainpoolP256r1:P-384", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
     [DataRow(OpenSslBuild, "*brainpoolP256r1:X25519", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
     [DataRow(OpenSslBuild, "brainpoolP256r1:*brainpoolP384r1:X25519", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000065:SSL routines::no suitable key share")]
     [DataRow(OpenSslBuild, "*brainpoolP256r1", null, CurlExitCode.SslConnectError, "TLS connect error: error:0A000127:SSL routines::no suitable groups")]
@@ -307,7 +298,6 @@ public sealed partial class HandBuiltTlsProviderTests
     // ec_point_formats and supported_groups, as Ubuntu's curl 8.18.0 with OpenSSL 3.5.5 did for
     // '?bogus' and X25519MLKEM768 (measured 2026-10-01, BL-1094).
     [TestMethod]
-    [DataRow(SchannelBuild, "?bogus")]
     [DataRow(OpenSslBuild, "?bogus")]
     [DataRow(OpenSslBuild, "X25519MLKEM768")]
     public async Task AuthenticateAsClientAsync_WithCurvesLeavingNoGroupUnderATls12Ceiling_SendsTheHelloWithoutGroups(bool matchesSchannelBuild, string curves)
@@ -338,7 +328,6 @@ public sealed partial class HandBuiltTlsProviderTests
     // "no ciphers available" and its internal_error alert, whatever --curves leaves (measured
     // 2026-10-01, BL-1094).
     [TestMethod]
-    [DataRow(SchannelBuild, null, "RSA+SHA1")]
     [DataRow(OpenSslBuild, null, "RSA+SHA1")]
     [DataRow(OpenSslBuild, null, "mldsa65")]
     [DataRow(OpenSslBuild, "?bogus", "RSA+SHA1")]
@@ -502,14 +491,10 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsFalse(hello.Extensions.Any(extension => extension.Type == TlsExtensionType.KeyShare));
     }
 
-    // A server sharing no group or unable to sign answers handshake_failure: Windows prints what
-    // the build applying the option prints (curl.se's LibreSSL build for --curves, the OpenSSL
-    // build for --sigalgs, both measured 2026-09-30); elsewhere the OpenSSL build's line.
+    // A server sharing no group or unable to sign answers handshake_failure: the OpenSSL build
+    // prints its line (measured 2026-09-30).
     [TestMethod]
-    [DataRow(SchannelBuild, "X25519", null, "TLS connect error: error:14004410:SSL routines:CONNECT_CR_SRVR_HELLO:sslv3 alert handshake failure")]
     [DataRow(OpenSslBuild, "X25519", null, "TLS connect error: error:0A000410:SSL routines::ssl/tls alert handshake failure")]
-    [DataRow(SchannelBuild, null, "ECDSA+SHA256", "TLS connect error: error:0A000410:SSL routines::ssl/tls alert handshake failure")]
-    [DataRow(SchannelBuild, "X25519", "ECDSA+SHA256", "TLS connect error: error:0A000410:SSL routines::ssl/tls alert handshake failure")]
     [DataRow(OpenSslBuild, null, "ECDSA+SHA256", "TLS connect error: error:0A000410:SSL routines::ssl/tls alert handshake failure")]
     public async Task AuthenticateAsClientAsync_WithCurvesOrSigalgsAndAHandshakeFailureAlert_ReportsTheApplyingBuildsLine(
         bool matchesSchannelBuild,
@@ -536,8 +521,41 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.AreEqual(expected, result.Result.ErrorMessage);
     }
 
-    // Only the handshake_failure alert was measured from curl.se's build; the server closing
-    // keeps the platform build's line.
+    // curl 8.22.0 Schannel ignores --curves and --sigalgs, whatever their value: -sSk with
+    // --curves nope, X25519 or P-256:nope, or --sigalgs nope or ecdsa_secp256r1_sha256, exits 0
+    // with the body (measured 2026-10-23, BL-3305, ADR-0793), so the hello is the profile's.
+    [TestMethod]
+    [DataRow("nope", null)]
+    [DataRow("X25519", null)]
+    [DataRow("P-256:nope", null)]
+    [DataRow("*brainpoolP256r1:P-384", "RSA+SHA1")]
+    [DataRow(null, "nope")]
+    [DataRow(null, "ecdsa_secp256r1_sha256")]
+    public async Task AuthenticateAsClientAsync_WithCurvesOrSigalgsInTheSchannelBuild_OffersTheSchannelProfile(string? curves, string? signatureAlgorithms)
+    {
+        var profile = ProfileOf(SchannelBuild);
+        Diagnostics.Arrange("build", "Schannel");
+        Diagnostics.Arrange("Curves", curves ?? "(none)");
+        Diagnostics.Arrange("SignatureAlgorithms", signatureAlgorithms ?? "(none)");
+
+        byte[] record;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            record = await CaptureClientHelloAsync(new TlsClientOptions(Curves: curves, SignatureAlgorithms: signatureAlgorithms), SchannelBuild, ProfileHost, Http11);
+        }
+
+        var hello = DecodeClientHello(record);
+        var groups = SupportedGroupsExtension.Decode(ExtensionData(hello, TlsExtensionType.SupportedGroups)).Value.ToArray();
+        var schemes = SignatureAlgorithmsExtension.Decode(ExtensionData(hello, TlsExtensionType.SignatureAlgorithms)).Value.ToArray();
+        Diagnostics.Bytes("captured ClientHello record", record);
+        Diagnostics.Assert("groups", string.Join(",", profile.SupportedGroups), string.Join(",", groups));
+        Diagnostics.Assert("schemes", string.Join(",", ClientHelloProfileMapping.CheckableSignatureAlgorithms(profile)), string.Join(",", schemes));
+        CollectionAssert.AreEqual(profile.SupportedGroups.ToArray(), groups);
+        CollectionAssert.AreEqual(profile.KeyShareGroups.ToArray(), KeySharesOf(hello).Select(share => share.Group).ToArray());
+        CollectionAssert.AreEqual(ClientHelloProfileMapping.CheckableSignatureAlgorithms(profile).ToArray(), schemes);
+    }
+
+    // The Schannel build, ignoring --curves, prints its own line when the server closes.
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCurvesInTheSchannelBuildWhenTheServerCloses_ReportsSchannelsLine()
     {

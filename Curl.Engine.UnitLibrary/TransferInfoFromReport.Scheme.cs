@@ -1,3 +1,4 @@
+using Curl.Api.Info;
 using Curl.Core;
 using Curl.Protocol.Abstractions;
 
@@ -47,6 +48,25 @@ internal static partial class TransferInfoFromReport
     internal static string? RequestSchemeOf(string requestUrl, TransferResult result) =>
         result.ExitCode != CurlExitCode.UnsupportedProtocol ? SchemeOf(requestUrl) : null;
 
+    /// <summary>
+    /// <paramref name="info" /> with the scheme and <c>CURLPROTO_*</c> bit libcurl's handle keeps from its last connection:
+    /// the effective URL's, except that a redirect refused by <c>CURLOPT_REDIR_PROTOCOLS</c> never reaches its target, so
+    /// the transfer's own URL's stay (<c>file://</c> redirect from http answers http and 1), and a <c>file://</c> transfer
+    /// whose file cannot be read, which has no report, answers its URL's (<c>file</c> and 1024).
+    /// </summary>
+    private static TransferInfo WithSchemeAndProtocol(TransferInfo info, TransferResult result, string requestUrl, string effectiveUrl)
+    {
+        if (result.Report is null && result.ExitCode != CurlExitCode.FileCouldntReadFile)
+        {
+            return info;
+        }
+
+        string schemeUrl = RedirectRefused(result) ? requestUrl : effectiveUrl;
+        return info with { Scheme = SchemeOf(schemeUrl), Protocol = ProtocolOf(schemeUrl) };
+    }
+
+    private static bool RedirectRefused(TransferResult result) =>
+        result.ExitCode == CurlExitCode.UnsupportedProtocol && result.ErrorMessage?.EndsWith("(in redirect)", StringComparison.Ordinal) == true;
     private static string? SchemeOf(string effectiveUrl) =>
         CurlUrl.TryParse(effectiveUrl, pathAsIs: false, out CurlUrl? url) ? url.Scheme : null;
 

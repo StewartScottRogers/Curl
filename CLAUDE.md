@@ -294,7 +294,7 @@ Curl/
 ├── Curl.Networking.IntegrationTests/ ← its Integration tests, just before the library
 ├── Curl.Networking.UnitLibrary/
 ├── Curl.Networking.UnitTests/
-├── ...                           ← 98 projects, one flat alphabetical run
+├── ...                           ← every other project, one flat alphabetical run
 ├── Documentation/                ← shared project (docs and planning)
 ├── Tasks/                        ← shared project (task board)
 ├── Audit/                        ← shared project (the audit office; never written by the factory)
@@ -361,9 +361,8 @@ Each project folder may contain its own `CLAUDE.md` with project-specific rules;
 - **Base class library only.** Write against `System.*`. Sockets, TLS, HTTP, DNS,
   compression, JSON and argument handling are all in the BCL already, and
   `Curl.Console` publishes native AOT, where every dependency is a trim risk. The
-  approved packages are Microsoft's `MSTest` meta-package, the test harness, and, for
-  `Curl.Mcp` alone, `ModelContextProtocol` and `Microsoft.Extensions.Hosting` (Stewart,
-  2026-10-15, ADR-0548); no other project, and no `*.UnitLibrary`, may reference those two.
+  only approved package is Microsoft's `MSTest` meta-package, the test harness; no
+  production project references a package (the MCP server is hand-written, ADR-0799).
   Adding any other package needs Stewart's explicit approval, asked for *before* the
   reference is added — hand-roll the small piece needed, or stop and ask. Test projects use
   MSTest, the framework in the .NET SDK; no third-party test, mocking or assertion

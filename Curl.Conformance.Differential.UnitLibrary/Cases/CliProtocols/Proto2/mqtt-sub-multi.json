@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"mqtt-sub-multi","command":"-sS mqtt://127.0.0.1:18450/a/b/c","files":{"m.txt":"filemsg"},"timeoutSeconds":8}
+  ]
+}

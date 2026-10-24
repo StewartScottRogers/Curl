@@ -327,11 +327,44 @@ public sealed class TransferInfoFromReportTests
         Assert.IsNull(TransferInfoFromReport.Of(new TransferResult(CurlExitCode.CouldntConnect, 0), RequestUrl, false, new ManualTimeProvider()).Scheme);
 
     [TestMethod]
+    public void Of_RedirectRefusedByProtocolList_KeepsTheRequestUrlsSchemeAndProtocol()
+    {
+        TransferResult result = new(CurlExitCode.UnsupportedProtocol, 0, "Protocol \"file\" is disabled (in redirect)")
+        {
+            Report = new TransferReport { EffectiveUrl = "file:///x" },
+        };
+        TransferInfo info = TransferInfoFromReport.Of(result, "http://h/loc-file", false, new ManualTimeProvider());
+        Assert.AreEqual("http", info.Scheme);
+        Assert.AreEqual(1, info.Protocol);
+    }
+
+    [TestMethod]
+    public void Of_UnsupportedProtocolWithNoMessage_TakesTheEffectiveUrlsScheme()
+    {
+        TransferResult result = new(CurlExitCode.UnsupportedProtocol, 0) { Report = new TransferReport { EffectiveUrl = "ftp://h/" } };
+        Assert.AreEqual("ftp", TransferInfoFromReport.Of(result, "http://h/", false, new ManualTimeProvider()).Scheme);
+    }
+    [TestMethod]
+    public void Of_FileThatCannotBeRead_AnswersFileSchemeAndProtocol()
+    {
+        TransferInfo info = TransferInfoFromReport.Of(TransferResult.Failure(CurlExitCode.FileCouldntReadFile, "x"), "file:///dir/nope.txt", false, new ManualTimeProvider());
+        Assert.AreEqual("file", info.Scheme);
+        Assert.AreEqual(1024, info.Protocol);
+    }
+    [TestMethod]
     public void Of_FileTimeRequested_TakesTheSourceTime() => Assert.AreEqual(1234, Full.FileTime);
 
     [TestMethod]
     public void Of_FileTimeRequestedButUnknown_AnswersMinusOne() =>
         Assert.AreEqual(-1, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport() }, RequestUrl, true, new ManualTimeProvider()).FileTime);
+
+    [TestMethod]
+    public void Of_FileTimeNotRequestedForAFileUrl_TakesTheSourceTime() =>
+        Assert.AreEqual(1711956244, TransferInfoFromReport.Of(new TransferResult(CurlExitCode.Ok, 0) { SourceLastWriteUnixSeconds = 1711956244 }, "file:///dir/x", false, new ManualTimeProvider()).FileTime);
+
+    [TestMethod]
+    public void Of_FileTimeNotRequestedForAFileUrlThatFailed_AnswersMinusOne() =>
+        Assert.AreEqual(-1, TransferInfoFromReport.Of(TransferResult.Failure(CurlExitCode.FileCouldntReadFile, "x"), "file:///dir/nope.txt", false, new ManualTimeProvider()).FileTime);
 
     [TestMethod]
     public void Of_FileTimeNotRequested_AnswersMinusOne() =>

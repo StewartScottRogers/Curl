@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-proxy-bad-scheme","command":"-sS -x foo://127.0.0.1:1 {U}/echo"}
+  ]
+}

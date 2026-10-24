@@ -575,7 +575,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure), null);
         }
 
-        var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options);
+        var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options, _matchesSchannelBuild);
         if (listFailure is not null)
         {
             return (null, listFailure, InternalErrorAlertFor(listFailure));
@@ -744,17 +744,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
 
-    // The Schannel build ignores --sigalgs and --curves, so on Windows a handshake that fails
-    // with either in force prints what the build that applies it prints (ADR-0151): OpenSSL's
-    // text for --sigalgs, and for --curves the handshake_failure alert as curl.se's LibreSSL
-    // build prints it (ADR-0284).
+    // The Schannel build ignores --sigalgs and --curves (ADR-0793), so its failed handshake
+    // prints Schannel's text whether or not either is given.
     private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
-        !_matchesSchannelBuild || _options.SignatureAlgorithms is not null ? TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure)
-        : _options.Curves is not null && IsHandshakeFailureAlertReceived(failure) ? TlsFailureMessages.LibreSslHandshakeFailureAlert
-        : TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12);
-
-    private static bool IsHandshakeFailureAlertReceived(TlsHandshakeFailure failure) =>
-        failure is { Origin: TlsHandshakeFailureOrigin.AlertReceived, Alert: TlsAlertDescription.HandshakeFailure };
+        _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12)
+        : TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure);
 
     // What a handshake was prepared with: the ClientHello's settings, the --cert certificate
     // the connection disposes, and the verifier that judges the server's chain.

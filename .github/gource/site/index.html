@@ -15,7 +15,7 @@
   The viewer for Curl's Gource render. Published to GitHub Pages from the gource branch by
   .github/workflows/gource.yml; its source is .github/gource/site/index.html. It plays
   hls/av1/master.m3u8 (4K, 1080p) where the browser decodes AV1, else
-  hls/h264/master.m3u8 (4K, 1080p), choosing the best quality the screen and the
+  hls/h264/master.m3u8 (1080p only), choosing the best quality the screen and the
   connection can take, and falls back to gource.mp4 where HLS cannot play.
 -->
 <style>
@@ -142,7 +142,7 @@
     <span class="spacer"></span>
     <div id="quality" role="group" aria-label="Quality"></div>
     <button id="full" aria-label="Full screen">&#x26F6; Full screen</button>
-    <a class="btn" href="gource.mp4" download>4K MP4</a>
+    <a class="btn" href="gource.mp4" download>1080p MP4</a>
     <a class="btn" href="still-4k.jpg" download>4K still</a>
     <a class="btn" href="board/">Board</a>
     <a class="btn" href="coverage/">Coverage</a>

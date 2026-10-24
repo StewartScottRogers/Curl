@@ -58,7 +58,7 @@ namespace Curl.Cli;
 /// refused as not reversible (measured 2026-09-28; see <see cref="CommandLineOption.NoFunctionFlag"/>).
 /// </para>
 /// </remarks>
-public static class CommandLineOptionTable
+public static partial class CommandLineOptionTable
 {
     private static readonly CommandLineOption[] RowsInTableOrder =
     [
@@ -331,12 +331,9 @@ public static class CommandLineOptionTable
         CommandLineOption.NegatableFlag("http0.9", null, (options, on) => options.AllowHttp09Reply = on),
         CommandLineOption.Text("request-target", null, (options, target) => options.RequestTarget = target),
         CommandLineOption.Text("ipfs-gateway", null, (options, gateway) => options.IpfsGateway = gateway),
-        CommandLineOption.Flag("http1.0", '0', options => options.SelectHttpVersion(RequestedHttpVersion.Http10)),
-        CommandLineOption.Flag("http1.1", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http11)),
+        .. HttpVersionRows(),
         CommandLineOption.Flag("ipv4", '4', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv4Only),
         CommandLineOption.Flag("ipv6", '6', options => options.IpAddressFamily = IpAddressFamilyChoice.IPv6Only),
-        CommandLineOption.Flag("http2", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2)),
-        CommandLineOption.Flag("http2-prior-knowledge", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http2PriorKnowledge)),
         CommandLineOption.Flag("http3", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3)).RefusedWithoutQuic(),
         CommandLineOption.Flag("http3-only", null, options => options.SelectHttpVersion(RequestedHttpVersion.Http3Only)).RefusedWithoutQuic(),
         CommandLineOption.NoFunctionFlag("sslv2", '2', negatable: false),

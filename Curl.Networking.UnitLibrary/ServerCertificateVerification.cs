@@ -344,14 +344,44 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     }
 
     // The chain's errors do not count when it leads to a --capath root trusted beside the
-    // system store, or when --ssl-revoke-best-effort tolerates every one of them.
+    // system store, when --ssl-revoke-best-effort tolerates every one of them, or when the
+    // Schannel build's --cacert file lists the server's own certificate.
     private SslPolicyErrors WithoutChainErrorsCurlTolerates(
         SslPolicyErrors errors,
         X509Chain? chain,
         X509Certificate2Collection anchorsBesideSystemStore) =>
-        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain)
+        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain) || SchannelTrustsListedLeaf(chain)
             ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
             : errors;
+
+    // curl's Schannel build builds the --cacert chain with an exclusive-root engine holding
+    // the file's certificates, where a leaf the file lists is itself a trust anchor: a chain
+    // .NET finds partial or untrusted only for want of a root is accepted (measured with curl
+    // 8.22.0, tls-wrong-ca, BL-3289, ADR-0797).
+    //
+    // curl's OpenSSL build sets X509_V_FLAG_PARTIAL_CHAIN, so there any certificate of the
+    // chain the file lists, leaf or intermediate, anchors it (measured with curl 8.18.0 and
+    // OpenSSL 3.5.5, BL-3335).
+    private bool SchannelTrustsListedLeaf(X509Chain? chain) =>
+        options.HasCaCertificates
+        && chain is not null
+        && chain.ChainElements.Count > 0
+        && HasOnlyMissingRootStatus(ReadChainStatus(chain))
+        && ListsAnAnchorCandidate(chain);
+
+    private bool ListsAnAnchorCandidate(X509Chain chain)
+    {
+        var candidates = matchesSchannelBuild
+            ? chain.ChainElements.Cast<X509ChainElement>().Take(1)
+            : chain.ChainElements.Cast<X509ChainElement>();
+        return candidates.Any(element => ListsCertificate(chain.ChainPolicy.CustomTrustStore, element.Certificate));
+    }
+
+    private static bool HasOnlyMissingRootStatus(X509ChainStatus[] chainStatus) =>
+        chainStatus.All(status => (status.Status & ~(X509ChainStatusFlags.PartialChain | X509ChainStatusFlags.UntrustedRoot)) == 0);
+
+    private static bool ListsCertificate(X509Certificate2Collection certificates, X509Certificate2 certificate) =>
+        certificates.Any(listed => listed.RawDataMemory.Span.SequenceEqual(certificate.RawDataMemory.Span));
 
     // curl's Schannel build, under --ssl-revoke-best-effort, masks CERT_TRUST_REVOCATION_STATUS_UNKNOWN
     // and CERT_TRUST_IS_OFFLINE_REVOCATION out of the chain's trust errors (measured, BL-490).

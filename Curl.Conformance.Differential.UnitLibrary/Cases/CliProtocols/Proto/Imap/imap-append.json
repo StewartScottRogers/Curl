@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-append","command":"-s -T mail.txt imap://127.0.0.1:18230/Sent","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

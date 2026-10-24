@@ -258,6 +258,24 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    [DataRow(SocketError.ConnectionReset)]
+    [DataRow(SocketError.ConnectionAborted)]
+    public async Task ExecuteAsync_ReceiveFailsWithASocketError_ReportsItsOperatingSystemNumberAsOsErrno(SocketError error)
+    {
+        // libcurl 8.22.0: CURLINFO_OS_ERRNO after a failed receive is the receive's socket error
+        // (10054 or 10053 on Windows, errno elsewhere), BL-3329.
+        SocketException socketError = new((int)error);
+        IOException failure = new("Connection failed.", socketError);
+        Diagnostics.Arrange("socket error", error);
+
+        TransferResult result = await Handler(QueueConnector.For(new ScriptedConnection([], 65536, failureAfterResponse: failure)))
+            .ExecuteAsync(ReuseContext(new RecordingTransferEvents()));
+
+        Diagnostics.Assert("os errno", socketError.NativeErrorCode, result.Report?.OsErrno);
+        Assert.AreEqual((long)socketError.NativeErrorCode, result.Report?.OsErrno);
+    }
+
+    [TestMethod]
     [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok", "< Content-Length: 2\r\n", DisplayName = "Without keep-alive")]
     [DataRow("HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\nok", "* HTTP/1.0 connection set to keep alive", DisplayName = "With keep-alive")]
     public async Task ExecuteAsync_Http10Response_ReportsAssumeCloseBeforeTheStatusLine(string response, string firstHeader)

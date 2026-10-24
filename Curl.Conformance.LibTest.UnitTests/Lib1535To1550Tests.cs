@@ -3,6 +3,7 @@ using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Mime;
+using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Libcurl.Easy;
@@ -397,14 +398,17 @@ public sealed class Lib1535To1550Tests
     [TestMethod]
     public async Task Lib1550_SetsTheBlocklistsAndSucceeds()
     {
-        var run = new PortRun(new FakeCurlEngine(), 1550);
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 1550);
 
         LibTestResult result = await new Lib1550().RunAsync(run.Context, CancellationToken.None);
 
+        // Both blocklists are set and answered Ok, each writing engine.Multi.Options back once; libcurl
+        // has ignored them since 7.62.0, so the options written are the defaults.
         Assert.AreEqual(0, result.ExitCode);
         Assert.AreEqual("lib1550", new Lib1550().ProgramName);
-        CollectionAssert.AreEqual(new[] { "curl.se:443", "example.com:80" }, Lib1550.BlockedSites.ToArray());
-        Assert.AreEqual(2, Lib1550.BlockedServers.Count);
+        CollectionAssert.AreEqual(new[] { new MultiOptions(), new MultiOptions() }, engine.Multi.OptionsWritten);
+        Assert.AreEqual(new MultiOptions(), engine.Multi.Options);
     }
 
     // Times above 0 but for the appconnect time, with a download speed of 5.

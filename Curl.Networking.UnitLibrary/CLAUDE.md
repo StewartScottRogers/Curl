@@ -27,7 +27,7 @@ for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-01
 adds its row and a data row in `TlsClientRoutingTests`; `KeyLogFile`, the OpenSSL build's `SSLKEYLOGFILE`, is ADR-0518's row (BL-2327): the provider hands `Curl.Tls`'s TLS 1.2 and TLS 1.3 settings one `NssKeyLogFile`, which appends each `CLIENT_RANDOM` line and each TLS 1.3 traffic secret line (BL-2339) and skips a file it cannot write), `SslStreamTlsProvider` otherwise. Per
 ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
 and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
-and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms`;
+and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms` in the OpenSSL build; the Schannel build ignores both, as curl 8.22.0 Schannel does (ADR-0793, BL-3305);
 a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
 `CertificateStatusFailureMessages`' text on every platform; a good, revoked or unknown status is
@@ -551,8 +551,10 @@ Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`
 (BL-1450) on Windows it reports a read failing with `SocketError.ConnectionAborted` as
 `ConnectionReset` (`ReportsAbortedReadAsReset`), since Windows gives a receive issued a few
 milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees WSAECONNRESET; per
-ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesBeforeWrite`),
-as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort. `UdpDatagramConnector` opens channels
+ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesOrEndBeforeWrite`),
+as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort,
+nor per ADR-0796 (BL-3304) when it found the peer's unread FIN, as on a kept connection the server
+closed and curl reused. `UdpDatagramConnector` opens channels
 through an internal seam, so its tests need no socket. `UdpDatagramChannelTests` opens,
 cancels and disposes local UDP sockets without sending anything.
 `SslStreamTlsProviderTests` runs real handshakes against a server-side `SslStream` over

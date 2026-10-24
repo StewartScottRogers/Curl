@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- The reference libcurl is called through unmanaged function pointers (ADR-0800). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="MSTest" />
   </ItemGroup>
@@ -12,6 +17,15 @@
     <ProjectReference Include="..\Curl.Conformance.Differential.UnitLibrary\Curl.Conformance.Differential.UnitLibrary.csproj" />
     <!-- Builds the Curl under test into this project's output (ADR-0785). -->
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" />
+    <!-- The Curl.Api cases call it in process (BL-3242, ADR-0790). -->
+    <ProjectReference Include="..\Curl.Api\Curl.Api.csproj" />
+    <!-- Curl's Libcurl, which the Libcurl scenarios (ADR-0791) and easy-handle cases (ADR-0792) replay
+         against in process beside the reference library. -->
+    <ProjectReference Include="..\Libcurl\Libcurl.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="LibcurlScenarios\LibcurlScenarios.json" LogicalName="LibcurlScenarios.json" />
   </ItemGroup>
 
 </Project>

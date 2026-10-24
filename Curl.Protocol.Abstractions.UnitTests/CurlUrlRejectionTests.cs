@@ -13,6 +13,9 @@ public sealed class CurlUrlRejectionTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
+    // libcurl 8.22.0's curl_easy_perform with CURLOPT_URL "" (measured 2026-10-23, BL-3303's emptyurl case):
+    // exit 3, "URL rejected: Malformed input to a URL function".
+    [DataRow("", CurlUrlRejection.MalformedInput)]
     [DataRow("http://h/a b", CurlUrlRejection.MalformedInput)]
     [DataRow("http://h/\x7f", CurlUrlRejection.MalformedInput)]
     [DataRow("http:////h/", CurlUrlRejection.BadSlashes)]

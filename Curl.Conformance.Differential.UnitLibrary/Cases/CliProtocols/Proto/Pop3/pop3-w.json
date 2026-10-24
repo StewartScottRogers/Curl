@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"pop3-w","command":"-s -o NUL -w '%{size_download}' pop3://127.0.0.1:18220/1"}
+  ]
+}

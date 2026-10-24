@@ -5,7 +5,8 @@ namespace Curl.Cli;
 /// <summary>
 /// Pins <c>--http2</c>, <c>--http2-prior-knowledge</c> and <c>--proxy-http2</c> running on Windows over Curl's
 /// own HTTP/2 (ADR-0141) instead of being refused with exit 2 as curl's Schannel build refuses them: Stewart
-/// turned HTTP/2 on for Windows (ADR-0786, BL-3207), so <c>curl -V</c> lists <c>HTTP2</c> there too.
+/// turned HTTP/2 on for Windows (ADR-0786, BL-3207), though <c>curl -V</c> lists no <c>HTTP2</c> there, as the
+/// Schannel reference build lists none (ADR-0808, BL-3359).
 /// </summary>
 [TestClass]
 [OSCondition(OperatingSystems.Windows)]
@@ -67,14 +68,15 @@ public sealed class Http2OnWindowsTests
     }
 
     [TestMethod]
-    public void Lines_Windows_ListsHttp2RightAfterHsts()
+    public void Lines_Windows_ListsHttpsProxyRightAfterHstsWithNoHttp2()
     {
         string[] features = CurlVersionText.Lines(isWindows: true, isMacOS: false)[3].Split(' ');
         Diagnostics.Act("features", string.Join(' ', features));
 
         int hsts = Array.IndexOf(features, "HSTS");
         Assert.IsGreaterThanOrEqualTo(0, hsts);
-        Assert.AreEqual("HTTP2", features[hsts + 1]);
+        Assert.AreEqual("HTTPS-proxy", features[hsts + 1]);
+        CollectionAssert.DoesNotContain(features, "HTTP2");
     }
 
     private CommandLineParseResult ParseOnWindows(IReadOnlyList<string> arguments)

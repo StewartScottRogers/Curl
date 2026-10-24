@@ -44,8 +44,9 @@ public sealed partial class ManagedEasyTransferTests
         await first.PerformAsync(CancellationToken.None);
 
         await first.DisposeAsync();
-        await using IEasyTransfer second = engine.CreateEasy();
+        await using ManagedEasyTransfer second = (ManagedEasyTransfer)engine.CreateEasy();
         second.Options = options;
+        second.ToolSettings = ManagedEasyTransfer.TransferSettingsOf(options);
         CurlCode code = await second.PerformAsync(CancellationToken.None);
 
         Assert.AreEqual(CurlCode.Ok, code);
@@ -53,7 +54,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task DisposeAsync_HandleInAMultiHandle_LeavesThePooledConnectionForTheNextHandle()
+    public async Task DisposeAsync_HandleInAMultiHandle_LeavesThePooledConnectionForTheNextHandleInTheMulti()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response), Encoding.ASCII.GetBytes(Response)]);
         await using ManagedCurlEngine engine = CreatePoolingEngine(connector);
@@ -68,7 +69,9 @@ public sealed partial class ManagedEasyTransferTests
         await first.DisposeAsync();
         await using IEasyTransfer second = engine.CreateEasy();
         second.Options = options;
+        multi.Add(second);
         CurlCode code = await second.PerformAsync(CancellationToken.None);
+        multi.Remove(second);
 
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.HasCount(1, connector.Targets);

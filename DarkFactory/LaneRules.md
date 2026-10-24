@@ -77,8 +77,7 @@ modified; never edit anything under `bin/`, `obj/` or `.vs/`.
   C# file-based app (`dotnet run tool.cs`). Measure real curl with
   `Record-CurlExchange.ps1`, extending it when it falls short. Edit files with the Edit tool.
 - **Base class library only.** Write against `System.*`. The only packages are the
-  `MSTest` meta-package and, for `Curl.Mcp` alone, `ModelContextProtocol` and
-  `Microsoft.Extensions.Hosting`. Never add a package: block and ask Stewart. No mocking,
+  `MSTest` meta-package. Never add a package: block and ask Stewart. No mocking,
   fluent-assertion, parser or JSON library. Tests use MSTest.
 - **Tests pass on Windows, Linux and macOS.** CI runs the fast tests on all three, but
   lanes test only on Windows, so every test is platform-neutral: no drive-letter URL

@@ -6,7 +6,7 @@ process, such as a loopback socket that carries bytes. Every test carries
 
 It holds:
 
-- `CurlTransferToolIntegrationTests`: the `transfer` tool through the host's real composition (the
+- `CurlTransferToolIntegrationTests`: the `transfer` tool from `CurlMcpHost.CreateRegistry` (the
   production `ManagedCurlEngine`) against a loopback listener the test opens and closes itself (BL-2384).
 - `CurlMcpServerIntegrationTests`: the built `Curl.Mcp` started as a child process with
   `CURL_MCP_ROOT` set to a temporary folder, driven over stdio by `McpStdioClient` - `initialize`,
@@ -22,6 +22,8 @@ It holds:
 
 Both tests that run the SDK pass `--disable-build-servers`. Otherwise the MSBuild nodes and compiler
 server the child starts inherit its redirected output and hold it open for about 15 minutes (BL-2561).
+
+- `CurlMcpGoldenConversationIntegrationTests`: replays the 28 recorded conversations in `Golden/` (recorded from the SDK-based server, `CURL_MCP_RECORD_GOLDEN=1` re-records; `tools-call-transfer-missing-url` holds the hand-written server's deliberate answer, BL-3384) against the built server (BL-3374).
 
 `McpStdioClient` is a hand-written newline-delimited JSON-RPC client (`System.Text.Json`; the SDK
 stays in `Curl.Mcp`, ADR-0548). It runs `Curl.Mcp.dll` from this project's output through

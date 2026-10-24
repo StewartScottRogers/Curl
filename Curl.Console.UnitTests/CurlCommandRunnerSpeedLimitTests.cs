@@ -40,8 +40,8 @@ public sealed class CurlCommandRunnerSpeedLimitTests
         Task<int> run = RunAsync(Stalling(), "-sS", "-Y", "100", "-y", "2", Url);
         await stalled.Task;
 
-        clock.Advance(TimeSpan.FromSeconds(2));
-        Diagnostics.Assert("run completed after 2 seconds", false, run.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Diagnostics.Assert("run completed after 1 second", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromSeconds(1));
 
@@ -77,8 +77,8 @@ public sealed class CurlCommandRunnerSpeedLimitTests
         Task<int> run = RunAsync(Stalling(), "-sS", "-Y", "100", Url);
         await stalled.Task;
 
-        clock.Advance(TimeSpan.FromSeconds(30));
-        Diagnostics.Assert("run completed after 30 seconds", false, run.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(29));
+        Diagnostics.Assert("run completed after 29 seconds", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromSeconds(1));
 
@@ -114,8 +114,8 @@ public sealed class CurlCommandRunnerSpeedLimitTests
         Task<int> run = RunAsync(Stalling(), "-sS", "-Y", "0", "-y", "2", Url);
         await stalled.Task;
 
-        clock.Advance(TimeSpan.FromSeconds(2));
-        Diagnostics.Assert("run completed after 2 seconds", false, run.IsCompleted);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Diagnostics.Assert("run completed after 1 second", false, run.IsCompleted);
         Assert.IsFalse(run.IsCompleted);
         clock.Advance(TimeSpan.FromSeconds(1));
 

@@ -692,4 +692,24 @@ public sealed partial class ManagedCurlUrlHandleTests
                 "htt ps://user:password@example.net/get?this=and-what",
                 CurlUrlFlags.NonSupportScheme | CurlUrlFlags.AllowSpace));
     }
+
+    [TestMethod]
+    [DataRow("1ab://a", "https://1ab//a")]
+    [DataRow("-ab://a", "https://-ab//a")]
+    public void Set_DefaultSchemeAndATextWhoseSchemeStartsWithADigitOrDash_TakesItAsAHost(string text, string expected)
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Url, text, CurlUrlFlags.DefaultScheme));
+
+        Assert.AreEqual(expected, GetOk(url, CurlUrlPart.Url));
+    }
+
+    [TestMethod]
+    public void Set_DefaultSchemeAndATextWhoseSchemeStartsWithAPlus_ReturnsBadHostname()
+    {
+        using ManagedCurlUrlHandle url = new();
+
+        Assert.AreEqual((CurlUrlCode)21, url.Set(CurlUrlPart.Url, "+ab://a", CurlUrlFlags.DefaultScheme));
+    }
 }

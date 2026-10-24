@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-proxy-tunnel-https-v","command":"-sv -x http://127.0.0.1:18300 --cacert {PKI}/ca.pem --ssl-no-revoke https://127.0.0.1:18100/echo"}
+  ]
+}

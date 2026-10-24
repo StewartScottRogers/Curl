@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"rtsp-get-parameter","command":"-s -X GET_PARAMETER -d 'x: y' rtsp://127.0.0.1:18430/x","files":{"sdp.txt":"v=0\r\n"}}
+  ]
+}

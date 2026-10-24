@@ -11,16 +11,26 @@ namespace Curl.Conformance.Differential.IntegrationTests.Host;
 /// </summary>
 internal sealed partial class DifferentialProcessRunner(string rootDirectory, string baseUrl)
 {
+    private readonly Dictionary<(string Tag, string Name), string> _directories = [];
+    private int _runCount;
     private readonly string _homeDirectory = Directory.CreateDirectory(Path.Combine(rootDirectory, "home")).FullName;
 
-    /// <summary>Gets the working directory <paramref name="differentialCase"/> runs in for the binary tagged <paramref name="tag"/>.</summary>
-    public string WorkingDirectoryOf(DifferentialCase differentialCase, string tag) =>
-        Path.Combine(rootDirectory, tag, NonWordCharacter().Replace(differentialCase.Name, "_"));
+    /// <summary>Gets the working directory <paramref name="differentialCase"/> last ran in for the binary tagged <paramref name="tag"/>; every run gets a directory of its own.</summary>
+    public string WorkingDirectoryOf(DifferentialCase differentialCase, string tag) => _directories[(tag, differentialCase.Name)];
 
+    /// <summary>Creates, and remembers for <see cref="WorkingDirectoryOf"/>, a new working directory for <paramref name="differentialCase"/> under the binary tagged <paramref name="tag"/>; a run in process, with no child process, uses it too.</summary>
+    public string CreateWorkingDirectory(DifferentialCase differentialCase, string tag)
+    {
+        var workingDirectory = Directory.CreateDirectory(
+            Path.Combine(rootDirectory, tag, $"{_runCount++}_{NonWordCharacter().Replace(differentialCase.Name, "_")}")).FullName;
+        _directories[(tag, differentialCase.Name)] = workingDirectory;
+        return workingDirectory;
+    }
     /// <summary>Runs <paramref name="differentialCase"/> through the binary <paramref name="command"/> starts; the wire is left empty.</summary>
     public async Task<DifferentialRunResult> RunAsync(IReadOnlyList<string> command, DifferentialCase differentialCase, string tag)
     {
-        var workingDirectory = Directory.CreateDirectory(WorkingDirectoryOf(differentialCase, tag)).FullName;
+        var workingDirectory = CreateWorkingDirectory(differentialCase, tag);
+
         foreach (var (name, content) in differentialCase.Files)
         {
             var path = Path.Combine(workingDirectory, name);
@@ -32,8 +42,8 @@ internal sealed partial class DifferentialProcessRunner(string rootDirectory, st
         using var process = Process.Start(CreateStartInfo(command, differentialCase, workingDirectory))!;
         var standardOutput = ReadAllAsync(process.StandardOutput.BaseStream);
         var standardError = ReadAllAsync(process.StandardError.BaseStream);
-        await WriteStandardInputAsync(process, differentialCase.StandardInput);
-        var exitCode = await WaitForExitAsync(process, differentialCase.Timeout);
+        using var timer = new CancellationTokenSource(differentialCase.Timeout);
+        var exitCode = await RunToExitAsync(process, differentialCase.StandardInput, timer.Token);
         var elapsed = stopwatch.Elapsed;
         return new DifferentialRunResult(
             exitCode, await standardOutput, await standardError, CollectFiles(workingDirectory, differentialCase.Files), [], elapsed);
@@ -72,32 +82,45 @@ internal sealed partial class DifferentialProcessRunner(string rootDirectory, st
         return start;
     }
 
-    private static async Task WriteStandardInputAsync(Process process, byte[]? standardInput)
+    private static async Task WriteStandardInputAsync(Process process, byte[]? standardInput, CancellationToken cancellationToken)
     {
         try
         {
             if (standardInput is not null)
             {
-                await process.StandardInput.BaseStream.WriteAsync(standardInput);
+                await process.StandardInput.BaseStream.WriteAsync(standardInput, cancellationToken);
             }
-
-            process.StandardInput.Close();
         }
         catch (IOException)
         {
             // The binary exited without reading all of its input.
         }
+        finally
+        {
+            CloseStandardInput(process);
+        }
     }
 
-    private static async Task<int?> WaitForExitAsync(Process process, TimeSpan timeout)
+    private static void CloseStandardInput(Process process)
     {
-        using var timer = new CancellationTokenSource(timeout);
         try
         {
-            await process.WaitForExitAsync(timer.Token);
-            return process.ExitCode;
+            process.StandardInput.Close();
         }
-        catch (OperationCanceledException)
+        catch (IOException)
+        {
+            // The pipe is already broken: the binary has gone.
+        }
+    }
+
+    private static async Task<int?> RunToExitAsync(Process process, byte[]? standardInput, CancellationToken timeout)
+    {
+        try
+        {
+            await WriteStandardInputAsync(process, standardInput, timeout);
+            await process.WaitForExitAsync(timeout);
+            return process.ExitCode;
+        }        catch (OperationCanceledException)
         {
             process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync();

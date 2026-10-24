@@ -50,6 +50,21 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_BasicSentBeforeAnyChallenge_ReportsBasicPicked()
+    {
+        TurnTakingConnection connection = new(65536, OkHead + "ok");
+        ScriptedAuthenticator authenticator = new("Basic dTpw", null);
+        Diagnostics.Arrange("authenticator answers first request", "Basic, no earlier hop");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), authenticator).ExecuteAsync(PickedSchemeContext(HttpAuthSchemes.None));
+
+        WriteResult(result);
+        Assert.AreEqual(BasicRequest, connection.Written);
+        Diagnostics.Assert("scheme picked", HttpAuthSchemes.Basic, result.Report!.AuthSchemePicked);
+        Assert.AreEqual(HttpAuthSchemes.Basic, result.Report.AuthSchemePicked);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_EarlierHopPickedASchemeNotAllowed_AllowsEverySchemeGiven()
     {
         TurnTakingConnection connection = new(65536, OkHead + "ok");

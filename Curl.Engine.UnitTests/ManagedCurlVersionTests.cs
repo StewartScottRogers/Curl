@@ -35,16 +35,23 @@ public sealed class ManagedCurlVersionTests
     }
 
     [TestMethod]
-    [DataRow(true, false)]
-    [DataRow(false, true)]
-    [DataRow(false, false)]
-    public void For_EachPlatform_ListsHttp2RightAfterHsts(bool isWindows, bool isMacOS)
+    [DataRow(true)]
+    [DataRow(false)]
+    public void For_LinuxOrMacOS_ListsHttp2RightAfterHsts(bool isMacOS)
     {
-        IReadOnlyList<string> features = ManagedCurlVersion.For(isWindows, isMacOS).Features;
+        IReadOnlyList<string> features = ManagedCurlVersion.For(isWindows: false, isMacOS).Features;
 
         int hsts = features.ToList().IndexOf("HSTS");
         Assert.IsGreaterThanOrEqualTo(0, hsts);
         Assert.AreEqual("HTTP2", features[hsts + 1]);
+    }
+
+    [TestMethod]
+    [DataRow("HTTP2")]
+    [DataRow("HTTPSRR")]
+    public void For_Windows_DoesNotListWhatTheSchannelBuildDoesNot(string feature)
+    {
+        CollectionAssert.DoesNotContain(ManagedCurlVersion.For(isWindows: true, isMacOS: false).Features.ToArray(), feature);
     }
 
     [TestMethod]

@@ -49,16 +49,11 @@
     <InternalsVisibleTo Include="Curl.Mcp.UnitTests" />
   </ItemGroup>
 
-  <!-- The only project that takes the MCP SDK packages (ADR-0548). -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
-    <PackageReference Include="ModelContextProtocol" />
-  </ItemGroup>
-
   <ItemGroup>
     <!-- For its public InProcessCurl, which the curl tool's runner adapter calls (BL-2382). -->
     <!-- Built runtime-agnostic, as a library, so each per-runtime pack needs no restore of it for that runtime. -->
     <ProjectReference Include="..\Curl.Console\Curl.Console.csproj" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained" />
+    <ProjectReference Include="..\Curl.Mcp.Protocol.UnitLibrary\Curl.Mcp.Protocol.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Mcp.UnitLibrary\Curl.Mcp.UnitLibrary.csproj" />
   </ItemGroup>
 

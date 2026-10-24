@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-env-proxy","command":"-s http://example.test/x"}
+  ]
+}

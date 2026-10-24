@@ -90,7 +90,9 @@ public sealed record TransferReport
     /// <summary>
     /// Gets the number of redirects followed, set by the redirect follower, the source of
     /// <c>%{num_redirects}</c>; from the HTTP handler, the resends it made itself, after a 417 or
-    /// in answer to an authentication challenge (BL-396, BL-3256).
+    /// in answer to an authentication challenge (a 401 or 407 retry); curl 8.22.0 counts those
+    /// resends against <c>--max-redirs</c> too, so <c>--max-redirs 0</c> with <c>--digest</c> or
+    /// <c>--anyauth</c> ends with exit 47 (BL-396, BL-3256).
     /// </summary>
     public int RedirectCount { get; init; }
 

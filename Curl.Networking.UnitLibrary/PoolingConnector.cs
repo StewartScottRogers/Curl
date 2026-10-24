@@ -100,7 +100,20 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
     /// <returns>The connector.</returns>
     public PoolingConnector Over(IConnector innerConnector) =>
-        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, MaximumConnectionLifetime = MaximumConnectionLifetime };
+        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
+
+    /// <summary>
+    /// Gets a value indicating whether this connector's transfers open a new connection although the pool holds an
+    /// idle or shareable one with their key: curl's <c>CURLOPT_FRESH_CONNECT</c>. The connection it opens is pooled
+    /// afterwards like any other, unless <see cref="ForbidReuse" /> is also set (BL-3326).
+    /// </summary>
+    public bool FreshConnect { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether this connector's transfers close their connection when they end instead of
+    /// returning it to the pool, and let no other transfer share it meanwhile: curl's <c>CURLOPT_FORBID_REUSE</c> (BL-3326).
+    /// </summary>
+    public bool ForbidReuse { get; init; }
 
     /// <summary>
     /// Gets the longest since it was opened that a connection may be reused by this connector's
@@ -354,7 +367,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
 
     private static bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
         connect.ApplicationProtocol == "h2"
-            || (!target.UseTls && !target.IsForwardProxy && target.Proxy is null);
+            || (!target.IsForwardProxy && target.Proxy is null);
 
     private static int? ConcurrentTransferLimitOf(PoolEntry entry, ConnectionPoolKey key) =>
         key.Equals(entry.Key) && !entry.IsShareBarred && !entry.HasReadPeerClose
@@ -412,6 +425,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         lock (_cache.Gate)
         {
             entry.LeaseCount = 1;
+            entry.IsShareBarred |= ForbidReuse;
             if (entry.Key is not null)
             {
                 _cache.Leased.Add(entry);
@@ -530,6 +544,11 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         bool isQuic,
         CancellationToken cancellationToken)
     {
+        if (FreshConnect)
+        {
+            return await OpenAsync(target, key, openAsync, isQuic, cancellationToken);
+        }
+
         var shared = await ShareAsync(key, target.Events, cancellationToken);
         if (shared is not null)
         {
@@ -607,7 +626,8 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             mappedHost: entry.MappedHost,
             mappedPort: entry.MappedPort,
             connectReplyHeadersStored: connect.ConnectReplyHeadersStored,
-            proxyConnectHeaderBytes: connect.ProxyConnectHeaderBytes);
+            proxyConnectHeaderBytes: connect.ProxyConnectHeaderBytes,
+            lastSocketError: connect.LastSocketError);
     }
 
     private ConnectResult Reuse(ConnectTarget target, PoolEntry entry)

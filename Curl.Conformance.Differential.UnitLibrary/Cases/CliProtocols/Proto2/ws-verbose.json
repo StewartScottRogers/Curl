@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ws-verbose","command":"-sv ws://127.0.0.1:18440/echo","stdin":"","timeoutSeconds":8}
+  ]
+}

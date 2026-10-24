@@ -368,4 +368,34 @@ public sealed class ConnectionEndPointRecorderTests
         Diagnostics.Assert("os errno", 61L, errno);
         Assert.AreEqual(61L, errno);
     }
+
+    [TestMethod]
+    public void ReportOn_RedirectHopFailsBeforeConnecting_KeepsTheEarlierHopsStatusAndEndPoints()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.Record(Local, Remote);
+        recorder.ReportOn(TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 302 } });
+        Diagnostics.Arrange("first hop", "302 from " + Remote);
+
+        recorder.Clear(followingRedirect: true);
+        TransferReport report = recorder.ReportOn(TransferResult.Failure(CurlExitCode.CouldntConnect, "refused")).Report!;
+
+        Diagnostics.Assert("response code", 302, report.ResponseCode);
+        Assert.AreEqual(302, report.ResponseCode);
+        Assert.AreEqual(Remote, report.RemoteEndPoint);
+        Assert.AreEqual(Local, report.LocalEndPoint);
+    }
+
+    [TestMethod]
+    public void ReportOn_NewTransferFailsBeforeConnecting_KeepsNothingOfTheEarlierOne()
+    {
+        ConnectionEndPointRecorder recorder = new();
+        recorder.Record(Local, Remote);
+        recorder.ReportOn(TransferResult.Success(0) with { Report = new TransferReport { ResponseCode = 302 } });
+
+        recorder.Clear();
+        TransferResult failed = TransferResult.Failure(CurlExitCode.CouldntConnect, "refused");
+
+        Assert.AreSame(failed, recorder.ReportOn(failed));
+    }
 }

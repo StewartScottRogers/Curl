@@ -25,7 +25,9 @@ internal static class CurlUrlParser
 
     /// <summary>
     /// Parses <paramref name="text" />, or returns <see langword="null" /> when curl rejects
-    /// it, with <paramref name="rejection" /> saying why. With <paramref name="disallowUser" />,
+    /// it, with <paramref name="rejection" /> saying why. Empty text is
+    /// <see cref="CurlUrlRejection.MalformedInput" />, as libcurl 8.22.0 rejects an empty <c>CURLOPT_URL</c>
+    /// (BL-3336). With <paramref name="disallowUser" />,
     /// user information in the authority is rejected before its host and port are checked. With
     /// <paramref name="allowEmptyHost" />, as libcurl's <c>CURLU_NO_AUTHORITY</c>, at most two
     /// slashes follow the scheme and an empty authority is an empty host. With
@@ -47,7 +49,7 @@ internal static class CurlUrlParser
         bool fileSchemeWithoutSlash = false,
         bool refuseUnconvertibleName = false)
     {
-        if (Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace))
+        if (IsMalformedInput(text))
         {
             rejection = CurlUrlRejection.MalformedInput;
 
@@ -65,6 +67,13 @@ internal static class CurlUrlParser
 
         return url;
     }
+
+    /// <summary>
+    /// Whether curl rejects <paramref name="text" /> as <see cref="CurlUrlRejection.MalformedInput" />: empty,
+    /// longer than <see cref="MaximumLength" /> bytes, or holding a control character or a space.
+    /// </summary>
+    private static bool IsMalformedInput(string text) =>
+        text.Length == 0 || Encoding.UTF8.GetByteCount(text) > MaximumLength || text.Any(IsControlOrSpace);
 
     private static bool IsControlOrSpace(char character) => character <= ' ' || character == '\x7f';
 

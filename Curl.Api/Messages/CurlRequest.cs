@@ -45,6 +45,16 @@ public sealed partial record CurlRequest
     } = [];
 
     /// <summary>
+    /// Names of default headers libcurl adds that the request removes, each sent as the
+    /// <c>CURLOPT_HTTPHEADER</c> line <c>Name:</c> after <see cref="Headers"/>. Default: none.
+    /// </summary>
+    public IReadOnlyList<string> RemovedHeaders
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = [];
+
+    /// <summary>
     /// The request body, or <see langword="null"/> for none: bytes (<c>CURLOPT_POSTFIELDS</c> with
     /// their size; a byte array converts implicitly), a stream (<see cref="CurlContent.FromStream"/>) or a
     /// multipart body (<see cref="CurlMultipartContent"/>).

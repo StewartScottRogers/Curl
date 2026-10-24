@@ -463,7 +463,8 @@ internal sealed class HttpResponseHeadReader
     /// <summary>
     /// Reads a status line; after a 1xx head, bytes that cannot begin one are a weird server
     /// reply (exit 8, <c>Invalid status line</c>) rather than an HTTP/0.9 response (exit 1), as
-    /// curl 8.21.0 fails them (upstream test1480, BL-1805).
+    /// curl 8.21.0 fails them (upstream test1480, BL-1805), carrying the 1xx heads read before,
+    /// which curl 8.22.0 has already written to <c>-i</c>'s output (measured, BL-3280 Notes).
     /// </summary>
     /// <param name="afterInterimHead">Whether a 1xx head came before.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
@@ -475,7 +476,12 @@ internal sealed class HttpResponseHeadReader
         }
         catch (HttpTransferException failure) when (afterInterimHead && failure.Message == HttpTransferMessages.Http09NotAllowed)
         {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine)
+            {
+                HeadBytesBeforeFailure = builder.HeadBytesSoFar(),
+                StatusLineBeforeFailure = headStatusLine,
+                ContentTypeBeforeFailure = builder.ContentType,
+            };
         }
     }
 

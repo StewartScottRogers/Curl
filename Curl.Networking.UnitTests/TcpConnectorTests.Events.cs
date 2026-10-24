@@ -92,6 +92,27 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WhenTheDialFromABoundLocalPortFails_NamesThatPortInTheFailureLine()
+    {
+        // curl -sv --local-port 49000-49010 http://127.0.0.1:9/ ->
+        // * connect to 127.0.0.1 port 9 from 0.0.0.0 port 49000 failed: Connection refused (BL-3306)
+        var events = new RecordingTransferEvents();
+        var dialer = new FakeTcpDialer
+        {
+            DialOutcome = _ => throw new BoundConnectFailedException(
+                SocketError.ConnectionRefused,
+                new SocketException((int)SocketError.ConnectionRefused).Message,
+                new IPEndPoint(IPAddress.Any, 49000)),
+        };
+        var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider());
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 9, UseTls: false) { Events = events });
+
+        Assert.AreEqual("connect to 127.0.0.1 port 9 from 0.0.0.0 port 49000 failed: Connection refused", events.Info[1]);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WhenTheDialIsRefusedAfterOneConnection_NumbersTheRefusedConnectOne()
     {
         var dials = 0;

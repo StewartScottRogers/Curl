@@ -71,6 +71,80 @@ public sealed class UpstreamManagenScriptTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ListHelp_WritesOneEntryPerDocumentSortedByLongName()
+    {
+        WriteOption("b.md", "Short: b\nLong: beta\nArg: <x>\nHelp: Second one\nCategory: tls http\n");
+        WriteOption("a.md", "Short: a\r\nLong: alpha\r\nHelp: First one\r\nCategory: auth\r\n");
+        WriteOption("c.md", "Long: gamma\nHelp: Third one\n");
+        WriteOption("d.md", "Long: nohelp\n");
+        WriteOption("e.md", "Help: nolong\n");
+        string output = await RunListHelpAsync(["b.md", "a.md", "c.md", "d.md", "e.md", "missing.md", "*.nothing"]);
+
+        string entries = output[output.IndexOf("helptext[] = {\n", StringComparison.Ordinal)..];
+        Assert.AreEqual(
+            "helptext[] = {\n  { \"-a, --alpha\",\n    \"First one\",\n    CURLHELP_AUTH },\n  { \"-b, --beta <x>\",\n    \"Second one\",\n    CURLHELP_TLS | CURLHELP_HTTP },\n  { \"    --gamma\",\n    \"Third one\",\n     },\n  { NULL, NULL, 0 }\n};\n",
+            entries);
+        Assert.StartsWith("/*****", output);
+        Assert.Contains("#include \"tool_setup.h\"\n\n#include \"tool_help.h\"\n", output);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ListHelpWithAWildcard_ReadsEveryMatchingDocument()
+    {
+        WriteOption("one.md", "Long: one\nHelp: Uno\nCategory: ftp\n");
+        WriteOption("two.md", "Long: two\nHelp: Dos\nCategory: ftp\n");
+        File.WriteAllText(Path.Combine(folder, "ignored.txt"), "---\nLong: three\nHelp: Tres\n---\n");
+
+        string output = await RunListHelpAsync(["*.md"]);
+
+        Assert.Contains("\"    --one\",\n    \"Uno\",", output);
+        Assert.Contains("\"    --two\",\n    \"Dos\",", output);
+        Assert.DoesNotContain("three", output);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ListHelpWithAWildcardInAMissingFolder_ReadsNoDocument()
+    {
+        string output = await RunListHelpAsync([Path.Combine("nowhere", "*.md")]);
+
+        Assert.EndsWith("helptext[] = {\n  { NULL, NULL, 0 }\n};\n", output);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_ListHelpOnAnOptionABuildCanDisable_WrapsItsEntryInIfndef()
+    {
+        WriteOption("g.md", "Long: ipfs-gateway\nArg: <URL>\nHelp: Gateway\nCategory: curl\n");
+        WriteOption("w.md", "Long: wide\nHelp: Many\nCategory: tls http ftp sftp scp ssh auth imap pop3 smtp ldap mqtt\n");
+
+        string output = await RunListHelpAsync(["g.md", "w.md"]);
+
+        Assert.Contains("#ifndef CURL_DISABLE_IPFS\n  { \"    --ipfs-gateway <URL>\",\n    \"Gateway\",\n    CURLHELP_CURL },\n#endif\n", output);
+        Assert.Contains("    CURLHELP_TLS | CURLHELP_HTTP | CURLHELP_FTP | CURLHELP_SFTP |\n    CURLHELP_SCP | CURLHELP_SSH | ", output);
+    }
+
+    private void WriteOption(string name, string header) =>
+        File.WriteAllText(Path.Combine(folder, name), $"---\n{header}---\n\n# text\n");
+
+    private async Task<string> RunListHelpAsync(string[] names)
+    {
+        using MemoryStream standardOutput = new();
+        using MemoryStream standardError = new();
+        UpstreamCurlInvocation invocation = new(
+            ["-d", folder, "-I", folder, "listhelp", .. names.Select(name => Path.Combine(folder, name))],
+            standardOutput,
+            standardError,
+            Stream.Null,
+            new UnusedConnector(),
+            new UnreachableDatagramConnector());
+
+        int exitCode = await Script().RunAsync(invocation, _ => throw new AssertFailedException("the script runs no curl"));
+
+        Assert.AreEqual(0, exitCode);
+        Assert.AreEqual(0, standardError.Length);
+        return Encoding.Latin1.GetString(standardOutput.ToArray());
+    }
+
+    [TestMethod]
     public async Task RunAsync_NullInvocation_Throws() =>
         await Assert.ThrowsExactlyAsync<ArgumentNullException>(() => Script().RunAsync(null!, _ => Task.FromResult(0)));
 

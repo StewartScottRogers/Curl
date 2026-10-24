@@ -16,15 +16,14 @@ public sealed partial class ManagedEasyTransferTests
         [0x01, 0x04, 0x00, 0x01, 0xAA, 0x02, 0x03, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0xF4, 0x86, 0x57, 0x00];
 
     [TestMethod]
-    public async Task ImportTlsSession_NoShare_EngineCacheHoldsItForEveryHandleToExport()
+    public async Task ImportTlsSession_NoShare_HandlesOwnCacheHoldsItForTheHandleToExport()
     {
         await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
         ManagedEasyTransfer importer = SessionExporting(engine);
-        ManagedEasyTransfer exporter = SessionExporting(engine);
 
         CurlCode imported = importer.ImportTlsSession(SslSessionPeer, null, PackedSslSession);
         List<ExportedTlsSession> exported = [];
-        CurlCode code = exporter.ExportTlsSessions(session => { exported.Add(session); return CurlCode.Ok; });
+        CurlCode code = importer.ExportTlsSessions(session => { exported.Add(session); return CurlCode.Ok; });
 
         Assert.AreEqual(CurlCode.Ok, imported);
         Assert.AreEqual(CurlCode.Ok, code);
@@ -37,7 +36,6 @@ public sealed partial class ManagedEasyTransferTests
         Assert.IsNull(only.Alpn);
         Assert.AreEqual(0u, only.MaxEarlyData);
         await importer.DisposeAsync();
-        await exporter.DisposeAsync();
     }
 
     [TestMethod]
@@ -71,7 +69,7 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task ImportTlsSession_ShareNotSharingSslSessions_GoesToTheEngineCache()
+    public async Task ImportTlsSession_ShareNotSharingSslSessions_GoesToTheHandlesOwnCacheAndNotAnotherHandles()
     {
         await using ManagedCurlEngine engine = CreateEngine(new ScriptedConnector([]));
         IShareHandle share = engine.CreateShare();
@@ -81,12 +79,16 @@ public sealed partial class ManagedEasyTransferTests
         ManagedEasyTransfer unattached = SessionExporting(engine);
 
         CurlCode imported = attached.ImportTlsSession(SslSessionPeer, null, PackedSslSession);
-        int engineCount = 0;
-        CurlCode engineCode = unattached.ExportTlsSessions(_ => { engineCount++; return CurlCode.Ok; });
+        int ownCount = 0;
+        CurlCode ownCode = attached.ExportTlsSessions(_ => { ownCount++; return CurlCode.Ok; });
+        int otherCount = 0;
+        CurlCode otherCode = unattached.ExportTlsSessions(_ => { otherCount++; return CurlCode.Ok; });
 
         Assert.AreEqual(CurlCode.Ok, imported);
-        Assert.AreEqual(CurlCode.Ok, engineCode);
-        Assert.AreEqual(1, engineCount);
+        Assert.AreEqual(CurlCode.Ok, ownCode);
+        Assert.AreEqual(CurlCode.Ok, otherCode);
+        Assert.AreEqual(1, ownCount);
+        Assert.AreEqual(0, otherCount);
         await attached.DisposeAsync();
         await unattached.DisposeAsync();
     }

@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-get-dir","command":"-s ftp://127.0.0.1:18200/dir/b.txt"}
+  ]
+}

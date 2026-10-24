@@ -82,6 +82,65 @@ public sealed partial class TlsFailureMessagesTests
     }
 
     [TestMethod]
+    public void SchannelSslConnectError_IllegalMessage_IsCurlsFatalAlertTextNotTheSystemText()
+    {
+        // curl 8.22.0 (Schannel), BL-3235's tls12-server-tls13only and badssl cases: schannel.c replaces the text.
+        var exception = new AuthenticationException(
+            "Authentication failed because the remote party sent a TLS alert: 'HandshakeFailure'.",
+            new Win32Exception(unchecked((int)0x80090326), "The message received was unexpected or badly formatted."));
+
+        Diagnostics.Arrange("exception", "AuthenticationException over Win32Exception 0x80090326");
+
+        var message = TlsFailureMessages.SchannelSslConnectError(exception);
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", SchannelFatalAlertReceived, message);
+
+        Assert.AreEqual(SchannelFatalAlertReceived, message);
+    }
+
+    [TestMethod]
+    [DataRow(TlsVersion.Tls12, "ProtocolVersion", 0x80090326u, "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported")]
+    [DataRow(TlsVersion.Tls12, "HandshakeFailure", 0x80090326u, SchannelFatalAlertReceived)]
+    [DataRow(TlsVersion.Tls12, "ProtocolVersion", 0x80090302u, "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported")]
+    [DataRow(TlsVersion.Tls12, "ProtocolVersion", 0x80090327u, "schannel: next InitializeSecurityContext failed: SEC_E_CERT_UNKNOWN (0x80090327) - text")]
+    [DataRow(TlsVersion.SystemDefault, "ProtocolVersion", 0x80090326u, SchannelFatalAlertReceived)]
+    [DataRow(TlsVersion.Tls13, "ProtocolVersion", 0x80090326u, SchannelFatalAlertReceived)]
+    [DataRow(TlsVersion.Tls11, "ProtocolVersion", 0x80090326u, SchannelHandshakeNotReceived)]
+    [DataRow(TlsVersion.Tls10, "HandshakeFailure", 0x80090326u, SchannelHandshakeNotReceived)]
+    public void SchannelSslConnectError_ByCeilingAndAlert_IsTheLineSchannelsCurlPrints(TlsVersion maximumVersion, string alert, uint securityStatus, string expected)
+    {
+        var text = securityStatus == 0x80090302u ? "The function requested is not supported" : "text";
+        var exception = new AuthenticationException(
+            $"Authentication failed because the remote party sent a TLS alert: '{alert}'.",
+            new Win32Exception(unchecked((int)securityStatus), text));
+
+        Diagnostics.Arrange("maximumVersion, alert, status", $"{maximumVersion}, {alert}, 0x{securityStatus:X8}");
+
+        var message = TlsFailureMessages.SchannelSslConnectError(exception, maximumVersion);
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", expected, message);
+
+        Assert.AreEqual(expected, message);
+    }
+
+    [TestMethod]
+    public void SchannelSslConnectError_IllegalMessageWithoutAnAuthenticationExceptionUnderATls12Ceiling_IsCurlsFatalAlertText()
+    {
+        var exception = new IOException("TLS alert: 'ProtocolVersion'", new Win32Exception(unchecked((int)0x80090326), "text"));
+
+        Diagnostics.Arrange("exception", "IOException over Win32Exception 0x80090326");
+
+        var message = TlsFailureMessages.SchannelSslConnectError(exception, TlsVersion.Tls12);
+
+        Diagnostics.Act("message", message);
+        Diagnostics.Assert("message", SchannelFatalAlertReceived, message);
+
+        Assert.AreEqual(SchannelFatalAlertReceived, message);
+    }
+
+    [TestMethod]
     public void SchannelSslConnectError_SocketErrorWhenOfferingOnlyVersionsBelowTls12_IsTheRecvFailure()
     {
         Diagnostics.Arrange("socket error", SocketError.ConnectionReset);

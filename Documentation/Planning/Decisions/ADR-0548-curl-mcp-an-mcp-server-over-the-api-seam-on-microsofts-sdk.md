@@ -2,6 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-15
+- **Status note (2026-10-23):** decision 1 (the two packages) and the SDK wording in decisions 2
+  and 5 are superseded in intent by
+  [ADR-0799](ADR-0799-curl-mcp-drops-its-two-packages-for-a-hand-written-server.md), which
+  replaces the SDK with a hand-written server. The packages stay until its final task lands. The
+  rest of this ADR stands.
 
 `Curl.Mcp`, its two packages and publishing it to nuget.org were **approved by Stewart on
 2026-10-15** ("built on Microsoft's SDK, yes, yes"). The other details below (the project

@@ -48,7 +48,8 @@ function Start-Detached {
 # tabs group together; a finished tab ends in "close" or "read"; anything else is working.
 # A lane holding no task is "DF 09:07 L1 $Dot empty": after each task it clears its screen to
 # one line saying what it finished, and a lane that ends cleanly reads "empty, close".
-# $Dot is U+00B7, the middle dot.
+# $Dot is U+00B7, the middle dot. Finished tabs are swept at shift end: Close-FinishedHerdrTabs
+# closes every such tab, "read" ones included, that has no live run under it (BL-3340).
 $Dot = [char]0x00B7
 $ShiftTime = if ($Stamp -match '^\d{8}-(\d\d)(\d\d)') { "$($Matches[1]):$($Matches[2])" } else { (Get-Date).ToString('HH:mm') }
 $OwnTabPrefix = if ($Lane) { "DF $ShiftTime L$Lane" } else { "DF $ShiftTime shift" }
@@ -108,6 +109,70 @@ function Close-HerdrTab {
     Write-Trace '-' 'herdr' "closing tab $Tab ($Why)"
     & $herdr tab close $Tab 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0 -and $DoneLabel) { Set-HerdrTabLabel $Tab "$DoneLabel $Dot done, close" }
+}
+
+function Test-HerdrPaneRunAlive {
+    # True when a factory or sibling-office run is a descendant of the pane's shell: the
+    # foreground process is always the pane's own pwsh.exe, so it cannot say. $Processes
+    # is Win32_Process rows (ProcessId, ParentProcessId, CommandLine).
+    param([int]$ShellPid, [object[]]$Processes)
+    $children = @{}
+    foreach ($p in $Processes) {
+        $key = "$($p.ParentProcessId)"
+        if (-not $children.ContainsKey($key)) { $children[$key] = [System.Collections.Generic.List[object]]::new() }
+        $children[$key].Add($p)
+    }
+    $queue = [System.Collections.Generic.Queue[int]]::new()
+    $seen = [System.Collections.Generic.HashSet[int]]::new()
+    $queue.Enqueue($ShellPid)
+    while ($queue.Count -gt 0) {
+        $parent = $queue.Dequeue()
+        if (-not $children.ContainsKey("$parent")) { continue }
+        foreach ($child in $children["$parent"]) {
+            if (-not $seen.Add([int]$child.ProcessId)) { continue }
+            if ("$($child.CommandLine)" -match 'Run(DarkFactory|Audit|GapAnalysis)\.ps1') { return $true }
+            $queue.Enqueue([int]$child.ProcessId)
+        }
+    }
+    return $false
+}
+
+function Close-FinishedHerdrTabs {
+    # Sweeps the herdr workspace at shift end: closes every factory, audit and gap tab
+    # ("DF *", "Dark factory*", "Audit *", "Gap *", the ones ending in "read" too) that has
+    # no live run under its pane's shell. Never closes this process's own tab or a tab with
+    # another caption. Returns how many it closed; outside herdr, or when herdr fails, it
+    # returns what it closed so far after one trace line.
+    $herdr = Get-HerdrBin
+    if (-not $herdr) { return 0 }
+    $closed = 0
+    try {
+        $tabs = @(((& $herdr tab list) -join "`n" | ConvertFrom-Json).result.tabs)
+        $panes = @(((& $herdr pane list) -join "`n" | ConvertFrom-Json).result.panes)
+        $processes = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CommandLine)
+        foreach ($tab in $tabs) {
+            if ($env:HERDR_WORKSPACE_ID -and $tab.workspace_id -ne $env:HERDR_WORKSPACE_ID) { continue }
+            if ($tab.tab_id -eq $env:HERDR_TAB_ID) { continue }
+            if ("$($tab.label)" -notmatch '^(DF |Dark factory|Audit |Gap )') { continue }
+            $alive = $false
+            foreach ($pane in @($panes | Where-Object { $_.tab_id -eq $tab.tab_id })) {
+                $info = ((& $herdr pane process-info --pane $pane.pane_id) -join "`n" | ConvertFrom-Json).result.process_info
+                if (-not $info.shell_pid -or (Test-HerdrPaneRunAlive -ShellPid ([int]$info.shell_pid) -Processes $processes)) { $alive = $true; break }
+            }
+            if ($alive) { continue }
+            & $herdr tab close $tab.tab_id 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) { $closed++ }
+        }
+    } catch {
+        Write-Trace '-' 'herdr' "could not sweep finished tabs: $($_.Exception.Message)" 'Yellow'
+    }
+    return $closed
+}
+
+function Close-FinishedHerdrTabsAndTrace {
+    # The shift-end sweep: Close-FinishedHerdrTabs, then one trace line saying how many.
+    $closed = Close-FinishedHerdrTabs
+    if (Get-HerdrBin) { Write-Trace '-' 'herdr' "closed $closed finished tabs" 'Cyan' }
 }
 
 function Get-LaneMarker {

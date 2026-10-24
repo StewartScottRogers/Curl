@@ -55,6 +55,12 @@ internal sealed class TransferHeaderStore : ITransferHeaders
     /// </summary>
     internal long ContentLength { get; private set; } = -1;
 
+    /// <summary>
+    /// Gets the <c>CURL_HTTP_VERSION_*</c> number of the last status line that was not a CONNECT reply's, 0 before one: what
+    /// libcurl's <c>CURLINFO_HTTP_VERSION</c> keeps when the transfer then fails, after a low-speed abort or a refused redirect hop (BL-3338).
+    /// </summary>
+    internal long HttpVersion { get; private set; }
+
     /// <summary>Gets or sets what is called each time <see cref="ResponseCode" /> or <see cref="ContentLength" /> is set by a line.</summary>
     internal Action? ResponseHeadRead { get; set; }
 
@@ -69,6 +75,7 @@ internal sealed class TransferHeaderStore : ITransferHeaders
         lineOrigin = CurlHeaderOrigin.Header;
         ResponseCode = 0;
         ContentLength = -1;
+        HttpVersion = 0;
     }
 
     /// <summary>Marks the next status line as a CONNECT reply's, whose headers are <see cref="CurlHeaderOrigin.Connect" />.</summary>
@@ -182,6 +189,7 @@ internal sealed class TransferHeaderStore : ITransferHeaders
         string[] words = statusLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         string status = words.Length > 1 ? words[1] : string.Empty;
         lineOrigin = HeadOriginOf(status);
+        ReadHttpVersion(words[0]);
         nextHeadIsConnectReply = false;
         if (words[0] is "HTTP/2" or "HTTP/3")
         {
@@ -189,6 +197,22 @@ internal sealed class TransferHeaderStore : ITransferHeaders
         }
 
         ReadResponseCode(status);
+    }
+
+    /// <summary>Takes a status line's first word as <see cref="HttpVersion" />, unless the head is a CONNECT reply's.</summary>
+    private void ReadHttpVersion(string protocol)
+    {
+        if (lineOrigin != CurlHeaderOrigin.Connect)
+        {
+            HttpVersion = protocol switch
+            {
+                "HTTP/1.0" => 1,
+                "HTTP/1.1" => 2,
+                "HTTP/2" => 3,
+                "HTTP/3" => 30,
+                _ => 0,
+            };
+        }
     }
 
     /// <summary>Takes <paramref name="status" /> as <see cref="ResponseCode" />, 0 when it does not parse, and forgets the length, unless the head is a CONNECT reply's.</summary>

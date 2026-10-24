@@ -148,7 +148,7 @@ internal sealed class HttpLineReader(IConnection connection)
         }
         catch (IOException exception)
         {
-            throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailure(exception));
+            throw HttpTransferException.OfReceiveFailure(exception);
         }
 
         end += read;

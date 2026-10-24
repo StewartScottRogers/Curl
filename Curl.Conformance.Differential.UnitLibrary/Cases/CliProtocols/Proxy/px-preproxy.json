@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-preproxy","command":"-s --preproxy socks5://127.0.0.1:18300 -x http://127.0.0.1:18300 http://example.test/x"}
+  ]
+}

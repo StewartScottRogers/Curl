@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-type-d","command":"-s 'ftp://127.0.0.1:18200/;type=d'"}
+  ]
+}

@@ -1271,7 +1271,6 @@ internal sealed class CurlCommandRunner(
                 ? new ParallelProgressMeter(timeProvider, writeGate, WriteParallelProgressMeter)
                 : null,
         };
-        run.Queue.BeforeEachWait = run.Hosts.StartReleased;
         return run;
     }
 
@@ -1919,13 +1918,16 @@ internal sealed class CurlCommandRunner(
         string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
         await run.Hosts.WaitForHostAsync(url, options.HttpVersion == RequestedHttpVersion.Http2PriorKnowledge, abortToken).ConfigureAwait(false);
         Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null);
+        bool connectionStayedOpen = false;
         try
         {
-            return await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+            var ended = await TransferUrlAsync(dispatch, options, transfer).ConfigureAwait(false);
+            connectionStayedOpen = ParallelHostQueue.ConnectionStayedOpen(ended.Result);
+            return ended;
         }
         finally
         {
-            run.Hosts.Leave(url);
+            run.Hosts.Leave(url, connectionStayedOpen);
         }
     }
 

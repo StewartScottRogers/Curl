@@ -23,7 +23,7 @@ namespace Curl.Engine;
 internal sealed partial class ManagedEasyTransfer
 {
     /// <inheritdoc />
-    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared) { cookieListItemsApplied = cookieListItemsApplied, Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
+    public IEasyTransfer Duplicate() => new ManagedEasyTransfer(createDispatcher, shared.DuplicatedWithOwnCaches()) { cookieListItemsApplied = cookieListItemsApplied, Options = Options, ToolSettings = ToolSettings, Host = Host, TraceComponents = TraceComponents, CreateFormBoundary = CreateFormBoundary, CreateConnectOnlyConnector = CreateConnectOnlyConnector, WebSocketRandomSource = WebSocketRandomSource };
 
     /// <inheritdoc />
     /// <remarks>
@@ -89,7 +89,7 @@ internal sealed partial class ManagedEasyTransfer
         optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
-        await shared.Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
+        await (ToolSettings is not null ? shared.EngineWide : shared).Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
     }
 
     /// <summary>Writes the handle's alt-svc cache to its <c>CURLOPT_ALTSVC</c> file, as libcurl does at cleanup (BL-2671); nothing when no perform opened one.</summary>

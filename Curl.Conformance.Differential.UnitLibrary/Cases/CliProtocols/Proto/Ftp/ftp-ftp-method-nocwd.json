@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-ftp-method-nocwd","command":"-s --ftp-method nocwd ftp://127.0.0.1:18200/dir/b.txt"}
+  ]
+}

@@ -72,6 +72,31 @@ public sealed class HttpAuthProblemLinesTests
         CollectionAssert.AreEqual(expected, lines);
     }
 
+    /// <summary>
+    /// Measured (BL-3282, auth-all-challenges-v): under <c>--anyauth</c>, the 401 answering the
+    /// picked Negotiate, NTLM or Basic answer repeats the first 401's Digest challenge, which
+    /// libcurl refuses because its Digest state still holds that nonce.
+    /// </summary>
+    [TestMethod]
+    [DataRow("Negotiate YII=", new[] { DigestProblem }, DisplayName = "Negotiate sent")]
+    [DataRow("NTLM TlRMTVNT", new[] { DigestProblem }, DisplayName = "NTLM sent")]
+    [DataRow("Basic dTpw", new[] { DigestProblem }, DisplayName = "Basic sent")]
+    [DataRow(null, new string[0], DisplayName = "The first request, no answer sent")]
+    public void LinesBefore_DigestHeaderUnderAnyAuth_GivesTheProblemLineOnceAnAnswerWasSent(string? authorization, string[] expected)
+    {
+        HttpStatusLine statusLine = HttpStatusLine.Parse("HTTP/1.1 401 X");
+        HttpAuthRequest request = new("GET", CurlUrl.Parse("http://127.0.0.1/authall"), "/authall", null, null, HttpAuthSchemes.Any, false);
+        HttpResponseHeader header = new("WWW-Authenticate", "Digest realm=\"r\", nonce=\"abc\", qop=\"auth\"");
+
+        Diagnostics.Arrange("authorization", authorization ?? "none");
+
+        List<string> lines = [.. new HttpAuthProblemLines().LinesBefore(request, authorization, statusLine, header)];
+
+        Diagnostics.Act("lines", string.Join(" | ", lines));
+        Diagnostics.Assert("lines", string.Join(" | ", expected), string.Join(" | ", lines));
+        CollectionAssert.AreEqual(expected, lines);
+    }
+
     /// <summary>Measured: a second Digest header of the same head is a duplicate, whatever the first said.</summary>
     [TestMethod]
     public void LinesBefore_SecondDigestHeaderOfTheHead_GivesTheDuplicateLine()

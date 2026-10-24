@@ -202,9 +202,9 @@ internal sealed partial class ManagedEasyTransfer
             return Finish(CurlCode.UrlMalformat, NoUrlSetText, new TransferInfo());
         }
 
-        if (TransferUrlOf(urlText, options) is not { } url)
+        if (TransferUrlOf(urlText, options, out CurlUrlRejection rejection) is not { } url)
         {
-            return Finish(CurlCode.UrlMalformat, MalformedUrlText, new TransferInfo { EffectiveUrl = urlText });
+            return Finish(CurlCode.UrlMalformat, TransferPerformer.UrlRejectedPrefix + rejection.ToCurlMessage(), new TransferInfo { EffectiveUrl = urlText });
         }
 
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);
@@ -298,7 +298,11 @@ internal sealed partial class ManagedEasyTransfer
     /// </summary>
     /// <param name="urlText">The URL set.</param>
     /// <param name="options">The handle's options.</param>
+    /// <param name="rejection">Why the URL set does not parse, as curl's <c>URL rejected:</c> text says.</param>
     /// <returns>The URL, or <see langword="null" /> when the URL set does not parse.</returns>
-    private CurlUrl? TransferUrlOf(string urlText, EasyOptions options) =>
-        ToolInputs?.Url ?? (CurlUrl.TryParse(urlText, options.Network.PathAsIs, out CurlUrl? parsed) ? parsed : null);
+    private CurlUrl? TransferUrlOf(string urlText, EasyOptions options, out CurlUrlRejection rejection)
+    {
+        rejection = default;
+        return ToolInputs?.Url ?? (CurlUrl.TryParse(urlText, options.Network.PathAsIs, out CurlUrl? parsed, out rejection) ? parsed : null);
+    }
 }

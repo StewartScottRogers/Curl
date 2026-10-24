@@ -5,9 +5,10 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Applies <c>--curves</c> and <c>--sigalgs</c> to the platform curl's ClientHello profile
-/// for the hand-built client, on every platform (ADR-0151, ADR-0284): the groups, key shares
+/// for the hand-built client in the OpenSSL build (ADR-0151, ADR-0284): the groups, key shares
 /// and signature schemes they name replace the profile's, and the rest of the ClientHello
-/// stays the profile's. Failures come in the OpenSSL build's order (measured, BL-709): a
+/// stays the profile's. The Schannel build ignores both, whatever their value, as curl 8.22.0
+/// Schannel does (measured, BL-3305, ADR-0793). Failures come in the OpenSSL build's order (measured, BL-709): a
 /// refused <c>--curves</c> value, then a refused <c>--sigalgs</c> value (both exit 59), then
 /// no group left, then no signature scheme left, then - when TLS 1.3 is offered - no key
 /// share left (all three exit 35, BL-1082). Under a TLS 1.2 ceiling the one failure is no
@@ -19,8 +20,12 @@ internal static class CurvesAndSignatureAlgorithms
     /// <summary>Applies the options to <paramref name="profile" />.</summary>
     /// <param name="profile">The platform curl's profile.</param>
     /// <param name="options">The connection's TLS options.</param>
+    /// <param name="matchesSchannelBuild">Whether to ignore both options, as curl's Schannel build does.</param>
     /// <returns>The profile to offer, or the failure that stops the handshake before it starts.</returns>
-    public static (ClientHelloProfile? Profile, ConnectResult? Failure) Apply(ClientHelloProfile profile, TlsClientOptions options)
+    public static (ClientHelloProfile? Profile, ConnectResult? Failure) Apply(ClientHelloProfile profile, TlsClientOptions options, bool matchesSchannelBuild) =>
+        matchesSchannelBuild ? (profile, null) : ApplyAsOpenSslBuild(profile, options);
+
+    private static (ClientHelloProfile? Profile, ConnectResult? Failure) ApplyAsOpenSslBuild(ClientHelloProfile profile, TlsClientOptions options)
     {
         var groups = ReadCurves(profile, options.Curves);
         if (groups is null)

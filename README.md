@@ -11,9 +11,8 @@ The port is behavioural, not a line-by-line translation of curl's C source. curl
 documentation, its manual page and its test suite are the specification; every protocol
 is reimplemented against its RFCs in its own class library, behind interfaces that can be
 driven from a unit test without touching a network. The only dependency of the curl port is
-the .NET base class library; the one exception is the MCP server host `Curl.Mcp`, which
-references the `ModelContextProtocol` and `Microsoft.Extensions.Hosting` NuGet packages
-(ADR-0548).
+the .NET base class library, the MCP server `Curl.Mcp` included (hand-written, ADR-0799);
+the only package in the solution is `MSTest`, for the tests.
 
 
 <a href="https://stewartscottrogers.github.io/Curl/" target="_blank"><img src="https://github.com/StewartScottRogers/Curl/raw/gource/gource.gif" alt="Gource animation of Curl's commit history across every branch - click to watch in 4K, full screen" width="800"></a>

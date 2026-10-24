@@ -95,8 +95,9 @@ public sealed class ConnectResult
 
     /// <summary>
     /// Gets the socket error of the last connect attempt that failed, the source of libcurl's
-    /// <c>CURLINFO_OS_ERRNO</c> (BL-2374); <see cref="SocketError.Success" /> for a success and
-    /// for a failure the connector built without one, such as a failed resolve.
+    /// <c>CURLINFO_OS_ERRNO</c> (BL-2374), or of the earlier address's attempt that failed before a
+    /// success connected (BL-3328); <see cref="SocketError.Success" /> for a success no attempt
+    /// failed before and for a failure the connector built without one, such as a failed resolve.
     /// </summary>
     public SocketError LastSocketError { get; private init; }
 
@@ -209,6 +210,11 @@ public sealed class ConnectResult
     /// How many bytes the heads of the proxy's replies to a tunnelling CONNECT held; <c>0</c> when
     /// there was none.
     /// </param>
+    /// <param name="lastSocketError">
+    /// The socket error of an earlier address's connect attempt that failed before this one
+    /// connected, which curl keeps as <c>CURLINFO_OS_ERRNO</c> (BL-3328); <see cref="SocketError.Success" />
+    /// when none failed.
+    /// </param>
     /// <returns>A result whose <see cref="ExitCode" /> is <see cref="CurlExitCode.Ok" />.</returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="connection" /> is <see langword="null" />, which would leave a
@@ -227,7 +233,8 @@ public sealed class ConnectResult
         string? mappedHost = null,
         int mappedPort = 0,
         int connectReplyHeadersStored = 0,
-        long proxyConnectHeaderBytes = 0)
+        long proxyConnectHeaderBytes = 0,
+        SocketError lastSocketError = SocketError.Success)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
@@ -245,6 +252,7 @@ public sealed class ConnectResult
             MappedPort = mappedPort,
             ConnectReplyHeadersStored = connectReplyHeadersStored,
             ProxyConnectHeaderBytes = proxyConnectHeaderBytes,
+            LastSocketError = lastSocketError,
         };
     }
 

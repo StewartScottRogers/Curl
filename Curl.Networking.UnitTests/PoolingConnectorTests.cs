@@ -210,6 +210,26 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_ForANewConnectionThenAReuse_KeepsTheEarlierSocketErrorOnlyOnTheNewConnection()
+    {
+        _inner.LastSocketError = System.Net.Sockets.SocketError.ConnectionRefused;
+        await using var pool = CreatePool();
+
+        var opened = await pool.ConnectAsync(Target(), CancellationToken.None);
+        opened.Connection!.MarkReusable();
+        await opened.Connection.DisposeAsync();
+        var reused = await pool.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Assert(
+            "opened, reused last socket error",
+            (System.Net.Sockets.SocketError.ConnectionRefused, System.Net.Sockets.SocketError.Success),
+            (opened.LastSocketError, reused.LastSocketError));
+        Assert.IsTrue(reused.IsReused);
+        Assert.AreEqual(System.Net.Sockets.SocketError.ConnectionRefused, opened.LastSocketError);
+        Assert.AreEqual(System.Net.Sockets.SocketError.Success, reused.LastSocketError);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_ForANewConnectionThenAReuse_PassesTheConnectReplyHeadBytesOnOnlyOnce()
     {
         _inner.ProxyConnectHeaderBytes = 61;
@@ -930,6 +950,70 @@ public sealed class PoolingConnectorTests
         Diagnostics.Assert("shut down count", 1, session.ShutDownCount);
 
         Assert.AreEqual(1, session.ShutDownCount);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithFreshConnect_OpensANewConnectionAlthoughAnIdleOneIsPooled()
+    {
+        var cache = new ConnectionCache(_time);
+        await using var plain = new PoolingConnector(_inner, cache, configuration: null);
+        var fresh = new PoolingConnector(_inner, cache, configuration: null) { FreshConnect = true };
+        await ReturnToPoolAsync(plain, Target());
+
+        var result = await fresh.ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("pooled idle connections", 1);
+        Diagnostics.Assert("connection number", 1L, result.ConnectionNumber);
+        Assert.IsFalse(result.IsReused);
+        Assert.AreEqual(1L, result.ConnectionNumber);
+        Assert.HasCount(2, _inner.Opened);
+        Assert.IsFalse(_inner.Opened[0].IsDisposed);
+        await cache.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithForbidReuse_ClosesTheConnectionOnDisposeAndNeverPoolsIt()
+    {
+        var cache = new ConnectionCache(_time);
+        var forbidding = new PoolingConnector(_inner, cache, configuration: null) { ForbidReuse = true };
+        await ReturnToPoolAsync(forbidding, Target());
+
+        var next = await new PoolingConnector(_inner, cache, configuration: null).ConnectAsync(Target(), CancellationToken.None);
+
+        Diagnostics.Arrange("forbid reuse", true);
+        Diagnostics.Assert("next is reused", false, next.IsReused);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        Assert.IsFalse(next.IsReused);
+        Assert.HasCount(2, _inner.Opened);
+        await cache.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_WithForbidReuseOnAnIdleConnection_ClosesItWhenTheTransferEnds()
+    {
+        var cache = new ConnectionCache(_time);
+        var plain = new PoolingConnector(_inner, cache, configuration: null);
+        await ReturnToPoolAsync(plain, Target());
+        var forbidding = new PoolingConnector(_inner, cache, configuration: null) { ForbidReuse = true };
+
+        await ReturnToPoolAsync(forbidding, Target());
+
+        Diagnostics.Assert("opened", 1, _inner.Opened.Count);
+        Assert.HasCount(1, _inner.Opened);
+        Assert.IsTrue(_inner.Opened[0].IsDisposed);
+        await cache.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task Over_KeepsFreshConnectAndForbidReuse()
+    {
+        await using var pool = new PoolingConnector(_inner, new ConnectionCache(_time), configuration: null) { FreshConnect = true, ForbidReuse = true };
+
+        var over = pool.Over(_inner);
+
+        Diagnostics.Assert("fresh and forbid", (true, true), (over.FreshConnect, over.ForbidReuse));
+        Assert.IsTrue(over.FreshConnect);
+        Assert.IsTrue(over.ForbidReuse);
     }
 
     private static ConnectTarget Target(

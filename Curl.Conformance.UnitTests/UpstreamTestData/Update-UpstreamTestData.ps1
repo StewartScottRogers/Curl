@@ -7,7 +7,8 @@
     in this folder with the test* files of tests/data at that tag as test*.curltest, every
     file in certs\ with the files of tests/certs at that tag except its build files
     (Makefile.*, CMakeLists.txt) and dot files, and COPYING with curl's
-    COPYING at that tag. Files are written byte for byte; the .gitattributes beside them marks
+    COPYING at that tag, plus the extra folders it names below (docs, include, src, and lib/libcurl.def, lib/optiontable.pl,
+    lib/easyoptions.c and projects/OS400/ccsidcurl.c for the source-analysis cases, and configure.ac, m4, CMakeLists.txt, the lib and src C sources and every Markdown file for cases 1165 and 1275). Files are written byte for byte; the .gitattributes beside them marks
     them -text so git keeps their line endings. ADR-0013, decision 3: the data is vendored and
     pinned, and tests never download anything - only this script does.
 
@@ -39,7 +40,7 @@ try {
     # Windows' own bsdtar: a Git Bash GNU tar earlier on PATH reads "C:\..." as a remote host.
     $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
     if (-not (Test-Path -LiteralPath $tar)) { $tar = 'tar' }
-    & $tar -xzf $archive -C $workFolder "$sourceRoot/COPYING" "$sourceRoot/tests/data" "$sourceRoot/tests/certs" "$sourceRoot/docs/options-in-versions" "$sourceRoot/docs/VERSIONS.md" "$sourceRoot/docs/cmdline-opts" "$sourceRoot/src/tool_writeout.c" "$sourceRoot/src/tool_getparam.c" "$sourceRoot/src/tool_listhelp.c" "$sourceRoot/docs/libcurl" "$sourceRoot/include/curl"
+    & $tar -xzf $archive -C $workFolder "$sourceRoot/COPYING" "$sourceRoot/tests/data" "$sourceRoot/tests/certs" "$sourceRoot/docs/options-in-versions" "$sourceRoot/docs/VERSIONS.md" "$sourceRoot/docs/cmdline-opts" "$sourceRoot/src/tool_writeout.c" "$sourceRoot/src/tool_getparam.c" "$sourceRoot/src/tool_listhelp.c" "$sourceRoot/docs/libcurl" "$sourceRoot/include/curl" "$sourceRoot/lib/libcurl.def" "$sourceRoot/lib/optiontable.pl" "$sourceRoot/lib/easyoptions.c" "$sourceRoot/projects/OS400/ccsidcurl.c"
     if ($LASTEXITCODE -ne 0) { throw "tar could not extract $sourceRoot from $archive." }
 
     $upstreamData = Join-Path $workFolder "$sourceRoot/tests/data"
@@ -57,6 +58,28 @@ try {
         Copy-Item -LiteralPath $test.FullName -Destination (Join-Path $destination ($test.Name + '.curltest'))
     }
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/COPYING") -Destination (Join-Path $destination 'COPYING') -Force
+
+    # The files test1165.pl and test1275.pl read (BL-3407): configure.ac, m4/*.m4, CMakeLists.txt, lib/curl_config-cmake.h.in,
+    # the lib and src C sources (*.c, *.h) and every Markdown file of the tree, at the same relative paths.
+    & $tar -xzf $archive -C $workFolder --include "$sourceRoot/*.md" --include "$sourceRoot/lib/*" --include "$sourceRoot/src/*" --include "$sourceRoot/m4/*" --include "$sourceRoot/configure.ac" --include "$sourceRoot/CMakeLists.txt"
+    if ($LASTEXITCODE -ne 0) { throw "tar could not extract the configure, C source and Markdown files from $archive." }
+    $sourceRootFull = (Join-Path $workFolder $sourceRoot).TrimEnd('\') + '\'
+    $scanFiles = @(Get-ChildItem -LiteralPath (Join-Path $workFolder $sourceRoot) -File -Recurse | Where-Object {
+        $relative = $_.FullName.Substring($sourceRootFull.Length).Replace('\', '/')
+        $relative -eq 'configure.ac' -or $relative -eq 'CMakeLists.txt' -or $relative -eq 'lib/curl_config-cmake.h.in' -or
+        $_.Extension -eq '.md' -or
+        (($_.Extension -eq '.c' -or $_.Extension -eq '.h') -and ($relative.StartsWith('lib/') -or $relative.StartsWith('src/'))) -or
+        ($_.Extension -eq '.m4' -and $relative.StartsWith('m4/')) })
+    if ($scanFiles.Count -eq 0) { throw "No configure, C source or Markdown files found at $Tag." }
+    foreach ($scanFile in $scanFiles) {
+        $scanRelative = $scanFile.FullName.Substring($sourceRootFull.Length)
+        # Upstream's root README.md would overwrite this folder's own README.md, so it is not vendored.
+        if ($scanRelative -eq 'README.md') { continue }
+        $scanDestination = Join-Path $destination $scanRelative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $scanDestination) -Force | Out-Null
+        Copy-Item -LiteralPath $scanFile.FullName -Destination $scanDestination -Force
+    }
+
 
     $certsDestination = Join-Path $destination 'certs'
     New-Item -ItemType Directory -Path $certsDestination -Force | Out-Null
@@ -100,6 +123,14 @@ try {
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_getparam.c") -Destination (Join-Path $sourceDestination 'tool_getparam.c') -Force
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/src/tool_listhelp.c") -Destination (Join-Path $sourceDestination 'tool_listhelp.c') -Force
 
+    # The files test1135.pl (case 1279), test1276.pl and test1544.pl open (BL-3391): lib/libcurl.def,
+    # lib/optiontable.pl, lib/easyoptions.c and projects/OS400/ccsidcurl.c, at the same relative paths.
+    foreach ($sourceAnalysisFile in @('lib/libcurl.def', 'lib/optiontable.pl', 'lib/easyoptions.c', 'projects/OS400/ccsidcurl.c')) {
+        $sourceAnalysisDestination = Join-Path $destination $sourceAnalysisFile
+        New-Item -ItemType Directory -Path (Split-Path -Parent $sourceAnalysisDestination) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/$sourceAnalysisFile") -Destination $sourceAnalysisDestination -Force
+    }
+
     # The files the libcurl table check scripts test1119.pl, test1139.pl, test1175.pl, test1177.pl, test1222.pl,
     # test1477.pl and test1488.pl open (BL-2990): docs/libcurl (symbols-in-versions and the *.md pages, with
     # opts\*.md) and include/curl/*.h, at the same relative paths. curl_version_info.3, which test1177.pl reads,
@@ -129,7 +160,7 @@ try {
         Copy-Item -LiteralPath $header.FullName -Destination (Join-Path $includeDestination $header.Name)
     }
 
-    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, $($upstreamLibcurlDocs.Count) docs/libcurl files, $($upstreamLibcurlOptionDocs.Count) docs/libcurl/opts files, $($upstreamHeaders.Count) include/curl headers, the httpsig key files, data-xml1, data1461.txt, data1463.txt, the managen case files and COPYING from $Tag into $destination."
+    Write-Output "Vendored $($upstreamTests.Count) test files, $($upstreamCerts.Count) certs files, $($upstreamOptionDocs.Count) docs/cmdline-opts files, $($upstreamLibcurlDocs.Count) docs/libcurl files, $($upstreamLibcurlOptionDocs.Count) docs/libcurl/opts files, $($upstreamHeaders.Count) include/curl headers, the lib and projects source-analysis files, the httpsig key files, data-xml1, data1461.txt, data1463.txt, the managen case files and COPYING from $Tag into $destination."
     Write-Output "If the count changed, update VendoredTestFileCount in UpstreamTestDataTests.cs and the tag in README.md."
 }
 finally {

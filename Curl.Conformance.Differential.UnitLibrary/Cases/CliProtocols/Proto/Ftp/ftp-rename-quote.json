@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-rename-quote","command":"-s -Q '-RNFR a' -Q '-RNTO b' ftp://127.0.0.1:18200/"}
+  ]
+}

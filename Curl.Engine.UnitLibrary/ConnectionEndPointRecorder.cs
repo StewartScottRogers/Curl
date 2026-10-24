@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
-using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -17,110 +14,22 @@ namespace Curl.Engine;
 /// domain socket has no address or ports, so it is reported as
 /// <see cref="TransferReport.UnixSocketRemoteIp" /> alone (measured, BL-793 Notes). One
 /// recorder serves the run's transfers one at a time; <see cref="EndPointReportingProtocolHandler" />
-/// clears it before each.
+/// clears it before each. Its units live in one file each: the first connection's end points
+/// (<c>ConnectionEndPointRecorder.EndPoints.cs</c>), the failed connect's error numbers
+/// (<c>.OsErrno.cs</c>) and the earlier redirect hop (<c>.EarlierHop.cs</c>).
 /// </remarks>
-internal sealed class ConnectionEndPointRecorder
+internal sealed partial class ConnectionEndPointRecorder
 {
-    // A sockaddr_un holds its path from byte 2, after the address family; an abstract name's
-    // path starts with a NUL byte.
-    private const int UnixSocketPathOffset = 2;
-
-    /// <summary>Whether the transfer's first connection has been recorded.</summary>
-    private bool connectionRecorded;
-
-    /// <summary>The local end of the first connection, or <see langword="null" /> when unknown.</summary>
-    private IPEndPoint? localEndPoint;
-
-    /// <summary>The remote end of the first connection, or <see langword="null" /> when it is not an IP end point.</summary>
-    private IPEndPoint? remoteEndPoint;
-
     /// <summary>
-    /// The <c>%{remote_ip}</c> text of the first connection when it went through a Unix domain
-    /// socket, or <see langword="null" />.
+    /// Forgets what the previous transfer recorded, or - for a redirect's next hop - sets it aside as the earlier hop's,
+    /// which a hop that fails before it connects reports in its place as libcurl 8.22.0 keeps them (BL-3314).
     /// </summary>
-    private string? unixSocketRemoteIp;
-
-    /// <summary>The operating system's error number of the last failed connect attempt, or <c>0</c>.</summary>
-    private long osErrno;
-
-    /// <summary>Why the last failed SOCKS proxy handshake failed, or <see cref="CurlProxyCode.Ok" />.</summary>
-    private CurlProxyCode proxyError;
-
-    /// <summary>Forgets what the previous transfer recorded.</summary>
-    internal void Clear()
+    /// <param name="followingRedirect">Whether the transfer about to run is a redirect's next hop.</param>
+    internal void Clear(bool followingRedirect = false)
     {
-        connectionRecorded = false;
-        localEndPoint = null;
-        remoteEndPoint = null;
-        unixSocketRemoteIp = null;
-        osErrno = 0;
-        proxyError = CurlProxyCode.Ok;
-    }
-
-    /// <summary>
-    /// Records the socket error of a failed connect's last attempt as the operating system's error
-    /// number, the transfer's <c>CURLINFO_OS_ERRNO</c> (BL-2374), and why its SOCKS proxy handshake
-    /// failed, the transfer's <c>CURLINFO_PROXY_ERROR</c> (BL-2375); a later failure replaces each,
-    /// and <see cref="SocketError.Success" /> or <see cref="CurlProxyCode.Ok" /> leaves what was recorded.
-    /// </summary>
-    /// <param name="lastSocketError">The failed connect's <see cref="ConnectResult.LastSocketError" />.</param>
-    /// <param name="failedProxyError">The failed connect's <see cref="ConnectResult.ProxyError" />.</param>
-    internal void RecordFailedConnect(SocketError lastSocketError, CurlProxyCode failedProxyError = CurlProxyCode.Ok)
-    {
-        if (lastSocketError != SocketError.Success)
-        {
-            osErrno = OsErrnoOf(lastSocketError);
-        }
-
-        if (failedProxyError != CurlProxyCode.Ok)
-        {
-            proxyError = failedProxyError;
-        }
-    }
-
-    /// <summary>
-    /// The operating system's number for <paramref name="socketError" />, as the platform's curl reports
-    /// <c>CURLINFO_OS_ERRNO</c>: the Winsock code on Windows (the Schannel build, <c>WSAECONNREFUSED</c>
-    /// 10061), <c>errno</c> elsewhere (the OpenSSL builds, <c>ECONNREFUSED</c> 111 on Linux and 61 on
-    /// macOS), which the runtime's <c>SocketException.NativeErrorCode</c> maps to.
-    /// </summary>
-    /// <param name="socketError">The socket error.</param>
-    /// <returns>The platform's error number.</returns>
-    internal static long OsErrnoOf(SocketError socketError) => new SocketException((int)socketError).NativeErrorCode;
-
-    /// <summary>
-    /// Records a connection the transfer opened, unless it already opened one.
-    /// </summary>
-    /// <param name="local">
-    /// The local address and port, or <see langword="null" /> when the connection has none to
-    /// report, as a UDP channel curl never connects has none.
-    /// </param>
-    /// <param name="remote">
-    /// The peer's address and port, or the Unix domain socket the connection went through; any
-    /// other end point, or <see langword="null" />, records nothing, as a connection with no
-    /// known peer has nothing to report.
-    /// </param>
-    internal void Record(IPEndPoint? local, EndPoint? remote)
-    {
-        if (connectionRecorded)
-        {
-            return;
-        }
-
-        switch (remote)
-        {
-            case IPEndPoint ip:
-                remoteEndPoint = ip;
-                break;
-            case UnixDomainSocketEndPoint unixSocket:
-                unixSocketRemoteIp = RemoteIpOf(unixSocket);
-                break;
-            default:
-                return;
-        }
-
-        localEndPoint = local;
-        connectionRecorded = true;
+        SetAsideEarlierHop(followingRedirect);
+        ClearEndPoints();
+        ClearConnectFailure();
     }
 
     /// <summary>
@@ -136,49 +45,9 @@ internal sealed class ConnectionEndPointRecorder
     /// without a report. <paramref name="result" /> itself when nothing was recorded or the
     /// handler reported an end point.
     /// </returns>
-    internal TransferResult ReportOn(TransferResult result) => WithEndPoints(WithConnectFailure(result));
-
-    /// <summary>
-    /// Puts the recorded <see cref="TransferReport.OsErrno" /> and <see cref="TransferReport.ProxyError" />
-    /// on <paramref name="result" />'s report, building one as <see cref="ReportOn" /> does when the
-    /// handler returned none; <paramref name="result" /> itself when no connect attempt failed.
-    /// </summary>
-    private TransferResult WithConnectFailure(TransferResult result) => osErrno == 0 && proxyError == CurlProxyCode.Ok
-        ? result
-        : result with
-        {
-            Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { OsErrno = osErrno, ProxyError = proxyError },
-        };
-
-    /// <summary>The end points half of <see cref="ReportOn" />.</summary>
-    private TransferResult WithEndPoints(TransferResult result)
+    internal TransferResult ReportOn(TransferResult result)
     {
-        if (!connectionRecorded)
-        {
-            return result;
-        }
-
-        TransferReport report = result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
-        if (report.LocalEndPoint is not null || report.RemoteEndPoint is not null || report.UnixSocketRemoteIp is not null)
-        {
-            return result;
-        }
-
-        return result with
-        {
-            Report = report with { LocalEndPoint = localEndPoint, RemoteEndPoint = remoteEndPoint, UnixSocketRemoteIp = unixSocketRemoteIp },
-        };
-    }
-
-    /// <summary>
-    /// Returns the text curl 8.21.0 prints as <c>%{remote_ip}</c> for a connection through
-    /// <paramref name="unixSocket" />: <see cref="UnixSocketAddress.RemoteIpText" />.
-    /// </summary>
-    /// <param name="unixSocket">The socket the connection went through.</param>
-    /// <returns>The path cut to 45 characters, or empty for an abstract name.</returns>
-    private static string RemoteIpOf(UnixDomainSocketEndPoint unixSocket)
-    {
-        var isAbstract = unixSocket.Serialize()[UnixSocketPathOffset] == 0;
-        return new UnixSocketAddress(unixSocket.ToString(), isAbstract).RemoteIpText;
+        RememberResponseCode(result);
+        return WithEarlierHop(WithEndPoints(WithConnectFailure(result)));
     }
 }

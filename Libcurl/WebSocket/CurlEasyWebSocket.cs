@@ -1,5 +1,6 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
+using Curl.Api.Options.Network;
 using Libcurl.Easy;
 
 namespace Libcurl.WebSocket;
@@ -80,11 +81,14 @@ public static class CurlEasyWebSocket
 
     /// <summary>
     /// <c>curl_ws_meta</c>: the frame being delivered to the write callback, or <see langword="null"/> outside
-    /// the callback and for a <see langword="null"/> or cleaned-up handle, as libcurl returns <c>NULL</c>.
+    /// the callback and for a <see langword="null"/> or cleaned-up handle, as libcurl returns <c>NULL</c>. A
+    /// connect-only handle never runs a write callback (its data comes from <see cref="WebSocketRecv"/>), so it
+    /// always answers <see langword="null"/>, whatever the last receive returned.
     /// </summary>
     /// <param name="easy">The handle whose write callback is running.</param>
     /// <returns>The engine's current frame, or <see langword="null"/>.</returns>
-    public static CurlWebSocketFrame? WebSocketMeta(this CurlEasy? easy) => LiveWebSocket(easy)?.CurrentFrame;
+    public static CurlWebSocketFrame? WebSocketMeta(this CurlEasy? easy) =>
+        easy is { IsCleanedUp: false } && easy.Options.Network.ConnectOnly != ConnectOnly.Disabled ? null : LiveWebSocket(easy)?.CurrentFrame;
 
     /// <summary>
     /// <c>curl_ws_start_frame</c>: from inside a read callback, starts a frame whose payload the callback then

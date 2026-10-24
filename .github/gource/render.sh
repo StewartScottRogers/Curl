@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Renders Curl's history across every branch, once, at 3840x2160 (4K), into the directory
-# given. There is no 8K rendering (Stewart, 2026-10-01): 4K is the top quality.
+# given. There is no 8K rendering (Stewart, 2026-10-01): 4K is the top quality, and it
+# is AV1 only. The log it draws leaves out archived tasks (Tasks/Done/<timestamp>/, see
+# make-log.cs).
 #
-#   hls/av1/master.m3u8    adaptive stream in AV1 at 4K and 1080p, for browsers that
+#   hls/av1/master.m3u8    adaptive stream in AV1 at 2160p and 1080p, for browsers that
 #                          decode AV1 - what the viewer page plays wherever it can
-#   hls/h264/master.m3u8   the same in H.264 at 4K and 1080p, for browsers that do not
+#   hls/h264/master.m3u8   H.264 at 1080p only, for browsers that do not decode AV1 (the
+#                          4K H.264 rung was dropped on 2026-10-23 to keep the site small)
 #   hls/<codec>/<height>p/ each quality as 2-second fragmented-MP4 segments, each far under
 #                          GitHub's 100 MB file limit (the workflow checks every file)
-#   gource.mp4             the 4K H.264 quality as one file, for download: remuxed when it
-#                          fits in 85 MiB, otherwise re-encoded (two-pass) to land there
+#   gource.mp4             the 1080p H.264 quality as one file, for download: remuxed, not
+#                          re-encoded; the script fails if it is over 85 MiB
 #   gource.gif             the widest GIF under GitHub's 10 MB inline limit, for the README
 #   still-4k.jpg           the final frame at full 4K, for download
 #   poster.jpg             the final frame at 1920 px, shown before the video plays
@@ -30,7 +33,7 @@ cs() { dotnet run --file "$here/$1.cs" -- "${@:2}"; }
 work="$out/.work"
 rm -rf "$work"
 mkdir -p "$work/hls/av1/2160p" "$work/hls/av1/1080p" \
-    "$work/hls/h264/2160p" "$work/hls/h264/1080p"
+    "$work/hls/h264/1080p"
 
 width=3840
 height=2160
@@ -109,13 +112,11 @@ echo "rendering ${width}x${height} at ${fps} fps: $days day(s) at ${spd}s/day, $
     --font-size 18 --font-scale "$scale" --dir-colour 8AB4F8 --highlight-colour FFFFFF \
     --output-framerate "$fps" --output-ppm-stream - \
   | ffmpeg -y -loglevel error -r "$fps" -f image2pipe -vcodec ppm -i - \
-      -filter_complex "[0:v]split=4[a4][h4][s2][s1];[s2]scale=1920:1080:flags=lanczos,split[a2][h2];[s1]fps=1[still]" \
+      -filter_complex "[0:v]split=3[a4][s2][s1];[s2]scale=1920:1080:flags=lanczos,split[a2][h2];[s1]fps=1[still]" \
       -map "[a4]" "${av1[@]}" -crf "$av1_crf_4k" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/2160p/seg_%03d.m4s" "$d/av1/2160p/index.m3u8" \
       -map "[a2]" "${av1[@]}" -crf "$av1_crf_1080" "${av1_common[@]}" "${hls[@]}" \
           -hls_segment_filename "$d/av1/1080p/seg_%03d.m4s" "$d/av1/1080p/index.m3u8" \
-      -map "[h4]" "${x264[@]}" -crf 18 -maxrate 14M -bufsize 28M -level 5.1 "${hls[@]}" \
-          -hls_segment_filename "$d/h264/2160p/seg_%03d.m4s" "$d/h264/2160p/index.m3u8" \
       -map "[h2]" "${x264[@]}" -crf 18 -maxrate 6M -bufsize 12M -level 4.1 "${hls[@]}" \
           -hls_segment_filename "$d/h264/1080p/seg_%03d.m4s" "$d/h264/1080p/index.m3u8" \
       -map "[still]" -update 1 -q:v 2 "$work/still-4k.jpg"
@@ -124,36 +125,17 @@ for ladder in av1 h264; do
     cs make-master-playlist "$d/$ladder" > "$d/$ladder/master.m3u8"
 done
 
-# A fragmented MP4 is its init segment followed by its media segments; the 4K H.264 one
-# becomes the plain, seekable gource.mp4 for download, and the 1080p one the GIF's source.
-# gource.mp4 is one file, so it alone must fit GitHub's 100 MB file limit (the 4K ladder
-# reached 117 MB on 2026-09-30 and every push was refused). It is remuxed as it is when it
-# fits in mp4_limit; otherwise it is re-encoded in two passes at the bitrate that lands it
-# there, measured from the duration, and the bitrate lowered by a tenth until it fits.
+# A fragmented MP4 is its init segment followed by its media segments; the 1080p H.264 one
+# becomes the plain, seekable gource.mp4 for download (remuxed, no second encode) and the
+# GIF's source. gource.mp4 is one file, so it alone must fit GitHub's 100 MB file limit; at
+# the 6 Mbit/s cap above, a video of this length stays far under mp4_limit.
 mp4_limit=$(( 85 * 1024 * 1024 ))
-cat "$d/h264/2160p/init.mp4" "$d/h264/2160p"/seg_*.m4s > "$work/2160p.frag.mp4"
-ffmpeg -y -loglevel error -i "$work/2160p.frag.mp4" -c copy -movflags +faststart "$work/gource.mp4"
-if [ "$(wc -c < "$work/gource.mp4")" -gt "$mp4_limit" ]; then
-    duration=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$work/2160p.frag.mp4")
-    # 97% of the budget for the video stream, the rest for the container.
-    kbps=$(awk -v b="$mp4_limit" -v t="$duration" 'BEGIN { printf "%d", b * 8 * 0.97 / t / 1000 }')
-    for attempt in 1 2 3; do
-        echo "gource.mp4: remux is $(wc -c < "$work/gource.mp4") bytes, over $mp4_limit; two-pass at ${kbps} kbit/s over ${duration}s"
-        x264_mp4=("${x264[@]}" -b:v "${kbps}k" -maxrate $(( kbps * 2 ))k -bufsize $(( kbps * 4 ))k
-                  -level 5.1 -passlogfile "$work/x264")
-        ffmpeg -y -loglevel error -i "$work/2160p.frag.mp4" "${x264_mp4[@]}" -pass 1 -an -f null -
-        ffmpeg -y -loglevel error -i "$work/2160p.frag.mp4" "${x264_mp4[@]}" -pass 2 -an \
-            -movflags +faststart "$work/gource.mp4"
-        if [ "$(wc -c < "$work/gource.mp4")" -le "$mp4_limit" ]; then break; fi
-        kbps=$(( kbps * 9 / 10 ))
-    done
-    rm -f "$work"/x264*.log "$work"/x264*.log.mbtree
-    if [ "$(wc -c < "$work/gource.mp4")" -gt "$mp4_limit" ]; then
-        echo "gource.mp4 is still $(wc -c < "$work/gource.mp4") bytes after three encodes, over $mp4_limit" >&2
-        exit 1
-    fi
-fi
 cat "$d/h264/1080p/init.mp4" "$d/h264/1080p"/seg_*.m4s > "$work/1080p.frag.mp4"
+ffmpeg -y -loglevel error -i "$work/1080p.frag.mp4" -c copy -movflags +faststart "$work/gource.mp4"
+if [ "$(wc -c < "$work/gource.mp4")" -gt "$mp4_limit" ]; then
+    echo "gource.mp4 is $(wc -c < "$work/gource.mp4") bytes, over $mp4_limit; lower the 1080p H.264 -maxrate" >&2
+    exit 1
+fi
 ffmpeg -y -loglevel error -i "$work/still-4k.jpg" -vf scale=1920:-2:flags=lanczos -q:v 3 "$work/poster.jpg"
 
 # GitHub only plays a GIF inline, and shows nothing over 10 MB: the largest that fits.

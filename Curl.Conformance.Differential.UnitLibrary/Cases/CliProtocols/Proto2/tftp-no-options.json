@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"tftp-no-options","command":"-s --tftp-no-options tftp://127.0.0.1:18460/file.txt","files":{"up.txt":"tftp upload data\n"}}
+  ]
+}

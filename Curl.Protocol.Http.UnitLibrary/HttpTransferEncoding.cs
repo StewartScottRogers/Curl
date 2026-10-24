@@ -17,7 +17,8 @@ namespace Curl.Protocol.Http;
 /// or <c>identity</c> anywhere else, a later header included, is exit 61
 /// <c>Unsolicited Transfer-Encoding (X) found</c>. curl reads headers
 /// in order, so an invalid Content-Length before a rejected Transfer-Encoding is reported
-/// instead of it.
+/// instead of it. Every exit 61 message here is also a <c>-v</c> line, as curl's <c>failf</c>
+/// writes it.
 /// </remarks>
 internal static class HttpTransferEncoding
 {
@@ -228,6 +229,10 @@ internal static class HttpTransferEncoding
     private static bool Is(string coding, string name) =>
         string.Equals(coding, name, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The exit 61 failure for a refused Transfer-Encoding, which curl 8.22.0's <c>failf</c> also
+    /// writes as a <c>-v</c> line (measured, BL-3283 Notes).
+    /// </summary>
     private static HttpTransferException Rejected(string message) =>
-        new(CurlExitCode.BadContentEncoding, message);
+        new(CurlExitCode.BadContentEncoding, message) { InfoLines = [message] };
 }

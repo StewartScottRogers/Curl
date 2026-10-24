@@ -108,6 +108,18 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task Info_TwoDifferentContentLengths_IsWeirdServerReplyWithNoLength()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\nxy")]);
+        await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/x" } };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual((CurlCode.WeirdServerReply, -1L), (code, easy.Info.ContentLengthDownload));
+    }
+
+    [TestMethod]
     public async Task Info_ReadFromTheHeaderCallbackAtTheEndOfTheHead_HoldsTheResponseCodeAndContentLength()
     {
         ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);

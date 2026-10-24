@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-http-proxy-basic","command":"-s -x http://127.0.0.1:18300 --proxy-basic -U u:p http://example.test/x"}
+  ]
+}

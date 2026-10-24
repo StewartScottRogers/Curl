@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-output-O","command":"-s -O ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

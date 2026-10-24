@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-account","command":"-s --ftp-account acct ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

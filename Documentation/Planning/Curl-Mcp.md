@@ -13,9 +13,11 @@ the seam it stands on: [ADR-0506](Decisions/ADR-0506-libcurl-and-curl-api-over-o
 
 A fourth front end over the one transfer engine, beside `Curl.Console`, `Libcurl` and
 `Curl.Api`: an MCP server over stdio that AI agents (GitHub Copilot in VS Code and Visual
-Studio, Claude, any MCP client) use as a tool. It is built on Microsoft's C# MCP SDK
-(`ModelContextProtocol` 2.2.0 and `Microsoft.Extensions.Hosting` 10.0.x, both approved by
-Stewart on 2026-10-15 and referenced by `Curl.Mcp` only) and packed the way Microsoft
+Studio, Claude, any MCP client) use as a tool. It is hand-written on the base class
+library: the protocol core is `Curl.Mcp.Protocol.UnitLibrary`, the tool adapters are in
+`Curl.Mcp/Tools/` and the stdio host is `McpStdioHost` (ADR-0799, ADR-0805; it began on
+Microsoft's `ModelContextProtocol` and `Microsoft.Extensions.Hosting` packages, ADR-0548).
+It is packed the way Microsoft
 documents it (<https://learn.microsoft.com/dotnet/ai/quickstarts/build-mcp-server>): a NuGet
 package of `PackageType` `McpServer` that `dnx Curl.Mcp` runs.
 

@@ -22,6 +22,27 @@ public sealed class ParallelRunTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
+    public async Task Queue_WaitingForARunningTransfer_StartsTheTransfersTheHostQueueFreed()
+    {
+        Diagnostics.Arrange("run", "--parallel-max 1, --parallel-max-host 1; /2 waits for the host and /1 leaves it");
+        ParallelRun run = new(1, 1, false);
+        await run.Hosts.WaitForHostAsync("http://h/1", CancellationToken.None);
+        Task second = run.Hosts.WaitForHostAsync("http://h/2", CancellationToken.None);
+        run.Hosts.Leave("http://h/1");
+        TaskCompletionSource running = new();
+        run.Queue.Add(running.Task);
+
+        Task slot = run.Queue.WaitForFreeSlotAsync();
+        bool started = second.IsCompleted;
+        Diagnostics.Act("second started by the wait", started);
+        running.SetResult();
+        await slot;
+
+        Diagnostics.Assert("second started by the wait", true, started);
+        Assert.IsTrue(started);
+    }
+
+    [TestMethod]
     public async Task WaitForFreeSlotAsync_NoSlotFreeWithAMeter_DrawsTheMeterBeforeWaiting()
     {
         Diagnostics.Arrange("run", "--parallel-max 1 with a progress meter, one transfer running");

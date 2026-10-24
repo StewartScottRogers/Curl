@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-quote-post","command":"-s -Q '+SITE post' ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

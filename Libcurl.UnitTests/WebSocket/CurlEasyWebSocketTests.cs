@@ -1,6 +1,7 @@
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Options;
+using Curl.Api.Options.Network;
 using Libcurl.Easy;
 using Libcurl.Options;
 using Libcurl.WebSocket;
@@ -121,6 +122,22 @@ public sealed class CurlEasyWebSocketTests
         webSocket.CurrentFrame = TextFrame;
 
         Assert.AreEqual(TextFrame, easy.WebSocketMeta());
+    }
+
+    [TestMethod]
+    public void WebSocketMeta_ConnectOnlyHandleAfterAReceive_AnswersNull()
+    {
+        var transfer = new FakeWebSocketTransfer
+        {
+            Options = new EasyOptions { Network = new EasyNetworkOptions { ConnectOnly = ConnectOnly.WebSocket } },
+        };
+        var easy = new CurlEasy(transfer, new EasyOptionDispatch(new Dictionary<CurlOption, EasyOptionSetter>()));
+        var webSocket = transfer.FakeWebSocket;
+        webSocket.ReceiveResult = new CurlWebSocketReceiveResult(CurlCode.Ok, 1, TextFrame);
+        webSocket.CurrentFrame = TextFrame;
+
+        Assert.AreEqual(CurlCode.Ok, easy.WebSocketRecv(new byte[4], out _, out _));
+        Assert.IsNull(easy.WebSocketMeta());
     }
 
     [TestMethod]

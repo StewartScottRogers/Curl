@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-proxy-redirect","command":"-sL -x http://127.0.0.1:18300 http://example.test/x"}
+  ]
+}

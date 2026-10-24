@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-login-bad","command":"-sS imap://127.0.0.1:18230/INBOX;UID=9","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

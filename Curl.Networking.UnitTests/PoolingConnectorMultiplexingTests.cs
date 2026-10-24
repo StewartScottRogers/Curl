@@ -290,25 +290,25 @@ public sealed class PoolingConnectorMultiplexingTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_WaitingForATlsConnectionThatAgreedHttp11_OpensItsOwnOnceItConnects()
+    public async Task ConnectAsync_WaitingForATlsConnectionThatAgreedHttp11_ReusesItOnceItIsReturned()
     {
         await using var pool = CreatePool(waits: true);
         _inner.ApplicationProtocol = "http/1.1";
-        var gate = _inner.GateNext();
-        var opening = pool.ConnectAsync(Target(useTls: true), CancellationToken.None).AsTask();
+        var first = await pool.ConnectAsync(Target(useTls: true), CancellationToken.None);
         var waiting = pool.ConnectAsync(Target(useTls: true), CancellationToken.None).AsTask();
 
-        gate.SetResult();
-        _ = await opening;
+        Diagnostics.Arrange("agreed protocol", "http/1.1");
+        Diagnostics.Act("waiting completed before return", waiting.IsCompleted);
+        Diagnostics.Assert("waiting completed before return", false, waiting.IsCompleted);
+        Assert.IsFalse(waiting.IsCompleted);
+        first.Connection!.MarkReusable();
+        await first.Connection.DisposeAsync();
         var second = await waiting;
 
-        Diagnostics.Arrange("agreed protocol", "http/1.1");
-        Diagnostics.Act("connections opened", _inner.Opened.Count);
-        Diagnostics.Assert("second is reused", false, second.IsReused);
-        Assert.IsFalse(second.IsReused);
-        Assert.HasCount(2, _inner.Opened);
+        Diagnostics.Assert("second is reused", true, second.IsReused);
+        Assert.IsTrue(second.IsReused);
+        Assert.HasCount(1, _inner.Opened);
     }
-
     [TestMethod]
     public async Task ConnectAsync_ForANewConnectionThatAgreedH2_GivesTheAgreedProtocol()
     {

@@ -231,16 +231,18 @@ internal sealed partial class ManagedEasyTransfer
     /// <param name="toolEvents">The runner's events and state, or <see langword="null" /> for a handle's own.</param>
     /// <param name="options">The handle's options.</param>
     /// <returns>The state and the events.</returns>
-    private (EngineTransferState State, ITransferEvents Events, TlsVerifyResultRecordingTransferEvents? Recorder) StateAndEventsOf(EngineToolTransferEvents? toolEvents, EasyOptions options)
+    private (EngineTransferState State, ITransferEvents Events, TlsVerifyResultRecordingTransferEvents? Recorder, NegotiateFailureRecordingTransferEvents? NegotiateFailure, AbortedHeadRecordingTransferEvents? AbortedHead) StateAndEventsOf(EngineToolTransferEvents? toolEvents, EasyOptions options)
     {
         if (toolEvents is not null)
         {
-            return (toolEvents.State, toolEvents.Events, null);
+            return (toolEvents.State, toolEvents.Events, null, null, null);
         }
 
         EngineTransferState state = new();
-        TlsVerifyResultRecordingTransferEvents recorder = new(EventsOf(options, state));
-        return (state, recorder, recorder);
+        AbortedHeadRecordingTransferEvents abortedHead = new(EventsOf(options, state));
+        NegotiateFailureRecordingTransferEvents negotiateFailure = new(abortedHead);
+        TlsVerifyResultRecordingTransferEvents recorder = new(negotiateFailure);
+        return (state, recorder, recorder, negotiateFailure, abortedHead);
     }
 
     /// <summary>

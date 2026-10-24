@@ -47,13 +47,13 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     internal bool ReportsAbortedReadAsReset { get; init; } = OperatingSystem.IsWindows();
 
     /// <summary>
-    /// Gets the check run before each write: whether the peer had already sent bytes the stream has
-    /// not read yet. Production asks the socket under a <see cref="NetworkStream" />; tests set it
-    /// (ADR-0708, BL-2821).
+    /// Gets the check run before each write: whether the peer had already sent bytes, or its FIN,
+    /// that the stream has not read yet. Production asks the socket under a
+    /// <see cref="NetworkStream" />; tests set it (ADR-0708, BL-2821, BL-3304).
     /// </summary>
-    internal Func<Stream, bool> HasUnreadBytesBeforeWrite { get; init; } = HasSocketUnderUnreadBytes;
+    internal Func<Stream, bool> HasUnreadBytesOrEndBeforeWrite { get; init; } = HasSocketUnderUnreadBytesOrEnd;
 
-    private bool _hadUnreadBytesAtLastWrite;
+    private bool _hadUnreadBytesOrEndAtLastWrite;
 
     /// <inheritdoc />
     /// <remarks>
@@ -67,16 +67,36 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
         stream is NetworkStream network && network.Socket.Poll(0, SelectMode.SelectRead) && network.Socket.Available == 0;
 
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
-    private static bool HasSocketUnderUnreadBytes(Stream stream) =>
-        stream is NetworkStream network && network.Socket.Available > 0;
+    private static bool HasSocketUnderUnreadBytesOrEnd(Stream stream) =>
+        stream is NetworkStream network && (network.Socket.Available > 0 || HasUnreadEnd(network.Socket));
+
+    /// <summary>
+    /// Peeks one byte from a readable socket with nothing to read: zero means the peer's FIN; a
+    /// reset fails the peek and is not an end (ADR-0419 keeps rewording it).
+    /// </summary>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
+    private static bool HasUnreadEnd(Socket socket)
+    {
+        try
+        {
+            return socket.Poll(0, SelectMode.SelectRead) && socket.Receive(new byte[1], SocketFlags.Peek) == 0;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+    }
 
     /// <inheritdoc />
     /// <remarks>
     /// The aborted-to-reset rewrite (<see cref="ReportsAbortedReadAsReset" />) applies only when the
-    /// last write found no unread bytes: a peer that resets in answer to the request, or right after
-    /// accepting (ADR-0419). A peer whose bytes were still unread at the write, as a proxy leaving
-    /// bytes after its CONNECT reply and closing the tunnel (upstream test1802), keeps the abort, as
-    /// curl's Schannel build prints it (ADR-0708).
+    /// last write found no unread bytes and no unread FIN: a peer that resets in answer to the
+    /// request, or right after accepting (ADR-0419). A peer whose bytes were still unread at the
+    /// write, as a proxy leaving bytes after its CONNECT reply and closing the tunnel (upstream
+    /// test1802), keeps the abort, as curl's Schannel build prints it (ADR-0708); so does a peer
+    /// whose FIN was unread at the write, as a server that closed a kept connection curl then reuses
+    /// (BL-3304, ADR-0796): Windows answers the reset of a connection it had a FIN on with
+    /// WSAECONNABORTED however soon the receive runs.
     /// </remarks>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
@@ -84,7 +104,7 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
         {
             return await _stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
-        catch (IOException failure) when (ReportsAbortedReadAsReset && !_hadUnreadBytesAtLastWrite && IsConnectionAborted(failure))
+        catch (IOException failure) when (ReportsAbortedReadAsReset && !_hadUnreadBytesOrEndAtLastWrite && IsConnectionAborted(failure))
         {
             throw new IOException(failure.Message, new SocketException((int)SocketError.ConnectionReset));
         }
@@ -96,7 +116,7 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// <inheritdoc />
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        _hadUnreadBytesAtLastWrite = HasUnreadBytesBeforeWrite(_stream);
+        _hadUnreadBytesOrEndAtLastWrite = HasUnreadBytesOrEndBeforeWrite(_stream);
         return _stream.WriteAsync(buffer, cancellationToken);
     }
 

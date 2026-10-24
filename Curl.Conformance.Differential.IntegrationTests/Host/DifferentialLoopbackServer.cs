@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using Curl.Conformance.Differential.Http.Core;
@@ -15,8 +16,10 @@ internal sealed class DifferentialLoopbackServer : IAsyncDisposable
     private readonly CancellationTokenSource _stopping = new();
     private readonly Task _accepting;
     private readonly Task _acceptingControl;
+    private readonly ConcurrentDictionary<Task, bool> _inFlight = new();
+    private readonly ConcurrentQueue<Exception> _faults = new();
 
-    private DifferentialLoopbackServer(int port)
+    private DifferentialLoopbackServer(int port, Func<Stream, CancellationToken, Task>? routesResponder)
     {
         Port = port;
         var state = new DifferentialResponderState();
@@ -26,7 +29,7 @@ internal sealed class DifferentialLoopbackServer : IAsyncDisposable
         _controlListener = new TcpListener(IPAddress.Loopback, port + 1);
         _listener.Start();
         _controlListener.Start();
-        _accepting = AcceptAsync(_listener, responder.RespondAsync, _stopping.Token);
+        _accepting = AcceptAsync(_listener, routesResponder ?? responder.RespondAsync, _stopping.Token);
         _acceptingControl = AcceptAsync(_controlListener, control.RespondAsync, _stopping.Token);
     }
 
@@ -40,7 +43,20 @@ internal sealed class DifferentialLoopbackServer : IAsyncDisposable
     public string BaseUrl => $"http://127.0.0.1:{Port}";
 
     /// <summary>Starts serving on <paramref name="port"/> and <paramref name="port"/> + 1.</summary>
-    public static DifferentialLoopbackServer Start(int port) => new(port);
+    public static DifferentialLoopbackServer Start(int port) => new(port, null);
+
+    /// <summary>Starts serving on <paramref name="port"/> with <paramref name="routesResponder"/> in place of the routes, so a test can make the responder fail.</summary>
+    public static DifferentialLoopbackServer StartWithResponder(int port, Func<Stream, CancellationToken, Task> routesResponder) =>
+        new(port, routesResponder);
+
+    /// <summary>Throws when the accept loop or a responder failed in any way other than a client hanging up.</summary>
+    public void ThrowIfFaulted()
+    {
+        if (!_faults.IsEmpty)
+        {
+            throw new AggregateException("The loopback server failed, so a case result cannot be trusted.", _faults);
+        }
+    }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
@@ -49,10 +65,12 @@ internal sealed class DifferentialLoopbackServer : IAsyncDisposable
         _listener.Stop();
         _controlListener.Stop();
         await Task.WhenAll(_accepting, _acceptingControl);
+        await Task.WhenAll(_inFlight.Keys);
         _stopping.Dispose();
+        ThrowIfFaulted();
     }
 
-    private static async Task AcceptAsync(TcpListener listener, Func<Stream, CancellationToken, Task> respond, CancellationToken cancellationToken)
+    private async Task AcceptAsync(TcpListener listener, Func<Stream, CancellationToken, Task> respond, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -61,16 +79,23 @@ internal sealed class DifferentialLoopbackServer : IAsyncDisposable
             {
                 client = await listener.AcceptTcpClientAsync(cancellationToken);
             }
-            catch (Exception exception) when (exception is OperationCanceledException or SocketException or ObjectDisposedException)
+            catch (Exception exception)
             {
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _faults.Enqueue(exception);
+                }
+
                 return;
             }
 
-            _ = ServeAsync(client, respond, cancellationToken);
+            var serving = ServeAsync(client, respond, cancellationToken);
+            _inFlight[serving] = true;
+            _ = serving.ContinueWith(finished => _inFlight.TryRemove(finished, out _), TaskScheduler.Default);
         }
     }
 
-    private static async Task ServeAsync(TcpClient client, Func<Stream, CancellationToken, Task> respond, CancellationToken cancellationToken)
+    private async Task ServeAsync(TcpClient client, Func<Stream, CancellationToken, Task> respond, CancellationToken cancellationToken)
     {
         using (client)
         {
@@ -82,6 +107,10 @@ internal sealed class DifferentialLoopbackServer : IAsyncDisposable
             catch (Exception exception) when (exception is IOException or OperationCanceledException or SocketException or ObjectDisposedException)
             {
                 // A client that hangs up mid-response ends only its own connection.
+            }
+            catch (Exception exception)
+            {
+                _faults.Enqueue(exception);
             }
         }
     }

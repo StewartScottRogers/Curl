@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-time-cond","command":"-s -z 'Jan 1 2030' ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

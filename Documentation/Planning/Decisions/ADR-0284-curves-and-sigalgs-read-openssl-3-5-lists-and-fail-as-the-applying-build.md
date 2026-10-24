@@ -1,6 +1,6 @@
 # ADR-0284 — `--curves` and `--sigalgs` read OpenSSL 3.5's lists on every platform and fail as the build that applies them
 
-- **Status:** Accepted
+- **Status:** Accepted; the Schannel build's `--curves` and `--sigalgs` part superseded by [ADR-0793](ADR-0793-the-schannel-build-ignores-curves-and-sigalgs.md)
 - **Date:** 2026-09-30
 
 Decided by Claude under Stewart's delegation (root `CLAUDE.md`, "Decisions"), in BL-709.
