@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp/McpStdioHost.cs, Curl.Mcp.Protocol.UnitLibrary/Server/McpServer.cs, Curl.Mcp.UnitTests, Curl.Mcp.Protocol.UnitTests]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3434 — Make Curl.Mcp stop at once on a stop signal while its stdin read is blocked
 
@@ -31,14 +31,17 @@ Suggested fix: in `RunAsync`, stop waiting on the read once the token fires, e.g
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Mcp.Protocol.UnitTests` runs `McpServer.RunAsync` over an input stream whose `ReadAsync` ignores its cancellation token and blocks. It shows `RunAsync` completes promptly after the token is cancelled, with no request in flight.
-- [ ] A unit test in `Curl.Mcp.UnitTests` shows `McpStdioHost.RunAsync` returns 0 and logs "Curl.Mcp stopped." after `StopOnSignal` over such a stream, under a fake `TimeProvider`, without advancing time by `ShutdownTimeout`.
-- [ ] A request still in flight at the stop signal still gets up to `ShutdownTimeout` to finish, and an existing test shows it.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Curl.Mcp` and `Curl.Mcp.Protocol.UnitLibrary` stay at 100% line and branch coverage.
+- [x] A unit test in `Curl.Mcp.Protocol.UnitTests` runs `McpServer.RunAsync` over an input stream whose `ReadAsync` ignores its cancellation token and blocks. It shows `RunAsync` completes promptly after the token is cancelled, with no request in flight.
+- [x] A unit test in `Curl.Mcp.UnitTests` shows `McpStdioHost.RunAsync` returns 0 and logs "Curl.Mcp stopped." after `StopOnSignal` over such a stream, under a fake `TimeProvider`, without advancing time by `ShutdownTimeout`.
+- [x] A request still in flight at the stop signal still gets up to `ShutdownTimeout` to finish, and an existing test shows it.
+- [x] `dotnet build` is clean, the fast tests pass, and `Curl.Mcp` and `Curl.Mcp.Protocol.UnitLibrary` stay at 100% line and branch coverage.
 
 ## Notes
+
+- Fix: `McpServer.RunAsync` waits on the read with `WaitAsync(cancellationToken)`; an abandoned read is not awaited again. `running` is locked because the abandoned reader may still add to it. Criterion 3 is shown by the existing `RunAsync_RequestOutlivesTheShutdownTimeout_LogsItAndReturnsOne`. Quality run: 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: dc65d3b5 9b1f4cfc 850a5a7c a43672c6.
+- 2026-10-23: Doing -> Done. Stop signal ends McpServer.RunAsync despite a blocked token-ignoring read

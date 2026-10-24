@@ -44,7 +44,7 @@ public sealed class McpServer
 
     /// <summary>
     /// Reads and answers messages until the transport ends or <paramref name="cancellationToken" /> is
-    /// cancelled, then cancels the requests still in flight and returns once they have finished.
+    /// cancelled, then cancels the requests still in flight and returns once they have finished; a read blocked past the cancellation is abandoned.
     /// </summary>
     /// <param name="cancellationToken">The host's token; cancelling it ends the loop and every request.</param>
     /// <returns>A task that completes when the loop and every request it started have ended; it rethrows a failure of the transport's read once they have.</returns>
@@ -52,10 +52,24 @@ public sealed class McpServer
     {
         List<Task> running = [];
         Task reading = ReadMessagesAsync(running, cancellationToken);
-        await reading.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await reading.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         _tracker.CancelAll();
-        await Task.WhenAll(running).ConfigureAwait(false);
-        await reading.ConfigureAwait(false);
+        await Task.WhenAll(SnapshotOf(running)).ConfigureAwait(false);
+        if (reading.IsCompleted)
+        {
+            await reading.ConfigureAwait(false);
+        }
+
+        // Otherwise the host cancelled while a read that ignores its token was blocked: that read is
+        // abandoned and dies with the process.
+    }
+
+    private static Task[] SnapshotOf(List<Task> running)
+    {
+        lock (running)
+        {
+            return [.. running];
+        }
     }
 
     private async Task ReadMessagesAsync(List<Task> running, CancellationToken cancellationToken)
@@ -64,8 +78,12 @@ public sealed class McpServer
         {
             while (await _transport.ReadMessageAsync(cancellationToken).ConfigureAwait(false) is { } message)
             {
-                running.RemoveAll(task => task.IsCompleted);
-                running.Add(DispatchAsync(message, cancellationToken));
+                Task dispatched = DispatchAsync(message, cancellationToken);
+                lock (running)
+                {
+                    running.RemoveAll(task => task.IsCompleted);
+                    running.Add(dispatched);
+                }
             }
         }
         catch (OperationCanceledException)

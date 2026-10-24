@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Curl.Mcp.Protocol.JsonRpc;
+using Curl.Mcp.Protocol.Transport;
 
 namespace Curl.Mcp.Protocol.Server;
 
@@ -281,4 +282,34 @@ public sealed class McpServerTests
 
         Assert.IsEmpty(transport.RemainingResponses());
     }
-}
+
+    [TestMethod]
+    public async Task RunAsync_HostCancelsWhileReadIgnoresItsToken_CompletesPromptly()
+    {
+        using CancellationTokenSource host = new();
+        TokenIgnoringTransport transport = new();
+        Task run = new McpServer(transport, ServerInfo, []).RunAsync(host.Token);
+
+        await transport.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await host.CancelAsync();
+        await run.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.IsFalse(transport.ReadFinished.Task.IsCompleted);
+    }
+
+    // A transport whose read blocks and never looks at its token, as the console's standard input does.
+    private sealed class TokenIgnoringTransport : IMcpTransport
+    {
+        public TaskCompletionSource ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReadFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<JsonRpcIncoming?> ReadMessageAsync(CancellationToken cancellationToken)
+        {
+            ReadStarted.TrySetResult();
+            await ReadFinished.Task;
+            return null;
+        }
+
+        public ValueTask WriteMessageAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    }}

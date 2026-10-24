@@ -193,6 +193,26 @@ public sealed class McpStdioHostTests
     }
 
     [TestMethod]
+    public async Task RunAsync_StopSignalWhileReadIgnoresItsToken_ReturnsZeroWithoutWaitingTheShutdownTimeout()
+    {
+        TokenIgnoringInputStream input = new();
+        using MemoryStream output = new();
+        using StringWriter error = new();
+        RecordingSignals signals = new();
+        ManualTimeProvider time = new();
+        using McpStdioHost host = CreateHost(input, output, error, _ => null, time, signals, []);
+
+        Task<int> running = host.RunAsync(CancellationToken.None);
+        await input.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        signals.Handler!(new PosixSignalContext(PosixSignal.SIGTERM));
+        int exitCode = await running.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.AreEqual(0, exitCode);
+        StringAssert.EndsWith(error.ToString(), "Curl.Mcp stopped." + Environment.NewLine);
+        Assert.AreEqual(new DateTimeOffset(2026, 10, 23, 12, 0, 0, TimeSpan.Zero), time.GetUtcNow());
+    }
+
+    [TestMethod]
     public void RegisterProcessStopSignals_Disposed_UnregistersWithoutRaisingAnySignal()
     {
         int calls = 0;
@@ -281,6 +301,39 @@ public sealed class McpStdioHostTests
             byte[] chunk = await chunks.Reader.ReadAsync(cancellationToken);
             chunk.CopyTo(buffer);
             return chunk.Length;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Flush() => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    // An input whose read blocks and never looks at its token, as the console's standard input does.
+    private sealed class TokenIgnoringInputStream : Stream
+    {
+        public TaskCompletionSource ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            ReadStarted.TrySetResult();
+            await new TaskCompletionSource().Task;
+            return 0;
         }
 
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
