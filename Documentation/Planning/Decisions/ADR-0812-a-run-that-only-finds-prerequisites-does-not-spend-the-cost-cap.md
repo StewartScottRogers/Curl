@@ -1,4 +1,4 @@
-# ADR-0811 — A run that only finds prerequisites does not spend the cost cap
+# ADR-0812 — A run that only finds prerequisites does not spend the cost cap
 
 - **Status:** Accepted
 - **Date:** 2026-10-24

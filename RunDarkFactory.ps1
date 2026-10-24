@@ -66,7 +66,7 @@
     BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more),
     except a run that sent it back to Backlog waiting on a `depends-on` ID not yet Done with
     nothing to stash, which the shift waives with a .prerequisite-requeue.txt marker beside
-    its log (ADR-0811: AF-0387, AF-0404 to AF-0406). Once
+    its log (ADR-0812: AF-0387, AF-0404 to AF-0406). Once
     those runs leave less than $2 of the cap (AF-0326: a $1.02 claim of BL-2970 only requeued), a fresh claim is not run but
     goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed, and one bounded
