@@ -3,8 +3,8 @@ id: AF-0408
 title: CI red 41 minutes on work/dark-factory from run 40008612979 (three VerifyPeer_CaCertificateFileHoldingOnly* partial-chain tests)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:VerifyPeer_CaCertificateFileHoldingOnlyAnIntermediateInTheOpenSslBuild:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
