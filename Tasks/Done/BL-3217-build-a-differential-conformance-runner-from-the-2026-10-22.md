@@ -8,7 +8,7 @@ depends-on: [BL-3231, BL-3232, BL-3233, BL-3424, BL-3425, BL-3426, BL-3427, BL-3
 touches: [Curl.Conformance.Differential.UnitLibrary, Curl.Conformance.Differential.UnitTests, Curl.slnx]
 requirement: none
 created: 2026-10-22
-completed:
+completed: 2026-10-23
 ---
 # BL-3217 — Build a differential conformance runner from the 2026-10-22 tester's cases, in C#
 
@@ -24,10 +24,10 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 
 ## Acceptance criteria
 
-- [ ] The ADR exists and is in the index, naming where the runner runs and its exclusions.
-- [ ] The runner replays at least the CLI HTTP cases from `scen.json` against both binaries and writes a report in the tester's `### DIFF` shape; the remaining areas are either covered or filed as follow-up tasks.
-- [ ] New cases for WebSocket, `curl_formadd` and `Curl.Api` exist (or are filed as tasks with their scope).
-- [ ] No Python is committed; the projects build clean with -warnaserror and their fast tests pass; Measure-CodeQuality.ps1 0 failing members for any new UnitLibrary.
+- [x] The ADR exists and is in the index, naming where the runner runs and its exclusions.
+- [x] The runner replays at least the CLI HTTP cases from `scen.json` against both binaries and writes a report in the tester's `### DIFF` shape; the remaining areas are either covered or filed as follow-up tasks.
+- [x] New cases for WebSocket, `curl_formadd` and `Curl.Api` exist (or are filed as tasks with their scope).
+- [x] No Python is committed; the projects build clean with -warnaserror and their fast tests pass; Measure-CodeQuality.ps1 0 failing members for any new UnitLibrary.
 
 ## Notes
 
@@ -35,9 +35,12 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 - The second criterion says "CLI HTTP cases from scen.json", but scen.json holds the Libcurl scenarios; the CLI HTTP cases are in cases.py and cases_more.py. BL-3233 ports those, and BL-3236 replays scen.json, so the criterion is met as written once both are Done.
 - Once every subtask is Done, this task only verifies: tick the criteria against the subtasks' work and run the build, fast tests and quality gate.
 
+- 2026-10-23, lane 3: verified. ADR-0782 (on demand from Curl.Conformance.Differential.IntegrationTests, named ReferenceBuildLimitation exclusions) is in the index; BL-3231 to BL-3242 and BL-3424 to BL-3427 are Done (BL-3234 Deferred, replaced by BL-3424 to BL-3427), covering CLI HTTP, protocols, proxy, TLS, Libcurl scen/easy/multi/share/MIME/printf, WebSocket, curl_formadd and Curl.Api. No .py file is tracked. UnitTests and IntegrationTests build clean with -warnaserror; 619 fast tests pass; Measure-CodeQuality.ps1 -Library Curl.Conformance.Differential.UnitLibrary reports 0 failing members.
+
 ## Log
 
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 2ff5cb0a 5b38a42d 04d49e93 c1b5bc31.
 - 2026-10-22: Doing -> Backlog. Split for size: waits on BL-3231 to BL-3242 (ADR and runner core, HTTP routes, CLI HTTP/protocol/TLS replay, Libcurl scen/easy/multi/MIME replay, WebSocket, formadd and Curl.Api cases)
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 2ff5cb0a 5b38a42d 04d49e93 c1b5bc31.
+- 2026-10-23: Doing -> Done. Differential conformance runner verified: ADR-0782, every area replayed or covered by subtasks, build clean, 619 fast tests green, quality gate 0 failing
