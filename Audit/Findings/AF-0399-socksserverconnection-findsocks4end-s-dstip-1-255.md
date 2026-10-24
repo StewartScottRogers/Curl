@@ -3,8 +3,8 @@ id: AF-0399
 title: SocksServerConnection.FindSocks4End's DSTIP - 1 < 255 can become + 1 with no test failing, so the SOCKS4a stand-in misreads 0.0.0.0 and 0.0.0.254-255
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitLibrary/SocksServerConnection.cs:static-minus1:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/SocksServerConnection.cs:106:-1
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.

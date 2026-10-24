@@ -3,8 +3,8 @@ id: AF-0400
 title: With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues sets and checks eight options, not ten
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitTests/TlsClientOptionsTests.cs:With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/TlsClientOptionsTests.cs -Pattern 
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
