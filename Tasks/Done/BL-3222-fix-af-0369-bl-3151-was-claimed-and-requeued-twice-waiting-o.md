@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-24
 ---
 # BL-3222 — Fix AF-0369: BL-3151 was claimed and requeued twice waiting on a shift-end merge it could not cause; the second claim came from a shift started for it during that merge's CI wait
 
@@ -42,12 +42,14 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 Fix (2026-10-23): the poll during the shift-end merge's CI wait (BL-3142) now calls `Get-MergeWaitClaimableTaskId` (DarkFactory/ShiftCoordinator.ps1), which skips every task in the shift's `requeued.txt` (`Get-ShiftRequeued`). Lanes already record a requeue there, so a task that waited on this merge is not offered to the shift started beside it; the next shift tries it afresh. Tests: three cases in the -TestHeartbeat rehearsal (DarkFactory/LaneState.ps1); -TestHeartbeat and -TestTaskIds pass with no FAIL. Only PowerShell changed, so dotnet build and tests were not rerun. Live-log measurement not done: no shift has run since the fix, so criterion 1 stays open and the task waits in Backlog.
+
+Measurement (2026-10-24, interactive session): fix 8cdd75307, landed 2026-10-23 00:58:47 Arizona. Window: 2026-10-23 00:58 to 2026-10-24 08:40 Arizona, shifts 20261023-005934 through 20261024-062026 (10 shifts). `Measure-FactoryProcess.ps1 -Since 2026-10-23 -LogRoot Z:\repos\Curl.logs` with a fresh `gh run list` copy: no REQUEUE line in the window names the shift-end merge or master; the only "claimable during the merge's CI wait" line is 20261024-061031 06:20:26 for BL-3463, which was claimed once (L1 06:20:49) and Done at 06:21:58. Tasks claimed twice and requeued: BL-3234, BL-3315 and BL-3412, each requeued twice waiting on other tasks (dependencies), not on a merge; each is its own finding and task (AF-0406/BL-3453, AF-0405/BL-3452, AF-0404/BL-3451), so they are not this cause. Result: no task waiting on the shift-end merge was claimed again before it landed. `dotnet build` (0 errors) and the fast tests (no failures) pass on 3775626b6.
 
 ## Log
 
@@ -55,3 +57,4 @@ Fix (2026-10-23): the poll during the shift-end merge's CI wait (BL-3142) now ca
 - 2026-10-23: Backlog -> Doing. Interactive session claims AF-0369 fix Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-23: Doing -> Backlog. Fix landed; live-log measurement needs a shift run after it
 - 2026-10-24: Backlog -> Doing. Interactive session measures AF-0369 fix over live logs Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-24: Doing -> Done. No merge-wait re-claim in 10 shifts since fix 8cdd75307; build and fast tests pass
