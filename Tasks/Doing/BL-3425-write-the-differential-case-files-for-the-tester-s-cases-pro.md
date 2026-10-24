@@ -34,3 +34,4 @@ Reference: `Z:\repos\Curl.difftest\2026-10-22\cases_proto2.py` (Python is a refe
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 973eb9fe 57c655f4 1f9665bb 5e81fa96.
