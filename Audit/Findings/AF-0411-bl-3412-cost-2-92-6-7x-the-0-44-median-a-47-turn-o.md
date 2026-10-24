@@ -3,8 +3,8 @@ id: AF-0411
 title: BL-3412 cost $2.92 (6.7x the $0.44 median): a 47-turn Opus retry that ran out of cap after an earlier Opus run found an undeclared dependency
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-3412:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
