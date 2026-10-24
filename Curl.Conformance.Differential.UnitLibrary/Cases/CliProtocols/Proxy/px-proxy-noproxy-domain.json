@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-proxy-noproxy-domain","command":"-s -x http://127.0.0.1:18300 --noproxy .test http://example.test:18080/echo"}
+  ]
+}

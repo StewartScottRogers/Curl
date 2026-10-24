@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-http-proxy-anyauth","command":"-s -x http://127.0.0.1:18300 --proxy-anyauth -U u:p http://example.test/x"}
+  ]
+}

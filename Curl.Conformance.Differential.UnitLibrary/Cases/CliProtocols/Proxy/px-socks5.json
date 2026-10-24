@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-socks5","command":"-s --socks5 127.0.0.1:18300 {U}/echo"}
+  ]
+}

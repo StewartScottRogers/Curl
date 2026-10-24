@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-http-proxy-userinfo","command":"-s -x http://pu:pp@127.0.0.1:18300 http://example.test/x"}
+  ]
+}

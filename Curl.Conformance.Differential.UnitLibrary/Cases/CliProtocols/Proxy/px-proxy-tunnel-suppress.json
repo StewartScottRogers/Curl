@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"px-proxy-tunnel-suppress","command":"-si --suppress-connect-headers -p -x http://127.0.0.1:18300 {U}/echo"}
+  ]
+}
