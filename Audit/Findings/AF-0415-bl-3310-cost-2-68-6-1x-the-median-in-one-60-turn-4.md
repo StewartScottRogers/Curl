@@ -45,4 +45,5 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
-- 2026-10-24: proposed -> rejected.
+- 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> rejected.
