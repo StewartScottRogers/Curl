@@ -115,6 +115,24 @@ You are the dark factory's shift-end reviewer (ADR-0710). This checkout is detac
 5. Write the review summary (Critical, Important and Suggestions, each with the task ID filed for it) to {REPORT}. Its last line is exactly "FILED: <number of tasks filed>".
 '@
 
+function Invoke-ReviewDedupe {
+    # The review numbers its tasks from the board at the reviewed commit, which lanes have
+    # moved past: on 2026-10-23 it filed BL-3263 twelve minutes after a lane had, and two
+    # lanes then claimed the one ID (AF-0386, BL-3363). Once its commits sit on the fresh
+    # branch, every task the branch already had keeps its ID and the review's take the next
+    # free ones; the renumbering is committed for the push that follows.
+    param([string]$Dir, [string]$Branch)
+    $saved = $env:CLAUDE_PROJECT_DIR
+    try {
+        $env:CLAUDE_PROJECT_DIR = $Dir
+        $renumbered = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $Board dedupe -Since "origin/$Branch" 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -match '->' })
+    } finally { $env:CLAUDE_PROJECT_DIR = $saved }
+    if (-not $renumbered.Count) { return }
+    git -C $Dir add -A Tasks 2>&1 | Out-Null
+    git -C $Dir commit -q -m "chore(tasks): renumber the shift-end review's task IDs other tasks took first`n`n$($renumbered -join "`n")" -m $SkipCiNote 2>&1 | Out-Null
+    foreach ($line in $renumbered) { Write-Trace '-' 'renum' "review: $($line -replace '\s{2,}.*$', '')" 'DarkYellow' }
+}
+
 function Push-ReviewCommitsUnderLock {
     # Pushes the commits the review run made in its worktree, holding the integrate lock every
     # lane takes to push, so the push cannot land in the middle of a lane's verify and cost it
@@ -129,6 +147,7 @@ function Push-ReviewCommitsUnderLock {
             if ($LASTEXITCODE -ne 0) { continue }
             git -C $Dir rebase -q "origin/$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { git -C $Dir rebase --abort 2>&1 | Out-Null; return 'its commit would not rebase onto the branch' }
+            Invoke-ReviewDedupe -Dir $Dir -Branch $Branch
             git -C $Dir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) { return '' }
         }

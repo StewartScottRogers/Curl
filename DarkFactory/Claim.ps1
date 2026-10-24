@@ -327,10 +327,14 @@ function Invoke-Claim {
             # With the usage stop on, only a CI fix is claimed (AF-0308); any other task waits.
             if ($CiFixOnly -and -not (Test-CiFixTitle (Get-TaskTitle $id))) { return @{ None = $true } }
             $moved = (Invoke-Board @('move', '-Id', $id, '-To', 'Doing')) -join ' '
-            if ((Get-TaskState $id) -ne 'Doing') {
+            # A refusal over a shared ID is a refusal even when the task's twin is already in
+            # Doing: Get-TaskState finds the twin, and lane 2 once took that for its own claim
+            # and redid lane 6's work (AF-0386, BL-3363).
+            $sharedId = $moved -match 'names \d+ tasks'
+            if ($sharedId -or (Get-TaskState $id) -ne 'Doing') {
                 # The board refuses an ID that names two live tasks, and no claim can win
                 # until they are renumbered (BL-2014); any other refusal is reported as it is.
-                if ($moved -match 'names \d+ tasks' -and (Invoke-RenumberDuplicates $id)) { continue }
+                if ($sharedId -and (Invoke-RenumberDuplicates $id)) { continue }
                 $refusal = Get-Short $moved 100
                 Write-Trace $id 'refused' "the board would not move it to Doing: $refusal" 'DarkYellow'
                 continue
@@ -422,6 +426,33 @@ if ($TestClaimDuplicates) {
         $gitCalls = [System.Collections.Generic.List[string]]::new()
         $refusedGit = { param([string[]]$GitArgs) $gitCalls.Add($GitArgs[0]); if ($GitArgs[0] -in 'push', 'pull', 'rebase') { $false } else { Invoke-Git $GitArgs } }
         $refused = Complete-ClaimSplit 'BL-009' 'over its cost cap' 'failed' -Git $refusedGit
+        # AF-0386: a task's twin is already in Doing, so a refused move must not pass for a claim.
+        git -C $repo reset -q --hard origin/work 2>&1 | Out-Null
+        $reviewed = "$(git -C $repo rev-parse HEAD)".Trim()
+        $before = @(Get-ChildItem (Join-Path $repo 'Tasks\Backlog') -Filter 'BL-*.md' | ForEach-Object { Get-TaskIdFromFileName $_.Name })
+        & $file 'twin-a' 'BL-020' 'High'
+        git -C $repo mv (Join-Path $repo 'Tasks\Backlog\BL-020-twin-a.md') (Join-Path $repo 'Tasks\Doing\BL-020-twin-a.md') 2>&1 | Out-Null
+        git -C $repo commit -q -m 'claim twin-a' 2>&1 | Out-Null
+        & $file 'twin-b' 'BL-020' 'High'
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $twinClaim = Invoke-Claim -Skip $before
+        git -C $repo fetch -q origin work 2>&1 | Out-Null
+        $twinTree = @(git -C $repo ls-tree -r --name-only origin/work Tasks)
+        $twinB = "$($twinTree | Where-Object { $_ -match 'twin-b' })"
+        # The shift-end review filed BL-020 from the board at the reviewed commit, while a lane
+        # had filed BL-020 on the branch: the review's push renumbers its own task.
+        $reviewDir = Join-Path $temp 'review'
+        git -C $repo worktree add -q --detach $reviewDir $reviewed 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $reviewDir 'Tasks\Backlog\BL-020-review-finding.md') -Encoding UTF8 -Value ((Get-Content (Join-Path $repo 'Tasks\Doing\BL-020-twin-a.md') -ErrorAction SilentlyContinue) -replace 'twin-a', 'review-finding')
+        if (-not (Test-Path (Join-Path $reviewDir 'Tasks\Backlog\BL-020-review-finding.md'))) { throw 'no review task file' }
+        git -C $reviewDir add -A 2>&1 | Out-Null
+        git -C $reviewDir commit -q -m 'chore(tasks): file shift-end review findings' 2>&1 | Out-Null
+        $reviewPush = Push-ReviewCommitsUnderLock -Dir $reviewDir -Head $reviewed -Branch 'work'
+        git -C $repo worktree remove --force $reviewDir 2>&1 | Out-Null
+        git -C $repo fetch -q origin work 2>&1 | Out-Null
+        $reviewTree = @(git -C $repo ls-tree -r --name-only origin/work Tasks)
+        $reviewTask = "$($reviewTree | Where-Object { $_ -match 'review-finding' })"
+        $liveIds = @($reviewTree | Where-Object { $_ -notmatch '/Done/' } | ForEach-Object { if ($_ -match '(BL-\d+)-') { $Matches[1] } })
         $trace = @(Get-Content $TraceFile -ErrorAction SilentlyContinue)
         git -C $repo fetch -q origin work 2>&1 | Out-Null
         $blockedFile = @(git -C $repo show origin/work:Tasks/Blocked/BL-010-splitfails.md 2>&1) -join "`n"
@@ -437,6 +468,8 @@ if ($TestClaimDuplicates) {
             ,@('no ID is left naming two tasks on the shared branch', '5 tasks, 5 IDs', "$($ids.Count) tasks, $(@($ids | Select-Object -Unique).Count) IDs")
             ,@('the first task to be filed keeps its ID', 'True', "$(@($shared | Where-Object { $_ -match 'BL-001-first' }).Count -eq 1)")
             ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
+            ,@('a shared ID whose twin is in Doing is renumbered, not taken for a claim (AF-0386)', 'True True', "$($twinClaim.Id -and $twinClaim.Id -ne 'BL-020') $($twinB -match "^Tasks/Doing/$($twinClaim.Id)-twin-b\.md$")")
+            ,@('the shift-end review push renumbers a task ID the branch already had (AF-0386)', "'' True True", "'$reviewPush' $($reviewTask -match '^Tasks/Backlog/BL-0(2[1-9]|[3-9]\d)-review-finding\.md$') $($liveIds.Count -eq @($liveIds | Select-Object -Unique).Count)")
         )
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
