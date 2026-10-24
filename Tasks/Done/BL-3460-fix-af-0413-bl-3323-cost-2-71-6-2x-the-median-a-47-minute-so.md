@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3460 — Fix AF-0413: BL-3323 cost $2.71 (6.2x the median): a 47-minute Sonnet run requeued at the end because BL-3316 held Finish.cs, then an Opus retry
 
@@ -41,12 +41,16 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (from the task Context): run 1 (Sonnet, $0.98) finished its work and passed its tests, then requeued because Finish.cs was held by BL-3316 in Doing; run 2 was a retry, which DarkFactory/ModelChoice.ps1 raises to Opus by design (BL-1705), $1.74 to apply the stash and finish. Total $2.71 against a $0.44 median.
+- Recorded as unavoidable here: lane rule 3 already tells a run to check other lanes' Doing touches on the shared branch when it needs a file outside its touches, and the overlap was a one-off between two tasks whose touches were set when filed. The Opus-on-retry rule is deliberate. No change to RunDarkFactory.ps1 is warranted. Build clean; fast tests green.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-24: Doing -> Done. Cost cause named (late file overlap plus by-design Opus retry), recorded unavoidable; build and fast tests green
