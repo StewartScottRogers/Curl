@@ -49,3 +49,4 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-24: Backlog -> Deferred. Stewart rejected its finding on 2026-10-24 (single run under the new 5-dollar cost-outlier floor); no work wanted.
