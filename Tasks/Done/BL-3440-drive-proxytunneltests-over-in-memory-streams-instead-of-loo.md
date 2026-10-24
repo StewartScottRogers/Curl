@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.UnitTests/Protocols/Proxy/ProxyTunnelTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3440 — Drive ProxyTunnelTests over in-memory streams instead of loopback sockets that send bytes
 
@@ -40,3 +40,4 @@ Moving the tests to `Curl.Conformance.Differential.IntegrationTests` would satis
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: fe2b4688 2008f7a2 74706fe2 98f27dcf 779790c0.
+- 2026-10-23: Doing -> Done. ProxyTunnelTests now use an in-memory duplex stream; no sockets.
