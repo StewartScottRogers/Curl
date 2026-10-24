@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-size-w","command":"-s -o NUL -w '%{size_download}' ftp://127.0.0.1:18200/big.bin"}
+  ]
+}

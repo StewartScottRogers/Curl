@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-mkdir-quote","command":"-s -Q 'MKD d' ftp://127.0.0.1:18200/"}
+  ]
+}

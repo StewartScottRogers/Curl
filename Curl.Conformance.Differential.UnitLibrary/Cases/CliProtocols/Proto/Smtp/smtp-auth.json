@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"smtp-auth","command":"-s smtp://127.0.0.1:18210 --mail-from a@x --mail-rcpt b@y -u u:p -T mail.txt","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n","dots.txt":"Subject: d\r\n\r\n.leading dot\r\n..two\r\n.\r\nafter\r\n","lf.txt":"Subject: lf\n\nbare\nlf\n"}}
+  ]
+}

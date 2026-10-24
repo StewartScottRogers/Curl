@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-uidvalidity","command":"-sS 'imap://127.0.0.1:18230/INBOX;UID=1;UIDVALIDITY=99'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

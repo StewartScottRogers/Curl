@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-store","command":"-s 'imap://127.0.0.1:18230/INBOX' -X 'STORE 1 +Flags \\Deleted'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

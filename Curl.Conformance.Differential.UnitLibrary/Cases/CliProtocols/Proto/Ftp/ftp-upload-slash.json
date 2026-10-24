@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-upload-slash","command":"-s -T up.txt ftp://127.0.0.1:18200/new/","files":{"up.txt":"uploaded text\nline2\n"}}
+  ]
+}

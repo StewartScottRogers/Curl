@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-quote-bad","command":"-sS -Q 'BOGUS' ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

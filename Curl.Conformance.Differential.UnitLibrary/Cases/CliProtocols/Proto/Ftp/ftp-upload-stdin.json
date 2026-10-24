@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-upload-stdin","command":"-s -T - ftp://127.0.0.1:18200/up.txt","stdin":"stdin up\n","files":{"up.txt":"uploaded text\nline2\n"}}
+  ]
+}

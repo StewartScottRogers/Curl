@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-status","command":"-s imap://127.0.0.1:18230/ -X 'STATUS INBOX (MESSAGES)'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

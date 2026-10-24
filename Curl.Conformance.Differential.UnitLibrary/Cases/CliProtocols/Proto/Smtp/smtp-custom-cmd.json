@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"smtp-custom-cmd","command":"-s smtp://127.0.0.1:18210 -X 'NOOP'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n","dots.txt":"Subject: d\r\n\r\n.leading dot\r\n..two\r\n.\r\nafter\r\n","lf.txt":"Subject: lf\n\nbare\nlf\n"}}
+  ]
+}

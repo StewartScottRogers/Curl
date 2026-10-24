@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-skip-pasv-ip","command":"-s --ftp-skip-pasv-ip ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

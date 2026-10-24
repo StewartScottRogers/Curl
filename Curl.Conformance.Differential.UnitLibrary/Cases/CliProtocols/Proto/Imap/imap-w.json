@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-w","command":"-s -o NUL -w '%{size_download}' 'imap://127.0.0.1:18230/INBOX;UID=1'","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-w-vars","command":"-s -o NUL -w '%{http_code}|%{response_code}|%{ftp_entry_path}|%{scheme}|%{size_download}|%{url_effective}' ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

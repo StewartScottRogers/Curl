@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-list-custom","command":"-s -X 'LIST -a' ftp://127.0.0.1:18200/","stdin":"stdin up\n","files":{"up.txt":"uploaded text\nline2\n"}}
+  ]
+}

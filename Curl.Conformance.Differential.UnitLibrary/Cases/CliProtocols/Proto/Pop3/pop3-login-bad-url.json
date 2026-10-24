@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"pop3-login-bad-url","command":"-s pop3://u:p@127.0.0.1:18220/1"}
+  ]
+}

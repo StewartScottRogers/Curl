@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-verbose","command":"-v ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

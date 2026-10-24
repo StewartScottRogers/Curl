@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-delete-quote","command":"-s -Q 'DELE a.txt' ftp://127.0.0.1:18200/"}
+  ]
+}

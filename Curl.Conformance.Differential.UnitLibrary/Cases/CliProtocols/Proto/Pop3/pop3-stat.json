@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"pop3-stat","command":"-s pop3://127.0.0.1:18220/ -X STAT"}
+  ]
+}

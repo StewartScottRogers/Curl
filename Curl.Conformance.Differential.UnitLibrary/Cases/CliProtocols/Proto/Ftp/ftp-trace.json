@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"ftp-trace","command":"--trace-ascii - -s ftp://127.0.0.1:18200/a.txt"}
+  ]
+}

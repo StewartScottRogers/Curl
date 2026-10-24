@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"imap-expunge","command":"-s 'imap://127.0.0.1:18230/INBOX' -X EXPUNGE","files":{"mail.txt":"Subject: hi\r\n\r\nhello\r\n"}}
+  ]
+}
