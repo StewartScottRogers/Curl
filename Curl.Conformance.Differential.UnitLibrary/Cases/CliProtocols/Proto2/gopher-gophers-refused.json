@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"gopher-gophers-refused","command":"-sS gophers://127.0.0.1:18410/","timeoutSeconds":15}
+  ]
+}

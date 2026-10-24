@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"telnet-timeout","command":"-s -m 1 telnet://127.0.0.1:18420","stdin":"user\r\n","files":{"up.txt":"abc\n"},"timeoutSeconds":10}
+  ]
+}

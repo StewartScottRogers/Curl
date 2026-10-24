@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"dict-lookup","command":"-s dict://127.0.0.1:18400/lookup:word"}
+  ]
+}

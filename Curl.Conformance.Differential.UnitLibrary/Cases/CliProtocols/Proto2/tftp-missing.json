@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"tftp-missing","command":"-sS tftp://127.0.0.1:18460/","files":{"up.txt":"tftp upload data\n"}}
+  ]
+}

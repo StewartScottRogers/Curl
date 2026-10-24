@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"gopher-query","command":"-s gopher://127.0.0.1:18410/7/sel%09query"}
+  ]
+}

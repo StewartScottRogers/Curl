@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"mqtt-pub","command":"-sS -d msg mqtt://127.0.0.1:18450/topic/a","files":{"m.txt":"filemsg"},"timeoutSeconds":8}
+  ]
+}

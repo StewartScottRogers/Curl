@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"dict-define-v","command":"-sv dict://127.0.0.1:18400/d:word"}
+  ]
+}

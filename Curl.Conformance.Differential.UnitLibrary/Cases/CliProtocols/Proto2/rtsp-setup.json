@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"rtsp-setup","command":"-s -X SETUP -H 'Transport: RTP/AVP;unicast;client_port=1-2' rtsp://127.0.0.1:18430/x/track1","files":{"sdp.txt":"v=0\r\n"}}
+  ]
+}

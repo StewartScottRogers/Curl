@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"rtsp-options","command":"-s -X OPTIONS rtsp://127.0.0.1:18430/","files":{"sdp.txt":"v=0\r\n"}}
+  ]
+}

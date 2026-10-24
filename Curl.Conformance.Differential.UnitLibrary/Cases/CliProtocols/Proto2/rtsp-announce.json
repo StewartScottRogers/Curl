@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"rtsp-announce","command":"-s -X ANNOUNCE -T sdp.txt rtsp://127.0.0.1:18430/x","files":{"sdp.txt":"v=0\r\n"}}
+  ]
+}

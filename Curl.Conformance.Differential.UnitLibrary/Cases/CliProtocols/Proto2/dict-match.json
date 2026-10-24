@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"dict-match","command":"-s dict://127.0.0.1:18400/m:wor:*:prefix"}
+  ]
+}

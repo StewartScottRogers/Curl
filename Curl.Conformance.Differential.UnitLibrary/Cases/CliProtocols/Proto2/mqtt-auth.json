@@ -1,0 +1,5 @@
+{
+  "cases": [
+    {"name":"mqtt-auth","command":"-sS -u u:p mqtt://127.0.0.1:18450/topic/a","files":{"m.txt":"filemsg"},"timeoutSeconds":8}
+  ]
+}
