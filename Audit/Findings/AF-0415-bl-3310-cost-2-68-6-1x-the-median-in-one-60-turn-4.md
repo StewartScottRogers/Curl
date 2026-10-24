@@ -3,8 +3,8 @@ id: AF-0415
 title: BL-3310 cost $2.68 (6.1x the median) in one 60-turn, 41-minute Opus run porting easytest.py cases
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:BL-3310:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
