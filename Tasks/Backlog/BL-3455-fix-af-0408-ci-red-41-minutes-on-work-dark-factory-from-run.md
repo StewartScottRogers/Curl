@@ -43,11 +43,16 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Acceptance criteria
 
 - [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: the fix landed about 15 minutes after the red, but run 40011412660 on 9e379e12, a pre-fix commit, was already running and always finishes on work/dark-factory (ADR-0693); it failed too, and green came only from the run after it. The watch also filed 6 minutes after the run's end rather than when the failing job ended.
+- Fix: 7ad52e292 (`DarkFactory/CiWatch.ps1`, ADR-0811, shared with BL-3365, BL-3454, BL-3456, BL-3457), landed on origin/work/dark-factory 2026-10-24T15:46:55Z (08:46:55 Arizona): `Stop-CiRunWithoutFix` cancels such a running run while CI is red once the waiting run's commit brings the CI-fix task into Tasks/Done, and `Get-CiRunningRun` files from a failed job before its run ends. `-TestCiWatch`: 60 PASS, 0 FAIL; `dotnet build` clean; fast tests green.
+- To measure once a shift has run since then: the finding's measurement with `-Since 2026-10-24T15:46:55Z`, `-LogRoot` the repository's `.logs`, `-CiRunsJson` a fresh `gh run list` as above; expect no `ciRedSpells` entry over 30 minutes. The floor is one full CI run, which only `.github/workflows/ci.yml` (a guard file, audit branch only) could shorten.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. interactive session: CI watch fix for red spells Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-24: Doing -> Backlog. fix 7ad52e292 (ADR-0811) landed 2026-10-24T15:46:55Z; waits for a shift to run since then to measure the live logs (ADR-0761)

@@ -43,11 +43,16 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Acceptance criteria
 
 - [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: of the 40 minutes, about 31 were CI runs after the fix: the CI watch read only finished runs (the failing Build and test jobs end 7 to 18 minutes before Quality gates lets the run end), and a running run on work/dark-factory always finishes (ADR-0693), so a fix landing after the red run waited behind a pre-fix run doomed to fail too (39906620565 here).
+- Fix: 7ad52e292 (`DarkFactory/CiWatch.ps1`, ADR-0811), landed on origin/work/dark-factory 2026-10-24T15:46:55Z (08:46:55 Arizona). The watch reads a running run's failed jobs from their job logs, and while the newest finished run is red cancels the running run when the waiting run's commit brings a CI-fix task into Tasks/Done that the running commit lacks. `-TestCiWatch`: 60 PASS, 0 FAIL; `dotnet build` clean; fast tests green.
+- To measure once a shift has run since then: the finding's measurement with `-Since 2026-10-24T15:46:55Z`, `-LogRoot` the repository's `.logs`, `-CiRunsJson` a fresh `gh run list` as above; expect no `ciRedSpells` entry over 30 minutes, and look for `ci` trace lines "cancelled run ..." beside any spell. A spell can still pass 30 minutes when the fix takes longer than the red run's Quality gates tail, since one full run is 15 to 34 minutes; shortening the run itself is a `.github/workflows/ci.yml` change (a guard file, audit branch only).
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-24: Backlog -> Doing. interactive session: CI watch fix for red spells Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-24: Doing -> Backlog. fix 7ad52e292 (ADR-0811) landed 2026-10-24T15:46:55Z; waits for a shift to run since then to measure the live logs (ADR-0761)
