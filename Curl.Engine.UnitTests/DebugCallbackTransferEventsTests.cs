@@ -31,7 +31,15 @@ public sealed class DebugCallbackTransferEventsTests
     [TestMethod]
     public void Of_VerboseWithADebugCallback_GivesTheEvents()
     {
-        Assert.IsNotNull(DebugCallbackTransferEvents.Of(verbose: true, (_, _) => 0));
+        List<(CurlInfoType Type, string Data)> calls = [];
+
+        DebugCallbackTransferEvents? events = DebugCallbackTransferEvents.Of(verbose: true, Recording(calls));
+        events!.ReportInfo("Trying 127.0.0.1:80...");
+        events.ReportDataReceived("down"u8);
+
+        CollectionAssert.AreEqual(
+            new (CurlInfoType, string)[] { (CurlInfoType.Text, "Trying 127.0.0.1:80...\n"), (CurlInfoType.DataIn, "down") },
+            calls);
     }
 
     [TestMethod]

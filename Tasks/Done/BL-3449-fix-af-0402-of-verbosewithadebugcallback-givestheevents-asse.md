@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3449 — Fix AF-0402: Of_VerboseWithADebugCallback_GivesTheEvents asserts only that a result is not null
 
@@ -41,12 +41,21 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now hands `Of` a recording callback, reports an info line and received data through the events it
+  returns, and asserts both reach that callback as `Text` and `DataIn`; an `ITransferEvents` that ignores the
+  callback fails it. Reproduction now shows line 34 building the call list, not `Assert.IsNotNull`.
+- Test-only change, so no Measure-CodeQuality run: no library's production code changed. Platform-neutral (no
+  paths, OS text or certificates).
+- Narrowing `touches` to the one test file (ADR-0694) was refused by the run's permissions; left as the whole project.
+- `dotnet build` clean; fast tests passed (exit 0, no failures) on Windows.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. Of_VerboseWithADebugCallback_GivesTheEvents asserts reported events reach the given debug callback
