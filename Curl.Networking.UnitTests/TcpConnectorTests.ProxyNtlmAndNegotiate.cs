@@ -127,6 +127,31 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_WithProxyNegotiate_AsksForTheProxyServiceNameNotTheServiceName()
+    {
+        // --service-name origin --proxy-service-name proxysvc: the CONNECT is the proxy's request, so its ticket is for proxysvc (AF-0397).
+        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));
+        var tokens = new ScriptedTokenSource(new SecurityContextStep(SecurityContextStatus.Completed, [1, 2, 3]));
+        var dialer = new FakeTcpDialer { DialOutcome = _ => connection };
+        var options = HttpProxyTunnelOptions.Default with
+        {
+            ProxyAuthSchemes = HttpAuthSchemes.Negotiate,
+            ProxyAuthenticator = new RankedHttpAuthenticator(
+                new BasicAndBearerAuthenticator(Encoding.UTF8),
+                new DigestAuthenticator(Encoding.UTF8, () => MeasuredClientNonce),
+                new NegotiateHttpAuthenticator(tokens, new NegotiateOptions("origin", "proxysvc", SecurityDelegation.None), wordsFailuresAsSspi: true),
+                new NtlmHttpAuthenticator(tokens, matchesSspiBuild: false)),
+        };
+        var connector = new TcpConnector(new FakeDnsResolver(ProxyAddress), dialer, new FakeTlsProvider(), new ManualTimeProvider(), options);
+
+        var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
+
+        Diagnostics.Assert("service name", "proxysvc", tokens.Requests.Single().ServiceName);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(TokenConnect("Negotiate AQID"), Encoding.Latin1.GetString([.. connection.Written]));
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_WithProxyNegotiate_WhenTheTunnelOpensAtOnce_EndsTheKeptContext()
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(EstablishedReply));

@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3444 — Fix AF-0397: TcpConnector.ProxyAuthRequestOf's IsProxy: true can become false with no test failing, so proxy Negotiate uses --service-name instead of --proxy-service-name
 
@@ -50,6 +50,7 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - Lanes may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`IsProxy: true` -> `false` at TcpConnector.cs:1516): the new test failed (`Expected "proxysvc"`), so the mutant is killed; the line was then restored. The re-audit runs the tool itself.
 - Build clean, fast tests green on Windows; the test uses no paths, OS text or certificates, so it is platform-neutral.
 - Added `Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs` to touches: the killing test must live in the library's test project. BL-3447 (Doing) holds all of Curl.Networking.UnitTests, so this task went back to Backlog with the test uncommitted; the next claim only needs to apply the stash, build, run the fast tests and move to Done.
+- Second claim: BL-3447 is Done and no task in Doing holds Curl.Networking.UnitTests; applied the stash, dropped a duplicated service-name assertion, build clean and the full fast suite green on Windows.
 
 ## Log
 
@@ -57,3 +58,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-24: Doing -> Backlog. Needs Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs, which BL-3447 (Doing) holds as the whole Curl.Networking.UnitTests; test written and verified, uncommitted
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. Proxy Negotiate service-name test kills the AF-0397 mutant; build clean, fast tests green
