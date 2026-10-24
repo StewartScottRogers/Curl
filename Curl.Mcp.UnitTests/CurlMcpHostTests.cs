@@ -40,7 +40,7 @@ public sealed class CurlMcpHostTests
     [TestMethod]
     public void CreateHandlers_AnswersTheToolResourceAndLoggingMethods()
     {
-        IEnumerable<IMcpMethodHandler> handlers = CurlMcpHost.CreateHandlers(McpConfinementRoot.NotConfigured, Cap);
+        IEnumerable<IMcpMethodHandler> handlers = CurlMcpHost.CreateHandlers(McpConfinementRoot.NotConfigured, Cap, _ => { });
 
         CollectionAssert.AreEquivalent(
             new[] { "tools/list", "tools/call", "resources/list", "resources/read", "logging/setLevel" },

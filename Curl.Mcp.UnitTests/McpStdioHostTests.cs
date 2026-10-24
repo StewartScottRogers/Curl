@@ -157,8 +157,24 @@ public sealed class McpStdioHostTests
         int exitCode = await host.RunAsync(CancellationToken.None);
 
         Assert.AreEqual(1, exitCode);
-        StringAssert.Contains(error.ToString(), "Curl.Mcp stopped because reading its input failed: The pipe broke.");
+        StringAssert.Contains(error.ToString(), "Curl.Mcp stopped because reading its input failed: System.IO.IOException: The pipe broke.");
         Assert.AreEqual(0, output.Length);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_WritingAResponseFails_LogsItAsAWriteFailureInFullAndReturnsOne()
+    {
+        using MemoryStream input = new(Encoding.UTF8.GetBytes(PingRequest + "\n"));
+        using FailingOutputStream output = new();
+        using StringWriter error = new();
+        using McpStdioHost host = CreateHost(input, output, error, _ => null, new ManualTimeProvider(), new RecordingSignals(), []);
+
+        int exitCode = await host.RunAsync(CancellationToken.None);
+
+        Assert.AreEqual(1, exitCode);
+        StringAssert.Contains(error.ToString(), "Curl.Mcp stopped because writing a response failed: Curl.Mcp.Protocol.Server.McpResponseWriteException: Writing a response failed.");
+        StringAssert.Contains(error.ToString(), "System.IO.IOException: The output broke.");
+        Assert.DoesNotContain("reading its input", error.ToString());
     }
 
     [TestMethod]
@@ -345,6 +361,32 @@ public sealed class McpStdioHostTests
         public override void SetLength(long value) => throw new NotSupportedException();
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class FailingOutputStream : Stream
+    {
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => true;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            ValueTask.FromException(new IOException("The output broke."));
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new IOException("The output broke.");
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Flush() => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
     }
 
     private sealed class FailingInputStream : Stream

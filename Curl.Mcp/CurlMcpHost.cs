@@ -40,16 +40,19 @@ internal static class CurlMcpHost
     /// <param name="output">The stream the protocol messages are written to.</param>
     /// <param name="error">Where the log lines go.</param>
     /// <returns>The host, not yet running.</returns>
-    internal static McpStdioHost Build(Func<string, string?> readEnvironmentVariable, Stream input, Stream output, TextWriter error) =>
-        new(
+    internal static McpStdioHost Build(Func<string, string?> readEnvironmentVariable, Stream input, Stream output, TextWriter error)
+    {
+        McpStandardErrorLog log = new(error, TimeProvider.System);
+        return new(
             ServerInfo,
-            CreateHandlers,
+            (root, cap) => CreateHandlers(root, cap, log.WriteLine),
             input,
             output,
-            new McpStandardErrorLog(error, TimeProvider.System),
+            log,
             readEnvironmentVariable,
             TimeProvider.System,
             McpStdioHost.RegisterProcessStopSignals);
+    }
 
     /// <summary>
     /// Builds the handlers of <c>tools/list</c>, <c>tools/call</c>, <c>resources/list</c> and
@@ -57,11 +60,12 @@ internal static class CurlMcpHost
     /// </summary>
     /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
     /// <param name="cap">The most bytes a tool returns.</param>
+    /// <param name="logFailure">Receives one line for each exception a tool throws.</param>
     /// <returns>The five handlers.</returns>
-    internal static IEnumerable<IMcpMethodHandler> CreateHandlers(McpConfinementRoot root, McpResponseCap cap)
+    internal static IEnumerable<IMcpMethodHandler> CreateHandlers(McpConfinementRoot root, McpResponseCap cap, Action<string> logFailure)
     {
         McpServerRegistry registry = CreateRegistry(root, cap);
-        return [new ToolsListHandler(registry), new ToolsCallHandler(registry), new ResourcesListHandler(registry), new ResourcesReadHandler(registry), new LoggingSetLevelMcpHandler()];
+        return [new ToolsListHandler(registry), new ToolsCallHandler(registry, logFailure), new ResourcesListHandler(registry), new ResourcesReadHandler(registry), new LoggingSetLevelMcpHandler()];
     }
 
     /// <summary>

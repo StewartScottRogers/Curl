@@ -94,7 +94,7 @@ internal sealed class McpStdioHost : IDisposable
     /// cancelled or a stop signal arrives, and waits up to <see cref="ShutdownTimeout" /> for requests in flight.
     /// </summary>
     /// <param name="cancellationToken">Cancelling it stops the server as a stop signal does.</param>
-    /// <returns>0 on a clean stop; 1 when reading the input failed or requests in flight outlived <see cref="ShutdownTimeout" />.</returns>
+    /// <returns>0 on a clean stop; 1 when reading the input or writing a response failed or requests in flight outlived <see cref="ShutdownTimeout" />.</returns>
     /// <exception cref="ArgumentException"><c>CURL_MCP_ROOT</c> is set but names no existing absolute folder.</exception>
     /// <exception cref="McpConfigurationException"><c>CURL_MCP_MAX_RESPONSE_BYTES</c> is not a positive whole number.</exception>
     internal async Task<int> RunAsync(CancellationToken cancellationToken)
@@ -107,7 +107,7 @@ internal sealed class McpStdioHost : IDisposable
         }
 
         using StdioMcpTransport transport = new(input, output);
-        McpServer server = new(transport, serverInfo, createHandlers(root, cap));
+        McpServer server = new(transport, serverInfo, createHandlers(root, cap), log.WriteLine);
         using CancellationTokenSource stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, stopRequested.Token);
         using IDisposable signals = registerStopSignals(StopOnSignal);
         log.WriteLine("Curl.Mcp is serving on standard input and output.");
@@ -146,7 +146,8 @@ internal sealed class McpStdioHost : IDisposable
 
         if (serving.Exception is { } failure)
         {
-            log.WriteLine($"Curl.Mcp stopped because reading its input failed: {failure.InnerException!.Message}");
+            string cause = failure.InnerException is McpResponseWriteException ? "writing a response" : "reading its input";
+            log.WriteLine($"Curl.Mcp stopped because {cause} failed: {failure.InnerException}");
             return 1;
         }
 

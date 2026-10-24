@@ -21,10 +21,10 @@ public sealed class McpServerTests
         new StubCapabilityHandler("tools/list", "tools", """{"listChanged":true}"""),
     ];
 
-    private static (FakeMcpTransport Transport, Task Run) Start(IEnumerable<IMcpMethodHandler> handlers, CancellationToken cancellationToken = default)
+    private static (FakeMcpTransport Transport, Task Run) Start(IEnumerable<IMcpMethodHandler> handlers, CancellationToken cancellationToken = default, Action<string>? logFailure = null, FakeMcpTransport? fake = null)
     {
-        FakeMcpTransport transport = new();
-        Task run = new McpServer(transport, ServerInfo, handlers).RunAsync(cancellationToken);
+        FakeMcpTransport transport = fake ?? new();
+        Task run = new McpServer(transport, ServerInfo, handlers, logFailure ?? (_ => { })).RunAsync(cancellationToken);
         return (transport, run);
     }
 
@@ -266,11 +266,83 @@ public sealed class McpServerTests
     }
 
     [TestMethod]
+    public void Constructor_NullLogFailure_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => new McpServer(new FakeMcpTransport(), ServerInfo, [], null!));
+
+    [TestMethod]
+    public async Task RunAsync_ResponseWriteFailsBeforeTheInputEnds_StopsReadingAndEndsWithTheWriteFailure()
+    {
+        IOException broken = new("pipe broken");
+        (FakeMcpTransport transport, Task run) = Start([], fake: new FakeMcpTransport { WriteFailure = broken });
+
+        transport.Send("""{"jsonrpc":"2.0","id":1,"method":"ping"}""");
+        transport.Send("""{"jsonrpc":"2.0","id":2,"method":"ping"}""");
+        McpResponseWriteException failure = await Assert.ThrowsExactlyAsync<McpResponseWriteException>(() => run.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.AreSame(broken, failure.InnerException);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_HandlerThrows_WritesTheExceptionTypeAndMessageToTheFailureSinkAndAnswersAsBefore()
+    {
+        List<string> logged = [];
+        (FakeMcpTransport transport, Task run) = Start([StubMcpMethodHandler.Throwing("tools/call", new InvalidOperationException("secret detail"))], logFailure: logged.Add);
+
+        transport.Send("""{"jsonrpc":"2.0","id":5,"method":"tools/call"}""");
+        string response = await transport.NextResponseAsync();
+
+        Assert.AreEqual("""{"jsonrpc":"2.0","id":5,"error":{"code":-32603,"message":"An error occurred."}}""", response);
+        Assert.IsEmpty(await EndAsync(transport, run));
+        Assert.HasCount(1, logged);
+        Assert.AreEqual("The handler of request 'tools/call' threw System.InvalidOperationException: secret detail", logged[0]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_NotificationHandlerThrows_WritesTheExceptionTypeAndMessageToTheFailureSink()
+    {
+        List<string> logged = [];
+        (FakeMcpTransport transport, Task run) = Start([StubMcpMethodHandler.Throwing("notifications/failing", new InvalidOperationException("boom"))], logFailure: logged.Add);
+
+        transport.Send("""{"jsonrpc":"2.0","method":"notifications/failing"}""");
+        Assert.IsEmpty(await EndAsync(transport, run));
+
+        Assert.HasCount(1, logged);
+        Assert.AreEqual("The handler of notification 'notifications/failing' threw System.InvalidOperationException: boom", logged[0]);
+    }
+
+    [TestMethod]
+    public async Task RunAsync_UnparseableLine_WritesADiscardedLineToTheFailureSinkAndNoResponse()
+    {
+        List<string> logged = [];
+        (FakeMcpTransport transport, Task run) = Start([], logFailure: logged.Add);
+
+        transport.Send("not json");
+        Assert.IsEmpty(await EndAsync(transport, run));
+
+        Assert.HasCount(1, logged);
+        StringAssert.StartsWith(logged[0], "Discarded a message without answering it: ");
+        StringAssert.EndsWith(logged[0], "(JSON-RPC error -32700).");
+    }
+
+    [TestMethod]
+    public async Task RunAsync_OverLongLine_WritesADiscardedLineToTheFailureSinkAndNoResponse()
+    {
+        List<string> logged = [];
+        (FakeMcpTransport transport, Task run) = Start([], logFailure: logged.Add);
+
+        transport.Send(new JsonRpcInvalidMessage(new JsonRpcError(JsonRpcErrorCodes.InvalidRequest, "Invalid Request", null), null));
+        Assert.IsEmpty(await EndAsync(transport, run));
+
+        Assert.HasCount(1, logged);
+        StringAssert.StartsWith(logged[0], "Discarded a message without answering it: ");
+    }
+
+    [TestMethod]
     public async Task RunAsync_TransportReadFails_RethrowsTheFailure()
     {
         FakeMcpTransport transport = new() { ReadFailure = new IOException("pipe broken") };
 
-        await Assert.ThrowsExactlyAsync<IOException>(() => new McpServer(transport, ServerInfo, []).RunAsync(CancellationToken.None));
+        await Assert.ThrowsExactlyAsync<IOException>(() => new McpServer(transport, ServerInfo, [], _ => { }).RunAsync(CancellationToken.None));
     }
 
     [TestMethod]
@@ -278,7 +350,7 @@ public sealed class McpServerTests
     {
         FakeMcpTransport transport = new() { ReadFailure = new OperationCanceledException() };
 
-        await new McpServer(transport, ServerInfo, []).RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+        await new McpServer(transport, ServerInfo, [], _ => { }).RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.IsEmpty(transport.RemainingResponses());
     }
@@ -288,7 +360,7 @@ public sealed class McpServerTests
     {
         using CancellationTokenSource host = new();
         TokenIgnoringTransport transport = new();
-        Task run = new McpServer(transport, ServerInfo, []).RunAsync(host.Token);
+        Task run = new McpServer(transport, ServerInfo, [], _ => { }).RunAsync(host.Token);
 
         await transport.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await host.CancelAsync();
@@ -312,4 +384,5 @@ public sealed class McpServerTests
         }
 
         public ValueTask WriteMessageAsync(ReadOnlyMemory<byte> message, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-    }}
+    }
+}

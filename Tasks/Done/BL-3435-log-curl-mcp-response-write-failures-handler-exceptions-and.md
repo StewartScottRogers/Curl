@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.Protocol.UnitLibrary/Server, Curl.Mcp.Protocol.UnitLibrary/Tools/ToolsCallHandler.cs, Curl.Mcp/McpStdioHost.cs, Curl.Mcp.Protocol.UnitTests, Curl.Mcp.UnitTests]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3435 — Log Curl.Mcp response write failures, handler exceptions and discarded invalid messages to stderr
 
@@ -28,15 +28,18 @@ The host already owns a stderr log (`Curl.Mcp/McpStandardErrorLog.cs`). Pass a s
 
 ## Acceptance criteria
 
-- [ ] A unit test shows that when a response write throws for a request that is not the last one, `McpServer.RunAsync` stops reading and ends faulted, and the write failure is not lost.
-- [ ] `McpStdioHost` logs a write failure as a write failure, not as "reading its input failed", and logs the exception in full, not only `InnerException!.Message`. A unit test pins the line.
-- [ ] Unit tests show that a throwing request handler, a throwing tool and a throwing notification handler each write the exception's type and message to the failure sink. The JSON-RPC response bytes stay unchanged from today's.
-- [ ] A unit test shows that an over-long line and an unparseable line each write a "discarded" line to the failure sink, and that no response is written.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Curl.Mcp` and `Curl.Mcp.Protocol.UnitLibrary` stay at 100% line and branch coverage.
+- [x] A unit test shows that when a response write throws for a request that is not the last one, `McpServer.RunAsync` stops reading and ends faulted, and the write failure is not lost.
+- [x] `McpStdioHost` logs a write failure as a write failure, not as "reading its input failed", and logs the exception in full, not only `InnerException!.Message`. A unit test pins the line.
+- [x] Unit tests show that a throwing request handler, a throwing tool and a throwing notification handler each write the exception's type and message to the failure sink. The JSON-RPC response bytes stay unchanged from today's.
+- [x] A unit test shows that an over-long line and an unparseable line each write a "discarded" line to the failure sink, and that no response is written.
+- [x] `dotnet build` is clean, the fast tests pass, and `Curl.Mcp` and `Curl.Mcp.Protocol.UnitLibrary` stay at 100% line and branch coverage.
 
 ## Notes
+
+- Decided by Claude: the failure sink is a plain `Action<string>` passed to `McpServer` and `ToolsCallHandler` (the host passes `McpStandardErrorLog.WriteLine`); a failed response write is recorded, cancels the read loop and `RunAsync` ends with the new `McpResponseWriteException` (inner = transport's exception), which the host logs as a write failure with the full exception. Sink lines carry the exception type and message only. Measured: Curl.Mcp and Curl.Mcp.Protocol.UnitLibrary at 100% line and branch, fast tests of both test projects pass.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 6c43e9ea 24260786 1e990932 5e636157 a43672c6.
+- 2026-10-23: Doing -> Done. Curl.Mcp logs write failures, handler/tool exceptions and discarded messages to stderr; a broken stdout stops the server
