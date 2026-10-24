@@ -131,7 +131,7 @@ public sealed class UpstreamTest1707ScriptTests
     [DataRow(1710)]
     public async Task UpstreamCase_RunThroughTheInterpretation_Passes(int testNumber)
     {
-        string upstreamTestData = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+        string upstreamTestData = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(upstreamTestData, $"test{testNumber}.curltest"));
         UpstreamTest1707Script script = new(upstreamTestData);
         UpstreamCaseRunner runner = new(

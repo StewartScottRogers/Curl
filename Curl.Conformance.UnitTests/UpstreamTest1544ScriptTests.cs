@@ -25,7 +25,7 @@ public sealed class UpstreamTest1544ScriptTests
     [TestMethod]
     public void Check_VendoredUpstreamFiles_FindsNothingToReport()
     {
-        string vendored = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+        string vendored = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
 
         Assert.AreEqual(("", 0), UpstreamTest1544Script.Check(vendored));
     }

@@ -309,7 +309,7 @@ outside the case's log directory; before expansion `UpstreamTestDirectoryComposi
 `%PWD/%LOGDIR` to `%LOGDIR` (the absolute log directory, so the composition names the file there on
 every platform; a file part named `log/<name>` and a `log/<name>` word in `<command>` become `%LOGDIR/<name>` too, as runtests.pl runs in the tests folder, BL-2202) and `%SRCDIR/libtest/test610.pl` / `test613.pl` to `./libtest/...`, as
 `runtests.pl`'s default `$srcdir` names them; any other `%SRCDIR` is the `sourceDirectory`
-`RunAsync` is given, with forward slashes (`UpstreamConformanceTests` passes `UpstreamTestData`,
+`RunAsync` is given, with forward slashes (`UpstreamConformanceTests` passes `CurlTestCases/Original`,
 whose `data/` holds the httpsig key files, BL-2183), and with none it has no value and skips the case
 (ADR-0458, BL-1944); `UpstreamCurlPlatform.WithFeatures` adds a feature the harness stands in for
 (`Debug` for the httpsig cases, whose fixed `created=0` the tests supply as the signing clock, and for a case naming the `HSTS` feature and setting `CURL_TIME` - 446 and 780 to 783 - whose fixed HSTS clock Curl reads from `CURL_TIME` because the tests pass `CreateRunner(honoursHstsTimeVariable: true)`, ADR-0493, BL-2234); curl's `--output` is `%LOGDIR/curl%TESTNUMBER.out`, as `runtests.pl` names it, and `--trace-ascii %LOGDIR/trace%TESTNUMBER --trace-config all --trace-time` follow `--include` as `runtests.pl` passes them, so the default config file's note prints as test433 expects (BL-2017);

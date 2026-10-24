@@ -22,7 +22,7 @@ public sealed class UpstreamTest1275ScriptTests
     [TestMethod]
     public void Check_TheVendoredFiles_WritesOk()
     {
-        UpstreamTest1275Script.Result result = UpstreamTest1275Script.Check(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData"));
+        UpstreamTest1275Script.Result result = UpstreamTest1275Script.Check(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original"));
 
         Assert.AreEqual(new UpstreamTest1275Script.Result("ok\n", "", 0), result);
     }

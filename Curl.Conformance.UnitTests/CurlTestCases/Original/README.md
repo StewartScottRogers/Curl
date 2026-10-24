@@ -63,12 +63,12 @@ the same relative paths: test1119.pl, test1139.pl, test1175.pl, test1222.pl, tes
 through `%SRCDIR/..`, and test1177.pl reads `docs/libcurl/curl_version_info.3` through `%PWD/..`. The tarball ships that
 page only as `curl_version_info.md` (upstream generates the `.3` at build time), so the `.3` is not vendored, and
 `lib/version.c` is not vendored: `Libcurl`'s tables stand for it. The csproj copies both folders to the test output and
-again beside `UpstreamTestData`; `.gitattributes` marks them `-text`.
+again beside `CurlTestCases/Original`; `.gitattributes` marks them `-text`.
 
 ## Refresh to another tag
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File Curl.Conformance.UnitTests\UpstreamTestData\Update-UpstreamTestData.ps1 -Tag curl-8_22_0
+powershell -NoProfile -ExecutionPolicy Bypass -File Curl.Conformance.UnitTests\CurlTestCases\Original\Update-UpstreamTestData.ps1 -Tag curl-8_22_0
 ```
 
 The script downloads the tag's source archive from GitHub, replaces every `test*.curltest` file in

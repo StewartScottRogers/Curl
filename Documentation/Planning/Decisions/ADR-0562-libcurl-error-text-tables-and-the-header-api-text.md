@@ -9,7 +9,7 @@
 
 Phase 3 of `Documentation/Planning/Curl-Api-And-libcurl.md` gives `Libcurl` the strerror family.
 Upstream curl 8.22.0's `lib/strerror.c` has `curl_multi_strerror`, `curl_share_strerror` and
-`curl_url_strerror`; upstream's test1538 (`Curl.Conformance.UnitTests/UpstreamTestData/test1538.curltest`)
+`curl_url_strerror`; upstream's test1538 (`Curl.Conformance.UnitTests/CurlTestCases/Original/test1538.curltest`)
 prints every code of each, plus one past the last, so it pins both the strings and the fallback for
 an unknown code: `Unknown error` for multi, `CURLSHcode unknown` for share, `CURLUcode unknown` for
 URL. Upstream has no strerror function for the header API's `CURLHcode`, but BL-2459 asks for its

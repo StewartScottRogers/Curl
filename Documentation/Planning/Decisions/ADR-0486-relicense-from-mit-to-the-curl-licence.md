@@ -19,7 +19,7 @@ already cleared curl's licence (<https://curl.se/docs/copyright.html>, SPDX iden
 
 1. `LICENSE.txt` holds the curl licence word for word, as curl's `COPYING` file at release
    tag `curl-8_22_0` has it. The text is the one vendored in
-   `Curl.Conformance.UnitTests/UpstreamTestData/COPYING`. Only the copyright line names this
+   `Curl.Conformance.UnitTests/CurlTestCases/Original/COPYING`. Only the copyright line names this
    project's holder: "Copyright (c) 2026, Stewart Scott Rogers, and many contributors."
 2. The SPDX identifier of the repository is `curl`.
 3. The vendored upstream test data keeps its own `COPYING` beside it, unchanged, as before.

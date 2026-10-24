@@ -3,7 +3,7 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamCertificateFolderTests
 {
-    private static readonly string VendoredCaParameters = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "certs", "test-ca.prm");
+    private static readonly string VendoredCaParameters = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", "certs", "test-ca.prm");
 
     [TestMethod]
     public void Prepare_CertsSourceFolder_WritesTheCertificatesIntoCertsAndReturnsTheOutputFolder()

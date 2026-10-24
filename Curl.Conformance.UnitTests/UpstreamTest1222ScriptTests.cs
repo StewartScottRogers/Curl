@@ -53,7 +53,7 @@ public sealed class UpstreamTest1222ScriptTests
     [TestMethod]
     public void Check_VendoredRelease_FindsTheSourcesAgreeOverItsConvertedManual()
     {
-        string release = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+        string release = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
 
         (int exitCode, string standardOutput, string standardError) = UpstreamTest1222Script.Check(release, BuildRoot);
 

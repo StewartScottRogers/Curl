@@ -397,7 +397,7 @@ public sealed partial class UpstreamCaseRunnerTests
             await channel.SendAsync(new byte[] { 0, 4, 0, 1 }, received.RemoteEndPoint, CancellationToken.None);
             return 0;
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test271.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", "test271.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1357,7 +1357,7 @@ public sealed partial class UpstreamCaseRunnerTests
     public async Task RunAsync_Test1085_IsNotSkipped()
     {
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(45));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test1085.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", "test1085.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1375,7 +1375,7 @@ public sealed partial class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1404,7 +1404,7 @@ public sealed partial class UpstreamCaseRunnerTests
     public async Task RunAsync_CaseNamingGopherOrHttp2Port_IsNotSkippedForAMissingPort(int testNumber)
     {
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1444,7 +1444,7 @@ public sealed partial class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1464,7 +1464,7 @@ public sealed partial class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1483,7 +1483,7 @@ public sealed partial class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1495,7 +1495,7 @@ public sealed partial class UpstreamCaseRunnerTests
     public async Task RunAsync_HttpsMtlsCaseWithoutACertificateDirectory_SkipsForTheMtlsPort()
     {
         UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "test2088.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", "test2088.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1546,7 +1546,7 @@ public sealed partial class UpstreamCaseRunnerTests
             commandLine = string.Join(' ', invocation.Arguments);
             return Task.FromResult(0);
         });
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 
@@ -1842,7 +1842,7 @@ public sealed partial class UpstreamCaseRunnerTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         UpstreamCaseRunner runner = Runner(_ => throw new AssertFailedException("curl must not run"));
-        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", $"test{testNumber}.curltest"));
+        string testFile = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", $"test{testNumber}.curltest"));
 
         UpstreamCaseOutcome outcome = await RunAsync(runner, testFile);
 

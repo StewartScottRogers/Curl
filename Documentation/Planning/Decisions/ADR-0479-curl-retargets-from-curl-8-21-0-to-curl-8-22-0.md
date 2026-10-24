@@ -64,7 +64,7 @@ Framework support, API hardening guards and Apple fast UDP for QUIC, beside the 
 
 ### What moving costs
 
-- `Curl.Conformance.UnitTests/UpstreamTestData` (2018 files) re-vendored with
+- `Curl.Conformance.UnitTests/CurlTestCases/Original` (2018 files) re-vendored with
   `Update-UpstreamTestData.ps1 -Tag curl-8_22_0`, `UpstreamCaseRunner.CurlVersion`, and the
   passing-list ratchet for the 89 changed and 62 added cases.
 - The version strings Curl prints or sends: `CurlVersionText` (`-V`), the default

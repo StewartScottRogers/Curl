@@ -16,7 +16,7 @@ once through `NamedUpstreamCase_RunThroughCurl_PassesAsAListedCaseMust` on Windo
 
 1. **The eight disabled cases stay off `PassingUpstreamCases.txt`.** None passed on Windows, so none
    reached the ten-of-ten bar a disabled case must clear to be listed. `DISABLED` is not vendored in
-   `UpstreamTestData`; the reasons below are its comments as the gap scorecard and BL-2858 record them.
+   `CurlTestCases/Original`; the reasons below are its comments as the gap scorecard and BL-2858 record them.
 
    | Case | Upstream's reason for disabling it | Windows outcome |
    | --- | --- | --- |

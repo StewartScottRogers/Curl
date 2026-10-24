@@ -12,6 +12,9 @@
     them -text so git keeps their line endings. ADR-0013, decision 3: the data is vendored and
     pinned, and tests never download anything - only this script does.
 
+    It writes only into this Original folder (the folder holding the script) and never touches its sibling
+    Extended, where our own ext<number>.curltest cases live (BL-3462).
+
 .PARAMETER Tag
     The curl release tag, as named in https://github.com/curl/curl/tags, e.g. curl-8_22_0.
 
