@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [behaviour:test1704]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-3431
+tasks: [BL-3431]
 ---
 # GF-0098 - --http2 runs an h2c Upgrade in Curl (exit 8), while the Windows reference curl, built without nghttp2, refuses --http2 with exit 2
 
@@ -37,3 +37,4 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary alre
 ## Log
 
 - 2026-10-23_1637: Opened by gap-behaviour.
+- 2026-10-23_1729: Filed BL-3431.

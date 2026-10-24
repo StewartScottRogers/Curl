@@ -13,8 +13,8 @@ closed:
 regression: true
 items: [features:HTTP2]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task: BL-1824
-tasks: [BL-1824]
+task: BL-3430
+tasks: [BL-1824, BL-3430]
 ---
 # GF-0031 - Curl lists HTTP2 in Features; the Windows reference build does not
 
@@ -57,3 +57,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 - 2026-10-08_1731: Filed BL-1824.
 - 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.
 - 2026-10-23_1637: Reopened as a regression: run 2026-10-23_1637 measured features:HTTP2 as gap again on windows.
+- 2026-10-23_1729: Filed BL-3430.

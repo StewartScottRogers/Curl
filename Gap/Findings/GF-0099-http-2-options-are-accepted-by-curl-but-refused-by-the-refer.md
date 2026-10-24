@@ -13,8 +13,8 @@ closed:
 regression: false
 items: [options:--http2, options:--http2-prior-knowledge, options:--proxy-http2, options:--proxy-http2:no-form]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
-task:
-tasks: []
+task: BL-3432
+tasks: [BL-3432]
 ---
 # GF-0099 - HTTP/2 options are accepted by Curl but refused by the reference curl as unsupported by its libcurl
 
@@ -37,3 +37,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 ## Log
 
 - 2026-10-23_1637: Opened by gap-options.
+- 2026-10-23_1729: Filed BL-3432.
