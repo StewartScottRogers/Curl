@@ -18,7 +18,7 @@ namespace Curl.Conformance;
 /// <see cref="NotSupportedException"/>. The library is read as text lines (Latin-1, as Perl reads bytes); a missing file
 /// throws.
 /// </remarks>
-internal static class UpstreamTest1169Script
+internal static class UpstreamRunTestsScript
 {
     private static readonly Regex ExcludeFieldSeparator = new(@"\s*:\s*", RegexOptions.CultureInvariant, UpstreamRegex.MatchTimeout);
 
@@ -40,9 +40,9 @@ internal static class UpstreamTest1169Script
         return exitCode;
     }
 
-    /// <summary>Carries out a <c>runtests.pl</c> command line of the form <c>-L FILE</c>.</summary>
+    /// <summary>Carries out a <c>runtests.pl</c> command line of the form <c>-L FILE</c> or <c>[-o NAME=VALUE]... -E FILE TEST...</c>, discarding the <c>test NNNN SKIPPED: reason</c> lines the second prints.</summary>
     /// <param name="arguments">The words after the script's name.</param>
-    /// <returns>The exit code of the library's first <c>exit</c> line.</returns>
+    /// <returns>The exit code of the library's first <c>exit</c> line, or 1 when every test named was excluded.</returns>
     public static int Run(IReadOnlyList<string> arguments) => Run(arguments, new StringBuilder());
 
     /// <summary>Carries out a <c>runtests.pl</c> command line of the form <c>-L FILE</c> or <c>[-o NAME=VALUE]... -E FILE TEST...</c>.</summary>
@@ -109,7 +109,10 @@ internal static class UpstreamTest1169Script
 
     private static bool IsTestLine(string[] fields) => fields.Length == 3 && fields[0] == "test";
 
-    private static int ParseTestNumber(string text) => int.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+    private static int ParseTestNumber(string text) =>
+        int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int number)
+            ? number
+            : throw new NotSupportedException($"the test word {text} is not a test number, so runtests.pl would not run it as one");
 
     private static string SkipReason(Dictionary<int, string> reasons, int test) =>
         reasons.TryGetValue(test, out string? reason) ? reason : throw new NotSupportedException($"test {test} is not excluded, so runtests.pl would run it");

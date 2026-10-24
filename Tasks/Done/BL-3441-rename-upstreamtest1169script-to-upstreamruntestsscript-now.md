@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary/UpstreamTest1169Script.cs, Curl.Conformance.UnitLibrary/UpstreamRunTestsScript.cs, Curl.Conformance.UnitTests/UpstreamPerlCommandScripts.Test1169.cs, Curl.Conformance.UnitTests/UpstreamTest1169ScriptTests.cs, Curl.Conformance.UnitTests/UpstreamRunTestsScriptTests.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3441 — Rename UpstreamTest1169Script to UpstreamRunTestsScript now that it also runs case 1182's -E, and fix its Run doc and number parsing
 
@@ -26,16 +26,19 @@ Found by the shift-end review of 2026-10-23 (ADR-0710, type-design-analyzer and 
 
 ## Acceptance criteria
 
-- [ ] No `.cs` file in the solution names `UpstreamTest1169Script`; `Curl.Conformance.UnitLibrary/UpstreamRunTestsScript.cs` holds `internal static class UpstreamRunTestsScript`, and its tests are in `Curl.Conformance.UnitTests/UpstreamRunTestsScriptTests.cs`.
-- [ ] The one-argument `Run` overload's doc comment states exactly which command lines it accepts and what it returns, and a unit test pins that behaviour.
-- [ ] A unit test pins that `-E FILE abc` throws `NotSupportedException`, and another that an exclude file line `test:abc:reason` makes the run throw `NotSupportedException`.
-- [ ] The upstream cases 1169 and 1182 still pass (their rows in `PassingUpstreamCases.txt` stay).
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports the renamed class inside every gate.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] No `.cs` file in the solution names `UpstreamTest1169Script`; `Curl.Conformance.UnitLibrary/UpstreamRunTestsScript.cs` holds `internal static class UpstreamRunTestsScript`, and its tests are in `Curl.Conformance.UnitTests/UpstreamRunTestsScriptTests.cs`.
+- [x] The one-argument `Run` overload's doc comment states exactly which command lines it accepts and what it returns, and a unit test pins that behaviour.
+- [x] A unit test pins that `-E FILE abc` throws `NotSupportedException`, and another that an exclude file line `test:abc:reason` makes the run throw `NotSupportedException`.
+- [x] The upstream cases 1169 and 1182 still pass (their rows in `PassingUpstreamCases.txt` stay).
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary` reports the renamed class inside every gate.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Registration file UpstreamPerlCommandScripts.Test1169.cs keeps its name: it is the 1169 entry of the per-case registration partials. One-argument Run now documents both command lines (decided: document, not restrict). Measure-CodeQuality: 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 7151d7a3 d69b8d66 5eb137c4 1a291900 cb47ba9b 779790c0.
+- 2026-10-23: Doing -> Done. UpstreamRunTestsScript renamed, Run doc fixed, non-numeric test words throw NotSupportedException
