@@ -1,7 +1,6 @@
 {
   "items": [
     { "key": "behaviour:test1704", "platform": "windows", "reason": "decided:ADR-0786" },
-    { "key": "features:HTTP2", "platform": "windows", "reason": "decided:ADR-0786" },
     { "key": "options:--http2", "platform": "windows", "reason": "decided:ADR-0786" },
     { "key": "options:--http2-prior-knowledge", "platform": "windows", "reason": "decided:ADR-0786" },
     { "key": "options:--proxy-http2", "platform": "windows", "reason": "decided:ADR-0786" },
