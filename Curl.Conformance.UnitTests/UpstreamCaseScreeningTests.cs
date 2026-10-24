@@ -702,6 +702,27 @@ public sealed class UpstreamCaseScreeningTests
     }
 
     [TestMethod]
+    [DataRow("<client>\n<precheck>\nmkdir /log/data ; mkdir /log/log; cp /tests/data/test1 /log/data; echo 'test:1:Test should not run' > /log/exclude\n</precheck>\n</client>\n")]
+    [DataRow("<verify>\n<postcheck>\ngrep -q \"Test should not run for unit test 1182\" /log/stdout1182\n</postcheck>\n</verify>\n")]
+    public void FindSkipReason_MkdirCpEchoPrecheckAndGrepPostcheck_AreInterpreted(string sections)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.DoesNotContain("the harness does not interpret", reason ?? "");
+    }
+
+    [TestMethod]
+    [DataRow("<client>\n<precheck>\nmkdir /log/data; rm /log/data\n</precheck>\n</client>\n", "client><precheck")]
+    [DataRow("<client>\n<precheck>\ngrep -q \"text\" /log/stdout1\n</precheck>\n</client>\n", "client><precheck")]
+    [DataRow("<verify>\n<postcheck>\nmkdir /log/data\n</postcheck>\n</verify>\n", "verify><postcheck")]
+    public void FindSkipReason_ShellCheckLineWithAnotherCommand_IsUninterpreted(string sections, string part)
+    {
+        string? reason = Screen(RunnableClient + sections);
+
+        Assert.Contains($"the harness does not interpret the <{part}> line", reason ?? "");
+    }
+
+    [TestMethod]
     [DataRow("<client>\n<precheck>\n%PERL %SRCDIR/libtest/test610.pl mkdir /log/test610.dir\n</precheck>\n</client>\n")]
     [DataRow("<verify>\n<postcheck>\n%PERL %SRCDIR/libtest/test610.pl move /log/a /log/b rmdir /log/c rm /log/d\n</postcheck>\n</verify>\n")]
     public void FindSkipReason_Test610ScriptLines_AreNotPerlTheHarnessDoesNotRun(string sections)

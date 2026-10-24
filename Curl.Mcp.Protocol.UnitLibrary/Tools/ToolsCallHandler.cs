@@ -18,12 +18,17 @@ public sealed class ToolsCallHandler : IMcpMethodHandler
 
     private readonly McpServerRegistry _registry;
 
+    private readonly Action<string> _logFailure;
+
     /// <summary>Initializes a new instance of the <see cref="ToolsCallHandler" /> class.</summary>
     /// <param name="registry">The registry the called tool is found in.</param>
-    public ToolsCallHandler(McpServerRegistry registry)
+    /// <param name="logFailure">Receives one line for each exception a tool throws, whose text the client never sees.</param>
+    public ToolsCallHandler(McpServerRegistry registry, Action<string> logFailure)
     {
         ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(logFailure);
         _registry = registry;
+        _logFailure = logFailure;
     }
 
     /// <inheritdoc />
@@ -64,7 +69,7 @@ public sealed class ToolsCallHandler : IMcpMethodHandler
             : throw new McpProtocolException(JsonRpcErrorCodes.InvalidParams, "The tools/call arguments must be a JSON object.");
     }
 
-    private static async ValueTask<McpToolCallResult> CallToolAsync(IMcpTool tool, JsonElement arguments, CancellationToken cancellationToken)
+    private async ValueTask<McpToolCallResult> CallToolAsync(IMcpTool tool, JsonElement arguments, CancellationToken cancellationToken)
     {
         try
         {
@@ -72,6 +77,7 @@ public sealed class ToolsCallHandler : IMcpMethodHandler
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            _logFailure($"The tool '{tool.Name}' threw {exception.GetType().FullName}: {exception.Message}");
             return McpToolCallResult.Error($"An error occurred invoking '{tool.Name}'.");
         }
     }

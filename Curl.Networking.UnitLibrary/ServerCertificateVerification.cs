@@ -345,12 +345,13 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     // The chain's errors do not count when it leads to a --capath root trusted beside the
     // system store, when --ssl-revoke-best-effort tolerates every one of them, or when the
-    // Schannel build's --cacert file lists the server's own certificate.
+    // --cacert file anchors it: on the Schannel build by listing the server's own (leaf)
+    // certificate, on the OpenSSL build by listing any certificate of the chain.
     private SslPolicyErrors WithoutChainErrorsCurlTolerates(
         SslPolicyErrors errors,
         X509Chain? chain,
         X509Certificate2Collection anchorsBesideSystemStore) =>
-        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain) || SchannelTrustsListedLeaf(chain)
+        ChainLeadsToAnyOf(chain, anchorsBesideSystemStore) || RevocationBestEffortTolerates(chain) || CaCertificateFileAnchorsChain(chain)
             ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
             : errors;
 
@@ -362,7 +363,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     // curl's OpenSSL build sets X509_V_FLAG_PARTIAL_CHAIN, so there any certificate of the
     // chain the file lists, leaf or intermediate, anchors it (measured with curl 8.18.0 and
     // OpenSSL 3.5.5, BL-3335).
-    private bool SchannelTrustsListedLeaf(X509Chain? chain) =>
+    private bool CaCertificateFileAnchorsChain(X509Chain? chain) =>
         options.HasCaCertificates
         && chain is not null
         && chain.ChainElements.Count > 0

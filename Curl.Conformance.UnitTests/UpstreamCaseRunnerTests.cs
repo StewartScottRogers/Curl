@@ -1194,6 +1194,58 @@ public sealed partial class UpstreamCaseRunnerTests
     }
 
     // Beside the tests, whose path has no blank in the development checkout, unlike the user's temporary folder.
+    [TestMethod]
+    public async Task RunAsync_MkdirCpEchoPrecheck_CreatesTheDirectoriesCopiesTheFileAndWritesTheText()
+    {
+        string logDirectory = CreateLogDirectory();
+        string source = Path.Combine(CreateLogDirectory(), "source.txt");
+        File.WriteAllText(source, "copied");
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\n"
+            + $"mkdir %LOGDIR/data ; mkdir %LOGDIR/log; cp {source.Replace(Path.DirectorySeparatorChar, '/')} %LOGDIR/data; echo 'test:1:reason %TESTNUMBER' > %LOGDIR/exclude\n"
+            + "</precheck>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Passed, outcome.Kind, outcome.Detail);
+        Assert.IsTrue(Directory.Exists(Path.Combine(logDirectory, "log")));
+        Assert.AreEqual("copied", File.ReadAllText(Path.Combine(logDirectory, "data", "source.txt")));
+        Assert.AreEqual("test:1:reason 5\n", File.ReadAllText(Path.Combine(logDirectory, "exclude")));
+    }
+
+    [TestMethod]
+    public async Task RunAsync_PrecheckWritingOutsideTheLogDirectory_SkipsTheCase()
+    {
+        string logDirectory = CreateLogDirectory();
+        string outside = Path.Combine(CreateLogDirectory(), "made").Replace(Path.DirectorySeparatorChar, '/');
+        UpstreamCaseRunner runner = Runner(_ => Task.FromResult(0));
+        string testFile = $"<testcase>\n<client>\n<command>\na\n</command>\n<precheck>\nmkdir {outside}\n</precheck>\n</client>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, logDirectory);
+
+        Assert.AreEqual(UpstreamCaseOutcomeKind.Skipped, outcome.Kind, outcome.Detail);
+        Assert.AreEqual($"the check path {outside} is outside the log directory", outcome.Detail);
+        Assert.IsFalse(Directory.Exists(outside));
+    }
+
+    [TestMethod]
+    [DataRow("said text", UpstreamCaseOutcomeKind.Passed)]
+    [DataRow("other text", UpstreamCaseOutcomeKind.Failed)]
+    public async Task RunAsync_GrepPostcheck_PassesOnlyWhenTheFileHoldsTheText(string text, UpstreamCaseOutcomeKind expected)
+    {
+        UpstreamCaseRunner runner = Runner(async invocation =>
+        {
+            await invocation.StandardOutput.WriteAsync("we said text here\n"u8.ToArray());
+            return 0;
+        });
+        string testFile = "<testcase>\n<client>\n<command>\na\n</command>\n</client>\n"
+            + $"<verify>\n<postcheck>\ngrep -q \"{text}\" %LOGDIR/stdout%TESTNUMBER\n</postcheck>\n</verify>\n</testcase>\n";
+
+        UpstreamCaseOutcome outcome = await RunWithLogDirectoryAsync(runner, testFile, CreateLogDirectory());
+
+        Assert.AreEqual(expected, outcome.Kind, outcome.Detail);
+    }
+
     private static string CreateLogDirectory() =>
         Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "log", $"runner-{Guid.NewGuid():N}")).FullName;
 

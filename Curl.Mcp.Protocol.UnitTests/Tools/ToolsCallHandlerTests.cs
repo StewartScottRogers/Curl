@@ -10,7 +10,9 @@ public sealed class ToolsCallHandlerTests
 {
     private static JsonElement Json(string text) => JsonDocument.Parse(text).RootElement.Clone();
 
-    private static ToolsCallHandler Handler(params IMcpTool[] tools)
+    private static ToolsCallHandler Handler(params IMcpTool[] tools) => Handler(_ => { }, tools);
+
+    private static ToolsCallHandler Handler(Action<string> logFailure, params IMcpTool[] tools)
     {
         McpServerRegistry registry = new();
         foreach (IMcpTool tool in tools)
@@ -18,7 +20,7 @@ public sealed class ToolsCallHandlerTests
             registry.Add(tool);
         }
 
-        return new ToolsCallHandler(registry);
+        return new ToolsCallHandler(registry, logFailure);
     }
 
     private static async Task<McpProtocolException> CallFailingAsync(ToolsCallHandler handler, JsonElement? parameters) =>
@@ -26,7 +28,11 @@ public sealed class ToolsCallHandlerTests
 
     [TestMethod]
     public void Constructor_NullRegistry_Throws() =>
-        Assert.ThrowsExactly<ArgumentNullException>(() => new ToolsCallHandler(null!));
+        Assert.ThrowsExactly<ArgumentNullException>(() => new ToolsCallHandler(null!, _ => { }));
+
+    [TestMethod]
+    public void Constructor_NullLogFailure_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => new ToolsCallHandler(new McpServerRegistry(), null!));
 
     [TestMethod]
     public void Method_IsToolsCall() => Assert.AreEqual("tools/call", Handler().Method);
@@ -60,6 +66,18 @@ public sealed class ToolsCallHandlerTests
         JsonElement result = await Handler(tool).HandleAsync(Json("""{"name":"curl","arguments":{}}"""), CancellationToken.None);
 
         Assert.IsTrue(JsonElement.DeepEquals(Json("""{"content":[{"type":"text","text":"An error occurred invoking 'curl'."}],"isError":true}"""), result), result.GetRawText());
+    }
+
+    [TestMethod]
+    public async Task HandleAsync_ToolThrows_WritesTheExceptionTypeAndMessageToTheFailureSink()
+    {
+        List<string> logged = [];
+        FakeMcpTool tool = new("curl", (_, _) => throw new InvalidOperationException("secret detail"));
+
+        await Handler(logged.Add, tool).HandleAsync(Json("""{"name":"curl","arguments":{}}"""), CancellationToken.None);
+
+        Assert.HasCount(1, logged);
+        Assert.AreEqual("The tool 'curl' threw System.InvalidOperationException: secret detail", logged[0]);
     }
 
     [TestMethod]

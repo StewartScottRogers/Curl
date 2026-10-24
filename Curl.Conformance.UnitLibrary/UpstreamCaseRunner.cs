@@ -425,7 +425,7 @@ public sealed class UpstreamCaseRunner(
 
     private async Task<UpstreamCaseOutcome> RunScreenedAsync(UpstreamTestCase testCase, int testNumber, string logDirectory, string? certificateDirectory)
     {
-        if (await PrecheckSkipReasonAsync(testCase, testNumber).ConfigureAwait(false) is { } skipReason)
+        if (await PrecheckSkipReasonAsync(testCase, testNumber, logDirectory).ConfigureAwait(false) is { } skipReason)
         {
             return UpstreamCaseOutcome.Skipped(skipReason);
         }
@@ -493,7 +493,7 @@ public sealed class UpstreamCaseRunner(
         ]);
         // runner.pm sets $CURLOUT to a tool run's stdout, and runtests.pl compares <reply><data> with $CURLOUT (BL-2560).
         // The --output file is read after the postcheck too: test613.pl rewrites the listing 613 and 614 compare (BL-2855).
-        return Judge(testCase, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, runsTool ? standardOutputBytes : ReadOutputFile(outputFile))
+        return Judge(testCase, logDirectory, () => new UpstreamCaseRun(exitCode, standardOutputBytes, standardError.ToArray(), receivedBytes, runsTool ? standardOutputBytes : ReadOutputFile(outputFile))
         {
             ReplyDataName = runsTool ? "the program's stdout" : "the --output file",
             ProxyReceivedBytes = server.ProxyReceivedBytes.ToArray(),
@@ -507,9 +507,9 @@ public sealed class UpstreamCaseRunner(
 
     // runtests.pl runs the postcheck, then compares <verify><upload>, so the run is built after the postcheck: it can
     // move the upload into place (tests 624 and 625 upload into a folder and test610.pl moves the file).
-    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, Func<UpstreamCaseRun> buildRun)
+    private UpstreamCaseOutcome Judge(UpstreamTestCase testCase, string logDirectory, Func<UpstreamCaseRun> buildRun)
     {
-        if (FirstFailedCheck(testCase, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
+        if (FirstFailedCheck(testCase, logDirectory, "verify", "postcheck", result => result.ExitCode != 0) is { } postcheck)
         {
             return UpstreamCaseOutcome.Failed($"postcheck FAILED: exit code {postcheck.ExitCode.ToString(CultureInfo.InvariantCulture)}");
         }
@@ -584,13 +584,13 @@ public sealed class UpstreamCaseRunner(
     // runtests.pl skips the case with the first line a precheck prints, or with "precheck command
     // error" when it prints nothing and exits non-zero. Screening let only interpreted one-liners and %LIBTESTS lines
     // running a ported program through.
-    private async Task<string?> PrecheckSkipReasonAsync(UpstreamTestCase testCase, int testNumber)
+    private async Task<string?> PrecheckSkipReasonAsync(UpstreamTestCase testCase, int testNumber, string logDirectory)
     {
         foreach (string line in UpstreamTestPartBodies.Lines(testCase.Find("client", "precheck")))
         {
             UpstreamPerlOneLinerResult result = UpstreamLibTestCheckLine.Parse(line) is { } libTestCheck
                 ? await RunLibTestCheckAsync(testCase, testNumber, libTestCheck.Program, libTestCheck.Arguments).ConfigureAwait(false)
-                : RunCheckLine(line);
+                : RunCheckLine(line, logDirectory);
             if (result.ExitCode != 0 || result.Output.Length > 0)
             {
                 return PrecheckSkipReason(result);
@@ -615,12 +615,12 @@ public sealed class UpstreamCaseRunner(
         return new UpstreamPerlOneLinerResult(failure is null ? exitCode : 1, System.Text.Encoding.Latin1.GetString(standardOutput.ToArray()));
     }
 
-    private UpstreamPerlOneLinerResult RunCheckLine(string line) =>
-        UpstreamPerlCheckLine.RunLine(line, platform.OperatingSystemName) ?? UpstreamResolveCheck.RunLine(line)!;
+    private UpstreamPerlOneLinerResult RunCheckLine(string line, string logDirectory) =>
+        UpstreamPerlCheckLine.RunLine(line, platform.OperatingSystemName) ?? UpstreamShellCheckLine.RunLine(line, logDirectory) ?? UpstreamResolveCheck.RunLine(line)!;
 
-    private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
+    private UpstreamPerlOneLinerResult? FirstFailedCheck(UpstreamTestCase testCase, string logDirectory, string section, string name, Func<UpstreamPerlOneLinerResult, bool> failed) =>
         UpstreamTestPartBodies.Lines(testCase.Find(section, name))
-            .Select(RunCheckLine)
+            .Select(line => RunCheckLine(line, logDirectory))
             .FirstOrDefault(failed);
 
     // Screening let a <tool> case through only when its libtest program is ported, so libTests is given then.
