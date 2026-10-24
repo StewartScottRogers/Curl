@@ -3,8 +3,8 @@ id: AF-0368
 title: Requirements FR-018 says nothing consumes a failed transfer's byte count until --write-out exists; --write-out exists and reads it
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_2322.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-23_0618.md, 2026-10-23_2322.md).
 key: truthfulness:Documentation/Product/Requirements.md:FR-018:false-statement
 reproduction: none
 task: BL-3221
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: consecutive
+closed-by: 2026-10-23_0618.md, 2026-10-23_2322.md
 ---
 # AF-0368 - Requirements FR-018 says nothing consumes a failed transfer's byte count until --write-out exists; --write-out exists and reads it
 
@@ -43,8 +43,10 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Output.UnitLibra
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the reproduction: the only match is WriteOutTransferInfo.cs:77 ('?? result.BytesTransferred'). Requirements.md no longer says 'nothing consumes it until'; FR-018 (line 51) now says '--write-out reads it (WriteOutTransferInfo)'.
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction: only WriteOutTransferInfo.cs:77 matched. Requirements.md no longer says 'nothing consumes it until'; FR-018 (line 51) now says '--write-out reads it (WriteOutTransferInfo)'.
 
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_2322.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-23_0618.md, 2026-10-23_2322.md).

@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/TlsClientOptionsTests.cs -Pattern 
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the Select-String reproduction: no match for 'LeavesTheTenOptionsOfAdr0151NotGiven'. The test is now Constructor_WithNoArguments_LeavesTheEightTlsClientOptionsFieldsOfAdr0151NotGiven (TlsClientOptionsTests.cs:75) and asserts those eight fields, so name and body agree.
+
 ## Log
 
 - 2026-10-23: filed proposed.

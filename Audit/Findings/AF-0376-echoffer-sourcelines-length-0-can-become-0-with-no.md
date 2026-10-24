@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | not re-audited | Ran the -Site reproduction: EchOffer.cs:92 'encoded is not { Length: > 0 }' -> '>= 0' survived, but only with three baseline-failing tests excluded - HandBuiltTlsProviderTests.AuthenticateAsClientAsync_WithEch_WritesCurlsEchLinesBeforeTheHello, ..._WithEchHardAndNoUsableList_FailsWithExit35BeforeSendingAByte and ..._WithEchTrueAndNoUsableList_SendsAPlainHello. These are the tests that drive EchOffer.SourceLines and pin its -v ECH lines; they fail unmutated (TlsReader.Take bounds defect, see this audit's failing-baseline finding), so the survival cannot tell whether the suite would kill the mutant.
+
 ## Log
 
 - 2026-10-23: filed proposed.

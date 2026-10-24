@@ -42,6 +42,8 @@ Select-String -Path Curl.Cli.UnitLibrary/CommandLineParser.cs, Curl.Cli.UnitLibr
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction: CommandLineParser.cs matched neither 'The one file-system question it asks' nor 'except that a'. Only CommandLineOptionTable.cs (lines 127, 216, 218, 225, 234, 248) and CaCertificateEnvironment.cs:35 matched. The parser's summary (lines 17-34) now lists the six path checks (--netrc-file, --cacert, --crlfile, --proxy-cacert, --proxy-crlfile, --knownhosts) and the default config file, and says off Windows every parse reads CURL_CA_BUNDLE, SSL_CERT_DIR and SSL_CERT_FILE.
+
 ## Log
 
 - 2026-10-23: filed proposed.

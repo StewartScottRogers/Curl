@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | Same cause crossed the rule again: BL-3412 was requeued twice (L4 14:55:22 'Depends on BL-3410', L3 17:26:39 cost cap reached with work stashed), then was unclaimable over its cap and split at 19:14:54. BL-3315 was requeued twice (L5 07:35:46, L7 11:32:02 'Waits on BL-3342'), then split over its cap at 17:16:38. BL-3234 was requeued twice (L3 04:46:47, L1 11:08:44 waiting on BL-3334), then split over its cap at 17:16:23.
+
 ## Log
 
 - 2026-10-23: filed proposed.

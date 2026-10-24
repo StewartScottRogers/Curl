@@ -42,6 +42,8 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'go
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | not re-audited | overlaps planted defect PD-403 in RunDarkFactory.ps1, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: only ShiftRunner.ps1:195 matched. RunDarkFactory.ps1 no longer contains 'goes to Blocked for Stewart, since it is too big'; the COST CAP help now describes the split run (BL-3091, ADR-0759). A remaining copy of the old claim, in the -TaskBudgetUsd parameter comment at line 439, is filed as a new finding.
+
 ## Log
 
 - 2026-10-23: filed proposed.

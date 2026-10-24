@@ -42,6 +42,8 @@ dotnet build Curl.Console -c Release; $c=(Resolve-Path Curl.Console\bin\Release\
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | Ran the reproduction against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel. exitcode.txt gave '2' for curl and '0' for Curl with --http2. The reduced --http2-prior-knowledge http://127.0.0.1:51895/ gave curl 2 ('curl: option --http2-prior-knowledge: the installed libcurl version does not support this') and Curl 55. This audit's differential run (seed 349861470, 300 cases) found the same cause in all 5 of its differences: cases 31, 112, 247 and 252 (--http2-prior-knowledge: curl exit 2, Curl exit 55, 56, 56 and 56) and case 64 (--http2: curl exit 2, Curl exit 0).
+
 ## Log
 
 - 2026-10-23: filed proposed.

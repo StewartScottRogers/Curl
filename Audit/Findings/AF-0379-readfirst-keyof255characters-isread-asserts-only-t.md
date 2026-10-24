@@ -42,6 +42,8 @@ Select-String -Path Curl.Authentication.UnitTests/DigestChallengeTests.cs -Patte
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the Select-String reproduction: ReadFirst_KeyOf255Characters_IsRead (DigestChallengeTests.cs:152) now asserts Assert.AreEqual("n", challenge.Nonce) after Assert.IsNotNull(challenge) - the parameter after the 255-character key is read.
+
 ## Log
 
 - 2026-10-23: filed proposed.

@@ -42,6 +42,8 @@ Select-String -Path CLAUDE.md -Pattern '98 projects' | ForEach-Object { '{0}:{1}
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction: CLAUDE.md no longer contains '98 projects', and its repository layout gives no project count at all. The directory count with a .csproj is 103.
+
 ## Log
 
 - 2026-10-23: filed proposed.

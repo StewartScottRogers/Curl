@@ -3,8 +3,8 @@ id: AF-0386
 title: BL-3263 claimed 3 times because two tasks shared its ID, so lanes 6 and 2 both made the same differential-normaliser change
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.
 key: process:logs:BL-3263:redone-work
 reproduction: none
 task: none
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_2322.md
 ---
 # AF-0386 - BL-3263 claimed 3 times because two tasks shared its ID, so lanes 6 and 2 both made the same differential-normaliser change
 
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | I ran the given command: it measures the old 20261023-061815 window and shows the original incident. Judged by mechanism over this window (-Since 2026-10-23, 169 tasks done): duplicate IDs still happen (BL-3314 was held by two different tasks: L4 did CURLINFO_PRIMARY_PORT and was Done at 07:12:25; L1 renumbered at 07:31:07 and then claimed a Gource task as BL-3314; BL-3234's and BL-3315's splits both minted BL-3424/3425, renumbered at 17:20:59). But no duplicate-ID task crossed the redone-work rule: BL-3314 has 2 claims and 1 requeue, and the two lanes did different work. The only task with 3 or more claims, BL-3436, comes from a lane-9 trace with no run, not from a shared ID.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> closed. Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.

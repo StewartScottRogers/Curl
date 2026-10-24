@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1535To1550Tests.cs -Pa
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the Select-String reproduction: Lib1550_SetsTheBlocklistsAndSucceeds (Lib1535To1550Tests.cs:399) now asserts CollectionAssert.AreEqual(new[] { new MultiOptions(), new MultiOptions() }, engine.Multi.OptionsWritten) and Assert.AreEqual(new MultiOptions(), engine.Multi.Options) - it checks the multi handle's options were written for both blocklists, not Lib1550's own lists.
+
 ## Log
 
 - 2026-10-23: filed proposed.
