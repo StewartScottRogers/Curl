@@ -3,8 +3,8 @@ id: AF-0414
 title: BL-3416 cost $2.69 (6.1x the median) in one 41-turn Opus run finishing the checksrc.pl entry point
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: rejected
+reason: Stewart rejected it on 2026-10-24: a $2.69 run that finished its task in one run is not waste; cost outliers now also need a run over $5 (as AF-0415).
 key: process:BL-3416:cost-outlier
 reproduction: none
 task: BL-3461
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> rejected.
