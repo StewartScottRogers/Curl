@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.Differential.UnitLibrary/Protocols/Proxy/ProxyTunnel.cs, Curl.Conformance.Differential.UnitTests]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3436 — Close the client side when the target ends in the differential ProxyTunnel relay
 
@@ -31,14 +31,17 @@ The problem is in `Curl.Conformance.Differential.UnitLibrary/Protocols/Proxy/Pro
 
 ## Acceptance criteria
 
-- [ ] When the target side ends first, `RelayAsync` closes the client connection (shutdown or dispose) and returns.
-- [ ] When the client side ends first, `RelayAsync` closes the target and returns, as it does today.
-- [ ] Unit tests in `Curl.Conformance.Differential.UnitTests` cover both directions over in-memory streams or a loopback pair. Each shows `RelayAsync` completes and the other side reads end-of-stream, with no network beyond loopback.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] When the target side ends first, `RelayAsync` closes the client connection (shutdown or dispose) and returns.
+- [x] When the client side ends first, `RelayAsync` closes the target and returns, as it does today.
+- [x] Unit tests in `Curl.Conformance.Differential.UnitTests` cover both directions over in-memory streams or a loopback pair. Each shows `RelayAsync` completes and the other side reads end-of-stream, with no network beyond loopback.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- ProxyTunnel made public (was internal) so the test project can call it; the test project has no InternalsVisibleTo and the csproj is outside touches. When the target ends first the client connection is disposed. Measure-CodeQuality: 0 failing members.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: ca289d49 908f0847 a3bf4675 3d836d5e.
+- 2026-10-23: Doing -> Done. ProxyTunnel.RelayAsync closes the client when the target ends first
