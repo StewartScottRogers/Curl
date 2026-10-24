@@ -38,3 +38,4 @@ Found by the shift-end review of 2026-10-23 (ADR-0710, type-design-analyzer and 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 7151d7a3 d69b8d66 5eb137c4 1a291900 cb47ba9b 779790c0.
