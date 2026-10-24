@@ -3,8 +3,8 @@ id: AF-0405
 title: BL-3315 requeued twice, each time for missing prerequisite work, then deferred over its cost cap and split
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: process:logs:BL-3315:redone-work
 reproduction: none
 task: BL-3452
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0405 - BL-3315 requeued twice, each time for missing prerequisite work, then deferred over its cost cap and split
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Re-audited by mechanism over this window (13 tasks Done). No REQUEUE for missing prerequisite work, no deferral over a cost cap and no split: the only REQUEUE lines are BL-3444's overlap requeue (05:21:29) and BL-3447's three 'Lane restarted.' requeues (07:21 to 07:35). Every lane's shift-end line reads deferred=0.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

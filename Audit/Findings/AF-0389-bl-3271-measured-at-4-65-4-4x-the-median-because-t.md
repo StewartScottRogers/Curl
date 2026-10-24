@@ -3,8 +3,8 @@ id: AF-0389
 title: BL-3271 measured at $4.65 (4.4x the median) because two different tasks shared its ID; the merged cost then tripped the cost cap and a split that failed
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-24_0845.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3366) are Done at d3ee244c64c5, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:logs:BL-3271:cost-outlier
 reproduction: none
 task: BL-3366
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: task-done-historical
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0389 - BL-3271 measured at $4.65 (4.4x the median) because two different tasks shared its ID; the merged cost then tripped the cost cap and a split that failed
 
@@ -48,3 +48,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-23: filed proposed.
 - 2026-10-23: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Audit 2026-10-24_0845.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3366) are Done at d3ee244c64c5, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

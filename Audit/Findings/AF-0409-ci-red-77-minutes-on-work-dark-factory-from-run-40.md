@@ -3,8 +3,8 @@ id: AF-0409
 title: CI red 77 minutes on work/dark-factory from run 40021720442 (Conversation_AnswersAsRecorded on macOS); 23 runs cancelled before the first green
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: process:logs:Conversation_AnswersAsRecorded:ci-red
 reproduction: none
 task: BL-3456
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0409 - CI red 77 minutes on work/dark-factory from run 40021720442 (Conversation_AnswersAsRecorded on macOS); 23 runs cancelled before the first green
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Re-audited by mechanism. Run 40021720442's spell (2026-10-23T21:02:11Z to 22:19:09Z, 76.97 minutes) is the recorded incident from the previous window. With -Since 2026-10-24 the tool gives ciRedMinutes 0. Cancelled runs continue in this window (for example 11 cancelled between 12:16Z and 12:32Z on 2026-10-24), but none is a failure, and the CI red rule ignores cancelled runs.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

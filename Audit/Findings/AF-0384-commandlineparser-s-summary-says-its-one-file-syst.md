@@ -3,8 +3,8 @@ id: AF-0384
 title: CommandLineParser's summary says its one file-system question is the --cacert path and that only --variable %name reads the environment; six options probe paths and every off-Windows parse reads CA environment variables
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-23_2322.md, 2026-10-24_0845.md).
 key: truthfulness:Curl.Cli.UnitLibrary/CommandLineParser.cs:CommandLineParser:false-doc-comment
 reproduction: none
 task: BL-3361
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: consecutive
+closed-by: 2026-10-23_2322.md, 2026-10-24_0845.md
 ---
 # AF-0384 - CommandLineParser's summary says its one file-system question is the --cacert path and that only --variable %name reads the environment; six options probe paths and every off-Windows parse reads CA environment variables
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Cli.UnitLibrary/CommandLineParser.cs, Curl.Cli.UnitLibr
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction: CommandLineParser.cs matched neither 'The one file-system question it asks' nor 'except that a'. Only CommandLineOptionTable.cs (lines 127, 216, 218, 225, 234, 248) and CaCertificateEnvironment.cs:35 matched. The parser's summary (lines 17-34) now lists the six path checks (--netrc-file, --cacert, --crlfile, --proxy-cacert, --proxy-crlfile, --knownhosts) and the default config file, and says off Windows every parse reads CURL_CA_BUNDLE, SSL_CERT_DIR and SSL_CERT_FILE.
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Ran the reproduction: no match in CommandLineParser.cs for 'The one file-system question it asks' or 'except that a' at line end; only the option-table and CaCertificateEnvironment lines matched. The summary (lines 17-18, 32-34) now names all six path checks (--netrc-file, --cacert, --crlfile, --proxy-cacert, --proxy-crlfile, --knownhosts) and says off Windows every parse reads CURL_CA_BUNDLE, SSL_CERT_DIR and SSL_CERT_FILE.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-23: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-23_2322.md, 2026-10-24_0845.md).

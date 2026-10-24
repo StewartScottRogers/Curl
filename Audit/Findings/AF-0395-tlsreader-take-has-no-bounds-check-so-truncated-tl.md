@@ -42,6 +42,8 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: yes | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": Passed 1266, Failed 8, then the test run was aborted when the host crashed in Tls12ClientConnectionTests.ServerFlightSplitAcrossRecordsCompletesTheHandshake. The finding's named cause is fixed: TlsReader.Take now returns false when end - position < count. The failures now come from HandshakeMessageReader.Read (System.ArgumentOutOfRangeException at line 32: buffer[HeaderLength..total] with no buffer.Length >= total check), filed as its own finding. Curl.Networking.UnitTests also still has 5 TcpConnectorQuicTests failing unmutated (excluded by the mutation baseline).
+
 ## Log
 
 - 2026-10-23: filed proposed.

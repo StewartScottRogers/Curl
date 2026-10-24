@@ -3,8 +3,8 @@ id: AF-0399
 title: SocksServerConnection.FindSocks4End's DSTIP - 1 < 255 can become + 1 with no test failing, so the SOCKS4a stand-in misreads 0.0.0.0 and 0.0.0.254-255
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.UnitLibrary/SocksServerConnection.cs:static-minus1:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/SocksServerConnection.cs:106:-1
 task: BL-3446
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: mechanical
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0399 - SocksServerConnection.FindSocks4End's DSTIP - 1 < 255 can become + 1 with no test failing, so the SOCKS4a stand-in misreads 0.0.0.0 and 0.0.0.254-255
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Ran the -Site Curl.Conformance.UnitLibrary/SocksServerConnection.cs:106:-1 run: resolvedLine 106, 'ReadUInt32BigEndian(request.AsSpan(4)) - 1 < 255' -> '+ 1 < 255', outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

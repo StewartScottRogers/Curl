@@ -3,8 +3,8 @@ id: AF-0404
 title: BL-3412 requeued twice (undeclared dependency on BL-3410, then cost cap with work stashed) and then split
 auditor: process
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: process:logs:BL-3412:redone-work
 reproduction: none
 task: BL-3451
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0404 - BL-3412 requeued twice (undeclared dependency on BL-3410, then cost cap with work stashed) and then split
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Re-audited by mechanism over this window (13 tasks Done). Select-String over DarkFactory-*.log finds no 'split', 'unclaimable', cost-cap or stash-then-requeue line except BL-3444's single overlap requeue, after which its stash was reapplied and the task Done. No task was requeued for an undeclared dependency and then for its cost cap.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
