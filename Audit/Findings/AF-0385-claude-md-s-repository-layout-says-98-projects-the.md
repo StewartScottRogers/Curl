@@ -3,12 +3,12 @@ id: AF-0385
 title: CLAUDE.md's repository layout says 98 projects; the tree has 101 project directories with a .csproj plus 5 shared projects
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:CLAUDE.md:project-count:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-3362
+tasks: BL-3362
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
@@ -42,6 +42,9 @@ Select-String -Path CLAUDE.md -Pattern '98 projects' | ForEach-Object { '{0}:{1}
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction: CLAUDE.md no longer contains '98 projects', and its repository layout gives no project count at all. The directory count with a .csproj is 103.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.

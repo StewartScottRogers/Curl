@@ -3,19 +3,19 @@ id: AF-0381
 title: --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: closed
+reason: Stewart closed it on 2026-10-23 (decision about 23:30 Arizona, 'Keep HTTP/2 on'): explained by ADR-0786, which keeps HTTP/2 on in the Windows build and accepts that a Windows script relying on the Schannel reference's exit-2 refusal of --http2 now sees a transfer; BL-3358's refuse-on-Windows fix is not wanted.
 key: conformance:--http2:RefusedBySchannelBuild:exit-code
 reproduction: none
-task: none
-tasks:
+task: BL-3358
+tasks: BL-3358
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0381 - --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
 
@@ -42,6 +42,10 @@ dotnet build Curl.Console -c Release; $c=(Resolve-Path Curl.Console\bin\Release\
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | Ran the reproduction against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel. exitcode.txt gave '2' for curl and '0' for Curl with --http2. The reduced --http2-prior-knowledge http://127.0.0.1:51895/ gave curl 2 ('curl: option --http2-prior-knowledge: the installed libcurl version does not support this') and Curl 55. This audit's differential run (seed 349861470, 300 cases) found the same cause in all 5 of its differences: cases 31, 112, 247 and 252 (--http2-prior-knowledge: curl exit 2, Curl exit 55, 56, 56 and 56) and case 64 (--http2: curl exit 2, Curl exit 0).
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Stewart closed it on 2026-10-23 (decision about 23:30 Arizona, 'Keep HTTP/2 on'): explained by ADR-0786, which keeps HTTP/2 on in the Windows build and accepts that a Windows script relying on the Schannel reference's exit-2 refusal of --http2 now sees a transfer; BL-3358's refuse-on-Windows fix is not wanted.

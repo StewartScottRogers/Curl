@@ -3,8 +3,8 @@ id: AF-0367
 title: ADR-0759 says the split run may run git stash store; $SplitForbidden denies it
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-23_2322.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-23_0618.md, 2026-10-23_2322.md).
 key: truthfulness:Documentation/Planning/Decisions/ADR-0759-a-task-over-its-cost-cap-is-split-by-one-bounded-run.md:SplitForbidden:stale-adr
 reproduction: none
 task: BL-3220
@@ -13,9 +13,9 @@ found: 2026-10-22
 found-at: 9ada2459e76878e927865fe930a3afac67191f22
 scorecard: 2026-10-22_1902.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: consecutive
+closed-by: 2026-10-23_0618.md, 2026-10-23_2322.md
 ---
 # AF-0367 - ADR-0759 says the split run may run git stash store; $SplitForbidden denies it
 
@@ -43,8 +43,10 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0759-*.md, DarkFactory/
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_0618.md | reproduces: no | Ran the reproduction: the only match is Prompts.ps1:435 ($SplitForbidden's 'git stash store'). ADR-0759 no longer contains 'except `list` and `store`'; its line 21 now says the split run is denied 'every git stash subcommand except list', which agrees with $SplitForbidden.
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction: only Prompts.ps1:435 ('git stash store' in $SplitForbidden) matched. ADR-0759 no longer contains 'except `list` and `store`'; its line 21 now says the split run is denied 'every `git stash` subcommand except `list`', which matches the code.
 
 ## Log
 
 - 2026-10-22: filed proposed.
 - 2026-10-22: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_2322.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-23_0618.md, 2026-10-23_2322.md).

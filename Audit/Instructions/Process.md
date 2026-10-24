@@ -47,8 +47,11 @@ the named log files).
 | CI red | `ciRedMinutes` over 60, or any one of `ciRedSpells` over 30 minutes | for each such spell, its run id, the commit and test that turned it red, and how long until a task was filed and fixed |
 | Overlap waits | `waitOverlapMinutes` over 20% of `laneMinutes` | the `touches` that serialised lanes (often a shared file such as `RunDarkFactory.ps1` or `Curl.slnx`), and whether a narrower `touches` would have been true |
 | Empty queue | `waitNothingReadyMinutes` over 20% of `laneMinutes`, with ready tasks assigned to Stewart or interactive only | which tasks were waiting on him or on an interactive session |
-| Cost outliers | one task over 3 times the median `costUsd` | the 5 costliest tasks, and what in their runs drove the cost (turns, retries, rereading) |
+| Cost outliers | one task over 3 times the median `costUsd` and over 5 US dollars | the 5 costliest tasks, and what in their runs drove the cost (turns, retries, rereading) |
 | Unfinished runs | any file in `unfinishedRuns` | for each, what stopped it: a timeout, a usage limit, a crash |
+
+The 5-dollar floor is Stewart's (2026-10-24, rejecting AF-0415): with a median task near 50
+cents, 3 times the median flagged ordinary 2-dollar runs that finished their task in one run.
 
 Lane time (`laneMinutes`) is the sum, over every lane in the period, of the time from its first to
 its last log line.

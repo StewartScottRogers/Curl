@@ -3,12 +3,12 @@ id: AF-0387
 title: BL-3204 requeued twice: first blocked by BL-3199 holding ManagedEasyTransfer.cs, then out of its cost cap with 7 Engine tests failing
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3204:redone-work
 reproduction: none
-task: none
-tasks:
+task: BL-3364
+tasks: BL-3364
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | Same cause crossed the rule again: BL-3412 was requeued twice (L4 14:55:22 'Depends on BL-3410', L3 17:26:39 cost cap reached with work stashed), then was unclaimable over its cap and split at 19:14:54. BL-3315 was requeued twice (L5 07:35:46, L7 11:32:02 'Waits on BL-3342'), then split over its cap at 17:16:38. BL-3234 was requeued twice (L3 04:46:47, L1 11:08:44 waiting on BL-3334), then split over its cap at 17:16:23.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.

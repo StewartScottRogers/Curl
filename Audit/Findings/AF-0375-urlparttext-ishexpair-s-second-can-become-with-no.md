@@ -3,19 +3,19 @@ id: AF-0375
 title: UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/UrlPartText.cs:IsHexPair-and:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/UrlPartText.cs:133:&&
-task: none
-tasks:
+task: BL-3352
+tasks: BL-3352
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: mechanical
+closed-by: 2026-10-23_2322.md
 ---
 # AF-0375 - UrlPartText.IsHexPair's second && can become || with no test failing, so a malformed percent escape throws instead of passing through
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the -Site reproduction: UrlPartText.cs:133 'index + 1 < bytes.Length && ...' -> '... || ...' was killed (resolvedLine 133). Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
