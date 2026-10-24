@@ -47,3 +47,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 9f6e160d 1fd5de8c 28346828.
