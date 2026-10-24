@@ -36,9 +36,12 @@ ADR-0803 (BL-3406) decides 1182 as `interpret`: the C# runner honours `-E <file>
 
 - 2026-10-23 (lane 4): Claimed with template placeholders for Goal, Context and criteria, which no run can tick, so moved back to Backlog to write them (the board allows criteria edits only outside Doing). Found in the same pass: the script registry is a dictionary keyed by script name and BL-3410 registers `runtests.pl` for 1169, so a second registration here would collide; added BL-3410 to `depends-on` and its files to `touches`. The precheck needs `UpstreamCaseScreening.cs` and `UpstreamCaseRunner.cs` (and their tests), which no task in Doing on origin/work/dark-factory held; added them. The postcheck `grep -q "..." %LOGDIR/stdout1182` is not interpreted either (`UninterpretedCheck` in `UpstreamCaseScreening.cs` accepts only perl one-liners and %RESOLVE lines); only case 1182 uses `grep -q` and no task covers it, so it is in this task's criteria, in the same two files. The case has no server, so nothing else stands in the way.
 
+- 2026-10-23 (lane 3): Implemented but left uncommitted for the shift to stash (the run hit its cost cap): new Curl.Conformance.UnitLibrary/UpstreamShellCheckLine.cs and Curl.Conformance.UnitTests/UpstreamShellCheckLineTests.cs (new files, no other task holds them), screening and runner wired to it, UpstreamTest1169Script honours -E (prints `test NNNN SKIPPED: reason`, exit 1), tests added, 1182 listed. Curl.Conformance.UnitTests fast run: 4321 passed, 0 failed, and the test1182 row passes. Left for the next claim: Measure-CodeQuality.ps1 -Library Curl.Conformance.UnitLibrary, the solution fast tests, tick the boxes and commit.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: fbecace0.
 - 2026-10-23: Doing -> Backlog. Depends on BL-3410: both cases run runtests.pl, which the script registry keys once, so -E extends BL-3410's runtests.pl interpretation; criteria were template placeholders and are written now
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 54e0f226 84ffb677 ef020bad 406ec57e 45ba054b 7d0a04bb 779790c0.
+- 2026-10-23: Doing -> Backlog. Code done and Conformance tests green (stash); cost cap reached before the quality measurement and solution fast tests
