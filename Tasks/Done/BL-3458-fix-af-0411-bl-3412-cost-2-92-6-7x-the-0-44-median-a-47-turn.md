@@ -8,7 +8,7 @@ depends-on: []
 touches: [RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3458 — Fix AF-0411: BL-3412 cost $2.92 (6.7x the $0.44 median): a 47-turn Opus retry that ran out of cap after an earlier Opus run found an undeclared dependency
 
@@ -41,12 +41,17 @@ The finding describes a past run's cost, which no fix can change, so no re-audit
 
 ## Acceptance criteria
 
-- [ ] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The cause of the cost is named in this task, and either fixed or recorded as unavoidable.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause (from the task Context): two Opus runs. The first (25 turns, $0.73) ended in REQUEUE "Depends on BL-3410" - a dependency BL-3412 did not declare; the second was a retry, and DarkFactory/ModelChoice.ps1 picks Opus for any retried task (a deliberate rule, BL-1705), so it re-read a large context for 47 turns ($2.19, 3.73M cache-read tokens) and hit the cost cap before the gates. Total $2.92 against a $0.44 median.
+- Recorded as unavoidable here: the undeclared dependency was a one-off task-authoring gap that the lane rules (rule 4, find every prerequisite before the first edit) already address, and the retry-on-Opus rule is by design. The cost cap did its job by stopping the run; the work went to a split task (sonnet, $0.26). No change to RunDarkFactory.ps1 is warranted. Build clean; fast tests green.
+
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: af4de8c2 9742157d.
+- 2026-10-24: Doing -> Done. Cost cause named (undeclared dependency plus by-design Opus retry), recorded unavoidable; build and fast tests green
