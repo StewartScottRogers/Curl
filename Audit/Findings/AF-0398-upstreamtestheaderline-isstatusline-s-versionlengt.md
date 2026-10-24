@@ -3,8 +3,8 @@ id: AF-0398
 title: UpstreamTestHeaderLine.IsStatusLine's versionLength + 1 bound can become - 1 with no test failing, so a short HTTP/ line throws instead of being judged
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitLibrary/UpstreamTestHeaderLine.cs:IsStatusLine-plus1:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/UpstreamTestHeaderLine.cs:33:+1
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
