@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs, Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-23
 completed:
