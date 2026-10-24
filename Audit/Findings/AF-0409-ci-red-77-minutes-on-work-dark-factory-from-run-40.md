@@ -3,8 +3,8 @@ id: AF-0409
 title: CI red 77 minutes on work/dark-factory from run 40021720442 (Conversation_AnswersAsRecorded on macOS); 23 runs cancelled before the first green
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:Conversation_AnswersAsRecorded:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
