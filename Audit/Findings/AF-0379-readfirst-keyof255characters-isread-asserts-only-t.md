@@ -3,8 +3,8 @@ id: AF-0379
 title: ReadFirst_KeyOf255Characters_IsRead asserts only that a challenge is not null
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: quality:Curl.Authentication.UnitTests/DigestChallengeTests.cs:ReadFirst_KeyOf255Characters_IsRead:weak-assertion
 reproduction: none
 task: BL-3356
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0379 - ReadFirst_KeyOf255Characters_IsRead asserts only that a challenge is not null
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Authentication.UnitTests/DigestChallengeTests.cs -Patte
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the Select-String reproduction: ReadFirst_KeyOf255Characters_IsRead (DigestChallengeTests.cs:152) now asserts Assert.AreEqual("n", challenge.Nonce) after Assert.IsNotNull(challenge) - the parameter after the 255-character key is read.
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Select-String shows ReadFirst_KeyOf255Characters_IsRead now asserts Assert.AreEqual("n", challenge.Nonce) after Assert.IsNotNull(challenge). A challenge carrying a 255-character key is parsed through to its nonce.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-23: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

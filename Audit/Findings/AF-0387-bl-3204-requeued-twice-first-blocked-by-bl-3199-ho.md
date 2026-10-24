@@ -3,8 +3,8 @@ id: AF-0387
 title: BL-3204 requeued twice: first blocked by BL-3199 holding ManagedEasyTransfer.cs, then out of its cost cap with 7 Engine tests failing
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: process:logs:BL-3204:redone-work
 reproduction: none
 task: BL-3364
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0387 - BL-3204 requeued twice: first blocked by BL-3199 holding ManagedEasyTransfer.cs, then out of its cost cap with 7 Engine tests failing
 
@@ -43,8 +43,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | Same cause crossed the rule again: BL-3412 was requeued twice (L4 14:55:22 'Depends on BL-3410', L3 17:26:39 cost cap reached with work stashed), then was unclaimable over its cap and split at 19:14:54. BL-3315 was requeued twice (L5 07:35:46, L7 11:32:02 'Waits on BL-3342'), then split over its cap at 17:16:38. BL-3234 was requeued twice (L3 04:46:47, L1 11:08:44 waiting on BL-3334), then split over its cap at 17:16:23.
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Re-audited by mechanism over this audit's log folder, which holds shifts 20261023-201004, 20261024-050935, -061031 and -062026; tasksDone is 13. Measure-FactoryProcess.ps1 -Since 2026-10-23 gives requeues 4 and tasksClaimedMoreThanOnce 2. BL-3444 was requeued once because another task held a file (BL-3447's touches covered the whole Curl.Networking.UnitTests project); its stash f7e1ef60 was reapplied and it was Done on its second claim. One requeue is under the redone-work threshold, and no cost-cap requeue follows it. The only task that crossed the threshold, BL-3447, was requeued for 'Lane restarted', a different cause. Select-String finds no 'stash', 'split' or 'unclaimable' line tied to a twice-requeued task.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-23: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

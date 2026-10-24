@@ -3,8 +3,8 @@ id: AF-0377
 title: Lib1550_SetsTheBlocklistsAndSucceeds checks Lib1550's own constant lists, never that the blocklists were set on the multi handle
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1535To1550Tests.cs:Lib1550_SetsTheBlocklistsAndSucceeds:name-lies
 reproduction: none
 task: BL-3354
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0377 - Lib1550_SetsTheBlocklistsAndSucceeds checks Lib1550's own constant lists, never that the blocklists were set on the multi handle
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1535To1550Tests.cs -Pa
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the Select-String reproduction: Lib1550_SetsTheBlocklistsAndSucceeds (Lib1535To1550Tests.cs:399) now asserts CollectionAssert.AreEqual(new[] { new MultiOptions(), new MultiOptions() }, engine.Multi.OptionsWritten) and Assert.AreEqual(new MultiOptions(), engine.Multi.Options) - it checks the multi handle's options were written for both blocklists, not Lib1550's own lists.
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Select-String context shows that Lib1550_SetsTheBlocklistsAndSucceeds now also asserts CollectionAssert.AreEqual(new[] { new MultiOptions(), new MultiOptions() }, engine.Multi.OptionsWritten) and Assert.AreEqual(new MultiOptions(), engine.Multi.Options). Setting the blocklists on the multi handle is now checked.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-23: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0410
 title: CI red 50 minutes on work/dark-factory from run 40034290028 (test1173 on Linux and macOS)
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: process:logs:test1173:ci-red
 reproduction: none
 task: BL-3457
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0410 - CI red 50 minutes on work/dark-factory from run 40034290028 (test1173 on Linux and macOS)
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Re-audited by mechanism. Run 40034290028's spell (2026-10-23T22:57:04Z to 23:47:24Z, 50.33 minutes) is the recorded incident from the previous window. With -Since 2026-10-24 the tool gives ciRedMinutes 0 and no spell, and every finished CI run in this window passed.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

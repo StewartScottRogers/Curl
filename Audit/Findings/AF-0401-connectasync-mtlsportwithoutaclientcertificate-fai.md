@@ -3,8 +3,8 @@ id: AF-0401
 title: ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake checks only that the reply is not the expected one, not that the handshake failed
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: quality:Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs:ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake:weak-assertion
 reproduction: none
 task: BL-3448
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0401 - ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake checks only that the reply is not the expected one, not that the handshake failed
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | The reproduction's pattern 'Assert.AreNotEqual(ExpectedReply, reply)' no longer matches. ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake now asserts Assert.IsNull(reply) (TryExchangeAsync returns null on a handshake exception) and Assert.IsEmpty(verifier.ReceivedCertificates).
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

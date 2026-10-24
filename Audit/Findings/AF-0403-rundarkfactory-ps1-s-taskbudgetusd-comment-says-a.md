@@ -42,6 +42,8 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'ha
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Ran the reproduction: only ShiftRunner.ps1:195 matched; 'has its task filed as Blocked' is gone. The -TaskBudgetUsd comment (RunDarkFactory.ps1:437-440) now says a run that reaches the cap gets one bounded split run that defers the original, Blocked only if the split is skipped or fails.
+
 ## Log
 
 - 2026-10-23: filed proposed.

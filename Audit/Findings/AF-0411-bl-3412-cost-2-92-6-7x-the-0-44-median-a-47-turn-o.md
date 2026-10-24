@@ -3,8 +3,8 @@ id: AF-0411
 title: BL-3412 cost $2.92 (6.7x the $0.44 median): a 47-turn Opus retry that ran out of cap after an earlier Opus run found an undeclared dependency
 auditor: process
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Audit 2026-10-24_0845.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3458) are Done at d3ee244c64c5, so it closes without a re-audit (ADR-0422, amended 2026-10-14).
 key: process:BL-3412:cost-outlier
 reproduction: none
 task: BL-3458
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: task-done-historical
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0411 - BL-3412 cost $2.92 (6.7x the $0.44 median): a 47-turn Opus retry that ran out of cap after an earlier Opus run found an undeclared dependency
 
@@ -46,3 +46,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Audit 2026-10-24_0845.md: a cost-outlier finding records a past run's cost, which no fix can change; its tasks (BL-3458) are Done at d3ee244c64c5, so it closes without a re-audit (ADR-0422, amended 2026-10-14).

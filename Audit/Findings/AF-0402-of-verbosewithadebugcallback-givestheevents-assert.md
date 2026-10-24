@@ -3,8 +3,8 @@ id: AF-0402
 title: Of_VerboseWithADebugCallback_GivesTheEvents asserts only that a result is not null
 auditor: quality
 severity: Low
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs:Of_VerboseWithADebugCallback_GivesTheEvents:weak-assertion
 reproduction: none
 task: BL-3449
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0402 - Of_VerboseWithADebugCallback_GivesTheEvents asserts only that a result is not null
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs -P
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Select-String context shows Of_VerboseWithADebugCallback_GivesTheEvents now drives ReportInfo and ReportDataReceived and asserts CollectionAssert.AreEqual of (Text, "Trying 127.0.0.1:80...\n") and (DataIn, "down") against the recorded callback calls.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.

@@ -3,8 +3,8 @@ id: AF-0396
 title: DnsServerQuery.QuestionEnd's != 0 can become == 0 with no test failing, so a reply whose question differs after its first five bytes is accepted
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/DnsServerQuery.cs:QuestionEnd-ne:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsServerQuery.cs:121:!=
 task: BL-3443
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: mechanical
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0396 - DnsServerQuery.QuestionEnd's != 0 can become == 0 with no test failing, so a reply whose question differs after its first five bytes is accepted
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Ran the -Site Curl.Networking.UnitLibrary/DnsServerQuery.cs:121:!= run: resolvedLine 121, 'while (query[index] != 0)' -> '== 0', outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
