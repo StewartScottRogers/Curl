@@ -38,3 +38,4 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary alre
 
 - 2026-10-23_1637: Opened by gap-behaviour.
 - 2026-10-23_1729: Filed BL-3431.
+- 2026-10-23_2330: Stewart decided 'Keep HTTP/2 on': ADR-0786 stands, so the Windows build keeps HTTP/2 and Curl will not refuse it to match the Schannel reference. Gap/Baselines/platform-exclusions.json now has Measure-GapAreas.ps1 measure behaviour:test1704 as excluded with reason decided:ADR-0786 on Windows only; this finding closes on the next run that measures them so (findings close only on measurement).

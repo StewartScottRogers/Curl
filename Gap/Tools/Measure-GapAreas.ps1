@@ -32,7 +32,11 @@
                       #:project line builds the tree's Curl.Console into the harness), then
                       ConvertTo-BehaviourMeasurement.ps1, then Measure-ReferenceCrossCheck.ps1.
        A tool that fails is reported, its areas are "not measured: <tool> exited <n>", and
-       the next tool runs.
+       the next tool runs. After a tool succeeds, every item of its areas that
+       Gap/Baselines/platform-exclusions.json lists for this platform ({ key, platform,
+       reason }, a decision that holds on one platform only, such as ADR-0786's HTTP/2 on
+       Windows) is set excluded with that reason, keeping its expected and actual answers,
+       and the measurement's counts (and behaviour's reasons) are recounted.
     5. The status file, JSON: platform (windows, linux or macos), commit (git -C <Tree>
        rev-parse HEAD), target, reference, areas (one property per selected area: "X of Y"
        or "not measured: ...") and failure (null, or why the script stopped early).
@@ -130,6 +134,55 @@ function Get-MeasurementCount {
         $counts = (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json).counts
         return "$($counts.x) of $($counts.y)"
     } catch { return 'measured (counts unreadable)' }
+}
+
+function Get-GapPlatformExclusions {
+    # The items platform-exclusions.json excludes on one platform, as key -> reason. No file
+    # means no exclusions.
+    param([string] $Path, [string] $Platform)
+    $table = @{}
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $table }
+    foreach ($entry in @((Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json).items)) {
+        if (-not $entry.key -or -not $entry.platform -or -not $entry.reason) { throw "An exclusion in $Path needs a key, a platform and a reason." }
+        if ($entry.platform -eq $Platform) { $table[[string] $entry.key] = [string] $entry.reason }
+    }
+    return $table
+}
+
+function Set-GapPlatformExclusions {
+    # Sets each listed item of one measurement file excluded with its reason, keeping its
+    # answers, and recounts counts (and behaviour's reasons). Rewrites the file only when an
+    # item changed; returns the number changed.
+    param([string] $Path, [hashtable] $Exclusions)
+    if ($Exclusions.Count -eq 0) { return 0 }
+    $read = @{}
+    # PowerShell 7 would turn measuredAt into a DateTime and write it back reformatted.
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $read.DateKind = 'String' }
+    $measurement = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json @read
+    $items = @($measurement.items)
+    $changed = 0
+    foreach ($item in $items) {
+        $key = [string] $item.key
+        if (-not $Exclusions.ContainsKey($key) -or ($item.state -eq 'excluded' -and $item.reason -eq $Exclusions[$key])) { continue }
+        $item.state = 'excluded'
+        if (@($item.PSObject.Properties.Name) -contains 'reason') { $item.reason = $Exclusions[$key] } else { $item | Add-Member -NotePropertyName reason -NotePropertyValue $Exclusions[$key] }
+        $changed++
+    }
+    if ($changed -eq 0) { return 0 }
+    foreach ($state in 'match', 'gap', 'unmeasured', 'excluded') { $measurement.counts.$state = @($items | Where-Object { $_.state -eq $state }).Count }
+    $measurement.counts.x = $measurement.counts.match
+    $measurement.counts.y = $measurement.counts.match + $measurement.counts.gap + $measurement.counts.unmeasured
+    if (@($measurement.PSObject.Properties.Name) -contains 'reasons') {
+        $sorted = New-Object 'System.Collections.Generic.SortedDictionary[string,int]' ([System.StringComparer]::Ordinal)
+        foreach ($item in $items) { if ($item.state -eq 'unmeasured' -or $item.state -eq 'excluded') { $sorted[[string] $item.reason] = 1 + $(if ($sorted.ContainsKey([string] $item.reason)) { $sorted[[string] $item.reason] } else { 0 }) } }
+        $reasons = [ordered] @{}
+        foreach ($pair in $sorted.GetEnumerator()) { $reasons[$pair.Key] = $pair.Value }
+        $measurement.reasons = $reasons
+    }
+    $write = @{ Depth = 32 }
+    if ((Get-Command ConvertTo-Json).Parameters.ContainsKey('EscapeHandling')) { $write.EscapeHandling = 'EscapeNonAscii' }
+    [System.IO.File]::WriteAllText([System.IO.Path]::GetFullPath($Path), ($measurement | ConvertTo-Json @write), (New-Object System.Text.UTF8Encoding $false))
+    return $changed
 }
 
 function Format-GapCommand {
@@ -233,6 +286,7 @@ function Invoke-GapMeasurement {
     }
     Write-Host "Reference: $referenceLine"
 
+    $platformExclusions = Get-GapPlatformExclusions (Join-Path (Split-Path $script:ToolsDirectory -Parent) 'Baselines/platform-exclusions.json') $platform
     $common = @('-Version', $Version, '-UpstreamRoot', $releaseFolder)
     foreach ($tool in $selection.Tools) {
         $out = { param([string] $Name) Join-Path $OutDirectory "$Name.json" }
@@ -259,7 +313,11 @@ function Invoke-GapMeasurement {
             if (-not $areaStatus.Contains($area)) { continue }
             $path = & $out $area
             if ($DryRun) { $areaStatus[$area] = 'dry run' }
-            elseif ($code -eq 0 -and (Test-Path -LiteralPath $path)) { $areaStatus[$area] = Get-MeasurementCount $path }
+            elseif ($code -eq 0 -and (Test-Path -LiteralPath $path)) {
+                $excluded = Set-GapPlatformExclusions $path $platformExclusions
+                if ($excluded -gt 0) { Write-Host "[exclusions] $area`: $excluded item(s) excluded by platform-exclusions.json on $platform" }
+                $areaStatus[$area] = Get-MeasurementCount $path
+            }
             else { $areaStatus[$area] = "not measured: $tool exited $code"; Write-Host "Area $area not measured: $tool exited $code." }
         }
     }
@@ -291,6 +349,28 @@ function Invoke-GapMeasureSelfTest {
         [System.IO.File]::WriteAllText($counted, $measurement.Replace('AREA', 'options'))
         & $report 'a measurement reads as "X of Y"' ((Get-MeasurementCount $counted) -eq '3 of 5')
         & $report 'an unreadable measurement says so' ((Get-MeasurementCount (Join-Path $scratch 'none.json')) -eq 'measured (counts unreadable)')
+
+        $shipped = Join-Path (Split-Path $savedTools -Parent) 'Baselines/platform-exclusions.json'
+        $onWindows = Get-GapPlatformExclusions $shipped 'windows'
+        $http2Keys = 'behaviour:test1704,features:HTTP2,options:--http2,options:--http2-prior-knowledge,options:--proxy-http2,options:--proxy-http2:no-form'
+        & $report 'the shipped platform exclusions are the six ADR-0786 HTTP/2 items, on Windows only' ((($onWindows.Keys | Sort-Object) -join ',') -eq $http2Keys -and @($onWindows.Values | Where-Object { $_ -ne 'decided:ADR-0786' }).Count -eq 0 -and (Get-GapPlatformExclusions $shipped 'linux').Count -eq 0 -and (Get-GapPlatformExclusions $shipped 'macos').Count -eq 0)
+        & $report 'no platform exclusions file means no exclusions' ((Get-GapPlatformExclusions (Join-Path $scratch 'none.json') 'windows').Count -eq 0)
+        $exclusionsFile = Join-Path $scratch 'platform-exclusions.json'
+        [System.IO.File]::WriteAllText($exclusionsFile, '{ "items": [ { "key": "behaviour:test2", "platform": "windows", "reason": "decided:ADR-9999" }, { "key": "behaviour:test1", "platform": "linux", "reason": "decided:ADR-9998" } ] }')
+        $table = Get-GapPlatformExclusions $exclusionsFile 'windows'
+        & $report 'an exclusion applies only on its own platform' ($table.Count -eq 1 -and $table['behaviour:test2'] -eq 'decided:ADR-9999')
+        [System.IO.File]::WriteAllText($exclusionsFile, '{ "items": [ { "key": "behaviour:test2", "reason": "decided:ADR-9999" } ] }')
+        $threw = $false; try { Get-GapPlatformExclusions $exclusionsFile 'windows' | Out-Null } catch { $threw = $true }
+        & $report 'an exclusion without a platform is refused' $threw
+        $behaviour = Join-Path $scratch 'behaviour.json'
+        [System.IO.File]::WriteAllText($behaviour, '{ "area": "behaviour", "measuredAt": "2026-10-23T16:37:00Z", "items": [ { "key": "behaviour:test1", "state": "match", "reason": null, "expected": "e1", "actual": "a1" }, { "key": "behaviour:test2", "state": "gap", "reason": null, "expected": "exit 2", "actual": "exit 8" }, { "key": "behaviour:test3", "state": "unmeasured", "reason": "needs-server:smtp", "expected": null, "actual": null } ], "counts": { "match": 1, "gap": 1, "unmeasured": 1, "excluded": 0, "x": 1, "y": 3 }, "reasons": { "needs-server:smtp": 1 } }')
+        $changed = Set-GapPlatformExclusions $behaviour $table
+        $after = Get-Content -LiteralPath $behaviour -Raw | ConvertFrom-Json
+        $test2 = @($after.items | Where-Object { $_.key -eq 'behaviour:test2' })[0]
+        & $report 'a listed item becomes excluded with its reason and keeps its answers' ($changed -eq 1 -and $test2.state -eq 'excluded' -and $test2.reason -eq 'decided:ADR-9999' -and $test2.expected -eq 'exit 2' -and $test2.actual -eq 'exit 8')
+        & $report 'counts and reasons are recounted after an exclusion' ($after.counts.gap -eq 0 -and $after.counts.excluded -eq 1 -and $after.counts.x -eq 1 -and $after.counts.y -eq 2 -and $after.reasons.'decided:ADR-9999' -eq 1 -and $after.reasons.'needs-server:smtp' -eq 1 -and (Get-Content -LiteralPath $behaviour -Raw) -match '"measuredAt":\s*"2026-10-23T16:37:00Z"')
+        $before = [System.IO.File]::ReadAllBytes($behaviour)
+        & $report 'a measurement already excluded is left unwritten' ((Set-GapPlatformExclusions $behaviour $table) -eq 0 -and [Convert]::ToBase64String($before) -eq [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($behaviour)))
 
         # Faked tools: options writes its file, writeout fails, the probe functions find no reference.
         $writer = 'param([string] $Version, [string] $UpstreamRoot, [string] $Candidate, [string] $OutFile) [System.IO.File]::WriteAllText($OutFile, ''' + $measurement.Replace('AREA', 'options').Replace("'", "''") + '''); exit 0'

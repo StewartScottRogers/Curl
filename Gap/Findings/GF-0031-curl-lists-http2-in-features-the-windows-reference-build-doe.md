@@ -58,3 +58,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 - 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.
 - 2026-10-23_1637: Reopened as a regression: run 2026-10-23_1637 measured features:HTTP2 as gap again on windows.
 - 2026-10-23_1729: Filed BL-3430.
+- 2026-10-23_2330: Stewart decided 'Keep HTTP/2 on': ADR-0786 stands, so the Windows build keeps HTTP/2 and Curl will not refuse it to match the Schannel reference. Gap/Baselines/platform-exclusions.json now has Measure-GapAreas.ps1 measure features:HTTP2 as excluded with reason decided:ADR-0786 on Windows only; this finding closes on the next run that measures them so (findings close only on measurement).

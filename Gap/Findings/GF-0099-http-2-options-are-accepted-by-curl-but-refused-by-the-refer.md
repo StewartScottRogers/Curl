@@ -38,3 +38,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 
 - 2026-10-23_1637: Opened by gap-options.
 - 2026-10-23_1729: Filed BL-3432.
+- 2026-10-23_2330: Stewart decided 'Keep HTTP/2 on': ADR-0786 stands, so the Windows build keeps HTTP/2 and Curl will not refuse it to match the Schannel reference. Gap/Baselines/platform-exclusions.json now has Measure-GapAreas.ps1 measure options:--http2, options:--http2-prior-knowledge, options:--proxy-http2 and options:--proxy-http2:no-form as excluded with reason decided:ADR-0786 on Windows only; this finding closes on the next run that measures them so (findings close only on measurement).
