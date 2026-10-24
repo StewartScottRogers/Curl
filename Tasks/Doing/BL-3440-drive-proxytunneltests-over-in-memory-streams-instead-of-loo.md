@@ -37,3 +37,4 @@ Moving the tests to `Curl.Conformance.Differential.IntegrationTests` would satis
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: fe2b4688 2008f7a2 74706fe2 98f27dcf 779790c0.
