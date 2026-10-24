@@ -3,8 +3,8 @@ id: AF-0403
 title: RunDarkFactory.ps1's -TaskBudgetUsd comment says a run that reaches the cost cap has its task filed as Blocked; the shift splits it with Invoke-TaskSplit
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:RunDarkFactory.ps1:TaskBudgetUsd:false-help
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'ha
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
