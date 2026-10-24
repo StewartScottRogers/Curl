@@ -49,3 +49,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
+- 2026-10-23: Doing -> Blocked. Stewart: GF-0099 needs --http2/--http2-prior-knowledge/--proxy-http2 refused on Windows, reversing your ADR-0786; reject the finding (re-measure against an HTTP/2 reference, ADR-0809) or reverse ADR-0786?
