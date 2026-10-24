@@ -7,8 +7,8 @@ status: closed
 reason: Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs:SendFramedAsync-ge:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyWebSocket.cs:231:>=
-task: BL-3069
-tasks: BL-3069
+task: BL-3350
+tasks: BL-3069, BL-3350
 found: 2026-10-22
 found-at: 167e765b2a009a4887fc971075283ef9d24a73a1
 scorecard: 2026-10-22_0130.md

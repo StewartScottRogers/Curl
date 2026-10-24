@@ -3,12 +3,12 @@ id: AF-0377
 title: Lib1550_SetsTheBlocklistsAndSucceeds checks Lib1550's own constant lists, never that the blocklists were set on the multi handle
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib1535To1550Tests.cs:Lib1550_SetsTheBlocklistsAndSucceeds:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3354
+tasks: BL-3354
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
@@ -47,3 +47,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib1535To1550Tests.cs -Pa
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
