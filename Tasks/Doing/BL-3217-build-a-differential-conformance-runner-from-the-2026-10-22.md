@@ -40,3 +40,4 @@ Measure upstream libcurl 8.22.0 before pinning values; tests use fakes or loopba
 - 2026-10-22: Created.
 - 2026-10-22: Backlog -> Doing. Criteria at claim: 2ff5cb0a 5b38a42d 04d49e93 c1b5bc31.
 - 2026-10-22: Doing -> Backlog. Split for size: waits on BL-3231 to BL-3242 (ADR and runner core, HTTP routes, CLI HTTP/protocol/TLS replay, Libcurl scen/easy/multi/MIME replay, WebSocket, formadd and Curl.Api cases)
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 2ff5cb0a 5b38a42d 04d49e93 c1b5bc31.
