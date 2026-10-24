@@ -54,3 +54,4 @@ Fix (2026-10-23): the poll during the shift-end merge's CI wait (BL-3142) now ca
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Interactive session claims AF-0369 fix Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-23: Doing -> Backlog. Fix landed; live-log measurement needs a shift run after it
+- 2026-10-24: Backlog -> Doing. Interactive session measures AF-0369 fix over live logs Criteria at claim: 87cd20bd 9742157d.
