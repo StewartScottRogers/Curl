@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3463 — Move the ADR-0810 index row into the ADR table in Decisions README
 
@@ -22,9 +22,9 @@ The shift-end review of 2026-10-24 (review-20261024-050935, pr-review-toolkit co
 
 ## Acceptance criteria
 
-- [ ] Line 2 of `Documentation/Planning/Decisions/README.md` is no longer the ADR-0810 row. The heading is followed by the intro text, as before BL-3462.
-- [ ] The ADR-0810 row, with its text unchanged, is the row directly after the ADR-0809 row at the end of the table.
-- [ ] `grep -c "ADR-0810-" Documentation/Planning/Decisions/README.md` prints 1.
+- [x] Line 2 of `Documentation/Planning/Decisions/README.md` is no longer the ADR-0810 row. The heading is followed by the intro text, as before BL-3462.
+- [x] The ADR-0810 row, with its text unchanged, is the row directly after the ADR-0809 row at the end of the table.
+- [x] `grep -c "ADR-0810-" Documentation/Planning/Decisions/README.md` prints 1.
 
 ## Notes
 
@@ -32,3 +32,4 @@ The shift-end review of 2026-10-24 (review-20261024-050935, pr-review-toolkit co
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b0b4473a 65fdf62e 2cdc9c29.
+- 2026-10-24: Doing -> Done. ADR-0810 row moved into the index table after 0809

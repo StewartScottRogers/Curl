@@ -1,5 +1,4 @@
 # Architecture Decision Records
-| [0810](ADR-0810-conformance-cases-split-into-original-upstream-and-extended-ours.md) | Conformance cases split into `CurlTestCases/Original` (upstream `tests/data`) and `CurlTestCases/Extended` (our own `ext<number>.curltest`); the upstream count and ratchet see only `Original` (BL-3462) | Accepted | 2026-10-24 |
 
 One file per decision, named `ADR-NNNN-short-slug.md`. Numbers are assigned in
 order and never reused.
@@ -859,3 +858,4 @@ Each option and the specific reason it lost.
 | [0807](ADR-0807-checksrc-pl-puts-the-d-directory-before-every-path-not-starting-dot-slash.md) | The C# `checksrc.pl` (case 1185) puts the `-D` directory before every path not starting `./` or `../`, absolute ones too, strips CR LF or LF on every platform, and never warns `COPYRIGHTYEAR` (BL-3419) | Accepted | 2026-10-23 |
 | [0808](ADR-0808-windows-features-line-omits-http2-and-httpsrr.md) | The Windows `curl -V` Features line lists neither `HTTP2` nor `HTTPSRR`, as the Schannel reference build does not, though `--http2` and HTTPS records still work there; supersedes ADR-0786's Features-line part (BL-3359) | Accepted | 2026-10-23 |
 | [0809](ADR-0809-http2-keeps-running-on-windows-against-gf-0098.md) | `--http2` keeps running on Windows (ADR-0786) though the nghttp2-less Schannel reference refuses it with exit 2; GF-0098 (test1704) is left to Stewart and the gap measurement (BL-3431) | Accepted | 2026-10-23 |
+| [0810](ADR-0810-conformance-cases-split-into-original-upstream-and-extended-ours.md) | Conformance cases split into `CurlTestCases/Original` (upstream `tests/data`) and `CurlTestCases/Extended` (our own `ext<number>.curltest`); the upstream count and ratchet see only `Original` (BL-3462) | Accepted | 2026-10-24 |
