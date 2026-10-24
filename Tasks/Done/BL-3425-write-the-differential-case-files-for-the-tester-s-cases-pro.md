@@ -8,7 +8,7 @@ depends-on: [BL-3233, BL-3235, BL-3284, BL-3285, BL-3286, BL-3287, BL-3288, BL-3
 touches: [Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols/Proto2, Curl.Conformance.Differential.UnitTests/Protocols/Proto2]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3425 — Write the differential case files for the tester's cases_proto2.py cases
 
@@ -22,10 +22,10 @@ Reference: `Z:\repos\Curl.difftest\2026-10-22\cases_proto2.py` (Python is a refe
 
 ## Acceptance criteria
 
-- [ ] One case file per `cases_proto2.py` case exists under `Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols/Proto2`, with the same name, arguments and expected server behaviour as the tester's case.
-- [ ] A unit test in `Curl.Conformance.Differential.UnitTests/Protocols/Proto2` loads every case file and checks the count and that each parses; it is platform-neutral.
-- [ ] Projects build clean with -warnaserror and their fast tests pass on Windows.
-- [ ] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
+- [x] One case file per `cases_proto2.py` case exists under `Curl.Conformance.Differential.UnitLibrary/Cases/CliProtocols/Proto2`, with the same name, arguments and expected server behaviour as the tester's case.
+- [x] A unit test in `Curl.Conformance.Differential.UnitTests/Protocols/Proto2` loads every case file and checks the count and that each parses; it is platform-neutral.
+- [x] Projects build clean with -warnaserror and their fast tests pass on Windows.
+- [x] Measure-CodeQuality.ps1 reports 0 failing members for Curl.Conformance.Differential.UnitLibrary.
 
 ## Notes
 
@@ -35,3 +35,4 @@ Reference: `Z:\repos\Curl.difftest\2026-10-22\cases_proto2.py` (Python is a refe
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 973eb9fe 57c655f4 1f9665bb 5e81fa96.
+- 2026-10-23: Doing -> Done. The tester's 52 cases_proto2.py cases exist as differential case files under Cases/CliProtocols/Proto2, checked by Proto2CasesTests
