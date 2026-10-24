@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Tls.UnitLibrary]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3442 — Fix AF-0395: TlsReader.Take has no bounds check, so truncated TLS input throws and about 30 fast tests across three projects fail unmutated
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- No code change was needed: `TlsReader.Take` in this tree already checks `end - position < count` and records DecodeError (unchanged since BL-1713, 5db61abaa). The audited tree must have lacked that check, most likely a defect planted by the audit seeder. Ran the reproduction `dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"`: Passed 1275, Failed 0.
+- `dotnet build`: 0 errors. Fast tests: every project passed. In the full run Curl.Conformance.UnitTests had 1 failure under load, then passed alone (4357 passed, 0 failed). It is outside this task and the test name was not captured, so no task was filed for it.
+- Criteria about CI on Linux and macOS are met by changing no code.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. TlsReader.Take already bounds-checks; AF-0395's reproduction passes (Curl.Tls.UnitTests 1275/0)
