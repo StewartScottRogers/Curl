@@ -40,3 +40,4 @@ This is a rename and a comment fix only. Behaviour does not change.
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 7e62dbbc 892bbcb0 795a2296.
