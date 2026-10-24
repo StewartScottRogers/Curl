@@ -55,3 +55,4 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-23: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, which BL-3301 (Doing) holds as the whole Curl.Engine.UnitLibrary
+- 2026-10-23: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
