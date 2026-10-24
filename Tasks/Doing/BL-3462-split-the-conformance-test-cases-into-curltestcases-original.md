@@ -52,3 +52,4 @@ Decisions made with Stewart's approval: PascalCase `Original` and `Extended`; pa
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-24: Backlog -> Doing. Criteria at claim: f2d4fc49 e3e7bd70 641ada7b 6ad4c3b6 26214cae 91ff8df9 338e5e58 1b8306bd.
