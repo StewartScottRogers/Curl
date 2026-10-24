@@ -26,15 +26,17 @@ Moving the tests to `Curl.Conformance.Differential.IntegrationTests` would satis
 
 ## Acceptance criteria
 
-- [ ] `ProxyTunnelTests.cs` creates no `TcpListener`, `TcpClient` or `Socket`; `grep -n "TcpListener\|TcpClient\|Socket" Curl.Conformance.Differential.UnitTests/Protocols/Proxy/ProxyTunnelTests.cs` finds nothing.
-- [ ] `RelayAsync_TargetEndsFirst_ClosesTheClientAndReturns` and `RelayAsync_ClientEndsFirst_ClosesTheTargetAndReturns` still pass, each asserting the relayed bytes and that the other side then reads end of stream.
-- [ ] Each test still fails if the `await connection.DisposeAsync()` in `ProxyTunnel.RelayAsync` is removed (target-ends-first) or `remote.Dispose()` is removed (client-ends-first), checked by hand and noted in the Log.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Conformance.Differential.UnitLibrary` reports `ProxyTunnel.RelayAsync` at 100% line and branch coverage.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `ProxyTunnelTests.cs` creates no `TcpListener`, `TcpClient` or `Socket`; `grep -n "TcpListener\|TcpClient\|Socket" Curl.Conformance.Differential.UnitTests/Protocols/Proxy/ProxyTunnelTests.cs` finds nothing.
+- [x] `RelayAsync_TargetEndsFirst_ClosesTheClientAndReturns` and `RelayAsync_ClientEndsFirst_ClosesTheTargetAndReturns` still pass, each asserting the relayed bytes and that the other side then reads end of stream.
+- [x] Each test still fails if the `await connection.DisposeAsync()` in `ProxyTunnel.RelayAsync` is removed (target-ends-first) or `remote.Dispose()` is removed (client-ends-first), checked by hand and noted in the Log.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Conformance.Differential.UnitLibrary` reports `ProxyTunnel.RelayAsync` at 100% line and branch coverage.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 ## Log
+
+- 2026-10-23: Hand mutation check: removing `await connection.DisposeAsync()` fails the target-ends-first test (client read hangs to the 30 s limit); removing `remote.Dispose()` fails the client-ends-first test. Quality run for Curl.Conformance.Differential.UnitLibrary: 0 failing members. Fake is a Channel-based in-memory duplex stream inside the test file.
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: fe2b4688 2008f7a2 74706fe2 98f27dcf 779790c0.
