@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3448 — Fix AF-0401: ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake checks only that the reply is not the expected one, not that the handshake failed
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The two mTLS failure tests now assert `Assert.IsNull(reply)`; TryExchangeAsync returns null also when the server closes with no reply byte, so a clean close counts as a failed exchange. Build clean, Curl.Conformance.UnitTests fast tests 4360 passed, 0 failed.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. mTLS failure tests assert a null reply (failed handshake) instead of not-the-expected-reply
