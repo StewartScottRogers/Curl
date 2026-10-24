@@ -44,3 +44,4 @@ Watch out for:
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-24: Backlog -> Doing. Interactive session (Stewart: do BL-3464): sharding on guard/bl-3464 from master Criteria at claim: 68a57379 7d68909b f586dc79 a03ef6b7 3d836d5e.
