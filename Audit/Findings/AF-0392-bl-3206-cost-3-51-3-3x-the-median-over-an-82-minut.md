@@ -3,12 +3,12 @@ id: AF-0392
 title: BL-3206 cost $3.51 (3.3x the median) over an 82-minute, 65-turn Opus run
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3206:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-3369
+tasks: BL-3369
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | Same cause, one long Opus run alone driving cost past 3x the median: BL-3310, one opus run of 60 turns and 41.2 min, $2.68 (6.1x); BL-3418, one opus run of 49 turns, $2.90 (6.6x); BL-3416, one opus run of 41 turns, $2.69 (6.1x).
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.

@@ -3,19 +3,19 @@ id: AF-0380
 title: --remote-name-all given after -T applies to the upload URL: Curl warns 'No remote filename' and writes curl_response where curl does neither
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.
 key: conformance:--remote-name-all:upload-file-order:stderr
 reproduction: none
-task: none
-tasks:
+task: BL-3357
+tasks: BL-3357
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_2322.md
 ---
 # AF-0380 - --remote-name-all given after -T applies to the upload URL: Curl warns 'No remote filename' and writes curl_response where curl does neither
 
@@ -42,6 +42,10 @@ dotnet build Curl.Console -c Release; $r=(Get-Location).Path; foreach ($n in 'cu
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction against curl 8.22.0 (x86_64-w64-mingw32) libcurl/8.22.0 Schannel. Output: 'curl warning=False curl_response=False' and 'cand warning=False curl_response=False'. Both exited 0. Curl no longer warns 'No remote filename' and writes no curl_response file for -T f.txt --remote-name-all.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.

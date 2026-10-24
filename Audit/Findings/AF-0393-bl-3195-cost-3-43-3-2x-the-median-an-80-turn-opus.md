@@ -3,19 +3,19 @@ id: AF-0393
 title: BL-3195 cost $3.43 (3.2x the median): an 80-turn Opus run plus two rebase-conflict resolve runs
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.
 key: process:logs:BL-3195:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-3370
+tasks: BL-3370
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_2322.md
 ---
 # AF-0393 - BL-3195 cost $3.43 (3.2x the median): an 80-turn Opus run plus two rebase-conflict resolve runs
 
@@ -42,6 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Mechanism over this window: no cost outlier includes resolve runs. The window's three resolve runs were cheap sonnet runs ($0.10-$0.12) on tasks under 3x the median. The long-Opus-run part recurs and is recorded under AF-0392.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.

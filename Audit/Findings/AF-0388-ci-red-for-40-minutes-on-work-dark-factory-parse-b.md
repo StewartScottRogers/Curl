@@ -3,12 +3,12 @@ id: AF-0388
 title: CI red for 40 minutes on work/dark-factory: Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason failed on Linux and macOS
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason:ci-red
 reproduction: none
-task: none
-tasks:
+task: BL-3365
+tasks: BL-3365
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
@@ -42,6 +42,9 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: yes | The given command shows the old 40.15-min spell (run 39903809116). Over this window ciRedMinutes = 319.05, with spells over 30 min from failing tests on Linux/macOS: 37.45 min (run 39986660283), 40.98 (40008612979), 76.97 (40021720442, macOS), 50.33 (40034290028, test1173 on Linux and macOS), plus 90 min (90941437168).
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.

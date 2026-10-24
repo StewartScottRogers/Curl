@@ -275,6 +275,7 @@ Every area may use these two:
 | --- | --- | --- |
 | `no-probe` | `unmeasured` | The office has no probe for this item yet. |
 | `reference-lacks:<feature>` | `excluded` | The matched reference build on this platform lacks the feature or protocol, read from its `curl -V`. |
+| `decided:<ADR-nnnn>` | `excluded` | A decision recorded in that ADR keeps Curl different from the reference on this platform only; `Gap/Baselines/platform-exclusions.json` lists the item with its platform, and `Measure-GapAreas.ps1` applies it after the area's tool runs (ADR-0786's HTTP/2 on Windows). |
 
 The rest, by area:
 
@@ -283,7 +284,7 @@ The rest, by area:
 | `options` | `needs-server:<protocol>` | `unmeasured` | The option's effect shows only against a server the probe cannot stand up. |
 | | `platform:<os>` | `excluded` | The option exists only on another platform. |
 | | `debug-build-only` | `excluded` | The option needs a debug build of curl. |
-| | `intended-difference:<ADR-
+| | `intended-difference:<ADR-nnnn>` | `excluded` | The option differs on purpose, as that ADR records; `Gap/Baselines/option-exclusions.json` lists it on every platform. |
 | `protocols` | `needs-server:<protocol>` | `unmeasured` | The scheme probe needs a server the probe cannot stand up. |
 | `features` | `debug-build-only` | `excluded` | The feature appears only in a debug build (`Debug`, `TrackMemory`). |
 | `writeout` | `needs-server:<protocol>` | `unmeasured` | The variable has a value only after a transfer to a server the probe cannot stand up. |

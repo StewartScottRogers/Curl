@@ -3,19 +3,19 @@ id: AF-0382
 title: curl -V on Windows lists HTTP2 and HTTPSRR, which the Schannel reference build's Features line does not
 auditor: conformance
 severity: Medium
-status: proposed
-reason:
+status: closed
+reason: Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.
 key: conformance:--version:WindowsFeaturesLine:stdout
 reproduction: none
-task: none
-tasks:
+task: BL-3359
+tasks: BL-3359
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: reliable-reaudit
+closed-by: 2026-10-23_2322.md
 ---
 # AF-0382 - curl -V on Windows lists HTTP2 and HTTPSRR, which the Schannel reference build's Features line does not
 
@@ -42,6 +42,10 @@ dotnet build Curl.Console -c Release; (& 'C:\Program Files\Git\ucrt64\bin\curl.e
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | reproduces: no | Ran the reproduction. Reference Features: 'alt-svc AsynchDNS brotli Debug HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd'. Curl Features: 'alt-svc AsynchDNS brotli HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd'. HTTP2 and HTTPSRR are gone. The remaining gap is only 'Debug', which comes from the reference build being debug-enabled and is not part of this finding.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Re-audit 2026-10-23_2322.md: the reproduction no longer reproduces.

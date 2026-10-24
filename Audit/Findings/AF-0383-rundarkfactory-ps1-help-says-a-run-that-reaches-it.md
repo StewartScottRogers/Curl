@@ -3,12 +3,12 @@ id: AF-0383
 title: RunDarkFactory.ps1 help says a run that reaches its cost cap sends its task to Blocked for Stewart; the shift splits it with Invoke-TaskSplit instead
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:RunDarkFactory.ps1:COST-CAP-help:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-3360
+tasks: BL-3360
 found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
@@ -42,6 +42,9 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'go
 
 ## Re-audits
 
+- 2026-10-23 | 2026-10-23_2322.md | not re-audited | overlaps planted defect PD-403 in RunDarkFactory.ps1, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: only ShiftRunner.ps1:195 matched. RunDarkFactory.ps1 no longer contains 'goes to Blocked for Stewart, since it is too big'; the COST CAP help now describes the split run (BL-3091, ADR-0759). A remaining copy of the old claim, in the -TaskBudgetUsd parameter comment at line 439, is filed as a new finding.
+
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-23: proposed -> accepted.
