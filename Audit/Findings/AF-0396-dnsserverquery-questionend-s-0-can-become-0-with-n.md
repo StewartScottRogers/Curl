@@ -3,8 +3,8 @@ id: AF-0396
 title: DnsServerQuery.QuestionEnd's != 0 can become == 0 with no test failing, so a reply whose question differs after its first five bytes is accepted
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/DnsServerQuery.cs:QuestionEnd-ne:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DnsServerQuery.cs:121:!=
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
