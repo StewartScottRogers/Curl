@@ -94,7 +94,7 @@ public sealed class TlsClientOptionsTests
     }
 
     [TestMethod]
-    public void With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues()
+    public void With_TheEightTlsClientOptionsFieldsOfAdr0151_CopiesTheOptionsWithTheNewValues()
     {
         Diagnostics.Arrange("changed values", "X25519, ECDSA+SHA256, early data, hard, example.com, AEX+DQ==, sess.bin, pkcs11");
 
