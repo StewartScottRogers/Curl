@@ -3,8 +3,8 @@ id: AF-0381
 title: --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Stewart closed it on 2026-10-23 (decision about 23:30 Arizona, 'Keep HTTP/2 on'): explained by ADR-0786, which keeps HTTP/2 on in the Windows build and accepts that a Windows script relying on the Schannel reference's exit-2 refusal of --http2 now sees a transfer; BL-3358's refuse-on-Windows fix is not wanted.
 key: conformance:--http2:RefusedBySchannelBuild:exit-code
 reproduction: none
 task: BL-3358
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 32b1dda228a5fded8978ed4ee514a932b0728722
 scorecard: 2026-10-23_0618.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-23
+closed-how: stewart
+closed-by: stewart
 ---
 # AF-0381 - --http2 and --http2-prior-knowledge run a transfer on Windows where the Schannel reference curl refuses them with exit 2
 
@@ -46,3 +46,4 @@ dotnet build Curl.Console -c Release; $c=(Resolve-Path Curl.Console\bin\Release\
 
 - 2026-10-23: filed proposed.
 - 2026-10-23: proposed -> accepted.
+- 2026-10-23: accepted -> closed. Stewart closed it on 2026-10-23 (decision about 23:30 Arizona, 'Keep HTTP/2 on'): explained by ADR-0786, which keeps HTTP/2 on in the Windows build and accepts that a Windows script relying on the Schannel reference's exit-2 refusal of --http2 now sees a transfer; BL-3358's refuse-on-Windows fix is not wanted.
