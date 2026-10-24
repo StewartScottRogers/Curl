@@ -3,8 +3,8 @@ id: AF-0402
 title: Of_VerboseWithADebugCallback_GivesTheEvents asserts only that a result is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs:Of_VerboseWithADebugCallback_GivesTheEvents:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs -P
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
