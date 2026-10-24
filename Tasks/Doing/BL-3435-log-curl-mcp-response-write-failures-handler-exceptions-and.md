@@ -39,3 +39,4 @@ The host already owns a stderr log (`Curl.Mcp/McpStandardErrorLog.cs`). Pass a s
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 6c43e9ea 24260786 1e990932 5e636157 a43672c6.
