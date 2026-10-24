@@ -41,3 +41,4 @@ The problem is in `Curl.Conformance.Differential.UnitLibrary/Protocols/Proxy/Pro
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: ca289d49 908f0847 a3bf4675 3d836d5e.
