@@ -31,11 +31,13 @@ This is a rename and a comment fix only. Behaviour does not change.
 
 ## Acceptance criteria
 
-- [ ] `SchannelTrustsListedLeaf` is renamed to a name true of both builds, e.g. `CaCertificateFileAnchorsChain`, and no reference to the old name remains in the repository.
-- [ ] The comment on `WithoutChainErrorsCurlTolerates` describes both builds: the leaf on Schannel, and any chain certificate on OpenSSL.
-- [ ] `dotnet build` is clean and the fast tests pass unchanged.
+- [x] `SchannelTrustsListedLeaf` is renamed to a name true of both builds, e.g. `CaCertificateFileAnchorsChain`, and no reference to the old name remains in the repository.
+- [x] The comment on `WithoutChainErrorsCurlTolerates` describes both builds: the leaf on Schannel, and any chain certificate on OpenSSL.
+- [x] `dotnet build` is clean and the fast tests pass unchanged.
 
 ## Notes
+
+Renamed to `CaCertificateFileAnchorsChain`. The old name remains only in the Done tasks BL-3289 and BL-3335, which are historical records of what the code was called then; left unedited. Build clean; Curl.Networking.UnitTests pass; Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
