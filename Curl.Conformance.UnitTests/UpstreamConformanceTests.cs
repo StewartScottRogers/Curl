@@ -49,7 +49,7 @@ public sealed partial class UpstreamConformanceTests
     // Past it the case is judged failed, so only a listed case fails its row.
     private static readonly TimeSpan CaseHangLimit = TimeSpan.FromSeconds(30);
 
-    internal static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+    internal static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
 
     // Beside the tests rather than under the system's temporary folder, whose path can hold a
     // space that an unquoted %LOGDIR in a command would split, as upstream's relative log/ never does.

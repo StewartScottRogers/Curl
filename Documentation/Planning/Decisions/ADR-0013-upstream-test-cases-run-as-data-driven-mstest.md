@@ -37,7 +37,7 @@ disabled. The solution is base class library only, with MSTest the one package.
    every other `.UnitLibrary`. `Curl.Conformance.UnitTests` holds the harness's own
    tests and the data-driven MSTest method that runs the upstream cases.
 3. **Vendored, pinned test data.** The `tests/data/test*` files are copied into
-   `Curl.Conformance.UnitTests/UpstreamTestData/` from one curl release tag (the release
+   `Curl.Conformance.UnitTests/CurlTestCases/Original/` from one curl release tag (the release
    the solution matches, curl 8.21.0 at the time of writing), with curl's `COPYING`
    notice beside them. A script in that folder refreshes them to a named tag. Tests never
    download anything.

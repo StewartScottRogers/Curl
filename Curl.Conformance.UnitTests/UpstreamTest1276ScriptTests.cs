@@ -11,7 +11,7 @@ namespace Curl.Conformance;
 [TestClass]
 public sealed class UpstreamTest1276ScriptTests
 {
-    private static readonly string VendoredRoot = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+    private static readonly string VendoredRoot = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
 
     private string root = null!;
 

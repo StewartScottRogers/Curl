@@ -53,8 +53,11 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
   route (a): re-measure against an HTTP/2-built reference, or exclude these facets. That work belongs to the gap office.
   Remove the block once Stewart rejects GF-0099 (then close as won't-change) or reverses ADR-0786.
 
+- 2026-10-24 (interactive): Stewart decided 'Keep HTTP/2 on' (2026-10-23, about 23:30 Arizona): ADR-0786 stands, so the refuse-on-Windows fix this task asks for is not wanted and no code changes. Done for it: AF-0381 closed by Stewart (closed-how: stewart, citing ADR-0786) on the audit branch, PR #221; on the gap branch (PR #217, commits 7c68dc274 and ea55d6f6b) Gap/Baselines/platform-exclusions.json has Measure-GapAreas.ps1 measure options:--http2, --http2-prior-knowledge, --proxy-http2, --proxy-http2:no-form and behaviour:test1704 as excluded with reason decided:ADR-0786 on Windows only, and GF-0098 and GF-0099 log the decision; they close on the next gap run that measures those items excluded. Its criteria (the four option items measuring match) cannot be met without undoing ADR-0786, so it is deferred rather than ticked; GF-0099 closes on the exclusion instead.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
 - 2026-10-23: Doing -> Blocked. Stewart: GF-0099 needs --http2/--http2-prior-knowledge/--proxy-http2 refused on Windows, reversing your ADR-0786; reject the finding (re-measure against an HTTP/2 reference, ADR-0809) or reverse ADR-0786?
+- 2026-10-24: Blocked -> Deferred. Stewart decided 'Keep HTTP/2 on' (2026-10-23): ADR-0786 stands, so refusing HTTP/2 on Windows is not wanted; no code change. Revisit only if Stewart reverses ADR-0786.

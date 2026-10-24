@@ -10,7 +10,7 @@ internal static class MtlsTestCertificates
         string source = Directory.CreateDirectory(Path.Combine(root, "source")).FullName;
         foreach (string parameters in new[] { "test-ca.prm", "test-localhost.prm", "test-client-eku-only.prm" })
         {
-            File.Copy(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "certs", parameters), Path.Combine(source, parameters), overwrite: true);
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", "certs", parameters), Path.Combine(source, parameters), overwrite: true);
         }
 
         return UpstreamCertificateFolder.Prepare(source, Path.Combine(root, "out"), TimeProvider.System);

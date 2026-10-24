@@ -8,7 +8,7 @@ Today it holds `HarnessReferencesTests`, which pins that the harness library and
 the tests, and `UpstreamTestCaseParserTests`, which drive the test-file parser from
 inline test-file text, and `UpstreamTestFileExpanderTests`, which pin variable
 substitution, `%if` evaluation and the inline instructions against upstream's `prepro`, and
-`UpstreamTestDataTests`, which pin that the vendored `UpstreamTestData/` (curl 8.22.0's
+`UpstreamTestDataTests`, which pin that the vendored `CurlTestCases/Original/` (curl 8.22.0's
 `tests/data/test*` files and `COPYING`; see its `README.md`) is copied beside the tests,
 and `SwsHttpServerConnectorTests`, which pin the in-memory `sws` emulation's request framing,
 reply-part selection, connection closing, the `<servercmd>` commands that change framing
@@ -36,6 +36,10 @@ fails is run once more before it is judged, since a stall of a busy CI runner ca
 past a time limit - the harness's (curl past 20 seconds, or the whole case past 30; BL-1859) or
 the case's own, as test303's `-m 8` (BL-2093). When a change makes
 a case pass, add its number to the list in the same commit.
+
+## Our own cases
+
+`CurlTestCases/Extended/` holds our own cases as `ext<number>.curltest` in the upstream format (see its `README.md`); `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` runs them all, apart from the upstream ratchet and `PassingUpstreamCases.txt` (ADR-0810).
 
 ## Debugging one case
 

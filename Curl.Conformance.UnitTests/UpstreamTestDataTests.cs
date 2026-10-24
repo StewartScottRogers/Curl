@@ -3,7 +3,7 @@ using Curl.Testing;
 namespace Curl.Conformance;
 
 /// <summary>
-/// Pins the upstream test data vendored under <c>UpstreamTestData/</c> (ADR-0013, decision 3):
+/// Pins the upstream test data vendored under <c>CurlTestCases/Original/</c> (ADR-0013, decision 3):
 /// every <c>tests/data/test*</c> file of curl 8.22.0, stored here as <c>test*.curltest</c>, and curl's
 /// <c>COPYING</c> notice are
 /// copied beside the tests, so no case ever has to download anything.
@@ -26,7 +26,7 @@ public sealed class UpstreamTestDataTests
     /// <summary>The number of <c>*.h</c> files in <c>include/curl</c> at <c>curl-8_22_0</c>.</summary>
     private const int VendoredHeaderCount = 12;
 
-    private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+    private static readonly string UpstreamTestDataFolder = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -34,7 +34,7 @@ public sealed class UpstreamTestDataTests
     public void UpstreamTestData_CopiedBesideTheTests_HoldsEveryTestFileFromTheTag()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("pattern", "UpstreamTestData/test*.curltest");
+        diagnostics.Arrange("pattern", "CurlTestCases/Original/test*.curltest");
         diagnostics.Arrange("expected file count", VendoredTestFileCount);
 
         string[] testFiles = Directory.GetFiles(UpstreamTestDataFolder, "test*.curltest");
@@ -48,7 +48,7 @@ public sealed class UpstreamTestDataTests
     public void UpstreamTestData_CopiedBesideTheTests_HoldsTheFilesTheDocumentationChecksOpen()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("folder", "UpstreamTestData/docs and src");
+        diagnostics.Arrange("folder", "CurlTestCases/Original/docs and src");
 
         string[] required =
         [
@@ -71,7 +71,7 @@ public sealed class UpstreamTestDataTests
     public void UpstreamTestData_CopiedBesideTheTests_HoldsTheLibcurlDocsAndHeadersTheTableChecksOpen()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("folder", "UpstreamTestData/docs/libcurl and include/curl");
+        diagnostics.Arrange("folder", "CurlTestCases/Original/docs/libcurl and include/curl");
 
         string[] required =
         [
@@ -101,9 +101,9 @@ public sealed class UpstreamTestDataTests
     public void UpstreamTestData_CopiedBesideTheTests_BesideTheSrcDirHoldsTheLibcurlDocsForPercentSrcDirParent()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        string besideSrcDir = Path.Combine(AppContext.BaseDirectory, "docs", "libcurl", "symbols-in-versions");
-        string headerBesideSrcDir = Path.Combine(AppContext.BaseDirectory, "include", "curl", "curl.h");
-        diagnostics.Arrange("folders", "docs/libcurl and include/curl beside UpstreamTestData");
+        string besideSrcDir = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "docs", "libcurl", "symbols-in-versions");
+        string headerBesideSrcDir = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "include", "curl", "curl.h");
+        diagnostics.Arrange("folders", "docs/libcurl and include/curl beside CurlTestCases/Original");
 
         bool present = File.Exists(besideSrcDir) && File.Exists(headerBesideSrcDir);
 
@@ -117,7 +117,7 @@ public sealed class UpstreamTestDataTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         string xmlPath = Path.Combine(UpstreamTestDataFolder, "data", "data-xml1");
-        diagnostics.Arrange("file", "UpstreamTestData/data/data-xml1");
+        diagnostics.Arrange("file", "CurlTestCases/Original/data/data-xml1");
 
         byte[] xml = File.ReadAllBytes(xmlPath);
 
@@ -132,7 +132,7 @@ public sealed class UpstreamTestDataTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         string copyingPath = Path.Combine(UpstreamTestDataFolder, "COPYING");
-        diagnostics.Arrange("file", "UpstreamTestData/COPYING");
+        diagnostics.Arrange("file", "CurlTestCases/Original/COPYING");
 
         string copying = File.ReadAllText(copyingPath);
 

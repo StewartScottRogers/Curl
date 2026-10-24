@@ -1,4 +1,5 @@
 # Architecture Decision Records
+| [0810](ADR-0810-conformance-cases-split-into-original-upstream-and-extended-ours.md) | Conformance cases split into `CurlTestCases/Original` (upstream `tests/data`) and `CurlTestCases/Extended` (our own `ext<number>.curltest`); the upstream count and ratchet see only `Original` (BL-3462) | Accepted | 2026-10-24 |
 
 One file per decision, named `ADR-NNNN-short-slug.md`. Numbers are assigned in
 order and never reused.

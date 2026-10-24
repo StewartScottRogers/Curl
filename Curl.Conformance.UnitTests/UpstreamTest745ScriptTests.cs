@@ -29,7 +29,7 @@ public sealed class UpstreamTest745ScriptTests
     [TestMethod]
     public void Check_VendoredUpstreamHeaders_WritesOk()
     {
-        Assert.AreEqual("OK\n", UpstreamTest745Script.Check(Path.Combine(AppContext.BaseDirectory, "UpstreamTestData")));
+        Assert.AreEqual("OK\n", UpstreamTest745Script.Check(Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original")));
     }
 
     [TestMethod]

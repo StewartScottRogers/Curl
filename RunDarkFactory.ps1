@@ -436,7 +436,8 @@ param(
     [int]$TaskMinutes = 120,
     # The most a single headless run may cost, in US dollars (claude's
     # --max-budget-usd); the cap is 4 times the median recent run, at least $3, up to
-    # this, and a run that reaches it has its task filed as Blocked. 0 means no cap (ADR-0288, ADR-0407, ADR-0478).
+    # this, and a run that reaches it gets one bounded split run that files smaller tasks and
+    # defers the original (Blocked only if the split is skipped or fails). 0 means no cap (ADR-0288, ADR-0407, ADR-0478, ADR-0759).
     [double]$TaskBudgetUsd = 10,
     # The most turns a single headless run may take (claude's --max-turns); a run that
     # reaches it stops, since its task is too big for one run. 0 means no cap (BL-3001).

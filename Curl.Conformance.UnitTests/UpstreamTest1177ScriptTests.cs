@@ -117,7 +117,7 @@ public sealed class UpstreamTest1177ScriptTests
     [TestMethod]
     public async Task RunAsync_VendoredFilesAndLibcurlFeatureNames_AgreeAndExitZero()
     {
-        string release = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData");
+        string release = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original");
         string manPage = Path.Combine(release, "docs", "libcurl", "curl_version_info.3");
         string header = Path.Combine(release, "include", "curl", "curl.h");
         using MemoryStream standardOutput = new();

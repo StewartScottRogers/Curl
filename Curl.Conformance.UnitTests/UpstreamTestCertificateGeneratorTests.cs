@@ -14,7 +14,7 @@ public sealed class UpstreamTestCertificateGeneratorTests
 {
     public TestContext TestContext { get; set; } = null!;
 
-    private static readonly string ParametersFolder = Path.Combine(AppContext.BaseDirectory, "UpstreamTestData", "certs");
+    private static readonly string ParametersFolder = Path.Combine(AppContext.BaseDirectory, "CurlTestCases", "Original", "certs");
 
     private static string outputFolder = null!;
 

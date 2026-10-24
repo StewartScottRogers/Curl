@@ -34,7 +34,7 @@ public sealed partial class HttpsServerConnectorTests
 
         string? reply = await TryExchangeAsync(connector, clientCertificate: null);
 
-        Assert.AreNotEqual(ExpectedReply, reply);
+        Assert.IsNull(reply);
         Assert.IsEmpty(verifier.ReceivedCertificates);
     }
 
@@ -48,7 +48,7 @@ public sealed partial class HttpsServerConnectorTests
 
         string? reply = await TryExchangeAsync(connector, selfSigned);
 
-        Assert.AreNotEqual(ExpectedReply, reply);
+        Assert.IsNull(reply);
         Assert.HasCount(1, verifier.ReceivedCertificates);
     }
 
@@ -73,7 +73,8 @@ public sealed partial class HttpsServerConnectorTests
         return (new HttpsServerConnector(sws, serverCertificate, sws, HttpsServerConnector.HttpsMtlsPort, verifier), verifier);
     }
 
-    // The reply to one request over a TLS connection to the mTLS port, or null when the handshake or the exchange fails.
+    // The reply to one request over a TLS connection to the mTLS port, or null when the handshake or the exchange fails
+    // or the server closes the connection without a reply byte.
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Any failure of a refused handshake is the outcome under test.")]
     private static async Task<string?> TryExchangeAsync(HttpsServerConnector connector, X509Certificate2? clientCertificate)
     {
@@ -88,7 +89,8 @@ public sealed partial class HttpsServerConnectorTests
                     TargetHost = "localhost",
                     LocalCertificateSelectionCallback = (_, _, _, _, _) => clientCertificate!,
                 });
-                return await ExchangeAsync(client, ExpectedReply.Length);
+                string reply = await ExchangeAsync(client, ExpectedReply.Length);
+                return reply.Length == 0 ? null : reply;
             }
             catch (Exception)
             {

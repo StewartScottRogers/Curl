@@ -11,7 +11,7 @@ ADR-0718 (BL-2852) and ADR-0755 (BL-2851) recorded upstream cases 1135, 1140, 11
 1173, 1185, 1275, 1279, 1544, 745 and 1276 as `no counterpart` because "Curl has no C headers".
 ADR-0749 (BL-2991) then ran 1119, 1175 and 1477 through C# interpretations (ADR-0714) that read
 the vendored upstream headers, on the reasoning that these cases check upstream's tree for
-consistency and the vendored files under `Curl.Conformance.UnitTests/UpstreamTestData` are that
+consistency and the vendored files under `Curl.Conformance.UnitTests/CurlTestCases/Original` are that
 tree. That reasoning holds for every case below. Stewart (2026-10-23) wants every test active and
 passing on Windows, and the root CLAUDE.md allows no row whose reason is difficulty or a missing
 BCL primitive. Each case's `<command>` line and script were read for this decision.

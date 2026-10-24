@@ -14,11 +14,11 @@ release tarball: upstream's `managen` generates it from `docs/cmdline-opts/*.md`
 
 ## Decision
 
-- `Curl.Conformance.UnitTests/UpstreamTestData/docs/cmdline-opts/curl.txt` is the output of real
+- `Curl.Conformance.UnitTests/CurlTestCases/Original/docs/cmdline-opts/curl.txt` is the output of real
   curl 8.22.0's `curl -M` (the Windows Schannel build in `C:\Program Files\Git\ucrt64\bin`, line feeds only), measured
   on 2026-10-21. It is the text `managen` generated for that release, as embedded in the binary.
 - `UpstreamTest1707Script` interprets test1707.pl in C# and reads that file from `docs` under the
-  folder standing in for upstream's source tree (the conformance tests' `UpstreamTestData`).
+  folder standing in for upstream's source tree (the conformance tests' `CurlTestCases/Original`).
 - When BL-2881 builds `managen`, the file can be generated from the vendored `.md` files instead;
   until then `Update-UpstreamTestData.ps1` does not refresh it, since the tarball does not hold it.
 

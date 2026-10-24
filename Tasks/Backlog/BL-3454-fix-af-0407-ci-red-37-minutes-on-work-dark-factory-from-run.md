@@ -1,0 +1,52 @@
+---
+id: BL-3454
+title: Fix AF-0407: CI red 37 minutes on work/dark-factory from run 39986660283 (RunAsync_StalledBelowSpeedLimitForSpeedTime_Exits28WithCurlsMessage)
+priority: Low
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [RunDarkFactory.ps1]
+lane: no
+requirement: none
+created: 2026-10-24
+completed:
+---
+# BL-3454 — Fix AF-0407: CI red 37 minutes on work/dark-factory from run 39986660283 (RunAsync_StalledBelowSpeedLimitForSpeedTime_Exits28WithCurlsMessage)
+
+## Goal
+
+The cause of the factory behaviour the audit office reported as AF-0407 is fixed: the finding's measurement, run over the logs written after the fix, gives its expected result, so a re-audit of that window can close the finding.
+
+## Context
+
+Filed from audit finding AF-0407 (Low, process auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0407-ci-red-37-minutes-on-work-dark-factory-from-run-39.md`.
+
+Location: `logs/ci-runs.json`
+
+Location: `logs/ci-runs.json`
+
+ciRedSpells: start 2026-10-23T16:41:26Z, end 17:18:53Z, 37.45 min, run 39986660283 on commit 13c20167. The coordinator logged the failure at 09:42:23 local and filed BL-3332 at 09:48:56, 7 min after the red (DarkFactory-20261023-035126.log:87-90). L2 claimed BL-3332 at 09:49:19 and it was Done at 09:53:12, about 12 min after the red. CI stayed red until 10:18 local, waiting for the next CI run to finish green.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-10-23 -LogRoot Z:\repos\Curl.audit\20261023-232221\logs -CiRunsJson Z:\repos\Curl.audit\20261023-232221\logs\ci-runs.json -OutFile $env:TEMP\process.json; (Get-Content $env:TEMP\process.json -Raw | ConvertFrom-Json).ciRedSpells | Where-Object runId -eq 39986660283
+```
+
+- Expected: no ciRedSpells entry over 30 minutes
+- Actual: start 2026-10-23T16:41:26Z end 17:18:53Z minutes 37.45 runId 39986660283
+
+The reproduction measures a frozen copy of the logs, which no fix can change, so this task's evidence is the same measurement run over the live logs written after the fix landed (ADR-0761). The finding closes only when a later re-audit by the process auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-10-24: Created.

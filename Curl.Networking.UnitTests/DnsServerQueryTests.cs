@@ -147,6 +147,9 @@ public sealed class DnsServerQueryTests
     [DataRow(1)]
     [DataRow(2)]
     [DataRow(14)]
+    [DataRow(20)]
+    [DataRow(24)]
+    [DataRow(27)]
     public void Match_AReplyWithAnotherIdOrQuestionOrNotAResponse_IsAMismatch(int changedIndex)
     {
         var query = Query();

@@ -75,7 +75,7 @@ Measured directly from curl 8.21.0 rather than estimated:
 | `--write-out` variables | **76** | `docs/cmdline-opts/write-out.md` |
 | Exit codes | **0–101**, with gaps | `libcurl-errors` (`CURLE_*`) |
 | Upstream test cases | **2,126** | `tests/data` on `master` |
-| Upstream test cases vendored here | **2,017** | `Curl.Conformance.UnitTests/UpstreamTestData` |
+| Upstream test cases vendored here | **2,017** | `Curl.Conformance.UnitTests/CurlTestCases/Original` |
 
 ### The 29 schemes, and why they are 16 libraries
 
