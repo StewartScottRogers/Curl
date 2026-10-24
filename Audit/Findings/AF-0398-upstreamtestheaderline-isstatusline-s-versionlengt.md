@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Conformance.UnitLibrary/UpstreamTestHeaderLine.cs:IsStatusLine-plus1:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/UpstreamTestHeaderLine.cs:33:+1
-task: none
-tasks:
+task: BL-3445
+tasks: BL-3445
 found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md

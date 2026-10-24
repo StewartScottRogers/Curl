@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: process:BL-3412:cost-outlier
 reproduction: none
-task: none
-tasks:
+task: BL-3458
+tasks: BL-3458
 found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md

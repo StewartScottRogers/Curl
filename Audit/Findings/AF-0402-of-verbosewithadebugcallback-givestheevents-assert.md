@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitTests/DebugCallbackTransferEventsTests.cs:Of_VerboseWithADebugCallback_GivesTheEvents:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3449
+tasks: BL-3449
 found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
