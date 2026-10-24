@@ -48,3 +48,4 @@ The Windows reference curl (Git for Windows, Schannel) was built without HTTP/2,
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 4f192eea 3314e1db ca72db98 7fbbecd2 1fd5de8c 28346828.
