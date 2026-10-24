@@ -43,6 +43,7 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'go
 ## Re-audits
 
 - 2026-10-23 | 2026-10-23_2322.md | not re-audited | overlaps planted defect PD-403 in RunDarkFactory.ps1, so the auditor's verdict (reproduces no) is set aside: Ran the reproduction: only ShiftRunner.ps1:195 matched. RunDarkFactory.ps1 no longer contains 'goes to Blocked for Stewart, since it is too big'; the COST CAP help now describes the split run (BL-3091, ADR-0759). A remaining copy of the old claim, in the -TaskBudgetUsd parameter comment at line 439, is filed as a new finding.
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Ran the reproduction: only ShiftRunner.ps1:195 (if ($capped) { Invoke-TaskSplit ...) matched; 'goes to Blocked for Stewart, since it is too big' no longer appears in RunDarkFactory.ps1. The COST CAP help (lines 71-74) now says one bounded split run files smaller tasks and defers the original, Blocked only when the split is skipped or fails, which matches Test-TaskSplitLeavesBlockToCaller (TaskStash.ps1:238).
 
 ## Log
 

@@ -3,8 +3,8 @@ id: AF-0400
 title: With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues sets and checks eight options, not ten
 auditor: quality
 severity: Medium
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
 key: quality:Curl.Networking.UnitTests/TlsClientOptionsTests.cs:With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues:name-lies
 reproduction: none
 task: BL-3447
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_0845.md
 ---
 # AF-0400 - With_TheTenOptionsOfAdr0151_CopiesTheOptionsWithTheNewValues sets and checks eight options, not ten
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Networking.UnitTests/TlsClientOptionsTests.cs -Pattern 
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_0845.md | reproduces: no | The reproduction's pattern 'With_TheTenOptionsOfAdr0151' no longer matches. The test is now With_TheEightTlsClientOptionsFieldsOfAdr0151_CopiesTheOptionsWithTheNewValues: it sets eight fields and asserts each of them.
+
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_0845.md: the reproduction no longer reproduces.
