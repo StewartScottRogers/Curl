@@ -34,3 +34,4 @@ Last step of BL-3234. Reports to compare with: `report_proto.txt`, `report_proto
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: ec95dc2b d0cfd46a 05cc481e 5e81fa96.
