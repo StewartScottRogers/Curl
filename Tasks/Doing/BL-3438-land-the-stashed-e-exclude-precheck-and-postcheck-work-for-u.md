@@ -38,3 +38,4 @@ The stash holds the finished code: new `UpstreamShellCheckLine.cs` and `Upstream
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 16a6d8ed 84ffb677 ef020bad 406ec57e 45ba054b 22b8e47e.
