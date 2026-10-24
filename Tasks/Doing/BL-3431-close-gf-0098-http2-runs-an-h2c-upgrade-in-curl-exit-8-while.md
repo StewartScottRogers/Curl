@@ -45,3 +45,4 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary alre
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: bbcffc50 1fd5de8c 28346828.
