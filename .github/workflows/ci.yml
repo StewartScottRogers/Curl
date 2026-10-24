@@ -173,11 +173,21 @@ jobs:
   # The four quality gates (CLAUDE.md "Quality gates"): 100% line and branch coverage,
   # complexity at most 10 and CRAP at most 30 for every member, measured as the coverage
   # page measures them. The build's CA1502 counts complexity on the source and can pass a
-  # method the coverage report counts above 10, so this job is what keeps the page green:
+  # method the coverage report counts above 10, so these jobs are what keep the page green:
   # Measure-CodeQuality.ps1 exits 1 when any member is outside a gate (BL-2068). Windows
   # only, where the gates are measured, as gource.yml's coverage job does.
-  quality:
-    name: Quality gates (windows-latest)
+  #
+  # One job measuring every library took 10 to 27 minutes and was the whole run's critical
+  # path, so the coverage is collected by three parallel shard jobs (BL-3464), each running
+  # a disjoint set of the *.UnitTests projects that Measure-CodeQuality.ps1 -Shard deals by
+  # their measured test-run time, and the quality job below scores them together. The shard
+  # count is the matrix below and -ShardCount; change both together.
+  quality-shard:
+    name: Quality gates shard ${{ matrix.shard }} of 3 (windows-latest)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -192,13 +202,73 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Collect coverage for shard ${{ matrix.shard }}
+        shell: pwsh
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File Measure-CodeQuality.ps1 -Shard ${{ matrix.shard }} -ShardCount 3 -ResultsDirectory "$env:RUNNER_TEMP\quality"
+          exit $LASTEXITCODE
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quality-shard-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/quality/**/*.cobertura.xml
+            ${{ runner.temp }}/quality/shard-*.txt
+          if-no-files-found: error
+          retention-days: 3
+
+  # Keeps the name the factory and the audit office know (CiWatch.ps1 files its failures):
+  # it fails when any shard failed or was cancelled, when the shards together did not run
+  # every test project once or left a gated library out, and when any member is outside a
+  # gate, with one ::error annotation per such member as the single job gave.
+  quality:
+    name: Quality gates (windows-latest)
+    needs: quality-shard
+    if: ${{ !cancelled() }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      VSTEST_CONNECTION_TIMEOUT: 600
+    steps:
+      - name: Every shard succeeded
+        shell: pwsh
+        run: |
+          if ('${{ needs.quality-shard.result }}' -ne 'success') {
+            Write-Host "::error::A Quality gates shard did not succeed (result: ${{ needs.quality-shard.result }}); see the shard jobs."
+            exit 1
+          }
+
+      - uses: actions/checkout@v4
+
+      # For the recheck: a member short of coverage reruns the test projects that reach it.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: quality-shard-*
+          path: ${{ runner.temp }}/quality
+
       - name: Measure coverage, complexity and CRAP
         shell: pwsh
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File Measure-CodeQuality.ps1 -JsonPath "$env:RUNNER_TEMP\coverage.json"
+          powershell -NoProfile -ExecutionPolicy Bypass -File Measure-CodeQuality.ps1 -FromShards -ResultsDirectory "$env:RUNNER_TEMP\quality" -JsonPath "$env:RUNNER_TEMP\coverage.json"
           $code = $LASTEXITCODE
           if (-not (Test-Path "$env:RUNNER_TEMP\coverage.json")) { throw 'Measure-CodeQuality.ps1 wrote no JSON' }
-          foreach ($m in @((Get-Content "$env:RUNNER_TEMP\coverage.json" -Raw | ConvertFrom-Json).failing)) {
+          $data = Get-Content "$env:RUNNER_TEMP\coverage.json" -Raw | ConvertFrom-Json
+          foreach ($m in @($data.failing)) {
             Write-Host "::error file=$($m.file.Replace('\', '/')),line=$($m.line)::$($m.member) is outside a gate: $($m.fails -join ', ')"
           }
+          foreach ($name in @($data.missingLibraries)) {
+            Write-Host "::error::$name is a gated library that no shard measured"
+          }
           exit $code
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: quality-coverage-json
+          path: ${{ runner.temp }}/coverage.json
+          if-no-files-found: ignore
+          retention-days: 7

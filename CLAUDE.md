@@ -45,7 +45,8 @@ All four are measured with tooling the solution already has - the coverage colle
 MSTest meta-package brings, and the SDK's own `CA1502` analyzer - so no package is needed
 for any of it. Complexity is enforced at build time: the threshold lives in
 `CodeMetricsConfig.txt` and warnings are errors, so a method at 11 breaks the build. CI
-enforces all four: its `quality` job (Windows) runs `Measure-CodeQuality.ps1`, which
+enforces all four: its `quality` job (Windows) runs `Measure-CodeQuality.ps1` on the
+coverage three parallel `quality-shard` jobs collect (`-Shard`, `-FromShards`, BL-3464), which
 measures complexity from the coverage report as the coverage page does - stricter than
 `CA1502` for async methods and lambdas - and fails when any member is outside a gate, so a
 red quality job blocks the shift-end merge to `master` (BL-2068). The
