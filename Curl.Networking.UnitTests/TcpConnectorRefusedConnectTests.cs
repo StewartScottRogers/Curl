@@ -1,0 +1,79 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+
+using Curl.Networking.Fakes;
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Networking;
+
+/// <summary>
+/// A refused loopback connect (<c>curl -sS http://127.0.0.1:9/</c>) fails on the first refused
+/// dial, with no wait of Curl's own: off Windows curl 8.22.0 fails it at once (measured on Linux
+/// and macOS, BL-3164 Notes), and on Windows the stack's own retry of a refused SYN is all the
+/// delay there is, so curl 8.21.0 Schannel and Curl both take about two seconds there.
+/// </summary>
+public sealed partial class TcpConnectorTests
+{
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ConnectAsync_ToARefusedLoopbackPortOffWindows_FailsOnTheFirstDialWithNoWaitAndExit7()
+    {
+        var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
+        var time = new ManualTimeProvider();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), time);
+
+        // The clock never moves, so any wait on the TimeProvider would leave this connect unfinished.
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 9, UseTls: false)).WaitAsync(TimeSpan.FromSeconds(30));
+
+        Diagnostics.Assert("dials", 1, dialer.DialedEndPoints.Count);
+        Assert.AreEqual(1, dialer.DialedEndPoints.Count);
+        Assert.AreEqual(0, time.PendingTimerCount);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.AreEqual("Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server", result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ConnectAsync_ToARealRefusedLoopbackPortOffWindows_FailsWithExit7InUnder500Milliseconds()
+    {
+        var port = ClosedLoopbackPort();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), new TcpDialer(), new FakeTlsProvider(), TimeProvider.System);
+
+        var stopwatch = Stopwatch.StartNew();
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", port, UseTls: false));
+        stopwatch.Stop();
+
+        Diagnostics.Assert("elapsed ms", "< 500", stopwatch.ElapsedMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.IsLessThan(500L, stopwatch.ElapsedMilliseconds);
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public async Task ConnectAsync_ToARefusedLoopbackPortOnWindows_DialsOnceAndLeavesTheSynRetryToTheStack()
+    {
+        var dialer = new FakeTcpDialer { DialOutcome = _ => throw new SocketException((int)SocketError.ConnectionRefused) };
+        var time = new ManualTimeProvider();
+        var connector = new TcpConnector(new FakeDnsResolver(Loopback), dialer, new FakeTlsProvider(), time);
+
+        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 9, UseTls: false)).WaitAsync(TimeSpan.FromSeconds(30));
+
+        Diagnostics.Assert("dials", 1, dialer.DialedEndPoints.Count);
+        Assert.AreEqual(1, dialer.DialedEndPoints.Count);
+        Assert.AreEqual(0, time.PendingTimerCount);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsTrue(result.IsConnectionRefused);
+        Assert.AreEqual("Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server", result.ErrorMessage);
+    }
+
+    /// <summary>A loopback port nothing listens on: one the system just handed a listener, now closed.</summary>
+    private static int ClosedLoopbackPort()
+    {
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)listener.LocalEndPoint!).Port;
+    }
+}
