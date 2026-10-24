@@ -3,8 +3,8 @@ id: AF-0407
 title: CI red 37 minutes on work/dark-factory from run 39986660283 (RunAsync_StalledBelowSpeedLimitForSpeedTime_Exits28WithCurlsMessage)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:RunAsync_StalledBelowSpeedLimitForSpeedTime_Exits28WithCurlsMessage:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
