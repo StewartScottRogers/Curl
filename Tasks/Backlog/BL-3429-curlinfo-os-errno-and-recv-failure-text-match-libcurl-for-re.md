@@ -1,5 +1,5 @@
 ---
-id: BL-3425
+id: BL-3429
 title: CURLINFO_OS_ERRNO and Recv failure text match libcurl for reuse-idle-close and the proxy cases
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-23
 completed:
 ---
-# BL-3425 — CURLINFO_OS_ERRNO and Recv failure text match libcurl for reuse-idle-close and the proxy cases
+# BL-3429 — CURLINFO_OS_ERRNO and Recv failure text match libcurl for reuse-idle-close and the proxy cases
 
 ## Goal
 
@@ -27,7 +27,7 @@ Split from BL-3315. libcurl gives 10054 for reuse-idle-close (a dead reused conn
 
 ## Notes
 
-- 2026-10-23: Split from BL-3315 (over its cost cap), with BL-3424 for the other cases. The differential run takes about 10 minutes; if it passes already once BL-3343 is Done, only the pinning unit tests remain.
+- 2026-10-23: Split from BL-3315 (over its cost cap), with BL-3428 for the other cases. The differential run takes about 10 minutes; if it passes already once BL-3343 is Done, only the pinning unit tests remain.
 
 ## Log
 
