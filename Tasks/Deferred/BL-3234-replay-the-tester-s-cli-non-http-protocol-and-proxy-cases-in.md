@@ -42,3 +42,4 @@ The tester's harness and data are in `Z:\repos\Curl.difftest\2026-10-22\` (outsi
 - 2026-10-23: Doing -> Backlog. Waiting on BL-3284 to BL-3288 (the protocol and proxy server ports, split out for size) and BL-3235 (the test PKI the proxy https cases need)
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 1f83bf22 ae951636 5e81fa96.
 - 2026-10-23: Doing -> Backlog. Waiting on BL-3334 (the SOCKS4/SOCKS5 half of proxy_server.py, needed by the px-socks* and px-preproxy cases)
+- 2026-10-23: Backlog -> Deferred. Split for size into BL-3424, BL-3425, BL-3426 and BL-3427 (over its cost cap); look again never, the subtasks replace it

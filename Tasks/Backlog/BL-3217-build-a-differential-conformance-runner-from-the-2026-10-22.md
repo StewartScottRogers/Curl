@@ -4,7 +4,7 @@ title: Build a differential conformance runner from the 2026-10-22 tester's case
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3231, BL-3232, BL-3233, BL-3234, BL-3235, BL-3236, BL-3237, BL-3238, BL-3239, BL-3240, BL-3241, BL-3242]
+depends-on: [BL-3231, BL-3232, BL-3233, BL-3424, BL-3425, BL-3426, BL-3427, BL-3235, BL-3236, BL-3237, BL-3238, BL-3239, BL-3240, BL-3241, BL-3242]
 touches: [Curl.Conformance.Differential.UnitLibrary, Curl.Conformance.Differential.UnitTests, Curl.slnx]
 requirement: none
 created: 2026-10-22
