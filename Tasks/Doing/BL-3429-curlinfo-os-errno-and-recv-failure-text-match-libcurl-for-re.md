@@ -32,3 +32,4 @@ Split from BL-3315. libcurl gives 10054 for reuse-idle-close (a dead reused conn
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 20050769 db93e725.
