@@ -31,7 +31,7 @@ public sealed class McpRequestTracker
     {
         if (_inFlight.TryGetValue(idText, out CancellationTokenSource? source))
         {
-            source.Cancel();
+            CancelUnlessFinished(source);
         }
     }
 
@@ -40,9 +40,23 @@ public sealed class McpRequestTracker
     {
         foreach (CancellationTokenSource source in _inFlight.Values)
         {
-            source.Cancel();
+            CancelUnlessFinished(source);
         }
     }
 
     private static string KeyOf(JsonRpcRequestId id) => id.Value.GetRawText();
+
+    // A request can finish and dispose its source between the lookup and the cancel (BL-3423: the
+    // server's CancelAll at the end of the input raced a ping that had just answered); a finished
+    // request has nothing left to cancel.
+    private static void CancelUnlessFinished(CancellationTokenSource source)
+    {
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
 }
