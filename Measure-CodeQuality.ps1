@@ -58,6 +58,40 @@
     reported as production code, and no file under either kind of project is listed
     among the coverage exclusions in production code.
 
+.PARAMETER Shard
+    With -ShardCount, collect coverage for one shard of a whole-solution run and stop:
+    the *.UnitTests projects (all of them, as a whole-solution run measures) are split
+    into -ShardCount shards by Get-ShardTestProjects, and this run builds and tests only
+    shard -Shard (1-based) into ResultsDirectory, one folder per test project, beside a
+    manifest named shard-<Shard>-of-<ShardCount>.txt that lists the projects it ran. It
+    scores nothing, because a library's coverage is the merge of every test project that
+    reaches it and those may sit in other shards; a -FromShards run scores the shards'
+    reports together. A shard with no test project, or whose tests wrote no Cobertura
+    report, fails rather than passing having measured nothing. CI's quality-shard jobs
+    run the shards in parallel (BL-3464). The unit of a shard is a whole test project,
+    never part of one: the merge keeps the best condition count per line, not a union of
+    branches, so splitting one project's tests would change what it measures.
+
+.PARAMETER ShardCount
+    How many shards -Shard counts from. Splits the test projects by their measured
+    test-run seconds (Get-ShardTestProjects), so the shards are roughly even.
+
+.PARAMETER FromShards
+    Score the reports that every shard of a -Shard run left under ResultsDirectory (in
+    any folder layout, such as one folder per downloaded CI artifact), instead of running
+    tests. Fails unless the shards' manifests name every shard of one -ShardCount and
+    every *.UnitTests project exactly once, and unless every gated library - every
+    production project in the checkout - is measured, so a library is never silently
+    dropped. A member short of line or branch coverage gets the same recheck as a
+    whole-solution run's.
+
+.PARAMETER SelfTest
+    Check Get-ShardTestProjects against this checkout and exit: for every shard count
+    from 1 to 8 the shards hold every *.UnitTests project exactly once, none is empty,
+    the split does not depend on the order projects are listed in, and every gated
+    library is reached by at least one test project, so by some shard. Exits 1 on a
+    failed check.
+
 .PARAMETER SkipTestRun
     Reuse the Cobertura files already in ResultsDirectory instead of running tests.
     Without -ResultsDirectory these are the reports this checkout's last run left in
@@ -97,10 +131,18 @@
 
 .EXAMPLE
     .\Measure-CodeQuality.ps1 -Library Curl.Protocol.File.UnitLibrary -ReportPath report.md
+
+.EXAMPLE
+    .\Measure-CodeQuality.ps1 -Shard 2 -ShardCount 3 -ResultsDirectory $env:TEMP\q\shard-2
+    .\Measure-CodeQuality.ps1 -FromShards -ResultsDirectory $env:TEMP\q -JsonPath q.json
 #>
 [CmdletBinding()]
 param(
     [string[]] $Library,
+    [int] $Shard,
+    [int] $ShardCount,
+    [switch] $FromShards,
+    [switch] $SelfTest,
     [switch] $SkipTestRun,
     [switch] $IncludeIntegration,
     [string] $ResultsDirectory,
@@ -197,10 +239,13 @@ function Invoke-CoverageTestRun {
     $testOutput = New-Object System.Collections.Generic.List[string]
     $testExitCode = 0
     foreach ($target in $Targets) {
+        # One folder per test project, so each project's reports sit apart when shards'
+        # results are gathered; the reports are merged from every folder alike.
+        $projectDirectory = Join-Path $Directory ([System.IO.Path]::GetFileNameWithoutExtension($target))
         $testArguments = @(
             'test', $target,
             '--collect:Code Coverage;Format=cobertura',
-            '--results-directory', $Directory
+            '--results-directory', $projectDirectory
         )
         if ($NoBuild) { $testArguments += '--no-build' }
         if (-not $IncludeIntegration) { $testArguments += @('--filter', 'TestCategory!=Integration') }
@@ -237,9 +282,153 @@ function Invoke-CoverageTestRun {
     }
 }
 
+# Production code is *.UnitLibrary, Curl.Console, Curl.Api, Curl.Mcp and Libcurl only. Test assemblies of both kinds,
+# *.UnitTests and *.IntegrationTests, are never production code (ADR-0421).
+function Test-IsProductionAssembly {
+    param([string] $Name)
+
+    if ($Name -like '*.UnitTests' -or $Name -like '*.IntegrationTests') { return $false }
+    return ($Name -like '*.UnitLibrary') -or ($Name -in 'Curl.Console', 'Curl.Api', 'Curl.Mcp', 'Libcurl')
+}
+
+function Get-GatedLibraries {
+    # The gated libraries: every production project in the checkout, by project name.
+    param([string] $Root)
+    return @(Get-ChildItem -Path $Root -Filter '*.csproj' -Recurse -Depth 1 -File |
+        Where-Object { Test-IsProductionAssembly $_.BaseName } |
+        ForEach-Object { $_.BaseName } | Sort-Object -Unique)
+}
+
+# --- Shards (BL-3464) -------------------------------------------------------------
+
+# Seconds each test project's coverage run took on CI's slow Windows runner, CI run
+# 40108510840 (the job that took 25 minutes): what Get-ShardTestProjects balances. A
+# project not listed counts as $defaultTestProjectSeconds. Only the balance depends on
+# these numbers; every project lands in exactly one shard whatever they say.
+$measuredTestProjectSeconds = @{
+    'Curl.Protocol.Ssh.UnitTests' = 707; 'Curl.Conformance.UnitTests' = 72; 'Curl.Cryptography.UnitTests' = 58
+    'Curl.Tls.UnitTests' = 24; 'Curl.Networking.UnitTests' = 23; 'Curl.Console.UnitTests' = 17
+    'Curl.Conformance.LibTest.UnitTests' = 15; 'Curl.Engine.UnitTests' = 13; 'Curl.Protocol.Http.UnitTests' = 11
+    'Curl.Cli.UnitTests' = 10; 'Libcurl.UnitTests' = 10; 'Curl.Mcp.UnitTests' = 9; 'Curl.Api.UnitTests' = 8
+    'Curl.Kerberos.UnitTests' = 8; 'Curl.Conformance.Http3Server.UnitTests' = 7; 'Curl.Conformance.SshServer.UnitTests' = 7
+}
+$defaultTestProjectSeconds = 5
+
+function Get-ShardTestProjects {
+    # The test project paths in shard -Shard (1-based) of -ShardCount, sorted by name. The
+    # projects are dealt longest first, by $measuredTestProjectSeconds (ties by name), each
+    # to the shard with the fewest seconds so far (ties to the lowest shard), so the split
+    # depends only on the set of projects, never on the order -Projects lists them in.
+    param([string[]] $Projects, [int] $Shard, [int] $ShardCount)
+    $load = New-Object 'double[]' $ShardCount
+    $assigned = @{}
+    $ordered = @($Projects | Sort-Object -Unique |
+        Sort-Object @{ Expression = { $name = [System.IO.Path]::GetFileNameWithoutExtension($_); if ($measuredTestProjectSeconds.ContainsKey($name)) { $measuredTestProjectSeconds[$name] } else { $defaultTestProjectSeconds } }; Descending = $true },
+                    @{ Expression = { [System.IO.Path]::GetFileNameWithoutExtension($_) } })
+    foreach ($project in $ordered) {
+        $name = [System.IO.Path]::GetFileNameWithoutExtension($project)
+        $seconds = if ($measuredTestProjectSeconds.ContainsKey($name)) { $measuredTestProjectSeconds[$name] } else { $defaultTestProjectSeconds }
+        $lightest = 0
+        for ($i = 1; $i -lt $ShardCount; $i++) { if ($load[$i] -lt $load[$lightest]) { $lightest = $i } }
+        $load[$lightest] += $seconds
+        $assigned[$project] = $lightest + 1
+    }
+    return @($ordered | Where-Object { $assigned[$_] -eq $Shard } | Sort-Object { [System.IO.Path]::GetFileNameWithoutExtension($_) })
+}
+
+function Invoke-ShardSelfTest {
+    # -SelfTest: the shards partition this checkout's test projects exactly, and every
+    # gated library is reached by some test project. Returns the number of failed checks.
+    $failed = 0
+    $all = @(Get-TestProjects -Root $repositoryRoot)
+    $reversed = @($all); [array]::Reverse($reversed)
+    foreach ($count in 1..8) {
+        $seen = @{}
+        $empty = 0
+        $orderDependent = 0
+        foreach ($index in 1..$count) {
+            $shardProjects = @(Get-ShardTestProjects -Projects $all -Shard $index -ShardCount $count)
+            if ($shardProjects.Count -eq 0) { $empty++ }
+            $fromReversed = @(Get-ShardTestProjects -Projects $reversed -Shard $index -ShardCount $count)
+            if (($shardProjects -join '|') -cne ($fromReversed -join '|')) { $orderDependent++ }
+            foreach ($project in $shardProjects) { $seen[$project] = 1 + $(if ($seen.ContainsKey($project)) { $seen[$project] } else { 0 }) }
+        }
+        $twice = @($seen.Keys | Where-Object { $seen[$_] -ne 1 })
+        $missing = @($all | Where-Object { -not $seen.ContainsKey($_) })
+        $ok = ($twice.Count -eq 0) -and ($missing.Count -eq 0) -and ($empty -eq 0) -and ($orderDependent -eq 0)
+        if (-not $ok) { $failed++ }
+        $sizes = @(1..$count | ForEach-Object { @(Get-ShardTestProjects -Projects $all -Shard $_ -ShardCount $count).Count }) -join ', '
+        Write-Host ('{0} {1} shard(s) of {2} test projects: sizes {3}; in more than one {4}, in none {5}, empty {6}, order-dependent {7}' -f
+            $(if ($ok) { 'PASS' } else { 'FAIL' }), $count, $all.Count, $sizes, $twice.Count, $missing.Count, $empty, $orderDependent)
+    }
+    $unreached = @(Get-GatedLibraries -Root $repositoryRoot | Where-Object {
+            @(Get-TestProjectsReaching -Root $repositoryRoot -Library @($_)).Count -eq 0 })
+    if ($unreached.Count) { $failed++ }
+    Write-Host ('{0} every gated library is reached by a test project; unreached: {1}' -f
+        $(if ($unreached.Count) { 'FAIL' } else { 'PASS' }), $(if ($unreached.Count) { $unreached -join ', ' } else { 'none' }))
+    return $failed
+}
+
+if ($SelfTest) {
+    $failedChecks = Invoke-ShardSelfTest
+    if ($failedChecks) { Write-Host "$failedChecks shard check(s) failed." -ForegroundColor Red; exit 1 }
+    Write-Host 'Every shard check passed.' -ForegroundColor Green
+    exit 0
+}
+
+if ($ShardCount -gt 0 -or $Shard -gt 0) {
+    if ($ShardCount -lt 1 -or $Shard -lt 1 -or $Shard -gt $ShardCount) { throw "-Shard must be from 1 to -ShardCount; got -Shard $Shard -ShardCount $ShardCount." }
+    if ($Library -or $FromShards -or $SkipTestRun -or $IncludeIntegration) { throw '-Shard measures a shard of a whole-solution run; it takes none of -Library, -FromShards, -SkipTestRun or -IncludeIntegration.' }
+    $shardProjects = @(Get-ShardTestProjects -Projects (Get-TestProjects -Root $repositoryRoot) -Shard $Shard -ShardCount $ShardCount)
+    if ($shardProjects.Count -eq 0) { throw "Shard $Shard of $ShardCount holds no test project, so it would measure nothing." }
+    if (Test-Path $ResultsDirectory) { Remove-Item $ResultsDirectory -Recurse -Force }
+    New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
+    Write-Host "Shard $Shard of ${ShardCount}: $(@($shardProjects | ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_) }) -join ', ')" -ForegroundColor Cyan
+
+    # Build only what this shard tests: a solution filter of its test projects, whose
+    # project references build with them.
+    $filterPath = Join-Path $ResultsDirectory "shard-$Shard-of-$ShardCount.slnf"
+    $filter = [ordered]@{ solution = [ordered]@{
+            path     = (Join-Path $repositoryRoot 'Curl.slnx')
+            projects = @($shardProjects | ForEach-Object { $_.Substring($repositoryRoot.Length).TrimStart('\', '/') })
+        } }
+    $filter | ConvertTo-Json -Depth 4 | Out-File -FilePath $filterPath -Encoding utf8
+    Write-Host "Building shard $Shard of $ShardCount ..." -ForegroundColor Cyan
+    & dotnet build $filterPath | ForEach-Object { Write-Host ([string]$_) }
+    if ($LASTEXITCODE -ne 0) { throw "dotnet build failed with exit code $LASTEXITCODE. Fix the build before measuring quality." }
+
+    Invoke-CoverageTestRun -Targets $shardProjects -Directory $ResultsDirectory -NoBuild
+    $shardReports = @(Get-ChildItem -Path $ResultsDirectory -Filter '*.cobertura.xml' -Recurse -ErrorAction SilentlyContinue)
+    if ($shardReports.Count -eq 0) { throw "Shard $Shard of $ShardCount wrote no Cobertura report, so it measured nothing." }
+    $manifest = @("shard $Shard of $ShardCount") + @($shardProjects | ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_) })
+    $manifest | Out-File -FilePath (Join-Path $ResultsDirectory "shard-$Shard-of-$ShardCount.txt") -Encoding utf8
+    Write-Host "Shard $Shard of $ShardCount wrote $($shardReports.Count) Cobertura report(s) for $($shardProjects.Count) test project(s)." -ForegroundColor Cyan
+    exit 0
+}
+
+if ($FromShards) {
+    if ($Library -or $SkipTestRun -or $IncludeIntegration) { throw '-FromShards scores a whole-solution run; it takes none of -Library, -SkipTestRun or -IncludeIntegration.' }
+    if (-not (Test-Path $ResultsDirectory)) { throw "-FromShards found no $ResultsDirectory." }
+    # Every shard of one count reported, and together they ran every test project once.
+    $manifests = @(Get-ChildItem -Path $ResultsDirectory -Filter 'shard-*-of-*.txt' -Recurse -File)
+    $counts = @($manifests | ForEach-Object { if ($_.Name -match '^shard-(\d+)-of-(\d+)\.txt$') { [int] $Matches[2] } } | Sort-Object -Unique)
+    if ($counts.Count -ne 1) { throw "-FromShards needs the manifests of one shard count under $ResultsDirectory; found $($manifests.Count) manifest(s) of count(s) '$($counts -join ', ')'." }
+    $shardNumbers = @($manifests | ForEach-Object { if ($_.Name -match '^shard-(\d+)-of-') { [int] $Matches[1] } } | Sort-Object)
+    if (($shardNumbers -join ',') -ne ((1..$counts[0]) -join ',')) { throw "-FromShards needs shards 1 to $($counts[0]) once each; found shard(s) $($shardNumbers -join ', ')." }
+    $ran = @($manifests | ForEach-Object { Get-Content -LiteralPath $_.FullName | Select-Object -Skip 1 | ForEach-Object { $_.Trim() } | Where-Object { $_ } })
+    $expected = @(Get-TestProjects -Root $repositoryRoot | ForEach-Object { [System.IO.Path]::GetFileNameWithoutExtension($_) })
+    $repeated = @($ran | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+    $notRun = @($expected | Where-Object { $ran -notcontains $_ })
+    $unknown = @($ran | Where-Object { $expected -notcontains $_ } | Sort-Object -Unique)
+    if ($repeated.Count -or $notRun.Count -or $unknown.Count) {
+        throw "The shards did not run every test project exactly once. Run twice: $($repeated -join ', '). Not run: $($notRun -join ', '). Not in this checkout: $($unknown -join ', ')."
+    }
+    Write-Host "Scoring $($counts[0]) shard(s) that ran all $($expected.Count) test projects." -ForegroundColor Cyan
+}
+
 # --- 1. Collect coverage ----------------------------------------------------------
 
-if (-not $SkipTestRun) {
+if (-not $SkipTestRun -and -not $FromShards) {
     if (Test-Path $ResultsDirectory) { Remove-Item $ResultsDirectory -Recurse -Force }
     New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
 
@@ -277,15 +466,6 @@ if ($coverageFiles.Count -eq 0) {
 }
 
 # --- 2. Merge every report into one table of production methods -------------------
-
-# Production code is *.UnitLibrary, Curl.Console, Curl.Api, Curl.Mcp and Libcurl only. Test assemblies of both kinds,
-# *.UnitTests and *.IntegrationTests, are never production code (ADR-0421).
-function Test-IsProductionAssembly {
-    param([string] $Name)
-
-    if ($Name -like '*.UnitTests' -or $Name -like '*.IntegrationTests') { return $false }
-    return ($Name -like '*.UnitLibrary') -or ($Name -in 'Curl.Console', 'Curl.Api', 'Curl.Mcp', 'Libcurl')
-}
 
 # Curl.Console.csproj sets <AssemblyName>curl</AssemblyName> so the binary is a drop-in
 # for curl, which makes its Cobertura package "curl". Report it under its project name,
@@ -437,7 +617,7 @@ $scored = Get-ScoredMembers
 # whole-solution run leaves a member short of line or branch coverage, run the test
 # projects that reach its library again, one at a time, and merge their reports in. A
 # real gap stays a gap, since merging only ever adds lines some test executed.
-if (-not $SkipTestRun -and $wholeSolution) {
+if ($FromShards -or (-not $SkipTestRun -and $wholeSolution)) {
     $shortAssemblies = @($scored |
         Where-Object { $_.Failures -contains 'line' -or $_.Failures -contains 'branch' } |
         Select-Object -ExpandProperty Assembly -Unique)
@@ -451,6 +631,14 @@ if (-not $SkipTestRun -and $wholeSolution) {
             $scored = Get-ScoredMembers
         }
     }
+}
+
+# A -FromShards run fails when a gated library is not in the merged reports at all, so a
+# shard that lost a library can never pass by leaving it out (BL-3464).
+$missingLibraries = @()
+if ($FromShards) {
+    $measured = @($scored | Select-Object -ExpandProperty Assembly -Unique)
+    $missingLibraries = @(Get-GatedLibraries -Root $repositoryRoot | Where-Object { $measured -notcontains $_ })
 }
 
 # ToArray rather than @(...): Windows PowerShell 5.1 throws "Argument types do not
@@ -583,6 +771,12 @@ else {
 }
 
 $report.Add('')
+if ($missingLibraries.Count) {
+    $report.Add('## Gated libraries missing from the shards'' reports')
+    $report.Add('')
+    foreach ($name in $missingLibraries) { $report.Add("- $name") }
+    $report.Add('')
+}
 $report.Add(('**{0} failing member(s) across {1} production assembly/assemblies.**' -f $totalViolations, $assemblies.Count))
 
 $text = $report -join [Environment]::NewLine
@@ -619,10 +813,11 @@ if ($JsonPath) {
         libraries = $jsonLibraries.ToArray()
         failing = $jsonFailing.ToArray()
         exclusions = $exclusions
+        missingLibraries = @($missingLibraries)
     }
     $data | ConvertTo-Json -Depth 6 | Out-File -FilePath $JsonPath -Encoding utf8
     Write-Host "Data written to $JsonPath" -ForegroundColor Cyan
 }
 
-if ($totalViolations -gt 0) { exit 1 }
+if ($totalViolations -gt 0 -or $missingLibraries.Count -gt 0) { exit 1 }
 exit 0

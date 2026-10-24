@@ -36,7 +36,8 @@ that is pure computation stays in its `*.UnitTests` project as `LongRunning`.
 Every `*.UnitLibrary`, `Curl.Console`, `Curl.Api`, `Curl.Mcp` and `Libcurl` is held to
 100% line coverage, 100% branch coverage, cyclomatic complexity at most 10 per method and
 a CRAP score at most 30. Complexity is enforced at build time (`CodeMetricsConfig.txt`,
-warnings are errors); CI's quality job runs `Measure-CodeQuality.ps1` and fails on any
+warnings are errors); CI's quality job runs `Measure-CodeQuality.ps1` (on coverage three
+parallel shard jobs collect, BL-3464) and fails on any
 member outside a gate. Coverage is measured from the fast tests only, so a line only an
 Integration test reaches counts as uncovered. Never change a threshold in
 `CodeMetricsConfig.txt`: that is Stewart's, and a lane blocks to ask.
