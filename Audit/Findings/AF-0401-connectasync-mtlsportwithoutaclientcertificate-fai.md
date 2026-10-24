@@ -3,8 +3,8 @@ id: AF-0401
 title: ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake checks only that the reply is not the expected one, not that the handshake failed
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs:ConnectAsync_MtlsPortWithoutAClientCertificate_FailsTheHandshake:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.UnitTests/HttpsServerConnectorTests.Mtls.cs
 ## Log
 
 - 2026-10-23: filed proposed.
+- 2026-10-24: proposed -> accepted.
