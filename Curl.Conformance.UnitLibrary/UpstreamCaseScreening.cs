@@ -113,8 +113,8 @@ internal static class UpstreamCaseScreening
             () => UnsupportedPart(testCase, "client", ClientParts),
             () => unitProgram is null ? UnrunTool(testCase, isPorted) : UnportedUnitProgram(unitProgram, OrNone(isPortedUnitProgram)),
             () => UnsupportedPart(testCase, "verify", VerifyParts),
-            () => UninterpretedCheck(testCase, "client", "precheck", line => UpstreamLibTestCheckLine.Parse(line) is { } check && isPorted(check.Program)),
-            () => UninterpretedCheck(testCase, "verify", "postcheck", _ => false),
+            () => UninterpretedCheck(testCase, "client", "precheck", line => UpstreamShellCheckLine.InterpretsPrecheck(line) || (UpstreamLibTestCheckLine.Parse(line) is { } check && isPorted(check.Program))),
+            () => UninterpretedCheck(testCase, "verify", "postcheck", UpstreamShellCheckLine.InterpretsPostcheck),
             () => UnsupportedServer(testCase, standIns),
             () => FtpDataConnection(testCase),
             () => UploadOffMailServer(testCase),
@@ -269,10 +269,10 @@ internal static class UpstreamCaseScreening
 
     // A precheck or postcheck runs only when every line is a %PERL -e one-liner that
     // UpstreamPerlOneLiner interprets (BL-1933), a test610.pl or test613.pl line (BL-1894) or a %RESOLVE line UpstreamResolveCheck emulates (BL-1929),
-    // or, in a precheck, a %LIBTESTS line running a ported libtest program (BL-2634).
-    private static string? UninterpretedCheck(UpstreamTestCase testCase, string section, string name, Func<string, bool> runsLibTest) =>
+    // or, in a precheck, a %LIBTESTS line running a ported libtest program (BL-2634) or mkdir, cp and echo commands, and in a postcheck a grep -q line (BL-3412).
+    private static string? UninterpretedCheck(UpstreamTestCase testCase, string section, string name, Func<string, bool> interpretsInSection) =>
         UpstreamTestPartBodies.Lines(testCase.Find(section, name))
-            .FirstOrDefault(line => !UpstreamPerlCheckLine.Interprets(line) && !UpstreamResolveCheck.Interprets(line) && !runsLibTest(line)) is { } line
+            .FirstOrDefault(line => !UpstreamPerlCheckLine.Interprets(line) && !UpstreamResolveCheck.Interprets(line) && !interpretsInSection(line)) is { } line
             ? $"the harness does not interpret the <{section}><{name}> line {line}"
             : null;
 

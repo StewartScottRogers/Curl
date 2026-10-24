@@ -1,3 +1,4 @@
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Conformance;
@@ -48,7 +49,59 @@ public sealed class UpstreamTest1169ScriptTests
 
     [TestMethod]
     public void Run_AnotherCommandLine_IsNotSupported() =>
-        Assert.ThrowsExactly<NotSupportedException>(() => UpstreamTest1169Script.Run(["-E", "exclude", "1"]));
+        Assert.ThrowsExactly<NotSupportedException>(() => UpstreamTest1169Script.Run(["-X", "exclude", "1"]));
+
+    [TestMethod]
+    public void Run_ExcludeFileNamingTheTest_SkipsItPrintsTheReasonAndExits1()
+    {
+        string excludeFile = Write("# a comment\n\ntest:5\nkeyword:HTTP:not this one\ntest : 2,01 : Test should not run for unit test 1182\n");
+        StringBuilder output = new();
+
+        int exitCode = UpstreamTest1169Script.Run(["-o", "TESTDIR=x", "-o", "LOGDIR=y", "-E", excludeFile, "1"], output);
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual("test 0001 SKIPPED: Test should not run for unit test 1182\n", output.ToString());
+    }
+
+    [TestMethod]
+    public void Run_ExcludeFileNotNamingTheTest_IsNotSupported()
+    {
+        string excludeFile = Write("test:2:only two\n");
+
+        Assert.ThrowsExactly<NotSupportedException>(() => UpstreamTest1169Script.Run(["-E", excludeFile, "1"], new StringBuilder()));
+    }
+
+    [TestMethod]
+    [DataRow("-o", "LOGDIR=y", "-L", "library")]
+    [DataRow("-X", "exclude", "-o", "x")]
+    [DataRow("-o", "LOGDIR=y", "-E", "exclude")]
+    public void Run_OptionsAroundAnotherShape_IsNotSupported(string first, string second, string third, string fourth) =>
+        Assert.ThrowsExactly<NotSupportedException>(() => UpstreamTest1169Script.Run([first, second, third, fourth]));
+
+    [TestMethod]
+    [DataRow("-o")]
+    [DataRow("-X library")]
+    [DataRow("-L library extra")]
+    [DataRow("-E exclude")]
+    public void Run_IncompleteOrUnknownCommandLine_IsNotSupported(string arguments) =>
+        Assert.ThrowsExactly<NotSupportedException>(() => UpstreamTest1169Script.Run(arguments.Split(' ')));
+
+    [TestMethod]
+    public void Run_NullOutput_Throws() =>
+        Assert.ThrowsExactly<ArgumentNullException>(() => UpstreamTest1169Script.Run(["-L", "x"], null!));
+
+    [TestMethod]
+    public async Task RunAsync_ExcludeCommand_WritesTheSkipLineToStdout()
+    {
+        string excludeFile = Write("test:1:no\n");
+        using MemoryStream stdout = new();
+        UpstreamCurlInvocation invocation = new(["-E", excludeFile, "1"], stdout, new MemoryStream(), new MemoryStream(), new UnusedConnector(), new UnreachableDatagramConnector());
+
+        int exitCode = await UpstreamTest1169Script.RunAsync(invocation, _ => Task.FromResult(0));
+
+        Assert.AreEqual(1, exitCode);
+        Assert.AreEqual("test 0001 SKIPPED: no\n", Encoding.Latin1.GetString(stdout.ToArray()));
+    }
 
     [TestMethod]
     public void Run_NullArguments_Throws() =>
