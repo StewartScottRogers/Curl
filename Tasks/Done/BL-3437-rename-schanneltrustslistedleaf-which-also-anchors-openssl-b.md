@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs]
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3437 — Rename SchannelTrustsListedLeaf, which also anchors OpenSSL-build partial chains
 
@@ -43,3 +43,4 @@ Renamed to `CaCertificateFileAnchorsChain`. The old name remains only in the Don
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 7e62dbbc 892bbcb0 795a2296.
+- 2026-10-23: Doing -> Done. Renamed to CaCertificateFileAnchorsChain, comment covers both builds; build and fast tests green
