@@ -32,3 +32,4 @@ Split from BL-3315. libcurl keeps 10061 (the refused ::1 attempt) while 127.0.0.
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 060985cf db93e725.
