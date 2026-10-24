@@ -45,3 +45,4 @@ ADR-0803 (BL-3406) decides 1182 as `interpret`: the C# runner honours `-E <file>
 - 2026-10-23: Doing -> Backlog. Depends on BL-3410: both cases run runtests.pl, which the script registry keys once, so -E extends BL-3410's runtests.pl interpretation; criteria were template placeholders and are written now
 - 2026-10-23: Backlog -> Doing. Criteria at claim: 54e0f226 84ffb677 ef020bad 406ec57e 45ba054b 7d0a04bb 779790c0.
 - 2026-10-23: Doing -> Backlog. Code done and Conformance tests green (stash); cost cap reached before the quality measurement and solution fast tests
+- 2026-10-23: Backlog -> Deferred. Split into BL-3438 (land the stashed work) and BL-3439 (quality gates and solution fast tests); cost cap reached
