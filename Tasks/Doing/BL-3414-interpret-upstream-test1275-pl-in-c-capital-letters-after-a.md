@@ -26,6 +26,8 @@ completed:
 
 ## Notes
 
+- Interpreted test1275.pl (curl 8.22.0, fetched from the tag) in UpstreamTest1275Script: every vendored *.md except the root README.md, in ordinal order; prints ok on success, else the script's stderr lines and exit 1. Case 1275 added to PassingUpstreamCases.txt. Fast tests green (4312 passed), Measure-CodeQuality for Curl.Conformance.UnitLibrary: 0 failing members.
+
 ## Log
 
 - 2026-10-23: Created.
