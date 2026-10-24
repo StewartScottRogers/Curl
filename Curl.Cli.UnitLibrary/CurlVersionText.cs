@@ -30,7 +30,7 @@ public static class CurlVersionText
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>GSS-API</c> and <c>HTTP2</c>
+    /// is the Windows line, which drops <c>GSS-API</c>, <c>HTTP2</c>, <c>HTTPSRR</c> and <c>SSLS-EXPORT</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
     /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
     /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
@@ -55,12 +55,12 @@ public static class CurlVersionText
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
     /// the Schannel reference build does not list, though <c>--ech</c> still works (ADR-0448, BL-1822), and
     /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
-    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), with <c>HTTP2</c> in the OpenSSL build's
-    /// position after <c>HSTS</c>, because Curl's own HTTP/2 runs on Windows too (ADR-0786, BL-3207), and without
+    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), without <c>HTTP2</c> or <c>HTTPSRR</c>, which the
+    /// Schannel reference build does not list, though Curl's own HTTP/2 and HTTPS records still work there (ADR-0808, BL-3359), and without
     /// <c>HTTP3</c>, which the Schannel reference build does not list, though <c>--http3</c> still works
     /// (ADR-0451, BL-1825).
     /// </summary>
-    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTP2 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
+    public const string WindowsFeaturesLine = "Features: alt-svc AsynchDNS brotli HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
 
     /// <summary>Returns the four lines for the platform described, without line terminators.</summary>
     /// <param name="isWindows">Whether the running system is Windows (<see cref="OperatingSystem.IsWindows"/>).</param>
