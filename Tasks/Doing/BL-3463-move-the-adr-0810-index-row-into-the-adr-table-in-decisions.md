@@ -31,3 +31,4 @@ The shift-end review of 2026-10-24 (review-20261024-050935, pr-review-toolkit co
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-24: Backlog -> Doing. Criteria at claim: b0b4473a 65fdf62e 2cdc9c29.
