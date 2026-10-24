@@ -9,7 +9,7 @@ touches: [.github/workflows/gource.yml, .github/gource/render.sh, .github/gource
 lane: no
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-23
 ---
 # BL-3314 — Make the Gource render finish and publish again on a large, busy repository
 
@@ -59,3 +59,5 @@ Update gource.yml's header comment and render.sh's header so they say what the w
 - 2026-10-23: Doing -> Backlog. Interactive only: the dispatch criterion needs gource.yml run on work/dark-factory after the shift merges these changes; code criteria done
 - 2026-10-23: Backlog -> Doing. interactive session finishing the dispatch criterion Criteria at claim: 137f4a65 da86baa8 e818b190 425c647f bd9fbc09 b590f4b4 d187ee2f.
 - 2026-10-23: Doing -> Backlog. Interactive work paused for a reboot; resumes after it
+- 2026-10-23: Backlog -> Doing. Criteria at claim: 137f4a65 da86baa8 e818b190 425c647f bd9fbc09 b590f4b4 d187ee2f.
+- 2026-10-23: Doing -> Done. render run 40040045409 published: site 552 MB, gource.mp4 55 MB, 1080p H.264 only
