@@ -41,6 +41,34 @@ public sealed class SocksServerConnectorTests
     }
 
     [TestMethod]
+    [DataRow((byte)0, (byte)0, DisplayName = "0.0.0.0")]
+    [DataRow((byte)1, (byte)0, DisplayName = "0.0.1.0")]
+    public async Task Socks4_AddressOutsideTheSocks4aRange_AnswersAfterTheUserId(byte thirdOctet, byte fourthOctet)
+    {
+        (SocksServerConnector socks, _) = Server(string.Empty);
+        IConnection connection = await ConnectAsync(socks);
+
+        await connection.WriteAsync(new byte[] { 4, 1, 0x23, 0x1E, 0, 0, thirdOctet, fourthOctet, (byte)'u', 0 }, CancellationToken.None);
+
+        Assert.AreEqual(90, (await ReadAsync(connection))[1]);
+    }
+
+    [TestMethod]
+    [DataRow((byte)254)]
+    [DataRow((byte)255)]
+    public async Task Socks4a_AddressAtTheTopOfTheRange_WaitsForTheHostName(byte fourthOctet)
+    {
+        (SocksServerConnector socks, _) = Server(string.Empty);
+        IConnection connection = await ConnectAsync(socks);
+
+        await connection.WriteAsync(new byte[] { 4, 1, 0x23, 0x1E, 0, 0, 0, fourthOctet, 0, (byte)'h' }, CancellationToken.None);
+        Assert.AreEqual(0, (await ReadAsync(connection)).Length);
+        await connection.WriteAsync(new byte[] { 0 }, CancellationToken.None);
+
+        Assert.AreEqual(90, (await ReadAsync(connection))[1]);
+    }
+
+    [TestMethod]
     public async Task Socks5_NoAuthentication_ConnectsToAnIpv4Address()
     {
         (SocksServerConnector socks, _) = Server(string.Empty);
