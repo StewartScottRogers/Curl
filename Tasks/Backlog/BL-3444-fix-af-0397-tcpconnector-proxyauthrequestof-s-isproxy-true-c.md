@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs]
 requirement: none
 created: 2026-10-24
 completed:
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `TcpConnectorTests.ConnectAsync_WithProxyNegotiate_AsksForTheProxyServiceNameNotTheServiceName` (Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs): a Negotiate CONNECT with `--service-name origin --proxy-service-name proxysvc` must ask for a `proxysvc` ticket. No production change.
+- Lanes may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (`IsProxy: true` -> `false` at TcpConnector.cs:1516): the new test failed (`Expected "proxysvc"`), so the mutant is killed; the line was then restored. The re-audit runs the tool itself.
+- Build clean, fast tests green on Windows; the test uses no paths, OS text or certificates, so it is platform-neutral.
+- Added `Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs` to touches: the killing test must live in the library's test project. BL-3447 (Doing) holds all of Curl.Networking.UnitTests, so this task went back to Backlog with the test uncommitted; the next claim only needs to apply the stash, build, run the fast tests and move to Done.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Backlog. Needs Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs, which BL-3447 (Doing) holds as the whole Curl.Networking.UnitTests; test written and verified, uncommitted
