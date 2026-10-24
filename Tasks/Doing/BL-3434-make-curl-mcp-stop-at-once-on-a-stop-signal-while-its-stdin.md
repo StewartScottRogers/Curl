@@ -41,3 +41,4 @@ Suggested fix: in `RunAsync`, stop waiting on the read once the token fires, e.g
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-23: Backlog -> Doing. Criteria at claim: dc65d3b5 9b1f4cfc 850a5a7c a43672c6.
