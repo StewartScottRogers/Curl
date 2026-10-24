@@ -202,6 +202,7 @@ while ($true) {
         }
         $state = Get-TaskState $id
     }
+    Register-PrerequisiteRequeueRun $id $state
     Save-StrayChanges $id
 
     if ($Lane -and $state -in 'Done', 'Blocked', 'Deferred', 'Backlog') {

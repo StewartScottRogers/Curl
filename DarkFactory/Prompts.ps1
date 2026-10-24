@@ -24,7 +24,12 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
 3. If the only thing stopping the task is other work - an existing task, or one you
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
-   they are Done.
+   they are Done. A run that ends that way with nothing to stash does not count toward
+   the task's cost cap, so the claim that does the work gets a whole cap; a run that
+   edited first is counted (AF-0404 to AF-0406). When you file several tasks together,
+   give each the `depends-on` of every other one whose code or registry it extends, so
+   none is offered ready before the work it builds on (AF-0404: BL-3412 was ready beside
+   BL-3410, whose runtests.pl interpretation it extends, and its first run found only that).
    Look for that in your first few turns, before any code: read the task, the files it
    touches and the tests or data it names, and if it is too big for one run or needs work
    no task covers yet, split it or file that work and requeue it then, not after a
@@ -209,13 +214,22 @@ Rules for this unattended run, in addition to the lane rules (DarkFactory/LaneRu
    `git ls-tree --name-only origin/{BRANCH} Tasks/Doing/` lists them and
    `git show origin/{BRANCH}:<path>` shows one (other lanes keep that ref current).
    When none of them names it, add it to this task's `touches`, say why under Notes,
-   and carry on. When one does, add it anyway and move the task to Backlog with a
-   -Reason naming the project and that task; the board will not offer it again until
-   they no longer overlap.
+   and carry on. When one does, add it anyway, add that task's ID to this task's
+   `depends-on`, and move the task to Backlog with a -Reason naming the project and that
+   task; the board will not offer it again until that task is Done, and this run does not
+   count toward the task's cost cap (AF-0387: BL-3204's run that found BL-3199 holding
+   ManagedEasyTransfer.cs left its `depends-on` empty, so it spent a third of the cap of
+   the claim that did the work).
 4. If the only thing stopping the task is other work - an existing task, or one you
    file with the board script - add those IDs to its `depends-on` and move it to
    Backlog, not Blocked, with a -Reason naming them. The board starts it again once
-   they are Done. Blocked is only for what needs Stewart.
+   they are Done. Blocked is only for what needs Stewart. A run that ends that way with
+   nothing to stash does not count toward the task's cost cap, so the claim that does the
+   work gets a whole cap; a run that edited first is counted (AF-0404 to AF-0406). When
+   you file several tasks together, give each the `depends-on` of every other one whose
+   code or registry it extends, so none is offered ready before the work it builds on
+   (AF-0404: BL-3412 was ready beside BL-3410, whose runtests.pl interpretation it
+   extends, and its first run found only that).
    Look for that in your first few turns, before any code: read the task, the files it
    touches and the tests or data it names, and if it is too big for one run or needs work
    no task covers yet, split it or file that work and requeue it then, not after a
