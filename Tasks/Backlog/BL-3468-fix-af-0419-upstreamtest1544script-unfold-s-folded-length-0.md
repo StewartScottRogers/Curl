@@ -6,6 +6,7 @@ assignee: Claude
 pipeline: feature
 depends-on: []
 touches: [Curl.Conformance.UnitLibrary]
+lane: no
 requirement: none
 created: 2026-10-24
 completed:
@@ -46,7 +47,11 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- The mutant (`>` to `>=` on the fold condition) is equivalent: every path out of `Unfold` trims the line (`WithoutComments`), and a leading space only widens the join, so no test can tell. Fix drafted and left uncommitted: `line = folded + " " + line;` with no condition (the 1544 tests pass, 9/9). The finding reproduction cannot be run by a lane (the audit guard refuses the audit tools folder), and the site no longer exists, so the tool would resolve to another site in `Unfold`.
+- Interactive only. Remove `lane: no` once the draft change is committed and the reproduction has been run from an interactive session (or the finding is re-audited and closed).
+
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Backlog. Interactive only: the criterion 1 reproduction runs the audit tools, which a lane may not touch; fix drafted (uncommitted)
