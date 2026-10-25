@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3467 — Fix AF-0418: SwsHttpRequestFraming.ReachesAuthorizationRules' ParseContentLength(...) < 0 can become <= 0 with no test failing, so a Content-Length: 0 request skips the stand-in's authorization rules
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added a DataRow to SwsHttpServerConnectorTests.Authorization_SelectsThePartAsSwsDoes: Content-Length: 0 with Authorization: Digest must select data1000. The lane guard refuses the mutation script, so I applied the mutant (< 0 to <= 0) by hand: the new row fails (killed), then restored. Build clean, 4373 fast tests pass.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. Content-Length: 0 request now pinned to reach sws auth rules; the <= 0 mutant is killed
