@@ -34,3 +34,4 @@ Follow-up to BL-3502, which reruns only a *mechanical* (mutation) reproduction o
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 13e1a945 02264073 8ba38dad 68e59f8c.
+- 2026-10-25: Doing -> Backlog. Waiting on CI for audit PR #233 (commit 93e08e8d6); reclaim to tick the criteria and finish once Windows, Linux and macOS pass.
