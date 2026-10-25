@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/CertificateRevocationListTests.cs]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3470 — Fix AF-0421: CertificateRevocationList.Revokes' isUnsigned: false can become true with no test failing, so --crlfile misses a revoked certificate whose serial number is negative
 
@@ -41,12 +41,19 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Narrowed nothing; added `Curl.Networking.UnitTests/CertificateRevocationListTests.cs` to touches for the test (no Doing task on origin/work/dark-factory names it).
+- The fix is a test, `Revokes_WithACertificateWhoseSerialNumberIsNegative_MatchesItsSignedListEntry`: production code is unchanged and already right. `CertificateRequest.Create` always encodes a serial as positive (it prefixes 00), so the test issues a leaf with serial 00 9A 01 and patches its DER to the same-length negative INTEGER 9A 01 02. It then checks that a list `CertificateRevocationListBuilder` writes from those bytes revokes it, and that a list holding the positive 00 9A 01 02 does not. Under `isUnsigned: true` both checks flip.
+- A lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so I checked the reproduction by hand: with line 137 changed to `isUnsigned: true`, the new test failed (killed); reverted, all 13 `CertificateRevocationListTests` pass.
+- Platform: the patched certificate is loaded with `X509CertificateLoader.LoadCertificate`, and the test never checks its signature; OpenSSL and Apple both accept negative serial numbers, so the test is platform-neutral.
+- dotnet build clean; fast tests: 46 projects passed, 0 failed. No production change, so no Measure-CodeQuality run was needed.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. CertificateRevocationList.Revokes has a test with a negative certificate serial number, which kills the isUnsigned mutant (AF-0421)

@@ -155,6 +155,45 @@ public sealed class CertificateRevocationListTests
     }
 
     [TestMethod]
+    public void Revokes_WithACertificateWhoseSerialNumberIsNegative_MatchesItsSignedListEntry()
+    {
+        using var negative = CreateLeafWithNegativeSerialNumber();
+        Diagnostics.Arrange("certificate serial number", Convert.ToHexString(negative.SerialNumberBytes.Span));
+        Diagnostics.Arrange("revoked serial numbers", "the certificate's own 9A 01 02, or the positive 00 9A 01 02");
+        var builder = new CertificateRevocationListBuilder();
+        builder.AddEntry(negative.SerialNumberBytes.Span);
+        var thisUpdate = DateTimeOffset.UtcNow;
+
+        var list = CertificateRevocationList.Decode(builder.Build(s_rsaAuthority, BigInteger.One, thisUpdate.AddDays(1), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1, thisUpdate));
+        var otherList = CertificateRevocationList.Decode(TestRevocationList.Write(s_rsaAuthority, revokedSerialNumbers: [[0x9A, 0x01, 0x02]]));
+        var revokes = list.Revokes(negative);
+        var revokedByPositive = otherList.Revokes(negative);
+        Diagnostics.Act("revoked by 9A 01 02", revokes);
+        Diagnostics.Act("revoked by 00 9A 01 02", revokedByPositive);
+
+        Diagnostics.Assert("serial number", "9A0102", Convert.ToHexString(negative.SerialNumberBytes.Span));
+        Assert.AreEqual("9A0102", Convert.ToHexString(negative.SerialNumberBytes.Span));
+        Diagnostics.Assert("revoked by 9A 01 02", true, revokes);
+        Assert.IsTrue(revokes);
+        Diagnostics.Assert("revoked by 00 9A 01 02", false, revokedByPositive);
+        Assert.IsFalse(revokedByPositive);
+    }
+
+    // CertificateRequest always encodes a serial number as positive, so the leaf is issued
+    // with 00 9A 01 and its DER patched to the same-length negative INTEGER 9A 01 02. The
+    // signature no longer verifies, which Revokes never checks.
+    private static X509Certificate2 CreateLeafWithNegativeSerialNumber()
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest("CN=negative.example", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using var issued = request.Create(s_rsaAuthority, DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1), [0x00, 0x9A, 0x01]);
+        var der = issued.RawData;
+        var serial = der.AsSpan().IndexOf(new byte[] { 0x02, 0x03, 0x00, 0x9A, 0x01 });
+        new byte[] { 0x9A, 0x01, 0x02 }.CopyTo(der, serial + 2);
+        return X509CertificateLoader.LoadCertificate(der);
+    }
+
+    [TestMethod]
     public void Decode_WithRevokedCertificatesButNoNextUpdate_ReadsTheRevokedSerialNumber()
     {
         Diagnostics.Arrange("revoked serial number", "9A 01");
