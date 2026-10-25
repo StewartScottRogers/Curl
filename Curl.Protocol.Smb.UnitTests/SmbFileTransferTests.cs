@@ -172,6 +172,23 @@ public sealed partial class SmbFileTransferTests
     }
 
     [TestMethod]
+    public async Task TransferAsync_OutputThatCannotSeek_ReceivesTheFilesBytesAndCountsThem()
+    {
+        // -o's file and standard output are both streams that cannot seek (BL-3504).
+        var output = new UnseekableStream(new byte[SmbRecordedExchange.FileContent.Length]);
+        var connection = new ScriptedConnection(Replies(SmbRecordedExchange.ReadAccepted));
+
+        TransferResult result = await RunAsync(Transfer(connection, output), connection, SmbRecordedExchange.Host, DownloadPath());
+
+        Diagnostics.ActOutput(output);
+        Diagnostics.AssertResult(CurlExitCode.Ok, null, result);
+        Diagnostics.Assert("bytes written", (long)SmbRecordedExchange.FileContent.Length, output.Position);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(SmbRecordedExchange.FileContent.Length, result.BytesTransferred);
+        Assert.AreEqual(SmbRecordedExchange.FileContent, Encoding.ASCII.GetString(output.ToArray()));
+    }
+
+    [TestMethod]
     public async Task TransferAsync_FullRead_ReadsAgainFromWhereItEnded()
     {
         byte[] first = new byte[SmbReadRequest.MaxPayloadSize];
