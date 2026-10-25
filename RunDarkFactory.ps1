@@ -366,8 +366,8 @@
     (hash-object, mktree, commit-tree), so its checkout's working tree and index never
     change. It publishes once more at shift end with "state": "ended" and every lane
     finished. A single-runner shift publishes its own lane 0 the same way, from where it
-    writes its heartbeat. The board branch is the only one this script force-pushes
-    (Stewart, 2026-09-28); a failed push is traced once and never stops the shift. The
+    writes its heartbeat. This script force-pushes two branches: the board branch (Stewart,
+    2026-09-28) and, at the shift-end merge, the pin branch factory/merge-<stamp>; a failed heartbeat push is traced once and never stops the shift. The
     live board page reads it. -TestHeartbeat rehearses the files, the merge and the
     commit, without pushing.
 

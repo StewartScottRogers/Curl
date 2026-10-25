@@ -37,6 +37,7 @@ BL-3464 sharded the Quality gates job; `Curl.Protocol.Ssh.UnitTests` sits alone 
 - Local (32 logical processors), `dotnet test Curl.Protocol.Ssh.UnitTests --collect:"Code Coverage;Format=cobertura" --filter "TestCategory!=Integration"`: before, 64 s wall (test run 59 s, summed test time 1,336 s, slowest test 47.8 s); after, 27 s wall (test run 23 s, summed 706 s, slowest 7.8 s). 1899 tests pass both times.
 - `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary`: 0 failing members. `dotnet build`: 0 warnings, 0 errors.
 - CI: run 40211830827 on `work/dark-factory` (head 0c9a296c3, which carries 75c6bb831): Quality gates shard 1 (SSH) took 1m53s (16:28:50 to 16:30:43 UTC), against 2m10s to 12m22s before. The run was still going at 16:34 UTC (Ubuntu build and test done at 4m39s; shards 2 and 3 and the Windows and macOS builds still running), so its wall time was not final when this run ended; shard 1 is no longer its long pole. Ticked under lane rule 11 (a lane does not requeue only to wait for CI); the same line is in BL-3464's Notes, whose own criterion records the run wall times.
+- Final (interactive session, after the lane closed the task): run 40211830827 finished green, 9m08s from first job start to last job end (16:28:49 to 16:37:57 UTC), with no queueing before the first job. The long pole is now `Pack Curl.Mcp (windows-latest)` at 9m07s. Runner contention during shift-end merges, the other cause of runs over 15 minutes, is filed as BL-3512.
 
 ## Log
 

@@ -35,12 +35,24 @@ public sealed class CurlMcpNativeAotIntegrationTests
         binary = Path.Combine(publishFolder, OperatingSystem.IsWindows() ? "Curl.Mcp.exe" : "Curl.Mcp");
     }
 
+    /// <summary>
+    /// Deletes the publish folder, trying again for up to 30 seconds while it is in use: on Windows the
+    /// native binary can stay locked for a moment after the server process has exited (BL-3522).
+    /// </summary>
+    /// <returns>A task that completes when the folder is gone.</returns>
     [ClassCleanup]
-    public static void DeletePublishFolder()
+    public static async Task DeletePublishFolderAsync()
     {
-        if (Directory.Exists(publishFolder))
+        for (int attempt = 1; Directory.Exists(publishFolder); attempt++)
         {
-            Directory.Delete(publishFolder, recursive: true);
+            try
+            {
+                Directory.Delete(publishFolder, recursive: true);
+            }
+            catch (Exception exception) when (attempt < 60 && exception is IOException or UnauthorizedAccessException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
         }
     }
 

@@ -166,6 +166,21 @@ public sealed class Lib1512To1523Tests
     }
 
     [TestMethod]
+    public async Task Lib1515_WaitsTheDnsTimeoutPlusOneSecondOnlyBetweenTheRequests()
+    {
+        var engine = new FakeCurlEngine();
+        engine.Multi.DoneResult = CurlCode.Ok;
+        var run = new PortRun(engine, 1515, "path/1515", "127.0.0.1", "8990");
+        var timeProvider = new ImmediateTimersTimeProvider();
+
+        LibTestResult result = await new Lib1515(timeProvider).RunAsync(run.Context, CancellationToken.None);
+
+        Assert.AreEqual(0, result.ExitCode);
+        TimeSpan betweenRequests = TimeSpan.FromSeconds(Lib1515.DnsTimeoutSeconds + 1);
+        Assert.AreEqual(Lib1515.RequestCount - 1, timeProvider.DueTimes.Count(dueTime => dueTime == betweenRequests));
+    }
+
+    [TestMethod]
     public async Task Lib1515_OnAFailingTransfer_WritesTheRequestAndStopsWithItsCode()
     {
         var engine = new FakeCurlEngine();
@@ -431,5 +446,19 @@ public sealed class Lib1512To1523Tests
         Assert.AreEqual(0, progress);
         Assert.AreEqual(expectedError, run.Error.ToString());
         Assert.AreEqual("lib1523", new Lib1523().ProgramName);
+    }
+
+    /// <summary>The system clock, except that every timer fires at once and its due time is recorded.</summary>
+    private sealed class ImmediateTimersTimeProvider : TimeProvider
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<TimeSpan> dueTimes = new();
+
+        public IReadOnlyCollection<TimeSpan> DueTimes => dueTimes;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            dueTimes.Enqueue(dueTime);
+            return System.CreateTimer(callback, state, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        }
     }
 }

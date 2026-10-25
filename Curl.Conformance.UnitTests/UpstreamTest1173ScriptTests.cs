@@ -95,6 +95,16 @@ public sealed class UpstreamTest1173ScriptTests
     }
 
     [TestMethod]
+    public void Scan_ExampleFollowsSynopsis_ChecksExampleLinesNotSynopsisLines()
+    {
+        string[] page = [".TH t 3", ".SH NAME", "n", ".SH SYNOPSIS", ".nf", ".SH EXAMPLE", "printf(\"a\\n\");"];
+
+        (_, string error) = Scan(("curl_a.3", page));
+
+        StringAssert.Contains(error, "d/curl_a.3:7 '\\n' need to be '\\\\n'!\n");
+    }
+
+    [TestMethod]
     public void Scan_RequiredSections_ReportsMissingExampleAndSections()
     {
         string[] few = [".TH t 3", ".SH NAME", "n", ".SH SYNOPSIS"];

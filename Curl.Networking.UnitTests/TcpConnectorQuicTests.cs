@@ -542,15 +542,28 @@ public sealed partial class TcpConnectorQuicTests
     }
 
     [TestMethod]
-    public void QuicDialer_PublicConstructor_CreatesADialer()
+    public async Task QuicDialer_PublicConstructor_BindsTheLocalAddressAndPortGiven()
     {
-        Diagnostics.Arrange("local address", IPAddress.Loopback);
+        // A socket already holding the local end makes the dialer's own bind fail before any
+        // datagram is sent, which only happens when the constructor wired a real UDP opener to
+        // the address and port it was given.
+        using var holder = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        var heldPort = ((IPEndPoint)holder.LocalEndPoint!).Port;
+        Diagnostics.Arrange("local end held", $"{IPAddress.Loopback}:{heldPort}");
+        var dialer = new QuicDialer(new TlsClientOptions(Insecure: true), TimeProvider.System, IPAddress.Loopback, heldPort);
+        var connector = new TcpConnector(
+            new FakeDnsResolver(IPAddress.Loopback),
+            new FakeTcpDialer { DialOutcome = _ => new FakeConnection() },
+            new FakeTlsProvider(),
+            TimeProvider.System,
+            quicDialer: dialer);
 
-        var dialer = new QuicDialer(new TlsClientOptions(), TimeProvider.System, IPAddress.Loopback, 0);
+        var result = await ConnectMultiplexedAsync(connector, Target(), writesErrorMessage: false);
 
-        Diagnostics.Act("dialer", dialer.GetType().Name);
-        Diagnostics.Assert("dialer is null", false, dialer is null);
-        Assert.IsNotNull(dialer);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsNull(result.Connection);
     }
 
     [TestMethod]

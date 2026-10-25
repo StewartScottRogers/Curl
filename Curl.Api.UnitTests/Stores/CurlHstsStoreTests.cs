@@ -108,10 +108,16 @@ public sealed class CurlHstsStoreTests
     [TestMethod]
     public void ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks()
     {
-        EasyCallbackOptions callbacks = new CurlHstsStore().ApplyTo(new EasyCallbackOptions());
+        CurlHstsStore store = new();
+        store.Add(Forever);
+        EasyCallbackOptions callbacks = store.ApplyTo(new EasyCallbackOptions());
 
-        Assert.IsNotNull(callbacks.HstsRead);
-        Assert.IsNotNull(callbacks.HstsWrite);
+        Assert.AreEqual(HstsResult.Ok, callbacks.HstsRead!(out HstsEntry? read));
+        Assert.AreEqual(Forever, read);
+        Assert.AreEqual(HstsResult.Done, callbacks.HstsRead!(out HstsEntry? done));
+        Assert.IsNull(done);
+        Assert.AreEqual(HstsResult.Ok, callbacks.HstsWrite!(Example, 0, 1));
+        CollectionAssert.AreEqual(new[] { Example }, store.GetEntries().ToArray());
     }
 
     [TestMethod]
