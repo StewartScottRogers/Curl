@@ -37,8 +37,13 @@
                   the mutant is killed there, it survived only in the planted tree - a plant's
                   effect, wherever the finding's location is - so it is set aside: listed in
                   set-aside.json with the reason (and the overlapping plant, if one is found) and
-                  no AF-#### is written (BL-3502). Survived, unverified or no mutation
-                  reproduction: filed as before.
+                  no AF-#### is written (BL-3502). One with no mutation reproduction whose
+                  reproduction command is exactly one dotnet test <project> --filter "<filter>"
+                  (a project folder in the tree; no other command is ever run) has that test rerun
+                  on the clean -Commit, checked out in a throwaway worktree <repo>.audit\testrerun-*
+                  that is removed afterwards; if the tests run and none fails, it failed only in
+                  the planted tree and is set aside the same way (BL-3503: AF-0426). Survived,
+                  still failing, unverified or any other command: filed as before.
       duplicate  Before anything else, open findings that share a key are one finding: all but
                   the lowest ID are closed with closed-how duplicate and duplicate-of, and their
                   tasks join the original's tasks list.
@@ -112,8 +117,9 @@
 
 .PARAMETER RerunReproductions
     Rerun each mechanical reproduction the closure rule needs, with Invoke-MutationTest.ps1 -Site
-    on -Commit (the clean audited commit, not the planted tree). Without it the rerun reads as
-    unverified and the other closure paths apply.
+    on -Commit (the clean audited commit, not the planted tree), and each new finding's single
+    dotnet test --filter command on -Commit (the clean new rule). Without it each rerun reads as
+    unverified: the other closure paths apply, and new findings are filed.
 
 .PARAMETER SelfTest
     Run against Audit/Tools/Fixtures/findings and Fixtures/closure, copied to a temporary folder,
@@ -133,6 +139,8 @@ param(
 )
 # Finding ID -> a mechanical outcome to use instead of rerunning; only the self-test sets it.
 $MechanicalOutcomes = @{}
+# Finding key -> a failing-test rerun outcome to use instead of rerunning; only the self-test sets it.
+$TestOutcomes = @{}
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -341,6 +349,82 @@ function Invoke-MechanicalReproduction($Target) {
     # Not to the console: RunAudit.ps1 reads this script's output as its one summary line.
     [IO.File]::AppendAllText((Join-Path $reruns 'outcomes.txt'), "$($Target.Id) $($site.File):$($site.Line):$($site.Operator) on $Commit`: $outcome$(if ($raw -and $raw -ne $outcome) { " ($raw)" })`r`n", $Utf8)
     return $outcome
+}
+
+# --- failing-test reproductions on the clean commit (BL-3503) ---------------------------------
+
+function Get-TestCommand([string]$Command) {
+    # A reproduction command that is exactly one `dotnet test <project> --filter "<filter>"` ->
+    # Project, Filter; $null for anything else, so no other command an auditor wrote is ever run.
+    # The project is a folder name (optionally <name>/<name>.csproj): letters, digits, _ and dots,
+    # never a path out of the tree. The filter is one double-quoted string with no quote in it.
+    $pattern = '^dotnet\s+test\s+(?<project>[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)(?:[\\/](?:\k<project>\.csproj)?)?\s+--filter\s+"(?<filter>[^"\r\n`$]+)"$'
+    if ("$Command".Trim() -notmatch $pattern) { return $null }
+    return [pscustomobject]@{ Project = $Matches['project']; Filter = $Matches['filter'] }
+}
+
+function Get-TrxCounts([string]$TrxPath) {
+    # Executed and failed counts from a trx log's ResultSummary, or $null when there is none.
+    if (-not (Test-Path -LiteralPath $TrxPath)) { return $null }
+    [xml]$trx = [IO.File]::ReadAllText($TrxPath)
+    $counters = $trx.TestRun.ResultSummary.Counters
+    if (-not $counters) { return $null }
+    return [pscustomobject]@{ Executed = [int]$counters.executed; Failed = [int]$counters.failed + [int]$counters.error + [int]$counters.timeout }
+}
+
+function Invoke-TestReproduction($Target) {
+    # Reruns a new finding's failing-test command on the clean audited commit, checked out in a
+    # throwaway worktree <repo>.audit\testrerun-<stamp> beside the repository and removed afterwards
+    # (as Invoke-MutationTest.ps1 does; the planted tree is never used): 'passed' (the tests ran and
+    # none failed: the failure was the planted tree's), 'failed' (still fails), 'unverified' (not
+    # run, or it could not tell: no such project, a build failure, a timeout, no test matched), or
+    # 'none' (the command is not one `dotnet test <project> --filter "..."`). Its output and trx
+    # stay in <ReportDirectory>\reruns\<id>.log and .trx, one line per rerun in reruns\outcomes.txt.
+    $test = Get-TestCommand $Target.Command
+    if (-not $test) { return 'none' }
+    if ($Target.Key -and $TestOutcomes.ContainsKey($Target.Key)) { return $TestOutcomes[$Target.Key] }
+    if (-not $RerunReproductions) { return 'unverified' }
+    $reruns = Join-Path $ReportDirectory 'reruns'
+    New-Item -ItemType Directory -Force $reruns | Out-Null
+    $log = Join-Path $reruns "$($Target.Id).log"
+    $trxPath = Join-Path $reruns "$($Target.Id).trx"
+    Remove-Item -LiteralPath $trxPath -ErrorAction SilentlyContinue
+    $outcome = 'unverified'
+    $detail = ''
+    $ErrorActionPreference = 'Continue'
+    $sha = "$(git -C $repo rev-parse --verify "$Commit^{commit}" 2>$null)".Trim()
+    $workRoot = "$repo.audit"
+    $worktree = Join-Path $workRoot "testrerun-$(Get-Date -Format 'yyyyMMdd-HHmmss')-$([guid]::NewGuid().ToString('N').Substring(0, 6))"
+    try {
+        if (-not $sha) { $detail = "$Commit is not a commit"; return $outcome }
+        New-Item -ItemType Directory -Force $workRoot | Out-Null
+        & git -C $repo worktree add --detach $worktree $sha *> $log
+        if ($LASTEXITCODE -ne 0) { $detail = 'git worktree add failed'; return $outcome }
+        $project = Join-Path $worktree "$($test.Project)\$($test.Project).csproj"
+        if (-not (Test-Path -LiteralPath $project)) { $detail = "no $($test.Project) at $sha"; return $outcome }
+        $out = [IO.Path]::GetTempFileName(); $err = [IO.Path]::GetTempFileName()
+        $arguments = @('test', "`"$project`"", '-p:TreatWarningsAsErrors=false', '--filter', "`"$($test.Filter)`"", '--logger', "`"trx;LogFileName=$trxPath`"", '-nologo')
+        $p = Start-Process -FilePath 'dotnet' -ArgumentList $arguments -WorkingDirectory $worktree -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+        $null = $p.Handle
+        if (-not $p.WaitForExit(1800 * 1000)) {
+            if ($env:OS -eq 'Windows_NT') { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null } else { $p.Kill() }
+            $p.WaitForExit()
+            $detail = 'timed out'
+        }
+        [IO.File]::AppendAllText($log, "$(Get-Content $out -Raw)`n$(Get-Content $err -Raw)", $Utf8)
+        Remove-Item $out, $err -ErrorAction SilentlyContinue
+        $counts = if ($detail) { $null } else { Get-TrxCounts $trxPath }
+        if ($counts -and $counts.Failed -gt 0) { $outcome = 'failed' }
+        elseif ($counts -and $counts.Executed -gt 0 -and $p.ExitCode -eq 0) { $outcome = 'passed' }
+        elseif (-not $detail) { $detail = if ($counts) { "executed $($counts.Executed), exit $($p.ExitCode)" } else { "no test results, exit $($p.ExitCode)" } }
+        return $outcome
+    }
+    finally {
+        & git -C $repo worktree remove --force $worktree *> $null
+        if (Test-Path -LiteralPath $worktree) { Remove-Item -Recurse -Force -LiteralPath $worktree -ErrorAction SilentlyContinue; & git -C $repo worktree prune *> $null }
+        # Not to the console: RunAudit.ps1 reads this script's output as its one summary line.
+        [IO.File]::AppendAllText((Join-Path $reruns 'outcomes.txt'), "$($Target.Id) dotnet test $($test.Project) --filter `"$($test.Filter)`" on $Commit`: $outcome$(if ($detail) { " ($detail)" })`r`n", $Utf8)
+    }
 }
 
 function Get-ClosePath($Target, [string]$Auditor, [bool]$Flagged, [string]$Mechanical) {
@@ -611,13 +695,25 @@ function Invoke-WriteFindings {
             # A new finding with a mechanical reproduction is rerun on the clean audited commit first:
             # the auditor found it in the planted tree, so a mutant the clean commit kills is a plant's
             # effect, wherever the finding's location is (BL-3502: AF-0426 was PD-303 seen from
-            # another file). Survived, unverified or no mechanical reproduction: filed as before.
+            # another file). One with no mutation whose command is a single `dotnet test <project>
+            # --filter "..."` has that test rerun there the same way, and one that passes there failed
+            # only in the planted tree (BL-3503: AF-0426's command). Survived, failed, unverified or
+            # any other command: filed as before.
             $newCount++
-            $candidate = [pscustomobject]@{ Id = "new-$auditor-$newCount"; Key = $filed.Key; Reproduction = $filed.Reproduction; Location = "$($f.location)" }
-            if ((Invoke-MechanicalReproduction $candidate) -eq 'killed') {
-                $plant = Get-OverlappingPlant $candidate "$($f.evidence)" $planted $true
+            $candidate = [pscustomobject]@{ Id = "new-$auditor-$newCount"; Key = $filed.Key; Reproduction = $filed.Reproduction; Command = $filed.Command; Location = "$($f.location)" }
+            $mechanical = Invoke-MechanicalReproduction $candidate
+            $reason = ''
+            if ($mechanical -eq 'killed') {
                 $site = Get-MutationSite $filed.Reproduction
-                $setAside += [ordered]@{ auditor = $auditor; planted = $(if ($plant) { $plant.id } else { $null }); key = $filed.Key; title = "$($f.title)"; reason = "its mutant $($site.File):$($site.Line):$($site.Operator) is killed on the clean audited commit $Commit, so it survived only in the planted tree" }
+                $reason = "its mutant $($site.File):$($site.Line):$($site.Operator) is killed on the clean audited commit $Commit, so it survived only in the planted tree"
+            }
+            elseif ($mechanical -eq 'none' -and (Invoke-TestReproduction $candidate) -eq 'passed') {
+                $test = Get-TestCommand $filed.Command
+                $reason = "its failing test (dotnet test $($test.Project) --filter `"$($test.Filter)`") passes on the clean audited commit $Commit, so it failed only in the planted tree"
+            }
+            if ($reason) {
+                $plant = Get-OverlappingPlant $candidate "$($f.evidence)" $planted $true
+                $setAside += [ordered]@{ auditor = $auditor; planted = $(if ($plant) { $plant.id } else { $null }); key = $filed.Key; title = "$($f.title)"; reason = $reason }
                 $counts.setAside++
                 continue
             }
@@ -755,6 +851,12 @@ if ($SelfTest) {
         # commit (filed as AF-0024), the D.cs one is killed there (set aside, BL-3502).
         $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived'; 'AF-0020' = 'killed'; 'AF-0021' = 'survived'; 'AF-0023' = 'unverified'
             'quality:Curl.Net.UnitLibrary/C.cs:Check-eq:surviving-mutant' = 'survived'; 'quality:Curl.Net.UnitLibrary/D.cs:Flag-true:surviving-mutant' = 'killed' }
+        # New failing-test findings are stubbed by key (BL-3503): Ratchet_Holds passes on the clean
+        # commit (set aside), Parse_Holds still fails (AF-0025), Chain_Holds's command chains another
+        # one, so it is never rerun though its stub says passed (AF-0026), and Slow_Holds's rerun
+        # cannot tell (AF-0027).
+        $script:TestOutcomes = @{ 'quality:Curl.Net.UnitTests/RatchetTests.cs:Ratchet_Holds:failing-test' = 'passed'; 'quality:Curl.Net.UnitTests/ParseTests.cs:Parse_Holds:failing-test' = 'failed'
+            'quality:Curl.Net.UnitTests/ChainTests.cs:Chain_Holds:failing-test' = 'passed'; 'quality:Curl.Net.UnitTests/SlowTests.cs:Slow_Holds:failing-test' = 'unverified' }
         $line2 = Invoke-WriteFindings
         # LF throughout, whatever line endings the checkout gave the fixture.
         function Lf([string]$Prefix) { (Text $Prefix) -replace "`r`n", "`n" }
@@ -780,16 +882,28 @@ if ($SelfTest) {
         Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
         $closureSetAside = @((Get-Content -LiteralPath (Join-Path $ReportDirectory 'set-aside.json') -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
         $closureText = (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
-        Check 'a new mutant the clean commit kills is set aside with its reason and files no AF' ($closureSetAside.Count -eq 1 -and $closureSetAside[0].key -eq 'quality:Curl.Net.UnitLibrary/D.cs:Flag-true:surviving-mutant' -and $closureSetAside[0].planted -eq 'PD-103' -and $closureSetAside[0].reason -eq 'its mutant Curl.Net.UnitLibrary/D.cs:3:true is killed on the clean audited commit abc1234, so it survived only in the planted tree' -and $closureText -notmatch 'Flag can stay true' -and -not (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0025-*.md')) "set aside $($closureSetAside.Count)"
+        $mutantSetAside = @($closureSetAside | Where-Object { $_.key -eq 'quality:Curl.Net.UnitLibrary/D.cs:Flag-true:surviving-mutant' })
+        Check 'a new mutant the clean commit kills is set aside with its reason and files no AF' ($closureSetAside.Count -eq 2 -and $mutantSetAside.Count -eq 1 -and $mutantSetAside[0].planted -eq 'PD-103' -and $mutantSetAside[0].reason -eq 'its mutant Curl.Net.UnitLibrary/D.cs:3:true is killed on the clean audited commit abc1234, so it survived only in the planted tree' -and $closureText -notmatch 'Flag can stay true' -and -not (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0028-*.md')) "set aside $($closureSetAside.Count)"
         Check 'a new mutant that survives on the clean commit is filed' ($c16 -match '(?m)^title: a == 0 can become a != 0\r?$' -and $c16 -match '(?m)^status: proposed\r?$') 'AF-0024'
-        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0, set aside 1') $line2
+        # BL-3503: a new failing-test finding whose test passes on the clean commit is set aside.
+        $testSetAside = @($closureSetAside | Where-Object { $_.key -eq 'quality:Curl.Net.UnitTests/RatchetTests.cs:Ratchet_Holds:failing-test' })
+        Check 'a new failing-test finding whose test passes on the clean commit is set aside with its reason and files no AF' ($testSetAside.Count -eq 1 -and $testSetAside[0].auditor -eq 'quality' -and $testSetAside[0].planted -eq 'PD-103' -and $testSetAside[0].title -eq 'Ratchet_Holds fails unmutated' -and $testSetAside[0].reason -eq 'its failing test (dotnet test Curl.Net.UnitTests --filter "FullyQualifiedName~Ratchet_Holds&TestCategory!=Integration") passes on the clean audited commit abc1234, so it failed only in the planted tree' -and $closureText -notmatch 'Ratchet_Holds fails unmutated') "set aside $($testSetAside.Count)"
+        $c25 = Lf 'AF-0025'; $c26 = Lf 'AF-0026'; $c27 = Lf 'AF-0027'
+        Check 'a new failing-test finding whose test still fails on the clean commit is filed' ($c25 -match '(?m)^title: Parse_Holds fails on the clean commit too$' -and $c25 -match '(?m)^status: proposed$' -and $c25 -match '(?m)^reproduction: none$') 'AF-0025'
+        Check 'a new finding whose command is anything but one dotnet test --filter is filed, never rerun' ($c26 -match '(?m)^title: Chain_Holds fails behind a chained command$' -and $c26 -match '(?m)^status: proposed$') 'AF-0026'
+        Check 'a new failing-test finding whose rerun cannot tell is filed' ($c27 -match '(?m)^title: Slow_Holds fails and its rerun cannot tell$' -and $c27 -match '(?m)^status: proposed$') 'AF-0027'
+        $accepted = @('dotnet test Curl.Conformance.UnitTests --filter "FullyQualifiedName~UpstreamCase_RunThroughCurl_HoldsTheRatchet&TestCategory!=Integration"', 'dotnet test Curl.X.UnitTests/Curl.X.UnitTests.csproj --filter "Name=A"', 'dotnet test Curl.X.UnitTests\ --filter "Name=A"')
+        $refused = @('dotnet test Curl.X.UnitTests --filter "A"; Remove-Item x', 'dotnet test Curl.X.UnitTests --filter "A" && echo x', 'dotnet test ..\Other --filter "A"', 'dotnet test C:\x\Curl.X.UnitTests --filter "A"', 'dotnet test Curl.X.UnitTests --filter "A" --logger x', 'dotnet test Curl.X.UnitTests', 'dotnet test Curl.X.UnitTests --filter "$(Remove-Item x)"', 'dotnet test Curl.X.UnitTests/Other.csproj --filter "A"', 'dotnet build Curl.X.UnitTests --filter "A"', 'Write-Output x')
+        $badAccept = @($accepted | Where-Object { -not (Get-TestCommand $_) }); $badRefuse = @($refused | Where-Object { Get-TestCommand $_ })
+        Check 'only exactly one dotnet test <project> --filter "..." is a rerunnable test command' ($badAccept.Count -eq 0 -and $badRefuse.Count -eq 0 -and (Get-TestCommand $accepted[1]).Project -eq 'Curl.X.UnitTests' -and (Get-TestCommand $accepted[0]).Filter -eq 'FullyQualifiedName~UpstreamCase_RunThroughCurl_HoldsTheRatchet&TestCategory!=Integration') "wrongly refused: $($badAccept -join ' / '); wrongly accepted: $($badRefuse -join ' / ')"
+        Check 'closure summary line' ($line2 -eq 'findings: new 4, still open 1, closed 4, catches 0, set aside 2') $line2
 
         # ADR-0422, amended 2026-10-14: a finding about a past run's cost closes once its tasks are Done.
         $historical = Join-Path $work 'historical'
         $FindingsDirectory = Join-Path $historical 'findings'; $ReportDirectory = Join-Path $historical 'reports'
         New-Item -ItemType Directory -Force $FindingsDirectory, $ReportDirectory | Out-Null
         Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
-        $Manifest = ''; $Tree = ''; $Unreliable = @(); $script:MechanicalOutcomes = @{}
+        $Manifest = ''; $Tree = ''; $Unreliable = @(); $script:MechanicalOutcomes = @{}; $script:TestOutcomes = @{}
         $newHistorical = { param($Id, $Key, $Task, $Tasks, $Status)
             $t = [IO.File]::ReadAllText((Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md'))
             $t = $t.Replace('{{ID}}', $Id).Replace('{{TITLE}}', "Finding $Id").Replace('{{AUDITOR}}', 'process').Replace('{{SEVERITY}}', 'Low').Replace('{{KEY}}', $Key).Replace('{{REPRODUCTION}}', 'none').Replace('{{FOUND}}', '2026-10-13').Replace('{{FOUND_AT}}', 'abc').Replace('{{SCORECARD}}', '2026-10-13_1822.md').Replace('{{SUMMARY}}', 's').Replace('{{LOCATION}}', 'logs/x.jsonl').Replace('{{EVIDENCE}}', 'e').Replace('{{REPRODUCTION_COMMAND}}', 'c').Replace('{{REPRODUCTION_EXPECTED}}', 'x').Replace('{{REPRODUCTION_ACTUAL}}', 'y')
