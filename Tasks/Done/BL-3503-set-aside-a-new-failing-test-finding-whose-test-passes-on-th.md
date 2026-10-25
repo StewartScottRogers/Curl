@@ -9,7 +9,7 @@ touches: [Audit/Tools/Write-AuditFindings.ps1]
 lane: no
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3503 — Set aside a new failing-test finding whose test passes on the clean audited commit
 
@@ -23,10 +23,10 @@ Follow-up to BL-3502, which reruns only a *mechanical* (mutation) reproduction o
 
 ## Acceptance criteria
 
-- [ ] With `-RerunReproductions`, a new finding whose reproduction command is a single `dotnet test <project> --filter "..."` is rerun on the clean audited `-Commit` in a throwaway worktree that is removed afterwards; if the test passes there, the finding is listed in `set-aside.json` with its reason and no `AF-*.md` is written.
-- [ ] A finding whose test also fails on the clean commit, whose rerun cannot tell, or whose command is anything else is filed as before.
-- [ ] `Write-AuditFindings.ps1 -SelfTest` covers the set-aside, the filed and the other-command cases (with the rerun stubbed) and passes.
-- [ ] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
+- [x] With `-RerunReproductions`, a new finding whose reproduction command is a single `dotnet test <project> --filter "..."` is rerun on the clean audited `-Commit` in a throwaway worktree that is removed afterwards; if the test passes there, the finding is listed in `set-aside.json` with its reason and no `AF-*.md` is written.
+- [x] A finding whose test also fails on the clean commit, whose rerun cannot tell, or whose command is anything else is filed as before.
+- [x] `Write-AuditFindings.ps1 -SelfTest` covers the set-aside, the filed and the other-command cases (with the rerun stubbed) and passes.
+- [x] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
 
 ## Notes
 
@@ -35,3 +35,5 @@ Follow-up to BL-3502, which reruns only a *mechanical* (mutation) reproduction o
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 13e1a945 02264073 8ba38dad 68e59f8c.
 - 2026-10-25: Doing -> Backlog. Waiting on CI for audit PR #233 (commit 93e08e8d6); reclaim to tick the criteria and finish once Windows, Linux and macOS pass.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 13e1a945 02264073 8ba38dad 68e59f8c.
+- 2026-10-25: Doing -> Done. Write-AuditFindings.ps1 sets aside a new failing-test finding whose single dotnet test --filter passes on the clean audited commit (throwaway worktree); self-test 50 -> 55 checks pass; audit 93e08e8d6, PR #233 merged as 70a7db521 after CI green on Windows, Linux, macOS.

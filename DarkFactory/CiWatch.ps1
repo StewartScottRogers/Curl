@@ -422,17 +422,21 @@ function Get-CiRunningRun {
     $cacheKey = "running $id $(@($failed | ForEach-Object { $_.databaseId } | Sort-Object) -join ',')"
     if (-not $script:CiWatch.Failures.ContainsKey($cacheKey)) {
         $lines = @()
-        $unread = $false
+        $unreadIds = @()
         foreach ($job in $failed) {
             $log = & $ReadJobLog "$($job.databaseId)"
-            if ($null -eq $log) { $unread = $true; Write-CiRunLine -Key $key -Line "cannot read the log of failed job $($job.databaseId) of running run $id; skipped"; continue }
+            if ($null -eq $log) { $unreadIds += "$($job.databaseId)"; continue }
             $lines += @($log | ForEach-Object { "$($job.name)`tlog`t$(("$_").TrimStart([char]0xFEFF))" })
         }
+        $unread = $unreadIds.Count -gt 0
+        # One line for all unread jobs, so the same state is traced once, not once per job per heartbeat.
+        if ($unread) { Write-CiRunLine -Key $key -Line "cannot read the log of failed job $($unreadIds -join ', ') of running run $id; skipped" }
         $read = @(Get-CiFailures $lines | Where-Object { $_.Kind -in 'test', 'build' })
         # A log that could not be read is tried again on the next heartbeat, so nothing is cached.
         if ($unread) { $failures = $read; $skipCache = $true } else { $script:CiWatch.Failures[$cacheKey] = $read }
     }
     if (-not $skipCache) { $failures = @($script:CiWatch.Failures[$cacheKey]) }
+    if (-not $failures.Count -and $skipCache) { return $null }
     if (-not $failures.Count) { Write-CiRunLine -Key $key -Line "running run $id has failed jobs but no failing test or build error in their logs"; return $null }
     $finished = @($failed | ForEach-Object { ConvertTo-CiDateTime $_.completedAt } | Sort-Object)[-1]
     return [pscustomobject]@{ Id = $id; Sha = "$($running.headSha)"; FinishedAt = $finished; Failures = $failures }
@@ -714,9 +718,11 @@ function Invoke-SplitHotspotFiling {
     # ready task waits on overlapping touches, asks task-board.ps1 hotspots for the files
     # that hold them back and files at most one High task to split the top one no live task
     # names (Select-SplitHotspot), in the ci-watch worktree at origin/-Branch, pushed straight
-    # to -Branch like the CI-failure tasks; up to three tries when the push races a lane.
+    # to -Branch like the CI-failure tasks; up to three tries, each retried when git fetch
+    # fails or when the push races a lane.
     param([string]$Branch)
     $saved = $env:CLAUDE_PROJECT_DIR
+    $pushFailed = $false
     try {
         foreach ($attempt in 1..3) {
             git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
@@ -747,13 +753,14 @@ function Invoke-SplitHotspotFiling {
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
             git -C $CiWatchDir commit -q -m "chore(tasks): file $id to split $($choice.Path)" -m "Filed by the dark factory's coordinator: $($choice.Reason)." -m $SkipCiNote 2>&1 | Out-Null
             git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { continue }
+            if ($LASTEXITCODE -ne 0) { $pushFailed = $true; continue }
             $script:Auto.SplitFiled = @(@($script:Auto.SplitFiled) + $choice.Path)
             Write-Trace $id 'split' "filed: $($choice.Reason)" 'Yellow'
             Send-CiWhisper $line
             return
         }
-        Write-Trace '-' 'split' "could not push the split task to $Branch; trying again next step" 'DarkYellow'
+        $failed = if ($pushFailed) { "push the split task to $Branch" } else { "fetch origin $Branch" }
+        Write-Trace '-' 'split' "could not $failed; trying again next step" 'DarkYellow'
     } catch {
         Write-Trace '-' 'split' "split filing failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
@@ -1070,6 +1077,13 @@ if ($TestCiWatch) {
     $firstTry = Get-CiRunningRun -Listed $listedRetry -ListJobs { param($Id) $jobsJson } -ReadJobLog $readOnce
     $secondTry = Get-CiRunningRun -Listed $listedRetry -ListJobs { param($Id) $jobsJson } -ReadJobLog $readOnce
     & $check 'a failed job log that could not be read is read again, not cached' 'True|test1173:' "$($null -eq $firstTry)|$(@($secondTry.Failures)[0].Key)"
+    $neverRead = { param([string]$Id) return $null }
+    $listedUnread = @([pscustomobject]@{ databaseId = 79; status = 'in_progress'; conclusion = ''; headSha = 'abcdef1234' })
+    $tracedBefore = $traced.Count
+    $null = Get-CiRunningRun -Listed $listedUnread -ListJobs { param($Id) $jobsJson } -ReadJobLog $neverRead
+    $tracedFirst = $traced.Count - $tracedBefore
+    $null = Get-CiRunningRun -Listed $listedUnread -ListJobs { param($Id) $jobsJson } -ReadJobLog $neverRead
+    & $check 'a failed job log that stays unreadable is traced on the first call only' '1|1|False' "$tracedFirst|$($traced.Count - $tracedBefore)|$($traced -like '*has failed jobs but no failing*' -as [bool])"
     & $check 'a running run with no failed job is not read' 'True' "$($null -eq (Get-CiRunningRun -Listed $listedRunning -ListJobs { param($Id) '{"jobs":[{"databaseId":9,"name":"x","status":"in_progress","conclusion":""}]}' } -ReadJobLog $jobLog))"
     & $check 'no running run, nothing read' 'True' "$($null -eq (Get-CiRunningRun -Listed @([pscustomobject]@{ databaseId = 1; status = 'completed'; conclusion = 'failure'; headSha = 'x' }) -ListJobs { param($Id) throw 'not called' } -ReadJobLog $jobLog))"
     # BL-3456: a running run without the CI fix a waiting run carries is cancelled, only while CI is red.

@@ -479,14 +479,17 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         if ($AutoLanes) { $forward += @('-MaxLanes', $MaxLanes, '-MinStartLanes', $MinStartLanes) }
         if ($WeeklyPace) { $forward += '-WeeklyPace' }
         if ($QuietAlarm) { $forward += '-QuietAlarm' }
+        $startedAt = Get-Date; $keepTab = $false
         $next = Start-NextShiftDetached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
         if (-not $next.Started) { Write-Trace '-' 'shift' "$Why; the next shift did not start: $($next.Failure)" 'Red'; return $false }
+        # A tab that never runs the shift keeps this one's tab open and raises the alarm (BL-3509).
+        if ($next.Tab -and -not (Wait-NextShiftLog -Tab $next.Tab -Since $startedAt -LogDir $LogDir -OwnLog $TraceFile)) { $keepTab = $true }
         Write-Trace '-' 'shift' "$Why; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
         # The review runs beside the next shift, which claims what it files (ADR-0710).
-        if ($Beside) { $handOver.Tab = $next.Tab; return $true }
+        if ($Beside) { $handOver.Tab = $(if (-not $keepTab) { $next.Tab }); return $true }
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
         # The next shift has its own tab; this one has only notes, and they are in the log.
-        if ($next.Tab) { Close-FinishedHerdrTabsAndTrace; Close-OwnHerdrTab 'shift handed over to the next one' | Out-Null }
+        if ($next.Tab -and -not $keepTab) { Close-FinishedHerdrTabsAndTrace; Close-OwnHerdrTab 'shift handed over to the next one' | Out-Null }
         return $true
     }
     # What master held before the merge, so the shift-end review reads only what this shift merged.

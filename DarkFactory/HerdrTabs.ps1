@@ -33,7 +33,12 @@ function Start-Detached {
             # Windows PowerShell passes a native argument's inner quotes through unescaped,
             # and herdr's argument parser would then strip them, splitting any path with a
             # space. \" survives as a literal quote.
-            & $herdr pane run $pane $line.Replace('"', '\"') 2>&1 | Out-Null
+            # A refused command is tried once more: it was once swallowed with no sign (BL-3509).
+            foreach ($attempt in 1..2) {
+                & $herdr pane run $pane $line.Replace('"', '\"') 2>&1 | Out-Null
+                if ($LASTEXITCODE -eq 0) { break }
+                Write-Trace '-' 'herdr' "pane run in $pane failed (attempt $attempt of 2)" 'Red'
+            }
             return @{ Tab = $created.result.tab.tab_id }
         }
         Write-Trace '-' 'herdr' 'could not create a herdr tab; using a console window' 'DarkYellow'
@@ -175,6 +180,32 @@ function Close-FinishedHerdrTabsAndTrace {
     if (Get-HerdrBin) { Write-Trace '-' 'herdr' "closed $closed finished tabs" 'Cyan' }
 }
 
+function Wait-NextShiftLog {
+    # A hand-over is only done when the next shift has written its trace log: waits up to
+    # $TimeoutSeconds for a DarkFactory-*.log in $LogDir, other than this shift's own, written
+    # at or after $Since. Returns $true when one appears. Otherwise raises the alarm through
+    # $Notify, naming $Tab, and returns $false so the caller keeps this shift's tab (BL-3509:
+    # a tab traced as started at 05:02 never ran, and nothing said so for 2 hours 44 minutes).
+    param(
+        [string]$Tab, [datetime]$Since, [string]$LogDir, [string]$OwnLog,
+        [int]$TimeoutSeconds = 120,
+        [scriptblock]$Sleep = { param($Seconds) Start-Sleep -Seconds $Seconds },
+        [scriptblock]$Now = { Get-Date },
+        [scriptblock]$Notify = { param([string[]]$Reasons) Invoke-Alarm -Reasons $Reasons })
+    $deadline = (& $Now).AddSeconds($TimeoutSeconds)
+    while ($true) {
+        $written = @(Get-ChildItem -LiteralPath $LogDir -Filter 'DarkFactory-*.log' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -ne $OwnLog -and $_.LastWriteTime -ge $Since })
+        if ($written.Count) { return $true }
+        if ((& $Now) -ge $deadline) { break }
+        & $Sleep 5
+    }
+    $where = if ($Tab) { "herdr tab $Tab" } else { 'its process' }
+    Write-Trace '-' 'shift' "the next shift ($where) wrote no log within $TimeoutSeconds seconds" 'Red'
+    & $Notify -Reasons @("NEXT SHIFT NOT RUNNING  $where wrote no DarkFactory log within $TimeoutSeconds seconds", 'No shift runs until one is started again; this tab was kept.')
+    return $false
+}
+
 function Get-LaneMarker {
     # The CURL_DARK_FACTORY_LANE value for this process (LANE MARKER in RunDarkFactory.ps1's
     # help): the lane number, 0 for a coordinator or single runner, '' for a launcher that
@@ -217,6 +248,24 @@ if ($TestLaneMarker) {
         $probe.WaitForExit()
         $results += , @('a claude -p run started like Invoke-TaskRun sees the marker', $seen, '3')
     } finally { $env:CURL_DARK_FACTORY_LANE = $saved }
+    $logs = Join-Path ([IO.Path]::GetTempPath()) "df-nextlog-$PID"
+    New-Item -ItemType Directory -Force -Path $logs | Out-Null
+    $clock = @{ T = [datetime]'2026-10-25 05:02:31'; Alarms = @() }
+    $sleep = { param($Seconds) $clock.T = $clock.T.AddSeconds($Seconds) }
+    $now = { $clock.T }
+    $notify = { param([string[]]$Reasons) $clock.Alarms += $Reasons[0] }
+    $own = Join-Path $logs 'DarkFactory-own.log'
+    Set-Content -Path $own -Value 'own'
+    (Get-Item $own).LastWriteTime = $clock.T.AddSeconds(10)
+    $silent = Wait-NextShiftLog -Tab 'w4:t10' -Since $clock.T -LogDir $logs -OwnLog $own -Sleep $sleep -Now $now -Notify $notify 6>$null
+    $results += , @('a next shift that writes no log in 2 minutes raises the alarm naming its tab after 120 s', "$silent $($clock.Alarms.Count) $(($clock.Alarms[0] -split '  ')[1] -replace ' wrote.*') $(($clock.T - [datetime]'2026-10-25 05:02:31').TotalSeconds)", 'False 1 herdr tab w4:t10 120')
+    $clock.Alarms = @()
+    $other = Join-Path $logs 'DarkFactory-next.log'
+    Set-Content -Path $other -Value 'next'
+    (Get-Item $other).LastWriteTime = $clock.T.AddSeconds(5)
+    $found = Wait-NextShiftLog -Tab 'w4:t10' -Since $clock.T -LogDir $logs -OwnLog $own -Sleep $sleep -Now $now -Notify $notify
+    $results += , @('a next shift that wrote its log is found with no alarm', "$found $($clock.Alarms.Count)", 'True 0')
+    Remove-Item -Recurse -Force -Path $logs -ErrorAction SilentlyContinue
     $failed = 0
     foreach ($r in $results) {
         $ok = $r[1] -ceq $r[2]
