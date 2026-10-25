@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitLibrary, Curl.Engine.UnitLibrary/TransferHeaderStore.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Libcurl/Headers/CurlEasyHeaders.cs, Curl.Engine.UnitTests, Libcurl.UnitTests/Headers, Curl.Conformance.LibTest.UnitTests/FakeTransferHeaders.cs, Documentation/Planning/Decisions/ADR-0512-websocket-header-and-connect-only-contracts.md]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3498 — Fix AF-0433: ITransferHeaders.TryGet (and TransferHeaderStore.TryGet) returns a CurlHeaderCode, not a bool as a Try method should
 
@@ -52,3 +52,4 @@ Renamed `TryGet` to `Find` (mirrors curl_easy_header, returns CurlHeaderCode) in
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Renamed TryGet to Find across API, engine, Libcurl and tests; build and fast tests green
