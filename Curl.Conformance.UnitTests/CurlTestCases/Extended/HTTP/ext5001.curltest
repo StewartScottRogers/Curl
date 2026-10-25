@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP GET
+--fail
+--write-out errormsg
+</keywords>
+</info>
+
+<reply>
+<data crlf="headers" nocheck="yes">
+HTTP/1.1 404 Not Found
+Content-Length: 4
+
+nope
+</data>
+</reply>
+
+# Client-side. Expected output measured from real curl 8.22.0 (Schannel build) on Windows, 2026-10-25,
+# with Record-CurlExchange.ps1 against a canned loopback server.
+<client>
+<server>
+http
+</server>
+<name>
+-f on a 404 reply: -w errormsg, exitcode and http_code, no body, exit 22
+</name>
+<command option="no-include">
+-f -s -w "%{errormsg} %{exitcode} %{http_code}\n" http://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+<verify>
+<protocol crlf="headers">
+GET /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+
+</protocol>
+<stdout>
+The requested URL returned error: 404 22 404
+</stdout>
+<errorcode>
+22
+</errorcode>
+</verify>
+</testcase>

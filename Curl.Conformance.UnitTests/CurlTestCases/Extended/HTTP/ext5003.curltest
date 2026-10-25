@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP PATCH
+HTTP POST
+Content-Type
+</keywords>
+</info>
+
+<reply>
+<data crlf="headers" nocheck="yes">
+HTTP/1.1 200 OK
+Content-Length: 2
+
+ok
+</data>
+</reply>
+
+# Client-side. Request measured from real curl 8.22.0 (Schannel build) on Windows, 2026-10-25,
+# with Record-CurlExchange.ps1 against a canned loopback server; -H replaces the default Content-Type.
+<client>
+<server>
+http
+</server>
+<name>
+-X PATCH with -d sends the body under a user Content-Type in place of the form default
+</name>
+<command>
+-X PATCH -d '{"a":1}' -H "Content-Type: application/json" http://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+<verify>
+<protocol crlf="yes" nonewline="yes">
+PATCH /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+Content-Type: application/json
+Content-Length: 7
+
+{"a":1}
+</protocol>
+</verify>
+</testcase>
