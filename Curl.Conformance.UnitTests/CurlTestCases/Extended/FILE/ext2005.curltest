@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+FILE
+range error
+</keywords>
+</info>
+
+<reply>
+</reply>
+
+# Client-side. Expected output measured from real curl 8.22.0 (Schannel build) on Windows, 2026-10-25.
+<client>
+<server>
+file
+</server>
+<name>
+range starting past the end of a file:// file is CURLE_RANGE_ERROR
+</name>
+<command>
+-r 20-30 file://localhost%FILE_PWD/%LOGDIR/ext%TESTNUMBER.txt
+</command>
+<file name="%LOGDIR/ext%TESTNUMBER.txt">
+1234567890
+</file>
+</client>
+
+<verify>
+# CURLE_RANGE_ERROR is error code 36
+<errorcode>
+36
+</errorcode>
+</verify>
+</testcase>
