@@ -31,3 +31,4 @@ Found by BL-3485: an SMB download with `-o <file>` (or `-o /dev/null -w %{size_d
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: fbecace0.
