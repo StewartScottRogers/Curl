@@ -9,7 +9,7 @@ touches: [Audit/Tools/Write-AuditFindings.ps1]
 lane: no
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3465 — Set aside a new audit finding that another auditor files in a planted defect's file
 
@@ -23,11 +23,11 @@ Audit 2026-10-24_0845 (run folder `Z:\repos\Curl.audit\20261024-084551`) filed A
 
 ## Acceptance criteria
 
-- [ ] `Invoke-WriteFindings` sets aside a new finding whose location is in a planted file (for a code plant) when `Test-Catch` does not match it for its own auditor, and writes no `AF-*.md` for it.
-- [ ] Each set-aside finding is listed in the run's report directory (auditor, plant id, title), and the summary line counts them.
-- [ ] A new finding in another file of the same project is still filed.
-- [ ] The script's self-test gains a check for each of the two cases above, and passes.
-- [ ] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
+- [x] `Invoke-WriteFindings` sets aside a new finding whose location is in a planted file (for a code plant) when `Test-Catch` does not match it for its own auditor, and writes no `AF-*.md` for it.
+- [x] Each set-aside finding is listed in the run's report directory (auditor, plant id, title), and the summary line counts them.
+- [x] A new finding in another file of the same project is still filed.
+- [x] The script's self-test gains a check for each of the two cases above, and passes.
+- [x] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
 
 ## Notes
 
@@ -35,3 +35,5 @@ Audit 2026-10-24_0845 (run folder `Z:\repos\Curl.audit\20261024-084551`) filed A
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. interactive session Criteria at claim: a1cf0b27 8e3a97cb 83385b4e 7561d23b 68e59f8c.
+- 2026-10-24: Write-AuditFindings.ps1 sets aside another auditor's new finding in a planted file (set-aside.json, summary count); self-test 47 checks pass; audit PR #226 merged after CI green on Windows, Linux, macOS.
+- 2026-10-24: Doing -> Done. audit PR #226 merged
