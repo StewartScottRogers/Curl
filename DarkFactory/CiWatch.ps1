@@ -718,9 +718,11 @@ function Invoke-SplitHotspotFiling {
     # ready task waits on overlapping touches, asks task-board.ps1 hotspots for the files
     # that hold them back and files at most one High task to split the top one no live task
     # names (Select-SplitHotspot), in the ci-watch worktree at origin/-Branch, pushed straight
-    # to -Branch like the CI-failure tasks; up to three tries when the push races a lane.
+    # to -Branch like the CI-failure tasks; up to three tries, each retried when git fetch
+    # fails or when the push races a lane.
     param([string]$Branch)
     $saved = $env:CLAUDE_PROJECT_DIR
+    $pushFailed = $false
     try {
         foreach ($attempt in 1..3) {
             git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
@@ -751,13 +753,14 @@ function Invoke-SplitHotspotFiling {
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
             git -C $CiWatchDir commit -q -m "chore(tasks): file $id to split $($choice.Path)" -m "Filed by the dark factory's coordinator: $($choice.Reason)." -m $SkipCiNote 2>&1 | Out-Null
             git -C $CiWatchDir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { continue }
+            if ($LASTEXITCODE -ne 0) { $pushFailed = $true; continue }
             $script:Auto.SplitFiled = @(@($script:Auto.SplitFiled) + $choice.Path)
             Write-Trace $id 'split' "filed: $($choice.Reason)" 'Yellow'
             Send-CiWhisper $line
             return
         }
-        Write-Trace '-' 'split' "could not push the split task to $Branch; trying again next step" 'DarkYellow'
+        $failed = if ($pushFailed) { "push the split task to $Branch" } else { "fetch origin $Branch" }
+        Write-Trace '-' 'split' "could not $failed; trying again next step" 'DarkYellow'
     } catch {
         Write-Trace '-' 'split' "split filing failed: $(Get-Short $_.Exception.Message 80)" 'DarkYellow'
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }

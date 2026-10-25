@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3508 — Make the split-hotspot filing's final trace say fetch when every fetch attempt failed
 
@@ -26,13 +26,16 @@ The function's header comment ("up to three tries when the push races a lane") a
 
 ## Acceptance criteria
 
-- [ ] When no attempt got past `git fetch`, the final trace of `Invoke-SplitHotspotFiling` says the fetch failed. When a push failed, it still says the push failed.
-- [ ] The function's header comment names both reasons it retries: a failed fetch, and a push that races a lane.
-- [ ] `RunDarkFactory.ps1 -TestCiWatch` passes.
+- [x] When no attempt got past `git fetch`, the final trace of `Invoke-SplitHotspotFiling` says the fetch failed. When a push failed, it still says the push failed.
+- [x] The function's header comment names both reasons it retries: a failed fetch, and a push that races a lane.
+- [x] `RunDarkFactory.ps1 -TestCiWatch` passes.
 
 ## Notes
+
+No platform-specific behaviour; pushFailed flag decides the final trace wording. -TestCiWatch passes.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 8f0da363 d9e2efc5 49318181.
+- 2026-10-25: Doing -> Done. Final trace names fetch or push; header comment updated; -TestCiWatch passes
