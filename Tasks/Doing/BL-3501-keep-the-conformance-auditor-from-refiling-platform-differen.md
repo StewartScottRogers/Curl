@@ -32,3 +32,4 @@ The conformance auditor filed `--http2` / `--http2-prior-knowledge` accepted on 
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 82568fda 65e0fd9f 68e59f8c.
