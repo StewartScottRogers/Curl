@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+SMTP
+URL
+no-host
+</keywords>
+</info>
+# Expected output measured from real curl 8.22.0 (Schannel, WinLDAP) by running the same command line: exit code and
+# -w text as pinned below.
+# Upstream cases searched in Original/ for SMTP: test900 to test917, test920 to test926, test646 to test649, test1320,
+# test1406, test1520 and the smtp:// URLs of test1187 and test1507 (none checks this URL or failure).
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<name>
+SMTP URL without a host is rejected
+</name>
+<command>
+-s -w '%{exitcode}|%{errormsg}\n' smtp://
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+3
+</errorcode>
+<stdout>
+3|URL rejected: No host present
+</stdout>
+</verify>
+</testcase>
