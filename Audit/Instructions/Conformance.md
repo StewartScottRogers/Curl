@@ -87,14 +87,33 @@ minute preparing the 50 MiB body for each `large-get` run.
 
 Report `loadDifferences` (`load.json`'s `different`) in `metrics`.
 
-## 5. Deliberate divergences (phase 2 only)
+## 5. Platform differences an ADR decided
+
+Some differences from the reference curl are kept on purpose on one platform only, by an
+accepted ADR: ADR-0786 keeps HTTP/2 (`--http2`, `--http2-prior-knowledge`, `--proxy-http2`)
+working on Windows, where the Schannel curl refuses it. They are listed in
+`Gap/Baselines/platform-exclusions.json` in the audited tree, one item per difference with its
+`key` (`<area>:<item>`, such as `options:--http2` or `behaviour:test1704`), its `platform`
+(`windows`, `linux` or `macos`) and its reason (`decided:ADR-NNNN`). Read it before writing any
+finding (BL-3501; AF-0381, AF-0423 and AF-0432 refiled ADR-0786's difference and were rejected).
+
+- Do not report a difference the list names for the platform you measured on - the same
+  option, or the same upstream case. Name it in your summary instead, with its ADR ("excluded
+  by ADR-0786 on windows: `--http2`"), so the reader sees it was measured and set aside.
+- A difference the list does not name for that platform is still reported, even when it looks
+  like a listed one: the same option on another platform, or another option with the same
+  symptom. Step 6 may then annotate it with an ADR, but it stays a finding.
+- The list changes only by an ADR. Never treat a difference as decided because you think an
+  ADR would allow it, and never edit the file.
+
+## 6. Deliberate divergences (phase 2 only)
 
 After every phase-1 finding is written down, check `Documentation/Planning/Decisions/` for an
 ADR that records the divergence as deliberate (for example, a feature real curl's Schannel build
 lacks that Curl implements). Annotate the finding with it ("explained by ADR-NNNN: ...") - never
 delete it. An undocumented divergence stays a finding as it is.
 
-## 6. Name the reference
+## 7. Name the reference
 
 State the reference curl's `--version` first line in your summary and in every finding's
 evidence: a conformance claim means nothing without the curl it was measured against.
