@@ -45,6 +45,11 @@ concurrency:
 jobs:
   integration:
     name: Integration tests (${{ matrix.os }})
+    # Not on the shift-end merge's pull request (head factory/merge-<stamp>, ADR-0814): its head
+    # commit's push run on work/dark-factory has run these tests, master's push run runs them on
+    # the merge commit, and three 15 to 25 minute jobs here only took runners from the next
+    # work/dark-factory CI run (BL-3512).
+    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:

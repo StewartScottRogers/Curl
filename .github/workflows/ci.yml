@@ -21,6 +21,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/work/dark-factory' }}
 
+# The shift-end merge's pull request (head factory/merge-<stamp>, ShiftEnd.ps1) runs no build,
+# test, pack or quality job (ADR-0814). Its head is the work/dark-factory commit whose push run
+# already passed on Windows, Linux and macOS, the merge does not wait for this run, and master's
+# push run tests the merge commit straight after. Run in full, it only took runners from the
+# next work/dark-factory run (BL-3512: run 40206727905's jobs started up to 11 minutes late).
+# Each such job's if repeats the test, since a job's if cannot read workflow env. The audit
+# guard keeps its own if, under which it already skips that pull request.
+
 jobs:
   # Audit guard layer 3 (ADR-0267): fails when work/dark-factory, pushed or as a pull
   # request, carries a change of its own to Audit/, an auditor agent, or one of the guards
@@ -56,6 +64,7 @@ jobs:
 
   test:
     name: Build and test (${{ matrix.os }})
+    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -82,6 +91,7 @@ jobs:
   # .mcp/server.json. The packages are uploaded, never published.
   mcp-pack:
     name: Pack Curl.Mcp (${{ matrix.os }})
+    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -184,6 +194,7 @@ jobs:
   # count is the matrix below and -ShardCount; change both together.
   quality-shard:
     name: Quality gates shard ${{ matrix.shard }} of 3 (windows-latest)
+    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
     strategy:
       fail-fast: false
       matrix:
@@ -224,7 +235,7 @@ jobs:
   quality:
     name: Quality gates (windows-latest)
     needs: quality-shard
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && !startsWith(github.head_ref, 'factory/merge-') }}
     runs-on: windows-latest
     timeout-minutes: 45
     env:
