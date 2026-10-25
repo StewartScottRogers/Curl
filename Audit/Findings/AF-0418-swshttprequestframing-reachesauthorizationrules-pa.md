@@ -3,8 +3,8 @@ id: AF-0418
 title: SwsHttpRequestFraming.ReachesAuthorizationRules' ParseContentLength(...) < 0 can become <= 0 with no test failing, so a Content-Length: 0 request skips the stand-in's authorization rules
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitLibrary/SwsHttpRequestFraming.cs:ReachesAuthorizationRules-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/SwsHttpRequestFraming.cs:65:<
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
