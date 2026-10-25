@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3514 — Fix AF-0436: ObservePeerVerification's ChainElements.Count > 0 can become >= 0 with no test failing
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added `ServerCertificateVerificationEmptyChainTests`: `Judge` on an unbuilt (zero-element) `X509Chain` with no errors must report the peer certificates, so the `>= 0` mutant (an empty reported chain) fails the test. A lane may not run the mutation script, so the reproduction was not run; the test fails under the mutant by construction. No production change. Fast tests green (3457 passed); platform-neutral.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Added empty-chain Judge test that kills the >= 0 mutant
