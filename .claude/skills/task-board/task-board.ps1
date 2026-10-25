@@ -50,9 +50,12 @@
       move     Move a task to another state, appending a Log line. A move out of
                Backlog also whispers the Backlog's depth ("Backlog depth, 63.") a minute
                later, once per burst of moves, without waiting for it (BL-1182).
-      archive  Move finished tasks into Done\<yyyy-MM-dd>\, one folder per day: a later
-               archive the same day adds to it. With -WhenDoneIsLong, move all of
-               them, but only once Done holds more than 20.
+      archive  Move finished tasks completed -OlderThanDays (default 7) or more days ago
+               into Done\<yyyy-MM-dd>\, one folder per day: a later archive the same
+               day adds to it. A plain 'archive' leaves the last week's Done tasks in
+               place; -OlderThanDays 0 moves them all. With -WhenDoneIsLong, move all
+               of them, whatever -OlderThanDays says, but only once Done holds more
+               than 20.
       dedupe   Renumber tasks that share an ID with another. A task file that exists
                at -Since (a git ref; the shared branch before this lane's work) keeps
                its ID; the others get the next free IDs, and the old ID is rewritten in
