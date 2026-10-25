@@ -153,7 +153,14 @@ public sealed partial class ManagedEasyTransferTests
             Callbacks = new() { Interleave = data => data.Length },
         };
 
-        Assert.IsNotNull(ManagedCurlEngine.CreateDispatcher(options, shared, cookieStore: null));
+        ProtocolDispatcher dispatcher = ManagedCurlEngine.CreateDispatcher(options, shared, cookieStore: null);
+
+        foreach (string scheme in new[] { "ftp", "ftps", "rtsp" })
+        {
+            Assert.IsTrue(dispatcher.Serves(scheme), scheme);
+        }
+
+        Assert.IsFalse(dispatcher.Serves("bogus"));
     }
 
     /// <summary>An engine whose handlers connect through <paramref name="connector" /> with each handle's wildcard hooks and interleave sink, as production builds them.</summary>
