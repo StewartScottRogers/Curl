@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3466 — Fix AF-0417: CreateDispatcher_NoTimeout_BuildsTheProductionHandlers checks only that a dispatcher is not null, not which handlers it holds
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now asserts Serves() for http, https, ftp, file, dict, tftp, smtp, imap, pop3, ws and not bogus. Build clean; Engine tests for ManagedCurlEngineTests pass (44).
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. CreateDispatcher test asserts the schemes the production dispatcher serves

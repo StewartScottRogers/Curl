@@ -76,7 +76,12 @@ public sealed partial class ManagedCurlEngineTests
 
         Core.ProtocolDispatcher dispatcher = ManagedCurlEngine.CreateDispatcher(new EasyOptions(), engine.Shared, cookieStore: null);
 
-        Assert.IsNotNull(dispatcher);
+        foreach (string scheme in new[] { "http", "https", "ftp", "file", "dict", "tftp", "smtp", "imap", "pop3", "ws" })
+        {
+            Assert.IsTrue(dispatcher.Serves(scheme), scheme);
+        }
+
+        Assert.IsFalse(dispatcher.Serves("bogus"));
     }
 
     [TestMethod]
