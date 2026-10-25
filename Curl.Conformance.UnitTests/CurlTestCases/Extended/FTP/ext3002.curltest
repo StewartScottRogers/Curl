@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+FTP
+limit-rate
+</keywords>
+</info>
+# Expected output measured from real curl 8.21.0 (Schannel) against a scripted loopback FTP server
+# (a PowerShell stand-in answering USER, PASS, PWD, CWD, EPSV, TYPE, SIZE, RETR and QUIT).
+
+# Server-side
+<reply>
+<data nocheck="yes">
+line one
+line two
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+ftp
+</server>
+<name>
+FTP download with --limit-rate above the file size
+</name>
+<command>
+-s --limit-rate 100k ftp://%HOSTIP:%FTPPORT/test-3002/3002
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<protocol crlf="yes">
+USER anonymous
+PASS ftp@example.com
+PWD
+CWD test-%TESTNUMBER
+EPSV
+TYPE I
+SIZE %TESTNUMBER
+RETR %TESTNUMBER
+QUIT
+</protocol>
+<stdout>
+line one
+line two
+</stdout>
+</verify>
+</testcase>

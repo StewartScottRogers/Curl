@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+FTP
+write-out
+size_download
+response_code
+ftp_entry_path
+</keywords>
+</info>
+# Expected output measured from real curl 8.21.0 (Schannel) against a scripted loopback FTP server
+# (a PowerShell stand-in answering USER, PASS, PWD, CWD, EPSV, TYPE, SIZE, RETR and QUIT).
+
+# Server-side
+<reply>
+<data nocheck="yes">
+line one
+line two
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+ftp
+</server>
+<name>
+FTP download with --write-out size, response code and entry path
+</name>
+<command>
+-s -w '%{size_download}|%{response_code}|%{ftp_entry_path}\n' ftp://%HOSTIP:%FTPPORT/test-3001/3001
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<protocol crlf="yes">
+USER anonymous
+PASS ftp@example.com
+PWD
+CWD test-%TESTNUMBER
+EPSV
+TYPE I
+SIZE %TESTNUMBER
+RETR %TESTNUMBER
+QUIT
+</protocol>
+<stdout>
+line one
+line two
+18|226|/
+</stdout>
+</verify>
+</testcase>
