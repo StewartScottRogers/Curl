@@ -720,8 +720,8 @@ function Invoke-SplitHotspotFiling {
     try {
         foreach ($attempt in 1..3) {
             git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { Write-CiRunLine -Key 'fetch' -Line "git fetch origin $Branch failed (exit $LASTEXITCODE): a run is waiting but cannot be compared with the running one" }
-        else { $script:CiWatch.Logged.Remove('fetch') }
+            if ($LASTEXITCODE -ne 0) { Write-CiRunLine -Key 'split-fetch' -Line "git fetch origin $Branch failed (exit $LASTEXITCODE): the split-hotspot filing skips this attempt rather than file from a stale origin/$Branch"; continue }
+            $script:CiWatch.Logged.Remove('split-fetch')
             if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
                 New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
                 git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null

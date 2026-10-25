@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3506 — Give the split-hotspot filing's fetch failure its own trace key and a true message
 
@@ -29,14 +29,17 @@ The two lines are also indented one level less than the `foreach` body they sit 
 
 ## Acceptance criteria
 
-- [ ] The fetch check in `Invoke-SplitHotspotFiling` uses a key that no other caller uses, and its message names the split-hotspot filing, not a waiting CI run.
-- [ ] A failed fetch there goes on to the next attempt (`continue`) and does not file from the stale branch.
-- [ ] The two lines are indented to match the `foreach` body.
-- [ ] `powershell -NoProfile -File RunDarkFactory.ps1 -TestCiWatch` passes.
+- [x] The fetch check in `Invoke-SplitHotspotFiling` uses a key that no other caller uses, and its message names the split-hotspot filing, not a waiting CI run.
+- [x] A failed fetch there goes on to the next attempt (`continue`) and does not file from the stale branch.
+- [x] The two lines are indented to match the `foreach` body.
+- [x] `powershell -NoProfile -File RunDarkFactory.ps1 -TestCiWatch` passes.
 
 ## Notes
+
+Fetch check now uses key `split-fetch`, continues to the next attempt on failure; fixed indentation. -TestCiWatch passes.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 56350b18 0bfe3444 7fa28561 cfd9f717.
+- 2026-10-25: Doing -> Done. Split-hotspot fetch failure has its own key, true message, continues
