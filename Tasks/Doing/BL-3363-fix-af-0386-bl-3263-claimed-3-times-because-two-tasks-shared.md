@@ -58,3 +58,4 @@ To measure (criterion 1, open): after a shift has run on 3775626b6 or later, run
 - 2026-10-23: Created.
 - 2026-10-24: Backlog -> Doing. Interactive session fixes AF-0386 duplicate-ID claims Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-24: Doing -> Backlog. Fix 3775626b6 landed 2026-10-24 08:46; live-log measurement needs a shift run after it
+- 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix 3775626b6 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
