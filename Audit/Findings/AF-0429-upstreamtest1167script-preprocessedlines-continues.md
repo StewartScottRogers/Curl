@@ -3,8 +3,8 @@ id: AF-0429
 title: UpstreamTest1167Script.PreprocessedLines' continuesDirective || line.StartsWith('#') can become && with no test failing
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_0941.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.UnitLibrary/UpstreamTest1167Script.cs:PreprocessedLines-or:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/UpstreamTest1167Script.cs:104:||
 task: BL-3495
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: mechanical
+closed-by: 2026-10-25_0941.md
 ---
 # AF-0429 - UpstreamTest1167Script.PreprocessedLines' continuesDirective || line.StartsWith('#') can become && with no test failing
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the -Site reproduction (UpstreamTest1167Script.cs:104:||, -Member PreprocessedLines): resolvedLine 104, 'continuesDirective || line.TrimStart().StartsWith('#')' -> '&&', outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_0941.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

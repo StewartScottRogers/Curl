@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTest
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the Select-String reproduction: the pattern 'ForcedRandomBytes_BuildsTheAuthenticator' no longer matches. The test is now CreateHttpAuthenticator_ForcedRandomBytes_DigestResponseCarriesTheirCnonce (EngineCompositionDigestClientNonceTests.cs:35). It builds two authenticators with forced zero and 0xFF random bytes, then asserts Assert.AreNotEqual(zerosCnonce, onesCnonce) and Assert.AreEqual("AAAAAAAAAAAAAAAA", zerosCnonce), so the forced bytes are shown to reach the Digest cnonce.
+
 ## Log
 
 - 2026-10-24: filed proposed.

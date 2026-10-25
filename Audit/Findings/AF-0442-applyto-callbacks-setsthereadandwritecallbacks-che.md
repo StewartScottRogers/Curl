@@ -1,0 +1,47 @@
+---
+id: AF-0442
+title: ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks checks only that both callbacks are not null
+auditor: quality
+severity: Low
+status: proposed
+reason:
+key: quality:Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs:ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks:weak-assertion
+reproduction: none
+task: none
+tasks:
+found: 2026-10-25
+found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
+scorecard: 2026-10-25_0941.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0442 - ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks checks only that both callbacks are not null
+
+## Summary
+
+Low finding from the quality auditor at `Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs:113`: ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks checks only that both callbacks are not null. Reported by an auditor flagged unreliable in 2026-10-25_0941.md.
+
+## Evidence
+
+Location: `Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs:113`
+
+Body: 'EasyCallbackOptions callbacks = new CurlHstsStore().ApplyTo(new EasyCallbackOptions());' then 'Assert.IsNotNull(callbacks.HstsRead);' and 'Assert.IsNotNull(callbacks.HstsWrite);'. ApplyTo could set callbacks over another store, or ones that ignore the store, and this test would still pass. The other tests drive CreateReadCallback directly, not the callbacks ApplyTo sets. Found by Find-WeakTests.ps1 (weak-assertion) and confirmed by reading the test.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+Select-String -Path Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs -Pattern 'ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks' -Context 0,7
+```
+
+- Expected: The test drives the callbacks ApplyTo set and checks they read and write this store's entries.
+- Actual: Only Assert.IsNotNull(callbacks.HstsRead) and Assert.IsNotNull(callbacks.HstsWrite).
+
+## Re-audits
+
+## Log
+
+- 2026-10-25: filed proposed.

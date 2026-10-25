@@ -42,6 +42,8 @@ Select-String -Path Curl.Api.UnitLibrary/EngineContracts/Headers/ITransferHeader
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the reproduction: Select-String found no 'CurlHeaderCode TryGet(' in either file. ITransferHeaders now declares `CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)` and `CurlHeader? Next(...)`, and TransferHeaderStore implements Find (line 107) and Next (line 133). No Try-named member returns a non-bool.
+
 ## Log
 
 - 2026-10-24: filed proposed.
