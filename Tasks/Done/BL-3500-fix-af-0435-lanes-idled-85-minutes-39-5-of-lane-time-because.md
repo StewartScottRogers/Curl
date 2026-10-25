@@ -9,7 +9,7 @@ touches: [DarkFactory/Claim.ps1, DarkFactory/Park.ps1, Documentation/Planning/De
 lane: no
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3500 — Fix AF-0435: Lanes idled 85 minutes (39.5% of lane time) because every ready Backlog task was interactive only
 
@@ -42,7 +42,7 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -54,6 +54,10 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
   - `Test-InteractiveOnlyTask` moved from `DarkFactory/Park.ps1` to `Claim.ps1`. It now also counts audit-path and guard-file touches, using `task-board.ps1`'s own `Test-AuditPath`, parsed out of that script. So a guard-path task held by an interactive session (BL-3472 in AF-0435) no longer makes shift start refuse with "held by no lane".
 - Tests: every `RunDarkFactory.ps1 -Test*` self-test passes. `-TestTaskReadiness` has 4 new cases: a lane ends when only interactive work is left; the end notice names that work; a lane-eligible task in Doing still makes the lane wait; and the interactive-only predicate. `dotnet build` and the fast tests pass.
 - Criterion 1 is open: it waits for a shift to run on the new code, then for the measurement over `.logs` from 2026-10-25 08:10 (ADR-0761).
+- Measured 2026-10-25 (interactive session, ADR-0761). Fix c084d3887, landed 2026-10-25 08:10 Arizona. Window: 2026-10-25 08:10:00 Arizona to the logs' end. Shift `DarkFactory-20261025-081939` is the only one that started in it (074620 started at 07:46, before the fix). It ran 1 lane, which finished BL-3510.
+  - Commands: `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500 > <scratchpad>\ci-runs.json`, then `powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since '2026-10-25 08:10:00' -LogRoot Z:\repos\Curl.logs -CiRunsJson <scratchpad>\ci-runs.json -OutFile <scratchpad>\process-3500.json`.
+  - Numbers: waitNothingReadyMinutes 0 of laneMinutes 4.08 (0%; the rule allows 20%). laneIdleMinutes 0, tasksDone 1. The lane ended at 08:23:53 with one `idle` line ("nothing a lane can claim; ending the lane rather than waiting on interactive work") and `shift end (nothing ready)`. It wrote no `wait No task is ready` lines. The coordinator then polled the board every 5 minutes. The last such lane wait before the fix was L2 at 07:51:47 in the 074620 shift.
+  - The window is short: 4.08 lane minutes in one shift. The process auditor's re-audit of a longer window is what closes AF-0435.
 
 ## Log
 
@@ -61,3 +65,4 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-25: Doing -> Backlog. Fix c084d3887 landed 2026-10-25 08:10 Arizona (ADR-0813); waiting for a shift's live logs to measure waitNothingReadyMinutes after it (ADR-0761).
 - 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix c084d3887 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-25: Doing -> Done. Live logs after c084d3887 (from 2026-10-25 08:10, shift 081939): waitNothingReadyMinutes 0 of laneMinutes 4.08, lane ended with one idle line
