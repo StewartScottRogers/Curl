@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+TELNET
+URL
+port
+</keywords>
+</info>
+# Expected output measured from real curl 8.22.0 (Schannel, WinLDAP) by running the same command line: exit code and
+# -w text as pinned below.
+# Upstream cases searched in Original/ for TELNET: test1326, test1327, test1452, test1462, test1548, test1714 and
+# test445 (none checks this URL or option failure).
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<name>
+TELNET URL with a port above 65535 is rejected
+</name>
+<command>
+-s -w '%{exitcode}|%{errormsg}\n' telnet://127.0.0.1:99999
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+3
+</errorcode>
+<stdout>
+3|URL rejected: Port number was not a decimal number between 0 and 65535
+</stdout>
+</verify>
+</testcase>
