@@ -8,7 +8,7 @@ depends-on: [BL-3474]
 touches: [Curl.Conformance.UnitTests/CurlTestCases/Extended/WS]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-25
 ---
 # BL-3490 — Write the first Extended WS curltest cases
 
@@ -22,11 +22,11 @@ Stewart (2026-10-24) approved our own `.curltest` cases per protocol, beside the
 
 ## Acceptance criteria
 
-- [ ] `Extended/WS/` holds 3 to 5 `ext<number>.curltest` files, numbered within `ext16001` to `ext16999`, in upstream's `tests/data` format.
-- [ ] Each case's `<info><keywords>` names WS and the behaviour it checks, and the case's comment or this task's Notes says how its expected output was measured from real curl.
-- [ ] No case duplicates the behaviour of an upstream case in `Original/` (Notes list the upstream cases searched).
-- [ ] `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` passes, and the fast tests of `Curl.Conformance.UnitTests` pass.
-- [ ] If a case finds a real Curl bug, the case stays out until a task (filed with the bug, linked in Notes) fixes it; this task still finishes with the cases that pass.
+- [x] `Extended/WS/` holds 3 to 5 `ext<number>.curltest` files, numbered within `ext16001` to `ext16999`, in upstream's `tests/data` format.
+- [x] Each case's `<info><keywords>` names WS and the behaviour it checks, and the case's comment or this task's Notes says how its expected output was measured from real curl.
+- [x] No case duplicates the behaviour of an upstream case in `Original/` (Notes list the upstream cases searched).
+- [x] `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` passes, and the fast tests of `Curl.Conformance.UnitTests` pass.
+- [x] If a case finds a real Curl bug, the case stays out until a task (filed with the bug, linked in Notes) fixes it; this task still finishes with the cases that pass.
 
 ## Notes
 
@@ -34,3 +34,4 @@ Stewart (2026-10-24) approved our own `.curltest` cases per protocol, beside the
 
 - 2026-10-24: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 2cd3ef56 49fa21f4 b9d1ec5d ab8cce71 30cd2836.
+- 2026-10-25: Doing -> Done. Four Extended WS cases (ext16001-ext16004) pass through Curl

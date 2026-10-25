@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+WebSockets
+WebSockets refused upgrade 426
+</keywords>
+</info>
+
+# The path has no digits: sws reads a path number over 10000 as a part number, so /%TESTNUMBER would not find this case's reply.
+# Expected bytes: measured with Record-CurlExchange.ps1 against curl 8.22.0 (request.bin, stdout.bin, exit code 22,
+# stderr "curl: (22) Refused WebSocket upgrade: and the status"). The random Sec-WebSocket-Key line is stripped.
+# Upstream cases searched for overlap: test2300-test2304 and test2700-test2723 (all expect a 101 upgrade; none
+# gets a refused upgrade, sets -H, -u, -I or -w).
+
+# Server-side
+<reply>
+<data crlf="headers" nocheck="yes">
+HTTP/1.1 426 Upgrade Required
+Content-Length: 0
+
+</data>
+</reply>
+
+# Client-side
+<client>
+<features>
+ws
+</features>
+<server>
+http
+</server>
+<name>
+ws:// reply 426 Upgrade Required is refused with exit 22
+</name>
+<command>
+ws://%HOSTIP:%HTTPPORT/refused
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<strip>
+^Sec-WebSocket-Key: .*
+</strip>
+<protocol crlf="headers" nocheck="yes">
+GET /refused HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Connection: Upgrade
+
+</protocol>
+<errorcode>
+22
+</errorcode>
+</verify>
+</testcase>
