@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-25
 ---
 # BL-3492 — Trace CI watch's silent no-ops in the running-run read and the cancel step
 
@@ -31,15 +31,18 @@ The shift-end review of 2026-10-24 (diff `808c067b4...31527f6ba`) found these. A
 
 ## Acceptance criteria
 
-- [ ] `Get-CiFixTasksBetween` returns an empty array, not `$null`, when git succeeds and no CI-fix task is found (for example with `return , @(...)`). It returns `$null` only when git fails, and that includes `ls-tree` failing.
-- [ ] `Stop-CiRunWithoutFix` records the pair as decided when the commits compare and carry no fix. A `-TestCiWatch` case proves the second call does not run git again.
-- [ ] A failed `git fetch` before the cancel step is traced, at most once per change of state, through `Write-CiRunLine` or the same change-only logging.
-- [ ] Each `$null` return in `Get-CiRunningRun` is traced through `Write-CiRunLine -Key "running <id>"`. An unreadable job log skips only that job; the failures read from the other jobs are kept.
-- [ ] `-TestCiWatch` passes.
+- [x] `Get-CiFixTasksBetween` returns an empty array, not `$null`, when git succeeds and no CI-fix task is found (for example with `return , @(...)`). It returns `$null` only when git fails, and that includes `ls-tree` failing.
+- [x] `Stop-CiRunWithoutFix` records the pair as decided when the commits compare and carry no fix. A `-TestCiWatch` case proves the second call does not run git again.
+- [x] A failed `git fetch` before the cancel step is traced, at most once per change of state, through `Write-CiRunLine` or the same change-only logging.
+- [x] Each `$null` return in `Get-CiRunningRun` is traced through `Write-CiRunLine -Key "running <id>"`. An unreadable job log skips only that job; the failures read from the other jobs are kept.
+- [x] `-TestCiWatch` passes.
 
 ## Notes
+
+- Get-CiRunningRun traces each null return under Write-CiRunLine key "running <id>"; an unreadable job log skips that job only. The fetch failure is traced under key "fetch" and cleared on success, so it traces once per change. Stop-CiRunWithoutFix also traces a git compare failure. -TestCiWatch passes (empty-array, null-on-git-failure and decided-once-no-git cases added).
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: ea30fa20 6ccb956d a0060de3 d1f255ea a47b402b.
+- 2026-10-25: Doing -> Done. CI watch traces silent no-ops in running-run read, fetch and cancel step; no-fix pairs decided once
