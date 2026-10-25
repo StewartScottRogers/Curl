@@ -41,3 +41,4 @@ BL-3464 sharded the Quality gates job; `Curl.Protocol.Ssh.UnitTests` sits alone 
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 06cf1dc8 21232fd4 6ec49597 04eff97c e332083b ec4121aa.
+- 2026-10-25: Doing -> Backlog. Fixtures pushed as 75c6bb831; waiting for its CI run to record shard 1 and the run's wall time
