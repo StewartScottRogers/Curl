@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3472 — Fix AF-0424: task-board.ps1's comment on Test-AuditPath says an ancestor such as .claude is not an audit path; the function treats .claude, .github and .claude/skills as audit paths
 
@@ -41,11 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- 2026-10-24 (interactive session): The comment above Test-AuditPath now says a folder that holds an audit path (.claude, .github and the like) is one, and only * is not; guard branch guard/bl-3472 from origin/master, commit 14e48c990, PR #227 merged into master as 89143cadb once CI passed on Windows, Linux and macOS for its head (build and fast tests included). The reproduction prints only task-board.ps1:237, its expected result. The task-board self-tests and Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest pass.
 
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. Test-AuditPath's comment now agrees with the function: a folder holding a guard file counts, only * does not; merged to master in PR #227

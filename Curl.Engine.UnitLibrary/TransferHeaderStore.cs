@@ -17,7 +17,7 @@ namespace Curl.Engine;
 /// (<see cref="MarkConnectReplyHead" />), <see cref="CurlHeaderOrigin.Trailer" /> after a final head has
 /// ended, <see cref="CurlHeaderOrigin.Header" /> otherwise; an HTTP/2 or HTTP/3 status line also records
 /// its <c>:status</c> as a <see cref="CurlHeaderOrigin.Pseudo" /> header, as libcurl's <c>http2.c</c> does.
-/// <see cref="TryGet" /> and <see cref="Next" /> are <c>lib/headers.c</c>'s <c>curl_easy_header</c> and
+/// <see cref="Find" /> and <see cref="Next" /> are <c>lib/headers.c</c>'s <c>curl_easy_header</c> and
 /// <c>curl_easy_nextheader</c>.
 /// </summary>
 internal sealed class TransferHeaderStore : ITransferHeaders
@@ -28,7 +28,7 @@ internal sealed class TransferHeaderStore : ITransferHeaders
 
     private readonly List<StoredHeader> headers = [];
 
-    /// <summary>Each header <see cref="TryGet" /> or <see cref="Next" /> answered, to the stored header it stands for: libcurl's <c>anchor</c>.</summary>
+    /// <summary>Each header <see cref="Find" /> or <see cref="Next" /> answered, to the stored header it stands for: libcurl's <c>anchor</c>.</summary>
     private readonly ConditionalWeakTable<CurlHeader, StoredHeader> anchors = [];
 
     /// <summary>The number of the request whose headers arrive now, from 0.</summary>
@@ -104,7 +104,7 @@ internal sealed class TransferHeaderStore : ITransferHeaders
     }
 
     /// <inheritdoc />
-    public CurlHeaderCode TryGet(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)
+    public CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)
     {
         header = null;
         CurlHeaderCode code = CheckArguments(index, origin, request);

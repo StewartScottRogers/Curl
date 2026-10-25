@@ -32,15 +32,30 @@ public sealed class EngineCompositionDigestClientNonceTests
     }
 
     [TestMethod]
-    public void CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator()
+    public void CreateHttpAuthenticator_ForcedRandomBytes_DigestResponseCarriesTheirCnonce()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         HandBuiltNtlmSecurityContextFactory contexts = new(new UnusedFactory(), new UnusedFactory());
+        RankedHttpAuthenticator zeros = EngineComposition.CreateHttpAuthenticator(contexts, digestRandomBytes: count => new byte[count]);
+        RankedHttpAuthenticator ones = EngineComposition.CreateHttpAuthenticator(contexts, digestRandomBytes: count => Enumerable.Repeat((byte)0xFF, count).ToArray());
+        HttpAuthRequest request = new("GET", CurlUrl.Parse("http://127.0.0.1:18218/a"), "/a", new NetworkCredential("u", "p"), null, HttpAuthSchemes.Digest, IsProxy: false);
+        string[] challenges = ["Digest realm=\"r\", nonce=\"n\", qop=\"auth\""];
 
-        RankedHttpAuthenticator authenticator = EngineComposition.CreateHttpAuthenticator(contexts, digestRandomBytes: count => new byte[count]);
+        string zerosCnonce = CnonceOf(zeros.CreateAuthorization(request, challenges)!);
+        string onesCnonce = CnonceOf(ones.CreateAuthorization(request, challenges)!);
 
-        diagnostics.Assert("authenticator built", true, authenticator is not null);
-        Assert.IsNotNull(authenticator);
+        diagnostics.Act("zeros cnonce", zerosCnonce);
+        diagnostics.Act("ones cnonce", onesCnonce);
+        diagnostics.Assert("cnonces differ", true, zerosCnonce != onesCnonce);
+        Assert.AreNotEqual(zerosCnonce, onesCnonce);
+        Assert.AreEqual("AAAAAAAAAAAAAAAA", zerosCnonce);
+    }
+
+    private static string CnonceOf(string authorization)
+    {
+        const string Marker = "cnonce=\"";
+        int start = authorization.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length;
+        return authorization[start..authorization.IndexOf('"', start)];
     }
 
     private sealed class UnusedFactory : ISecurityContextFactory

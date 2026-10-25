@@ -449,6 +449,38 @@ if ($TestClaimDuplicates) {
         git -C $reviewDir commit -q -m 'chore(tasks): file shift-end review findings' 2>&1 | Out-Null
         $reviewPush = Push-ReviewCommitsUnderLock -Dir $reviewDir -Head $reviewed -Branch 'work'
         git -C $repo worktree remove --force $reviewDir 2>&1 | Out-Null
+        # BL-3491: a dedupe that fails and a commit that fails each stop the push and say why.
+        $failHead = "$(git -C $repo rev-parse origin/work)".Trim()
+        $stubBoard = Join-Path $temp 'stub-board.ps1'
+        $savedBoard = $Board
+        $failingReview = {
+            param([string]$Name)
+            $dir = Join-Path $temp $Name
+            git -C $repo worktree add -q --detach $dir $reviewed 2>&1 | Out-Null
+            Set-Content -Path (Join-Path $dir "Tasks\Backlog\BL-090-$Name.md") -Value $Name
+            git -C $dir add -A 2>&1 | Out-Null
+            git -C $dir commit -q -m 'chore(tasks): file shift-end review findings' 2>&1 | Out-Null
+            return $dir
+        }
+        try {
+            Set-Content -Path $stubBoard -Value 'Write-Output "dedupe broke"; exit 1'
+            $Board = $stubBoard
+            $dedupeDir = & $failingReview 'dedupe-fails'
+            $dedupePush = Push-ReviewCommitsUnderLock -Dir $dedupeDir -Head $reviewed -Branch 'work'
+            git -C $repo worktree remove --force $dedupeDir 2>&1 | Out-Null
+            Set-Content -Path $stubBoard -Value 'Write-Output "BL-090  -> BL-091"; exit 0'
+            $hooks = Join-Path $temp 'hooks'
+            New-Item -ItemType Directory -Force -Path $hooks | Out-Null
+            [IO.File]::WriteAllText((Join-Path $hooks 'pre-commit'), "#!/bin/sh`nexit 1`n")
+            $commitDir = & $failingReview 'commit-fails'
+            git -C $repo config core.hooksPath $hooks
+            $commitPush = Push-ReviewCommitsUnderLock -Dir $commitDir -Head $reviewed -Branch 'work'
+            git -C $repo config --unset core.hooksPath
+            git -C $repo worktree remove --force $commitDir 2>&1 | Out-Null
+        } finally { $Board = $savedBoard }
+        git -C $repo fetch -q origin work 2>&1 | Out-Null
+        $failPushed = "$(git -C $repo rev-parse origin/work)".Trim() -ne $failHead
+        $failTrace = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'renum' })
         git -C $repo fetch -q origin work 2>&1 | Out-Null
         $reviewTree = @(git -C $repo ls-tree -r --name-only origin/work Tasks)
         $reviewTask = "$($reviewTree | Where-Object { $_ -match 'review-finding' })"
@@ -470,6 +502,7 @@ if ($TestClaimDuplicates) {
             ,@('the claimed task is in Doing on the shared branch', 'True', "$(@($shared | Where-Object { $_ -match 'Tasks/Doing/' }).Count -eq 1)")
             ,@('a shared ID whose twin is in Doing is renumbered, not taken for a claim (AF-0386)', 'True True', "$($twinClaim.Id -and $twinClaim.Id -ne 'BL-020') $($twinB -match "^Tasks/Doing/$($twinClaim.Id)-twin-b\.md$")")
             ,@('the shift-end review push renumbers a task ID the branch already had (AF-0386)', "'' True True", "'$reviewPush' $($reviewTask -match '^Tasks/Backlog/BL-0(2[1-9]|[3-9]\d)-review-finding\.md$') $($liveIds.Count -eq @($liveIds | Select-Object -Unique).Count)")
+            ,@('a failed dedupe or a failed renumber commit pushes nothing and names the reason (BL-3491)', "True True False True True", "$($dedupePush -match 'dedupe failed') $($commitPush -match 'git commit failed') $failPushed $(@($failTrace | Where-Object { $_ -match 'dedupe failed \(exit 1\): dedupe broke' }).Count -eq 1) $(@($failTrace | Where-Object { $_ -match 'BL-090' }).Count -eq 0)")
         )
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }

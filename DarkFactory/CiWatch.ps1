@@ -413,22 +413,23 @@ function Get-CiRunningRun {
     }
     $id = "$($running.databaseId)"
     $json = & $ListJobs $id
-    if (-not $json) { return $null }
+    $key = "running $id"
+    if (-not $json) { Write-CiRunLine -Key $key -Line "cannot read the jobs of running run $id with gh run view"; return $null }
     try { $failed = @(($json | ConvertFrom-Json).jobs | Where-Object { $_ -and $_.status -eq 'completed' -and $_.conclusion -eq 'failure' }) }
-    catch { return $null }
+    catch { Write-CiRunLine -Key $key -Line "cannot parse the jobs of running run $id`: $(Get-Short "$($_.Exception.Message)" 60)"; return $null }
     if (-not $failed.Count) { return $null }
     $cacheKey = "running $id $(@($failed | ForEach-Object { $_.databaseId } | Sort-Object) -join ',')"
     if (-not $script:CiWatch.Failures.ContainsKey($cacheKey)) {
         $lines = @()
         foreach ($job in $failed) {
             $log = & $ReadJobLog "$($job.databaseId)"
-            if ($null -eq $log) { return $null }
+            if ($null -eq $log) { Write-CiRunLine -Key $key -Line "cannot read the log of failed job $($job.databaseId) of running run $id; skipped"; continue }
             $lines += @($log | ForEach-Object { "$($job.name)`tlog`t$(("$_").TrimStart([char]0xFEFF))" })
         }
         $script:CiWatch.Failures[$cacheKey] = @(Get-CiFailures $lines | Where-Object { $_.Kind -in 'test', 'build' })
     }
     $failures = @($script:CiWatch.Failures[$cacheKey])
-    if (-not $failures.Count) { return $null }
+    if (-not $failures.Count) { Write-CiRunLine -Key $key -Line "running run $id has failed jobs but no failing test or build error in their logs"; return $null }
     $finished = @($failed | ForEach-Object { ConvertTo-CiDateTime $_.completedAt } | Sort-Object)[-1]
     return [pscustomobject]@{ Id = $id; Sha = "$($running.headSha)"; FinishedAt = $finished; Failures = $failures }
 }
@@ -436,14 +437,17 @@ function Get-CiRunningRun {
 function Get-CiFixTasksBetween {
     # The CI-fix tasks ("Fix CI failure ...", "Fix CI build ...", "Fix flaky CI test ...") that
     # reached Tasks/Done between commit -From and commit -To in -Repo, by file name; a task
-    # already under Tasks/Done at -From and only archived since is not one. $null when git cannot
-    # compare the two commits.
+    # already under Tasks/Done at -From and only archived since is not one. An empty array when the
+    # commits compare and carry none; $null when git cannot compare them.
     param([string]$Repo, [string]$From, [string]$To)
     $added = @(git -C $Repo diff --no-renames --name-only --diff-filter=A $From $To -- Tasks/Done 2>$null | ForEach-Object { "$_" })
     if ($LASTEXITCODE -ne 0) { return $null }
     $before = @{}
-    foreach ($path in @(git -C $Repo ls-tree -r --name-only $From -- Tasks/Done 2>$null)) { $before[(Split-Path "$path" -Leaf)] = $true }
-    return @($added | ForEach-Object { Split-Path $_ -Leaf } |
+    $tree = @(git -C $Repo ls-tree -r --name-only $From -- Tasks/Done 2>$null)
+    if ($LASTEXITCODE -ne 0) { return $null }
+    foreach ($path in $tree) { $before[(Split-Path "$path" -Leaf)] = $true }
+    # The leading comma keeps an empty result an empty array: $null means git failed.
+    return , @($added | ForEach-Object { Split-Path $_ -Leaf } |
         Where-Object { $_ -match '^BL-\d+-fix-(?:ci-failure|ci-build|flaky-ci-test)-' -and -not $before.ContainsKey($_) } |
         ForEach-Object { $_ -replace '^(BL-\d+).*$', '$1' })
 }
@@ -468,7 +472,10 @@ function Stop-CiRunWithoutFix {
     $decided = "cancel $id $($waiting.databaseId)"
     if ($script:CiWatch.Logged.ContainsKey($decided)) { return '' }
     $fixes = Get-CiFixTasksBetween -Repo $Repo -From "$($running.headSha)" -To "$($waiting.headSha)"
-    if ($null -eq $fixes) { return '' }
+    if ($null -eq $fixes) {
+        Write-CiRunLine -Key "cancel $id" -Line "cannot compare commits $($running.headSha) and $($waiting.headSha) with git: run $id is not cancelled"
+        return ''
+    }
     $script:CiWatch.Logged[$decided] = 'looked'
     if (-not @($fixes).Count) { return '' }
     if (-not $CancelRun) { $CancelRun = { param([string]$Id) gh run cancel $Id 2>&1 | Out-Null; return ($LASTEXITCODE -eq 0) } }
@@ -534,6 +541,8 @@ function Invoke-CiWatch {
     $cancelled = ''
     if (@($listed | Where-Object { $_ -and $_.status -in 'queued', 'pending', 'waiting', 'requested' }).Count) {
         git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-CiRunLine -Key 'fetch' -Line "git fetch origin $Branch failed (exit $LASTEXITCODE): a run is waiting but cannot be compared with the running one" }
+        else { $script:CiWatch.Logged.Remove('fetch') }
         $cancelled = Stop-CiRunWithoutFix -Listed $listed -Runs $runs -Repo $Root
     }
     # A failure in a job of the run still running is read now, not when the run ends (BL-3454).
@@ -707,6 +716,8 @@ function Invoke-SplitHotspotFiling {
     try {
         foreach ($attempt in 1..3) {
             git -C $Root fetch -q origin $Branch 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-CiRunLine -Key 'fetch' -Line "git fetch origin $Branch failed (exit $LASTEXITCODE): a run is waiting but cannot be compared with the running one" }
+        else { $script:CiWatch.Logged.Remove('fetch') }
             if (-not (Test-Path (Join-Path $CiWatchDir '.git'))) {
                 New-Item -ItemType Directory -Force -Path $LanesDir | Out-Null
                 git -C $Root worktree add -q --detach $CiWatchDir "origin/$Branch" 2>&1 | Out-Null
@@ -1069,7 +1080,7 @@ if ($TestCiWatch) {
         Set-Content -Path (Join-Path $fixTemp 'Tasks\Done\BL-0003-fix-ci-failure-test1173-on-linux-and-macos.md') -Value 'fix'
         git -C $fixTemp add -A 2>&1 | Out-Null; git -C $fixTemp commit -q -m three 2>&1 | Out-Null
         $shaFix = "$(git -C $fixTemp rev-parse HEAD)".Trim()
-        & $check 'a CI fix reaching Done counts; an archived one and another task do not' 'BL-0003' ((@(Get-CiFixTasksBetween -Repo $fixTemp -From $shaRunning -To $shaFix)) -join ',')
+        & $check 'a CI fix reaching Done counts; an archived one and another task do not' 'BL-0003' ((Get-CiFixTasksBetween -Repo $fixTemp -From $shaRunning -To $shaFix) -join ',')
         $redRuns = @([pscustomobject]@{ Id = '70'; Sha = $shaRunning; FinishedAt = $now; Failures = @(& $f A @('Linux')) })
         $greenRuns = @([pscustomobject]@{ Id = '70'; Sha = $shaRunning; FinishedAt = $now; Failures = @() })
         $pair = { param([string]$WaitingSha, [string]$WaitingId = '79') @([pscustomobject]@{ databaseId = [long]$WaitingId; status = 'pending'; headSha = $WaitingSha }, [pscustomobject]@{ databaseId = 78; status = 'in_progress'; headSha = $shaRunning }) }
@@ -1078,6 +1089,14 @@ if ($TestCiWatch) {
         & $check 'red, and the waiting run carries the fix: the running run is cancelled' '78' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'the same pair is decided once' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'the waiting run carries no CI fix: nothing cancelled' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaNoFix '80') -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
+        $noFixes = Get-CiFixTasksBetween -Repo $fixTemp -From $shaRunning -To $shaNoFix
+        & $check 'no fix found is an empty array, not $null' 'True' ($null -ne $noFixes -and $noFixes.Count -eq 0).ToString()
+        & $check 'git failing is $null' 'True' ($null -eq (Get-CiFixTasksBetween -Repo $fixTemp -From 'nosuchcommit' -To $shaNoFix)).ToString()
+        $script:gitCalls = 0
+        function global:git { $script:gitCalls++; & (Get-Command git -CommandType Application | Select-Object -First 1) @args }
+        try { & $check 'a pair with no fix is decided once: the second call runs no git' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaNoFix '80') -Runs $redRuns -Repo $fixTemp -CancelRun $cancel) }
+        finally { Remove-Item function:\global:git -ErrorAction SilentlyContinue }
+        & $check 'no git ran for the decided pair' '0' "$script:gitCalls"
         & $check 'green: nothing cancelled, the red spell would be hidden' '' (Stop-CiRunWithoutFix -Listed (& $pair $shaFix '81') -Runs $greenRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'no waiting run: nothing cancelled' '' (Stop-CiRunWithoutFix -Listed @((& $pair $shaFix '82')[1]) -Runs $redRuns -Repo $fixTemp -CancelRun $cancel)
         & $check 'gh cancelled only run 78' '78' ($script:cancelledIds -join ',')

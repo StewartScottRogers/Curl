@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+HTTP
+HTTP HEAD
+--write-out size_header
+</keywords>
+</info>
+
+<reply>
+<data crlf="headers" nocheck="yes">
+HTTP/1.1 200 OK
+Content-Length: 10
+X-A: b
+
+</data>
+</reply>
+
+# Client-side. Expected output measured from real curl 8.22.0 (Schannel build) on Windows, 2026-10-25,
+# with Record-CurlExchange.ps1 against a canned loopback server.
+<client>
+<server>
+http
+</server>
+<name>
+HEAD with a Content-Length: 10 reply downloads no body: size_download 0, size_header 47
+</name>
+<command option="no-include">
+-I -w "%{response_code} %{size_download} %{size_header}\n" http://%HOSTIP:%HTTPPORT/%TESTNUMBER
+</command>
+</client>
+
+<verify>
+<protocol crlf="headers">
+HEAD /%TESTNUMBER HTTP/1.1
+Host: %HOSTIP:%HTTPPORT
+User-Agent: curl/%VERSION
+Accept: */*
+
+</protocol>
+<stdout crlf="headers">
+HTTP/1.1 200 OK
+Content-Length: 10
+X-A: b
+
+200 0 47
+</stdout>
+</verify>
+</testcase>

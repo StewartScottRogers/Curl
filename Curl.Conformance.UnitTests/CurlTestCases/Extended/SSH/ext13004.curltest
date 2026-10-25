@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+SFTP
+SFTP max-filesize
+</keywords>
+</info>
+
+# Expected bytes: no SSH server could be recorded with Record-CurlExchange.ps1 (it runs curl against its own
+# loopback listeners, not an sshd), so the output is what curl documents for a transfer: the downloaded bytes
+# unchanged, then the --write-out text. Upstream cases searched for overlap: test600-test642, test1446,
+# test1459, test1583, test1725 (none sets -w, an empty file, --max-filesize or a one-byte range).
+
+# Server-side
+<reply>
+<data nocheck="yes">
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+sftp
+</server>
+<name>
+SFTP retrieval refused by --max-filesize 3 exits 63
+</name>
+<command>
+--key %LOGDIR/server/curl_client_key --pubkey %LOGDIR/server/curl_client_key.pub -u %USER: --max-filesize 3 sftp://%HOSTIP:%SSHPORT%SFTP_PWD/%LOGDIR/file%TESTNUMBER.txt --insecure
+</command>
+<file name="%LOGDIR/file%TESTNUMBER.txt">
+abcdef
+</file>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+63
+</errorcode>
+</verify>
+</testcase>

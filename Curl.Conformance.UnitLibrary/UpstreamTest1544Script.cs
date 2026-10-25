@@ -121,7 +121,9 @@ internal static class UpstreamTest1544Script
             return null;
         }
 
-        line = folded.Length > 0 ? folded + " " + line : line;
+        // The pending fold, empty when there is none, goes in front. The space this puts before an
+        // unfolded line is harmless: WithoutComments trims every line this returns (AF-0419).
+        line = folded + " " + line;
         folded = string.Empty;
         Match continuation = Continued.Match(line);
         if (continuation.Success)

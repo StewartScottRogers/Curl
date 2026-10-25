@@ -27,7 +27,7 @@ the header API (`include/curl/header.h`) and `curl_easy_recv`/`curl_easy_send`, 
   property: `null` outside the write callback, where libcurl returns `NULL`.
 - `CurlWebSocketFlags` and `CurlHeaderOrigin` are `[Flags]` enums with upstream's numbers and an
   added `None = 0`, as `[Flags]` enums need a zero member.
-- `curl_easy_header` is `CurlHeaderCode TryGet(..., out CurlHeader? header)`: it returns libcurl's
+- `curl_easy_header` is `CurlHeaderCode Find(..., out CurlHeader? header)`: it returns libcurl's
   `CURLHcode` rather than a `bool`, so callers see why a lookup failed. `curl_easy_nextheader` is
   `CurlHeader? Next(...)`, `null` at the end. `struct curl_header` is the record `CurlHeader`
   without libcurl's private `anchor`; `Next` finds its place from the record it is given. The

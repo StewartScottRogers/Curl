@@ -31,23 +31,23 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
-    public void TryGet_OneHeader_AnswersItWithItsAmountIndexAndOrigin()
+    public void Find_OneHeader_AnswersItWithItsAmountIndexAndOrigin()
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Content-Type:  text/plain \t", string.Empty);
 
-        CurlHeaderCode code = store.TryGet("content-TYPE", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
+        CurlHeaderCode code = store.Find("content-TYPE", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
 
         Assert.AreEqual(CurlHeaderCode.Ok, code);
         Assert.AreEqual(new CurlHeader("Content-Type", "text/plain", 1, 0, CurlHeaderOrigin.Header), header);
     }
 
     [TestMethod]
-    public void TryGet_RepeatedHeader_AnswersEachByIndexAndBadIndexPastThem()
+    public void Find_RepeatedHeader_AnswersEachByIndexAndBadIndexPastThem()
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Set-Cookie: a=1", "Server: s", "set-cookie: b=2", string.Empty);
 
-        store.TryGet("Set-Cookie", 1, CurlHeaderOrigin.Header, 0, out CurlHeader? second);
-        CurlHeaderCode past = store.TryGet("Set-Cookie", 2, CurlHeaderOrigin.Header, 0, out CurlHeader? none);
+        store.Find("Set-Cookie", 1, CurlHeaderOrigin.Header, 0, out CurlHeader? second);
+        CurlHeaderCode past = store.Find("Set-Cookie", 2, CurlHeaderOrigin.Header, 0, out CurlHeader? none);
 
         Assert.AreEqual(new CurlHeader("set-cookie", "b=2", 2, 1, CurlHeaderOrigin.Header), second);
         Assert.AreEqual(CurlHeaderCode.BadIndex, past);
@@ -55,26 +55,26 @@ public sealed class TransferHeaderStoreTests
     }
 
     [TestMethod]
-    public void TryGet_NameNotReceivedOrOriginNotAsked_AnswersMissing()
+    public void Find_NameNotReceivedOrOriginNotAsked_AnswersMissing()
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Server: s", string.Empty);
 
-        Assert.AreEqual(CurlHeaderCode.Missing, store.TryGet("Date", 0, CurlHeaderOrigin.Header, Last, out _));
-        Assert.AreEqual(CurlHeaderCode.Missing, store.TryGet("Server", 0, CurlHeaderOrigin.Trailer, Last, out _));
+        Assert.AreEqual(CurlHeaderCode.Missing, store.Find("Date", 0, CurlHeaderOrigin.Header, Last, out _));
+        Assert.AreEqual(CurlHeaderCode.Missing, store.Find("Server", 0, CurlHeaderOrigin.Trailer, Last, out _));
     }
 
     [TestMethod]
-    public void TryGet_NothingRecorded_AnswersNoHeaders()
+    public void Find_NothingRecorded_AnswersNoHeaders()
     {
-        Assert.AreEqual(CurlHeaderCode.NoHeaders, new TransferHeaderStore().TryGet("Server", 0, CurlHeaderOrigin.Header, Last, out _));
+        Assert.AreEqual(CurlHeaderCode.NoHeaders, new TransferHeaderStore().Find("Server", 0, CurlHeaderOrigin.Header, Last, out _));
     }
 
     [TestMethod]
-    public void TryGet_RequestNotMade_AnswersNoRequest()
+    public void Find_RequestNotMade_AnswersNoRequest()
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Server: s", string.Empty);
 
-        Assert.AreEqual(CurlHeaderCode.NoRequest, store.TryGet("Server", 0, CurlHeaderOrigin.Header, 1, out _));
+        Assert.AreEqual(CurlHeaderCode.NoRequest, store.Find("Server", 0, CurlHeaderOrigin.Header, 1, out _));
     }
 
     [TestMethod]
@@ -82,11 +82,11 @@ public sealed class TransferHeaderStoreTests
     [DataRow(0, CurlHeaderOrigin.None, Last)]
     [DataRow(0, (CurlHeaderOrigin)(1 << 5), Last)]
     [DataRow(0, CurlHeaderOrigin.Header, -2)]
-    public void TryGet_ArgumentLibcurlRefuses_AnswersBadArgument(int index, CurlHeaderOrigin origin, int request)
+    public void Find_ArgumentLibcurlRefuses_AnswersBadArgument(int index, CurlHeaderOrigin origin, int request)
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Server: s", string.Empty);
 
-        Assert.AreEqual(CurlHeaderCode.BadArgument, store.TryGet("Server", index, origin, request, out CurlHeader? header));
+        Assert.AreEqual(CurlHeaderCode.BadArgument, store.Find("Server", index, origin, request, out CurlHeader? header));
         Assert.IsNull(header);
     }
 
@@ -97,12 +97,12 @@ public sealed class TransferHeaderStoreTests
             "HTTP/1.1 302 Found", "Location: /b", string.Empty,
             "HTTP/1.1 200 OK", "Server: second", string.Empty);
 
-        store.TryGet("Location", 0, CurlHeaderOrigin.Header, 0, out CurlHeader? location);
-        store.TryGet("Server", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? server);
+        store.Find("Location", 0, CurlHeaderOrigin.Header, 0, out CurlHeader? location);
+        store.Find("Server", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? server);
 
         Assert.AreEqual("/b", location?.Value);
         Assert.AreEqual("second", server?.Value);
-        Assert.AreEqual(CurlHeaderCode.Missing, store.TryGet("Location", 0, CurlHeaderOrigin.Header, 1, out _));
+        Assert.AreEqual(CurlHeaderCode.Missing, store.Find("Location", 0, CurlHeaderOrigin.Header, 1, out _));
     }
 
     [TestMethod]
@@ -133,10 +133,10 @@ public sealed class TransferHeaderStoreTests
     {
         TransferHeaderStore store = StoreOf("HTTP/2 404", "server: s", string.Empty);
 
-        store.TryGet(":status", 0, CurlHeaderOrigin.Pseudo, Last, out CurlHeader? status);
+        store.Find(":status", 0, CurlHeaderOrigin.Pseudo, Last, out CurlHeader? status);
 
         Assert.AreEqual(new CurlHeader(":status", "404", 1, 0, CurlHeaderOrigin.Pseudo), status);
-        Assert.AreEqual(CurlHeaderCode.Missing, store.TryGet(":status", 0, CurlHeaderOrigin.Header, Last, out _));
+        Assert.AreEqual(CurlHeaderCode.Missing, store.Find(":status", 0, CurlHeaderOrigin.Header, Last, out _));
     }
 
     [TestMethod]
@@ -144,7 +144,7 @@ public sealed class TransferHeaderStoreTests
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1", "Server: s", string.Empty);
 
-        Assert.AreEqual(CurlHeaderCode.Ok, store.TryGet("Server", 0, CurlHeaderOrigin.Header, Last, out _));
+        Assert.AreEqual(CurlHeaderCode.Ok, store.Find("Server", 0, CurlHeaderOrigin.Header, Last, out _));
     }
 
     [TestMethod]
@@ -152,7 +152,7 @@ public sealed class TransferHeaderStoreTests
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "X-Long: one", "  \ttwo  ", "\tthree", "   ", string.Empty);
 
-        store.TryGet("X-Long", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
+        store.Find("X-Long", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
 
         Assert.AreEqual("one two three", header?.Value);
     }
@@ -162,7 +162,7 @@ public sealed class TransferHeaderStoreTests
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Server: from ", " the\t", "\t\tconnect", string.Empty);
 
-        store.TryGet("Server", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
+        store.Find("Server", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
 
         Assert.AreEqual("from the connect", header?.Value);
     }
@@ -172,7 +172,7 @@ public sealed class TransferHeaderStoreTests
     {
         TransferHeaderStore store = StoreOf("HTTP/1.1 200 OK", "Content-Type:", " text/html", string.Empty);
 
-        store.TryGet("Content-Type", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
+        store.Find("Content-Type", 0, CurlHeaderOrigin.Header, Last, out CurlHeader? header);
 
         Assert.AreEqual("text/html", header?.Value);
     }
@@ -182,7 +182,7 @@ public sealed class TransferHeaderStoreTests
     {
         TransferHeaderStore store = StoreOf(" stray", "HTTP/1.1 200 OK", "no colon here", string.Empty);
 
-        Assert.AreEqual(CurlHeaderCode.NoHeaders, store.TryGet("no colon here", 0, CurlHeaderOrigin.Header, Last, out _));
+        Assert.AreEqual(CurlHeaderCode.NoHeaders, store.Find("no colon here", 0, CurlHeaderOrigin.Header, Last, out _));
     }
 
     [TestMethod]
@@ -243,9 +243,9 @@ public sealed class TransferHeaderStoreTests
         store.RecordLine("HTTP/1.1 200 OK");
         store.RecordLine("C: 3");
 
-        Assert.AreEqual(CurlHeaderCode.NoRequest, store.TryGet("C", 0, CurlHeaderOrigin.Header, 1, out _));
-        Assert.AreEqual(CurlHeaderCode.Ok, store.TryGet("C", 0, CurlHeaderOrigin.Header, 0, out _));
-        Assert.AreEqual(CurlHeaderCode.Missing, store.TryGet("A", 0, CurlHeaderOrigin.Header | CurlHeaderOrigin.Connect, 0, out _));
+        Assert.AreEqual(CurlHeaderCode.NoRequest, store.Find("C", 0, CurlHeaderOrigin.Header, 1, out _));
+        Assert.AreEqual(CurlHeaderCode.Ok, store.Find("C", 0, CurlHeaderOrigin.Header, 0, out _));
+        Assert.AreEqual(CurlHeaderCode.Missing, store.Find("A", 0, CurlHeaderOrigin.Header | CurlHeaderOrigin.Connect, 0, out _));
     }
 
     [TestMethod]

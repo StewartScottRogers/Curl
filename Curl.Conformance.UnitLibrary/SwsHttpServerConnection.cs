@@ -210,12 +210,16 @@ internal sealed class SwsHttpServerConnection : IConnection
     private static async Task<IConnection?> ConnectTunnelServerAsync(IConnector server, string host, int port) =>
         (await server.ConnectAsync(new ConnectTarget(host, port, false), CancellationToken.None)).Connection;
 
-    // Waits for the first send, then reads it and every later one already sent, up to a close.
+    // Waits for the first send, then reads it and every later one already sent. A close is the
+    // empty send queued last, so a read that reaches it alone returns the 0 that ends the
+    // connection, and every read after it finds nothing sent and nothing owed, which ends it too:
+    // a close queues nothing behind it, stops the reading of requests, and comes only in the
+    // normal reply mode, where no stream, idle wait or upgraded traffic can follow (AF-0420).
     private async ValueTask<int> ReadSentAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
         await WaitUntilAsync(pendingSends[0].SentAt, cancellationToken);
         int count = 0;
-        while (count < buffer.Length && pendingSends.Count > 0 && !pendingSends[0].IsClose && pendingSends[0].SentAt <= Now)
+        while (count < buffer.Length && pendingSends.Count > 0 && pendingSends[0].SentAt <= Now)
         {
             count += ReadFirstSend(buffer.Span[count..]);
         }
@@ -234,7 +238,7 @@ internal sealed class SwsHttpServerConnection : IConnection
         }
         else
         {
-            pendingSends[0] = new SwsServerSend(first.Bytes[count..], first.SentAt, false);
+            pendingSends[0] = new SwsServerSend(first.Bytes[count..], first.SentAt);
         }
 
         return count;
@@ -353,7 +357,7 @@ internal sealed class SwsHttpServerConnection : IConnection
     private void CloseUpgradedTraffic()
     {
         upgradedTrafficOpen = false;
-        pendingSends.Add(new SwsServerSend([], Now, true));
+        pendingSends.Add(new SwsServerSend([], Now));
         RecordDisconnectOnce();
     }
 
@@ -426,7 +430,7 @@ internal sealed class SwsHttpServerConnection : IConnection
             int count = Math.Min(BytesPerWrite, bytes.Length - offset);
             if (count > 0)
             {
-                pendingSends.Add(new SwsServerSend(bytes[offset..(offset + count)], writtenAt, false));
+                pendingSends.Add(new SwsServerSend(bytes[offset..(offset + count)], writtenAt));
             }
 
             offset += count;
@@ -438,7 +442,7 @@ internal sealed class SwsHttpServerConnection : IConnection
         if (closes)
         {
             readsRequests = false;
-            pendingSends.Add(new SwsServerSend([], serverBusyUntil, true));
+            pendingSends.Add(new SwsServerSend([], serverBusyUntil));
             RecordDisconnectOnce();
         }
     }

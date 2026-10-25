@@ -233,6 +233,7 @@ public sealed partial class SslStreamTlsProviderTests
     [DataRow("oneByte", TlsFailureMessages.OpenSslNotEnoughData)]
     [DataRow("twoByteEmptyOctetString", TlsFailureMessages.OpenSslWrongTag)]
     [DataRow("lengthCutShort", TlsFailureMessages.OpenSslNotEnoughData)]
+    [DataRow("longFormHeaderFillsTheFile", TlsFailureMessages.OpenSslWrongTag)]
     [DataRow("indefiniteLength", TlsFailureMessages.OpenSslWrongTag)]
     [DataRow("overlongLength", TlsFailureMessages.OpenSslWrongTag)]
     [DataRow("longFormOctetString", TlsFailureMessages.OpenSslWrongTag)]
@@ -254,6 +255,7 @@ public sealed partial class SslStreamTlsProviderTests
             "oneByte" => WriteCertificateFile("one.der", [0x30]),
             "twoByteEmptyOctetString" => WriteCertificateFile("two.der", [0x04, 0x00]),
             "lengthCutShort" => WriteCertificateFile("cut.der", [0x30, 0x84, 0x00]),
+            "longFormHeaderFillsTheFile" => WriteCertificateFile("header.der", [0x30, 0x81, 0x00]),
             "indefiniteLength" => WriteCertificateFile("indefinite.der", [0x30, 0x80, 0x00, 0x00]),
             "overlongLength" => WriteCertificateFile("overlong.der", [0x30, 0x85, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00]),
             _ => WriteCertificateFile("octets.der", [0x04, 0x81, 0x01, 0x00]),

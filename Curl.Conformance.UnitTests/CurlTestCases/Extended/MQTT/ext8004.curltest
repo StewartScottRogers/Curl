@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+MQTT
+MQTTS
+connect-refused
+</keywords>
+</info>
+# Expected output measured from real curl 8.22.0 (Schannel, WinLDAP) by running the same command line: exit code and
+# -w text as pinned below.
+# Upstream cases searched in Original/ for MQTT: test1132, test1190 to test1196, test1198, test1199, test1916, test1917,
+# test2109, test2200 to test2207, test3017, test3018, test445 (none checks this URL or connect failure).
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<name>
+MQTTS to a closed port fails to connect
+</name>
+<command>
+-s -w '%{exitcode}\n' mqtts://127.0.0.1:1/x
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+7
+</errorcode>
+<stdout>
+7
+</stdout>
+</verify>
+</testcase>

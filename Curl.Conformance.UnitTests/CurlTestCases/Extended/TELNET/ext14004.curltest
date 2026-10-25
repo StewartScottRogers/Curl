@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+TELNET
+telnet-option
+-t
+WS
+</keywords>
+</info>
+# Expected output measured from real curl 8.22.0 (Schannel, WinLDAP) by running the same command line against a local listener: exit code and
+# -w text as pinned below.
+# Upstream cases searched in Original/ for TELNET: test1326, test1327, test1452, test1462, test1548, test1714 and
+# test445 (none checks this URL or option failure).
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<server>
+telnet
+</server>
+<name>
+TELNET WS option without a WIDTHxHEIGHT size is a syntax error
+</name>
+<command>
+-s -m 5 -t WS=80 -w '%{exitcode}|%{errormsg}\n' telnet://%HOSTIP:%TELNETPORT
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+49
+</errorcode>
+<stdout>
+49|Syntax error in telnet option: WS=80
+</stdout>
+</verify>
+</testcase>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+LDAP
+connection-refused
+</keywords>
+</info>
+# Expected output measured from real curl 8.22.0 (Schannel, WinLDAP) with Record-CurlExchange-style runs of the same
+# command line: exit 7 (message holds a timing, so only the exit code is pinned).
+# Upstream cases searched in Original/ for LDAP: test445, test1462, test1538 (none run an ldap:// transfer).
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<name>
+LDAP connect to a port nothing listens on
+</name>
+<command>
+-s -w '%{exitcode}\n' ldap://%HOSTIP:%NOLISTENPORT/dc=example
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+7
+</errorcode>
+<stdout>
+7
+</stdout>
+</verify>
+</testcase>

@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="CurlTestCases\Extended\ext*.curltest;CurlTestCases\Original\test*.curltest;CurlTestCases\Original\COPYING;CurlTestCases\Original\certs\*;CurlTestCases\Original\data\*;CurlTestCases\Original\docs\options-in-versions;CurlTestCases\Original\docs\VERSIONS.md;CurlTestCases\Original\docs\cmdline-opts\*;CurlTestCases\Original\docs\libcurl\*;CurlTestCases\Original\docs\libcurl\opts\*;CurlTestCases\Original\include\curl\*;CurlTestCases\Original\lib\*;CurlTestCases\Original\src\*;CurlTestCases\Original\projects\OS400\ccsidcurl.c;PassingUpstreamCases.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="CurlTestCases\Extended\**\ext*.curltest;CurlTestCases\Original\test*.curltest;CurlTestCases\Original\COPYING;CurlTestCases\Original\certs\*;CurlTestCases\Original\data\*;CurlTestCases\Original\docs\options-in-versions;CurlTestCases\Original\docs\VERSIONS.md;CurlTestCases\Original\docs\cmdline-opts\*;CurlTestCases\Original\docs\libcurl\*;CurlTestCases\Original\docs\libcurl\opts\*;CurlTestCases\Original\include\curl\*;CurlTestCases\Original\lib\*;CurlTestCases\Original\src\*;CurlTestCases\Original\projects\OS400\ccsidcurl.c;PassingUpstreamCases.txt" CopyToOutputDirectory="PreserveNewest" />
     <!-- Again beside CurlTestCases\Original, the %SRCDIR, as upstream's docs and src sit beside its tests folder, where test971.pl and test1486.pl look (BL-2865). -->
     <!-- test1165.pl reads the build files and m4 macros beside docs and src too (BL-3409). -->
     <ContentWithTargetPath Include="CurlTestCases\Original\m4\*.m4" TargetPath="CurlTestCases\m4\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

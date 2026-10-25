@@ -59,6 +59,14 @@ public sealed class UpstreamTest1167ScriptTests
     }
 
     [TestMethod]
+    public void Check_DirectivesInsideAnEnum_AreDroppedWithTheirContinuationLines()
+    {
+        Write("include/curl/a.h", "enum {\n  CURLA,\n  #ifdef X\n  #endif\n#define CURL_WRAP \\\n  BAD_CONTINUED \\\n  more\n  CURLB\n};\n");
+
+        Assert.AreEqual(("3 fine symbols found\n", 0), UpstreamTest1167Script.Check(root));
+    }
+
+    [TestMethod]
     public void Check_SymbolsWithoutThePrefix_ListsThemAndExits1()
     {
         Write("include/curl/a.h", "#define CURLA 1\n#define BAD_DEFINE 1\nenum {\n  BAD_MEMBER,\n  CURLB\n};\n");

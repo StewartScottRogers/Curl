@@ -29,7 +29,7 @@ public static class CurlEasyHeaders
         var headers = LiveHeaders(easy);
         return headers is null || name is null
             ? CurlHeaderCode.BadArgument
-            : MarkedResult(headers.TryGet(name, index, origin, request, out header), ref header);
+            : MarkedResult(headers.Find(name, index, origin, request, out header), ref header);
     }
 
     /// <summary><c>curl_easy_nextheader</c>: the header after <paramref name="previous"/> the handle's last transfer received.</summary>

@@ -18,7 +18,7 @@ public interface ITransferHeaders
     /// <param name="request">Which request of the transfer, from 0, or <see cref="LastRequest"/>.</param>
     /// <param name="header"><c>*hout</c>: the header, or <see langword="null"/> when the result is not <see cref="CurlHeaderCode.Ok"/>.</param>
     /// <returns>The lookup's result.</returns>
-    CurlHeaderCode TryGet(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header);
+    CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header);
 
     /// <summary><c>curl_easy_nextheader</c>: the header after <paramref name="previous"/>.</summary>
     /// <param name="origin">The <c>CURLH_*</c> bits to walk.</param>
