@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/UpstreamConformanceTests.ExtendedCases.cs, Curl.Conformance.UnitTests/CurlTestCases/Extended/README.md, Curl.Conformance.UnitTests/Curl.Conformance.UnitTests.csproj, Curl.Conformance.UnitTests/CLAUDE.md]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-25
 ---
 # BL-3474 — Run Extended curltest cases from one subfolder per protocol
 
@@ -55,3 +55,4 @@ Number blocks, so parallel tasks never collide (decided by Claude under Stewart'
 
 - 2026-10-24: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b6539a77 a716d186 0bbd949c d625f67a e81fd22c 8939ec04.
+- 2026-10-25: Doing -> Done. Extended cases run from per-protocol subfolders with number-block and duplicate checks.
