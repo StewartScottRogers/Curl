@@ -3,8 +3,8 @@ id: AF-0416
 title: HandshakeMessageReader.Read slices a handshake message before checking it has all arrived, so 8 Curl.Tls.UnitTests and 5 Curl.Networking QUIC tests fail unmutated
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeReader_Larg
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
