@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: docs
 depends-on: []
-touches: [Curl.Api.UnitLibrary]
+touches: [Curl.Api.UnitLibrary, Curl.Engine.UnitLibrary/TransferHeaderStore.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Libcurl/Headers/CurlEasyHeaders.cs, Curl.Engine.UnitTests, Libcurl.UnitTests/Headers, Curl.Conformance.LibTest.UnitTests/FakeTransferHeaders.cs, Documentation/Planning/Decisions/ADR-0512-websocket-header-and-connect-only-contracts.md]
 requirement: none
 created: 2026-10-25
 completed:
@@ -41,10 +41,12 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Renamed `TryGet` to `Find` (mirrors curl_easy_header, returns CurlHeaderCode) in ITransferHeaders, TransferHeaderStore and every caller and fake: Curl.Engine.UnitLibrary, Libcurl, and the Engine, Libcurl and Conformance.LibTest tests (no other Doing task touches them), plus Engine CLAUDE.md and ADR-0512 text. A pure rename adds no branches, so Measure-CodeQuality was not run. Linux and macOS CI: change is platform-neutral.
 
 ## Log
 

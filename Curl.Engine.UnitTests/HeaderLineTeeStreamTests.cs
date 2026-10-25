@@ -141,7 +141,7 @@ public sealed class HeaderLineTeeStreamTests
         stream.MarkConnectReplyHead();
         stream.Write(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nVia: p\r\n\r\n"));
 
-        Assert.AreEqual(Api.Codes.CurlHeaderCode.Ok, store.TryGet("Via", 0, connect, 0, out _));
+        Assert.AreEqual(Api.Codes.CurlHeaderCode.Ok, store.Find("Via", 0, connect, 0, out _));
     }
 
     [TestMethod]

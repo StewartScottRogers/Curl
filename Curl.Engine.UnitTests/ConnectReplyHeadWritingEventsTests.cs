@@ -42,7 +42,7 @@ public sealed class ConnectReplyHeadWritingEventsTests
 
         await events.WriteConnectReplyHeadAsync(Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\nVia: p\r\n\r\n"), CancellationToken.None);
 
-        Assert.AreEqual(Api.Codes.CurlHeaderCode.Ok, store.TryGet("Via", 0, Api.EngineContracts.Headers.CurlHeaderOrigin.Connect, 0, out _));
+        Assert.AreEqual(Api.Codes.CurlHeaderCode.Ok, store.Find("Via", 0, Api.EngineContracts.Headers.CurlHeaderOrigin.Connect, 0, out _));
     }
 
     [TestMethod]

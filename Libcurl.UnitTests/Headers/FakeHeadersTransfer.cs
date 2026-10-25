@@ -54,7 +54,7 @@ internal sealed class FakeTransferHeaders : ITransferHeaders
 
     public (CurlHeaderOrigin Origin, int Request, CurlHeader? Previous)? LastNext { get; private set; }
 
-    public CurlHeaderCode TryGet(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)
+    public CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)
     {
         CallCount++;
         LastTryGet = (name, index, origin, request);

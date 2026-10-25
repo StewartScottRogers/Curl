@@ -18,7 +18,7 @@ internal sealed class FakeTransferHeaders(params CurlHeader[][] requests) : ITra
 
     public List<int> RequestsAsked { get; } = [];
 
-    public CurlHeaderCode TryGet(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)
+    public CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)
     {
         header = null;
         RequestsAsked.Add(request);

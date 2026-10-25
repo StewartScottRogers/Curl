@@ -24,14 +24,14 @@ public sealed partial class ManagedEasyTransferTests
         };
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
-        easy.Headers.TryGet("location", 0, CurlHeaderOrigin.Header, 0, out CurlHeader? location);
-        easy.Headers.TryGet("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out CurlHeader? contentType);
+        easy.Headers.Find("location", 0, CurlHeaderOrigin.Header, 0, out CurlHeader? location);
+        easy.Headers.Find("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out CurlHeader? contentType);
 
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.AreEqual(new CurlHeader("Location", "http://other/y", 1, 0, CurlHeaderOrigin.Header), location);
         Assert.AreEqual(new CurlHeader("Content-Type", "text/plain", 1, 0, CurlHeaderOrigin.Header), contentType);
-        Assert.AreEqual(CurlHeaderCode.Missing, easy.Headers.TryGet("Location", 0, CurlHeaderOrigin.Header, 1, out _));
-        Assert.AreEqual(CurlHeaderCode.NoRequest, easy.Headers.TryGet("Location", 0, CurlHeaderOrigin.Header, 2, out _));
+        Assert.AreEqual(CurlHeaderCode.Missing, easy.Headers.Find("Location", 0, CurlHeaderOrigin.Header, 1, out _));
+        Assert.AreEqual(CurlHeaderCode.NoRequest, easy.Headers.Find("Location", 0, CurlHeaderOrigin.Header, 2, out _));
     }
 
     [TestMethod]
@@ -68,7 +68,7 @@ public sealed partial class ManagedEasyTransferTests
 
         await easy.PerformAsync(CancellationToken.None);
 
-        Assert.AreEqual(CurlHeaderCode.NoHeaders, easy.Headers.TryGet("Server", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _));
+        Assert.AreEqual(CurlHeaderCode.NoHeaders, easy.Headers.Find("Server", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _));
     }
 
     [TestMethod]
@@ -78,12 +78,12 @@ public sealed partial class ManagedEasyTransferTests
         await using IEasyTransfer easy = CreateEngine(connector).CreateEasy();
         easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://h/x" } };
         await easy.PerformAsync(CancellationToken.None);
-        CurlHeaderCode afterPerform = easy.Headers.TryGet("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _);
+        CurlHeaderCode afterPerform = easy.Headers.Find("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _);
 
         easy.Reset();
 
         Assert.AreEqual(CurlHeaderCode.Ok, afterPerform);
-        Assert.AreEqual(CurlHeaderCode.NoHeaders, easy.Headers.TryGet("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _));
+        Assert.AreEqual(CurlHeaderCode.NoHeaders, easy.Headers.Find("Content-Type", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out _));
     }
 
     [TestMethod]

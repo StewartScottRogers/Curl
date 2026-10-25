@@ -12,7 +12,7 @@ public sealed class HeaderRecordingStreamTests
 
     private static string ServerOf(TransferHeaderStore store)
     {
-        store.TryGet("Server", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out CurlHeader? header);
+        store.Find("Server", 0, CurlHeaderOrigin.Header, ITransferHeaders.LastRequest, out CurlHeader? header);
         return header?.Value ?? "(none)";
     }
 
@@ -55,7 +55,7 @@ public sealed class HeaderRecordingStreamTests
         stream.Write(Encoding.Latin1.GetBytes("Trailer-Thing: t\n"));
 
         Assert.AreEqual("s\xe9", ServerOf(store));
-        Assert.AreEqual(CurlHeaderCode.Ok, store.TryGet("Trailer-Thing", 0, CurlHeaderOrigin.Trailer, 0, out _));
+        Assert.AreEqual(CurlHeaderCode.Ok, store.Find("Trailer-Thing", 0, CurlHeaderOrigin.Trailer, 0, out _));
     }
 
     [TestMethod]
@@ -67,7 +67,7 @@ public sealed class HeaderRecordingStreamTests
         stream.MarkConnectReplyHead();
         stream.Write(Head);
 
-        Assert.AreEqual(CurlHeaderCode.Ok, store.TryGet("Server", 0, CurlHeaderOrigin.Connect, 0, out _));
+        Assert.AreEqual(CurlHeaderCode.Ok, store.Find("Server", 0, CurlHeaderOrigin.Connect, 0, out _));
     }
 
     [TestMethod]
