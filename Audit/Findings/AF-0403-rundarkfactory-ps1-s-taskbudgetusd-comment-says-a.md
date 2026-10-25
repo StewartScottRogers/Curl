@@ -3,8 +3,8 @@ id: AF-0403
 title: RunDarkFactory.ps1's -TaskBudgetUsd comment says a run that reaches the cost cap has its task filed as Blocked; the shift splits it with Invoke-TaskSplit
 auditor: truthfulness
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces.
 key: truthfulness:RunDarkFactory.ps1:TaskBudgetUsd:false-help
 reproduction: none
 task: BL-3450
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_2106.md
 ---
 # AF-0403 - RunDarkFactory.ps1's -TaskBudgetUsd comment says a run that reaches the cost cap has its task filed as Blocked; the shift splits it with Invoke-TaskSplit
 
@@ -43,8 +43,10 @@ Select-String -Path RunDarkFactory.ps1, DarkFactory/ShiftRunner.ps1 -Pattern 'ha
 ## Re-audits
 
 - 2026-10-24 | 2026-10-24_0845.md | reproduces: no | Ran the reproduction: only ShiftRunner.ps1:195 matched; 'has its task filed as Blocked' is gone. The -TaskBudgetUsd comment (RunDarkFactory.ps1:437-440) now says a run that reaches the cap gets one bounded split run that defers the original, Blocked only if the split is skipped or fails.
+- 2026-10-24 | 2026-10-24_2106.md | reproduces: no | Ran the reproduction: the only match is ShiftRunner.ps1:195. 'has its task filed as Blocked' no longer appears in RunDarkFactory.ps1. The -TaskBudgetUsd parameter comment (lines 449-451) and the help now describe the split.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces.

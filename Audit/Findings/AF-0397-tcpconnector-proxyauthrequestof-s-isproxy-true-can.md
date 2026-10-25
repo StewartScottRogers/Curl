@@ -43,6 +43,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Re-audits
 
 - 2026-10-24 | 2026-10-24_0845.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site Curl.Networking.UnitLibrary/TcpConnector.cs:1516:true run: resolvedLine 1516, 'IsProxy: true);' -> 'IsProxy: false);', outcome survived. The same site also survived in this audit's seed-0 sample of Curl.Networking.UnitLibrary. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-24 | 2026-10-24_2106.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: Curl.Networking.UnitLibrary/TcpConnector.cs:1516 ProxyAuthRequestOf 'IsProxy: true);' -> 'IsProxy: false);' resolvedLine 1516, outcome survived (5 baseline-failing TcpConnectorQuicTests excluded). The seed-0 sample hit the same site and it survived there too. Runner's targeted mutation rerun on the clean audited commit: survived.
 
 ## Log
 

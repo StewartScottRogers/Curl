@@ -3,8 +3,8 @@ id: AF-0424
 title: task-board.ps1's comment on Test-AuditPath says an ancestor such as .claude is not an audit path; the function treats .claude, .github and .claude/skills as audit paths
 auditor: truthfulness
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-24, as Low: a wrong comment, not a behaviour defect.
+status: closed
+reason: Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces.
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-statement
 reproduction: none
 task: BL-3472
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_2106.md
 ---
 # AF-0424 - task-board.ps1's comment on Test-AuditPath says an ancestor such as .claude is not an audit path; the function treats .claude, .github and .claude/skills as audit paths
 
@@ -42,7 +42,10 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'An ancest
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_2106.md | reproduces: no | Ran the reproduction: 'An ancestor such as .claude or * is not one' no longer matches. The only match is task-board.ps1:237, the new comment 'A folder that holds a guard file or an auditor or analyst agent (".claude", ".github", ".claude/skills" and the like) counts too'. That agrees with the $holders check on lines 239-241.
+
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces.

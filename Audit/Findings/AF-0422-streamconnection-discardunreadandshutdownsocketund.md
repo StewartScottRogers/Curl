@@ -3,8 +3,8 @@ id: AF-0422
 title: StreamConnection.DiscardUnreadAndShutDownSocketUnder's Socket.Available > 0 can become >= 0 with no test failing, so closing a connection blocks in Receive
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-24.
+status: closed
+reason: Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:DiscardUnreadAndShutDownSocketUnder-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:156:>
 task: BL-3471
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: mechanical
+closed-by: 2026-10-24_2106.md
 ---
 # AF-0422 - StreamConnection.DiscardUnreadAndShutDownSocketUnder's Socket.Available > 0 can become >= 0 with no test failing, so closing a connection blocks in Receive
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_2106.md | reproduces: no | Ran the -Site command: StreamConnection.cs:156 DiscardUnreadAndShutDownSocketUnder 'Socket.Available > 0' -> '>= 0', resolvedLine 156, outcome killed. (The seed-0 sample's survivor on the same line is the other '>', 'Receive(discard) > 0' -> '>= 0', which is equivalent while Available > 0 guards the loop.) Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
