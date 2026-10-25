@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/Claim.ps1, DarkFactory/Park.ps1, Documentation/Planning/Decisions/ADR-0813-a-lane-ends-when-only-interactive-work-is-left.md]
+touches: [DarkFactory/Claim.ps1, DarkFactory/Park.ps1, Documentation/Planning/Decisions/ADR-0813-a-lane-ends-when-only-interactive-work-is-left.md, Documentation/Planning/Decisions/README.md]
 lane: no
 requirement: none
 created: 2026-10-25

@@ -44,12 +44,6 @@ function Test-WorktreeDirty {
     return [bool](@(git -C $Dir status --porcelain 2>$null) | Where-Object { $_ })
 }
 
-function Test-InteractiveOnlyTask([string]$Path) {
-    # True when the task file says lane: no. No lane ever claims such a task, so one in Doing
-    # is held by an interactive session, not orphaned by a lane (BL-2069).
-    return (Get-Content -Raw -LiteralPath $Path) -match '(?m)^lane: no\s*$'
-}
-
 function Get-OrphanAction {
     # What shift start does with task $Id, in Doing but held by no lane of the previous shift
     # (BL-1071): adopt it into the one lane worktree with uncommitted work, so that lane

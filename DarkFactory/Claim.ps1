@@ -69,7 +69,61 @@ function Test-Rebasing {
     return $false
 }
 
-function Get-DoingCount { return @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue).Count }
+function Get-AuditPathTest {
+    # task-board.ps1's own Test-AuditPath, as a script block taking one touch path, so the
+    # factory reads the one list of audit paths and guard files that the board and CI's audit
+    # guard keep in step (BL-1209) rather than a copy that could drift. The function's text is
+    # parsed out of the script once a process; the board script itself is never run here.
+    if (-not $script:AuditPathTest) {
+        $boardScript = Join-Path $PSScriptRoot '..\.claude\skills\task-board\task-board.ps1'
+        $ast = [Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $boardScript).Path, [ref]$null, [ref]$null)
+        $function = $ast.Find({ param($Node) $Node -is [Management.Automation.Language.FunctionDefinitionAst] -and $Node.Name -eq 'Test-AuditPath' }, $true)
+        if (-not $function) { throw "$boardScript has no Test-AuditPath function" }
+        $script:AuditPathTest = [scriptblock]::Create("$($function.Extent.Text)`nTest-AuditPath `$args[0]")
+    }
+    return $script:AuditPathTest
+}
+
+function Test-InteractiveOnlyTask([string]$Path) {
+    # True when the task is interactive only by the board's rule: its file says lane: no, or
+    # one of its touches is an audit path or guard file (task-board.ps1's Test-AuditPath). No
+    # lane ever claims such a task, so one in Doing is held by an interactive session, not
+    # orphaned by a lane (BL-2069; shift start leaves it alone), and no lane waits for it to
+    # finish (AF-0435: lane 1 waited 64 minutes on BL-3465, and BL-3472, touching .claude,
+    # refused two shift starts as held by no lane).
+    $text = Get-Content -Raw -LiteralPath $Path
+    if ($text -match '(?m)^lane: no\s*$') { return $true }
+    if ($text -notmatch '(?m)^touches:\s*\[(.*)\]\s*$') { return $false }
+    $touches = @($Matches[1] -split ',' | ForEach-Object { $_.Trim().Trim('"', "'").Replace([string][char]92, '/').TrimEnd('/') } | Where-Object { $_ })
+    $isAuditPath = Get-AuditPathTest
+    return [bool](@($touches | Where-Object { & $isAuditPath $_ }).Count)
+}
+
+function Get-DoingTasks {
+    # The tasks in Doing, split by who can hold them: Lane the lane-eligible ones, which a lane
+    # of a shift may be running and whose end can make more work ready this shift; Interactive
+    # the interactive-only ones (Test-InteractiveOnlyTask), which only an interactive session
+    # holds and finishes, in its own time (AF-0435).
+    $lane = @(); $interactive = @()
+    foreach ($file in @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Sort-Object Name)) {
+        $id = Get-TaskIdFromFileName $file.Name
+        if (Test-InteractiveOnlyTask $file.FullName) { $interactive += $id } else { $lane += $id }
+    }
+    return [pscustomobject]@{ Lane = $lane; Interactive = $interactive }
+}
+
+function Get-NothingReadyEndNotice {
+    # The trace line a lane writes when it ends because nothing is ready and nothing in Doing
+    # is a lane's: the interactive-only work that is left (-InteractiveDoing, the Doing tasks
+    # an interactive session holds; -HoldNote, Get-InteractiveHoldNote's sentence on Backlog),
+    # so an interactive session knows to take it, or '' when there is none to name.
+    param([string[]]$InteractiveDoing = @(), [string]$HoldNote = '')
+    $parts = @()
+    if ($InteractiveDoing.Count) { $parts += "in Doing with an interactive session: $($InteractiveDoing -join ', ')" }
+    if ($HoldNote) { $parts += "Backlog is $HoldNote" }
+    if (-not $parts.Count) { return '' }
+    return "nothing a lane can claim; ending the lane rather than waiting on interactive work ($($parts -join '; ')). An interactive session takes these; a -Continuous shift polls the board and starts the next shift once a task is claimable"
+}
 
 function Get-DuplicateIdSince {
     # The commit to hand `dedupe -Since` so that the first of the live tasks sharing <Id> to
@@ -254,9 +308,10 @@ function Complete-ClaimSplit {
 
 function Invoke-Claim {
     # Returns @{ Id = 'BL-###' } on success, or @{ Wait = $true } when every ready task
-    # overlaps work in progress (or nothing is ready but other lanes may unlock more, or the
-    # only ready tasks are unready for a lane), or @{ None = $true } when the board has
-    # nothing left for this shift.
+    # overlaps work in progress (or nothing is ready but a lane-eligible task in Doing may
+    # unlock more, or the only ready tasks are unready for a lane), or @{ None = $true } when
+    # the board has nothing left for this shift's lanes - also when the only work left is
+    # interactive only, in Backlog or in Doing (AF-0435); Why then names it.
     param([string[]]$Skip, [switch]$CiFixOnly)
     $splitDue = @()
     $lock = Enter-Lock
@@ -310,7 +365,13 @@ function Invoke-Claim {
                 }
             } while ($overCap -or $unreadyWhy)
             if (-not $id) {
-                if ($next -match 'can start yet' -or (Get-DoingCount) -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
+                # Nothing is ready: wait only while a lane-eligible task is in Doing, since its
+                # end may make more ready. An interactive-only one in Doing is a session's, which
+                # may hold it for hours: lane 1 waited 64 minutes on BL-3465 (AF-0435). The lane
+                # ends instead, and a -Continuous shift's idle poll starts the next shift once
+                # anything is claimable (BL-3092), so no later task is left without a shift.
+                $doing = Get-DoingTasks
+                if ($next -match 'can start yet' -or $doing.Lane.Count -gt 0) { return @{ Wait = $true; Why = (Get-Short (Get-WaitReason $next) 80) } }
                 # Ready tasks this lane already ran this shift (its -Skip) are not claimable by
                 # it, but they are not unready: end the lane so a fresh shift, whose lanes have
                 # run nothing yet, claims them. Waiting held lane 1 four hours on 2026-10-21
@@ -322,7 +383,9 @@ function Invoke-Claim {
                 # Only unready tasks are ready: wait rather than end the lane, or -Continuous
                 # would start shift after shift that each pass them over.
                 if ($unready.Count) { return @{ Wait = $true; Why = (Get-Short "only unready tasks are ready ($($unready -join ', ')); see unready.txt" 80) } }
-                return @{ None = $true }
+                $notice = Get-NothingReadyEndNotice -InteractiveDoing $doing.Interactive -HoldNote (Get-InteractiveHoldNote (Join-Path $Root 'Tasks\Backlog'))
+                if ($notice) { Write-Trace '-' 'idle' $notice 'Yellow' }
+                return @{ None = $true; Why = $notice }
             }
             # With the usage stop on, only a CI fix is claimed (AF-0308); any other task waits.
             if ($CiFixOnly -and -not (Test-CiFixTitle (Get-TaskTitle $id))) { return @{ None = $true } }
@@ -589,17 +652,47 @@ if ($TestTaskReadiness) {
         git -C $repo commit -q -m 'BL-003 finished' 2>&1 | Out-Null
         git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
         $second = Invoke-Claim -Skip @()
+        # AF-0435: only interactive-only work is left - BL-005 (lane: no) in Backlog, BL-006
+        # (lane: no) and BL-007 (touching a guard file) in Doing with an interactive session.
+        $unreadyState = Get-TaskState 'BL-001'
+        git -C $repo rm -q 'Tasks/Backlog/BL-001-anything.md' 2>&1 | Out-Null
+        Set-Content -Path (Join-Path $repo 'Tasks\Backlog\BL-005-interactive.md') -Encoding UTF8 -Value (((& $taskText 'Fix the factory' '[DarkFactory/A.ps1]') -replace 'BL-001', 'BL-005') -replace '(?m)^(touches: .*)$', "`$1`nlane: no")
+        Set-Content -Path (Join-Path $repo 'Tasks\Doing\BL-006-session.md') -Encoding UTF8 -Value (((& $taskText 'Fix the factory too' '[DarkFactory/B.ps1]') -replace 'BL-001', 'BL-006') -replace '(?m)^(touches: .*)$', "`$1`nlane: no")
+        Set-Content -Path (Join-Path $repo 'Tasks\Doing\BL-007-guard.md') -Encoding UTF8 -Value ((& $taskText 'Change a guard file' '[.claude/settings.json]') -replace 'BL-001', 'BL-007')
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m 'only interactive work left' 2>&1 | Out-Null
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $interactiveOnly = Invoke-Claim -Skip @()
+        # A lane-eligible task in Doing beside them may still make more ready: the lane waits.
+        Set-Content -Path (Join-Path $repo 'Tasks\Doing\BL-008-lane.md') -Encoding UTF8 -Value ((& $taskText 'Change a lane file' '[Curl.Cli.UnitLibrary/Qux.cs]') -replace 'BL-001', 'BL-008')
+        git -C $repo add -A 2>&1 | Out-Null
+        git -C $repo commit -q -m 'a lane runs BL-008' 2>&1 | Out-Null
+        git -C $repo push -q origin HEAD:work 2>&1 | Out-Null
+        $laneRunning = Invoke-Claim -Skip @()
         $traced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match 'BL-001 unready' })
+        $idleTraced = @(Get-Content $TraceFile -ErrorAction SilentlyContinue | Where-Object { $_ -match ' idle +nothing a lane can claim' })
         $cases = @(
             ,@('a claim passes over an unready task held back by Doing and takes the next', 'BL-002', "$($first.Id)")
             ,@('with only tasks this lane ran left besides the unready one, the lane ends', 'none', $(if ($ranAlready.Wait) { 'wait' } elseif ($ranAlready.None) { 'none' } else { "claimed $($ranAlready.Id)" }))
             ,@('the end says which task this lane already ran', 'True', "$($ranAlready.Why -match 'already ran this shift \(BL-003\)')")
             ,@('a fresh claim takes the task behind the unready one', 'BL-003', "$($third.Id)")
-            ,@('the unready task stays in Backlog', 'Backlog', (Get-TaskState 'BL-001'))
+            ,@('the unready task stays in Backlog', 'Backlog', $unreadyState)
             ,@('with only unready tasks ready the lane waits, not ends', 'wait', $(if ($second.Wait) { 'wait' } elseif ($second.None) { 'none' } else { "claimed $($second.Id)" }))
             ,@('the wait says why', 'True', "$($second.Why -match 'only unready tasks are ready \(BL-001\)')")
             ,@('the unready task is traced once a shift, not at every claim', '1', "$($traced.Count)")
             ,@('unready.txt lists it once with its reason', '1 touches', "$(@(Get-ShiftUnready).Count) $(if ((Get-ShiftUnready) -match 'touches are empty') { 'touches' })")
+            ,@('with only interactive-only work left, in Backlog and in Doing, the lane ends rather than waits (AF-0435)', 'none', $(if ($interactiveOnly.Wait) { "wait: $($interactiveOnly.Why)" } elseif ($interactiveOnly.None) { 'none' } else { "claimed $($interactiveOnly.Id)" }))
+            ,@('the end names the interactive tasks in Doing and in Backlog, and is traced once as idle, not wait', 'True True 1', "$($interactiveOnly.Why -match 'in Doing with an interactive session: BL-006, BL-007') $($interactiveOnly.Why -match 'Backlog is interactive only, waiting on Stewart or an interactive session: BL-005') $($idleTraced.Count)")
+            ,@('a lane-eligible task in Doing beside them keeps the lane waiting', 'wait No task is ready.', $(if ($laneRunning.Wait) { "wait $($laneRunning.Why)" } elseif ($laneRunning.None) { 'none' } else { "claimed $($laneRunning.Id)" }))
+            ,@('the end notice is empty when no interactive work is named', "''", "'$(Get-NothingReadyEndNotice)'")
+            ,@('a task is interactive only when it says lane: no or touches an audit path or guard file, and not otherwise', 'lane-no guard-file guard-folder audit-folder', $(
+                $kinds = [ordered]@{ 'lane-no' = @('touches: [x]', 'lane: no'); 'guard-file' = @('touches: [Curl.Cli.UnitLibrary, .claude/settings.json]'); 'guard-folder' = @('touches: [.claude]')
+                    'audit-folder' = @('touches: ["Audit\Tools"]'); 'lane-task' = @('touches: [DarkFactory/Claim.ps1, .claude/hooks/whisper-milestone.ps1]'); 'no-touches' = @() }
+                @(foreach ($kind in $kinds.Keys) {
+                    $path = Join-Path $temp "BL-500-$kind.md"
+                    Set-Content -Path $path -Encoding UTF8 -Value (@('---', 'id: BL-500', 'title: t', 'depends-on: []') + $kinds[$kind] + @('requirement: none', '---'))
+                    if (Test-InteractiveOnlyTask $path) { $kind }
+                }) -join ' '))
         )
         foreach ($case in $cases) {
             if ($case[1] -ceq $case[2]) { Write-Host "PASS $($case[0]): $($case[2])" -ForegroundColor Green }
