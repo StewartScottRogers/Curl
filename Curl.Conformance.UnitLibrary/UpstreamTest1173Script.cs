@@ -251,13 +251,13 @@ internal static class UpstreamTest1173Script
             {
                 SeeAlso(state, text, line);
             }
-            else if (state.InExample)
-            {
-                Output.Append(ExampleLine(state, text, line));
-            }
             else if (state.InSynopsis)
             {
                 Output.Append(SynopsisLine(state, text, line));
+            }
+            else if (state.InExample)
+            {
+                Output.Append(ExampleLine(state, text, line));
             }
         }
 
