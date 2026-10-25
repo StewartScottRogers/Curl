@@ -42,6 +42,8 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'archive  
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the reproduction: it printed only task-board.ps1:125 ([int] $OlderThanDays = 7) and task-board.ps1:810 (AddDays(-$OlderThanDays)). The old help text 'archive  Move finished tasks into' no longer matches, because line 53 now reads 'archive  Move finished tasks completed -OlderThanDays (default 7) or more days ago into Done\<yyyy-MM-dd>\' and lines 55-57 add that a plain archive leaves the last week's Done tasks and that -OlderThanDays 0 moves them all.
+
 ## Log
 
 - 2026-10-24: filed proposed.

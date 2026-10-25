@@ -3,8 +3,8 @@ id: AF-0435
 title: Lanes idled 85 minutes (39.5% of lane time) because every ready Backlog task was interactive only
 auditor: process
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_0941.md: the reproduction no longer reproduces.
 key: process:logs:interactive-only-backlog:empty-queue
 reproduction: none
 task: BL-3500
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: reliable-reaudit
+closed-by: 2026-10-25_0941.md
 ---
 # AF-0435 - Lanes idled 85 minutes (39.5% of lane time) because every ready Backlog task was interactive only
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the reproduction over this window. Measure-FactoryProcess.ps1 gives waitNothingReadyMinutes 10 of laneMinutes 295.63 (3.4%), waitOverlapMinutes 0, laneIdleMinutes 10. The empty-queue rule is not crossed in a window with 33 tasks Done. The Select-String over DarkFactory-20261024-185147-L*.log counts 0, because those logs are not in this window's copy. The same cause still occurs at small scale: 'Backlog is interactive only' waits in DarkFactory-20261025-021056-L1/L2/L3 (03:18-03:22) and 074620-L2 (07:51). The later shifts 081939 and 093314 end the lane instead of waiting ('ending the lane rather than waiting on interactive work').
+
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_0941.md: the reproduction no longer reproduces.
