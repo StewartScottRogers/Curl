@@ -35,3 +35,4 @@ The function's header comment ("up to three tries when the push races a lane") a
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 8f0da363 d9e2efc5 49318181.
