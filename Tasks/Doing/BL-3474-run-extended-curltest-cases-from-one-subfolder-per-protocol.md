@@ -52,3 +52,4 @@ Number blocks, so parallel tasks never collide (decided by Claude under Stewart'
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: b6539a77 a716d186 0bbd949c d625f67a e81fd22c 8939ec04.
