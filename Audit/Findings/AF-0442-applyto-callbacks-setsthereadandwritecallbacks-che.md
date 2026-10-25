@@ -3,12 +3,12 @@ id: AF-0442
 title: ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks checks only that both callbacks are not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs:ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3519
+tasks: BL-3519
 found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs -Pattern 'Ap
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

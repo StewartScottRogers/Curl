@@ -3,12 +3,12 @@ id: AF-0443
 title: SendsTheHttpsRecordQuery counts three DoH connections but never checks that an HTTPS-record query was sent
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.cs:ConnectAsync_ToAnHttpsOriginThroughAShuffledDohResolver_SendsTheHttpsRecordQuery:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3520
+tasks: BL-3520
 found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

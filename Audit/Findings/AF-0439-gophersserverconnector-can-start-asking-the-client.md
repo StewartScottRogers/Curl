@@ -3,12 +3,12 @@ id: AF-0439
 title: GophersServerConnector can start asking the client for a certificate with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Conformance.UnitLibrary/GophersServerConnector.cs:options-false:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/GophersServerConnector.cs:22:false
-task: none
-tasks:
+task: BL-3517
+tasks: BL-3517
 found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

@@ -3,8 +3,8 @@ id: AF-0440
 title: UpstreamCase_RunThroughCurl_HoldsTheRatchet fails unmutated in the fast tests
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: rejected
+reason: Stewart rejected it on 2026-10-25: the ratchet fails only in the planted tree, from planted defect PD-303 (the --path-as-is row removed from CommandLineOptionTable.cs, run 20261025-094104's manifest), as for AF-0426.
 key: quality:Curl.Conformance.UnitTests/UpstreamConformanceTests.cs:UpstreamCase_RunThroughCurl_HoldsTheRatchet:baseline-failure
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Conformance.UnitTests --filter "TestCategory!=Integration&Name~
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> rejected.
