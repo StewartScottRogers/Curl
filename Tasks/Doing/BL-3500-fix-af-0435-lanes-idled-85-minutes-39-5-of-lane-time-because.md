@@ -60,3 +60,4 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-25: Doing -> Backlog. Fix c084d3887 landed 2026-10-25 08:10 Arizona (ADR-0813); waiting for a shift's live logs to measure waitNothingReadyMinutes after it (ADR-0761).
+- 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix c084d3887 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
