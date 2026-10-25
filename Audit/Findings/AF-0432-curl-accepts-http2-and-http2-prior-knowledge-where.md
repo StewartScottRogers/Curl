@@ -3,8 +3,8 @@ id: AF-0432
 title: Curl accepts --http2 and --http2-prior-knowledge where the Schannel reference curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: rejected
+reason: Stewart rejected it on 2026-10-25: --http2 on Windows is decided by ADR-0786 (keep HTTP/2 on), as for AF-0381 and AF-0423.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.HttpVersionRows.cs:--http2:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -nologo -v q; & Curl.Console/bin/Release/ne
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> rejected.

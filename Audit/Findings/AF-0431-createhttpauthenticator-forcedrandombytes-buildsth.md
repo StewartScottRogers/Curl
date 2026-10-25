@@ -3,12 +3,12 @@ id: AF-0431
 title: CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator never checks the forced random bytes are used
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTests.cs:CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3497
+tasks: BL-3497
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTest
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.

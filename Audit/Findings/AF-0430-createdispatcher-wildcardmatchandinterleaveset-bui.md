@@ -3,12 +3,12 @@ id: AF-0430
 title: CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher checks only that a dispatcher is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.Wildcard.cs:CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3496
+tasks: BL-3496
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.Wildcard.cs -
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.

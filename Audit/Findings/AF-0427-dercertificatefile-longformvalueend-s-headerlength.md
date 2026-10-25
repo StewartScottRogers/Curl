@@ -3,12 +3,12 @@ id: AF-0427
 title: DerCertificateFile.LongFormValueEnd's headerLength > contents.Length can become >= with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Networking.UnitLibrary/DerCertificateFile.cs:LongFormValueEnd-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/DerCertificateFile.cs:109:>
-task: none
-tasks:
+task: BL-3493
+tasks: BL-3493
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.

@@ -32,7 +32,14 @@
                   quality:<file>:<member>-<operator word>:surviving-mutant, the member read from
                   -Tree at that line, with "reproduction: mutation <file>:<line>:<operator>" and
                   the targeted -Site command as its reproduction (ADR-0422).
-      duplicate   Before anything else, open findings that share a key are one finding: all but
+      clean new   A finding that would be filed new and has a mutation reproduction first gets the
+                  runner's targeted rerun on the clean audited -Commit (-RerunReproductions). If
+                  the mutant is killed there, it survived only in the planted tree - a plant's
+                  effect, wherever the finding's location is - so it is set aside: listed in
+                  set-aside.json with the reason (and the overlapping plant, if one is found) and
+                  no AF-#### is written (BL-3502). Survived, unverified or no mutation
+                  reproduction: filed as before.
+      duplicate  Before anything else, open findings that share a key are one finding: all but
                   the lowest ID are closed with closed-how duplicate and duplicate-of, and their
                   tasks join the original's tasks list.
       historical  Next, before any report is read, an accepted finding whose key ends in
@@ -312,7 +319,7 @@ function Invoke-MechanicalReproduction($Target) {
     # rerun in reruns\outcomes.txt.
     $site = Get-MutationSite $Target.Reproduction
     if (-not $site) { return 'none' }
-    if ($MechanicalOutcomes.ContainsKey($Target.Id)) { return $MechanicalOutcomes[$Target.Id] }
+    foreach ($stub in @($Target.Id, $Target.Key)) { if ($stub -and $MechanicalOutcomes.ContainsKey($stub)) { return $MechanicalOutcomes[$stub] } }
     if (-not $RerunReproductions) { return 'unverified' }
     $member = if ($Target.Key -match ':([A-Za-z0-9_]+)-[a-z0-9]+:surviving-mutant$') { $Matches[1] } else { '' }
     $reruns = Join-Path $ReportDirectory 'reruns'
@@ -567,6 +574,7 @@ function Invoke-WriteFindings {
     $counts = @{ new = 0; open = 0; closed = 0; catches = 0; setAside = 0 }
     $catches = @()
     $setAside = @()
+    $newCount = 0
     $counts.closed += Close-Duplicates $existing
     $counts.closed += Close-HistoricalFindings $existing
 
@@ -586,7 +594,7 @@ function Invoke-WriteFindings {
             }
             $inPlantedFile = Get-PlantInFindingFile $f $auditor $planted
             if ($inPlantedFile) {
-                $setAside += [ordered]@{ auditor = $auditor; planted = $inPlantedFile.id; key = "$($f.key)"; title = "$($f.title)" }
+                $setAside += [ordered]@{ auditor = $auditor; planted = $inPlantedFile.id; key = "$($f.key)"; title = "$($f.title)"; reason = "its location is $($inPlantedFile.id)'s planted file $($inPlantedFile.file)" }
                 $counts.setAside++
                 continue
             }
@@ -598,6 +606,19 @@ function Invoke-WriteFindings {
                 if ($plant) { Add-SetAsideLine $live $plant 'yes' 'still reported' }
                 else { Add-ReauditLine $live.Path "- $Date | $Scorecard | reproduces: yes | still reported" }
                 if ($live.Status -ne 'rejected') { $counts.open++ }
+                continue
+            }
+            # A new finding with a mechanical reproduction is rerun on the clean audited commit first:
+            # the auditor found it in the planted tree, so a mutant the clean commit kills is a plant's
+            # effect, wherever the finding's location is (BL-3502: AF-0426 was PD-303 seen from
+            # another file). Survived, unverified or no mechanical reproduction: filed as before.
+            $newCount++
+            $candidate = [pscustomobject]@{ Id = "new-$auditor-$newCount"; Key = $filed.Key; Reproduction = $filed.Reproduction; Location = "$($f.location)" }
+            if ((Invoke-MechanicalReproduction $candidate) -eq 'killed') {
+                $plant = Get-OverlappingPlant $candidate "$($f.evidence)" $planted $true
+                $site = Get-MutationSite $filed.Reproduction
+                $setAside += [ordered]@{ auditor = $auditor; planted = $(if ($plant) { $plant.id } else { $null }); key = $filed.Key; title = "$($f.title)"; reason = "its mutant $($site.File):$($site.Line):$($site.Operator) is killed on the clean audited commit $Commit, so it survived only in the planted tree" }
+                $counts.setAside++
                 continue
             }
             $closedBefore = @($same | Where-Object { $_.Status -eq 'closed' })[0]
@@ -718,7 +739,8 @@ if ($SelfTest) {
         Check 'a process report naming a planted log defect''s catch text is a catch, whatever file it cites' ((Test-Catch $report1 'process' @($plant1)) -and (Test-Catch $report2 'process' @($plant2)) -and -not (Test-Catch $other 'process' @($plant1)) -and -not (Test-Catch $report1 'security' @($plant1))) 'both PD-501 reports; not another task, not another auditor'
         $setAsideJson = @((Get-Content -LiteralPath (Join-Path $ReportDirectory 'set-aside.json') -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
         $allFindingText = (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
-        Check 'another auditor''s new finding in a planted file is set aside, listed, and files no AF' ($setAsideJson.Count -eq 1 -and $setAsideJson[0].auditor -eq 'quality' -and $setAsideJson[0].planted -eq 'PD-101' -and $setAsideJson[0].title -eq 'Verify compares before checking lengths' -and $allFindingText -notmatch 'Verify compares before checking lengths') "set aside $($setAsideJson.Count)"
+        Check 'another auditor''s new finding in a planted file is set aside, listed, and files no AF' ($setAsideJson.Count -eq 1 -and $setAsideJson[0].auditor -eq 'quality' -and $setAsideJson[0].planted -eq 'PD-101' -and $setAsideJson[0].title -eq 'Verify compares before checking lengths' -and $setAsideJson[0].reason -like 'its location is PD-101''s planted file *' -and $allFindingText -notmatch 'Verify compares before checking lengths') "set aside $($setAsideJson.Count)"
+        Check 'a new finding with no mechanical reproduction is filed without a rerun' ($af7 -match '(?m)^reproduction: none\r?$' -and -not (Test-Path -LiteralPath (Join-Path $ReportDirectory 'reruns'))) 'AF-0007'
         Check 'a new finding in another file of the planted file''s project is still filed' ($allFindingText -match 'Read slices before its length check' -and (Text 'AF-0010') -match 'Read slices before its length check') 'AF-0010'
         Check 'summary line' ($line -eq 'findings: new 4, still open 1, closed 1, catches 2, set aside 1') $line
 
@@ -729,7 +751,10 @@ if ($SelfTest) {
         Copy-Item -LiteralPath (Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md') -Destination $FindingsDirectory
         $ReportDirectory = Join-Path $closure 'reports'; $Manifest = Join-Path $closure 'manifest.json'; $Tree = Join-Path $closure 'tree'
         $Unreliable = @('quality')
-        $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived'; 'AF-0020' = 'killed'; 'AF-0021' = 'survived'; 'AF-0023' = 'unverified' }
+        # New findings are stubbed by their mechanical key: the C.cs mutant survives on the clean
+        # commit (filed as AF-0024), the D.cs one is killed there (set aside, BL-3502).
+        $script:MechanicalOutcomes = @{ 'AF-0010' = 'killed'; 'AF-0011' = 'survived'; 'AF-0020' = 'killed'; 'AF-0021' = 'survived'; 'AF-0023' = 'unverified'
+            'quality:Curl.Net.UnitLibrary/C.cs:Check-eq:surviving-mutant' = 'survived'; 'quality:Curl.Net.UnitLibrary/D.cs:Flag-true:surviving-mutant' = 'killed' }
         $line2 = Invoke-WriteFindings
         # LF throughout, whatever line endings the checkout gave the fixture.
         function Lf([string]$Prefix) { (Text $Prefix) -replace "`r`n", "`n" }
@@ -753,7 +778,11 @@ if ($SelfTest) {
         Check 'a re-audit whose evidence cites a planted file is set aside' ($c18 -match 'overlaps planted defect PD-104' -and $c18 -match '(?m)^status: accepted\r?$') 'AF-0018'
         Check 'a set-aside line is neither yes nor no' (@(Get-ReauditLines $c22).Count -eq 1) "$(@(Get-ReauditLines $c22).Count) parsed"
         Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
-        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0, set aside 0') $line2
+        $closureSetAside = @((Get-Content -LiteralPath (Join-Path $ReportDirectory 'set-aside.json') -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
+        $closureText = (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
+        Check 'a new mutant the clean commit kills is set aside with its reason and files no AF' ($closureSetAside.Count -eq 1 -and $closureSetAside[0].key -eq 'quality:Curl.Net.UnitLibrary/D.cs:Flag-true:surviving-mutant' -and $closureSetAside[0].planted -eq 'PD-103' -and $closureSetAside[0].reason -eq 'its mutant Curl.Net.UnitLibrary/D.cs:3:true is killed on the clean audited commit abc1234, so it survived only in the planted tree' -and $closureText -notmatch 'Flag can stay true' -and -not (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-0025-*.md')) "set aside $($closureSetAside.Count)"
+        Check 'a new mutant that survives on the clean commit is filed' ($c16 -match '(?m)^title: a == 0 can become a != 0\r?$' -and $c16 -match '(?m)^status: proposed\r?$') 'AF-0024'
+        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0, set aside 1') $line2
 
         # ADR-0422, amended 2026-10-14: a finding about a past run's cost closes once its tasks are Done.
         $historical = Join-Path $work 'historical'
