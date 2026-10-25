@@ -35,6 +35,23 @@ public sealed class StreamConnectionShutDownSendingTests
     }
 
     [TestMethod]
+    public async Task ShutDownSendingAsync_OverASocketWithNothingUnread_ReturnsWhileThePeerKeepsTheConnectionOpen()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        using var client = new System.Net.Sockets.TcpClient();
+        await client.ConnectAsync((IPEndPoint)listener.LocalEndpoint);
+        using System.Net.Sockets.TcpClient peer = await listener.AcceptTcpClientAsync();
+        await using var connection = new StreamConnection(client.GetStream(), remoteEndPoint: null);
+
+        Task shutDown = Task.Run(() => connection.ShutDownSendingAsync(CancellationToken.None).AsTask());
+        Task finished = await Task.WhenAny(shutDown, Task.Delay(TimeSpan.FromSeconds(2)));
+        peer.Dispose();
+
+        Assert.AreSame(shutDown, finished, "ShutDownSendingAsync blocked reading a socket with nothing waiting.");
+    }
+
+    [TestMethod]
     public async Task TcpIoTraceConnection_ShutDownSendingAsync_PassesThroughToTheInnerConnection()
     {
         var inner = new ShutDownCountingConnection();
