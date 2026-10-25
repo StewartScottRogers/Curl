@@ -33,3 +33,4 @@ Audit 2026-10-24_2106 (run `Z:\repos\Curl.audit\20261024-210628`) filed AF-0426:
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 953f1029 ad265e9d 7d9b3c97 68e59f8c.
