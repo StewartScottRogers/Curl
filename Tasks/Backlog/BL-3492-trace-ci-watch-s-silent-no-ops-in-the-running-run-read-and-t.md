@@ -1,5 +1,5 @@
 ---
-id: BL-3475
+id: BL-3492
 title: Trace CI watch's silent no-ops in the running-run read and the cancel step
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-24
 completed:
 ---
-# BL-3475 — Trace CI watch's silent no-ops in the running-run read and the cancel step
+# BL-3492 — Trace CI watch's silent no-ops in the running-run read and the cancel step
 
 ## Goal
 

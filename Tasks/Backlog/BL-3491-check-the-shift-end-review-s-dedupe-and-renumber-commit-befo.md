@@ -1,5 +1,5 @@
 ---
-id: BL-3474
+id: BL-3491
 title: Check the shift-end review's dedupe and renumber commit before pushing
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-24
 completed:
 ---
-# BL-3474 — Check the shift-end review's dedupe and renumber commit before pushing
+# BL-3491 — Check the shift-end review's dedupe and renumber commit before pushing
 
 ## Goal
 
