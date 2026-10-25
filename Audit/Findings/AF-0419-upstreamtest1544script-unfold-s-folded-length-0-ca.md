@@ -3,8 +3,8 @@ id: AF-0419
 title: UpstreamTest1544Script.Unfold's folded.Length > 0 can become >= 0 with no test failing, so every unfolded line gains a leading space
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs:Unfold-gt:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs:124:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
