@@ -40,3 +40,4 @@ The second line is also false in this case: it says the logs were read and held 
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 89d58156 bd8a5b5c f8aef7c9.
