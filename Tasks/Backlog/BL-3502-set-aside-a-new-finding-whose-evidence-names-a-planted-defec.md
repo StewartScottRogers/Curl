@@ -23,9 +23,9 @@ Audit 2026-10-24_2106 (run `Z:\repos\Curl.audit\20261024-210628`) filed AF-0426:
 
 ## Acceptance criteria
 
-- [ ] A new finding whose mechanical reproduction does not reproduce on the clean audited commit is set aside with the reason in `set-aside.json`, and no `AF-*.md` is written for it.
-- [ ] A new finding that reproduces on the clean commit, or that has no mechanical reproduction, is filed as before.
-- [ ] The script's self-test covers both cases and passes.
+- [x] A new finding whose mechanical reproduction does not reproduce on the clean audited commit is set aside with the reason in `set-aside.json`, and no `AF-*.md` is written for it.
+- [x] A new finding that reproduces on the clean commit, or that has no mechanical reproduction, is filed as before.
+- [x] The script's self-test covers both cases and passes.
 - [ ] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
 
 ## Notes
@@ -34,3 +34,4 @@ Audit 2026-10-24_2106 (run `Z:\repos\Curl.audit\20261024-210628`) filed AF-0426:
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 953f1029 ad265e9d 7d9b3c97 68e59f8c.
+- 2026-10-25: Doing -> Backlog. Change pushed to audit as a1f2710d5 (self-test 50/50); waits for PR #230 to merge on green CI, then reclaimed to finish. Failing-test findings like AF-0426 itself filed as BL-3503
