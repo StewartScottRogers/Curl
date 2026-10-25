@@ -121,16 +121,33 @@ function Invoke-ReviewDedupe {
     # lanes then claimed the one ID (AF-0386, BL-3363). Once its commits sit on the fresh
     # branch, every task the branch already had keeps its ID and the review's take the next
     # free ones; the renumbering is committed for the push that follows.
+    # Returns '' when the IDs are settled (nothing to renumber, or the renumbering committed),
+    # or why they are not: the caller must not push then (BL-3491).
     param([string]$Dir, [string]$Branch)
     $saved = $env:CLAUDE_PROJECT_DIR
     try {
         $env:CLAUDE_PROJECT_DIR = $Dir
-        $renumbered = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $Board dedupe -Since "origin/$Branch" 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -match '->' })
+        $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $Board dedupe -Since "origin/$Branch" 2>&1 | ForEach-Object { "$_" })
+        $dedupeExit = $LASTEXITCODE
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
-    if (-not $renumbered.Count) { return }
-    git -C $Dir add -A Tasks 2>&1 | Out-Null
-    git -C $Dir commit -q -m "chore(tasks): renumber the shift-end review's task IDs other tasks took first`n`n$($renumbered -join "`n")" -m $SkipCiNote 2>&1 | Out-Null
+    if ($dedupeExit -ne 0) {
+        Write-Trace '-' 'renum' "review: task-board dedupe failed (exit $dedupeExit): $(($output | Select-Object -First 5) -join ' | ')" 'Red'
+        return 'its task IDs could not be checked against the branch (task-board dedupe failed)'
+    }
+    $renumbered = @($output | Where-Object { $_ -match '->' })
+    if (-not $renumbered.Count) { return '' }
+    $added = git -C $Dir add -A Tasks 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Trace '-' 'renum' "review: git add of the renumbered tasks failed: $("$added".Trim())" 'Red'
+        return 'its renumbered task IDs could not be staged (git add failed)'
+    }
+    $committed = git -C $Dir commit -q -m "chore(tasks): renumber the shift-end review's task IDs other tasks took first`n`n$($renumbered -join "`n")" -m $SkipCiNote 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Trace '-' 'renum' "review: git commit of the renumbered tasks failed: $("$committed".Trim())" 'Red'
+        return 'its renumbered task IDs could not be committed (git commit failed)'
+    }
     foreach ($line in $renumbered) { Write-Trace '-' 'renum' "review: $($line -replace '\s{2,}.*$', '')" 'DarkYellow' }
+    return ''
 }
 
 function Push-ReviewCommitsUnderLock {
@@ -147,7 +164,8 @@ function Push-ReviewCommitsUnderLock {
             if ($LASTEXITCODE -ne 0) { continue }
             git -C $Dir rebase -q "origin/$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { git -C $Dir rebase --abort 2>&1 | Out-Null; return 'its commit would not rebase onto the branch' }
-            Invoke-ReviewDedupe -Dir $Dir -Branch $Branch
+            $unsettled = Invoke-ReviewDedupe -Dir $Dir -Branch $Branch
+            if ($unsettled) { return $unsettled }
             git -C $Dir push -q origin "HEAD:$Branch" 2>&1 | Out-Null
             if ($LASTEXITCODE -eq 0) { return '' }
         }

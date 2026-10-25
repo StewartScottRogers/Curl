@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [DarkFactory/ShiftEnd.ps1]
+touches: [DarkFactory/ShiftEnd.ps1, DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-24
 completed:
@@ -27,12 +27,14 @@ The shift-end review of 2026-10-24 (silent-failure-hunter, diff `808c067b4...315
 
 ## Acceptance criteria
 
-- [ ] `Invoke-ReviewDedupe` checks the exit code of the dedupe run, and traces its output when it fails.
-- [ ] `Invoke-ReviewDedupe` checks the exit code of `git add` and `git commit`, and writes the `renum` trace lines only after the commit succeeds.
-- [ ] When the dedupe or the commit fails, `Push-ReviewCommitsUnderLock` does not push, and returns a non-empty reason saying why.
-- [ ] A `-Test...` self-test case in the dark factory's existing test entry point (or an equivalent script test) covers a dedupe that fails and a commit that fails.
+- [x] `Invoke-ReviewDedupe` checks the exit code of the dedupe run, and traces its output when it fails.
+- [x] `Invoke-ReviewDedupe` checks the exit code of `git add` and `git commit`, and writes the `renum` trace lines only after the commit succeeds.
+- [x] When the dedupe or the commit fails, `Push-ReviewCommitsUnderLock` does not push, and returns a non-empty reason saying why.
+- [x] A `-Test...` self-test case in the dark factory's existing test entry point (or an equivalent script test) covers a dedupe that fails and a commit that fails.
 
 ## Notes
+
+- Added DarkFactory/Claim.ps1 to touches: the review-push self-test (-TestClaim) lives there; no other Doing task names it. Invoke-ReviewDedupe now returns a reason, which Push-ReviewCommitsUnderLock returns without pushing. Self-test case added to -TestClaim (stub board exiting 1; pre-commit hook failing). Platform-neutral: no paths or OS text pinned.
 
 ## Log
 
