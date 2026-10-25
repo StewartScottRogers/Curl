@@ -3,8 +3,8 @@ id: AF-0417
 title: CreateDispatcher_NoTimeout_BuildsTheProductionHandlers checks only that a dispatcher is not null, not which handlers it holds
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/ManagedCurlEngineTests.cs:CreateDispatcher_NoTimeout_BuildsTheProductionHandlers:weak-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/ManagedCurlEngineTests.cs -Pattern 'Cr
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
