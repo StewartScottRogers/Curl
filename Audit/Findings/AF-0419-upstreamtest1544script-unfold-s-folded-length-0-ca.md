@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_2106.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. Unfold was rewritten: it now always does line = folded + " " + line (UpstreamTest1544Script.cs:125, with a comment citing AF-0419) and has no '>' comparison left to mutate, so the mutant cannot be run. Not re-audited.
+
 ## Log
 
 - 2026-10-24: filed proposed.

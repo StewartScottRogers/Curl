@@ -42,6 +42,8 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_2106.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. SwsHttpServerConnection.Send now marks a close by queuing an empty SwsServerSend([], serverBusyUntil) (line 445) and passes no 'true' argument, so the mutant cannot be run. Not re-audited.
+
 ## Log
 
 - 2026-10-24: filed proposed.
