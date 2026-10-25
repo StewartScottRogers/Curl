@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitLibrary]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3516 — Fix AF-0438: UpstreamTest1173Script.Section's InSynopsis = false on an EXAMPLE heading can become true with no test failing
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Cause: Body tested InExample before InSynopsis, and the example heading sets InExample, so the heading's `InSynopsis = false` could never be seen (an equivalent mutant). Body now tests InSynopsis first; the two flags are never both true in the original, so behaviour is unchanged. New test Scan_ExampleFollowsSynopsis_ChecksExampleLinesNotSynopsisLines fails when line 215 is mutated to true (checked by editing the line by hand and running the test project: it and four other 1173 tests fail).
+- The lane guard refuses the audit mutation tool once the fix is committed; its one run, before the commit, said survived, probably because it measured the tree as committed. The re-audit confirms the finding.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. AF-0438 fixed: Section's example-heading InSynopsis reset is now observable and a test kills its mutant
