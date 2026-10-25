@@ -37,3 +37,4 @@ The shift-end review of 2026-10-24 (silent-failure-hunter, diff `808c067b4...315
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 0a07623b 65af0d05 33cfdc61 d3d0909e.
