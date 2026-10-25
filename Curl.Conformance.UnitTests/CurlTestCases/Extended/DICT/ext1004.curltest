@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+DICT
+DICT --head
+</keywords>
+</info>
+
+# Measured with real curl 8.22.0 (Record-CurlExchange.ps1) against a loopback server that answers
+# "220 dictserver <xnooptions> <msgid@msgid>" and "552 No matches", as the dict stand-in does.
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<server>
+dict
+</server>
+<features>
+dict
+</features>
+<name>
+DICT with --head prints nothing
+</name>
+<command>
+dict://%HOSTIP:%DICTPORT/d:basic -I
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<stdout>
+</stdout>
+</verify>
+</testcase>
