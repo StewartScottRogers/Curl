@@ -3,12 +3,12 @@ id: AF-0441
 title: QuicDialer_PublicConstructor_CreatesADialer's only assertion is IsNotNull on the result of new, which cannot fail
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Networking.UnitTests/TcpConnectorQuicTests.cs:QuicDialer_PublicConstructor_CreatesADialer:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3518
+tasks: BL-3518
 found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorQuicTests.cs -Pattern 
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

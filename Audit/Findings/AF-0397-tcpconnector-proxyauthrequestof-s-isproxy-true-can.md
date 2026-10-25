@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:ProxyAuthRequestOf-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:1516:true
-task: BL-3444
-tasks: BL-3444
+task: BL-3513
+tasks: BL-3444, BL-3513
 found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md

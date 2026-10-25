@@ -3,12 +3,12 @@ id: AF-0438
 title: UpstreamTest1173Script.Section's InSynopsis = false on an EXAMPLE heading can become true with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Conformance.UnitLibrary/UpstreamTest1173Script.cs:Section-false:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/UpstreamTest1173Script.cs:215:false
-task: none
-tasks:
+task: BL-3516
+tasks: BL-3516
 found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.
