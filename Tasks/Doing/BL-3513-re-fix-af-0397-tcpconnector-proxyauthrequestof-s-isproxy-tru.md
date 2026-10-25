@@ -59,3 +59,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-25: Doing -> Backlog. Needs Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs, which BL-3518 (Doing) holds as the whole Curl.Networking.UnitTests; fix diagnosed in Notes (one real Assert.AreEqual)
+- 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
