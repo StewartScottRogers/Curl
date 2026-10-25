@@ -418,17 +418,21 @@ function Get-CiRunningRun {
     try { $failed = @(($json | ConvertFrom-Json).jobs | Where-Object { $_ -and $_.status -eq 'completed' -and $_.conclusion -eq 'failure' }) }
     catch { Write-CiRunLine -Key $key -Line "cannot parse the jobs of running run $id`: $(Get-Short "$($_.Exception.Message)" 60)"; return $null }
     if (-not $failed.Count) { return $null }
+    $skipCache = $false; $failures = @()
     $cacheKey = "running $id $(@($failed | ForEach-Object { $_.databaseId } | Sort-Object) -join ',')"
     if (-not $script:CiWatch.Failures.ContainsKey($cacheKey)) {
         $lines = @()
+        $unread = $false
         foreach ($job in $failed) {
             $log = & $ReadJobLog "$($job.databaseId)"
-            if ($null -eq $log) { Write-CiRunLine -Key $key -Line "cannot read the log of failed job $($job.databaseId) of running run $id; skipped"; continue }
+            if ($null -eq $log) { $unread = $true; Write-CiRunLine -Key $key -Line "cannot read the log of failed job $($job.databaseId) of running run $id; skipped"; continue }
             $lines += @($log | ForEach-Object { "$($job.name)`tlog`t$(("$_").TrimStart([char]0xFEFF))" })
         }
-        $script:CiWatch.Failures[$cacheKey] = @(Get-CiFailures $lines | Where-Object { $_.Kind -in 'test', 'build' })
+        $read = @(Get-CiFailures $lines | Where-Object { $_.Kind -in 'test', 'build' })
+        # A log that could not be read is tried again on the next heartbeat, so nothing is cached.
+        if ($unread) { $failures = $read; $skipCache = $true } else { $script:CiWatch.Failures[$cacheKey] = $read }
     }
-    $failures = @($script:CiWatch.Failures[$cacheKey])
+    if (-not $skipCache) { $failures = @($script:CiWatch.Failures[$cacheKey]) }
     if (-not $failures.Count) { Write-CiRunLine -Key $key -Line "running run $id has failed jobs but no failing test or build error in their logs"; return $null }
     $finished = @($failed | ForEach-Object { ConvertTo-CiDateTime $_.completedAt } | Sort-Object)[-1]
     return [pscustomobject]@{ Id = $id; Sha = "$($running.headSha)"; FinishedAt = $finished; Failures = $failures }
@@ -1061,6 +1065,11 @@ if ($TestCiWatch) {
     $early = Get-CiRunningRun -Listed $listedRunning -ListJobs { param($Id) $jobsJson } -ReadJobLog $jobLog
     & $check 'a running run with a failed job is read now' "77|abcdef1234|test1173:|Linux|man page broke|$(([datetime]'2026-10-23T22:50:02Z').ToUniversalTime().ToString('HH:mm'))" `
         "$($early.Id)|$($early.Sha)|$(($early.Failures | ForEach-Object { "$($_.Key)|$($_.Platforms -join '+')|$($_.Message)" }) -join ';')|$($early.FinishedAt.ToUniversalTime().ToString('HH:mm'))"
+    $readOnce = { param([string]$Id) $script:flakyReads++; if ($script:flakyReads -eq 1) { return $null }; return , @('2026-10-23T22:48:58.5Z   Failed test1173: Man page syntax checks [40 s]', '2026-10-23T22:48:58.6Z   Error Message:', '2026-10-23T22:48:58.7Z    man page broke') }
+    $script:flakyReads = 0; $listedRetry = @([pscustomobject]@{ databaseId = 78; status = 'in_progress'; conclusion = ''; headSha = 'abcdef1234' })
+    $firstTry = Get-CiRunningRun -Listed $listedRetry -ListJobs { param($Id) $jobsJson } -ReadJobLog $readOnce
+    $secondTry = Get-CiRunningRun -Listed $listedRetry -ListJobs { param($Id) $jobsJson } -ReadJobLog $readOnce
+    & $check 'a failed job log that could not be read is read again, not cached' 'True|test1173:' "$($null -eq $firstTry)|$(@($secondTry.Failures)[0].Key)"
     & $check 'a running run with no failed job is not read' 'True' "$($null -eq (Get-CiRunningRun -Listed $listedRunning -ListJobs { param($Id) '{"jobs":[{"databaseId":9,"name":"x","status":"in_progress","conclusion":""}]}' } -ReadJobLog $jobLog))"
     & $check 'no running run, nothing read' 'True' "$($null -eq (Get-CiRunningRun -Listed @([pscustomobject]@{ databaseId = 1; status = 'completed'; conclusion = 'failure'; headSha = 'x' }) -ListJobs { param($Id) throw 'not called' } -ReadJobLog $jobLog))"
     # BL-3456: a running run without the CI fix a waiting run carries is cancelled, only while CI is red.
