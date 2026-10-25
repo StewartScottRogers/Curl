@@ -2,13 +2,13 @@
 id: AF-0424
 title: task-board.ps1's comment on Test-AuditPath says an ancestor such as .claude is not an audit path; the function treats .claude, .github and .claude/skills as audit paths
 auditor: truthfulness
-severity: High
-status: proposed
-reason:
+severity: Low
+status: accepted
+reason: Stewart accepted it on 2026-10-24, as Low: a wrong comment, not a behaviour defect.
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-3472
+tasks: BL-3472
 found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
@@ -45,3 +45,4 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'An ancest
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.

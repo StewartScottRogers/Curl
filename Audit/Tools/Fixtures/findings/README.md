@@ -12,6 +12,6 @@ Synthetic input for `Write-AuditFindings.ps1 -SelfTest` (BL-1016). Nothing here 
   reports a new finding.
 - `manifest.json`: one planted security defect, PD-101.
 
-Expected: new AF-0007 (quality), AF-0008 (reappeared; previously AF-0004) and AF-0009
+Expected (BL-3465: quality also reports TlsMac.cs, PD-101's file, so that report is set aside, listed in set-aside.json; process also reports TlsRecord.cs, another file, so AF-0010 is filed): new AF-0007 (quality), AF-0008 (reappeared; previously AF-0004) and AF-0009
 (process, flagged unreliable); AF-0001 still deferred with a line before its Log; AF-0003 still rejected with a
 line; AF-0005 open with a line; AF-0006 closed, with a reason and a last Log line; AF-0002 and AF-0004 unchanged; two catches of PD-101.
