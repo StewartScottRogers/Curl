@@ -9,7 +9,7 @@ touches: [Audit/Instructions/Conformance.md]
 lane: no
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3501 — Keep the conformance auditor from refiling platform differences an ADR already decided
 
@@ -25,7 +25,7 @@ The conformance auditor filed `--http2` / `--http2-prior-knowledge` accepted on 
 
 - [x] `Audit/Instructions/Conformance.md` tells the auditor to read `Gap/Baselines/platform-exclusions.json` and not to report a difference it lists for that platform, naming the ADR in its summary instead.
 - [x] The instruction says a difference outside the list is still reported, and that the list changes only by ADR.
-- [ ] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
+- [x] Done on the `audit` branch; its pull request is merged once CI passes on Windows, Linux and macOS.
 
 ## Notes
 
@@ -34,3 +34,5 @@ The conformance auditor filed `--http2` / `--http2-prior-knowledge` accepted on 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 82568fda 65e0fd9f 68e59f8c.
 - 2026-10-25: Doing -> Backlog. Change pushed to audit as 27994f627; waits for PR #230 to merge on green CI, then reclaimed to finish
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 82568fda 65e0fd9f 68e59f8c.
+- 2026-10-25: Doing -> Done. Conformance.md now has the auditor skip differences Gap/Baselines/platform-exclusions.json lists for the platform, naming the ADR in its summary (27994f627; PR #230 merged as d5489de45 after CI passed on Windows, Linux and macOS)
