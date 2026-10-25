@@ -3,8 +3,8 @@ id: AF-0417
 title: CreateDispatcher_NoTimeout_BuildsTheProductionHandlers checks only that a dispatcher is not null, not which handlers it holds
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-24.
+status: closed
+reason: Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces.
 key: quality:Curl.Engine.UnitTests/ManagedCurlEngineTests.cs:CreateDispatcher_NoTimeout_BuildsTheProductionHandlers:weak-assertion
 reproduction: none
 task: BL-3466
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-24
+closed-how: reliable-reaudit
+closed-by: 2026-10-24_2106.md
 ---
 # AF-0417 - CreateDispatcher_NoTimeout_BuildsTheProductionHandlers checks only that a dispatcher is not null, not which handlers it holds
 
@@ -42,7 +42,10 @@ Select-String -Path Curl.Engine.UnitTests/ManagedCurlEngineTests.cs -Pattern 'Cr
 
 ## Re-audits
 
+- 2026-10-24 | 2026-10-24_2106.md | reproduces: no | Ran the Select-String: CreateDispatcher_NoTimeout_BuildsTheProductionHandlers now loops over http, https, ftp, file, dict, tftp, smtp, imap, pop3 and ws asserting Assert.IsTrue(dispatcher.Serves(scheme), scheme), then Assert.IsFalse(dispatcher.Serves("bogus")) (ManagedCurlEngineTests.cs:79-84).
+
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> closed. Re-audit 2026-10-24_2106.md: the reproduction no longer reproduces.
