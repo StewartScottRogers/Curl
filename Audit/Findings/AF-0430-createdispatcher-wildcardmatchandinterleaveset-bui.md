@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.Wildcard.cs -
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the Select-String reproduction: CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher (ManagedEasyTransferTests.Wildcard.cs:147) now asserts Assert.IsTrue(dispatcher.Serves(scheme)) for ftp, ftps and rtsp, and Assert.IsFalse(dispatcher.Serves("bogus")), not just that the dispatcher is not null.
+
 ## Log
 
 - 2026-10-24: filed proposed.
