@@ -3,12 +3,12 @@ id: AF-0444
 title: RunDarkFactory.ps1 help says the board branch is the only one it force-pushes, but the shift-end merge force-pushes factory/merge-<stamp>
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: truthfulness:RunDarkFactory.ps1:board-branch-only-force-push:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-3521
+tasks: BL-3521
 found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
@@ -46,3 +46,4 @@ ShiftEnd.ps1:84
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.
