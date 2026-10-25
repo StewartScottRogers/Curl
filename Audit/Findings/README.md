@@ -120,7 +120,12 @@ The date, the old and new status, and the reason.
 6. A finding reported by an auditor flagged unreliable in that audit is still filed, and
    its Summary says so.
 7. A report that matches a planted defect is a catch, not a finding, and is never filed
-   here; it counts toward the auditor's catch rate on the scorecard.
+   here; it counts toward the auditor's catch rate on the scorecard. A plant's effect seen from
+   elsewhere is set aside, never filed, and listed with its reason in the run's
+   `reports\set-aside.json`: another auditor's report located in the planted file (BL-3465), and
+   a new finding with a mechanical `reproduction` whose mutant the runner's rerun on the clean
+   audited commit kills, wherever it is located (BL-3502). A new finding without a mechanical
+   reproduction, or whose mutant survives or cannot be rerun, is filed.
 8. `closed` findings are never edited again. A `rejected` finding is never edited either,
    except that a report repeating its `key` adds a `Re-audits` line saying it was still
    reported; its status stays `rejected` (Decided by Claude, 2026-09-30, BL-1016).

@@ -2,14 +2,15 @@
 
 Synthetic input for the ADR-0422 checks in `Write-AuditFindings.ps1 -SelfTest`. Nothing here is
 real. The quality auditor is flagged unreliable throughout; the self-test stubs the runner's
-mechanical rerun: AF-0010 and AF-0020 killed, AF-0011 and AF-0021 survived, AF-0023 unverified.
+mechanical rerun: AF-0010 and AF-0020 killed, AF-0011 and AF-0021 survived, AF-0023 unverified;
+for the new mutants, by key, the `C.cs` one survived and the `D.cs` one killed.
 
 - `findings/`: AF-0010 and AF-0011 accepted with a mutation reproduction; AF-0012 accepted in the
   format from before ADR-0422 (no reproduction, tasks, duplicate-of or closed-how), whose last
   re-audit said "reproduces: no"; AF-0013 accepted, its last re-audit "yes"; AF-0014 and AF-0015
   accepted with the same key.
 - `reports/`: quality re-audits AF-0010 to AF-0013 as fixed, reports the AF-0014 mutant in other
-  words and a new mutant in `C.cs`; security re-audits AF-0011 as fixed.
+  words, a new mutant in `C.cs` and a new mutant in `D.cs`; security re-audits AF-0011 as fixed.
   Quality also re-audits AF-0017 as still reproducing and AF-0014 with `"reproduces": null`;
   security re-audits AF-0018, citing `Cited.cs`. Quality re-audits AF-0020, AF-0021 and AF-0022 as fixed and
   AF-0023 as still reproducing.
@@ -30,4 +31,5 @@ AF-0013 open (its previous re-audit said "yes"); AF-0014 gains a "still reported
 "not re-audited | overlaps planted defect" line (PD-104, PD-103) and stay open; AF-0020 closed mechanical despite PD-103;
 AF-0021 open with "reproduces: yes (runner rerun on clean commit)"; AF-0023 set aside (the rerun could not tell); AF-0024 new, with
 the mechanical key
-`quality:Curl.Net.UnitLibrary/C.cs:Check-eq:surviving-mutant`.
+`quality:Curl.Net.UnitLibrary/C.cs:Check-eq:surviving-mutant`.The new `D.cs` mutant is set aside, not filed (BL-3502): the stubbed clean rerun kills it, so it
+is listed in `set-aside.json` with its reason and PD-103 (its project depends on PD-103's).

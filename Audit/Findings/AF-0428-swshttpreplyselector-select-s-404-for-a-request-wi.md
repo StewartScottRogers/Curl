@@ -3,12 +3,12 @@ id: AF-0428
 title: SwsHttpReplySelector.Select's 404 for a request without a path can stop closing the connection with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Conformance.UnitLibrary/SwsHttpReplySelector.cs:Select-true:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/SwsHttpReplySelector.cs:77:true
-task: none
-tasks:
+task: BL-3494
+tasks: BL-3494
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.

@@ -3,12 +3,12 @@ id: AF-0433
 title: ITransferHeaders.TryGet (and TransferHeaderStore.TryGet) returns a CurlHeaderCode, not a bool as a Try method should
 auditor: truthfulness
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: truthfulness:Curl.Api.UnitLibrary/EngineContracts/Headers/ITransferHeaders.cs:TryGet:misleading-name
 reproduction: none
-task: none
-tasks:
+task: BL-3498
+tasks: BL-3498
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Api.UnitLibrary/EngineContracts/Headers/ITransferHeader
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.

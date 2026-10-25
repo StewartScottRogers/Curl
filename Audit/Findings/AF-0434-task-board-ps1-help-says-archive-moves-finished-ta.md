@@ -3,12 +3,12 @@ id: AF-0434
 title: task-board.ps1 help says archive moves finished tasks but omits that only those completed -OlderThanDays (default 7) ago move
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: truthfulness:.claude/skills/task-board/task-board.ps1:archive:false-help
 reproduction: none
-task: none
-tasks:
+task: BL-3499
+tasks: BL-3499
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'archive  
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.

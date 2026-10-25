@@ -3,12 +3,12 @@ id: AF-0435
 title: Lanes idled 85 minutes (39.5% of lane time) because every ready Backlog task was interactive only
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: process:logs:interactive-only-backlog:empty-queue
 reproduction: none
-task: none
-tasks:
+task: BL-3500
+tasks: BL-3500
 found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> accepted.
