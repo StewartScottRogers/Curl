@@ -43,10 +43,18 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 ## Acceptance criteria
 
 - [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Cause (2026-10-24, from the 20261023-005934 logs and git history): two faults. (1) The shift-end review (DarkFactory/ShiftEnd.ps1) numbers its tasks in a worktree at the reviewed commit; lane 4 had filed BL-3263 (normaliser) at 01:21:07 (09cccdcef) and lane 6 claimed it at 01:32:49, then the review pushed its own BL-3263 (ConcatenatedReadStream, 7b0a471fc) at 01:33:23 without deduping against the fresh branch. (2) Lane 2's claim at 01:38:51 was refused by the board ("names 2 tasks"), but Invoke-Claim (DarkFactory/Claim.ps1) checked only `Get-TaskState BL-3263 -eq 'Doing'`, which found lane 6's twin, so its empty claim ("git commit: nothing to commit") passed for a claim and it redid lane 6's work. task-board.ps1 already refuses a shared ID, so no guard-file change was needed.
+
+Fix: 3775626b6, landed on work/dark-factory 2026-10-24 08:46 Arizona. Push-ReviewCommitsUnderLock now runs `Invoke-ReviewDedupe` (`dedupe -Since origin/<branch>` after the rebase, committed with [skip ci]); Invoke-Claim treats a "names N tasks" refusal as a refusal whatever Get-TaskState says, and renumbers before going on. Two new -TestClaimDuplicates cases, both failing without the fix; -TestClaimDuplicates, -TestIntegrateLock, -TestTaskIds, -TestTaskReadiness and -TestHeartbeat pass; `dotnet build` and the fast tests pass.
+
+To measure (criterion 1, open): after a shift has run on 3775626b6 or later, run `Measure-FactoryProcess.ps1 -Since 2026-10-24 -LogRoot Z:\repos\Curl.logs` with a fresh CI list, counting from 08:46 on 2026-10-24: no task with claims >= 2 whose claims came from two different tasks sharing one ID, no `claim` line right after a "nothing to commit" git FAIL, and any `renum ... review:` lines show the review's IDs renumbered before they reached the branch.
 
 ## Log
 
 - 2026-10-23: Created.
+- 2026-10-24: Backlog -> Doing. Interactive session fixes AF-0386 duplicate-ID claims Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-24: Doing -> Backlog. Fix 3775626b6 landed 2026-10-24 08:46; live-log measurement needs a shift run after it

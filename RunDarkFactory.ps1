@@ -63,7 +63,10 @@
     $4.33; AF-0102: three test-writers on Opus in one message took BL-1586 to $4.23; AF-0104: four Sonnet test-writers in one message took BL-1487 to $3.88). What the
     task's own runs of the last 24 hours cost comes off its next run's cap, down to $2, so a
     requeued task stays near one cap in all (AF-0095: BL-1488's two claims cost $6.56; AF-0099:
-    BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more). Once
+    BL-1683's $2.46 run requeued for a held project, and its next claim spent $1.96 more),
+    except a run that sent it back to Backlog waiting on a `depends-on` ID not yet Done with
+    nothing to stash, which the shift waives with a .prerequisite-requeue.txt marker beside
+    its log (ADR-0812: AF-0387, AF-0404 to AF-0406). Once
     those runs leave less than $2 of the cap (AF-0326: a $1.02 claim of BL-2970 only requeued), a fresh claim is not run but
     goes to Blocked (AF-0096: BL-1609's five claims cost $5.17). A task run that
     reaches the cap stops; like a timed-out run, its partial work is stashed, and one bounded
@@ -213,6 +216,11 @@
     green and its commit contains the filing of a Backlog "Fix CI failure", "Fix CI build" or
     "Fix flaky CI test" task, the watch moves that task to Deferred, "already fixed, CI green
     on <sha>", pushed the same way (ADR-0756); a task in Doing is left to its lane.
+    It also reads the run still running once one of its jobs has failed, from that job's
+    log, so a Linux test failure is filed when its job ends rather than when the Quality
+    gates job lets the run end; and while the newest finished run is red, it cancels the
+    running run when the run waiting behind it carries a CI-fix task into Tasks/Done that
+    the running commit lacks, so the fix is tested at once (ADR-0811).
     It files nothing while a Backlog, Doing or Blocked
     task names the test, or when a finished task names it and the failing run predates that
     task's last commit. The task is committed in a detached worktree,

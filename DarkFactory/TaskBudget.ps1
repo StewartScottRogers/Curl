@@ -134,10 +134,51 @@ function Get-TaskRunSpends {
     $pattern = '^' + [regex]::Escape($Id) + '-\d{8}-\d{6}(-L\d+)?(-resumed)?\.jsonl$'
     $runs = @()
     foreach ($log in @(Get-ChildItem $Dir -Filter "$Id-*.jsonl" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $pattern -and $_.LastWriteTime -ge $since })) {
+        # A run that only found the task waiting on other tasks is waived (Register-PrerequisiteRequeueRun).
+        if (Test-Path -LiteralPath (Get-PrerequisiteRequeueMarkerPath $Dir ($log.Name -replace '(-resumed)?\.jsonl$', ''))) { continue }
         $cost = Get-RunLogCost $log.FullName
         if ($cost) { $runs += [pscustomobject]@{ Time = $log.LastWriteTime; Usd = $cost.Usd } }
     }
     return $runs
+}
+
+# A run that sent its task back to Backlog waiting on other tasks, with no work to keep, did
+# none of the task's own work, so its cost does not come off the cap of the claim that does
+# it once they are Done (AF-0387, AF-0404, AF-0405, AF-0406: BL-3204, BL-3412, BL-3315 and
+# BL-3234 each spent a first run of $0.73 to $0.86 finding a prerequisite, and the claim
+# after it ran out of the rest of one cap and was split). The board claims a task only once
+# every ID in its depends-on is Done, so a depends-on ID still open when the run ends was
+# added by that run; the next claim waits for it, so a waived run is never repeated for free.
+function Get-PrerequisiteRequeueMarkerPath {
+    # The marker beside a run's log (<ID>-<stamp>[-L<n>]) that waives its cost.
+    param([string]$Dir, [string]$RunName)
+    return (Join-Path $Dir "$RunName.prerequisite-requeue.txt")
+}
+
+function Get-PrerequisiteRequeueWhy {
+    # Why the run that just ended is waived from its task's cost cap, or '' when it is not:
+    # the task is in Backlog, the run left nothing to stash and no stash of the task waits,
+    # and -OpenDependsOn (its depends-on IDs not Done) is not empty. Pure, so -TestTaskBudget proves it.
+    param([string]$State, [bool]$LeftWork, [string[]]$OpenDependsOn)
+    $open = @($OpenDependsOn | Where-Object { $_ })
+    if ($State -ne 'Backlog' -or $LeftWork -or -not $open.Count) { return '' }
+    return "went back to Backlog waiting on $($open -join ', ') with no work to keep, so this run does not count toward its cost cap"
+}
+
+function Register-PrerequisiteRequeueRun {
+    # Called after a task's run, before Save-StrayChanges: writes the marker for this shift's
+    # run of -Id when Get-PrerequisiteRequeueWhy says it is waived, and traces it.
+    param([string]$Id, [string]$State)
+    if ($State -ne 'Backlog') { return }
+    $file = Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter "$Id-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $file) { return }
+    $line = Select-String -LiteralPath $file.FullName -Pattern '^depends-on:\s*\[(.*)\]\s*$' | Select-Object -First 1
+    $open = if ($line) { @(Get-TaskIdsNamed $line.Matches[0].Groups[1].Value | Where-Object { $_ -ne $Id -and -not (Test-TaskDone $_) }) } else { @() }
+    $leftWork = [bool](Get-Dirty) -or [bool](Get-TaskStashSha $Id)
+    $why = Get-PrerequisiteRequeueWhy $State $leftWork $open
+    if (-not $why) { return }
+    Set-Content -LiteralPath (Get-PrerequisiteRequeueMarkerPath $LogDir "$Id-$Stamp$LaneTag") -Value $why -Encoding UTF8
+    Write-Trace $Id 'waive' $why 'Cyan'
 }
 
 function Get-CapResetTime {
@@ -250,6 +291,17 @@ if ($TestTaskBudget) {
     Set-Content (Join-Path $dir 'BL-2-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
     $cases += ,@('a task spent its last day of task and resumed runs only', '3.5', "$(Get-TaskSpentUsd $dir 'BL-2')")
     $cases += ,@('a task with no runs spent nothing', '0', "$(Get-TaskSpentUsd $dir 'BL-9')")
+    # A run that only found the task waiting on other tasks does not come off its cap (AF-0387, AF-0404 to AF-0406).
+    Set-Content (Join-Path $dir 'BL-2-20261003-110000-L5.prerequisite-requeue.txt') 'waived'
+    $cases += ,@('a waived prerequisite requeue run does not count toward the spend', '2.5', "$(Get-TaskSpentUsd $dir 'BL-2')")
+    Set-Content (Join-Path $dir 'BL-2-20261003-100000-L2.prerequisite-requeue.txt') 'waived'
+    $cases += ,@('the marker waives the resumed run of the same claim too', '0', "$(Get-TaskSpentUsd $dir 'BL-2')")
+    Remove-Item (Join-Path $dir 'BL-2-*.prerequisite-requeue.txt')
+    $cases += ,@('a requeue waiting on an open depends-on ID with no work is waived', 'True', "$([bool](Get-PrerequisiteRequeueWhy 'Backlog' $false @('BL-3410')))")
+    $cases += ,@('the waiver names the IDs waited on', 'True', "$((Get-PrerequisiteRequeueWhy 'Backlog' $false @('BL-3284', 'BL-3288')) -match 'waiting on BL-3284, BL-3288 ')")
+    $cases += ,@('a requeue that left work to stash is not waived', '', (Get-PrerequisiteRequeueWhy 'Backlog' $true @('BL-3410')))
+    $cases += ,@('a requeue with every depends-on ID Done is not waived', '', (Get-PrerequisiteRequeueWhy 'Backlog' $false @()))
+    $cases += ,@('a run that ended Done or Blocked is not waived', ',', "$(Get-PrerequisiteRequeueWhy 'Done' $false @('BL-1')),$(Get-PrerequisiteRequeueWhy 'Blocked' $false @('BL-1'))")
     $cases += ,@('earlier runs come off the cap', '3.7', "$(Get-RunBudgetUsd 10 $twelve 1.5)")
     $cases += ,@('a spent cap still leaves 2 dollars', '2', "$(Get-RunBudgetUsd 10 $twelve 4.73)")
     $cases += ,@('earlier runs come off -TaskBudgetUsd too', '8', "$(Get-RunBudgetUsd 10 ([double[]](1.0, 1.0, 1.0)) 2)")

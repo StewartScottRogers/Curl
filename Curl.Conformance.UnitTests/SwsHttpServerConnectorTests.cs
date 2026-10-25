@@ -1166,6 +1166,7 @@ public sealed partial class SwsHttpServerConnectorTests
     [DataRow("/12341000", "Authorization: Basic dXNlcjpwYXNz\r\n", "data1001")]
     [DataRow("/1234", "Authorization: Basic dXNlcjpwYXNz\r\n", "data")]
     [DataRow("/1234", "Authorization: Negotiate YII=\r\n", "data1")]
+    [DataRow("/1234", "Content-Length: 0\r\nAuthorization: Digest a\r\n", "data1000")]
     [DataRow("/1234", "Authorization: Negotiate YII=\r\nX: Authorization: Digest\r\n", "data1")]
     [DataRow("/1234", "Authorization: Digest a\r\nX: Authorization: NTLM TlRMTVNTUAADAAAA\r\n", "data1000")]
     [DataRow("/1234", "Authorization: NTLM TlRMTVNTUAADAAAA\r\nX: Authorization: NTLM TlRMTVNTUAAB\r\n", "data1002")]

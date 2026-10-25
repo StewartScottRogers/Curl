@@ -256,7 +256,7 @@ if ($TestModelChoice) {
     # one blocked because a run stopped at the cap stays Blocked (BL-2117).
     $refused = '2026-10-11: Doing -> Blocked. Stewart: dark factory its runs of the last day already cost 1.16 of its 2.10 US dollar cost cap, so it was not run again; split the task; see x'
     $stopped = '2026-10-11: Doing -> Blocked. Stewart: dark factory stopped at its 3.2 US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task; see x'
-    $cases += ,@('a refused task is requeued once its last day leaves 1 dollar', 'True,True', "$((Test-CapBlockRequeueDue $refused 2.10 0), (Test-CapBlockRequeueDue $refused 2.10 1.10) -join ',')")
+    $cases += ,@('a refused task is requeued once its last day leaves 2 dollars', 'True,True', "$((Test-CapBlockRequeueDue $refused 3.10 0), (Test-CapBlockRequeueDue $refused 3.10 1.10) -join ',')")
     $cases += ,@('a refused task stays Blocked while its cap is still spent', 'False', "$(Test-CapBlockRequeueDue $refused 2.10 1.16)")
     $cases += ,@('a run that stopped at the cap is never requeued', 'False,False', "$((Test-CapBlockRequeueDue $stopped 3.2 0), (Test-CapBlockRequeueDue $stopped 0 0) -join ',')")
     $cases += ,@('a task blocked for another reason is not requeued by the cap', 'False', "$(Test-CapBlockRequeueDue '2026-10-11: Doing -> Blocked. Stewart: which package?' 3 0)")

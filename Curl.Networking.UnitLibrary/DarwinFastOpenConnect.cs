@@ -38,6 +38,10 @@ internal static partial class DarwinFastOpenConnect
     /// <param name="socket">A TCP socket with its options set, not yet connected.</param>
     /// <param name="endPoint">The server's end point.</param>
     /// <returns>The connected socket, or <see langword="null" />.</returns>
+    /// <exception cref="SocketException">
+    /// <c>connectx</c> connected but the process is out of descriptors (EMFILE), so the duplicate failed;
+    /// <paramref name="socket" /> is left as it was.
+    /// </exception>
     internal static unsafe Socket? TryConnect(Socket socket, IPEndPoint endPoint)
     {
         if (!OperatingSystem.IsMacOS())
