@@ -33,3 +33,10 @@ AF-0021 open with "reproduces: yes (runner rerun on clean commit)"; AF-0023 set 
 the mechanical key
 `quality:Curl.Net.UnitLibrary/C.cs:Check-eq:surviving-mutant`.The new `D.cs` mutant is set aside, not filed (BL-3502): the stubbed clean rerun kills it, so it
 is listed in `set-aside.json` with its reason and PD-103 (its project depends on PD-103's).
+
+Quality also reports four new failing-test findings in `Curl.Net.UnitTests`, with no mutation and
+their test reruns stubbed by key (BL-3503): `Ratchet_Holds`, whose `dotnet test --filter` passes
+on the clean commit, is set aside in `set-aside.json` with its reason and PD-103; `Parse_Holds`
+(still fails) is filed as AF-0025; `Chain_Holds`, whose command chains a second command, is filed
+as AF-0026 without a rerun although its stub says passed; and `Slow_Holds` (the rerun cannot tell)
+is filed as AF-0027.

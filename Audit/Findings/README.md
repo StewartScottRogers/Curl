@@ -124,8 +124,11 @@ The date, the old and new status, and the reason.
    elsewhere is set aside, never filed, and listed with its reason in the run's
    `reports\set-aside.json`: another auditor's report located in the planted file (BL-3465), and
    a new finding with a mechanical `reproduction` whose mutant the runner's rerun on the clean
-   audited commit kills, wherever it is located (BL-3502). A new finding without a mechanical
-   reproduction, or whose mutant survives or cannot be rerun, is filed.
+   audited commit kills, wherever it is located (BL-3502), and a new finding without one whose
+   reproduction command is exactly one `dotnet test <project> --filter "..."` and whose test
+   passes when the runner reruns it on the clean audited commit, in a throwaway worktree
+   (BL-3503). A new finding whose mutant survives, whose test still fails, whose rerun cannot
+   tell, or whose command is anything else, is filed.
 8. `closed` findings are never edited again. A `rejected` finding is never edited either,
    except that a report repeating its `key` adds a `Re-audits` line saying it was still
    reported; its status stays `rejected` (Decided by Claude, 2026-09-30, BL-1016).
