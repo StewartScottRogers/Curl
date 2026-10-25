@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Api.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3519 — Fix AF-0442: ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks checks only that both callbacks are not null
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test now drives the callbacks ApplyTo set: HstsRead yields the store entry then Done, HstsWrite replaces the store entries. Build clean, Curl.Api.UnitTests 901 passed.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. ApplyTo callbacks test now drives read/write against the store
