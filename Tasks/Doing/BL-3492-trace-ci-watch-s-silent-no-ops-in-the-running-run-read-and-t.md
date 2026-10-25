@@ -42,3 +42,4 @@ The shift-end review of 2026-10-24 (diff `808c067b4...31527f6ba`) found these. A
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: ea30fa20 6ccb956d a0060de3 d1f255ea a47b402b.
