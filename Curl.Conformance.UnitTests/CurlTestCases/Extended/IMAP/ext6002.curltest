@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+IMAP
+Clear Text
+FETCH
+UID
+percent-encoded mailbox
+</keywords>
+</info>
+
+# Measured with real curl 8.22.0 against a loopback IMAP listener (tagged OK for every command, untagged
+# CAPABILITY, a FETCH literal for FETCH): curl sent exactly the commands listed under <protocol>.
+# Upstream cases searched (imap server cases in Original/): test800 to 849, 895 to 897, 981, 984, 988,
+# 1321, 1420, 1552, 1553, 1590, 1847, 1848, 1982, 3206, 3209, 3210, 647, 660, 677, 779, 795; none uses an encoded slash in the mailbox.
+
+# Server-side
+<reply>
+<data crlf="yes">
+body of three
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+imap
+</server>
+<name>
+IMAP UID FETCH in a mailbox whose name has an encoded slash
+</name>
+<command>
+'imap://%HOSTIP:%IMAPPORT/a%2Fb;UID=3' -u user:secret
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<protocol crlf="yes">
+A001 CAPABILITY
+A002 LOGIN user secret
+A003 SELECT a/b
+A004 UID FETCH 3 BODY[]
+A005 LOGOUT
+</protocol>
+</verify>
+</testcase>
