@@ -3,8 +3,8 @@ id: AF-0424
 title: task-board.ps1's comment on Test-AuditPath says an ancestor such as .claude is not an audit path; the function treats .claude, .github and .claude/skills as audit paths
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:.claude/skills/task-board/task-board.ps1:Test-AuditPath:false-statement
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path .claude/skills/task-board/task-board.ps1 -Pattern 'An ancest
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
