@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.LibTest.UnitLibrary]
+touches: [Curl.Conformance.LibTest.UnitLibrary, Curl.Conformance.LibTest.UnitTests/Lib1512To1523Tests.cs]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3515 — Fix AF-0437: Lib1515.TestAsync's i < RequestCount can become <= with no test failing, adding a DNS-timeout wait after the last request
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `Curl.Conformance.LibTest.UnitTests/Lib1512To1523Tests.cs` to touches: the fix is a test (the port already matches upstream lib1515.c), and no other task in Doing on origin/work/dark-factory names that file.
+- Fix: new test `Lib1515_WaitsTheDnsTimeoutPlusOneSecondOnlyBetweenTheRequests` runs the port on a TimeProvider that fires every timer at once and records its due time, and asserts exactly RequestCount - 1 waits of (DNS timeout + 1) s. No production change.
+- Criterion 1: a lane may not run the audit office tools, so the mutant was applied by hand (`i < RequestCount` -> `i <= RequestCount` at Lib1515.cs:74): the new test failed (killed), and passes with the code restored. The re-audit confirms with its own tool.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. A unit test now pins that Lib1515 waits the DNS timeout + 1 s only between requests, killing the i <= RequestCount mutant
