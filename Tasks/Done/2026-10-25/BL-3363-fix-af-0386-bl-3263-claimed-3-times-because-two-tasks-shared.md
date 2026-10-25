@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-25
 ---
 # BL-3363 — Fix AF-0386: BL-3263 claimed 3 times because two tasks shared its ID, so lanes 6 and 2 both made the same differential-normaliser change
 
@@ -42,7 +42,7 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -53,8 +53,14 @@ Fix: 3775626b6, landed on work/dark-factory 2026-10-24 08:46 Arizona. Push-Revie
 
 To measure (criterion 1, open): after a shift has run on 3775626b6 or later, run `Measure-FactoryProcess.ps1 -Since 2026-10-24 -LogRoot Z:\repos\Curl.logs` with a fresh CI list, counting from 08:46 on 2026-10-24: no task with claims >= 2 whose claims came from two different tasks sharing one ID, no `claim` line right after a "nothing to commit" git FAIL, and any `renum ... review:` lines show the review's IDs renumbered before they reached the branch.
 
+Measured 2026-10-25 (interactive session, ADR-0761). Fix 3775626b6, landed 2026-10-24 08:46 Arizona. Window: 2026-10-24 08:46:00 Arizona to the logs' end. It holds the shifts DarkFactory-20261024-185147, 20261025-021056, 035926, 074620 and 081939, which finished 37 tasks. Shifts 20261024-203407 and 203504 were refused at start and ran no lanes.
+- Commands: `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500 > <scratchpad>\ci-runs.json`, then `powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since '2026-10-24 08:46:00' -LogRoot Z:\repos\Curl.logs -CiRunsJson <scratchpad>\ci-runs.json -OutFile <scratchpad>\process-3363.json`. Then `Select-String` over those DarkFactory-*.log files for ` renum |nothing to commit|names \d+ tasks|race |claim`.
+- Numbers: tasksClaimedMoreThanOnce 0, and all 39 task rows have claims = 1. The logs hold no "nothing to commit" line and no "names N tasks" refusal. One `race` line (BL-3506, L1 04:02:21 in 035926) re-picked normally and claimed once. The shift-end review renumbered its own IDs before pushing: `renum review: BL-3474 -> BL-3491` and `BL-3475 -> BL-3492` at 21:01:54 in DarkFactory-20261024-185147.log. BL-3491 and BL-3492 were each claimed once in 021056 (L3 02:12:42, L2 02:13:17). Every task ID was claimed once.
+
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-24: Backlog -> Doing. Interactive session fixes AF-0386 duplicate-ID claims Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-24: Doing -> Backlog. Fix 3775626b6 landed 2026-10-24 08:46; live-log measurement needs a shift run after it
+- 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix 3775626b6 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-25: Doing -> Done. Live logs after 3775626b6 (from 2026-10-24 08:46, 5 shifts, 37 tasks done): tasksClaimedMoreThanOnce 0, review IDs renumbered before push

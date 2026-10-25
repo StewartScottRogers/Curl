@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-25
 ---
 # BL-3453 — Fix AF-0406: BL-3234 requeued twice waiting on unfinished prerequisite tasks, then split over its cost cap
 
@@ -42,7 +42,7 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -52,6 +52,10 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - Now `Register-PrerequisiteRequeueRun` (DarkFactory/TaskBudget.ps1, called in DarkFactory/ShiftRunner.ps1 before Save-StrayChanges) writes `<ID>-<stamp>[-L<n>].prerequisite-requeue.txt` beside the run log and traces `waive` when the task is in Backlog, nothing is left to stash, no stash of the task waits, and its depends-on names an ID not Done. `Get-TaskRunSpends` skips such runs. The lane prompt (DarkFactory/Prompts.ps1) says so, puts a Doing task holding a needed file into depends-on, and has tasks filed together name the ones they extend in depends-on.
 - Verified 2026-10-24: dotnet build clean; fast tests green (46 test projects); RunDarkFactory.ps1 -TestTaskBudget (7 new cases), -TestTaskStash, -TestTaskIds, -TestModelChoice, -TestClaimDuplicates and -TestTaskReadiness pass.
 - To measure once a shift has run: the finding's measurement over Z:\repos\Curl.logs from 2026-10-24 08:49. BL-3234 is now Deferred, so check the pattern for any task: every `waive` trace line, no task `unclaimable` or split over its cost cap after prerequisite REQUEUEs, and how many tasks still have two prerequisite REQUEUEs. No shift had run since the fix when this was written, so the task waits in Backlog.
+- Measured 2026-10-25 (interactive session, ADR-0761). Fix 9c6c5732f with 8bf4e3854, landed 2026-10-24 08:49 Arizona. Window: 2026-10-24 08:49:00 Arizona to the logs' end. It holds the shifts DarkFactory-20261024-185147, 20261025-021056, 035926, 074620 and 081939, which finished 37 tasks. 203407 and 203504 were refused at start.
+  - Commands: `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500 > <scratchpad>\ci-runs.json`, then `powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since '2026-10-24 08:49:00' -LogRoot Z:\repos\Curl.logs -CiRunsJson <scratchpad>\ci-runs.json -OutFile <scratchpad>\process-prereq.json`. Then `Select-String` over those DarkFactory-*.log files for `waive|REQUEUE|unclaimable|split|cost cap|stash`, and a listing of `*.prerequisite-requeue.txt` in the log folder.
+  - Numbers: requeues 1, tasksClaimedMoreThanOnce 0, all 39 task rows claims = 1. The one REQUEUE is BL-3468 (L1 19:10:34 in 185147, "Interactive only"), which is not a prerequisite requeue. Tasks with two prerequisite REQUEUEs: 0. The logs hold no `waive` line, no `.prerequisite-requeue.txt` file, no `unclaimable` line, and no cost-cap REQUEUE or split. Three stash lines (BL-3468, BL-3469, BL-3471, all in 185147) were none of them after a cost cap.
+  - No prerequisite requeue occurred, so the waive path was not exercised in this window. The criterion's expected result holds. The process auditor's re-audit is what closes the finding.
 
 ## Log
 
@@ -59,3 +63,5 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-10-24: Backlog -> Doing. Interactive session: fixing the prerequisite-requeue cost-cap mechanism (ADR-0811) Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-24: Doing -> Backlog. Fix 9c6c5732f (ADR-0811) landed 2026-10-24 08:49; waits for a shift to run since then so the live-log measurement can be taken (ADR-0761)
 - 2026-10-24: ADR-0811 named above for this fix was renumbered ADR-0812 (two ADRs took 0811 at once).
+- 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix 9c6c5732f and 8bf4e3854 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-25: Doing -> Done. Live logs after 9c6c5732f (from 2026-10-24 08:49, 5 shifts, 37 tasks done): 0 tasks with prerequisite requeues, no unclaimable line or cost-cap split
