@@ -147,6 +147,7 @@ public sealed partial class TcpConnectorTests
         var result = await ConnectLoggedAsync(connector, AuthenticatingTarget);
 
         Diagnostics.Assert("service name", "proxysvc", tokens.Requests.Single().ServiceName);
+        Assert.AreEqual("proxysvc", tokens.Requests.Single().ServiceName);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(TokenConnect("Negotiate AQID"), Encoding.Latin1.GetString([.. connection.Written]));
     }
