@@ -53,3 +53,4 @@ middle of the merge.
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 0ea323d0 4373e12a 22e2e1cb 3d836d5e.
