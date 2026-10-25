@@ -8,7 +8,7 @@ depends-on: [BL-3474]
 touches: [Curl.Conformance.UnitTests/CurlTestCases/Extended/POP3]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-25
 ---
 # BL-3483 — Write the first Extended POP3 curltest cases
 
@@ -22,15 +22,18 @@ Stewart (2026-10-24) approved our own `.curltest` cases per protocol, beside the
 
 ## Acceptance criteria
 
-- [ ] `Extended/POP3/` holds 3 to 5 `ext<number>.curltest` files, numbered within `ext9001` to `ext9999`, in upstream's `tests/data` format.
-- [ ] Each case's `<info><keywords>` names POP3 and the behaviour it checks, and the case's comment or this task's Notes says how its expected output was measured from real curl.
-- [ ] No case duplicates the behaviour of an upstream case in `Original/` (Notes list the upstream cases searched).
-- [ ] `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` passes, and the fast tests of `Curl.Conformance.UnitTests` pass.
-- [ ] If a case finds a real Curl bug, the case stays out until a task (filed with the bug, linked in Notes) fixes it; this task still finishes with the cases that pass.
+- [x] `Extended/POP3/` holds 3 to 5 `ext<number>.curltest` files, numbered within `ext9001` to `ext9999`, in upstream's `tests/data` format.
+- [x] Each case's `<info><keywords>` names POP3 and the behaviour it checks, and the case's comment or this task's Notes says how its expected output was measured from real curl.
+- [x] No case duplicates the behaviour of an upstream case in `Original/` (Notes list the upstream cases searched).
+- [x] `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` passes, and the fast tests of `Curl.Conformance.UnitTests` pass.
+- [x] If a case finds a real Curl bug, the case stays out until a task (filed with the bug, linked in Notes) fixes it; this task still finishes with the cases that pass.
 
 ## Notes
+
+Four cases ext9001 to ext9004, each measured by running the same command line through real curl 8.22.0; upstream cases searched are listed in each case. ext9004 pins only the exit code because the message carries a timing.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: cec95dec 36d50374 b9d1ec5d ab8cce71 30cd2836.
+- 2026-10-25: Doing -> Done. Four Extended POP3 cases pass
