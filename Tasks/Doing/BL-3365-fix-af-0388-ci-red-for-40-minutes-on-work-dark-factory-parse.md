@@ -56,3 +56,4 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-10-23: Created.
 - 2026-10-24: Backlog -> Doing. interactive session: CI watch fix for red spells Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-24: Doing -> Backlog. fix 7ad52e292 (ADR-0811) landed 2026-10-24T15:46:55Z; waits for a shift to run since then to measure the live logs (ADR-0761)
+- 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix 7ad52e292 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
