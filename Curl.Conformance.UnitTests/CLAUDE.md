@@ -39,7 +39,7 @@ a case pass, add its number to the list in the same commit.
 
 ## Our own cases
 
-`CurlTestCases/Extended/` holds our own cases as `ext<number>.curltest` in the upstream format (see its `README.md`); `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` runs them all, apart from the upstream ratchet and `PassingUpstreamCases.txt` (ADR-0810).
+`CurlTestCases/Extended/` holds our own cases as `ext<number>.curltest` in the upstream format (see its `README.md`); in one subfolder per protocol (`DICT/` ... `WS/`), each owning a block of numbers (`HTTP/` is `ext5001` to `ext5999`; see the README); `UpstreamConformanceTests.ExtendedCases_RunThroughCurl_AllPass` runs them all, fails a number outside its folder's block or used twice, apart from the upstream ratchet and `PassingUpstreamCases.txt` (ADR-0810).
 
 ## Debugging one case
 

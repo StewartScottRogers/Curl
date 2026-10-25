@@ -40,14 +40,16 @@ Number blocks, so parallel tasks never collide (decided by Claude under Stewart'
 
 ## Acceptance criteria
 
-- [ ] `Extended/` holds the 16 subfolders above, each with a `.gitkeep` or its cases, and the csproj copies `Extended/**/ext*.curltest` to the test output directory.
-- [ ] `RunExtendedCasesAsync` runs every `ext<number>.curltest` in `Extended/` and its subfolders, and a failure names it as `<FOLDER>/ext<number>`.
-- [ ] A case whose number is outside its folder's block, or a number used twice, fails `ExtendedCases_RunThroughCurl_AllPass` with a message naming the file.
-- [ ] `RunExtendedCasesAsync_ThrowawayCaseInATemporaryFolder_IsFoundAndRun` (or a sibling test) covers a case in a subfolder, an out-of-block number and a duplicate.
-- [ ] `Extended/README.md` and `Curl.Conformance.UnitTests/CLAUDE.md` describe the folders and the number blocks.
-- [ ] `dotnet build` is clean and the fast tests of `Curl.Conformance.UnitTests` pass.
+- [x] `Extended/` holds the 16 subfolders above, each with a `.gitkeep` or its cases, and the csproj copies `Extended/**/ext*.curltest` to the test output directory.
+- [x] `RunExtendedCasesAsync` runs every `ext<number>.curltest` in `Extended/` and its subfolders, and a failure names it as `<FOLDER>/ext<number>`.
+- [x] A case whose number is outside its folder's block, or a number used twice, fails `ExtendedCases_RunThroughCurl_AllPass` with a message naming the file.
+- [x] `RunExtendedCasesAsync_ThrowawayCaseInATemporaryFolder_IsFoundAndRun` (or a sibling test) covers a case in a subfolder, an out-of-block number and a duplicate.
+- [x] `Extended/README.md` and `Curl.Conformance.UnitTests/CLAUDE.md` describe the folders and the number blocks.
+- [x] `dotnet build` is clean and the fast tests of `Curl.Conformance.UnitTests` pass.
 
 ## Notes
+
+- Root-level `ext<number>` files stay allowed (not block-checked), so the existing throwaway test keeps its shape. Block of a folder is its position times 1000 plus 1 to 999. Fast Extended tests (8) pass; dotnet build clean; CI on Linux and macOS is covered by platform-neutral paths (relative paths normalised to `/`).
 
 ## Log
 
