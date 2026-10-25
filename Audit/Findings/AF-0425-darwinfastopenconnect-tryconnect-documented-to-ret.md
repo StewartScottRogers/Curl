@@ -3,8 +3,8 @@ id: AF-0425
 title: DarwinFastOpenConnect.TryConnect, documented to return the socket or null, throws SocketException when dup fails
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Curl.Networking.UnitLibrary/DarwinFastOpenConnect.cs:TryConnect:misleading-name
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Networking.UnitLibrary/DarwinFastOpenConnect.cs -Patter
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
