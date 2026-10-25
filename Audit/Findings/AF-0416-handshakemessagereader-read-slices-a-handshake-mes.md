@@ -45,4 +45,5 @@ dotnet test Curl.Tls.UnitTests --filter "FullyQualifiedName~HandshakeReader_Larg
 ## Log
 
 - 2026-10-24: filed proposed.
-- 2026-10-24: proposed -> rejected.
+- 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> rejected.
