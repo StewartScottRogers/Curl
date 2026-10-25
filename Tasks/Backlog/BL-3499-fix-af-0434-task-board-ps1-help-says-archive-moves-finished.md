@@ -50,3 +50,4 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Backlog. Fix on guard/bl-3499 as 2f60e0c8d, PR #231; build and fast tests green locally; waits for CI on all three platforms and the merge, then reclaimed to finish
