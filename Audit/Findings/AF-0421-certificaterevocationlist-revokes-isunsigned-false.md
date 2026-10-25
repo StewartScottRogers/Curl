@@ -3,12 +3,12 @@ id: AF-0421
 title: CertificateRevocationList.Revokes' isUnsigned: false can become true with no test failing, so --crlfile misses a revoked certificate whose serial number is negative
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-24.
 key: quality:Curl.Networking.UnitLibrary/CertificateRevocationList.cs:Revokes-false:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/CertificateRevocationList.cs:137:false
-task: none
-tasks:
+task: BL-3470
+tasks: BL-3470
 found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
