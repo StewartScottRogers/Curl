@@ -33,3 +33,4 @@ Stewart (2026-10-24) approved our own `.curltest` cases per protocol, beside the
 ## Log
 
 - 2026-10-24: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: 2397cf7b 4292616a b9d1ec5d ab8cce71 30cd2836.
