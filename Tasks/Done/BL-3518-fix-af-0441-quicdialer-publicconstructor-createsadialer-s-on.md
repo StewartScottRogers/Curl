@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3518 — Fix AF-0441: QuicDialer_PublicConstructor_CreatesADialer's only assertion is IsNotNull on the result of new, which cannot fail
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Replaced the test with `QuicDialer_PublicConstructor_BindsTheLocalAddressAndPortGiven`: a loopback UDP socket holds a port, the public constructor is given `IPAddress.Loopback` and that port, and a multiplexed connect through `TcpConnector` fails with exit 7 at the bind, before any datagram is sent. It passes only if the constructor wired a real `UdpChannelOpener` to the address and port it was given. The reproduction's Select-String now finds no `CreatesADialer` test; the test in its place asserts the dialer's local binding.
+- Pipeline `feature` run as a direct change: one test-only edit, no production code, so no Measure-CodeQuality run was needed.
+- Platform check: a second UDP bind to a held port without SO_REUSEADDR fails on Linux and macOS too (the existing `BindLocalEnd_WhenEveryPortIsInUse*` tests depend on the same). Only the exit code is asserted, not the platform's own words. Full build clean; fast tests green on Windows (46 projects passed, 0 failed).
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. QuicDialer's public-constructor test now checks the dialer binds the local address and port it was given
