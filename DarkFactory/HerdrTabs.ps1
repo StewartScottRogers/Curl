@@ -265,6 +265,12 @@ if ($TestLaneMarker) {
     (Get-Item $other).LastWriteTime = $clock.T.AddSeconds(5)
     $found = Wait-NextShiftLog -Tab 'w4:t10' -Since $clock.T -LogDir $logs -OwnLog $own -Sleep $sleep -Now $now -Notify $notify
     $results += , @('a next shift that wrote its log is found with no alarm', "$found $($clock.Alarms.Count)", 'True 0')
+    Remove-Item (Join-Path $logs 'DarkFactory-next.log')
+    # The coordinator's hand-over passes a Notify that only stores the reasons (BL-3510): the
+    # call returns $false with the alarm still unraised, to be raised after the merge and review.
+    $script:lateAlarmReasons = $null
+    $deferred = Wait-NextShiftLog -Tab 'w4:t10' -Since $clock.T.AddSeconds(1000) -LogDir $logs -OwnLog $own -Sleep $sleep -Now $now -Notify { param([string[]]$Reasons) $script:lateAlarmReasons = $Reasons } 6>$null
+    $results += , @('a hand-over whose Notify defers returns without an acknowledgement, the alarm left pending', "$deferred $(@($script:lateAlarmReasons).Count -gt 0) $($clock.Alarms.Count)", 'False True 0')
     Remove-Item -Recurse -Force -Path $logs -ErrorAction SilentlyContinue
     $failed = 0
     foreach ($r in $results) {

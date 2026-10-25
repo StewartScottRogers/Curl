@@ -471,6 +471,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # poll below finds some and when the same poll, run during the merge's CI wait, does
     # (-Beside: this coordinator stays to finish the merge, so it neither reviews nor closes
     # its tab yet). -Why says which.
+    # A next shift that wrote no log raises its alarm only after the merge and review, which
+    # waiting on the acknowledgement would otherwise hold (BL-3510).
+    $script:lateAlarmReasons = $null
+    function Invoke-LateAlarm { if ($script:lateAlarmReasons) { Invoke-Alarm -Reasons $script:lateAlarmReasons; $script:lateAlarmReasons = $null } }
     $startNextShift = {
         param([string]$Why, [switch]$Beside)
         # An Auto shift hands on Auto, not the count it ended at; the next one starts from
@@ -483,11 +487,12 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         $next = Start-NextShiftDetached -Label "DF shift starting" -Dir $Root -ScriptArgs $forward
         if (-not $next.Started) { Write-Trace '-' 'shift' "$Why; the next shift did not start: $($next.Failure)" 'Red'; return $false }
         # A tab that never runs the shift keeps this one's tab open and raises the alarm (BL-3509).
-        if ($next.Tab -and -not (Wait-NextShiftLog -Tab $next.Tab -Since $startedAt -LogDir $LogDir -OwnLog $TraceFile)) { $keepTab = $true }
+        if ($next.Tab -and -not (Wait-NextShiftLog -Tab $next.Tab -Since $startedAt -LogDir $LogDir -OwnLog $TraceFile -Notify { param([string[]]$Reasons) $script:lateAlarmReasons = $Reasons })) { $keepTab = $true }
         Write-Trace '-' 'shift' "$Why; next shift started ($(if ($next.Tab) { "herdr tab $($next.Tab)" } else { "pid $($next.Process.Id)" }))" 'Cyan'
         # The review runs beside the next shift, which claims what it files (ADR-0710).
         if ($Beside) { $handOver.Tab = $(if (-not $keepTab) { $next.Tab }); return $true }
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
+        Invoke-LateAlarm
         # The next shift has its own tab; this one has only notes, and they are in the log.
         if ($next.Tab -and -not $keepTab) { Close-FinishedHerdrTabsAndTrace; Close-OwnHerdrTab 'shift handed over to the next one' | Out-Null }
         return $true
@@ -523,6 +528,7 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     if ($handOver.Done) {
         foreach ($r in @($stalls) + @($retiredLines) + @(Get-WaitingOnStewart)) { Write-Trace '-' 'note' (Get-Short $r 100) 'Yellow' }
         if ($review) { Set-OwnTabLabel 'reviewing the merge'; Write-Trace '-' 'review' (Invoke-ShiftReview @review) 'Cyan' }
+        Invoke-LateAlarm
         if ($handOver.Tab) { Close-FinishedHerdrTabsAndTrace; Close-OwnHerdrTab 'shift handed over to the next one' }
         exit 0
     }
