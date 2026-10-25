@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3507 — Stop Get-CiRunningRun tracing two alternating lines every heartbeat while a failed job log stays unreadable
 
@@ -31,13 +31,16 @@ The second line is also false in this case: it says the logs were read and held 
 
 ## Acceptance criteria
 
-- [ ] When a failed job log was unreadable and no failure was read, `Get-CiRunningRun` returns `$null` without tracing "has failed jobs but no failing test or build error", or traces the unread case under a key of its own.
-- [ ] A `-TestCiWatch` self-test calls `Get-CiRunningRun` twice with a log that stays unreadable, and checks that the run's trace line is written on the first call only.
-- [ ] The BL-3505 self-test 'a failed job log that could not be read is read again, not cached' still passes.
+- [x] When a failed job log was unreadable and no failure was read, `Get-CiRunningRun` returns `$null` without tracing "has failed jobs but no failing test or build error", or traces the unread case under a key of its own.
+- [x] A `-TestCiWatch` self-test calls `Get-CiRunningRun` twice with a log that stays unreadable, and checks that the run's trace line is written on the first call only.
+- [x] The BL-3505 self-test 'a failed job log that could not be read is read again, not cached' still passes.
 
 ## Notes
+
+- One line now names all unread job ids (was one line per job, which alternated); the "has failed jobs but no failing" line is skipped when a log was unread. Self-test added; -TestCiWatch all PASS.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 89d58156 bd8a5b5c f8aef7c9.
+- 2026-10-25: Doing -> Done. Get-CiRunningRun traces an unreadable failed log once
