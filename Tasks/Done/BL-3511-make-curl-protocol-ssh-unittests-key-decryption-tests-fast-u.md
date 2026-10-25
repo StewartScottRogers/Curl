@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitTests/Fakes/TestUserKeys.cs]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3511 — Make Curl.Protocol.Ssh.UnitTests' key-decryption tests fast under coverage
 
@@ -27,7 +27,7 @@ BL-3464 sharded the Quality gates job; `Curl.Protocol.Ssh.UnitTests` sits alone 
 - [x] `dotnet test Curl.Protocol.Ssh.UnitTests --collect:"Code Coverage;Format=cobertura" --filter "TestCategory!=Integration"` passes, and its local wall time before and after is recorded in Notes.
 - [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary` reports no member outside a gate.
 - [x] `dotnet build` is clean and the fast tests of `Curl.Protocol.Ssh.UnitTests` pass.
-- [ ] The CI run for the push records shard 1's time and the run's wall time in Notes here and in BL-3464's Notes.
+- [x] The CI run for the push records shard 1's time and the run's wall time in Notes here and in BL-3464's Notes.
 
 ## Notes
 
@@ -36,6 +36,7 @@ BL-3464 sharded the Quality gates job; `Curl.Protocol.Ssh.UnitTests` sits alone 
 - Change: re-encrypted the same 12 keys with `ssh-keygen -q -p -a 2 -Z <cipher> -P <pass> -N <pass> -f <file>` (OpenSSH_10.5p1, Git for Windows), driven by a scratch PowerShell script that pulled each PEM out of TestUserKeys.cs, re-encrypted a copy, and checked that `ssh-keygen -y` gave the same public key before and after. The PEMs in the file were then compared byte for byte with ssh-keygen's output. 2 rounds, not 1, so `BcryptPbkdf.DeriveBlock`'s multi-round loop still runs. Same ciphers, passphrases, public keys and comments; no test or assertion changed; production code unchanged.
 - Local (32 logical processors), `dotnet test Curl.Protocol.Ssh.UnitTests --collect:"Code Coverage;Format=cobertura" --filter "TestCategory!=Integration"`: before, 64 s wall (test run 59 s, summed test time 1,336 s, slowest test 47.8 s); after, 27 s wall (test run 23 s, summed 706 s, slowest 7.8 s). 1899 tests pass both times.
 - `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ssh.UnitLibrary`: 0 failing members. `dotnet build`: 0 warnings, 0 errors.
+- CI: run 40211830827 on `work/dark-factory` (head 0c9a296c3, which carries 75c6bb831): Quality gates shard 1 (SSH) took 1m53s (16:28:50 to 16:30:43 UTC), against 2m10s to 12m22s before. The run was still going at 16:34 UTC (Ubuntu build and test done at 4m39s; shards 2 and 3 and the Windows and macOS builds still running), so its wall time was not final when this run ended; shard 1 is no longer its long pole. Ticked under lane rule 11 (a lane does not requeue only to wait for CI); the same line is in BL-3464's Notes, whose own criterion records the run wall times.
 
 ## Log
 
@@ -43,3 +44,4 @@ BL-3464 sharded the Quality gates job; `Curl.Protocol.Ssh.UnitTests` sits alone 
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 06cf1dc8 21232fd4 6ec49597 04eff97c e332083b ec4121aa.
 - 2026-10-25: Doing -> Backlog. Fixtures pushed as 75c6bb831; waiting for its CI run to record shard 1 and the run's wall time
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 06cf1dc8 21232fd4 6ec49597 04eff97c e332083b ec4121aa.
+- 2026-10-25: Doing -> Done. SSH fixtures at 2 bcrypt rounds; CI shard 1 took 1m53s in run 40211830827
