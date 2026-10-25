@@ -8,7 +8,7 @@ depends-on: [BL-3518]
 touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3513 — Re-fix AF-0397: TcpConnector.ProxyAuthRequestOf's IsProxy: true can become false with no test failing, so proxy Negotiate uses --service-name instead of --proxy-service-name
 
@@ -45,14 +45,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
 - Why the mutant survives (measured on Windows): with `IsProxy: false` hand-applied at TcpConnector.cs:1516, all `WithProxyNegotiate` tests in Curl.Networking.UnitTests pass. BL-3444's test `ConnectAsync_WithProxyNegotiate_AsksForTheProxyServiceNameNotTheServiceName` checks the service name only through `Diagnostics.Assert("service name", "proxysvc", ...)`, and `TestDiagnostics.Assert` (TestDiagnostics.cs:189) only writes an `ASSERT` log line and never fails. BL-3444's second claim dropped the real `Assert.AreEqual` as a "duplicated service-name assertion". The other two assertions (exit code, request bytes) are the same under both service names because `ScriptedTokenSource` ignores the service name.
 - Fix, no production change: in that test, after the `Diagnostics.Assert` line, add `Assert.AreEqual("proxysvc", tokens.Requests.Single().ServiceName);`. Then hand-apply the mutant, confirm the test fails, restore the line, build, and run the fast tests.
 - Added `Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs` to touches because the killing assertion has to live in that test. BL-3518 (Doing on origin/work/dark-factory) holds the whole of Curl.Networking.UnitTests, so BL-3518 went into depends-on and the task went back to Backlog. Nothing is left to stash.
+- Done (2026-10-25): added `Assert.AreEqual("proxysvc", tokens.Requests.Single().ServiceName);` to `ConnectAsync_WithProxyNegotiate_AsksForTheProxyServiceNameNotTheServiceName`. With `IsProxy: false` hand-applied at TcpConnector.cs:1516 that test fails ("Expected strings to be equal"), so the mutant is killed; the line was restored. A lane may not run the mutation runner, so the reproduction was checked by hand-applying its mutant. No production change, so no Measure-CodeQuality run was needed. dotnet build clean, fast tests green.
 
 ## Log
 
@@ -60,3 +61,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-25: Doing -> Backlog. Needs Curl.Networking.UnitTests/TcpConnectorTests.ProxyNtlmAndNegotiate.cs, which BL-3518 (Doing) holds as the whole Curl.Networking.UnitTests; fix diagnosed in Notes (one real Assert.AreEqual)
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. The proxy Negotiate tunnel test now asserts the proxy service name, so the IsProxy mutant is killed
