@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Conformance.UnitLibrary]
+touches: [Curl.Conformance.UnitLibrary, Curl.Conformance.UnitTests/SwsHttpServerConnectorTests.cs]
 requirement: none
 created: 2026-10-24
 completed:
@@ -46,7 +46,11 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Notes
 
+- Lane run: widened `touches` to the test file. Mutating line 441's `true` to `false` by hand and running a new test (a second read after the close still ends at once) still passed, so the mutant looks equivalent: a spent close entry and an empty queue both end in `ReadWithNothingOwedAsync` returning 0, because a closing reply sets `readsRequests` false and `idling`, `streaming` and `upgradedTrafficOpen` cannot be set with a Normal-mode close. No test can tell them apart without a production change that gives `IsClose` an observable effect. The reproduction script lives under `Audit/`, which a lane may not run. The draft test is left uncommitted in the worktree stash.
+- Needs: Stewart or the audit office to accept this as an equivalent mutant, or to say which production change should make `IsClose` observable.
+
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Blocked. Stewart: is AF-0420's mutant (SwsHttpServerConnection.cs:441 true->false) equivalent? A hand check shows no read differs, so no test can kill it
