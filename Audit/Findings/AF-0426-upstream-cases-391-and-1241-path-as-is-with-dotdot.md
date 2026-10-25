@@ -3,8 +3,8 @@ id: AF-0426
 title: Upstream cases 391 and 1241 (--path-as-is with dotdots) are on the passing list but fail unmutated: Curl sends no request
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: rejected
+reason: Stewart rejected it on 2026-10-25: it is planted defect PD-303 (the --path-as-is row removed from CommandLineOptionTable.cs, run 20261024-210628's manifest), reported by the quality auditor from another file; the audited commit passes 391 and 1241.
 key: quality:Curl.Conformance.UnitTests/UpstreamConformanceTests.cs:UpstreamCase_RunThroughCurl_HoldsTheRatchet:failing-test
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet test Curl.Conformance.UnitTests --filter "FullyQualifiedName~UpstreamCase
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-25: proposed -> rejected.
