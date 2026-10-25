@@ -8,7 +8,7 @@ depends-on: []
 touches: [.claude]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3499 — Fix AF-0434: task-board.ps1 help says archive moves finished tasks but omits that only those completed -OlderThanDays (default 7) ago move
 
@@ -41,8 +41,8 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
 
@@ -51,3 +51,5 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-25: Doing -> Backlog. Fix on guard/bl-3499 as 2f60e0c8d, PR #231; build and fast tests green locally; waits for CI on all three platforms and the merge, then reclaimed to finish
+- 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. task-board.ps1's archive help now states the -OlderThanDays (default 7) age limit; build and fast tests green; PR #231 merged as 7199fab29 after CI passed on Windows, Linux and macOS
