@@ -30,6 +30,8 @@ Stewart (2026-10-24) approved our own `.curltest` cases per protocol, beside the
 
 ## Notes
 
+Cases ext15001 to ext15004 (no host, bad port, missing file name, tftps unsupported) were measured from real curl 8.22.0 (Schannel) with the same command lines; each case's comment lists the upstream tftp URL cases searched (none covers these). No Curl bug found. tftps has no harness server (no secure TFTP exists), so it is pinned as an unsupported scheme. Fast tests of Curl.Conformance.UnitTests pass (4374 passed, 0 failed).
+
 ## Log
 
 - 2026-10-24: Created.
