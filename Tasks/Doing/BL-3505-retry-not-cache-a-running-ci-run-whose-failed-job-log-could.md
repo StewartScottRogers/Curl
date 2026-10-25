@@ -33,3 +33,4 @@ Found by the shift-end review of d5489de4..287e5bf6 (ADR-0710): the code-reviewe
 ## Log
 
 - 2026-10-25: Created.
+- 2026-10-25: Backlog -> Doing. Criteria at claim: a2de3ed1 4abf9b60 cfd9f717.
