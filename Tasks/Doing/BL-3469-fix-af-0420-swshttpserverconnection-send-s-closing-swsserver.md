@@ -54,3 +54,4 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
 - 2026-10-24: Doing -> Blocked. Stewart: is AF-0420's mutant (SwsHttpServerConnection.cs:441 true->false) equivalent? A hand check shows no read differs, so no test can kill it
+- 2026-10-24: Blocked -> Doing. Criteria at claim: b49d23ab 9742157d.
