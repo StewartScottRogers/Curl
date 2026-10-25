@@ -46,6 +46,24 @@ public sealed class GophersServerConnectorTests
     }
 
     [TestMethod]
+    [Timeout(60_000, CooperativeCancellation = true)]
+    public async Task ConnectAsync_GophersPort_AsksForNoClientCertificate()
+    {
+        using X509Certificate2 certificate = MailTlsServerConnectorTests.CreateCertificate();
+        using X509Certificate2 clientCertificate = MailTlsServerConnectorTests.CreateCertificate();
+        UpstreamTestCase testCase = ParsedTestCase.From("<reply>\n<data>\nmenu\n</data>\n</reply>\n");
+        GophersServerConnector connector = new(certificate, new GopherServerConnector(testCase, new SwsHttpServerConnector(testCase, TimeProvider.System)));
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("127.0.0.1", GophersServerConnector.GophersPort, false), TestContext.CancellationToken);
+        bool sentCertificate;
+        await using (SslStream client = await MailTlsServerConnectorTests.HandshakeAsync(result.Connection!, clientCertificate))
+        {
+            sentCertificate = client.IsMutuallyAuthenticated;
+        }
+
+        Assert.IsFalse(sentCertificate);
+    }
+
+    [TestMethod]
     public void EmulatedServers_Always_NamesTheGophersServer()
     {
         CollectionAssert.AreEqual(new[] { "gophers" }, GophersServerConnector.EmulatedServers.ToArray());

@@ -131,10 +131,14 @@ public sealed class MailTlsServerConnectorTests
         CollectionAssert.AreEqual(new[] { "smtps", "imaps", "pop3s" }, MailTlsServerConnector.EmulatedServers.ToArray());
     }
 
-    internal static async Task<SslStream> HandshakeAsync(IConnection connection)
+    internal static async Task<SslStream> HandshakeAsync(IConnection connection, X509Certificate2? clientCertificate = null)
     {
         SslStream client = new(new ConnectionStream(connection), leaveInnerStreamOpen: false, static (_, _, _, _) => true);
-        await client.AuthenticateAsClientAsync(new SslClientAuthenticationOptions { TargetHost = "localhost" });
+        await client.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+        {
+            TargetHost = "localhost",
+            LocalCertificateSelectionCallback = clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate,
+        });
         return client;
     }
 
