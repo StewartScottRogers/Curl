@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/ShiftEnd.ps1, DarkFactory/Claim.ps1]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-25
 ---
 # BL-3491 — Check the shift-end review's dedupe and renumber commit before pushing
 
@@ -40,3 +40,4 @@ The shift-end review of 2026-10-24 (silent-failure-hunter, diff `808c067b4...315
 
 - 2026-10-24: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 0a07623b 65af0d05 33cfdc61 d3d0909e.
+- 2026-10-25: Doing -> Done. Invoke-ReviewDedupe checks dedupe, git add and git commit; Push-ReviewCommitsUnderLock does not push and returns the reason; -TestClaim covers both failures
