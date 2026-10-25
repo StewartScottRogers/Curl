@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-24
-completed:
+completed: 2026-10-24
 ---
 # BL-3473 — Fix AF-0425: DarwinFastOpenConnect.TryConnect, documented to return the socket or null, throws SocketException when dup fails
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Added an `<exception cref="SocketException">` tag to `DarwinFastOpenConnect.TryConnect` (doc-only, no behaviour change; the throw on EMFILE is kept). Reproduction now shows an `<exception` line. Build clean, Curl.Networking.UnitTests fast tests pass (3455). No Measure-CodeQuality run: comment-only change.
 
 ## Log
 
 - 2026-10-24: Created.
 - 2026-10-24: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-24: Doing -> Done. TryConnect's doc comment now documents the SocketException it throws when dup fails
