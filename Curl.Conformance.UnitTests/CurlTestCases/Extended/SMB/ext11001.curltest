@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+SMB
+SMB empty file
+</keywords>
+</info>
+
+# Expected bytes are the file the smb server serves from <reply><data>, as in upstream's SMB cases: the
+# reference curl (8.22.0, Schannel build, Record-CurlExchange.ps1) is built without SMB, so no exchange
+# could be recorded; curl's output for a downloaded file is those bytes unchanged.
+
+# Server-side
+<reply>
+<data nocheck="yes">
+</data>
+</reply>
+
+# Client-side
+<client>
+<server>
+smb
+</server>
+<features>
+smb
+</features>
+<name>
+SMB download of an empty file prints nothing and reports size 0
+</name>
+<command>
+-u 'curltest:curltest' -w '%{size_download}\n' smb://%HOSTIP:%SMBPORT/TESTS/%TESTNUMBER
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<stdout>
+0
+</stdout>
+</verify>
+</testcase>
