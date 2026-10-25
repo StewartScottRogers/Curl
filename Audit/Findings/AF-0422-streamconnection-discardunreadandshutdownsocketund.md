@@ -3,12 +3,12 @@ id: AF-0422
 title: StreamConnection.DiscardUnreadAndShutDownSocketUnder's Socket.Available > 0 can become >= 0 with no test failing, so closing a connection blocks in Receive
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-24.
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:DiscardUnreadAndShutDownSocketUnder-gt:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:156:>
-task: none
-tasks:
+task: BL-3471
+tasks: BL-3471
 found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.

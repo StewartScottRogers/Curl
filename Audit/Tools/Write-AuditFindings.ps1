@@ -526,6 +526,19 @@ function Test-Catch($Finding, [string]$Auditor, [object[]]$Planted) {
     return $null
 }
 
+function Get-PlantInFindingFile($Finding, [string]$Auditor, [object[]]$Planted) {
+    # A plant of another auditor in the very file the finding's location names, or $null. The
+    # caller has already ruled out a catch for the finding's own auditor (Test-Catch). Another
+    # auditor's report of that file describes the planted defect itself, not a defect of Curl, so
+    # it is set aside rather than filed (BL-3465: AF-0416). A log plant has no code file to name.
+    foreach ($p in $Planted) {
+        if ($p.auditor -eq $Auditor -or (Test-LogPlant $p)) { continue }
+        if ("$($p.file)" -notmatch '[\/]') { continue }
+        if (Test-SamePath (ConvertTo-Normalised $Finding.location) (ConvertTo-Normalised $p.file)) { return $p }
+    }
+    return $null
+}
+
 function New-FindingFile($Finding, $Filed, [string]$Auditor, [string]$Id, [string]$Note) {
     $template = Join-Path $FindingsDirectory 'FINDING-TEMPLATE.md'
     if (-not (Test-Path -LiteralPath $template)) { $template = Join-Path $repo 'Audit\Findings\FINDING-TEMPLATE.md' }
@@ -551,8 +564,9 @@ function Invoke-WriteFindings {
     $next = 1 + [int](@($existing | ForEach-Object { [int]($_.Id -replace '\D', '') } | Measure-Object -Maximum).Maximum)
     $planted = @()
     if ($Manifest -and (Test-Path -LiteralPath $Manifest)) { $planted = @((Get-Content -LiteralPath $Manifest -Raw | ConvertFrom-Json).planted) }
-    $counts = @{ new = 0; open = 0; closed = 0; catches = 0 }
+    $counts = @{ new = 0; open = 0; closed = 0; catches = 0; setAside = 0 }
     $catches = @()
+    $setAside = @()
     $counts.closed += Close-Duplicates $existing
     $counts.closed += Close-HistoricalFindings $existing
 
@@ -568,6 +582,12 @@ function Invoke-WriteFindings {
             if ($planted1) {
                 $catches += [ordered]@{ auditor = $auditor; planted = $planted1.id; key = "$($f.key)"; title = "$($f.title)" }
                 $counts.catches++
+                continue
+            }
+            $inPlantedFile = Get-PlantInFindingFile $f $auditor $planted
+            if ($inPlantedFile) {
+                $setAside += [ordered]@{ auditor = $auditor; planted = $inPlantedFile.id; key = "$($f.key)"; title = "$($f.title)" }
+                $counts.setAside++
                 continue
             }
             $filed = ConvertTo-FiledFinding $f $auditor
@@ -632,7 +652,8 @@ function Invoke-WriteFindings {
     }
 
     [IO.File]::WriteAllText((Join-Path $ReportDirectory 'catches.json'), (ConvertTo-Json @($catches) -Depth 4), $Utf8)
-    Write-Output ("findings: new {0}, still open {1}, closed {2}, catches {3}" -f $counts.new, $counts.open, $counts.closed, $counts.catches)
+    [IO.File]::WriteAllText((Join-Path $ReportDirectory 'set-aside.json'), (ConvertTo-Json @($setAside) -Depth 4), $Utf8)
+    Write-Output ("findings: new {0}, still open {1}, closed {2}, catches {3}, set aside {4}" -f $counts.new, $counts.open, $counts.closed, $counts.catches, $counts.setAside)
 }
 
 if ($SelfTest) {
@@ -695,7 +716,11 @@ if ($SelfTest) {
         $report2 = [pscustomobject]@{ key = 'process:logs:BL-1289:redone-work'; title = 'BL-1289 was claimed 6 times (134 minutes) before reaching Done'; location = 'logs/BL-1289-20261002-211047-L1.jsonl:1'; evidence = 'six claims' }
         $other = [pscustomobject]@{ key = 'process:logs:BL-1300:redone-work'; title = 'BL-1300 claimed 3 times'; location = 'logs/DarkFactory-20261001-120001-L9.log'; evidence = 'three claims' }
         Check 'a process report naming a planted log defect''s catch text is a catch, whatever file it cites' ((Test-Catch $report1 'process' @($plant1)) -and (Test-Catch $report2 'process' @($plant2)) -and -not (Test-Catch $other 'process' @($plant1)) -and -not (Test-Catch $report1 'security' @($plant1))) 'both PD-501 reports; not another task, not another auditor'
-        Check 'summary line' ($line -eq 'findings: new 3, still open 1, closed 1, catches 2') $line
+        $setAsideJson = @((Get-Content -LiteralPath (Join-Path $ReportDirectory 'set-aside.json') -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
+        $allFindingText = (Get-ChildItem -LiteralPath $FindingsDirectory -Filter 'AF-*.md' | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join "`n"
+        Check 'another auditor''s new finding in a planted file is set aside, listed, and files no AF' ($setAsideJson.Count -eq 1 -and $setAsideJson[0].auditor -eq 'quality' -and $setAsideJson[0].planted -eq 'PD-101' -and $setAsideJson[0].title -eq 'Verify compares before checking lengths' -and $allFindingText -notmatch 'Verify compares before checking lengths') "set aside $($setAsideJson.Count)"
+        Check 'a new finding in another file of the planted file''s project is still filed' ($allFindingText -match 'Read slices before its length check' -and (Text 'AF-0010') -match 'Read slices before its length check') 'AF-0010'
+        Check 'summary line' ($line -eq 'findings: new 4, still open 1, closed 1, catches 2, set aside 1') $line
 
         # ADR-0422: closing on mechanical evidence, two consecutive "no"s, duplicates, mechanical keys.
         $closure = Join-Path $work 'closure'
@@ -728,7 +753,7 @@ if ($SelfTest) {
         Check 'a re-audit whose evidence cites a planted file is set aside' ($c18 -match 'overlaps planted defect PD-104' -and $c18 -match '(?m)^status: accepted\r?$') 'AF-0018'
         Check 'a set-aside line is neither yes nor no' (@(Get-ReauditLines $c22).Count -eq 1) "$(@(Get-ReauditLines $c22).Count) parsed"
         Check 'a re-audit with reproduces null is "not re-audited", not a no' ($c14 -match '\| 2026-10-14_0930\.md \| not re-audited \| site not sampled' -and $c14 -match '(?m)^status: accepted\r?$') 'AF-0014'
-        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0') $line2
+        Check 'closure summary line' ($line2 -eq 'findings: new 1, still open 1, closed 4, catches 0, set aside 0') $line2
 
         # ADR-0422, amended 2026-10-14: a finding about a past run's cost closes once its tasks are Done.
         $historical = Join-Path $work 'historical'
@@ -763,7 +788,7 @@ if ($SelfTest) {
         $openHistorical = @('AF-0031-x.md', 'AF-0033-x.md', 'AF-0034-x.md', 'AF-0036-x.md' | Where-Object { [IO.File]::ReadAllText((Join-Path $FindingsDirectory $_)) -cne $beforeHistorical[$_] })
         Check 'a cost-outlier finding with an open task, no task, a task not on the board, or not accepted is untouched' ($openHistorical.Count -eq 0) "changed: $($openHistorical -join ',')"
         Check 'any other key whose task is Done follows ADR-0422 unchanged: re-audited, still open' ($h32 -match '(?m)^status: accepted$' -and $h32 -match '\| 2026-10-15_0900\.md \| reproduces: yes \| requeued again' -and $h32 -notmatch 'closed-how: task') 'AF-0032'
-        Check 'historical summary line' ($line3 -eq 'findings: new 0, still open 0, closed 2, catches 0') $line3
+        Check 'historical summary line' ($line3 -eq 'findings: new 0, still open 0, closed 2, catches 0, set aside 0') $line3
         $Tree = ''
         Check 'with no tree the member is the key''s <what> without its operator' ((Get-SiteMember ([pscustomobject]@{ File = 'X.UnitLibrary/Y.cs'; Line = 3; Operator = 'true' }) 'quality:X.UnitLibrary/Y.cs:Turn-true:surviving-mutant') -eq 'Turn') 'Turn'
         exit $(if ($failed) { 1 } else { 0 })

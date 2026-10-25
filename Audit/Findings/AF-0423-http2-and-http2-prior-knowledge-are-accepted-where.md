@@ -3,8 +3,8 @@ id: AF-0423
 title: --http2 and --http2-prior-knowledge are accepted where the reference Schannel curl refuses them with exit 2
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: rejected
+reason: Stewart rejected it on 2026-10-24: --http2 on Windows is decided by ADR-0786 (keep HTTP/2 on), as for AF-0381.
 key: conformance:Curl.Cli.UnitLibrary/CommandLineOptionTable.cs:--http2:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,5 @@ $o=Join-Path $env:TEMP 'af-h2'; & .\Record-CurlExchange.ps1 -Port 50913 -Curl 'C
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
+- 2026-10-24: accepted -> rejected.

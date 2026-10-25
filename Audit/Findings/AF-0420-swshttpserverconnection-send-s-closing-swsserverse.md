@@ -3,12 +3,12 @@ id: AF-0420
 title: SwsHttpServerConnection.Send's closing SwsServerSend(..., true) can become false with no test failing, so a closing reply never marks the close
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-24.
 key: quality:Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:Send-true:surviving-mutant
 reproduction: mutation Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true
-task: none
-tasks:
+task: BL-3469
+tasks: BL-3469
 found: 2026-10-24
 found-at: d3ee244c64c5cb56d3fe0ca2ed9728e9383eb8ea
 scorecard: 2026-10-24_0845.md
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 ## Log
 
 - 2026-10-24: filed proposed.
+- 2026-10-24: proposed -> accepted.
