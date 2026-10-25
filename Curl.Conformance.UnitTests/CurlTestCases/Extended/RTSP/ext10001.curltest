@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<testcase>
+<info>
+<keywords>
+RTSP
+URL
+no-host
+</keywords>
+</info>
+# Expected output measured from real curl 8.22.0 (Schannel, WinLDAP) by running the same command line: exit code and
+# -w text as pinned below.
+# Upstream cases searched in Original/ for RTSP: test1400, test1405 to test1407, test1420, test1481, test1538, test3100,
+# test445, test567 to test572, test577, test689 (all need the RTSP server or a --libcurl/lib tool; none checks URL rejection).
+
+# Server-side
+<reply>
+</reply>
+
+# Client-side
+<client>
+<name>
+RTSP URL without a host is rejected
+</name>
+<command>
+-s -w '%{exitcode}|%{errormsg}\n' rtsp://
+</command>
+</client>
+
+# Verify data after the test has been "shot"
+<verify>
+<errorcode>
+3
+</errorcode>
+<stdout>
+3|URL rejected: No host present
+</stdout>
+</verify>
+</testcase>
