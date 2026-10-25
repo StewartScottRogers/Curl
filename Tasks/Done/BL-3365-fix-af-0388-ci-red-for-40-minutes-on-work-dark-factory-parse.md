@@ -9,7 +9,7 @@ touches: [RunDarkFactory.ps1]
 lane: no
 requirement: none
 created: 2026-10-23
-completed:
+completed: 2026-10-25
 ---
 # BL-3365 — Fix AF-0388: CI red for 40 minutes on work/dark-factory: Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason failed on Linux and macOS
 
@@ -42,7 +42,7 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 
 ## Acceptance criteria
 
-- [ ] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
+- [x] The finding's measurement, run over the live logs written after the fix landed (`-LogRoot` the repository's `.logs` folder, `-CiRunsJson` a fresh `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500`, counting only trace lines and CI runs from the fix's landing time), gives the finding's expected result; Notes name the fix, its landing time, the window and the numbers. If no factory shift has run since the fix, the task waits in Backlog.
 - [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
@@ -50,6 +50,10 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - Cause: of the 40 minutes, about 31 were CI runs after the fix: the CI watch read only finished runs (the failing Build and test jobs end 7 to 18 minutes before Quality gates lets the run end), and a running run on work/dark-factory always finishes (ADR-0693), so a fix landing after the red run waited behind a pre-fix run doomed to fail too (39906620565 here).
 - Fix: 7ad52e292 (`DarkFactory/CiWatch.ps1`, ADR-0811), landed on origin/work/dark-factory 2026-10-24T15:46:55Z (08:46:55 Arizona). The watch reads a running run's failed jobs from their job logs, and while the newest finished run is red cancels the running run when the waiting run's commit brings a CI-fix task into Tasks/Done that the running commit lacks. `-TestCiWatch`: 60 PASS, 0 FAIL; `dotnet build` clean; fast tests green.
 - To measure once a shift has run since then: the finding's measurement with `-Since 2026-10-24T15:46:55Z`, `-LogRoot` the repository's `.logs`, `-CiRunsJson` a fresh `gh run list` as above; expect no `ciRedSpells` entry over 30 minutes, and look for `ci` trace lines "cancelled run ..." beside any spell. A spell can still pass 30 minutes when the fix takes longer than the red run's Quality gates tail, since one full run is 15 to 34 minutes; shortening the run itself is a `.github/workflows/ci.yml` change (a guard file, audit branch only).
+- Measured 2026-10-25 (interactive session, ADR-0761). Fix 7ad52e292, landed 2026-10-24T15:46:55Z (08:46:55 Arizona). Window: from then to the CI list's newest run, 40206727905, which ended 2026-10-25T15:48:25Z. Shifts in it: DarkFactory-20261024-185147, 20261025-021056, 035926, 074620 and 081939, which finished 37 tasks.
+  - Commands: `gh run list --workflow CI --branch work/dark-factory --json databaseId,status,conclusion,headSha,createdAt,updatedAt --limit 500 > <scratchpad>\ci-runs.json` (oldest run 2026-10-22, so the list reaches back past the fix). Then `powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since '2026-10-24 08:46:55' -LogRoot Z:\repos\Curl.logs -CiRunsJson <scratchpad>\ci-runs.json -OutFile <scratchpad>\process-ci.json` and `.ciRedSpells`.
+  - Numbers: ciRedSpells is empty and ciRedMinutes is 0. The window holds 81 CI runs: 27 success, 54 cancelled, 0 failure.
+  - No red spell occurred, so the fix's early failed-job read and cancel path were not exercised in this window. The criterion's expected result (no spell over 30 minutes) holds. The process auditor's re-audit is what closes the finding.
 
 ## Log
 
@@ -57,3 +61,4 @@ The reproduction measures a frozen copy of the logs, which no fix can change, so
 - 2026-10-24: Backlog -> Doing. interactive session: CI watch fix for red spells Criteria at claim: 87cd20bd 9742157d.
 - 2026-10-24: Doing -> Backlog. fix 7ad52e292 (ADR-0811) landed 2026-10-24T15:46:55Z; waits for a shift to run since then to measure the live logs (ADR-0761)
 - 2026-10-25: Backlog -> Doing. Interactive session: measure the live logs after fix 7ad52e292 (ADR-0761) Criteria at claim: 87cd20bd 9742157d.
+- 2026-10-25: Doing -> Done. Live CI after 7ad52e292 (from 2026-10-24T15:46:55Z, 5 shifts): ciRedSpells empty, 81 runs, 27 success, 54 cancelled, 0 failure
