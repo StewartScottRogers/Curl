@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/HerdrTabs.ps1, DarkFactory/ShiftCoordinator.ps1]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3510 — Keep the no-log alarm from holding the shift-end merge and review
 
@@ -39,18 +39,21 @@ middle of the merge.
 
 ## Acceptance criteria
 
-- [ ] A next shift that writes no log within the timeout still traces the red line and
+- [x] A next shift that writes no log within the timeout still traces the red line and
       raises the alarm, but the merge's CI wait and the shift-end review go on without a key
       press (for example: the alarm is raised after the merge and review, or the notice is
       non-blocking and the blocking alarm comes at the end of the run).
-- [ ] The kept tab is still kept (`Close-OwnHerdrTab` is not called) when no log appeared.
-- [ ] A self-test in `DarkFactory/HerdrTabs.ps1` or `DarkFactory/ShiftCoordinator.ps1`
+- [x] The kept tab is still kept (`Close-OwnHerdrTab` is not called) when no log appeared.
+- [x] A self-test in `DarkFactory/HerdrTabs.ps1` or `DarkFactory/ShiftCoordinator.ps1`
       shows the hand-over returns without waiting on an acknowledgement when no log appears.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- The hand-over now passes Wait-NextShiftLog a Notify that stores the alarm reasons; Invoke-LateAlarm in ShiftCoordinator.ps1 raises them after the shift-end review (both the -Beside and the direct path). Close-OwnHerdrTab is still skipped via keepTab. Self-test: -TestLaneMarker case 7.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: 0ea323d0 4373e12a 22e2e1cb 3d836d5e.
+- 2026-10-25: Doing -> Done. no-log alarm is raised after the shift-end merge and review, not inside the hand-over
