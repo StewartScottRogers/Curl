@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3520 — Fix AF-0443: SendsTheHttpsRecordQuery counts three DoH connections but never checks that an HTTPS-record query was sent
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Test-only change (pipeline feature, but no production code, so no architect stage or quality run needed): SendsTheHttpsRecordQuery now compares the first DoH connection's written bytes with the full POST carrying the HTTPS (type 65) query for _41443._https.foo.example.com, the same shape DohDnsResolverHttpsRecordQueryTests pins. Build clean; fast tests green (46 projects, 0 failed); Curl.Networking.UnitTests 3456 passed. Platform-neutral (bytes only).
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. SendsTheHttpsRecordQuery asserts the DoH POST carries the HTTPS-record query bytes

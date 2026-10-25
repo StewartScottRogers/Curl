@@ -40,6 +40,7 @@ public sealed class TcpConnectorShuffledResolverTests
         _ = await connector.ConnectAsync(new ConnectTarget("foo.example.com", OriginPort, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
 
         Assert.HasCount(3, dohConnector.Opened);
+        CollectionAssert.AreEqual(DohPost(httpsQuery), dohConnector.Opened[0].Written.ToArray());
     }
 
     [TestMethod]
@@ -109,6 +110,9 @@ public sealed class TcpConnectorShuffledResolverTests
 
         return [.. events.Info];
     }
+
+    private static byte[] DohPost(byte[] query) =>
+        [.. Encoding.Latin1.GetBytes($"POST /dns-query HTTP/1.1\r\nHost: 127.0.0.1:41444\r\nAccept: */*\r\nContent-Type: application/dns-message\r\nContent-Length: {query.Length}\r\n\r\n"), .. query];
 
     private static byte[] Ok(byte[] answer) =>
         [.. Encoding.Latin1.GetBytes($"HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: {answer.Length}\r\n\r\n"), .. answer];
