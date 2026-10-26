@@ -406,7 +406,8 @@ public sealed class FtpProtocolHandlerTlsTests
             _ => { },
             ConnectResult.Failed(CurlExitCode.SslConnectError, "schannel: failed to receive handshake"));
 
-        var expectedSent = LogInSent + "PBSZ 0\r\nPROT P\r\nPWD\r\nEPSV\r\n";
+        // The handshake waits for RETR (CGR-005, BL-3534).
+        var expectedSent = LogInSent + "PBSZ 0\r\nPROT P\r\nPWD\r\nEPSV\r\nTYPE I\r\nSIZE a.txt\r\nRETR a.txt\r\n";
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
         Assert.IsTrue(run.Data.IsDisposed);
@@ -416,11 +417,12 @@ public sealed class FtpProtocolHandlerTlsTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_PassiveProtP_RunsTheDataHandshakeBeforeTypeI()
+    public async Task ExecuteAsync_PassiveProtP_RunsTheDataHandshakeAfterTheTransferCommand()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
-        // curl 8.21.0 -v -k --ssl-reqd ftp://127.0.0.1:18021/a.txt writes the data connection's
-        // schannel: lines right after "Trying 127.0.0.1:<port>...", before "> TYPE I" (BL-1084).
+        // curl 8.22.0 -v -k --ssl-reqd ftp://127.0.0.1:18021/a.txt sends TYPE I, SIZE and RETR
+        // before the data connection's handshake completes, so a server that starts data TLS
+        // only after RETR (vsftpd, proftpd) is served (CGR-005, BL-3534).
         var events = new RecordingTransferEvents();
         var securedControl = Scripted(LoggedIn + Protected + Pwd + Retrieved);
         var tls = new QueuedTlsProvider(ConnectResult.Connected(securedControl), ConnectResult.Connected(Scripted("hello")));
@@ -442,9 +444,8 @@ public sealed class FtpProtocolHandlerTlsTests
         TransferResult result = await new FtpProtocolHandler(connector, new QueuedListener(), tls).ExecuteAsync(context);
 
         diagnostics.ActResult(result);
-        diagnostics.Assert("header before the second handshake", "< " + Epsv, headersAtHandshake[1][^1]);
-        Assert.AreEqual("< " + Epsv, headersAtHandshake[1][^1]);
-        CollectionAssert.Contains(events.Headers, "> TYPE I\r\n");
+        diagnostics.Assert("header before the second handshake", "< 150 Opening BINARY mode data connection\r\n", headersAtHandshake[1][^1]);
+        Assert.AreEqual("< 150 Opening BINARY mode data connection\r\n", headersAtHandshake[1][^1]);
         Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
     }
 

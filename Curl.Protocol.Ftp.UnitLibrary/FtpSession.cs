@@ -1664,15 +1664,15 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Makes the data connection ready once the transfer command is answered: in active mode
-    /// accepts the server's connection, then runs the TLS handshake over it after an accepted
-    /// <c>PROT P</c>. Nothing to do in passive mode, whose handshake ran right after the
-    /// connect (<see cref="ConnectDataAsync" />).
+    /// accepts the server's connection; in either mode then runs the TLS handshake over it
+    /// after an accepted <c>PROT P</c>. A passive connection's handshake waits for the
+    /// transfer command too, as servers such as vsftpd and proftpd start data-connection TLS
+    /// only after it, and curl 8.22.0 sends <c>TYPE</c>, <c>SIZE</c> and <c>RETR</c> before
+    /// the handshake completes (CGR-005, BL-3534).
     /// </summary>
     private async ValueTask<TransferResult?> ReadyDataConnectionAsync() =>
-        pendingConnection is { } pending
-            ? await AcceptDataConnectionAsync(pending).ConfigureAwait(false)
-                ?? await SecureDataConnectionAsync().ConfigureAwait(false)
-            : null;
+        (pendingConnection is { } pending ? await AcceptDataConnectionAsync(pending).ConfigureAwait(false) : null)
+            ?? await SecureDataConnectionAsync().ConfigureAwait(false);
 
     /// <summary>
     /// Waits up to 60 seconds for the server to connect to the active-mode port: exit 12
@@ -1749,8 +1749,8 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
-    /// Runs the TLS handshake over the data connection after an accepted <c>PROT P</c>, right
-    /// after a passive connect or an active accept, reporting it to the transfer's events, which writes curl's <c>schannel:</c> lines and no
+    /// Runs the TLS handshake over the data connection after an accepted <c>PROT P</c>, once
+    /// the transfer command is answered, reporting it to the transfer's events, which writes curl's <c>schannel:</c> lines and no
     /// second <c>Established</c> line (measured, BL-1084); a failed one ends the transfer with
     /// its exit code and no <c>QUIT</c>, as a failed passive connect does.
     /// </summary>
@@ -1805,7 +1805,7 @@ internal sealed class FtpSession(
 
         TransferResult? dialFailure = await DialDataAsync(context.Url.IdnHost, controlPeerAddress, epsvPort).ConfigureAwait(false);
         return dialFailure is null
-            ? await SecureDataConnectionAsync().ConfigureAwait(false)
+            ? null
             : await AnswerFailedEpsvDialAsync(dialFailure).ConfigureAwait(false);
     }
 
@@ -1891,13 +1891,11 @@ internal sealed class FtpSession(
     /// Dials the passive data connection, after curl 8.21.0's <c>-v</c> line naming
     /// <paramref name="shownHost" /> and the port. A dial that fails names the control
     /// connection and then <paramref name="shownHost" /> after <c>via</c>, as curl 8.21.0's does (BL-904).
-    /// After an accepted <c>PROT P</c> the TLS handshake runs at once, before <c>TYPE</c>, so
-    /// its <c>schannel:</c> lines follow the <c>Trying</c> line, as curl 8.21.0 writes them
-    /// (measured, BL-1084; BL-1091).
+    /// After an accepted <c>PROT P</c> the TLS handshake waits for the transfer command
+    /// (<see cref="ReadyDataConnectionAsync" />, CGR-005).
     /// </summary>
     private async ValueTask<TransferResult?> ConnectDataAsync(string host, string shownHost, int port) =>
-        await DialDataAsync(host, shownHost, port).ConfigureAwait(false)
-            ?? await SecureDataConnectionAsync().ConfigureAwait(false);
+        await DialDataAsync(host, shownHost, port).ConfigureAwait(false);
 
     /// <summary>
     /// Dials the passive data connection without its TLS handshake: <see langword="null" />
