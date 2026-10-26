@@ -222,8 +222,9 @@ internal sealed partial class ManagedEasyTransfer
     /// <summary>
     /// The proxy credentials <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and <c>CURLOPT_PROXYPASSWORD</c>
     /// give, as the curl tool's <c>-U</c> gives them: <c>CURLOPT_PROXYUSERPWD</c> split at its first colon (no colon is
-    /// an empty password), the user name and password options each winning over their half of it. They replace the
-    /// proxy URL's own user information, as in libcurl (upstream test1588, BL-2660, ADR-0677).
+    /// an empty password), the user name and password options each winning over their half of it. They are used only
+    /// when the proxy URL has no user information of its own, as in libcurl (upstream test1588, BL-2660, ADR-0677,
+    /// CGR-079, ADR-0825).
     /// </summary>
     /// <param name="authentication">The handle's authentication options.</param>
     /// <returns>The credentials, or <see langword="null" /> when none of the three is set.</returns>

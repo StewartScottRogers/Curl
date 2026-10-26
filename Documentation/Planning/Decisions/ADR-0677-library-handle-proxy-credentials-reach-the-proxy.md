@@ -1,6 +1,6 @@
 # ADR-0677 — A library handle's `CURLOPT_PROXYUSERPWD` reaches the proxy
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by [ADR-0825](ADR-0825-the-proxy-urls-user-information-wins-over-proxy-user.md) (the proxy URL's user information wins over these options)
 - **Date:** 2026-10-17
 
 **Decided by Claude under Stewart's delegation** (root `CLAUDE.md`, "Decisions"), for BL-2660.

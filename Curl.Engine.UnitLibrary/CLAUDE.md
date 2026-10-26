@@ -473,7 +473,7 @@ A read-callback upload to an `http` or `https` URL with a known `EasyTransferOpt
 
 ## CURLOPT_PROXYUSERPWD (BL-2660)
 
-`ManagedEasyTransfer.TransferSettingsOf` gives a perform from the options the proxy credential `ProxyCredentialsOf` makes of `EasyAuthenticationOptions.ProxyUserPassword` (split at its first colon), `ProxyUserName` and `ProxyPassword` (each winning over its half), as the curl tool's `-U`, so the chosen proxy carries it in place of the proxy URL's user information and the HTTP handler answers a 407 with it (upstream test1588, ADR-0677). Its tests are in `ManagedEasyTransferTests.Proxy.cs`.
+`ManagedEasyTransfer.TransferSettingsOf` gives a perform from the options the proxy credential `ProxyCredentialsOf` makes of `EasyAuthenticationOptions.ProxyUserPassword` (split at its first colon), `ProxyUserName` and `ProxyPassword` (each winning over its half), as the curl tool's `-U`, so the chosen proxy carries it when the proxy URL has no user information of its own (the URL's wins, CGR-079, ADR-0825) and the HTTP handler answers a 407 with it (upstream test1588, ADR-0677). Its tests are in `ManagedEasyTransferTests.Proxy.cs`.
 
 ## CURLOPT_NETRC on a library handle (BL-2696)
 

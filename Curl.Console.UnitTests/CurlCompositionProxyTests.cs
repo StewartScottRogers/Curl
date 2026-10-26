@@ -78,14 +78,14 @@ public sealed partial class CurlCompositionProxyTests
     }
 
     [TestMethod]
-    public async Task RunAsync_ProxyUserOption_ReplacesTheProxyUrlsUserInformation()
+    public async Task RunAsync_ProxyUserOption_LosesToTheProxyUrlsUserInformation()
     {
         ScriptedConnector server = new([Latin1(Hello)]);
 
         await RunAsync(server, "-sS", "-x", "http://a:b@127.0.0.1:18238", "-U", "u:p", "http://example.com/a");
 
-        Diagnostics.Assert("contains " + "Proxy-Authorization: Basic dTpw\r\n", true, Latin1(server.Written).Contains("Proxy-Authorization: Basic dTpw\r\n", StringComparison.Ordinal));
-        StringAssert.Contains(Latin1(server.Written), "Proxy-Authorization: Basic dTpw\r\n");
+        Diagnostics.Assert("contains " + "Proxy-Authorization: Basic YTpi\r\n", true, Latin1(server.Written).Contains("Proxy-Authorization: Basic YTpi\r\n", StringComparison.Ordinal));
+        StringAssert.Contains(Latin1(server.Written), "Proxy-Authorization: Basic YTpi\r\n");
     }
 
     [TestMethod]
