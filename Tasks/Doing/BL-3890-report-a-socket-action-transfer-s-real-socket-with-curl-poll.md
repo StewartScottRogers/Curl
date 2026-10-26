@@ -31,3 +31,4 @@ BL-3563 (ADR-0828) wires `ManagedMultiTransfer` to `TransferSocketWait`: the soc
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: ef84e75a 7137fb27 779790c0.
