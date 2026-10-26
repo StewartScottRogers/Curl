@@ -36,3 +36,4 @@ Suggested design (decide and record an ADR): read argv's raw bytes on Linux from
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: d4a270ab c8eb6298 9fc2e6ad 1e378075 0d7e61ee 779790c0.
