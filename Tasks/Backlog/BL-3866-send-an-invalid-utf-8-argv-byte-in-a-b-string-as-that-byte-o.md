@@ -1,5 +1,5 @@
 ---
-id: BL-3864
+id: BL-3866
 title: Send an invalid-UTF-8 argv byte in a -b string as that byte on Linux and macOS
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3864 — Send an invalid-UTF-8 argv byte in a -b string as that byte on Linux and macOS
+# BL-3866 — Send an invalid-UTF-8 argv byte in a -b string as that byte on Linux and macOS
 
 ## Goal
 

@@ -77,7 +77,7 @@ E/vlinux.sh
 - Measured real curl 8.18.0 (OpenSSL, WSL) against a netcat listener on 127.0.0.1:20355, 2026-10-26: `curl -sS -X 中 .../a` sent `E4 B8 AD /a HTTP/1.1`, exit 0, stdout `ok`; `-b c=中` sent `Cookie: c=E4 B8 AD`; `-b c=é` sent `Cookie: c=C3 A9`; control `-H X:中` sent `X:E4 B8 AD`; all exit 0, stdout `ok\n`, stderr empty, no files. Curl was not run on Linux here (no .NET in WSL); its Linux wire bytes are pinned by the unit tests with `CommandLineTextEncoding` / the cookie encoding set to UTF-8, which is what `CredentialEncoding.ForPlatform(false)` gives: `Curl.Protocol.Http.UnitTests/Cgr065Tests.cs` (method gives E4 B8 AD; failed before as `?`) and `Curl.Engine.UnitTests/Cgr065Tests.cs` (`c=中` and `c=é` give their UTF-8 bytes). Exit code, stdout and stderr are unaffected by the change. Windows keeps its ANSI bytes as before, matching Schannel curl; the `-H` control case is untouched.
 - Platform check: the new tests set the encoding explicitly, so they give the same answer on every OS; CI on Linux and macOS is covered by keeping them platform-neutral and the fast tests green here.
 - Fast tests: all green (e.g. Curl.Protocol.Http.UnitTests 2319 passed, Curl.Engine.UnitTests 2540, Curl.Console.UnitTests 2913, Curl.Conformance.UnitTests 4381). Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary, Curl.Engine.UnitLibrary and Curl.Console: Http and Console 100/100, Engine one failing member, `MultiCallbackQueue.QueuedCallback.WaitUntilRun`, not touched here and already filed as BL-3857.
-- Filed BL-3864: a lone-surrogate (invalid UTF-8 argv byte) in a `-b` string still goes out as EF BF BD.
+- Filed BL-3866: a lone-surrogate (invalid UTF-8 argv byte) in a `-b` string still goes out as EF BF BD.
 
 ## Log
 
