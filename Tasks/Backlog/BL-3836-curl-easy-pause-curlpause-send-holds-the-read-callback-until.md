@@ -1,5 +1,5 @@
 ---
-id: BL-3832
+id: BL-3836
 title: curl_easy_pause(CURLPAUSE_SEND) holds the read callback until unpaused
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3832 — curl_easy_pause(CURLPAUSE_SEND) holds the read callback until unpaused
+# BL-3836 — curl_easy_pause(CURLPAUSE_SEND) holds the read callback until unpaused
 
 ## Goal
 

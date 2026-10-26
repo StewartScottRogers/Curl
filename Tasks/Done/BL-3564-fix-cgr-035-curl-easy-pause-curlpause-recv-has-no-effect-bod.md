@@ -80,7 +80,7 @@ probe.exe C_31,C_34 2
 - PORT: no Libcurl native build in the lane, so C_31 and C_34 run in-process in `Curl.Engine.UnitTests/Cgr035Tests.cs`: `WriteAsync_ReceivingPausedByTheApplication_CallsNoCallbackUntilUnpaused` (C_31: no callback, no completion while paused, the chunk delivered after the unpause), `WriteAsync_CallbackPausesThroughTheApiAndTakesTheChunk_HoldsTheNextChunkUntilUnpaused` (C_34: calls-while-paused=1) and `PerformAsync_WriteCallbackPausesTheHandleAndTakesTheChunk_DeliversNothingMoreUntilUnpaused` (C_34 through a whole HTTP perform: nothing delivered and the perform not finished while paused, then `helloworld` intact and `Ok`). The two stream tests failed with the fix removed and pass with it.
 - Variants that already matched (pausing by returning `CURL_WRITEFUNC_PAUSE` or `CURL_READFUNC_PAUSE`) still pass: `CallbackWriteStreamTests`, `CallbackReadStreamTests`, `ManagedEasyTransferTests.PausedPost.cs` and the conformance ratchet are green.
 - Fast tests: all 46 test assemblies passed (Curl.Engine.UnitTests 2481 passed, Curl.Conformance.UnitTests 4381 passed). The change is platform-neutral (no paths, OS text or certificates), which covers CI on Linux and macOS. `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
-- Follow-up: BL-3832, the same gap for `CURLPAUSE_SEND` in `CallbackReadStream` (left out here to keep this task to its issue).
+- Follow-up: BL-3836, the same gap for `CURLPAUSE_SEND` in `CallbackReadStream` (left out here to keep this task to its issue).
 
 ## Log
 
