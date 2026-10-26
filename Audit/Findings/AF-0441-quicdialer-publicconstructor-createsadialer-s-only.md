@@ -3,8 +3,8 @@ id: AF-0441
 title: QuicDialer_PublicConstructor_CreatesADialer's only assertion is IsNotNull on the result of new, which cannot fail
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_1944.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_1542.md, 2026-10-25_1944.md).
 key: quality:Curl.Networking.UnitTests/TcpConnectorQuicTests.cs:QuicDialer_PublicConstructor_CreatesADialer:weak-assertion
 reproduction: none
 task: BL-3518
@@ -13,9 +13,9 @@ found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: consecutive
+closed-by: 2026-10-25_1542.md, 2026-10-25_1944.md
 ---
 # AF-0441 - QuicDialer_PublicConstructor_CreatesADialer's only assertion is IsNotNull on the result of new, which cannot fail
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorQuicTests.cs -Pattern 
 ## Re-audits
 
 - 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction: no QuicDialer_PublicConstructor_CreatesADialer matches. Its replacement, QuicDialer_PublicConstructor_BindsTheLocalAddressAndPortGiven, holds the local UDP port and checks the dialer's own bind fails, which needs the constructor to have wired a real opener to the given address and port.
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Select-String finds no QuicDialer_PublicConstructor_CreatesADialer. The test is now QuicDialer_PublicConstructor_BindsTheLocalAddressAndPortGiven (TcpConnectorQuicTests.cs:545). It holds the local UDP port and asserts Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode), so it no longer stops at IsNotNull on new.
 
 ## Log
 
 - 2026-10-25: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1944.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_1542.md, 2026-10-25_1944.md).

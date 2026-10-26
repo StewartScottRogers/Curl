@@ -3,8 +3,8 @@ id: AF-0443
 title: SendsTheHttpsRecordQuery counts three DoH connections but never checks that an HTTPS-record query was sent
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_1944.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_1542.md, 2026-10-25_1944.md).
 key: quality:Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.cs:ConnectAsync_ToAnHttpsOriginThroughAShuffledDohResolver_SendsTheHttpsRecordQuery:weak-assertion
 reproduction: none
 task: BL-3520
@@ -13,9 +13,9 @@ found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: consecutive
+closed-by: 2026-10-25_1542.md, 2026-10-25_1944.md
 ---
 # AF-0443 - SendsTheHttpsRecordQuery counts three DoH connections but never checks that an HTTPS-record query was sent
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.
 ## Re-audits
 
 - 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction. Line 43 now asserts CollectionAssert.AreEqual(DohPost(httpsQuery), dohConnector.Opened[0].Written.ToArray()), so the HTTPS-record query bytes are checked as well as the count of three.
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | TcpConnectorShuffledResolverTests.cs:43: CollectionAssert.AreEqual(DohPost(httpsQuery), dohConnector.Opened[0].Written.ToArray()) checks that the HTTPS-record query bytes are sent, beside the count of 3 at line 42.
 
 ## Log
 
 - 2026-10-25: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1944.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_1542.md, 2026-10-25_1944.md).

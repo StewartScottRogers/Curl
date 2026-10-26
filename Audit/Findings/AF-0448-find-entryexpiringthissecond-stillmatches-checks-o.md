@@ -42,6 +42,8 @@ Select-String -Path Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs -Pattern 'Fin
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | AltSvcCacheTests.cs:348-352: after IsNotNull(entry) it asserts SourceHost 'a.example', DestinationAlpn H2, DestinationPort 1 and Expires 2026-09-29 05:21:56Z, so it checks for the h2 :1 entry exactly.
+
 ## Log
 
 - 2026-10-25: filed proposed.

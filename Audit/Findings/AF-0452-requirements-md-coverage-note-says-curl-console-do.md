@@ -42,6 +42,8 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Engine.UnitLibra
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Ran the reproduction at 390c05e0: matches only EngineComposition.cs:176 and :177 (the smb and scp LazyProtocolHandler registrations); 'SCP and SMB have handler libraries that' no longer matches in Documentation/Product/Requirements.md. Its line 11 now says 'SFTP, SCP and SMB are registered in `Curl.Console` too', which matches the code.
+
 ## Log
 
 - 2026-10-25: filed proposed.
