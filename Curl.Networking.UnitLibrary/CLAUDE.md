@@ -275,7 +275,9 @@ is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 6553
 an address literal `Dns` refuses with `ArgumentException` (the any-address, host `0`) as itself,
 so the dial fails with exit 7 as curl's does (BL-2084). It answers `localhost` and every name
 under `.localhost` itself, `::1` then `127.0.0.1`, without asking `Dns` (`TcpConnector.IsLocalhost`,
-test389, BL-2113). Every
+test389, BL-2113). Per ADR-0820 (BL-3575) on Windows it resolves an IPv4 address in shorthand
+(`Ipv4ShorthandAddress`: `127.1`, `0`, `2130706433`) to nothing, as the Schannel build does, and
+`LocalBindingAddressChooser` hands such an `--interface` host to the resolver. Every
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
 which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 

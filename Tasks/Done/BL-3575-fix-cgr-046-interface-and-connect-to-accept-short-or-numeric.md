@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/LocalBindingAddressChooser.cs, Curl.Networking.UnitTests/Cgr046Tests.cs]
+touches: [Curl.Networking.UnitLibrary/LocalBindingAddressChooser.cs, Curl.Networking.UnitTests/Cgr046Tests.cs, Curl.Networking.UnitLibrary/SystemDnsResolver.cs, Curl.Networking.UnitLibrary/Ipv4ShorthandAddress.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/SystemDnsResolverTests.cs, Curl.Core.UnitLibrary/ProxyUrlParser.cs, Curl.Core.UnitTests/ProxyUrlParserTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3575 — Fix CGR-046: --interface and --connect-to accept short or numeric IPv4 forms (0, 127.1, 2130706433) that REF rejects
 
@@ -60,10 +60,10 @@ curl -sS --connect-to foo.test:20000:127.1:20000 -o NUL http://foo.test:20000/
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,4 @@ curl -sS --connect-to foo.test:20000:127.1:20000 -o NUL http://foo.test:20000/
 
 - 2026-10-26: Created from CGR-046 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. On Windows --interface and --connect-to refuse IPv4 shorthand (0, 127.1, 2130706433) with exit 45 and 6 as curl's Schannel build

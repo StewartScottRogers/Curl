@@ -16,13 +16,16 @@ namespace Curl.Networking;
 /// <see cref="CurlExitCode.CouldntResolveHost" />. An address literal <see cref="Dns" />
 /// refuses, the any-address such as host <c>0</c>, resolves to itself. <c>localhost</c> and every
 /// name under <c>.localhost</c> resolve to <c>::1</c> and <c>127.0.0.1</c> without a lookup, as
-/// curl answers them itself.
+/// curl answers them itself. On Windows an IPv4 address in shorthand, such as <c>127.1</c> or
+/// <c>2130706433</c>, resolves to nothing, as curl's Schannel build resolves none (ADR-0820).
 /// </remarks>
 public sealed class SystemDnsResolver : IDnsResolver
 {
     private static readonly IPAddress[] LocalhostAddresses = [IPAddress.IPv6Loopback, IPAddress.Loopback];
 
     private readonly Func<string, CancellationToken, Task<IPAddress[]>> _lookUpHostAddresses;
+
+    private readonly bool _refusesIpv4Shorthand;
 
     /// <summary>
     /// Initializes a resolver backed by <see cref="Dns" />.
@@ -34,12 +37,26 @@ public sealed class SystemDnsResolver : IDnsResolver
 
     /// <summary>
     /// Initializes a resolver backed by <paramref name="lookUpHostAddresses" />, so a test
-    /// can make the lookup fail without a network.
+    /// can make the lookup fail without a network, refusing IPv4 shorthand on Windows.
     /// </summary>
     /// <param name="lookUpHostAddresses">Looks up a host's addresses.</param>
     internal SystemDnsResolver(Func<string, CancellationToken, Task<IPAddress[]>> lookUpHostAddresses)
+        : this(lookUpHostAddresses, OperatingSystem.IsWindows())
+    {
+    }
+
+    /// <summary>
+    /// Initializes a resolver backed by <paramref name="lookUpHostAddresses" /> that resolves no
+    /// IPv4 address in shorthand (<see cref="Ipv4ShorthandAddress" />) when
+    /// <paramref name="refusesIpv4Shorthand" /> is set, as curl's Windows build resolves none, so a
+    /// test pins each platform's answer on any platform.
+    /// </summary>
+    /// <param name="lookUpHostAddresses">Looks up a host's addresses.</param>
+    /// <param name="refusesIpv4Shorthand">Whether an IPv4 address in shorthand resolves to nothing.</param>
+    internal SystemDnsResolver(Func<string, CancellationToken, Task<IPAddress[]>> lookUpHostAddresses, bool refusesIpv4Shorthand)
     {
         _lookUpHostAddresses = lookUpHostAddresses;
+        _refusesIpv4Shorthand = refusesIpv4Shorthand;
     }
 
     /// <summary>
@@ -65,6 +82,13 @@ public sealed class SystemDnsResolver : IDnsResolver
             // asks the system resolver: curl -4 http://curlmachine.localhost/ dials 127.0.0.1
             // (test389, BL-2113).
             return LocalhostAddresses;
+        }
+
+        if (_refusesIpv4Shorthand && Ipv4ShorthandAddress.IsShorthand(host))
+        {
+            // curl 8.21.0's Windows build resolves no IPv4 address in shorthand: --connect-to
+            // foo.test:80:127.1:80 is exit 6 "Could not resolve host: 127.1" (BL-3575, ADR-0820).
+            return [];
         }
 
         try
