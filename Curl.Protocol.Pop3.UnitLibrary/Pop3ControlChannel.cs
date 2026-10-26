@@ -11,7 +11,7 @@ namespace Curl.Protocol.Pop3;
 /// Where <c>-v</c> and <c>--trace</c> learn of each command sent, as a request header, and
 /// each line read, as a response header.
 /// </param>
-/// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
 /// <param name="diagnosticLog">
 /// Where each command sent and each status read are logged at <c>verbose</c> (ADR-0222), a
 /// command as its sender says it may be logged; <see langword="null" /> logs nothing.
@@ -78,6 +78,12 @@ internal sealed class Pop3ControlChannel(
     public void SwitchTo(IConnection secured) => connection = secured;
 
     /// <summary>
+    /// Gets or sets the token that cancels every send and read: the connect phase's while the
+    /// session opens, so <c>--connect-timeout</c> bounds the greeting and the login (BL-3532).
+    /// </summary>
+    public CancellationToken CancellationToken { get; set; } = cancellationToken;
+
+    /// <summary>
     /// Reports nothing more: curl sends <c>QUIT</c> once the transfer is over, where <c>-v</c>
     /// does not see it or its answer, and its answer is not written to <c>-D</c> either.
     /// </summary>
@@ -104,8 +110,8 @@ internal sealed class Pop3ControlChannel(
         byte[] line = Encoding.Latin1.GetBytes(command + "\r\n");
         try
         {
-            await connection.WriteAsync(line, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(line, CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
         }
         catch (IOException failure)
         {
@@ -231,7 +237,7 @@ internal sealed class Pop3ControlChannel(
         reporting.ReportResponseHeader(bytes);
         if (dumping is not null)
         {
-            await dumping.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await dumping.WriteAsync(bytes, CancellationToken).ConfigureAwait(false);
         }
 
         return Encoding.Latin1.GetString(bytes, 0, length);
@@ -242,7 +248,7 @@ internal sealed class Pop3ControlChannel(
         bufferStart = 0;
         try
         {
-            bufferEnd = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            bufferEnd = await connection.ReadAsync(buffer, CancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {
