@@ -189,7 +189,9 @@ internal static class CurlUrlHost
     /// Checks and normalises a bracketed IPv6 address as curl's <c>ipv6_parse</c> does:
     /// only hexadecimal digits, colons and dots, then optionally <c>%</c> (a decoded <c>%25</c>)
     /// and a zone id of 1 to 15 characters, and the address printed back in its shortest
-    /// form. A zone id longer than 15 characters is a bad host name to curl; every other
+    /// form when that is no longer than the address as written (zone id aside), so
+    /// <c>[::FFFF:7f00:0001]</c> is <c>[::ffff:127.0.0.1]</c> but <c>[::ffff:7f00:1]</c> stays
+    /// as written (CGR-058). A zone id longer than 15 characters is a bad host name to curl; every other
     /// fault is a bad IPv6 address.
     /// </summary>
     /// <returns>Why curl rejects the address, or <see cref="CurlUrlRejection.None" />.</returns>
@@ -207,7 +209,8 @@ internal static class CurlUrlHost
             return CurlUrlRejection.BadIPv6;
         }
 
-        string text = address.ToString();
+        string shortest = address.ToString();
+        string text = shortest.Length <= inner.Length ? shortest : inner;
         normalized = $"[{text}]";
         idnHost = zoneId is null ? text : $"{text}%{zoneId}";
 
