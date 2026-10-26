@@ -172,7 +172,19 @@ internal sealed partial class ManagedEasyTransfer(
     /// transfers (<see cref="ToolSettings" />, ADR-0542), else the multi's connections, TLS sessions and resolved names with
     /// the handle's own cookies and HSTS while it performs in a multi handle, else the handle's own (BL-3204).
     /// </summary>
-    private ManagedEngineSharedState PerformShared => attachedShared ?? (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared);
+    private ManagedEngineSharedState PerformShared => (attachedShared ?? (ToolSettings is not null ? shared.EngineWide : MultiCachesOf() ?? shared)).WithSocketWait(SocketWait);
+
+    /// <summary>
+    /// Gets or sets what the handle's transfers wait for on their socket while a multi handle drives them by
+    /// <c>curl_multi_socket_action</c>: each perform starts its clock (<see cref="TransferSocketWait.Start" />) and
+    /// dials through a <see cref="SocketActionGatedTcpDialer" /> over it (ADR-0822, BL-3859); <see langword="null" />,
+    /// the default, outside socket-action mode, where nothing changes.
+    /// </summary>
+    internal TransferSocketWait? SocketWait { get; set; }
+
+    /// <summary>Starts the perform's clock on <see cref="SocketWait" />, when the handle has one.</summary>
+    /// <param name="options">The perform's options.</param>
+    private void StartSocketWait(EasyOptions options) => SocketWait?.Start(options);
 
     /// <summary>The caches the handle runs over in the multi handle it is in, or <see langword="null" /> outside one.</summary>
     /// <returns>The handle's state over the multi's caches, or <see langword="null" />.</returns>

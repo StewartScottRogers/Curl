@@ -224,4 +224,20 @@ internal sealed class ManagedEngineSharedState
 
     /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; }
+
+    /// <summary>
+    /// Gets what the transfer running over this state waits for on its socket while a multi handle drives it by
+    /// <c>curl_multi_socket_action</c>, which its dialer gates each dialed connection on
+    /// (<see cref="SocketActionGatedTcpDialer" />, ADR-0822); <see langword="null" /> outside socket-action mode.
+    /// </summary>
+    internal TransferSocketWait? SocketWait { get; private init; }
+
+    /// <summary>
+    /// Gives this state with <paramref name="wait" /> as its <see cref="SocketWait" />, or this state itself when
+    /// <paramref name="wait" /> is <see langword="null" />.
+    /// </summary>
+    /// <param name="wait">What the transfer waits for on its socket, or <see langword="null" />.</param>
+    /// <returns>The state the transfer runs over.</returns>
+    internal ManagedEngineSharedState WithSocketWait(TransferSocketWait? wait) =>
+        wait is null ? this : new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = wait };
 }

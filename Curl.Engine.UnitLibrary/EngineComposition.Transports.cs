@@ -115,8 +115,14 @@ internal static partial class EngineComposition
     /// and the datagram protocols and QUIC open their channels through its connector, as <c>Curl.Console</c>'s
     /// dialing runner composes them; <see langword="null" />, in production, for sockets and the resolver the options pick.
     /// </param>
+    /// <param name="socketWait">
+    /// What a transfer a multi handle drives by <c>curl_multi_socket_action</c> waits for on its socket: the
+    /// <see cref="TcpConnector" /> then dials through a <see cref="SocketActionGatedTcpDialer" /> over it, so each
+    /// dialed connection reads and writes only once the multi handle signals it (ADR-0822); <see langword="null" />,
+    /// outside socket-action mode, for the dialer as it is.
+    /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
@@ -132,7 +138,7 @@ internal static partial class EngineComposition
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
         (QuicDialer quicDialer, ITcpDialer connectorDialer, IDatagramConnector udpDatagramConnector) = DialersOf(dialing, tcpDialer, tlsClientOptions, traces, timeProvider, () => CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog));
-        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, connectorDialer, tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
+        TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, SocketActionGatedTcpDialer.Over(connectorDialer, socketWait), tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
         // The tunnel answers --proxy-ntlm and --proxy-negotiate on the same router the origin's
