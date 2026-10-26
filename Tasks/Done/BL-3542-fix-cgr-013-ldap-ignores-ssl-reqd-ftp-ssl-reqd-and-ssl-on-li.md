@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitTests/Cgr013Tests.cs]
+touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitLibrary/LdapExchange.cs, Curl.Protocol.Ldap.UnitLibrary/LdapRequests.cs, Curl.Protocol.Ldap.UnitLibrary/LdapStartTls.cs, Curl.Protocol.Ldap.UnitLibrary/LdapExtendedResponse.cs, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Protocol.Ldap.UnitTests/Cgr013Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3542 — Fix CGR-013: LDAP ignores --ssl-reqd / --ftp-ssl-reqd (and --ssl on Linux). PORT sends the simple bind, including the password, in cleartext where cur...
 
@@ -68,17 +68,24 @@ E\linux\lv.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr013Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 6): touches widened to the Ldap files the fix needed (StartTLS request/response, the exchange's TLS switch) and `Curl.Engine.UnitLibrary/EngineComposition.cs` (passes the TLS provider to the LDAP handler, one line); no task in Doing on `origin/work/dark-factory` named them.
+- Decision (ADR-0816): WinLDAP dialect refuses `--ssl-reqd`/`--ftp-ssl-reqd` on `ldap://` with exit 4 before sending a byte; OpenLDAP dialect sends StartTLS under `--ssl`/`--ssl-reqd` and binds inside TLS via the injected `ITlsProvider`; a refused StartTLS goes on in plaintext under `--ssl` and fails with exit 64 under `--ssl-reqd`.
+- Measured on Windows, real curl 8.22.0 (Schannel, WinLDAP), `Record-CurlExchange.ps1` on 127.0.0.1:21942: `curl -sS -k --ssl-reqd -u cn=admin:secret ldap://127.0.0.1:21942/dc=test` -> exit 4, stderr `curl: (4) LDAP local: explicit TLS not supported`, request bytes empty, stdout empty; `--ftp-ssl-reqd` identical; `--ssl` -> exit 38 after a plaintext bind (the canned server answers nothing), as Curl already did. `-v` adds `LDAP local: trying to establish cleartext connection` before the failure line. Curl now gives the same exit, stderr and empty request bytes (pinned in `Cgr013Tests`: exit 4 text, no bytes sent, the cleartext line).
+- Measured on Linux (WSL), curl 8.18.0 (OpenSSL, OpenLDAP 2.6.10): with `--ssl-reqd` and `--ssl` the first bytes sent are the StartTLS ExtendedRequest `301d02010177188016312e332e362e312e342e312e313436362e3230303337`; Curl's OpenLDAP dialect now sends exactly those bytes, then the bind inside TLS (pinned in `Cgr013Tests`). Under an `nc` stand-in curl never acted on the canned ExtendedResponse before the timeout, so the refused-StartTLS exit 64 follows `openldap.c` (recorded in ADR-0816). Linux/macOS CI: the tests use only scripted connections and no platform path, error text or certificate, so they are platform-neutral.
+- The focused tests in `Cgr013Tests.cs` fail before the fix (the WinLDAP case sent the bind in clear and exited past exit 4; the OpenLDAP case sent no StartTLS) and pass after it. Quality: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ldap.UnitLibrary,Curl.Engine.UnitLibrary` found `BindAndSearchAsync` at complexity 12 and one uncovered branch in `LdapExtendedResponse.Decode`; the bind was moved into `StartTlsAndBindAsync` and a DataRow added for each missing branch. Engine at 100/100. `dotnet build` clean, fast tests green.
+
 ## Log
 
 - 2026-10-26: Created from CGR-013 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. LDAP honours --ssl/--ssl-reqd: WinLDAP refuses --ssl-reqd with exit 4 before sending a byte; OpenLDAP sends StartTLS and binds inside TLS
