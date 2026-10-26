@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitLibrary/DigestChallengeParameters.cs, Curl.Authentication.UnitLibrary/DigestQuoting.cs, Curl.Authentication.UnitTests/Cgr077Tests.cs]
+touches: [Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitLibrary/DigestChallengeParameters.cs, Curl.Authentication.UnitLibrary/DigestQuoting.cs, Curl.Authentication.UnitTests/Cgr077Tests.cs, Curl.Authentication.UnitLibrary/DigestChallenge.cs, Curl.Authentication.UnitLibrary/DigestSspiChallenge.cs, Curl.Authentication.UnitTests/DigestAuthenticatorTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3606 — Fix CGR-077: Windows Digest (server and proxy) does not match the SSPI reference: challenges REF refuses with exit 94 are answered, and answer bytes d...
 
@@ -143,17 +143,26 @@ curl -s -x http://127.0.0.1:20600 --proxy-digest -U us:pw http://example.test/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr077Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Touches widened (nobody in Doing on origin/work/dark-factory names these files): `Curl.Authentication.UnitLibrary/DigestChallenge.cs` (a `TryReadFirst` that takes the parameter reader, and `SendsUtf8Charset`), the new `Curl.Authentication.UnitLibrary/DigestSspiChallenge.cs` (SSPI's challenge reader), and `Curl.Authentication.UnitTests/DigestAuthenticatorTests.cs` (its SSPI userhash test pinned the userhash that SSPI never sends). `DigestChallengeParameters.cs` was not changed.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1` (two connections: 401 with the challenge and body `denied`, then 200 `authed`; `curl -sS --digest -u <user> http://127.0.0.1:<port>/p?x=1`, plus `-X PATCH -d zz`, `-d zz`, the URL `/64"`, the URL user `%5cuser%22:password`) against REF = curl 8.22.0 Schannel (Git ucrt64) and PORT = Curl.Console Debug. Proxy: `curl -s -x http://127.0.0.1:20531 --proxy-digest -U us:pw http://example.test/x` with a 407 carrying `userhash=true` or `qop="auth-int"`. 47 cases in all: HS-12 (unknown algorithm, auth-int, qop foo, no nonce, trailing comma, PATCH), HS-13 (userhash, escaped, case, charset, extra blanks, 3000-char nonce), HS-14 (`dom\user`, `:pass`, `usér`), UC-6 (a)-(d), PC-10 (both) and 25 more forms (repeated realm, qop, opaque, unknown key, algorithm and nonce, empty element, key without value, unquoted values, charset with opaque, other charset, nonce/opaque/realm with escapes, no realm, tab in user, `dom/user`, `dom\`, `\user`, quote and `~%` in user, SHA-256, quoted algorithm, `auth-int,auth`, `AUTH`, MD5-sess with and without qop, stale, RFC 2069).
+- REF results (PORT after the fix is the same): exit 94, `curl: (94) An authentication function returned an error`, one request, for unknown algorithm, SHA-256, auth-int only, qop foo, no nonce, trailing comma, two nonces, empty element, key without value, CR/LF or tab in the user name (UC-6 c, d). Exit 67 `curl: (67) Login denied` for `:pass`. PATCH answers as GET does (exit 0, `authed`). userhash ignored (server and proxy: `username="us"`, no userhash). `realm="te\"st"` and `nonce="a\\bc"` on the wire give `realm="te\"st",nonce="a\bc"`; nonce and opaque are sent unescaped (`nonce="a"b"`). `ALGORITHM=md5` gives `algorithm=MD5`. `charset=UTF-8` appends `,charset=utf-8` after opaque. `realm = "testrealm"` with blanks gives `realm=""`, 200. 3000-char nonce keeps cnonce, nc and `qop="auth"`. `dom\user` and `dom/user` give `username="user",realm="dom"`; `usér` sends byte E9; `/64"` gives `uri="/64""`; `%5cuser%22` gives `username="user\""`, response ed551ba287723feffb063cafe9c43daa. Every response hash of both builds (68 answers) was checked to verify for its fields (`v.ps1`). Before the fix, PORT differed in every way the issue's Actual lists (re-measured; also the 25 extra forms differed where REF refuses or SSPI escapes differently).
+- Two differences remain, both outside the issue's repros, recorded in ADR-0824: (1) REF sends `nc=00000002` in its first answer when the 401's connection was closed (a kept connection, `-Script`, gives `nc=00000001`); PORT always sends 1 - filed as BL-3869. (2) MD5-sess without qop: REF answers with a hash not reproducible from the bytes it sends; PORT now fails with exit 94 instead of sending nothing (before: exit 0, `denied`).
+- Focused tests: `Cgr077Tests.cs` (41 cases). Each pins REF's measured answer, which PORT before the fix did not give (the before-fix PORT measurement above), so each failed before the fix; all pass after it. Curl.Authentication.UnitTests: 977 passed, 6 skipped.
+- Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary: 0 failing members, after splitting three methods the first run put past complexity 10.
+- Platform: the unit tests are pure string work with an injected encoding (Latin-1) and `matchesSspiBuild: true`; nothing depends on the OS, so they pass on Linux and macOS too.
+- Decision: ADR-0824 (decided by Claude under Stewart's delegation).
 
 ## Log
 
 - 2026-10-26: Created from CGR-077 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Windows Digest (server and proxy) now reads and answers challenges as curl 8.22.0's SSPI does; every CGR-077 repro matches
