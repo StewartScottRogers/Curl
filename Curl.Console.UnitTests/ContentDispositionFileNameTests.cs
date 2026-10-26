@@ -269,14 +269,14 @@ public sealed class ContentDispositionFileNameTests
         Diagnostics.Bytes("header line", line);
         Diagnostics.Arrange("header line length", line.Length);
 
-        string? name = ContentDispositionFileName.Find(line);
+        string? name = ContentDispositionFileName.Find(line, Encoding.UTF8);
 
         Diagnostics.Act("file name length", name?.Length);
         Diagnostics.Assert("file name", "caf\u00E9.txt", name);
-        Assert.AreEqual("caf\u00E9.txt", ContentDispositionFileName.Find(line));
+        Assert.AreEqual("caf\u00E9.txt", ContentDispositionFileName.Find(line, Encoding.UTF8));
     }
 
     private static string Escaped(string line) => line.Replace("\r", "\\r", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal);
 
-    private static string? Find(string line) => ContentDispositionFileName.Find(Encoding.Latin1.GetBytes(line));
+    private static string? Find(string line) => ContentDispositionFileName.Find(Encoding.Latin1.GetBytes(line), Encoding.UTF8);
 }

@@ -23,8 +23,12 @@ namespace Curl.Console;
 /// name <c>u.txt</c> is written; <c>filename=""</c> names the empty file, which fails to open.
 /// </para>
 /// <para>
-/// curl uses the value's bytes as the name. They are read here as UTF-8, the encoding .NET
-/// file names round-trip through on every platform.
+/// curl uses the value's bytes as the name. They are read here in the encoding the caller
+/// gives: the ANSI code page on Windows, where curl 8.22.0's Windows build opens the name
+/// with the ANSI file API (byte E9 writes <c>café.txt</c>, bytes C3 A9 write <c>cafÃ©.txt</c>
+/// under code page 1252; BL-3580 Notes, CGR-051), and UTF-8 elsewhere, the encoding .NET
+/// file names round-trip through, so a name that is not valid UTF-8 off Windows gets U+FFFD
+/// in place of its raw bytes (ADR-0821).
 /// </para>
 /// </remarks>
 internal static class ContentDispositionFileName
@@ -43,12 +47,13 @@ internal static class ContentDispositionFileName
     /// Finds the file name in one header line.
     /// </summary>
     /// <param name="line">One header line, with or without its CR LF.</param>
+    /// <param name="fileNameEncoding">The encoding the name's bytes are read in.</param>
     /// <returns>
     /// The name, which may be empty; <see langword="null" /> when the line is not a
     /// <c>Content-Disposition</c> header, has no <c>filename=</c> parameter, or its value
     /// ends in <c>/</c> or <c>\</c>.
     /// </returns>
-    internal static string? Find(ReadOnlySpan<byte> line)
+    internal static string? Find(ReadOnlySpan<byte> line, Encoding fileNameEncoding)
     {
         if (line.Length <= HeaderPrefix.Length
             || !Ascii.EqualsIgnoreCase(line[..HeaderPrefix.Length], HeaderPrefix))
@@ -59,7 +64,7 @@ internal static class ContentDispositionFileName
         ReadOnlySpan<byte> parameters = line[HeaderPrefix.Length..];
         int value = FileNameValueStart(parameters);
 
-        return value < 0 ? null : ParseValue(parameters[value..]);
+        return value < 0 ? null : ParseValue(parameters[value..], fileNameEncoding);
     }
 
     /// <summary>
@@ -99,8 +104,9 @@ internal static class ContentDispositionFileName
     /// Reads a <c>filename=</c> value as curl's <c>parse_filename</c> does.
     /// </summary>
     /// <param name="value">The bytes after <c>filename=</c>, to the end of the line.</param>
+    /// <param name="fileNameEncoding">The encoding the name's bytes are read in.</param>
     /// <returns>The name, or <see langword="null" /> when the value ends in <c>/</c> or <c>\</c>.</returns>
-    private static string? ParseValue(ReadOnlySpan<byte> value)
+    private static string? ParseValue(ReadOnlySpan<byte> value, Encoding fileNameEncoding)
     {
         bool quoted = StartsWithQuote(value);
         ReadOnlySpan<byte> name = quoted ? UpTo(value[1..], value[0]) : UpTo(value, (byte)';');
@@ -110,7 +116,7 @@ internal static class ContentDispositionFileName
             return null;
         }
 
-        return Encoding.UTF8.GetString(UpTo(UpTo(name[(slash + 1)..], (byte)'\r'), (byte)'\n'));
+        return fileNameEncoding.GetString(UpTo(UpTo(name[(slash + 1)..], (byte)'\r'), (byte)'\n'));
     }
 
     /// <summary>

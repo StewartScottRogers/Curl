@@ -1,3 +1,4 @@
+using Curl.Authentication;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -20,6 +21,11 @@ namespace Curl.Console;
 /// of a 3xx response renames it after the last segment of the URL it points at
 /// (<see cref="RedirectLocationFileName" />), as curl 8.21.0 does (upstream tests 1642, 1643).
 /// </param>
+/// <param name="fileNameEncoding">
+/// The encoding the <c>Content-Disposition</c> name's bytes are read in; <see langword="null" />
+/// for the platform's, as <c>CredentialEncoding.ForPlatform</c> gives it (the ANSI code page on
+/// Windows, UTF-8 elsewhere; ADR-0821).
+/// </param>
 /// <remarks>
 /// <para>
 /// Measured on Windows with curl 8.21.0 on 2026-09-27 (BL-239 Notes): the name is taken from a
@@ -39,7 +45,8 @@ internal sealed class RemoteHeaderNameStream(
     DeferredOutputFileStream output,
     Stream? headerOutput,
     Func<string, string> pathOf,
-    bool followsRedirects = false) : Stream
+    bool followsRedirects = false,
+    System.Text.Encoding? fileNameEncoding = null) : Stream
 {
     /// <summary>The start of a status line.</summary>
     private static ReadOnlySpan<byte> StatusLinePrefix => "HTTP/"u8;
@@ -201,7 +208,7 @@ internal sealed class RemoteHeaderNameStream(
     private string? ContentDispositionNameOf(byte[] line) =>
         output.NamedByContentDisposition || statusClass is not (2 or 3)
             ? null
-            : ContentDispositionFileName.Find(line);
+            : ContentDispositionFileName.Find(line, fileNameEncoding ?? CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
 
     /// <summary>
     /// Under <c>-L</c>, renames the not yet opened output file after a 3xx response's
