@@ -23,9 +23,7 @@ internal static class CurlUrlHost
     /// A dot and the characters IDNA (UTS #46, transitional) maps to nothing; see
     /// <see cref="IsMappedToNothingOrDot" />.
     /// </summary>
-    private const string CharactersMappedToNothingOrDot =
-        ".­͏᠋᠌᠍᠎᠏​‌‍⁠"
-        + "︀︁︂︃︄︅︆︇︈︉︊︋︌︍︎️﻿";
+    private const string CharactersMappedToNothingOrDot = "." + CurlUrlHostNameMapping.CharactersMappedToNothing;
 
     /// <summary>The longest zone id curl keeps; a longer one is rejected.</summary>
     private const int MaximumZoneIdLength = 15;
@@ -166,7 +164,9 @@ internal static class CurlUrlHost
         CharactersMappedToNothingOrDot.Contains(character);
 
     /// <summary>
-    /// Converts a host name that is not ASCII to punycode, or returns <see langword="null" />
+    /// Maps a host name that is not ASCII as UTS #46 does (<see cref="CurlUrlHostNameMapping" />,
+    /// so <c>BÜCHER</c> is <c>xn--bcher-kva</c> and <c>Ａb</c> is <c>ab</c>) and converts it to
+    /// punycode, or returns <see langword="null" />
     /// when <see cref="IdnMapping" /> cannot convert it: bytes that are not UTF-8
     /// (<c>invalid-utf8-%e2%90.local</c>, upstream test 1034) or a label longer than 63
     /// characters once converted (test 1035). curl 8.22.0 in a UTF-8 locale fails a transfer
@@ -174,9 +174,10 @@ internal static class CurlUrlHost
     /// </summary>
     private static string? ToPunycode(string name)
     {
+        string mapped = CurlUrlHostNameMapping.Map(name);
         try
         {
-            return Idn.GetAscii(name);
+            return Ascii.IsValid(mapped) ? mapped : Idn.GetAscii(mapped);
         }
         catch (ArgumentException)
         {
