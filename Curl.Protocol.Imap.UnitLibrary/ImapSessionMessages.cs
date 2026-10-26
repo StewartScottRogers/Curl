@@ -77,6 +77,12 @@ internal static class ImapSessionMessages
     /// <summary>An upload's URL names no mailbox to <c>APPEND</c> to (exit 3).</summary>
     internal const string AppendWithoutMailbox = "Cannot APPEND without a mailbox.";
 
+    /// <summary>
+    /// <c>--crlf</c> was given with an upload, whose converted size cannot be known before
+    /// <c>APPEND</c> announces it (exit 25).
+    /// </summary>
+    internal const string AppendWithCrlfConversion = "Cannot APPEND with CRLF conversion making size unknown";
+
     /// <summary>An upload's size is not known before it is sent, as with <c>-T -</c> (exit 25).</summary>
     internal const string AppendWithUnknownSize = "Cannot APPEND with unknown input file size";
 
