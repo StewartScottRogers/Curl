@@ -629,6 +629,10 @@ try {
     Write-Step "seeder avoids $($avoidFiles.Count) files named by $($awaited.Count) findings awaiting a re-audit$(if ($avoidFiles.Count) { ': ' + ($avoidFiles -join ', ') })"
     if ($ReauditOnly) {
         [IO.File]::WriteAllText($manifest, '{ "planted": [], "unseeded": [], "reauditOnly": true }', $Utf8)
+        # The seeder's "Audit baseline" commit would hold the overlay; with no seeder, commit it here,
+        # or the first auditor's clean-tree check sees the overlay as its own change and resets it away.
+        Invoke-Git @('-C', $plantedTree, 'add', '-A') | Out-Null
+        Invoke-Git @('-C', $plantedTree, '-c', 'user.name=Audit runner', '-c', 'user.email=audit-runner@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'Audit baseline (re-audit only, nothing planted)') | Out-Null
         $seedingProblems = @()
         Write-Step 're-audit only: nothing planted'
     }

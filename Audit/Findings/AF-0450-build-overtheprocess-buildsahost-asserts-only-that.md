@@ -42,6 +42,8 @@ Select-String -Path Curl.Mcp.UnitTests/CurlMcpHostTests.cs -Pattern 'Build_OverT
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Select-String finds no Build_OverTheProcess_BuildsAHost. It is now Build_OverTheProcess_ReadsTheResponseCapFromTheProcessEnvironment (CurlMcpHostTests.cs:84). It sets the cap variable to 'lots' and asserts that RunAsync throws McpConfigurationException with a message naming the variable.
+
 ## Log
 
 - 2026-10-25: filed proposed.

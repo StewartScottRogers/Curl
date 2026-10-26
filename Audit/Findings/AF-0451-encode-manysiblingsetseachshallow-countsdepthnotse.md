@@ -42,6 +42,8 @@ Select-String -Path Curl.Protocol.Ldap.UnitTests/LdapAdversarialTests.cs -Patter
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | LdapAdversarialTests.cs:382-386: asserts the first byte is 0xA0 and the AND header is 2-5 bytes, and runs CollectionAssert.AreEqual on the child encodings (the 11-byte OR of cn=a, repeated per sibling).
+
 ## Log
 
 - 2026-10-25: filed proposed.

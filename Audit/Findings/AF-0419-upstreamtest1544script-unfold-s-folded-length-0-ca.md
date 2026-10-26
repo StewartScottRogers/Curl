@@ -45,6 +45,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-24 | 2026-10-24_2106.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. Unfold was rewritten: it now always does line = folded + " " + line (UpstreamTest1544Script.cs:125, with a comment citing AF-0419) and has no '>' comparison left to mutate, so the mutant cannot be run. Not re-audited.
 - 2026-10-25 | 2026-10-25_0941.md | not re-audited | Ran the -Site reproduction (UpstreamTest1544Script.cs:124:>, -Member Unfold): outcome site-missing, resolvedLine null, no mutant run. Unfold now always writes 'line = folded + " " + line;' with no folded.Length > 0 test, so the site is gone. Not re-audited.
 - 2026-10-25 | 2026-10-25_1542.md | not re-audited | Ran the -Site Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs:124:> -Member Unfold command: outcome site-missing. Unfold no longer has the folded.Length > 0 test; line 124 now reads line = folded + " " + line; with a comment that WithoutComments trims each line. No mutant ran, so this is not re-audited.
+- 2026-10-25 | 2026-10-25_1944.md | not re-audited | Ran Invoke-MutationTest.ps1 -Site Curl.Conformance.UnitLibrary/UpstreamTest1544Script.cs:124:> -Member Unfold -ExcludeBaselineFailures -TimeoutSeconds 600: outcome site-missing (baseline 77555 ms, no mutants). grep finds no 'folded.Length' in UpstreamTest1544Script.cs any more; the code was rewritten, so the site could not be run. Not re-audited.
 
 ## Log
 
