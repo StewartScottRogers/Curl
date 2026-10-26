@@ -1,5 +1,5 @@
 ---
-id: BL-3830
+id: BL-3838
 title: Close an HTTP/2 connection given up after five REFUSED_STREAM retries without the closing GOAWAY
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3830 — Close an HTTP/2 connection given up after five REFUSED_STREAM retries without the closing GOAWAY
+# BL-3838 — Close an HTTP/2 connection given up after five REFUSED_STREAM retries without the closing GOAWAY
 
 ## Goal
 
