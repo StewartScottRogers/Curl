@@ -1,5 +1,5 @@
 ---
-id: BL-3849
+id: BL-3855
 title: FTP sends USER and PASS in Latin-1, not the credential bytes curl sends
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3849 — FTP sends USER and PASS in Latin-1, not the credential bytes curl sends
+# BL-3855 — FTP sends USER and PASS in Latin-1, not the credential bytes curl sends
 
 ## Goal
 

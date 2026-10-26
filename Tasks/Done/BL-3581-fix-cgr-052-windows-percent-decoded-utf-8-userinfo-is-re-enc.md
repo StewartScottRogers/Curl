@@ -84,7 +84,7 @@ curl -sS "http://%C3%A9:%E2%82%AC@127.0.0.1:20200/a"
 - No change was needed in BasicAndBearerAuthenticator.cs, so Curl.Authentication.UnitTests/Cgr052Tests.cs was not created: the fix is in the lookup (Engine) and the config-file URL (Cli), each with its own Cgr052Tests.cs. Cgr052Tests.TryLookUp_PercentEncodedUtf8OnWindows_SendsTheDecodedBytes gives E9 3A 80 with the old Uri.UnescapeDataString decode and C3 A9 3A E2 82 AC now; Parse_ConfigFileUrlWithUtf8UserInformationOnWindows_... likewise fails without the respell (measured as case 2 before the Cli change).
 - Touches widened to Curl.Cli.UnitLibrary/CommandLineOptionTable.cs and Curl.Cli.UnitTests/Cgr052Tests.cs for the -K repro; no task in Doing on origin/work/dark-factory names them. Curl.Console.UnitTests/CurlCommandRunnerCredentialControlCodeTests.cs's ftp user %c3%a9 row pinned the old string and now checks the bytes the platform encoding gives back (one-line fix, kept here since this change caused it).
 - Platform check: the tests use CredentialEncoding.ForPlatform(true) (Windows-1252 off Windows) or UTF-8 explicitly and no path, so they pass the same on Linux and macOS; Linux behaviour for valid UTF-8 is unchanged (REF-LINUX already matched).
-- Follow-up filed: BL-3849 (FTP writes USER/PASS in Latin-1, not the platform credential bytes).
+- Follow-up filed: BL-3855 (FTP writes USER/PASS in Latin-1, not the platform credential bytes).
 - Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Cli.UnitLibrary: 0 failing members. Fast tests: every project passed (Curl.Console.UnitTests 2889 passed after its test update, Curl.Engine.UnitTests 2518).
 ## Log
 
