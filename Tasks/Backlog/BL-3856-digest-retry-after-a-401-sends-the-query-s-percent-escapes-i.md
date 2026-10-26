@@ -1,5 +1,5 @@
 ---
-id: BL-3849
+id: BL-3856
 title: Digest retry after a 401 sends the query's percent-escapes in upper case as curl 8.22.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3849 — Digest retry after a 401 sends the query's percent-escapes in upper case as curl 8.22.0 does
+# BL-3856 — Digest retry after a 401 sends the query's percent-escapes in upper case as curl 8.22.0 does
 
 ## Goal
 

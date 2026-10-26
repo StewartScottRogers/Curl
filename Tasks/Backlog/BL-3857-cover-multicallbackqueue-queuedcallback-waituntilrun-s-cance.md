@@ -1,5 +1,5 @@
 ---
-id: BL-3850
+id: BL-3857
 title: Cover MultiCallbackQueue.QueuedCallback.WaitUntilRun's cancelled-after-taken branch deterministically
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3850 — Cover MultiCallbackQueue.QueuedCallback.WaitUntilRun's cancelled-after-taken branch deterministically
+# BL-3857 — Cover MultiCallbackQueue.QueuedCallback.WaitUntilRun's cancelled-after-taken branch deterministically
 
 ## Goal
 

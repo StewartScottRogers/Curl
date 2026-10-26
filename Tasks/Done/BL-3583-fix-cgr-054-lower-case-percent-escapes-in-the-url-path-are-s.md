@@ -137,8 +137,8 @@ curl -sS --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H 'X-Amz-Date: 2025010
   11. `-sS ws://P/a%2fb%3d` -> `GET /a%2Fb%3D`, exit 22 `curl: (22) Refused WebSocket upgrade: 200`
   12. `-sS -p -x http://P http://example.com/a%2fb` -> exit 56 `curl: (56) Recv failure: Connection was aborted` (already matched)
   `-O` file names come from the URL text and are unchanged (the report shows they already matched).
-- Found while measuring: on a Digest 401 retry curl 8.22.0 also upper-cases the query (`GET /a%2Fb?q=%2F`), which is not one of this issue's repros; filed as BL-3849.
-- Quality (`Measure-CodeQuality.ps1` over Abstractions, Http, Ws and Engine): Abstractions, Http and Ws 100%/100%; Engine's one failing member is BL-3562's `MultiCallbackQueue.QueuedCallback.WaitUntilRun` (a timing-dependent branch this task did not touch), filed as BL-3850. Every member this task changed passes.
+- Found while measuring: on a Digest 401 retry curl 8.22.0 also upper-cases the query (`GET /a%2Fb?q=%2F`), which is not one of this issue's repros; filed as BL-3856.
+- Quality (`Measure-CodeQuality.ps1` over Abstractions, Http, Ws and Engine): Abstractions, Http and Ws 100%/100%; Engine's one failing member is BL-3562's `MultiCallbackQueue.QueuedCallback.WaitUntilRun` (a timing-dependent branch this task did not touch), filed as BL-3857. Every member this task changed passes.
 - Fails before the fix: before it the request line, upgrade target and SigV4 path carried the typed lower-case escapes (measured above as the report's Actual), so every `Cgr054Tests` assertion on upper case fails there; `UrlPathEscapes` and `HttpUrlText.OriginTarget` did not exist.
 - CI on Linux and macOS: the new tests are pure string computation with no path, OS or certificate, so they are platform-neutral; fast tests green here (exit 0).
 
