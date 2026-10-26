@@ -1,5 +1,5 @@
 ---
-id: BL-3898
+id: BL-3900
 title: Windows: -o, -T and config-file file names take the mingw curl's ANSI bytes (CGR-114)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3898 — Windows: -o, -T and config-file file names take the mingw curl's ANSI bytes (CGR-114)
+# BL-3900 — Windows: -o, -T and config-file file names take the mingw curl's ANSI bytes (CGR-114)
 
 ## Goal
 

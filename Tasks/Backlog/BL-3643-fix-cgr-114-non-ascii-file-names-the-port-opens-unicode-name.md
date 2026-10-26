@@ -4,7 +4,7 @@ title: Fix CGR-114: Non-ASCII file names: the port opens Unicode names on Window
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3898, BL-3899]
+depends-on: [BL-3900, BL-3899]
 touches: [Curl.Protocol.File.UnitLibrary/FileUrlPath.cs, Curl.Protocol.File.UnitTests/Cgr114Tests.cs, Curl.Protocol.File.UnitTests/FileUrlPathAdversarialTests.cs, Curl.Protocol.File.UnitTests/FileUrlPathTests.cs, Curl.Protocol.File.UnitTests/FileProtocolHandlerAdversarialTests.cs]
 requirement: none
 created: 2026-10-26
@@ -99,10 +99,10 @@ curl -s file:///<dir>/%E6%97%A5%E6%9C%AC.txt
 
 - 2026-10-26 (lane 4, first pass, no code changed): measured real curl 8.22.0 (Git ucrt64 mingw, Schannel, non-UNICODE) on Windows with ACP 1252, files `café.txt`, `日本.txt`, `cafÃ©.txt` in `Z:/repos/Curl.lanes/cgr114-l4`: `file:///.../caf%E9.txt` prints `latin`, exit 0; `file:///.../%E6%97%A5%E6%9C%AC.txt` exits 37 `Could not open file Z:/repos/Curl.lanes/cgr114-l4/%E6%97%A5%E6%9C%AC.txt`; `file:///.../caf%C3%A9.txt` opens `cafÃ©.txt` (exit 0); `%81x.txt` exits 37. So on Windows the decoded escape bytes are read in the system ANSI code page, not UTF-8.
 - Plan for this task when it comes back: in `FileUrlPath.Decode`/`Flush`, read each run of escape bytes in the system ANSI code page on Windows (`CodePagesEncodingProvider.Instance.GetEncoding(0)`, asked twice as BL-1200 found, Windows-1252 fallback; the protocol library cannot reference `CredentialEncoding`), and in BL-3899's raw-byte path form on Unix; take the encoding through an internal `TryParse` overload so tests inject it on every platform. Unescaped non-ASCII characters in the URL stay as typed (the reference receives them in ANSI, which round-trips é). Existing tests pin UTF-8 decoding through the public `TryParse` (`FileUrlPathAdversarialTests` %C3%A9 / %C3x%A9 cases, `FileProtocolHandlerAdversarialTests.ExecuteAsync_NonAsciiName_OpensTheDecodedCharacters`, possibly `FileUrlPathTests`): move them onto the injected-encoding overload or pin per platform, so those files were added to `touches` (no live task in Doing on origin/work/dark-factory names them). Record the decision in an ADR (mingw reference, ADR-0018/ADR-0067).
-- Requeued for the work outside this task's library: BL-3898 (Windows `-o`, `-T`, config `output` names in ANSI bytes, in Curl.Console) and BL-3899 (Unix raw-byte open in PhysicalFileSystem plus the raw-byte path form in Protocol.Abstractions, which this task's Linux half needs).
+- Requeued for the work outside this task's library: BL-3900 (Windows `-o`, `-T`, config `output` names in ANSI bytes, in Curl.Console) and BL-3899 (Unix raw-byte open in PhysicalFileSystem plus the raw-byte path form in Protocol.Abstractions, which this task's Linux half needs).
 
 ## Log
 
 - 2026-10-26: Created from CGR-114 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Backlog. Waits on BL-3898 (Windows -o/-T/config file names in ANSI bytes, Curl.Console) and BL-3899 (Unix raw-byte file open hook); the file:// decode here follows them
+- 2026-10-26: Doing -> Backlog. Waits on BL-3900 (Windows -o/-T/config file names in ANSI bytes, Curl.Console) and BL-3899 (Unix raw-byte file open hook); the file:// decode here follows them
