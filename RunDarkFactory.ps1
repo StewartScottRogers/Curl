@@ -426,6 +426,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestCiWatch
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAffectedTests
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskIds
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestAdrIds
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskBudget
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestModelChoice
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestClaimDuplicates
@@ -496,6 +497,9 @@ param(
     # -Reason text, status lines and file names, and that a wait logs next's reason line
     # rather than a WARNING printed before it, and exit.
     [switch]$TestTaskIds,
+    # Prove, on scratch repositories, that an ADR a lane added under a number another lane
+    # pushed first is renumbered, with its heading and citations, and that base ADRs never are (BL-3834), and exit.
+    [switch]$TestAdrIds,
     # Prove the cost cap follows 4 times the median recent run cost (AF-0033), and exit.
     [switch]$TestTaskBudget,
     # Prove the choice of model per task (BL-1705), and exit.
@@ -616,6 +620,7 @@ foreach ($AreaFile in @(
         'MachineProbe',
         'OutOfTokens',
         'TaskIds',
+        'AdrIds',
         'TaskBudget',
         'ModelChoice',
         'Requeue',

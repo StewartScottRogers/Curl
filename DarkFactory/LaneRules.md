@@ -48,7 +48,9 @@ Match the platform's curl (Schannel build on Windows, OpenSSL build on Linux and
 measure real curl before pinning output text, base class library only, simplest thing
 that stays a drop-in replacement. Record the decision and why in an ADR marked "Decided
 by Claude under Stewart's delegation". Only a new package or a threshold change needs
-Stewart. Nothing is left out because it is hard or the BCL lacks a primitive: QUIC,
+Stewart. When two lanes pick the same ADR number, the integrating lane renumbers its own
+new ADR (file name, heading, README row and citations on the lines it added); never edit
+an ADR number of another lane's file to avoid a clash (ADR-0818). Nothing is left out because it is hard or the BCL lacks a primitive: QUIC,
 HTTP/3, SSH's Curve25519, Ed25519, ChaCha20-Poly1305, Kerberos and the like are built by
 hand, each in its own `Curl.<Area>.UnitLibrary` with its own `.UnitTests` project, held
 to the same gates. Never a package, never an ADR that decides a feature stays out.
