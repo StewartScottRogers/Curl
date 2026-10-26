@@ -77,3 +77,4 @@ curl -sS -H "Expect: 100-continue" -d abcde http://127.0.0.1:20335/a
 ## Log
 
 - 2026-10-26: Created from CGR-067 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
