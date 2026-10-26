@@ -389,7 +389,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var judgedHandshake = Unnegotiated(offeredApplicationProtocols);
         var authenticationOptions = new SslClientAuthenticationOptions
         {
-            TargetHost = targetHost,
+            TargetHost = ServerNameIndication(targetHost),
             EnabledSslProtocols = _offeredProtocols,
             CertificateChainPolicy = chainPolicy,
             LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
@@ -689,6 +689,20 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         insecure ? null
         : targetHost.StartsWith('[') && targetHost.EndsWith(']') ? targetHost[1..^1]
         : targetHost;
+
+    /// <summary>
+    /// Returns the name the handshake sends as SNI, as curl sends it (CGR-093, ADR-0825): the
+    /// target host lowercased, without the one trailing dot a fully qualified name may carry,
+    /// which RFC 6066 section 3 forbids in SNI. curl lowercases the URL host when it parses the
+    /// URL, so <c>https://LOCALHOST/</c> sends <c>localhost</c>; the Host header keeps its case.
+    /// </summary>
+    /// <param name="targetHost">The host the handshake connects to.</param>
+    /// <returns>The server name to send.</returns>
+    internal static string ServerNameIndication(string targetHost)
+    {
+        var lowercased = targetHost.ToLowerInvariant();
+        return lowercased.EndsWith('.') ? lowercased[..^1] : lowercased;
+    }
 
     // ADR-0011, ADR-0816: the Schannel build reads --ciphers as ALG_IDs and ignores
     // --tls13-ciphers; the OpenSSL build offers what they name. CipherSuitesPolicy cannot be
