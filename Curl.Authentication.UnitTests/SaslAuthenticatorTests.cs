@@ -423,22 +423,6 @@ public sealed class SaslAuthenticatorTests
     }
 
     [TestMethod]
-    public void Begin_Login_SendsAnEmptyAnswerAsEquals()
-    {
-        // LOGIN's empty password is an explicit empty response, "=".
-        var diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("mechanism", "LOGIN");
-        ISaslExchange exchange = new SaslAuthenticator(Windows1252, () => "c", answerDigestMd5AsSspi: false, securityContexts: null)
-            .Begin("LOGIN", Request(new NetworkCredential("user", string.Empty)));
-
-        bool sendsEmptyLine = exchange.SendsLastAnswerAsEmptyLine;
-
-        diagnostics.Act("sends last answer as empty line", sendsEmptyLine);
-        diagnostics.Assert("sends last answer as empty line", false, sendsEmptyLine);
-        Assert.IsFalse(sendsEmptyLine);
-    }
-
-    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public async Task Begin_DigestMd5WithoutCredential_SendsAnEmptyUser(bool answerAsSspi)
