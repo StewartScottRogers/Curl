@@ -351,11 +351,22 @@ internal static class HttpRequestHeadFormatter
     /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
     /// and port as the <c>Host</c> line has them, then the path and query; for an <c>ftp</c> URL
     /// the user and password come before the host (<see cref="FtpUserInformation" />), and the path ends in
-    /// <see cref="FtpTypeOf" />.
+    /// <see cref="FtpTypeOf" />. An IPv6 host keeps its zone id as <c>%25</c> and the id before the
+    /// closing bracket, as curl 8.22.0 sends <c>GET http://[fe80::1%25eth0]:8080/x</c> while its
+    /// <c>Host</c> line is <c>[fe80::1]:8080</c> (measured, CGR-056, BL-3585).
     /// </summary>
     private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType) =>
-        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.WireHostAndPort(url)}"
+        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{ZonedHostAndPort(url)}"
         + HttpUrlText.RequestTarget(url).Insert(HttpUrlText.Path(url).Length, FtpTypeOf(url, proxyTransferType));
+
+    /// <summary>
+    /// Gives <see cref="HttpUrlText.WireHostAndPort" /> with the URL's IPv6 zone id, when it has
+    /// one, put before the closing bracket as <c>%25</c> and the id.
+    /// </summary>
+    private static string ZonedHostAndPort(CurlUrl url) =>
+        url.ZoneId is { } zoneId
+            ? HttpUrlText.WireHostAndPort(url).Replace("]", $"%25{zoneId}]", StringComparison.Ordinal)
+            : HttpUrlText.WireHostAndPort(url);
 
     /// <summary>
     /// Gives <c>;type=</c> and <paramref name="proxyTransferType" /> for an <c>ftp</c> URL whose path does not

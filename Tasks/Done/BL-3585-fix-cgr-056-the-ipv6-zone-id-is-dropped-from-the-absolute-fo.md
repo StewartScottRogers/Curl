@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr056Tests.cs]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr056Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr056Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3585 — Fix CGR-056: The IPv6 zone id is dropped from the absolute-form request line sent to an HTTP proxy
 
@@ -69,17 +69,23 @@ curl -s -x http://127.0.0.1:20600 "http://[fe80::1%25eth0]:8080/x"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr056Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause: `CurlUrlHost` keeps the zone id apart from `Host` rightly (curl's `Host:` line has no zone), but `HttpRequestHeadFormatter.AbsoluteForm` built the proxy target from the zoneless host. Fix: `ZonedHostAndPort` puts `%25<zone>` before the `]` in the absolute form only. So the fix and its test are in Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs and Curl.Protocol.Http.UnitTests/Cgr056Tests.cs. Both were added to `touches`, and no task in Doing on origin/work/dark-factory names them. The Abstractions files were left unchanged.
+- Measured with Record-CurlExchange.ps1 (server replies `200 OK`, body `ok`), real curl 8.22.0 Schannel and Curl:
+  - `curl -sS -x http://127.0.0.1:P "http://[fe80::1%25eth0]:8080/x"`: both send `GET http://[fe80::1%25eth0]:8080/x HTTP/1.1`, `Host: [fe80::1]:8080`, `User-Agent: curl/8.22.0`, `Accept: */*`, `Proxy-Connection: Keep-Alive`; both exit 0, print stdout `ok` and write empty stderr. request.bin is byte-identical.
+  - `curl -sS -x http://127.0.0.1:P "http://[::1%25lo]:8080/a"`: both send `GET http://[::1%25lo]:8080/a HTTP/1.1` with `Host: [::1]:8080`; both exit 0 and print `ok`. request.bin is byte-identical.
+- Cgr056Tests failed 3 of 5 before the fix (the zoned proxy targets) and pass after it. The zoneless and origin-form cases (variants that already matched) still pass. Measure-CodeQuality -Library Curl.Protocol.Http.UnitLibrary: 0 failing members. The change is platform-neutral (string formatting only), so CI on Linux and macOS should agree.
 
 ## Log
 
 - 2026-10-26: Created from CGR-056 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A forward proxy's absolute-form target keeps the IPv6 zone id as %25zone, byte-identical to curl 8.22.0
