@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Authentication.UnitLibrary/NetrcFile.cs, Curl.Authentication.UnitTests/Cgr074Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3603 — Fix CGR-074: Non-ASCII bytes in a .netrc login or password are re-encoded instead of sent as the file's bytes
 
@@ -68,17 +68,25 @@ curl -sS --netrc-file n.txt http://127.0.0.1:20500/p
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr074Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 8): Not reproducible at d37706c30. 17c7a120a (CGR-052, after the report's b0d27d68) made `TransferCredentialLookup.ReadNetrcText` decode the netrc bytes with the credential encoding (`CredentialEncoding.ForPlatform`: the ANSI code page on Windows, byte-keeping UTF-8 elsewhere), so the login and password encode back to the file's bytes. No production change was needed.
+- Measured with `Record-CurlExchange.ps1` (REF = curl 8.22.0 Schannel, PORT = `dotnet Curl.Console\bin\Debug\net10.0\curl.dll`): `curl -sS --netrc-file <n.txt> http://127.0.0.1:<port>/p`, with n.txt = `machine 127.0.0.1 login us\xE9r password p\xE4ss\n` as Latin-1 bytes and as UTF-8.
+  - Latin-1 file: REF and PORT both exit 0, stdout empty, stderr empty, `Authorization: Basic dXPpcjpw5HNz`.
+  - UTF-8 file: REF and PORT both exit 0, stdout empty, stderr empty, `Authorization: Basic dXPDqXI6cMOkc3M=`.
+  - Whole request bytes equal for both files once the port and the User-Agent version are normalised. No files are written.
+- Unit test `Curl.Authentication.UnitTests/Cgr074Tests.cs` pins the contract the fix rests on: both files, decoded with the Windows (1252) and the non-Windows credential encoding, parsed by `NetrcFile` and encoded again, give REF's Basic credentials. With the decode swapped back to `Encoding.UTF8` (the behaviour before 17c7a120a) it failed 3 of its 4 cases. The test is pure computation and does not depend on the platform, so it holds on Linux and macOS CI as well.
+- Build clean, 0 warnings. Fast tests pass in every test project (for example Curl.Authentication.UnitTests 938 passed, Curl.Engine.UnitTests 2550, Curl.Conformance.UnitTests 4381). No production code changed, so no quality run was needed.
 
 ## Log
 
 - 2026-10-26: Created from CGR-074 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Non-ASCII .netrc credentials are sent as the file's bytes (fixed by 17c7a120a); pinned by Cgr074Tests
