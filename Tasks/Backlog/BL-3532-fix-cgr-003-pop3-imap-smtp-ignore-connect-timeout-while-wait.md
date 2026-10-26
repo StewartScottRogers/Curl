@@ -76,3 +76,4 @@ curl -sS -w '%{exitcode}|%{errormsg}\n' pop3://127.0.0.1:20700/ --connect-timeou
 
 - 2026-10-26: Created from CGR-003 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3532-20261026-063535-L1.jsonl
