@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Mcp.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3527 — Fix AF-0450: Build_OverTheProcess_BuildsAHost asserts only that CurlMcpHost.Build() is not null
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Pipeline `feature` run directly: a one-test change in Curl.Mcp.UnitTests, no production code, so no plan, no quality run.
+- The test is renamed `Build_OverTheProcess_ReadsTheResponseCapFromTheProcessEnvironment` (the old name only claimed a host was built). It sets the real process variable `CURL_MCP_MAX_RESPONSE_BYTES` to `lots`, calls the parameterless `Build()`, and asserts `RunAsync` refuses with `McpConfigurationException` naming the variable: proof that `Build()` wires the host to `Environment.GetEnvironmentVariable`. It restores the variable in `finally`; the class is `[DoNotParallelize]` and no other unit test reads the real variable. The throw comes before the host touches standard input, so the test never reads the real stdio (Curl.Mcp.UnitTests CLAUDE.md).
+- Reproduction: the old pattern now finds nothing; `Select-String -Pattern Build_OverTheProcess -Context 0,16` shows the test asserting the refusal and its message, not `Assert.IsNotNull`.
+- `dotnet build` clean; fast tests 0 failed across all test projects (Curl.Mcp.UnitTests 528 passed). Platform-neutral: no path, OS text or certificate.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Build_OverTheProcess test now asserts Build() reads CURL_MCP_MAX_RESPONSE_BYTES from the process environment
