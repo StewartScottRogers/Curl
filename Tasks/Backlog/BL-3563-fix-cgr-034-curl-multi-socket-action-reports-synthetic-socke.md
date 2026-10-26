@@ -4,7 +4,7 @@ title: Fix CGR-034: curl_multi_socket_action reports synthetic socket numbers, n
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847]
+depends-on: [BL-3846, BL-3847, BL-3849]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr034Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -90,3 +90,4 @@ probe.exe C_20,C_21,C_65,C_74,C_75 2
 - 2026-10-26: Created from CGR-034 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Needs BL-3846 (real OS socket through IConnection) and BL-3847 (readiness-gated socket-action I/O with OUT/IN and deadline) first
+- 2026-10-26: BL-3847 added BL-3849 to depends-on: the gate's routing into the dialer is BL-3849's.
