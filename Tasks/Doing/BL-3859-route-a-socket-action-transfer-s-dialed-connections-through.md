@@ -31,3 +31,4 @@ BL-3847 built `TransferSocketWait` and `SocketActionGatedConnection` (ADR-0821) 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: abd4b015 9f797c6a 877bdc24.
