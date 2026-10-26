@@ -669,6 +669,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "> EPSV\r\n",
             "* Connect data stream passively",
             "< " + reply,
+            "* Illegal port number in EPSV reply",
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
@@ -695,6 +696,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             "* Failed EPSV attempt. Disabling EPSV",
             "> PASV\r\n",
             "< 500 no\r\n",
+            "* Bad PASV/EPSV response: 500",
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
@@ -718,6 +720,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         [
             "> TYPE I\r\n",
             "< 500 no\r\n",
+            "* Could not set desired mode",
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
@@ -729,9 +732,9 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
     }
 
     [TestMethod]
-    [DataRow("", "> SIZE f.txt\r\n", DisplayName = "SIZE 550")]
-    [DataRow("213 11\r\n", "> RETR f.txt\r\n", DisplayName = "RETR 550")]
-    public async Task ExecuteAsync_FileNotFound_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit78(string sizeReply, string refusedCommand)
+    [DataRow("", "> SIZE f.txt\r\n", "The file does not exist", DisplayName = "SIZE 550")]
+    [DataRow("213 11\r\n", "> RETR f.txt\r\n", "RETR response: 550", DisplayName = "RETR 550")]
+    public async Task ExecuteAsync_FileNotFound_ReportsTheDirectoryAndLeftIntactLinesAndFailsWithExit78(string sizeReply, string refusedCommand, string failure)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
 
@@ -744,6 +747,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         [
             refusedCommand,
             "< 550 no\r\n",
+            "* " + failure,
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
@@ -769,6 +773,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
             .. LoggedInTranscript,
             "> CWD d\r\n",
             "< 550 no\r\n",
+            "* Server denied you to change to the given directory",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
         DiffLines(diagnostics, "transcript", expected, run.Events.Transcript);
@@ -793,6 +798,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         [
             "* Remembering we are in directory \"\"",
             "< " + reply,
+            "* " + run.Result.ErrorMessage,
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
         string[] actual = run.Events.Transcript.TakeLast(expected.Length).ToArray();
@@ -815,6 +821,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         [
             "> SIZE f.txt\r\n",
             "< 213 5\r\n",
+            "* Offset (200) was beyond file size (5)",
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
@@ -838,6 +845,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         [
             "> SIZE f.txt\r\n",
             "< 213 100\r\n",
+            "* Maximum file size exceeded",
             "* Remembering we are in directory \"\"",
             "* Connection #0 to host 127.0.0.1:47931 left intact",
         ];
@@ -869,6 +877,7 @@ public sealed class FtpProtocolHandlerDataConnectionEventTests
         string[] expected =
         [
             "< 213 100\r\n",
+            "* Maximum file size exceeded",
             "* Remembering we are in directory \"\"",
             "> ABOR\r\n",
             "< 502 Command not implemented\r\n",

@@ -813,7 +813,7 @@ internal sealed class FtpSession(
     {
         if (context.FtpAlternativeToUser is not { } command || alternativeUserSent)
         {
-            return TransferResult.Failure(CurlExitCode.LoginDenied, FtpTransferMessages.AccessDenied(refusedCode));
+            return FailClosing(CurlExitCode.LoginDenied, FtpTransferMessages.AccessDenied(refusedCode));
         }
 
         if (HasControlByte(command))
@@ -2370,8 +2370,9 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> QuitAndFailAsync(CurlExitCode exitCode, string message)
     {
+        context.Events.ReportInfo(message);
         ReportRememberedDirectory();
-        return await QuitAndFailLeavingConnectionIntactAsync(exitCode, message).ConfigureAwait(false);
+        return await QuitAndFailWithoutEchoAsync(exitCode, message).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2382,6 +2383,17 @@ internal sealed class FtpSession(
     /// whose directory line came before the reply (measured for exits 9, 18, 30 and 70, BL-1251).
     /// </summary>
     private async ValueTask<TransferResult> QuitAndFailLeavingConnectionIntactAsync(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(message);
+        return await QuitAndFailWithoutEchoAsync(exitCode, message).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends <c>QUIT</c> and fails the transfer after the <c>-v</c> line saying the control
+    /// connection is left intact, once the caller has echoed <paramref name="message" /> as
+    /// curl's <c>failf</c> does under <c>-v</c> (measured with curl 8.22.0, BL-3617).
+    /// </summary>
+    private async ValueTask<TransferResult> QuitAndFailWithoutEchoAsync(CurlExitCode exitCode, string message)
     {
         ReportUnalignedUpload();
         context.Events.ReportInfo(FtpTransferMessages.ConnectionLeftIntact(controlName.Number, controlName.Host, controlName.Port));
@@ -2473,6 +2485,7 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(exitCode, message).ConfigureAwait(false);
         }
 
+        context.Events.ReportInfo(message);
         ReportRememberedDirectory();
         await AbortRangeAsync().ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.PartialDownloadClosing);
@@ -2487,8 +2500,32 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult?> SendQuotesAsync(IReadOnlyList<FtpQuoteCommand> commands, FtpQuoteStage stage) =>
         await FindRefusedQuoteAsync(commands, stage).ConfigureAwait(false) is { } refused
-            ? TransferResult.Failure(CurlExitCode.QuoteError, FtpTransferMessages.QuoteCommandFailed(refused.Code), bytesTransferred)
+            ? FailShuttingDown(CurlExitCode.QuoteError, FtpTransferMessages.QuoteCommandFailed(refused.Code))
             : null;
+
+    /// <summary>
+    /// Fails the transfer with no <c>QUIT</c> after curl 8.22.0's <c>-v</c> lines for a refused
+    /// quote: the failure's text, as its <c>failf</c> echoes it, then <c>shutting down
+    /// connection #N</c> (measured, BL-3617).
+    /// </summary>
+    private TransferResult FailShuttingDown(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(message);
+        context.Events.ReportInfo(FtpTransferMessages.ShuttingDownConnection(controlName.Number));
+        return TransferResult.Failure(exitCode, message, bytesTransferred);
+    }
+
+    /// <summary>
+    /// Fails a refused login with no <c>QUIT</c> after curl 8.22.0's <c>-v</c> lines: the
+    /// failure's text, as its <c>failf</c> echoes it, then <c>closing connection #N</c>
+    /// (measured, BL-3617).
+    /// </summary>
+    private TransferResult FailClosing(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(message);
+        context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(controlName.Number));
+        return TransferResult.Failure(exitCode, message);
+    }
 
     /// <summary>
     /// Sends each of <paramref name="commands" /> in turn, stopping at the first answered

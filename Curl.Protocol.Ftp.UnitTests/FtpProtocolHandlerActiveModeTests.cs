@@ -478,7 +478,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         var expectedSent = LogInSent + "EPRT |1|192.0.2.1|61200|\r\nPORT 192,0,2,1,239,17\r\nQUIT\r\n";
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
-        CollectionAssert.AreEqual(new[] { NotLocalLine, "disabling EPRT usage", NotLocalLine, "Remembering we are in directory \"\"", LeftIntactLine }, events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, "disabling EPRT usage", NotLocalLine, "Failed to do PORT", "Remembering we are in directory \"\"", LeftIntactLine }, events.InfoPastTheEntryPath);
         var expectedResult = TransferResult.Failure(CurlExitCode.FtpPortFailed, "Failed to do PORT");
         diagnostics.Assert("result", expectedResult, run.Result);
         Assert.AreEqual(expectedResult, run.Result);
@@ -499,7 +499,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
         Assert.HasCount(2, listener.Targets);
-        CollectionAssert.AreEqual(new[] { NotLocalLine, LeftIntactLine }, events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { NotLocalLine, "bind(port=0) failed: Address not available", LeftIntactLine }, events.InfoPastTheEntryPath);
         var expectedResult = TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available");
         diagnostics.Assert("result", expectedResult, run.Result);
         Assert.AreEqual(expectedResult, run.Result);
@@ -516,7 +516,7 @@ public sealed class FtpProtocolHandlerActiveModeTests
         ActiveRun run = await RunAsync(diagnostics, "/a.txt", "-", LoggedIn + Bye, context => context.Events = events, listener);
 
         Assert.HasCount(1, listener.Targets);
-        CollectionAssert.AreEqual(new[] { LeftIntactLine }, events.InfoPastTheEntryPath);
+        CollectionAssert.AreEqual(new[] { "bind(port=0) failed: Address not available", LeftIntactLine }, events.InfoPastTheEntryPath);
         var expectedResult = TransferResult.Failure(CurlExitCode.FtpPortFailed, "bind(port=0) failed: Address not available");
         diagnostics.Assert("result", expectedResult, run.Result);
         Assert.AreEqual(expectedResult, run.Result);

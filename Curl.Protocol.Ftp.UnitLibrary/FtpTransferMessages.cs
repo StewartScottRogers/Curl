@@ -490,5 +490,13 @@ internal static class FtpTransferMessages
     /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
     internal static string ShuttingDownConnection(long connectionNumber) => Format($"shutting down connection #{connectionNumber}");
 
+    /// <summary>
+    /// The <c>-v</c> line after a refused login, whose control connection curl 8.22.0 closes
+    /// with no <c>QUIT</c> (measured, BL-3617).
+    /// </summary>
+    /// <param name="connectionNumber">The control connection's number.</param>
+    /// <returns>The line, such as <c>closing connection #0</c>.</returns>
+    internal static string ClosingConnection(long connectionNumber) => Format($"closing connection #{connectionNumber}");
+
     private static string Format(FormattableString message) => message.ToString(CultureInfo.InvariantCulture);
 }
