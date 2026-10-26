@@ -1,5 +1,5 @@
 ---
-id: BL-3881
+id: BL-3890
 title: Report a socket-action transfer's real socket with CURL_POLL_OUT while it connects (CGR-034 C_65)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3881 — Report a socket-action transfer's real socket with CURL_POLL_OUT while it connects (CGR-034 C_65)
+# BL-3890 — Report a socket-action transfer's real socket with CURL_POLL_OUT while it connects (CGR-034 C_65)
 
 ## Goal
 
