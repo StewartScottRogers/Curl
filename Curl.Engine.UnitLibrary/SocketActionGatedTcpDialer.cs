@@ -8,7 +8,8 @@ namespace Curl.Engine;
 
 /// <summary>
 /// The dialer of a transfer in a multi handle driven by <c>curl_multi_socket_action</c>: while a dial runs the
-/// transfer waits writable (<see cref="TransferSocketWait.BeginConnect" />), a dial that connects ends the connect
+/// transfer waits writable (<see cref="TransferSocketWait.BeginConnect" />) on the socket the inner dialer publishes as it
+/// creates it (<see cref="TransferSocketWait.ConnectingOn" />, BL-3890), a dial that connects ends the connect
 /// (<see cref="TransferSocketWait.EndConnect" />), and each dialed connection is wrapped, beneath TLS, in a
 /// <see cref="SocketActionGatedConnection" />, so its reads and writes wait for the multi handle's signal
 /// (ADR-0822, BL-3859). Every other member is the inner dialer's.
@@ -22,6 +23,8 @@ namespace Curl.Engine;
 /// <param name="wait">What the transfer waits for on its socket.</param>
 internal sealed class SocketActionGatedTcpDialer(ITcpDialer inner, TransferSocketWait wait) : ITcpDialer
 {
+    private readonly ITcpDialer dialer = inner.PublishingSocketsTo(wait.ConnectingOn);
+
     /// <summary>
     /// Gives <paramref name="dialer" /> gated on <paramref name="wait" />, or <paramref name="dialer" /> itself
     /// outside socket-action mode (<paramref name="wait" /> <see langword="null" />).
@@ -34,15 +37,15 @@ internal sealed class SocketActionGatedTcpDialer(ITcpDialer inner, TransferSocke
 
     /// <inheritdoc />
     public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken) =>
-        GatedAsync(() => inner.DialAsync(endPoint, cancellationToken));
+        GatedAsync(() => dialer.DialAsync(endPoint, cancellationToken));
 
     /// <inheritdoc />
     public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
-        GatedAsync(() => inner.DialFromAsync(endPoint, localEndPoint, localPortCount, cancellationToken));
+        GatedAsync(() => dialer.DialFromAsync(endPoint, localEndPoint, localPortCount, cancellationToken));
 
     /// <inheritdoc />
     public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, ITransferEvents events, CancellationToken cancellationToken) =>
-        GatedAsync(() => inner.DialFromAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken));
+        GatedAsync(() => dialer.DialFromAsync(endPoint, localEndPoint, localPortCount, events, cancellationToken));
 
     /// <inheritdoc />
     public ValueTask<DialedTcpConnection> DialFromDeviceAsync(
@@ -53,13 +56,13 @@ internal sealed class SocketActionGatedTcpDialer(ITcpDialer inner, TransferSocke
         int localPortCount,
         ITransferEvents events,
         CancellationToken cancellationToken) =>
-        GatedAsync(() => inner.DialFromDeviceAsync(endPoint, deviceName, bindsAddressAfterDevice, chooseLocalEndAsync, localPortCount, events, cancellationToken));
+        GatedAsync(() => dialer.DialFromDeviceAsync(endPoint, deviceName, bindsAddressAfterDevice, chooseLocalEndAsync, localPortCount, events, cancellationToken));
 
     /// <inheritdoc />
     public async ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken)
     {
         wait.BeginConnect();
-        IConnection connection = await inner.DialUnixSocketAsync(address, cancellationToken).ConfigureAwait(false);
+        IConnection connection = await dialer.DialUnixSocketAsync(address, cancellationToken).ConfigureAwait(false);
         wait.EndConnect();
         return new SocketActionGatedConnection(connection, wait);
     }

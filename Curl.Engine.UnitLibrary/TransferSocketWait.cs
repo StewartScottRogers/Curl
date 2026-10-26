@@ -75,6 +75,12 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     }
 
     /// <summary>
+    /// Gets the handle of the transfer's socket, or <see langword="null" /> until one is known: set as the dialer
+    /// creates it (<see cref="ConnectingOn" />), so the application is told it while the connect is in progress.
+    /// </summary>
+    internal nint? Socket { get; private set; }
+
+    /// <summary>
     /// Starts the transfer's clock: the connect deadline (<see cref="DefaultConnectTimeout" /> when the option is
     /// 0), the whole-transfer deadline when <c>CURLOPT_TIMEOUT_MS</c> is set, and the low-speed time each later
     /// wait counts when <c>CURLOPT_LOW_SPEED_LIMIT</c> and <c>CURLOPT_LOW_SPEED_TIME</c> are both set.
@@ -97,6 +103,13 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
 
     /// <summary>Marks the transfer as connecting: it waits for its socket to be writable.</summary>
     internal void BeginConnect() => Update(() => connecting = true);
+
+    /// <summary>
+    /// Records <paramref name="socket" /> as the transfer's socket while it connects: the dialer created it and
+    /// is about to connect it, so the transfer waits writable on it.
+    /// </summary>
+    /// <param name="socket">The handle of the socket being connected.</param>
+    internal void ConnectingOn(nint socket) => Update(() => Socket = socket);
 
     /// <summary>Marks the connect as over, so it no longer waits writable for it and the connect deadline ends.</summary>
     internal void EndConnect() => Update(() =>

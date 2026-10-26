@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Networking.UnitLibrary/ITcpDialer.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Networking.UnitTests/TcpDialerSocketCreatedTests.cs, Curl.Engine.UnitTests/SocketActionGatedTcpDialerConnectingTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3890 — Report a socket-action transfer's real socket with CURL_POLL_OUT while it connects (CGR-034 C_65)
 
@@ -22,13 +22,18 @@ BL-3563 (ADR-0828) wires `ManagedMultiTransfer` to `TransferSocketWait`: the soc
 
 ## Acceptance criteria
 
-- [ ] While a socket-action transfer's TCP connect is in progress, `TransferSocketWait.Socket` holds the socket's handle and `Waiting` is `CurlPoll.Out`; a unit test over a dialer that publishes a handle and holds the connect shows it.
-- [ ] `TcpDialer` publishes each socket it creates through the hook before connecting it; a unit test shows it.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] While a socket-action transfer's TCP connect is in progress, `TransferSocketWait.Socket` holds the socket's handle and `Waiting` is `CurlPoll.Out`; a unit test over a dialer that publishes a handle and holds the connect shows it.
+- [x] `TcpDialer` publishes each socket it creates through the hook before connecting it; a unit test shows it.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Design (ADR-0830): `ITcpDialer.PublishingSocketsTo(Action<nint>)` is a default interface member returning the dialer itself; `TcpDialer` returns a new dialer over the same options that hands each socket's handle to the hook after its options are set and before it connects (`PrepareToConnect`/`PublishCreated`, Unix socket too). A per-dial view, not a mutable hook on the shared dialer, so concurrent transfers never cross; the handle, not the `Socket`, crosses into the engine.
+- `SocketActionGatedTcpDialer` dials through `inner.PublishingSocketsTo(wait.ConnectingOn)`; `TransferSocketWait` gains `internal nint? Socket { get; private set; }` (as BL-3563's stash has it) and `ConnectingOn`, which sets it. `EndConnect` is left as it was so BL-3563's `EndConnect(nint? socket = null)` applies; `ManagedMultiTransfer.cs` untouched.
+- Verified: dotnet build clean; fast tests green in all 46 test projects (Networking 3604 passed, Engine 2563 passed); Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary,Curl.Engine.UnitLibrary: 0 failing members. Tests are platform-neutral (sockets opened and closed unconnected, fake handles).
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: ef84e75a 7137fb27 779790c0.
+- 2026-10-26: Doing -> Done. TcpDialer publishes each socket it creates before connecting; a socket-action transfer's wait holds that socket and waits Out while it connects
