@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/Globbing/UrlGlobParser.cs, Curl.Core.UnitTests/Cgr057Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3586 — Fix CGR-057: The URL globber rejects a bracketed IPv6 host whose zone id contains %XX or :
 
@@ -64,17 +64,23 @@ curl -sS "http://[::1%25a:b]:20200/a"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr057Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause: `UrlGlobParser.IsZone` allowed only `[A-Za-z0-9-._~]` in a zone id, so `%` and `:` sent the bracket to the range reader. Fix (ADR-0822): curl 8.22.0's rule, measured on Windows: an optional leading `25`; otherwise two hex digits after `%` refuse it; then 1 to 15 characters with no space, control, `/`, `?`, `#` or `@`. 31 hosts measured (`curl -sS "http://[<host>]:1/a"`, exit 7 taken / exit 3 range) are listed in the ADR and pinned in `Cgr057Tests`.
+- Repros, run with `Record-CurlExchange.ps1 -Port 20251 -ListenAddress ::1` (200, body `ok\n`), real curl 8.22.0 and Curl (`-Curl Curl.Console\bin\Debug\net10.0\curl.exe`): `curl -sS "http://[::1%25a%20b]:20251/a"` and `curl -sS "http://[::1%25a:b]:20251/a"` both give exit 0, stdout `ok`, empty stderr, request `GET /a HTTP/1.1` / `Host: [::1]:20251`; request.bin, stdout.bin, stderr.txt and exitcode.txt identical (cmp) for both. No files are written. Before the fix Curl gave exit 3, `bad range specification in position 9:` (the report's Actual).
+- Fails before the fix: the old `IsZone` refused every zone holding `%` or `:`, so the first DataRows of `TryParse_ZoneIdCurlTakes_ExpandsToTheUrlUnchanged` fail on it (reverting the file to rerun was refused by the lane's permissions, so this is from the code, not a run). Already-matching variants (`%25eth0`, `%eth0`, `%25]`, `%]`, `%e/h`) stay pinned in `UrlGlobTests` and pass.
+- Non-ASCII length: curl on Windows receives arguments in the ANSI code page (`25é` + 14 letters is taken), so the limit counts characters; a Linux UTF-8 difference is left unpinned. Tests are platform-neutral (pure parsing), so CI on Linux and macOS is covered by the green fast run here.
+- Gates: `dotnet build` 0 warnings; fast tests green in all 46 test projects (Curl.Core.UnitTests 1879 passed, 8 skipped); `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary` 0 failing members (first run flagged `IsZone` at complexity 14, split into `StartsWithTwoHexDigits` and `IsZoneName`).
 
 ## Log
 
 - 2026-10-26: Created from CGR-057 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. The URL globber takes a bracketed IPv6 host whose zone id holds %XX or : as curl 8.22.0 does (CGR-057)
