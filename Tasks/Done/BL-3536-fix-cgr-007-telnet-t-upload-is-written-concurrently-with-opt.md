@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Protocol.Telnet.UnitLibrary/TelnetReceiver.cs, Curl.Protocol.Telnet.UnitTests/Cgr007Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3536 — Fix CGR-007: TELNET -T upload is written concurrently with option-negotiation replies, so upload bytes can land inside an IAC SB NAWS ... IAC SE subne...
 
@@ -68,17 +68,23 @@ EV/verify-linux-tel.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr007Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Fix (ADR-0815): `TelnetProtocolHandler` no longer sends the upload from a task of its own. One loop, as curl's `telnet_do`: wait for the server's read (at most 100 ms while an upload is going), handle it and send every reply, then send the upload's next buffer if its read has completed (`TelnetUploadReader`, so an upload that never yields still leaves the session receiving). The send lock is gone, so nothing can land between `IAC SB NAWS`, the size and `IAC SE`. When the server closes, the part of the upload already read is still sent: `CurlCommandRunnerCookieTests.RunAsync_CookieFileOnStandardInputAfterATelnetTransfer_LeavesStandardInputToTelnet` (curl 8.21.0, BL-316) failed without that.
+- Repro, 2026-10-26, Windows, `Record-CurlExchange.ps1 -Script` with the report's server: send `FF FD 18 FF FD 1F FF FD 27 FF FD 23 FF FB 01 FF FB 03 FF FD 03`, pause 700, read, send SB SEND for TTYPE, XDISPLOC and NEW-ENVIRON and `server text\r\n`, pause 500, read, close. `curl -s -S -T tel_in.txt telnet://127.0.0.1:21931` (`hello telnet\r\nsecond line\n\xFF byte\n`): REF (curl 8.22.0) and PORT both exit 43 `curl: (43) A libcurl function was given a bad argument`, no stdout, wire `ff fc 18 ff fb 1f ff fa 1f 00 00 00 00 ff f0 ff fc 27 ff fc 23 ff fd 01 ff fd 03 ff fb 03 ff fb 00 ff fd 00` then `hello telnet\r\nsecond line\n ff ff  byte\n`, byte for byte equal. Before the fix PORT sent the upload first (the report's Actual). Large upload, `-T big_lf.txt` (410 000 bytes of LF lines): both exit 43 with the same stderr, request 410 037 bytes each with the same SHA-256 (5AFD76E5207DB0C5...), starting with the same replies. Linux was not run here (lanes test on Windows); the change is platform-neutral, one code path for both, and the report's Linux Expected wire is the same.
+- Focused tests `Cgr007Tests`: the reply-before-upload order failed before the fix (upload first) and passes after; a second covers an upload write failing after the server closed.
+- `Measure-CodeQuality.ps1 -Library Curl.Protocol.Telnet.UnitLibrary`: 100% line, 100% branch, 0 failing members, worst CRAP 10. Fast tests across the solution green; `dotnet build` 0 warnings.
+
 ## Log
 
 - 2026-10-26: Created from CGR-007 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A telnet -T upload goes out from the receive loop after each read's replies, so its wire matches curl 8.22.0 and never splits IAC SB NAWS
