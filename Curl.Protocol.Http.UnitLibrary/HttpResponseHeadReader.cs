@@ -539,8 +539,9 @@ internal sealed class HttpResponseHeadReader
     private async ValueTask<HttpStatusLine> ReadStatusLineAsync(CancellationToken cancellationToken)
     {
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
-        HttpLine line = HttpLine.Split(bytes);
+        HttpLine line = HttpLine.SplitKeepingCarriageReturns(bytes);
         HttpStatusLine statusLine = ParseStatusLine(line.Content);
+        line.RefuseCarriageReturn();
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);
         if (line.Content.StartsWith("HTTP/1.0", StringComparison.Ordinal) || HttpStatusLine.MatchesAlias(line.Content, Http200Aliases))

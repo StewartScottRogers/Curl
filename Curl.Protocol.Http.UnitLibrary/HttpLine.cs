@@ -48,14 +48,38 @@ internal readonly struct HttpLine
     /// </exception>
     internal static HttpLine Split(ReadOnlySpan<byte> line)
     {
+        HttpLine split = SplitKeepingCarriageReturns(line);
+        split.RefuseCarriageReturn();
+        return split;
+    }
+
+    /// <summary>
+    /// Splits a status line at its terminator without refusing a carriage return in it, for
+    /// the caller to parse first and only then <see cref="RefuseCarriageReturn" />: curl
+    /// 8.22.0 fails <c>abc\rdef</c> as HTTP/0.9 (exit 1) and <c>HTTP/1.1 2\r00 OK</c> as an
+    /// unsupported subversion (exit 1), and only a line it parses as a status line with a
+    /// carriage return in it as <c>Carriage return found in header</c> (exit 8, CGR-108).
+    /// </summary>
+    /// <param name="line">The line's bytes, ending in a line feed.</param>
+    /// <returns>The line, any carriage return before its terminator kept in its content.</returns>
+    internal static HttpLine SplitKeepingCarriageReturns(ReadOnlySpan<byte> line)
+    {
         int terminatorLength = line.EndsWith("\r\n"u8) ? 2 : 1;
-        ReadOnlySpan<byte> content = line[..^terminatorLength];
-        if (content.Contains((byte)'\r'))
+        return new HttpLine(Encoding.Latin1.GetString(line[..^terminatorLength]), terminatorLength == 2 ? "\r\n" : "\n");
+    }
+
+    /// <summary>
+    /// Fails a line whose content holds a carriage return, as curl 8.22.0 does.
+    /// </summary>
+    /// <exception cref="HttpTransferException">
+    /// The content holds a carriage return (exit 8, <c>Carriage return found in header</c>).
+    /// </exception>
+    internal void RefuseCarriageReturn()
+    {
+        if (Content.Contains('\r', StringComparison.Ordinal))
         {
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.CarriageReturnInHeader);
         }
-
-        return new HttpLine(Encoding.Latin1.GetString(content), terminatorLength == 2 ? "\r\n" : "\n");
     }
 
     /// <summary>
