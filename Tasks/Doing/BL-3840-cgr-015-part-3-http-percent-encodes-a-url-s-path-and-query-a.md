@@ -46,3 +46,4 @@ Split from BL-3544 (CGR-015 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 9c1acdef a9b9a7ee f4912012 326de9ca.
 - 2026-10-26: Doing -> Backlog. Criterion 1 contradicts real curl: a query typed in the URL is sent as the raw ANSI byte (?q=0xE9), not ?q=%E9; corrected the criterion from the measurement, ready to claim again
+- 2026-10-26: Backlog -> Doing. Criteria at claim: c437e79e a9b9a7ee f4912012 326de9ca.
