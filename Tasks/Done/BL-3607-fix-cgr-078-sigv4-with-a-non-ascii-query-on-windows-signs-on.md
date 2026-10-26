@@ -8,7 +8,7 @@ depends-on: [BL-3840]
 touches: [Curl.Authentication.UnitLibrary/AwsSigV4Request.cs, Curl.Authentication.UnitLibrary/AwsSigV4UriEncoding.cs, Curl.Authentication.UnitTests/Cgr078Tests.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3607 — Fix CGR-078: SigV4 with a non-ASCII query on Windows signs one byte form and sends another
 
@@ -64,16 +64,22 @@ curl -sS -g --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H 'X-Amz-Date: 2025
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr078Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 - 2026-10-26 (lane 4, before any edit): the wire half of both repros is BL-3840's work (HTTP percent-encodes the path, and sends the query bytes, in `HttpRequestOptions.CommandLineTextEncoding`: `/ü` -> `/%FC`, `?k=ä` -> raw `0xE4`). The signer already signs the query in the argument encoding (`AwsSigV4Signer` passes `argumentEncoding` to `CanonicalQuery`), which is why the query signature already matches real curl's `251a1c08...`; only the bytes sent differ, so the query case is fixed entirely by BL-3840. The path case also needs the signed path to follow: `Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs` `SigningRequestOf` sets `Path = UrlPathEscapes.WithUpperCaseHexDigits(request.Url.AbsolutePath)`, and `System.Uri` escapes `ü` as UTF-8 `%C3%BC`, so `s3` (which signs the path as given) signs `/%C3%BC` (`8c86e160...`) instead of `/%FC` (`3ff4f5d1...`). Plan for the next claim: once BL-3840 gives `HttpUrlText.Path` an `Encoding`, build the signed path from the same function with the command-line text encoding (the signer's `argumentEncoding`), so the signed path is the path on the request line; add `AwsSigV4HttpAuthenticator.cs` to touches (added; no task in Doing held it) and pin both repros in `Cgr078Tests.cs` with a cp1252 encoding. Requeued on BL-3840.
+- 2026-10-26 (lane 7): measured with `Record-CurlExchange.ps1 -Port 20571` (port 20571, so the signatures differ from the report's 20500 ones), real curl 8.21.0 Schannel `C:\Windows\System32\curl.exe` against Curl `Curl.Console\bin\Debug\net10.0\curl.exe`, args `-sS -g --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H 'X-Amz-Date: 20250101T000000Z' <url>`:
+  - `http://127.0.0.1:20571/p?k=ä`: REF `GET /p?k=\xE4`, `Signature=bbb8659e120557985bb1179c26fd4102ae6e2d254d6e7b29327532e491f631fe`, exit 0, empty stdout and stderr. PORT: request bytes identical, exit 0, empty stdout and stderr (BL-3840 already fixed this one).
+  - `http://127.0.0.1:20571/ü`: REF `GET /%FC`, `Signature=164bdd7fc297cf52b27491fecb31907f2011a6b09af53e8f0dba4a1decc1c3b9`, exit 0, empty stdout and stderr. PORT after the fix: request bytes identical, exit 0, empty stdout and stderr. No files are written in either case.
+  - Variant `--aws-sigv4 aws:amz:us-east-1:ec2` with `/ü?k=ä` (a non-S3 service, which escapes the sent path again to `/%25FC`): request, stdout, stderr and exit code identical.
+- Fix: rather than the plan's change in `AwsSigV4HttpAuthenticator.cs`, the fix went into `AwsSigV4UriEncoding.CanonicalPath`, which already has the signer's argument encoding. It now builds the canonical path from the path as the request line sends it (`PathAsSent`: its bytes in that encoding, a lone U+DC80 to U+DCFF as the argument byte it escapes, each byte above `~` as `%XX`, as `HttpUrlText.Path(CurlUrl, Encoding)` does). So the Engine file is unchanged. Before the fix, `s3` signed the raw `/ü` bytes. `Cgr078Tests` pins both repros with Latin-1, which gives cp1252's bytes for `ä` and `ü`, so the tests are platform-neutral. The two path rows failed before the fix (run with the old file) and pass after it. No ADR: this matches measured curl and makes no new design decision.
+- Measure-CodeQuality.ps1 -Library Curl.Authentication.UnitLibrary: no failing member. The fast tests are green. CI on Linux and macOS: the tests are platform-neutral (fixed encodings, no paths or OS text).
 
 ## Log
 
@@ -81,3 +87,4 @@ curl -sS -g --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H 'X-Amz-Date: 2025
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3840: the request line must carry the path and query in the command-line encoding before the signed path can follow it
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. SigV4 signs a non-ASCII path as the request line sends it, in the argument encoding (/%FC), matching curl 8.21.0 on Windows
