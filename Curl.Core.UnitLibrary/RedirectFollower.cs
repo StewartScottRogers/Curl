@@ -18,7 +18,7 @@ namespace Curl.Core;
 /// A hop is followed when it succeeded with a 3xx status and a redirect URL. Before
 /// following, the limit is checked (exit 47, <c>Maximum (N) redirects followed</c>), then
 /// whether the target parses (exit 3, <c>The redirect target URL could not be parsed:
-/// Bad IPv6 address</c>, <c>Bad hostname</c> or the port reason), then the target's scheme: one this curl build cannot parse fails with exit 1,
+/// Malformed input to a URL function</c> for a control byte or DEL, <c>Bad IPv6 address</c>, <c>Bad hostname</c> or the port reason), then the target's scheme: one this curl build cannot parse fails with exit 1,
 /// <c>The redirect target URL could not be parsed: Unsupported URL scheme</c>, and one
 /// <see cref="RedirectPolicy.AllowedSchemes" /> (<c>--proto-redir</c>) or
 /// <see cref="RedirectPolicy.AllowedTransferSchemes" /> (<c>--proto</c>) does not allow with exit 1,
@@ -436,6 +436,11 @@ public sealed class RedirectFollower(
             return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
         }
 
+        if (HasControlByte(target))
+        {
+            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {ProxyUrlParser.MalformedReason}", false, false);
+        }
+
         return CurlUrl.TryParse(EncodedForFollow(target), pathAsIs, out next)
             ? null
             : (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
@@ -565,6 +570,14 @@ public sealed class RedirectFollower(
             ? ProxyUrlParser.BadPortReason
             : ProxyUrlParser.BadHostnameReason;
     }
+
+    /// <summary>
+    /// Whether <paramref name="target" /> holds a control byte (0x00-0x1F) or DEL, which curl 8.22.0's
+    /// URL parser refuses as malformed input: the HTTP handler escapes them in a relative
+    /// <c>Location</c>, so only an absolute one still holds them (CGR-061).
+    /// </summary>
+    private static bool HasControlByte(string target) =>
+        target.AsSpan().ContainsAnyInRange('\0', '\x1f') || target.Contains('\x7f', StringComparison.Ordinal);
 
     private static int IndexOrLength(ReadOnlySpan<char> text, int index) => index < 0 ? text.Length : index;
 

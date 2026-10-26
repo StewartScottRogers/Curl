@@ -20,7 +20,7 @@ namespace Curl.Protocol.Http;
 /// Any other value is a reference resolved by RFC 3986 section 5.2: scheme-relative
 /// (<c>//host/x</c>), absolute-path (<c>/x</c>), relative-path (<c>x</c>, <c>../x</c>),
 /// query-only (<c>?q</c>) and fragment-only (<c>#f</c>). Before resolving, its spaces (<c>+</c> in
-/// the query, <c>%20</c> elsewhere) and non-ASCII bytes are percent-encoded and its percent escapes uppercased, as curl does
+/// the query, <c>%20</c> elsewhere), control bytes and non-ASCII bytes are percent-encoded and its percent escapes uppercased, as curl does
 /// to a relative <c>Location</c> and not to an absolute one.
 /// </para>
 /// </remarks>
@@ -191,7 +191,7 @@ internal static class HttpRedirectLocation
     }
 
     /// <summary>
-    /// Percent-encodes a relative reference's spaces (<c>+</c> in the query) and its bytes above 0x7E, each as itself, and
+    /// Percent-encodes a relative reference's spaces (<c>+</c> in the query), its control bytes and its bytes above 0x7E, each as itself, and
     /// uppercases the hexadecimal digits of its percent escapes, as curl 8.21.0 does.
     /// </summary>
     private static string Encode(string reference)
@@ -226,7 +226,8 @@ internal static class HttpRedirectLocation
 
     /// <summary>
     /// Appends the character at <paramref name="index" />, which does not start a percent
-    /// escape: a space as <c>+</c> in the query, a space or byte above 0x7E escaped, else itself.
+    /// escape: a space as <c>+</c> in the query, a space, control byte (TAB, 0x01-0x1F) or byte above
+    /// 0x7E escaped, as curl 8.22.0 escapes them (CGR-061), else itself.
     /// Returns how many characters it took.
     /// </summary>
     private static int AppendUnescaped(StringBuilder encoded, string value, int index, bool inQuery)
@@ -238,7 +239,7 @@ internal static class HttpRedirectLocation
             return 1;
         }
 
-        if (character is ' ' or > '~')
+        if (character is <= ' ' or > '~')
         {
             return AppendEscaped(encoded, value, index);
         }
