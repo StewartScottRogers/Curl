@@ -77,3 +77,4 @@ curl -sSi "$H/raw?b=$(b64 'HTTP/1.1 200 OK\r\nContent-Length: 3\r\nX')"
 ## Log
 
 - 2026-10-26: Created from CGR-027 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
