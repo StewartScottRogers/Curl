@@ -238,11 +238,13 @@ internal static class HttpRequestHeadFormatter
         framing ?? HttpRequestFraming.Of(options, customHeaders, noBody);
 
     /// <summary>
-    /// Appends the request line: the method, the target (<see cref="TargetOf" />) and the
-    /// version.
+    /// Appends the request line: the method as its bytes in
+    /// <see cref="HttpRequestOptions.CommandLineTextEncoding" /> (<see cref="HeadText" />), as
+    /// curl copies <c>-X</c> from its <c>argv</c> (CGR-065), the target (<see cref="TargetOf" />)
+    /// and the version.
     /// </summary>
     private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options) =>
-        head.Append(method).Append(' ').Append(TargetOf(url, proxiedCredentials, options)).Append(VersionOf(options)).Append("\r\n");
+        head.Append(HeadText(method, options)).Append(' ').Append(TargetOf(url, proxiedCredentials, options)).Append(VersionOf(options)).Append("\r\n");
 
     /// <summary>
     /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
