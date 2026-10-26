@@ -5,7 +5,7 @@ namespace Curl.Console;
 /// <summary>
 /// CGR-008 (BL-3537): standard error on a full device (<c>2&gt;/dev/full</c>) makes every write
 /// fail with ENOSPC; curl ignores that and exits with the transfer's own code, where Curl
-/// crashed. <see cref="StandardErrorFailureIgnoringStream" /> is what <c>Program.Main</c> wraps
+/// crashed. <see cref="WriteFailureIgnoringStream" /> is what <c>Program.Main</c> wraps
 /// standard error in.
 /// </summary>
 [TestClass]
@@ -15,7 +15,7 @@ public sealed class Cgr008Tests
     public async Task RunAsync_WhenStandardErrorIsFull_ReturnsTheTransfersExitCode()
     {
         using var standardOutput = new MemoryStream();
-        using var standardError = new StandardErrorFailureIgnoringStream(new FullDeviceStream());
+        using var standardError = new WriteFailureIgnoringStream(new FullDeviceStream());
 
         var exitCode = await UnhandledExceptionGuard.RunAsync(
             async () =>
@@ -34,7 +34,7 @@ public sealed class Cgr008Tests
     public async Task RunAsync_WhenTheRunThrowsAndStandardErrorIsFull_ReturnsExit2()
     {
         using var standardOutput = new MemoryStream();
-        using var standardError = new StandardErrorFailureIgnoringStream(new FullDeviceStream());
+        using var standardError = new WriteFailureIgnoringStream(new FullDeviceStream());
 
         var exitCode = await UnhandledExceptionGuard.RunAsync(
             () => throw new InvalidOperationException("handler broke"), standardOutput, standardError);
@@ -45,7 +45,7 @@ public sealed class Cgr008Tests
     [TestMethod]
     public void SynchronousWritesAndFlush_WhenStandardErrorIsFull_DoNotThrow()
     {
-        using var standardError = new StandardErrorFailureIgnoringStream(new FullDeviceStream());
+        using var standardError = new WriteFailureIgnoringStream(new FullDeviceStream());
 
         standardError.Write([1, 2, 3], 0, 3);
         standardError.Write([4]);
@@ -55,7 +55,7 @@ public sealed class Cgr008Tests
     [TestMethod]
     public async Task ArrayWriteAsync_WhenStandardErrorIsFull_DoesNotThrow()
     {
-        using var standardError = new StandardErrorFailureIgnoringStream(new FullDeviceStream());
+        using var standardError = new WriteFailureIgnoringStream(new FullDeviceStream());
 
         await standardError.WriteAsync([1, 2, 3], 0, 3, CancellationToken.None);
     }
@@ -64,7 +64,7 @@ public sealed class Cgr008Tests
     public async Task EveryWrite_WhenStandardErrorWorks_PassesTheBytesThrough()
     {
         using var inner = new MemoryStream();
-        using var standardError = new StandardErrorFailureIgnoringStream(inner);
+        using var standardError = new WriteFailureIgnoringStream(inner);
 
         standardError.Write([1, 2, 3], 1, 2);
         standardError.Write([4]);
@@ -81,7 +81,7 @@ public sealed class Cgr008Tests
     {
         var inner = new MemoryStream();
 
-        new StandardErrorFailureIgnoringStream(inner).Dispose();
+        new WriteFailureIgnoringStream(inner).Dispose();
 
         Assert.IsFalse(inner.CanWrite);
     }
@@ -89,7 +89,7 @@ public sealed class Cgr008Tests
     [TestMethod]
     public void TheStream_IsWriteOnlyAndUnseekable()
     {
-        using var standardError = new StandardErrorFailureIgnoringStream(new MemoryStream());
+        using var standardError = new WriteFailureIgnoringStream(new MemoryStream());
 
         Assert.IsFalse(standardError.CanRead);
         Assert.IsFalse(standardError.CanSeek);

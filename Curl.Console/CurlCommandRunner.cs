@@ -468,7 +468,7 @@ internal sealed class CurlCommandRunner(
     /// runner decides which targets are in text mode.
     /// </summary>
     private readonly WriteOutTemplateRenderer writeOutRenderer = new(
-        writeOutFileOpener ?? new RefusingWriteOutFileOpener(),
+        new WriteFailureIgnoringWriteOutFileOpener(writeOutFileOpener ?? new RefusingWriteOutFileOpener()),
         writesLineFeedAsCrLf: false,
         writeOutTimeDialect,
         DebugWriteOutStandIn.OrNone(debugWriteOut).ClockOr(timeProvider ?? TimeProvider.System));
@@ -1017,10 +1017,13 @@ internal sealed class CurlCommandRunner(
             return;
         }
 
+        // curl writes to the file through its freopen'ed stderr and ignores every failed write
+        // and close, so a full device leaves the exit code the transfer's (CGR-026, BL-3830).
         await CloseStandardErrorFileAsync().ConfigureAwait(false);
-        standardError = file;
-        standardErrorFile = file;
-        processStandardError = file;
+        WriteFailureIgnoringStream errorFile = new(file);
+        standardError = errorFile;
+        standardErrorFile = errorFile;
+        processStandardError = errorFile;
     }
 
     /// <summary>
@@ -3270,7 +3273,9 @@ internal sealed class CurlCommandRunner(
             return await ReportCannotOpenHeaderFileAsync(options, headerFile).ConfigureAwait(false);
         }
 
-        await using (headerStream.ConfigureAwait(false))
+        // curl ignores the -D file's fclose result, so a close that fails (a full device whose
+        // header write already failed) leaves the transfer's result alone (CGR-026, BL-3830).
+        await using (new WriteFailureIgnoringStream(headerStream).ConfigureAwait(false))
         {
             return await TransferReportingHeaderWriteFailureAsync(dispatch, options, url, uploadFile, transfer, headerFile, headerStream)
                 .ConfigureAwait(false);

@@ -1,14 +1,17 @@
 namespace Curl.Console;
 
 /// <summary>
-/// The write-only stream every standard error line is written through. It passes every
-/// write and flush through and ignores an <see cref="IOException" /> from either, the way
-/// curl ignores a failed <c>fputs</c> or <c>fflush</c> on <c>stderr</c>, so standard error
-/// on a full device (<c>2&gt;/dev/full</c>, ENOSPC) leaves the exit code the transfer's own
-/// instead of crashing the process (CGR-008, BL-3537).
+/// A write-only stream that passes every write and flush through and ignores an
+/// <see cref="IOException" /> from either, and from closing the stream it wraps, the way curl
+/// ignores a failed <c>fputs</c>, <c>fwrite</c>, <c>fflush</c> or <c>fclose</c> on a stream
+/// whose failure it never reports. Standard error is written through one, so standard error on
+/// a full device (<c>2&gt;/dev/full</c>, ENOSPC) leaves the exit code the transfer's own instead
+/// of crashing the process (CGR-008, BL-3537); so are a <c>--stderr</c> file, a <c>--trace</c>
+/// or <c>--trace-ascii</c> file and every <c>%output{file}</c> target, whose failed writes curl
+/// 8.18.0 ignores too (CGR-026, BL-3830).
 /// </summary>
-/// <param name="inner">The raw standard error stream, which this stream owns and disposes.</param>
-internal sealed class StandardErrorFailureIgnoringStream(Stream inner) : Stream
+/// <param name="inner">The stream written to, which this stream owns and disposes.</param>
+internal sealed class WriteFailureIgnoringStream(Stream inner) : Stream
 {
     /// <inheritdoc />
     public override bool CanRead => false;
@@ -97,7 +100,14 @@ internal sealed class StandardErrorFailureIgnoringStream(Stream inner) : Stream
     /// <remarks>The class is sealed and has no finalizer, so this only runs from <see cref="Stream.Dispose()" />.</remarks>
     protected override void Dispose(bool disposing)
     {
-        inner.Dispose();
+        try
+        {
+            inner.Dispose();
+        }
+        catch (IOException)
+        {
+        }
+
         base.Dispose(disposing);
     }
 }

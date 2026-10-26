@@ -416,19 +416,22 @@ public sealed class CookieStore : ICookieStore
             return false;
         }
 
+        // A close that fails (a full device takes the bytes into its buffer and fails as it
+        // closes) is a jar that cannot be written too (CGR-026, BL-3830).
         Stream content = opened.Content!;
-        await using (content.ConfigureAwait(false))
+        try
         {
-            try
+            await using (content.ConfigureAwait(false))
             {
                 await content.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
                 await content.FlushAsync(cancellationToken).ConfigureAwait(false);
-                return true;
             }
-            catch (IOException)
-            {
-                return false;
-            }
+
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
         }
     }
 

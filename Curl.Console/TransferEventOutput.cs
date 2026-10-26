@@ -176,7 +176,14 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
             .OpenForWriteAsync(traceFile, FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, CancellationToken.None)
             .ConfigureAwait(false);
 
-        return opened.Content is { } file ? (file, file) : (standardError, null);
+        if (opened.Content is not { } file)
+        {
+            return (standardError, null);
+        }
+
+        // curl ignores a failed write or close of its trace stream (CGR-026, BL-3830).
+        WriteFailureIgnoringStream traceStream = new(file);
+        return (traceStream, traceStream);
     }
 
     /// <summary>
