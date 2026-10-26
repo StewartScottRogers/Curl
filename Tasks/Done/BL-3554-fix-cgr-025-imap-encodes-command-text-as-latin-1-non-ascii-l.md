@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Imap.UnitLibrary/ImapControlChannel.cs, Curl.Protocol.Imap.UnitTests/Cgr025Tests.cs]
+touches: [Curl.Protocol.Imap.UnitLibrary/ImapControlChannel.cs, Curl.Protocol.Imap.UnitLibrary/ImapCommandLineText.cs, Curl.Protocol.Imap.UnitLibrary/ImapAuthentication.cs, Curl.Protocol.Imap.UnitLibrary/ImapSession.cs, Curl.Protocol.Imap.UnitTests/Cgr025Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3554 — Fix CGR-025: IMAP encodes command text as Latin-1: non-ASCII LOGIN user/password and -X commands are corrupted
 
@@ -71,17 +71,21 @@ curl -s -S -u "u€:p" "imap://127.0.0.1:21001/INBOX;UID=1"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr025Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 5): Fix. The control channel stays Latin-1 (URL-derived mailbox text is already one char per byte); the argv text is turned into its argv bytes at the source instead, by a new `ImapCommandLineText` (the IMAP twin of SMTP's `SmtpCommandLineText`, ADR-0135 §6 and ADR-0022: system ANSI code page on Windows, best-fitted; UTF-8 elsewhere), applied to LOGIN's user and password (`ImapAuthentication.LoginAsync`) and to the `-X` command before percent-decoding (`ImapSession.TryDecodeCustomCommand`). `touches` widened from ImapControlChannel.cs to those three files; no task in Doing on origin/work/dark-factory names an IMAP file. No new ADR: the choice is the one ADR-0135 §6 already made for SMTP. SASL is untouched (it already encodes through CredentialEncoding).
+- Measured on Windows with `Record-CurlExchange.ps1 -Port 18543 -Imap -ImapReply 'GREETING=* OK ready','CAPABILITY=* CAPABILITY IMAP4rev1\r\nOK done'`, real curl 8.22.0 (Schannel, cp1252) against Curl.Console's curl.exe: `-sS -u "u€:p" imap://…/INBOX;UID=1` sends `A002 LOGIN u\x80 p`, exit 0; `-sS -u u:p -X "XFOO €" imap://…/` sends `A003 XFOO \x80`, exit 21 `curl: (21) Quote command returned error`; `-sS -u usér:päss …/INBOX;UID=1` sends `LOGIN us\xE9r p\xE4ss`, exit 0; `-sS -u u:p -X "XFOO é" …/` sends `XFOO \xE9`, exit 21. For all four, request.bin, stdout.bin, stderr.txt and exitcode.txt hash equal between REF and PORT after the fix (before it, € went out as `?`). Linux's UTF-8 answer (`us\xC3\xA9r p\xC3\xA4ss`, `XFOO \xC3\xA9`, from the report) is pinned in Cgr025Tests by OS-conditioned tests and by `ForPlatform(false, …)`; the CI-on-Linux side is met by keeping the tests platform-neutral (each platform's bytes in its own OSCondition test).
+- Cgr025Tests: the Windows € tests fail before the fix (Latin-1 turned € into `?`) and pass after. IMAP tests 520 passed; full fast run green; Measure-CodeQuality for Curl.Protocol.Imap.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-025 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. IMAP LOGIN credentials and -X commands go out as curl's argv bytes (ANSI code page on Windows, UTF-8 elsewhere)
