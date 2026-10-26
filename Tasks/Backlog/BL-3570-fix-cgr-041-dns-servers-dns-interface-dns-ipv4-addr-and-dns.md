@@ -4,8 +4,8 @@ title: Fix CGR-041: --dns-servers, --dns-interface, --dns-ipv4-addr and --dns-ip
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr041Tests.cs, Curl.Networking.UnitLibrary/DnsServerList.cs, Curl.Networking.UnitTests/Cgr041Tests.cs]
+depends-on: [BL-3545]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineOption.cs, Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineGlobalState.cs, Curl.Cli.UnitLibrary/CommandLineParser.cs, Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Cli.UnitTests/Cgr041Tests.cs, Curl.Cli.UnitTests/CAresBuildParser.cs, Curl.Cli.UnitTests/CommandLineDnsOptionTests.cs, Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs, Curl.Cli.UnitTests/CommandLineNextGroupTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeProtocolOptionTests.cs, Curl.Cli.UnitTests/LibcurlSourceCodeOptionCoverageTests.cs, Curl.Console.UnitTests/CAresBuildParser.cs, Curl.Console.UnitTests/EasyOptionsFromCommandLineTests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -80,7 +80,11 @@ curl -sS --dns-ipv4-addr 127.0.0.1 http://127.0.0.1:20600/x
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr041Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 6, first pass, no code edited): plan. ADR-0454 kept the four DNS options accepted on every platform; ADR-0540 later set the precedent of refusing `--http3` as every reference build does, behind a parser seam (`ActsAsQuicBuild`, `RefusedWithoutQuic`, test-only `QuicBuildParser`). Do the same for c-ares: a new ADR, superseding ADR-0454 point 2 for the DNS options (`--ech` stays as it is). Add `CommandLineGlobalState.ActsAsCAresBuild` plus a matching `CommandLineOptions.ActsAsCAresBuild` property, a `CommandLineOption.RefusedWithoutCAres()` row modifier built like `RefusedWithoutQuic` (refusal after "requires parameter" and before the value is checked), and a `CommandLineParser.Parse` overload that takes `actsAsCAresBuild` (the executable never sets it). Mark the four dns-* rows in `CommandLineOptionTable.cs`, and have `--ai-help` say they are refused on every platform (`CurlAiHelpText.cs`). Point the existing tests at a new test-only `CAresBuildParser` (Cli and Console test projects): CommandLineDnsOptionTests, the blank-argument test (blank values are now refused as unsupported), the next-group test, the LibcurlSourceCode tests and Console's EasyOptionsFromCommandLineTests. Pin the refusal (exit 2, `curl: option --dns-servers: the installed libcurl version does not support this` and the try-help line) in `Cgr041Tests.cs`. `Curl.Networking.UnitLibrary/DnsServerList.cs` needs no change, so it is dropped from touches.
+- The fix needs `Curl.Cli.UnitLibrary/CommandLineOptions.cs`, which BL-3545 (in Doing on work/dark-factory) also names. Its private `globals` field means the refusal predicate cannot read the shared state without a property on that class, so BL-3545 goes in depends-on and the task goes back to Backlog. No other task in Doing names any of the other files.
+
 ## Log
 
 - 2026-10-26: Created from CGR-041 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Needs Curl.Cli.UnitLibrary/CommandLineOptions.cs, held by BL-3545 (Doing); plan recorded under Notes
