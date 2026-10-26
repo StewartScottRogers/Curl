@@ -18,6 +18,8 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
 
     private LdapSaslSecurityLayer? securityLayer;
 
+    private IConnection? securedConnection;
+
     private int nextMessageId = 1;
 
     /// <summary>Whether a send failed with an I/O error, after which every read finds the server closed.</summary>
@@ -35,9 +37,44 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
         reader = new LdapMessageReader(securityLayer);
     }
 
-    /// <summary>Disposes the security layer's keys, if the session has one; the connection stays open.</summary>
-    /// <returns>A task that completes when the keys have been disposed.</returns>
-    public ValueTask DisposeAsync() => securityLayer?.DisposeAsync() ?? ValueTask.CompletedTask;
+    /// <summary>
+    /// Sends and reads every later message on <paramref name="secured" />, the TLS connection
+    /// StartTLS moved the session onto, which the session now owns.
+    /// </summary>
+    /// <param name="secured">The connection the TLS handshake returned.</param>
+    public void UseSecuredConnection(IConnection secured)
+    {
+        securedConnection = secured;
+        connection = secured;
+        reader = new LdapMessageReader(secured);
+    }
+
+    /// <summary>
+    /// Sends the StartTLS ExtendedRequest and reads the server's answer; the result code is
+    /// that of its ExtendedResponse.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The server's answer.</returns>
+    public ValueTask<LdapBindReply> StartTlsAsync(CancellationToken cancellationToken) =>
+        ExchangeAsync("StartTLS ExtendedRequest", messageId => LdapRequests.StartTls(writer, messageId), LdapExtendedResponse.Decode, cancellationToken);
+
+    /// <summary>
+    /// Disposes the security layer's keys and the TLS connection StartTLS moved the session onto,
+    /// if the session has them; the plaintext connection stays open.
+    /// </summary>
+    /// <returns>A task that completes when they have been disposed.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        if (securityLayer is not null)
+        {
+            await securityLayer.DisposeAsync().ConfigureAwait(false);
+        }
+
+        if (securedConnection is not null)
+        {
+            await securedConnection.DisposeAsync().ConfigureAwait(false);
+        }
+    }
 
     /// <summary>Sends a simple BindRequest and reads the server's answer.</summary>
     /// <param name="version">The protocol version, 3, or 2 for WinLDAP's retry.</param>
@@ -66,7 +103,11 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
         BindWithAsync("Sicily BindRequest", messageId => LdapRequests.SicilyBind(writer, messageId, name, choice, token), cancellationToken);
 
     /// <summary>Sends the BindRequest <paramref name="encode" /> writes for the next messageID and reads the server's answer.</summary>
-    private async ValueTask<LdapBindReply> BindWithAsync(string operation, Func<int, byte[]> encode, CancellationToken cancellationToken)
+    private ValueTask<LdapBindReply> BindWithAsync(string operation, Func<int, byte[]> encode, CancellationToken cancellationToken) =>
+        ExchangeAsync(operation, encode, LdapBindResponse.Decode, cancellationToken);
+
+    /// <summary>Sends the request <paramref name="encode" /> writes for the next messageID and decodes the server's answer with <paramref name="decode" />.</summary>
+    private async ValueTask<LdapBindReply> ExchangeAsync(string operation, Func<int, byte[]> encode, Func<ReadOnlyMemory<byte>, int, LdapBindReply> decode, CancellationToken cancellationToken)
     {
         int messageId = nextMessageId++;
         await SendAsync(encode(messageId), cancellationToken).ConfigureAwait(false);
@@ -74,7 +115,7 @@ internal sealed class LdapExchange(IConnection connection, LdapBerWriter writer,
         (LdapReadStatus status, byte[] message) = await ReadMessageAsync(cancellationToken).ConfigureAwait(false);
         return status switch
         {
-            LdapReadStatus.Message => LdapBindResponse.Decode(message, messageId),
+            LdapReadStatus.Message => decode(message, messageId),
             LdapReadStatus.Closed => new LdapBindReply(LdapBindReplyStatus.Closed, 0),
             _ => new LdapBindReply(LdapBindReplyStatus.Malformed, 0),
         };

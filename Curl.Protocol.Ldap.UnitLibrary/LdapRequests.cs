@@ -21,6 +21,15 @@ internal static class LdapRequests
     /// <summary>The AbandonRequest's tag, <c>[APPLICATION 16]</c>, a primitive INTEGER.</summary>
     private static readonly Asn1Tag AbandonRequestTag = new(TagClass.Application, 16);
 
+    /// <summary>The ExtendedRequest's tag, [APPLICATION 23].</summary>
+    private static readonly Asn1Tag ExtendedRequestTag = new(TagClass.Application, 23);
+
+    /// <summary>The ExtendedRequest's requestName, [0].</summary>
+    private static readonly Asn1Tag RequestNameTag = new(TagClass.ContextSpecific, 0);
+
+    /// <summary>The StartTLS extended operation's name (RFC 4511 section 4.14.1).</summary>
+    private const string StartTlsOid = "1.3.6.1.4.1.1466.20037";
+
     /// <summary>The simple authentication choice's tag, <c>[0]</c>, a primitive OCTET STRING.</summary>
     private static readonly Asn1Tag SimpleAuthenticationTag = new(TagClass.ContextSpecific, 0);
 
@@ -158,4 +167,14 @@ internal static class LdapRequests
             Asn1Tag.Sequence,
             LdapBerWriter.Integer(messageId),
             LdapBerWriter.Null(UnbindRequestTag));
+
+    /// <summary>Writes the StartTLS ExtendedRequest, with no requestValue, as libldap sends it.</summary>
+    /// <param name="writer">The dialect's writer.</param>
+    /// <param name="messageId">The request's messageID.</param>
+    /// <returns>The LDAPMessage.</returns>
+    public static byte[] StartTls(LdapBerWriter writer, int messageId) =>
+        writer.Constructed(
+            Asn1Tag.Sequence,
+            LdapBerWriter.Integer(messageId),
+            writer.Constructed(ExtendedRequestTag, LdapBerWriter.OctetString(RequestNameTag, Encoding.ASCII.GetBytes(StartTlsOid))));
 }

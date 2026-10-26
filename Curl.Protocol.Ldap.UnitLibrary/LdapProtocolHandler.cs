@@ -46,10 +46,17 @@ namespace Curl.Protocol.Ldap;
 /// </para>
 /// </remarks>
 /// <param name="logonTokenSource">Produces the logged-on user's tokens for the WinLDAP dialect's bind without <c>-u</c>.</param>
-public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect, ILdapLogonTokenSource logonTokenSource) : IProtocolHandler
+/// <param name="tlsProvider">
+/// Performs the OpenLDAP dialect's StartTLS handshake for <c>--ssl</c> and <c>--ssl-reqd</c>
+/// (<see cref="LdapStartTls" />); without one, a StartTLS the server accepts fails with exit 64.
+/// </param>
+public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialect, ILdapLogonTokenSource logonTokenSource, ITlsProvider? tlsProvider) : IProtocolHandler
 {
     /// <summary>The user name or password held a byte below 0x20 (exit 43), curl 8.22.0's text (BL-2179).</summary>
     private const string CredentialsHaveControlCode = "control code detected in credentials";
+
+    /// <summary>The WinLDAP build's refusal of <c>--ssl-reqd</c> on <c>ldap</c> (exit 4), measured from curl 8.22.0 (BL-3542).</summary>
+    private const string ExplicitTlsNotSupported = "LDAP local: explicit TLS not supported";
 
     private const int DefaultPort = 389;
 
@@ -78,7 +85,19 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// <param name="connector">Supplies the connection to the URL's host and port.</param>
     /// <param name="dialect">The build to answer as.</param>
     public LdapProtocolHandler(IConnector connector, LdapDialect dialect)
-        : this(connector, dialect, new NegotiateLogonTokenSource())
+        : this(connector, dialect, new NegotiateLogonTokenSource(), null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LdapProtocolHandler" /> class with no TLS
+    /// provider for StartTLS.
+    /// </summary>
+    /// <param name="connector">Supplies the connection to the URL's host and port.</param>
+    /// <param name="dialect">The build to answer as.</param>
+    /// <param name="logonTokenSource">Produces the logged-on user's tokens for the WinLDAP dialect's bind without <c>-u</c>.</param>
+    public LdapProtocolHandler(IConnector connector, LdapDialect dialect, ILdapLogonTokenSource logonTokenSource)
+        : this(connector, dialect, logonTokenSource, null)
     {
     }
 
@@ -162,6 +181,10 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             if (dialect == LdapDialect.WinLdap)
             {
                 context.Events.ReportInfo(LdapVerboseLines.Establishing(context.Url.Scheme == TlsScheme));
+                if (StartsTls(context))
+                {
+                    return TransferResult.Failure(CurlExitCode.NotBuiltIn, ExplicitTlsNotSupported);
+                }
             }
 
             return await BindAndSearchAsync(connection, context, search).ConfigureAwait(false);
@@ -196,7 +219,8 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     }
 
     /// <summary>
-    /// Binds with the transfer's credentials; without them anonymously on OpenLDAP and as the
+    /// Starts TLS when <c>--ssl</c> or <c>--ssl-reqd</c> asks for it on the OpenLDAP dialect, then
+    /// binds with the transfer's credentials; without them anonymously on OpenLDAP and as the
     /// logged-on user on WinLDAP; then runs the search.
     /// </summary>
     private async ValueTask<TransferResult> BindAndSearchAsync(IConnection connection, ITransferContext context, LdapSearchParameters search)
@@ -205,9 +229,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         await using (exchange.ConfigureAwait(false))
         {
             bool bindsAsLogonUser = dialect == LdapDialect.WinLdap && context.Credentials is null;
-            TransferResult? bindFailure = bindsAsLogonUser
-                ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
-                : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
+            TransferResult? bindFailure = await StartTlsAndBindAsync(exchange, connection, context, bindsAsLogonUser).ConfigureAwait(false);
             if (bindFailure is not null)
             {
                 return bindFailure;
@@ -222,6 +244,31 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
 
             return await LdapSearch.RunAsync(dialect, exchange, search, context).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Whether <c>--ssl</c> or <c>--ssl-reqd</c> asks a plaintext <c>ldap</c> URL to start TLS:
+    /// the WinLDAP build refuses <c>--ssl-reqd</c> and binds in plaintext under <c>--ssl</c>; the
+    /// OpenLDAP build sends StartTLS for both. An <c>ldaps</c> URL is TLS from the first byte.
+    /// </summary>
+    private bool StartsTls(ITransferContext context) =>
+        context.Url.Scheme != TlsScheme
+        && (dialect == LdapDialect.OpenLdap ? context.SslLevel != TransportSecurityLevel.None : context.SslLevel == TransportSecurityLevel.Required);
+
+    /// <summary>
+    /// Starts TLS when <see cref="StartsTls" /> says so, then binds as the logged-on user or with
+    /// the transfer's credentials; the failure that ends the transfer, or <see langword="null" />.
+    /// </summary>
+    private async ValueTask<TransferResult?> StartTlsAndBindAsync(LdapExchange exchange, IConnection connection, ITransferContext context, bool bindsAsLogonUser)
+    {
+        if (StartsTls(context) && await LdapStartTls.UpgradeAsync(exchange, connection, tlsProvider, context).ConfigureAwait(false) is { } startTlsFailure)
+        {
+            return startTlsFailure;
+        }
+
+        return bindsAsLogonUser
+            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
+            : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
     }
 
     /// <summary>Names a simple bind by its DN, never its password, for the diagnostic log.</summary>
