@@ -4,7 +4,7 @@ title: Fix CGR-044: Windows: with stdin redirected, the -u/--proxy-user password
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3838]
+depends-on: [BL-3854]
 touches: [Curl.Cli.UnitLibrary/ConsolePasswordPrompt.cs, Curl.Cli.UnitLibrary/WindowsConsolePasswordInput.cs, Curl.Cli.UnitTests/Cgr044Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -70,10 +70,10 @@ curl -s -u user @U < pw.txt
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 - Measured REF (curl 8.21.0 Schannel, `C:\Windows\System32\curl.exe`; 8.22.0 not installed here): `timeout 8 curl -s -u user http://127.0.0.1:20002/ < pw.txt` (pw.txt `secret\n`) and `... < /dev/null` both print `Enter host password for user 'user':` (no LF) to stderr, nothing to stdout, and are killed at the timeout (exit 124); nothing is sent, so the closed port 20002 stands in for the echo server.
 - Fix (in this run's stash): new `WindowsConsolePasswordInput` reads `CONIN$` as `_getch` does (`CreateFileW`, `GetConsoleMode`/`SetConsoleMode(0)`, `ReadConsoleW` one character, modes restored), `ConsolePasswordPrompt.ForPlatform(true)` uses it, and a public `KeyReader` lets `Cgr044Tests` check the wiring; ADR-0819 records the decision. Added `WindowsConsolePasswordInput.cs` to touches (a new file no other task names). With it, PORT via `dotnet run --project Curl.Console --no-build -- -s -u user http://127.0.0.1:20002/` gives the same as REF for both inputs (exit 124, same stderr, empty stdout). Build clean.
-- Requeued for BL-3838: with the fix, `dotnet test Curl.Cli.UnitTests` ran past 60 minutes, because tests parse a password-less `-u` through `ConsolePasswordPrompt.ForProcessConsole` and now wait on the lane's console. BL-3838 gives those tests a fake prompt. `Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs` may also need checking. Still to do after BL-3838: fast tests, Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary, commit.
+- Requeued for BL-3854: with the fix, `dotnet test Curl.Cli.UnitTests` ran past 60 minutes, because tests parse a password-less `-u` through `ConsolePasswordPrompt.ForProcessConsole` and now wait on the lane's console. BL-3854 gives those tests a fake prompt. `Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs` may also need checking. Still to do after BL-3854: fast tests, Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary, commit.
 
 ## Log
 
 - 2026-10-26: Created from CGR-044 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Backlog. Waits on BL-3838: with the CONIN$ prompt fix, fast tests that parse a password-less -u through ConsolePasswordPrompt.ForProcessConsole wait on the console
+- 2026-10-26: Doing -> Backlog. Waits on BL-3854: with the CONIN$ prompt fix, fast tests that parse a password-less -u through ConsolePasswordPrompt.ForProcessConsole wait on the console

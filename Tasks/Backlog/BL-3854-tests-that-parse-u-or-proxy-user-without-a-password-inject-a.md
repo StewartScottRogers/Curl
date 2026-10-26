@@ -1,5 +1,5 @@
 ---
-id: BL-3838
+id: BL-3854
 title: Tests that parse -u or --proxy-user without a password inject a fake IPasswordPrompt, never the process console
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3838 — Tests that parse -u or --proxy-user without a password inject a fake IPasswordPrompt, never the process console
+# BL-3854 — Tests that parse -u or --proxy-user without a password inject a fake IPasswordPrompt, never the process console
 ## Goal
 
 No fast test reaches `ConsolePasswordPrompt.ForProcessConsole` (or `CommandLineParser.Parse` overloads that default to it) with a `-u`/`--proxy-user` user that has no password, so the fast tests never wait on the console once BL-3573 makes the Windows prompt read `CONIN$`.
