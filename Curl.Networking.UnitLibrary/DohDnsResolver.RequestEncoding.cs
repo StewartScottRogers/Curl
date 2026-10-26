@@ -25,13 +25,17 @@ public sealed partial class DohDnsResolver
     internal static string HttpsQueryName(string host, int port) =>
         port == 443 ? host : $"_{port}._https.{host}";
 
-    // The request line and header block of the POST curl sends for one query.
+    // The request line and header block of the POST curl sends for one query: through a forwarding
+    // proxy the target is absolute and Proxy-Connection follows Accept (measured, CGR-037).
     private byte[] BuildRequestHead(byte[] query)
     {
         var host = _dohUrl.IsDefaultPort ? _dohUrl.Host : $"{_dohUrl.Host}:{_dohUrl.Port}";
-        var head = $"POST {_dohUrl.PathAndQuery} HTTP/1.1\r\n"
+        var forwarded = ForwardsThroughProxy;
+        var target = forwarded ? $"{_dohUrl.Scheme}://{host}{_dohUrl.PathAndQuery}" : _dohUrl.PathAndQuery;
+        var head = $"POST {target} HTTP/1.1\r\n"
             + $"Host: {host}\r\n"
             + "Accept: */*\r\n"
+            + (forwarded ? "Proxy-Connection: Keep-Alive\r\n" : string.Empty)
             + "Content-Type: application/dns-message\r\n"
             + $"Content-Length: {query.Length}\r\n"
             + "\r\n";

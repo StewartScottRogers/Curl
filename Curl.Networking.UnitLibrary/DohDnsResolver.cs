@@ -113,6 +113,29 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfig
     /// </summary>
     public ITransferEvents SubTransferEvents { get; init; } = NoTransferEvents.Instance;
 
+    /// <summary>
+    /// Gets the proxy the DoH requests go through, as curl 8.22.0's DoH sub-transfers take the
+    /// proxy environment variables (CGR-037, ADR-0818): an <c>http://</c> DoH URL through an HTTP or
+    /// HTTPS proxy is POSTed to the proxy in absolute form with <c>Proxy-Connection: Keep-Alive</c>;
+    /// an <c>https://</c> one, or any through a SOCKS proxy, is tunnelled. <see langword="null" />,
+    /// the default, connects to the DoH server directly.
+    /// </summary>
+    public ProxyEndpoint? Proxy { get; init; }
+
+    // Whether each POST goes to an HTTP or HTTPS proxy in absolute form rather than through a tunnel.
+    private bool ForwardsThroughProxy =>
+        Proxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } && !_dohServer.UseTls;
+
+    // Where each DoH connection is opened: the DoH server, the proxy it is forwarded to, or the
+    // DoH server through a tunnel.
+    private ConnectTarget DohConnectTarget => Proxy switch
+    {
+        null => _dohServer,
+        { } proxy when ForwardsThroughProxy =>
+            new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true, PoolScheme = _dohServer.PoolScheme },
+        { } proxy => _dohServer with { Proxy = proxy },
+    };
+
     /// <inheritdoc />
     public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
     {

@@ -8,7 +8,7 @@ public sealed partial class DohDnsResolver
     private async Task<DohQueryResult> QueryAsync(byte[] query, DnsRecordType recordType, ITransferEvents events, CancellationToken cancellationToken)
     {
         var connectionNumber = Interlocked.Increment(ref _connectionCount);
-        var connected = await _connector.ConnectAsync(_dohServer with { Events = events }, cancellationToken).ConfigureAwait(false);
+        var connected = await _connector.ConnectAsync(DohConnectTarget with { Events = events }, cancellationToken).ConfigureAwait(false);
         if (connected.Connection is not { } connection)
         {
             return new DohQueryResult(recordType, connected.ExitCode, null);
