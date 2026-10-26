@@ -3,6 +3,8 @@ using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Options;
+using Curl.Core;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -92,35 +94,30 @@ public sealed class Cgr033Tests
     [TestMethod]
     public async Task GetTimeout_WriteCallbackQueued_IsZeroAndAWaitCountsItReady()
     {
-        string directory = Directory.CreateTempSubdirectory("cgr033-").FullName;
-        try
+        // A file:// transfer may read its whole file inside the first perform where the platform's file reads
+        // complete synchronously (Linux), leaving no callback to queue; this handler writes only once released,
+        // off the performing thread, so its write always waits for a perform (BL-3869).
+        WritingWhenReleasedProtocolHandler handler = new();
+        await using ManagedCurlEngine engine = new(TimeProvider.System, (_, _, _) => new ProtocolDispatcher([handler]));
+        await using IMultiTransfer multi = engine.CreateMulti();
+        await using IEasyTransfer transfer = engine.CreateEasy();
+        transfer.Options = new EasyOptions { Network = new() { Url = "http://h/x" }, Callbacks = new() { Write = data => data.Length } };
+        multi.Add(transfer);
+        await multi.PerformAsync(CancellationToken.None);
+        await multi.PerformAsync(CancellationToken.None);
+        handler.Release();
+        DateTime deadline = DateTime.UtcNow.AddSeconds(30);
+
+        // The transfer cannot finish while its write waits for a perform, so once the timeout is 0 a callback is queued.
+        while (multi.GetTimeout().TimeoutMilliseconds != 0 && DateTime.UtcNow < deadline)
         {
-            string path = Path.Combine(directory, "body.bin");
-            await File.WriteAllBytesAsync(path, new byte[BodyLength], TestContext.CancellationTokenSource.Token);
-            await using ManagedCurlEngine engine = new();
-            await using IMultiTransfer multi = engine.CreateMulti();
-            await using IEasyTransfer transfer = engine.CreateEasy();
-            transfer.Options = new EasyOptions { Network = new() { Url = new Uri(path).AbsoluteUri }, Callbacks = new() { Write = data => data.Length } };
-            multi.Add(transfer);
-            await multi.PerformAsync(CancellationToken.None);
-            await multi.PerformAsync(CancellationToken.None);
-            DateTime deadline = DateTime.UtcNow.AddSeconds(30);
-
-            // The transfer cannot finish while its write waits for a perform, so once the timeout is 0 a callback is queued.
-            while (multi.GetTimeout().TimeoutMilliseconds != 0 && DateTime.UtcNow < deadline)
-            {
-                await Task.Delay(1);
-            }
-
-            (CurlMultiCode code, int ready) = await multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromSeconds(30), CancellationToken.None);
-
-            Assert.AreEqual(CurlMultiCode.Ok, code);
-            Assert.AreEqual(1, ready);
+            await Task.Delay(1, TestContext.CancellationTokenSource.Token);
         }
-        finally
-        {
-            Directory.Delete(directory, recursive: true);
-        }
+
+        (CurlMultiCode code, int ready) = await multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromSeconds(30), CancellationToken.None);
+
+        Assert.AreEqual(CurlMultiCode.Ok, code);
+        Assert.AreEqual(1, ready);
     }
 
     // The probe's loop: perform, then wait, until the transfer's message comes; each wait is long, so a
@@ -142,5 +139,22 @@ public sealed class Cgr033Tests
         }
 
         return null;
+    }
+
+    // Writes 10 bytes once the test releases it, on a thread-pool thread rather than the performing one.
+    private sealed class WritingWhenReleasedProtocolHandler : IProtocolHandler
+    {
+        private readonly TaskCompletionSource released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public IReadOnlyCollection<string> SupportedSchemes { get; } = ["http"];
+
+        public void Release() => released.TrySetResult();
+
+        public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+        {
+            await released.Task.WaitAsync(context.CancellationToken);
+            await context.Output.WriteAsync(new byte[10], context.CancellationToken);
+            return TransferResult.Success(10);
+        }
     }
 }
