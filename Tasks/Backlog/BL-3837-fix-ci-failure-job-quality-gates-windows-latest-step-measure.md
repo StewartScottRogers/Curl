@@ -4,7 +4,7 @@ title: Fix CI failure job Quality gates (windows-latest) step Measure coverage, 
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3831]
 touches: [Measure-CodeQuality.ps1]
 requirement: none
 created: 2026-10-26
@@ -30,7 +30,10 @@ Lanes test only on Windows, so reproduce with `gh run view 40348984024 --log-fai
 
 ## Notes
 
+- 2026-10-26 (lane 2): The only member outside a gate is CurlCommandRunner.WriteRefusalAsync (branch), the exact work of BL-3831 (Backlog, ready, touches Curl.Console.UnitTests/CurlCommandRunnerWriteRefusalTests.cs). Left to that task (AF-0148) rather than redone here; this task waits on it and then only confirms the quality job is green.
+
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3831, which covers WriteRefusalAsync's untaken branch, the only member outside a gate
