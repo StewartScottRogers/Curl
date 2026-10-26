@@ -1,5 +1,5 @@
 ---
-id: BL-3873
+id: BL-3879
 title: OpenSSL build: a legacy --tls-max with --ciphers @SECLEVEL=0 connects as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3873 — OpenSSL build: a legacy --tls-max with --ciphers @SECLEVEL=0 connects as curl does
+# BL-3879 — OpenSSL build: a legacy --tls-max with --ciphers @SECLEVEL=0 connects as curl does
 
 ## Goal
 
