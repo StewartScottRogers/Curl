@@ -372,11 +372,18 @@ public sealed class LdapAdversarialTests
     [TestMethod]
     public void Encode_ManySiblingSetsEachShallow_CountsDepthNotSetsAndEncodes()
     {
-        string filter = "(&" + string.Concat(Enumerable.Repeat("(|(cn=a))", LdapFilterEncoder.MaximumSetDepth * 2)) + ")";
+        int siblings = LdapFilterEncoder.MaximumSetDepth * 2;
+        string filter = "(&" + string.Concat(Enumerable.Repeat("(|(cn=a))", siblings)) + ")";
+        byte[] orOfCnEqualsA = [0xA1, 0x09, 0xA3, 0x07, 0x04, 0x02, 0x63, 0x6E, 0x04, 0x01, 0x61];
+        byte[] expectedChildren = [.. Enumerable.Repeat(orOfCnEqualsA, siblings).SelectMany(child => child)];
 
         byte[]? encoded = Encoder(LdapDialect.OpenLdap).Encode(filter);
 
         Assert.IsNotNull(encoded);
+        Assert.AreEqual(0xA0, encoded[0]);
+        int headerLength = encoded.Length - expectedChildren.Length;
+        Assert.IsTrue(headerLength is >= 2 and <= 5, $"AND header was {headerLength} bytes");
+        CollectionAssert.AreEqual(expectedChildren, encoded[headerLength..]);
     }
 
     [TestMethod]

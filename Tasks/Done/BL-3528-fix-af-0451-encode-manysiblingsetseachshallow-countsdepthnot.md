@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ldap.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3528 — Fix AF-0451: Encode_ManySiblingSetsEachShallow_CountsDepthNotSetsAndEncodes checks only that some bytes came back, not the encoding
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Test now asserts the AND tag, header length and the exact bytes of all sibling OR sets. Only the test project changed, so no library quality run was needed. Ldap tests: 612 passed.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Encode_ManySiblingSets test asserts the exact encoded bytes
