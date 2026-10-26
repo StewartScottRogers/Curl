@@ -25,6 +25,11 @@ internal static class HttpConnectionInfoLines
     /// response is sent again, or given up on (<c>Curl_retry_request</c>, ADR-0187).
     /// </summary>
     internal const string RefusedStreamRetrying = "REFUSED_STREAM, retrying a fresh connect";
+    /// <summary>
+    /// The line written when the server resets an HTTP/2 stream with HTTP_1_1_REQUIRED and the
+    /// request is sent again over HTTP/1.1 (<c>multi_runsingle</c>, CGR-032).
+    /// </summary>
+    internal const string DowngradesToHttp11 = "Downgrades to HTTP/1.1";
 
     /// <summary>
     /// The line written before the first request on a connection this transfer opened, not on

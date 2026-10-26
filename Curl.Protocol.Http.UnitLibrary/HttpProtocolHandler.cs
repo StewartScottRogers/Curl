@@ -220,6 +220,11 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     internal const int MaximumStreamRefusedRetries = 5;
 
+    /// <summary>
+    /// The protocols a request downgraded to HTTP/1.1 offers through ALPN (CGR-032).
+    /// </summary>
+    private static readonly IReadOnlyList<string> Http11ApplicationProtocols = ["http/1.1"];
+
     private static readonly string[] Schemes = ["http", "https"];
 
     private readonly IConnector connector = connector ?? throw new ArgumentNullException(nameof(connector));
@@ -630,7 +635,7 @@ public sealed class HttpProtocolHandler(
             {
                 Proxy = plan.Options.ForwardProxy,
                 AltSvcRoute = plan.Options.AltSvcRoute,
-                ApplicationProtocols = AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
+                ApplicationProtocols = plan.DowngradedToHttp11 ? Http11ApplicationProtocols : AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
             };
         return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
     }
@@ -2142,6 +2147,19 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Builds the outcome of an exchange whose HTTP/2 stream the server reset with
+    /// <c>HTTP_1_1_REQUIRED</c>, as curl 8.18.0's <c>multi_runsingle</c> does for
+    /// <c>Curl_h2_http_1_1_error</c> (CGR-032, ADR-0819): <c>-v</c> says <c>Downgrades to HTTP/1.1</c>,
+    /// the HTTP/2 connection is closed and the request is sent again, once, over HTTP/1.1 on a
+    /// new connection, its body rewound as for a refused stream.
+    /// </summary>
+    private static HttpAttemptOutcome Http11RequiredOutcome(HttpRequestPlan plan, HttpRequestBodyWriter upload, TransferResult failed)
+    {
+        plan.Context.Events.ReportInfo(HttpConnectionInfoLines.DowngradesToHttp11);
+        return new HttpAttemptOutcome(failed, plan.AfterHttp11Required(RewindUploadFailure(plan.Framing.Body, upload)), KeepsAlive: false);
+    }
+
+    /// <summary>
     /// Builds the outcome of an exchange that failed with <paramref name="failure" />: as
     /// <see cref="StreamRefusedOutcome" /> says when the server refused its stream; sent
     /// again once on a fresh connection when a connection that already carried a request died
@@ -2153,6 +2171,11 @@ public sealed class HttpProtocolHandler(
         if (failure.IsStreamRefused)
         {
             return StreamRefusedOutcome(plan, upload, failed, headReader.HasReceived);
+        }
+
+        if (failure.RequiresHttp11 && !plan.DowngradedToHttp11)
+        {
+            return Http11RequiredOutcome(plan, upload, failed);
         }
 
         return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
@@ -3452,6 +3475,13 @@ public sealed class HttpProtocolHandler(
         public int StreamRefusedRetries { get; private set; }
 
         /// <summary>
+        /// Gets a value indicating whether the request is sent over HTTP/1.1 because the server
+        /// reset its HTTP/2 stream with <c>HTTP_1_1_REQUIRED</c> (CGR-032): its TLS handshake
+        /// offers only <c>http/1.1</c> through ALPN and it is never downgraded again.
+        /// </summary>
+        public bool DowngradedToHttp11 { get; private set; }
+
+        /// <summary>
         /// Gets the message this resend's <c>-T</c> upload failed to rewind with - <c>seek callback
         /// returned error 2</c> for one that cannot seek back to where the refused request began
         /// reading it, as stdin cannot, or an <see cref="IUploadRewinder" />'s own - so the resend fails
@@ -3638,6 +3668,23 @@ public sealed class HttpProtocolHandler(
         public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed, AuthorizationAnswersChallenge);
 
         /// <summary>
+        /// Makes the same request, sent again over HTTP/1.1 on a new connection because the server
+        /// reset its HTTP/2 stream with <c>HTTP_1_1_REQUIRED</c> (<see cref="DowngradedToHttp11" />).
+        /// </summary>
+        /// <param name="uploadRewindFailure">
+        /// The message its <c>-T</c> upload failed to rewind with, so the resend fails before it
+        /// connects (<see cref="UploadRewindFailure" />); <see langword="null" /> when it was rewound.
+        /// </param>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan AfterHttp11Required(string? uploadRewindFailure)
+        {
+            HttpRequestPlan retry = With(Framing, Authorization);
+            retry.Options = Options with { Version = HttpVersionPreference.Http11 };
+            retry.DowngradedToHttp11 = true;
+            return retry.FailingUploadRewind(uploadRewindFailure);
+        }
+
+        /// <summary>
         /// Makes the same request, sent again on a new connection because the server refused its
         /// HTTP/3 stream, with <see cref="StreamRefusedRetries" /> one higher.
         /// </summary>
@@ -3764,6 +3811,7 @@ public sealed class HttpProtocolHandler(
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
                 AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
+                DowngradedToHttp11 = DowngradedToHttp11,
                 HoldsDigestNonce = HoldsDigestNonce,
                 AuthSchemesOffered = AuthSchemesOffered,
                 ProxyAuthSchemesOffered = ProxyAuthSchemesOffered,

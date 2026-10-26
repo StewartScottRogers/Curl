@@ -28,6 +28,13 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal bool IsStreamRefused { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the server reset the request's HTTP/2 stream with
+    /// <c>HTTP_1_1_REQUIRED</c>, so the handler sends it again over HTTP/1.1 on a new
+    /// connection, as curl 8.18.0 with nghttp2 does (CGR-032).
+    /// </summary>
+    internal bool RequiresHttp11 { get; init; }
+
+    /// <summary>
     /// Gets the <c>-v</c> lines the handler reports for the failure, in order, once the head
     /// lines it holds are reported; none by default. Too many response headers reports its
     /// message, and among a chunked body's trailers also
