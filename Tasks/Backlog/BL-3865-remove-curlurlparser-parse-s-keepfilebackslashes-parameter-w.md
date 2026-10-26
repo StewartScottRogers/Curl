@@ -1,5 +1,5 @@
 ---
-id: BL-3862
+id: BL-3865
 title: Remove CurlUrlParser.Parse's keepFileBackslashes parameter, which no longer changes anything
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3862 — Remove CurlUrlParser.Parse's keepFileBackslashes parameter, which no longer changes anything
+# BL-3865 — Remove CurlUrlParser.Parse's keepFileBackslashes parameter, which no longer changes anything
 
 ## Goal
 

@@ -26,7 +26,7 @@ A `file` URL's backslashes stay exactly as typed. They are no path separator, so
 `localhost` or `127.0.0.1`. On Windows the operating system still reads `\` as a separator when the file is
 opened, as it does for curl.
 
-`CurlUrlParser.Parse`'s `keepFileBackslashes` parameter no longer changes anything; BL-3862 removes it once
+`CurlUrlParser.Parse`'s `keepFileBackslashes` parameter no longer changes anything; BL-3865 removes it once
 BL-3851 releases `CurlUrl.cs`.
 
 ## Consequences
