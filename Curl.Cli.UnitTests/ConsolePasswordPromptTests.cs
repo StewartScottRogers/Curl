@@ -135,30 +135,6 @@ public sealed class ConsolePasswordPromptTests
         Assert.AreNotSame(windows, offWindows);
     }
 
-    /// <summary>
-    /// On Windows a redirected input cannot be read by <see cref="Console.ReadKey(bool)"/>, so the
-    /// password is empty; off Windows the prompt reads <c>/dev/tty</c> or standard input instead,
-    /// which would wait on the test host's input.
-    /// </summary>
-    [TestMethod]
-    [OSCondition(OperatingSystems.Windows)]
-    public void ForProcessConsole_InputRedirected_ReturnsAnEmptyPassword()
-    {
-        Diagnostics.Arrange("prompt", "\"\"");
-        Diagnostics.Act("input redirected", Console.IsInputRedirected);
-        Diagnostics.Assert("input redirected", true, Console.IsInputRedirected);
-        if (!Console.IsInputRedirected)
-        {
-            Assert.Inconclusive("Standard input is a console here; reading a key would wait for a keypress.");
-        }
-
-        string password = ConsolePasswordPrompt.ForProcessConsole.ReadPassword(string.Empty);
-        Diagnostics.Act("password", "\"" + password + "\"");
-
-        Diagnostics.Assert("password", string.Empty, password);
-        Assert.AreEqual(string.Empty, password);
-    }
-
     /// <summary>Reads <c>secret</c> then Enter through a prompt on a default <see cref="StringWriter"/> (whose line terminator is the platform's, as on <see cref="Console.Error"/>) and pins what went to stderr.</summary>
     private void AssertPromptBytes(string expectedStandardError)
     {

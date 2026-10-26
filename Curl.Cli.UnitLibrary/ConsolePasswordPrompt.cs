@@ -45,8 +45,12 @@ public sealed class ConsolePasswordPrompt(TextWriter standardError, Func<Console
         return password;
     }
 
+    /// <summary>Reads one key without echoing it: the key reader this prompt was built with.</summary>
+    public Func<ConsoleKeyInfo> KeyReader => readKey;
+
     /// <summary>
-    /// On Windows, keys read with <see cref="Console.ReadKey(bool)"/> intercepting them; off Windows,
+    /// On Windows, keys read from the console input buffer by <see cref="WindowsConsolePasswordInput"/>,
+    /// whether or not standard input is redirected (ADR-0819); off Windows,
     /// <see cref="PosixTerminalPasswordInput"/>'s <c>/dev/tty</c> or standard input with its echo control.
     /// </summary>
     /// <param name="isWindows">Whether the prompt is for Windows.</param>
@@ -54,7 +58,7 @@ public sealed class ConsolePasswordPrompt(TextWriter standardError, Func<Console
     /// <returns>A new prompt; nothing is opened until it reads a key.</returns>
     public static ConsolePasswordPrompt ForPlatform(bool isWindows, TextWriter standardError) =>
         isWindows
-            ? new(standardError, () => Console.ReadKey(intercept: true))
+            ? new(standardError, WindowsConsolePasswordInput.ReadKey)
             : new(standardError, PosixTerminalPasswordInput.ReadKey, PosixTerminalPasswordInput.TurnEchoOff, PosixTerminalPasswordInput.TurnEchoOn);
 
     private static bool EchoIsAlreadyOff() => true;
