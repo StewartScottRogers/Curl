@@ -33,7 +33,7 @@ stay, as non-transitional processing keeps them. The URL API's own host keeps th
 
 Turning globalization on was rejected: it needs ICU on Linux and changes behaviour elsewhere.
 Calling the platform's IDN library was rejected: libidn2 is not on every machine and the
-library must stay testable without native code. The rest of the UTS #46 table is BL-3827.
+library must stay testable without native code. The rest of the UTS #46 table is BL-3829.
 
 ## Consequences
 

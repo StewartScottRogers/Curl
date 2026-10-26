@@ -1,5 +1,5 @@
 ---
-id: BL-3827
+id: BL-3829
 title: Map host names with the whole UTS#46 mapping table, not the BL-3548 subset
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3827 — Map host names with the whole UTS#46 mapping table, not the BL-3548 subset
+# BL-3829 — Map host names with the whole UTS#46 mapping table, not the BL-3548 subset
 
 ## Goal
 
