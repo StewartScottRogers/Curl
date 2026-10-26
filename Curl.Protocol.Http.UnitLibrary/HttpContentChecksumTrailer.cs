@@ -28,6 +28,18 @@ internal sealed class HttpContentChecksumTrailer(bool isGzip)
     /// </summary>
     private const int AdlerBlockSize = 5552;
 
+    /// <summary>
+    /// The length of a CRC-32 or Adler-32, and of a gzip member's size.
+    /// </summary>
+    private const int ChecksumLength = 4;
+
+    /// <summary>
+    /// The most encoded bytes that can follow the read that decoded a deflate stream's last
+    /// byte before its trailer: the rest of a final match code, and an end-of-block code of up
+    /// to 15 bits.
+    /// </summary>
+    private const int MostBytesAfterOutput = 3;
+
     private static readonly uint[] CrcTable = BuildCrcTable();
 
     private uint crc = uint.MaxValue;
@@ -86,6 +98,47 @@ internal sealed class HttpContentChecksumTrailer(bool isGzip)
         index = encoded.IndexOf(trailer);
         return index < 0 ? -1 : index + trailer.Length;
     }
+
+    /// <summary>
+    /// Tells which of the trailer's checks the stream failed, from where it failed: zlib reads
+    /// the trailer's 4-byte fields one after another, just after the deflate data's last
+    /// decoded byte and end-of-block code, and fails as soon as one is complete and wrong.
+    /// </summary>
+    /// <param name="read">
+    /// The encoded bytes read up to and including the one the stream failed on, at least
+    /// <see cref="CarriedLength" /> + 1 of them.
+    /// </param>
+    /// <param name="readSinceOutput">
+    /// How many encoded bytes were read after the last read that decoded something.
+    /// </param>
+    /// <returns>
+    /// <see cref="HttpTransferMessages.IncorrectDataCheck" /> when the stream failed where the
+    /// checksum ends and the 4 bytes there are not the checksum;
+    /// <see cref="HttpTransferMessages.IncorrectLengthCheck" /> when a gzip member failed where
+    /// its size ends after the checksum matched; otherwise <see langword="null" />, the failure
+    /// being in the deflate data.
+    /// </returns>
+    internal string? CheckFailed(ReadOnlySpan<byte> read, long readSinceOutput)
+    {
+        ReadOnlySpan<byte> checksum = Trailer().AsSpan(0, ChecksumLength);
+        if (EndsField(readSinceOutput, ChecksumLength) && !read[^ChecksumLength..].SequenceEqual(checksum))
+        {
+            return HttpTransferMessages.IncorrectDataCheck;
+        }
+
+        return isGzip && EndsField(readSinceOutput, 2 * ChecksumLength) && read[^(2 * ChecksumLength)..^ChecksumLength].SequenceEqual(checksum)
+            ? HttpTransferMessages.IncorrectLengthCheck
+            : null;
+    }
+
+    /// <summary>
+    /// Tells whether a failure <paramref name="readSinceOutput" /> bytes after the last decoded
+    /// output can be where a trailer field ending <paramref name="fieldEnd" /> bytes into the
+    /// trailer ends: the deflate data's last decoded byte is followed by at most
+    /// <see cref="MostBytesAfterOutput" /> bytes of end-of-block code before the trailer.
+    /// </summary>
+    private static bool EndsField(long readSinceOutput, int fieldEnd) =>
+        readSinceOutput >= fieldEnd && readSinceOutput <= fieldEnd + MostBytesAfterOutput;
 
     private byte[] Trailer()
     {

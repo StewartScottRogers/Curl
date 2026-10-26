@@ -18,7 +18,10 @@ namespace Curl.Protocol.Http;
 /// a method other than deflate is <see cref="HttpTransferMessages.UnknownCompressionMethod" />.
 /// <c>deflate</c> decodes a zlib stream, or a raw deflate stream when the first two bytes
 /// fail the zlib header check, as curl retries it. The first bytes are held until there are
-/// enough to tell. Any other corrupt data is exit 61
+/// enough to tell. A gzip or zlib trailer whose checksum or size does not match has every
+/// decoded byte written first and is <see cref="HttpTransferMessages.IncorrectDataCheck" /> or
+/// <see cref="HttpTransferMessages.IncorrectLengthCheck" /> (CGR-071, BL-3600). Any other
+/// corrupt data is exit 61
 /// <see cref="HttpTransferMessages.BadContentEncoding" /> (ADR-0031).
 /// </para>
 /// <para>
@@ -65,6 +68,12 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     /// </summary>
     private const int StoredBlockHeaderLength = 5;
 
+    /// <summary>
+    /// How many encoded bytes at each end of a piece of the body are fed one at a time: a
+    /// gzip trailer's length.
+    /// </summary>
+    private const int SinglyFedLength = 8;
+
     private readonly HttpContentInput input = new();
 
     private readonly byte[] output = new byte[OutputSize];
@@ -82,6 +91,17 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     private byte[] carried = [];
 
     private bool ended;
+
+    /// <summary>
+    /// How many encoded bytes have been fed to the decompression stream.
+    /// </summary>
+    private long fedTotal;
+
+    /// <summary>
+    /// <see cref="fedTotal" /> when the decompression stream last decoded something, or
+    /// <see langword="null" /> before it has.
+    /// </summary>
+    private long? fedAtLastOutput;
 
     /// <summary>
     /// Decodes the next piece of the encoded body.
@@ -180,10 +200,66 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
             yield break;
         }
 
-        input.Pending = encoded;
-        int read;
-        while ((read = ReadDecoded(decompressor)) > 0)
+        int fed = 0;
+        foreach (int length in FeedLengths(encoded.Length))
         {
+            input.Pending = encoded.Slice(fed, length);
+            fed += length;
+            fedTotal += length;
+            foreach (ReadOnlyMemory<byte> piece in ReadAll(encoded, length == 1 ? encoded[..fed] : ReadOnlyMemory<byte>.Empty))
+            {
+                yield return piece;
+            }
+        }
+
+        if (trailer is not null)
+        {
+            FindEndOnceFinished(encoded.Span);
+            Carry(encoded.Span);
+        }
+    }
+
+    /// <summary>
+    /// Splits <paramref name="length" /> encoded bytes into the pieces they are fed to the
+    /// decompression stream in: the first and last <see cref="SinglyFedLength" /> one at a time,
+    /// those between at once. The BCL streams drop what a read decoded when it fails, so a
+    /// trailer, which ends a body or spans the read before, is fed alone: a checksum that
+    /// fails then loses nothing decoded, as with curl (CGR-071, BL-3600).
+    /// </summary>
+    private static IEnumerable<int> FeedLengths(int length)
+    {
+        int head = Math.Min(length, SinglyFedLength);
+        int tail = Math.Max(head, length - SinglyFedLength);
+        for (int at = 0; at < head; at++)
+        {
+            yield return 1;
+        }
+
+        if (tail > head)
+        {
+            yield return tail - head;
+        }
+
+        for (int at = tail; at < length; at++)
+        {
+            yield return 1;
+        }
+    }
+
+    /// <summary>
+    /// Reads the decompression stream until it has decoded every byte fed to it.
+    /// </summary>
+    /// <param name="encoded">The encoded bytes of this piece of the body.</param>
+    /// <param name="readSingly">
+    /// The encoded bytes fed so far when the last was fed alone, to tell a failed trailer check
+    /// from other corrupt data; empty otherwise.
+    /// </param>
+    private IEnumerable<ReadOnlyMemory<byte>> ReadAll(ReadOnlyMemory<byte> encoded, ReadOnlyMemory<byte> readSingly)
+    {
+        int read;
+        while ((read = ReadDecoded(decompressor!, readSingly.Span)) > 0)
+        {
+            fedAtLastOutput = fedTotal;
             trailer?.Append(output.AsSpan(0, read));
             yield return output.AsMemory(0, read);
 
@@ -194,10 +270,12 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
             }
         }
 
-        if (trailer is not null)
+        // A trailer fed alone decodes nothing, and the next bytes can start a member
+        // GZipStream fails on; find the end before they are fed. Before anything is decoded
+        // the trailer sought is all zeros, which compressed zeros can hold.
+        if (decompressor is GZipStream && fedAtLastOutput is not null)
         {
-            FindEndOnceFinished(encoded.Span);
-            Carry(encoded.Span);
+            FindEnd(encoded.Span);
         }
     }
 
@@ -345,7 +423,7 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     private bool HasFinished(Stream stream)
     {
         int reads = input.ReadCount;
-        _ = ReadDecoded(stream);
+        _ = ReadDecoded(stream, []);
         return input.ReadCount == reads;
     }
 
@@ -376,7 +454,7 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
     private bool StartsAnotherGzipMember(ReadOnlySpan<byte> after) =>
         decompressor is GZipStream && after.Length >= 2 && after[0] == GzipFirstByte && after[1] == GzipSecondByte;
 
-    private int ReadDecoded(Stream stream)
+    private int ReadDecoded(Stream stream, ReadOnlySpan<byte> readSingly)
     {
         try
         {
@@ -384,9 +462,19 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
         }
         catch (InvalidDataException)
         {
-            throw Corrupt(HttpTransferMessages.BadContentEncoding);
+            throw Corrupt(CheckFailed(readSingly) ?? HttpTransferMessages.BadContentEncoding);
         }
     }
+
+    /// <summary>
+    /// Tells which trailer check failed when the stream failed on a byte fed alone after it had
+    /// decoded something; a stream without a trailer, one that failed on bytes fed together,
+    /// or one that decoded nothing has no such answer.
+    /// </summary>
+    private string? CheckFailed(ReadOnlySpan<byte> readSingly) =>
+        readSingly.IsEmpty || fedAtLastOutput is not long last
+            ? null
+            : trailer?.CheckFailed([.. carried, .. readSingly], fedTotal - last);
 
     private static HttpTransferException Corrupt(string message) => new(CurlExitCode.BadContentEncoding, message);
 

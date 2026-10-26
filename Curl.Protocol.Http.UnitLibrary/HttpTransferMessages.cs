@@ -352,6 +352,18 @@ internal static class HttpTransferMessages
     internal const string InvalidStoredBlockLengths = "Error while processing content unencoding: invalid stored block lengths";
 
     /// <summary>
+    /// The exit 61 message for a gzip member whose CRC-32, or a zlib stream whose Adler-32,
+    /// does not match the bytes it decoded to: zlib's text (CGR-071, BL-3600).
+    /// </summary>
+    internal const string IncorrectDataCheck = "Error while processing content unencoding: incorrect data check";
+
+    /// <summary>
+    /// The exit 61 message for a gzip member whose CRC-32 matches but whose size does not:
+    /// zlib's text (CGR-071, BL-3600).
+    /// </summary>
+    internal const string IncorrectLengthCheck = "Error while processing content unencoding: incorrect length check";
+
+    /// <summary>
     /// The exit 61 message for any other corrupt encoded body: measured for <c>br</c>, and
     /// the text <c>curl_easy_strerror</c> gives exit 61, used for corrupt <c>gzip</c> and
     /// <c>deflate</c> data too because the BCL does not report zlib's own text (ADR-0031).
