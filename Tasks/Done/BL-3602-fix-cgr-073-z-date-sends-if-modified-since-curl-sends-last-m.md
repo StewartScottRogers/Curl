@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr073Tests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr073Tests.cs, Curl.Cli.UnitLibrary/LibcurlSourceCode.TransferOptions.cs, Curl.Cli.UnitTests/CommandLineTimeConditionOptionTests.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Console.UnitTests/EasyOptionsFromCommandLineTests.Behaviour.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3602 — Fix CGR-073: -z "=DATE" sends If-Modified-Since; curl sends Last-Modified
 
@@ -59,17 +59,22 @@ curl -sS -z "=Wed, 21 Oct 2015 07:28:00 GMT" http://127.0.0.1:20500/f
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr073Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 1): Fix. `SetTimeCondition` now sets `TimeCondition.SentAsLastModified` for a leading `=` (curl's `CURL_TIMECOND_LASTMOD`, ADR-0781's flag, which the engine and HTTP formatter already honoured); `EasyOptionsFromCommandLine.WithConditions` maps it to `EasyTimeCondition.LastModified`, and `--libcurl` writes `CURL_TIMECOND_LASTMOD` (measured: real curl 8.21.0 `-z "=..." --libcurl -` writes it). No new ADR: this is a conformance fix inside ADR-0781's existing design.
+- Touches widened to `LibcurlSourceCode.TransferOptions.cs`, `CommandLineTimeConditionOptionTests.cs` (its `=` rows compared whole records and moved to `Cgr073Tests`), `Curl.Console/EasyOptionsFromCommandLine.cs` and its `.Behaviour.cs` test: the condition reaches the wire through the Console mapping. No task in Doing on origin/work/dark-factory names any of them.
+- Repro, Windows, real curl 8.21.0 (System32) vs Curl, `Record-CurlExchange.ps1 -Port 20587 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok' -CurlArgs -sS,-z,"<v>Wed, 21 Oct 2015 07:28:00 GMT",http://127.0.0.1:20587/f`: for `<v>` = `=` and `==` both send `Last-Modified: Wed, 21 Oct 2015 07:28:00 GMT`; for none and `+` both send `If-Modified-Since`, for `-` both `If-Unmodified-Since`. Exit code (0), stdout (`ok`), stderr (empty) and request bytes are identical for all five.
+- `Cgr073Tests`: 4 of 9 cases failed before the fix, all pass after. Fast tests green; `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary,Curl.Console`: 0 failing members. Linux/macOS: the change is platform-neutral (no paths, OS text or certificates) and the fast tests are green here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-073 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. -z =DATE and ==DATE send Last-Modified and --libcurl writes CURL_TIMECOND_LASTMOD, as curl does
