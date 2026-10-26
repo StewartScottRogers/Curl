@@ -63,8 +63,15 @@ public sealed class MaxTimeWatchdog : IDisposable
             log.Write(DiagnosticLogLevel.Verbose, DiagnosticLogComponents.Runner, string.Create(CultureInfo.InvariantCulture, $"--max-time {(long)maxTime.TotalMilliseconds} ms armed"));
         }
 
-        timer = timeProvider.CreateTimer(_ => CheckMaxTime(), null, maxTime, Timeout.InfiniteTimeSpan);
+        timer = timeProvider.CreateTimer(_ => CheckMaxTime(), null, AtMostLongestTimerWait(maxTime), Timeout.InfiniteTimeSpan);
     }
+
+    /// <summary>
+    /// Gets the longest wait a .NET timer takes, 4294967294 milliseconds (about 49.7 days). A longer
+    /// <c>-m</c>, which curl's 64-bit <c>long</c> takes on Linux and macOS, arms the timer for this
+    /// long and sets it again for the time left each time it fires early (CGR-039, BL-3568).
+    /// </summary>
+    public static TimeSpan LongestTimerWait { get; } = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
 
     /// <summary>
     /// Gets the <see cref="TimeProvider" /> timestamp the attempt started at, which becomes the
@@ -135,6 +142,9 @@ public sealed class MaxTimeWatchdog : IDisposable
         }
     }
 
+    private static TimeSpan AtMostLongestTimerWait(TimeSpan wait) =>
+        wait < LongestTimerWait ? wait : LongestTimerWait;
+
     private void CheckMaxTime()
     {
         if (HasJustTimedOut())
@@ -166,7 +176,7 @@ public sealed class MaxTimeWatchdog : IDisposable
             TimeSpan elapsed = timeProvider.GetElapsedTime(OperationStarted);
             if (elapsed < maxTime)
             {
-                timer.Change(maxTime - elapsed, Timeout.InfiniteTimeSpan);
+                timer.Change(AtMostLongestTimerWait(maxTime - elapsed), Timeout.InfiniteTimeSpan);
                 return false;
             }
 
