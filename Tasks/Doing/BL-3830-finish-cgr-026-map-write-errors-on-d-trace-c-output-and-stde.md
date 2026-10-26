@@ -35,3 +35,4 @@ WSL has curl 8.18.0 (`wsl -e curl`) and `/dev/full`; Curl itself can only be dri
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 39cc2287 779790c0.
