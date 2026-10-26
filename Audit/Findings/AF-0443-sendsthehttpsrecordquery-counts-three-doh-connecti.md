@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorShuffledResolverTests.
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction. Line 43 now asserts CollectionAssert.AreEqual(DohPost(httpsQuery), dohConnector.Opened[0].Written.ToArray()), so the HTTPS-record query bytes are checked as well as the count of three.
+
 ## Log
 
 - 2026-10-25: filed proposed.

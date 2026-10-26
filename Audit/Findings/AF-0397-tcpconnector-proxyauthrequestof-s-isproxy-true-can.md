@@ -3,8 +3,8 @@ id: AF-0397
 title: TcpConnector.ProxyAuthRequestOf's IsProxy: true can become false with no test failing, so proxy Negotiate uses --service-name instead of --proxy-service-name
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-25_1542.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.cs:ProxyAuthRequestOf-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.cs:1516:true
 task: BL-3513
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: mechanical
+closed-by: 2026-10-25_1542.md
 ---
 # AF-0397 - TcpConnector.ProxyAuthRequestOf's IsProxy: true can become false with no test failing, so proxy Negotiate uses --service-name instead of --proxy-service-name
 
@@ -45,8 +45,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 - 2026-10-24 | 2026-10-24_0845.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site Curl.Networking.UnitLibrary/TcpConnector.cs:1516:true run: resolvedLine 1516, 'IsProxy: true);' -> 'IsProxy: false);', outcome survived. The same site also survived in this audit's seed-0 sample of Curl.Networking.UnitLibrary. Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-10-24 | 2026-10-24_2106.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site command: Curl.Networking.UnitLibrary/TcpConnector.cs:1516 ProxyAuthRequestOf 'IsProxy: true);' -> 'IsProxy: false);' resolvedLine 1516, outcome survived (5 baseline-failing TcpConnectorQuicTests excluded). The seed-0 sample hit the same site and it survived there too. Runner's targeted mutation rerun on the clean audited commit: survived.
 - 2026-10-25 | 2026-10-25_0941.md | reproduces: yes (runner rerun on clean commit) | Ran the -Site reproduction (Curl.Networking.UnitLibrary/TcpConnector.cs:1516:true, -Member ProxyAuthRequestOf): resolvedLine 1516, 'IsProxy: true);' -> 'IsProxy: false);', outcome survived. The same mutant also survived in this audit's seed-0 Networking sample. Runner's targeted mutation rerun on the clean audited commit: survived.
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the -Site Curl.Networking.UnitLibrary/TcpConnector.cs:1516:true -Member ProxyAuthRequestOf command: resolvedLine 1516, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1542.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.

@@ -42,6 +42,8 @@ Select-String -Path Curl.Networking.UnitTests/TcpConnectorQuicTests.cs -Pattern 
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction: no QuicDialer_PublicConstructor_CreatesADialer matches. Its replacement, QuicDialer_PublicConstructor_BindsTheLocalAddressAndPortGiven, holds the local UDP port and checks the dialer's own bind fails, which needs the constructor to have wired a real opener to the given address and port.
+
 ## Log
 
 - 2026-10-25: filed proposed.

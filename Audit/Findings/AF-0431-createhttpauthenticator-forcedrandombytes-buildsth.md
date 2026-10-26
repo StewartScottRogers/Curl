@@ -3,8 +3,8 @@ id: AF-0431
 title: CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator never checks the forced random bytes are used
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).
 key: quality:Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTests.cs:CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator:weak-assertion
 reproduction: none
 task: BL-3497
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: consecutive
+closed-by: 2026-10-25_0941.md, 2026-10-25_1542.md
 ---
 # AF-0431 - CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator never checks the forced random bytes are used
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Engine.UnitTests/EngineCompositionDigestClientNonceTest
 ## Re-audits
 
 - 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the Select-String reproduction: the pattern 'ForcedRandomBytes_BuildsTheAuthenticator' no longer matches. The test is now CreateHttpAuthenticator_ForcedRandomBytes_DigestResponseCarriesTheirCnonce (EngineCompositionDigestClientNonceTests.cs:35). It builds two authenticators with forced zero and 0xFF random bytes, then asserts Assert.AreNotEqual(zerosCnonce, onesCnonce) and Assert.AreEqual("AAAAAAAAAAAAAAAA", zerosCnonce), so the forced bytes are shown to reach the Digest cnonce.
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction: no CreateHttpAuthenticator_ForcedRandomBytes_BuildsTheAuthenticator matches. Its replacement, CreateHttpAuthenticator_ForcedRandomBytes_DigestResponseCarriesTheirCnonce, asserts the zero-bytes and 0xFF-bytes cnonces differ and that the zero one is "AAAAAAAAAAAAAAAA", so the forced random bytes are checked.
 
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).

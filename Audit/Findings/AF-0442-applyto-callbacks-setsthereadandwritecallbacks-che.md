@@ -42,6 +42,8 @@ Select-String -Path Curl.Api.UnitTests/Stores/CurlHstsStoreTests.cs -Pattern 'Ap
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction. ApplyTo_Callbacks_SetsTheReadAndWriteCallbacks now calls HstsRead (Ok with Forever, then Done with null) and HstsWrite (Ok, store holds Example) and asserts each result, not just IsNotNull.
+
 ## Log
 
 - 2026-10-25: filed proposed.

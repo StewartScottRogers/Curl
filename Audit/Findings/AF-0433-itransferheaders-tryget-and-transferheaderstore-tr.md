@@ -3,8 +3,8 @@ id: AF-0433
 title: ITransferHeaders.TryGet (and TransferHeaderStore.TryGet) returns a CurlHeaderCode, not a bool as a Try method should
 auditor: truthfulness
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).
 key: truthfulness:Curl.Api.UnitLibrary/EngineContracts/Headers/ITransferHeaders.cs:TryGet:misleading-name
 reproduction: none
 task: BL-3498
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: consecutive
+closed-by: 2026-10-25_0941.md, 2026-10-25_1542.md
 ---
 # AF-0433 - ITransferHeaders.TryGet (and TransferHeaderStore.TryGet) returns a CurlHeaderCode, not a bool as a Try method should
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Api.UnitLibrary/EngineContracts/Headers/ITransferHeader
 ## Re-audits
 
 - 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the reproduction: Select-String found no 'CurlHeaderCode TryGet(' in either file. ITransferHeaders now declares `CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)` and `CurlHeader? Next(...)`, and TransferHeaderStore implements Find (line 107) and Next (line 133). No Try-named member returns a non-bool.
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the reproduction: Select-String for 'CurlHeaderCode TryGet\(' in ITransferHeaders.cs and TransferHeaderStore.cs gave no match. The member is now `CurlHeaderCode Find(string name, int index, CurlHeaderOrigin origin, int request, out CurlHeader? header)` (ITransferHeaders.cs:21, TransferHeaderStore.cs:107), so no Try-named member returns a non-bool.
 
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).
