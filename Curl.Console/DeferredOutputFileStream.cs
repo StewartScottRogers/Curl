@@ -354,9 +354,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// <returns><see langword="true" /> when the file is open.</returns>
     internal async ValueTask<bool> TryOpenNowAsync()
     {
-        FileOpenResult opened = await fileSystem
-            .OpenForWriteAsync(Path, openMode, CreateMode, CancellationToken.None)
-            .ConfigureAwait(false);
+        FileOpenResult opened = await OpenAsync(openMode, CancellationToken.None).ConfigureAwait(false);
         Adopt(opened.Content);
 
         return opened.IsOpen;
@@ -565,13 +563,14 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <summary>
-    /// Opens <see cref="Path" /> with <paramref name="mode" /> and <see cref="CreateMode" />.
+    /// Opens <see cref="Path" /> with <paramref name="mode" /> and <see cref="CreateMode" />, under
+    /// its raw bytes when it holds an argument byte that is not valid UTF-8 (<see cref="RawByteFileName" />).
     /// </summary>
     /// <param name="mode">How existing content is treated.</param>
     /// <param name="cancellationToken">Cancels the open.</param>
-    /// <returns>The file system's answer.</returns>
+    /// <returns>The open's answer.</returns>
     private ValueTask<FileOpenResult> OpenAsync(FileWriteMode mode, CancellationToken cancellationToken) =>
-        fileSystem.OpenForWriteAsync(Path, mode, CreateMode, cancellationToken);
+        RawByteFileName.OpenForWriteAsync(fileSystem, Path, mode, CreateMode, cancellationToken);
 
     /// <summary>
     /// Creates <c>&lt;path&gt;.1</c>, then <c>.2</c>, and so on while each is already taken, up to
