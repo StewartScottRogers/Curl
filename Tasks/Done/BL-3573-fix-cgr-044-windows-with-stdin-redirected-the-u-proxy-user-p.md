@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3854]
-touches: [Curl.Cli.UnitLibrary/ConsolePasswordPrompt.cs, Curl.Cli.UnitLibrary/WindowsConsolePasswordInput.cs, Curl.Cli.UnitTests/Cgr044Tests.cs]
+touches: [Curl.Cli.UnitLibrary/ConsolePasswordPrompt.cs, Curl.Cli.UnitLibrary/WindowsConsolePasswordInput.cs, Curl.Cli.UnitTests/Cgr044Tests.cs, Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3573 — Fix CGR-044: Windows: with stdin redirected, the -u/--proxy-user password prompt returns an empty password at once; REF waits for console input
 
@@ -59,10 +59,10 @@ curl -s -u user @U < pw.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -72,9 +72,12 @@ curl -s -u user @U < pw.txt
 - Fix (in this run's stash): new `WindowsConsolePasswordInput` reads `CONIN$` as `_getch` does (`CreateFileW`, `GetConsoleMode`/`SetConsoleMode(0)`, `ReadConsoleW` one character, modes restored), `ConsolePasswordPrompt.ForPlatform(true)` uses it, and a public `KeyReader` lets `Cgr044Tests` check the wiring; ADR-0819 records the decision. Added `WindowsConsolePasswordInput.cs` to touches (a new file no other task names). With it, PORT via `dotnet run --project Curl.Console --no-build -- -s -u user http://127.0.0.1:20002/` gives the same as REF for both inputs (exit 124, same stderr, empty stdout). Build clean.
 - Requeued for BL-3854: with the fix, `dotnet test Curl.Cli.UnitTests` ran past 60 minutes, because tests parse a password-less `-u` through `ConsolePasswordPrompt.ForProcessConsole` and now wait on the lane's console. BL-3854 gives those tests a fake prompt. `Curl.Cli.UnitTests/ConsolePasswordPromptTests.cs` may also need checking. Still to do after BL-3854: fast tests, Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary, commit.
 
+- Finished after BL-3854: removed `ConsolePasswordPromptTests.ForProcessConsole_InputRedirected_ReturnsAnEmptyPassword`, which pinned the old empty password and would now wait on the console (added that file to touches; no other Doing task names it). `Curl.Cli.UnitTests` 4372 passed, no hang; Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary: 0 failing members; full fast tests green; build clean. Cgr044Tests fails before the fix (KeyReader was the Console.ReadKey lambda) and passes after. The change is Windows-only behind ForPlatform(isWindows) and the tests compare delegates, so they are platform-neutral.
+
 ## Log
 
 - 2026-10-26: Created from CGR-044 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3854: with the CONIN$ prompt fix, fast tests that parse a password-less -u through ConsolePasswordPrompt.ForProcessConsole wait on the console
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Windows -u/--proxy-user prompt reads CONIN$ like _getch; redirected stdin no longer yields an empty password
