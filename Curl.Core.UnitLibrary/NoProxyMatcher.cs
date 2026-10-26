@@ -241,7 +241,7 @@ public static class NoProxyMatcher
     private static bool TryParseOctet(ReadOnlySpan<char> digits, out byte octet)
     {
         octet = 0;
-        return digits.Length <= 3
+        return digits.Length is > 0 and <= 3
             && (digits.Length == 1 || digits[0] != '0')
             && byte.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out octet);
     }
