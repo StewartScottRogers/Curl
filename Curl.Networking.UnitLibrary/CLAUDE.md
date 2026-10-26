@@ -109,7 +109,8 @@ load is exit 58; in the OpenSSL build a key that does not load is exit 43, as cu
 it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
 ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls13-ciphers`;
 the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
-the hand-written OpenSSL-name table, and a list naming no known suite is exit 59. On
+the hand-written OpenSSL-name table in OpenSSL's `ALL` order, `--ciphers` expanded as an OpenSSL
+cipher string by `OpenSslCipherString` (ADR-0817), and a list left with no suite is exit 59. On
 Windows `CipherSuitesPolicy` cannot be constructed, so there the OpenSSL build (reached
 only from tests) reports exit 59 instead of throwing. The provider builds the policy through
 `ICipherSuitesPolicyFactory` (`CipherSuitesPolicyFactory.ForThisPlatform` in production, whose

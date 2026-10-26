@@ -266,7 +266,7 @@ public sealed class OpenSslCipherSuitesTests
 
     [TestMethod]
     [DataRow("BOGUS")]
-    [DataRow("HIGH:!aNULL")]
+    [DataRow("aNULL:!HIGH")]
     [DataRow("TLS_AES_128_GCM_SHA256")]
     [DataRow("")]
     public void Select_WithCiphersNamingNoTls12Suite_FailsWithTheCipherListMessage(string ciphers)

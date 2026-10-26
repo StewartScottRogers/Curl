@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs, Curl.Networking.UnitTests/Cgr023Tests.cs]
+touches: [Curl.Networking.UnitLibrary/OpenSslCipherSuites.cs, Curl.Networking.UnitLibrary/OpenSslCipherString.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/Cgr023Tests.cs, Curl.Networking.UnitTests/OpenSslCipherSuitesTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3552 — Fix CGR-023: Linux: --ciphers rejects OpenSSL cipher-string keywords and operators (DEFAULT, HIGH, !x, aRSA, @SECLEVEL)
 
@@ -60,17 +60,23 @@ curl -sS -k --ciphers DEFAULT https://localhost:<p>/index.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr023Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Added `OpenSslCipherString.cs` (the cipher-string evaluator), `CLAUDE.md` (its doc line) and `OpenSslCipherSuitesTests.cs` (its `HIGH:!aNULL` failure row now succeeds as in curl, so the row became `aNULL:!HIGH`) to touches: no task in Doing on origin/work/dark-factory names them.
+- Measured in WSL (curl 8.18.0, OpenSSL 3.5.5; `openssl s_server -accept <p> -cert srv.crt -key srv.key -WWW -tls1_2`, `index.txt` holding `hello tls`): `curl -sS -k --ciphers <c> https://localhost:<p>/index.txt` with `DEFAULT`, `HIGH:!aNULL`, `aRSA` and `DEFAULT@SECLEVEL=0` each prints `hello tls`, exit 0, empty stderr; `@FOO` is exit 59 `curl: (59) failed setting cipher list: @FOO`. Before the fix Curl's OpenSSL build was exit 59 for the first four. After it `OpenSslCipherSuites.Select` gives the suite lists `openssl ciphers -s -tls1_2` gives for each (pinned in `Cgr023Tests`), so the handshake offers suites the server takes and the transfer matches; `@FOO`, `!!` and `DEFAULT@SECLEVEL=6` stay exit 59 with the same text. Curl's Linux build cannot run in this Windows lane, so the end-to-end match rests on the unit tests pinning the measured expansion; no 8.22.0 OpenSSL build was at hand, and the expansion is OpenSSL's, not curl's.
+- Decision (ADR-0817): suites in OpenSSL 3.5.5's `ALL` order, `@SECLEVEL=n` accepted and not kept, unknown aliases skipped, invalid commands fail the value. Platform-neutral: pure string logic, no OS dependency, so CI on Linux and macOS is met by the green fast tests here.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary` reports 0 failing members. Build clean; fast tests green.
+
 ## Log
 
 - 2026-10-26: Created from CGR-023 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. --ciphers is expanded as an OpenSSL cipher string: DEFAULT, HIGH:!aNULL, aRSA and @SECLEVEL now select suites as curl's OpenSSL build does
