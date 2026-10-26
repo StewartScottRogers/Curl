@@ -1,5 +1,5 @@
 ---
-id: BL-3892
+id: BL-3897
 title: --anyauth answers a Digest challenge with nc=00000001 where curl 8.22.0 sends nc=00000002
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3892 — --anyauth answers a Digest challenge with nc=00000001 where curl 8.22.0 sends nc=00000002
+# BL-3897 — --anyauth answers a Digest challenge with nc=00000001 where curl 8.22.0 sends nc=00000002
 
 ## Goal
 
