@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitTests]
+touches: [Curl.Engine.UnitTests/HandBuiltKerberosSourcesTests.cs]
 requirement: none
 created: 2026-10-25
 completed:
@@ -45,6 +45,8 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 - [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Narrowed touches from the whole Curl.Engine.UnitTests to HandBuiltKerberosSourcesTests.cs: the fix is a test-only change in that file (ADR-0694).
 
 ## Log
 
