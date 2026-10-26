@@ -85,7 +85,15 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr040Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 5): Measured with `Record-CurlExchange.ps1` (loopback server answering `HTTP/1.1 200 OK`, `hello\n`; UC-16 with `HTTP/1.1 101 Switching!\r\n\r\n` first). REF = Git's curl 8.22.0 Schannel; NG = curl.se 8.18.0 nghttp2 (WinGet); PORT = Curl at 25106b327.
+  - `--http2 -s URL`: REF exit 2, `curl: option --http2: the installed libcurl version does not support this` + `curl: try 'curl --help' or 'curl --manual' for more information`; NG exit 0, `hello`; PORT exit 0, `hello`, request bytes equal to NG's (Upgrade: h2c, HTTP2-Settings: AAMAAABkAAQAAQAAAAIAAAAA, Connection: Upgrade, HTTP2-Settings) apart from the User-Agent version.
+  - `--http2-prior-knowledge -s URL`: REF exit 2, same refusal naming the option; NG exit 55, no output; PORT exit 55, no output.
+  - `--proxy-http2 -s URL`: REF exit 2, refusal; NG exit 0, `hello`; PORT exit 0, `hello`, the same plain HTTP/1.1 request.
+  - `-s -S --http2 URL` (UC-16): REF exit 2, refusal; NG exit 16, `curl: (16) Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.`; PORT exit 56, `curl: (56) Recv failure: Connection was aborted`. That NG difference is BL-3650's (CGR-121).
+- Decision (ADR-0819): Curl keeps Stewart's ADR-0786 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0786, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
+
 ## Log
 
 - 2026-10-26: Created from CGR-040 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Blocked. Stewart: CGR-040 asks Windows to refuse --http2/--http2-prior-knowledge/--proxy-http2 (exit 2) as Schannel curl does, reversing your ADR-0786 - keep ADR-0786 (ADR-0819) and close CGR-040 as accepted, or refuse them?
