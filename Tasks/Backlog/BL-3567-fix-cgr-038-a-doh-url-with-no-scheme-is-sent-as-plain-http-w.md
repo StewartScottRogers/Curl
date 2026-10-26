@@ -4,8 +4,8 @@ title: Fix CGR-038: A --doh-url with no scheme is sent as plain http:// where cu
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Engine.UnitTests/Cgr038Tests.cs]
+depends-on: [BL-3813]
+touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Engine.UnitTests/EngineCompositionDohTests.cs, Curl.Engine.UnitTests/Cgr038Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -71,8 +71,13 @@ curl -sS -m 5 --doh-url 127.0.0.1:21800/dns-query http://foo.test:21802/x
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr038Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 3): Added `Curl.Engine.UnitTests/EngineCompositionDohTests.cs` to `touches`: its `DohUrlOf` rows and the `--doh-url bogus` connect test pinned the old `http://` guess (no other Doing task names it).
+- 2026-10-26 (lane 3): Measured curl 8.22.0 Schannel: a TCP listener given as `--doh-url 127.0.0.1:21840/dns-query` received a TLS ClientHello (`16 03 01 01 b1 ...`), curl exit 28 `curl: (28) Resolving timed out after 3031 milliseconds` (`-m 3`). BL-642's old "plain HTTP" note was wrong.
+- 2026-10-26 (lane 3): Fix (left uncommitted, stashed by the shift): `EngineComposition.DohUrlOf` prefixes `https://` instead of `http://`. ADR-0819 is new (file plus README row). `Cgr038Tests.cs` has `DohUrlOf_NoScheme_AssumesHttps` and `CreateDohResolver_NoScheme_ConnectsToTheDohServerOverTls`. `EngineCompositionDohTests` is updated (rows to `https://`, bogus target `bogus:443` TLS). Full build clean; fast tests green (46 projects passed, 8 integration-only projects had no match). Measure-CodeQuality has not been run yet: run it for Curl.Engine.UnitLibrary before committing. The change adds no branch.
+- 2026-10-26 (lane 3): Repro with a C# DoH server (TLS on 21801, self-signed, answers foo.test A 127.0.0.1; web on 21802 replies `hello`). `curl -sS --doh-insecure --doh-url 127.0.0.1:21801/dns-query http://foo.test:21802/x`: REF exit 0, stdout `hello\n`, stderr empty. PORT (with the fix) gives the same. Plain-server variant `-m 3 --doh-url 127.0.0.1:21841/dns-query`: PORT now sends a TLS ClientHello (`16 03 01 01 a8 ...`) and exits 28, but stderr says `curl: (28) Connection timed out after 2987 milliseconds` where REF says `Resolving timed out after N milliseconds`. That message is CGR-284, which BL-3813 covers (TcpConnector/MaxTimeWatchdog). So BL-3813 goes in `depends-on`. Once it is Done, re-apply the stash, run Measure-CodeQuality for Curl.Engine.UnitLibrary, rerun the plain-server repro to check the message, then tick the criteria and finish.
 
 ## Log
 
 - 2026-10-26: Created from CGR-038 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3813 (CGR-284): with the https fix applied, the plain-server repro still says 'Connection timed out' where curl says 'Resolving timed out'
