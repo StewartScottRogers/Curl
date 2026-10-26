@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3525 — Fix AF-0448: Find_EntryExpiringThisSecond_StillMatches checks only that some entry is found, not that it is the h2 :1 entry
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now asserts the found entry's source host (a.example), ALPN (h2), port (1) and expiry (start + 10 s, 05:21:56), so a Find returning a wrong entry fails. Test-only change, no production code, so no Measure-CodeQuality run was needed. Platform-neutral: no paths, OS text or certificates. dotnet build clean, fast tests green on Windows.
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Find_EntryExpiringThisSecond_StillMatches asserts the h2 :1 entry's host, ALPN, port and expiry
