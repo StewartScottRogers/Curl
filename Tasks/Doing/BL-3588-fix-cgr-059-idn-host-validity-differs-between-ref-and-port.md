@@ -80,3 +80,4 @@ curl -sS "http://a%FFb:20200/a" --connect-to ::127.0.0.1:20200
 ## Log
 
 - 2026-10-26: Created from CGR-059 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
