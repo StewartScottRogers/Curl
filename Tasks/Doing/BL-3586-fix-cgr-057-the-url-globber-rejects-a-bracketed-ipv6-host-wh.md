@@ -77,3 +77,4 @@ curl -sS "http://[::1%25a:b]:20200/a"
 ## Log
 
 - 2026-10-26: Created from CGR-057 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
