@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr006Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3535 — Fix CGR-006: Windows FTPS uploads end the TLS data connection with a TCP reset: in passive mode the server receives 0 bytes while PORT exits 0 (silent...
 
@@ -76,17 +76,26 @@ curl -sS -k --ssl-reqd -P 127.0.0.1 -T up.txt ftp://localhost:21900/new.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr006Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Cause: `FtpSession.CopyUploadAsync` disposed the upload's data connection straight after the last write, with no `close_notify`/FIN and the server's TLS 1.3 session ticket unread, so Windows reset it and the server lost unread upload bytes. Fix: `CloseUploadDataConnectionAsync` shuts the send side down, reads until the server closes (at most curl's 2 s shutdown timeout, on the transfer's `TimeProvider`), then disposes (ADR-0816).
+- Repro rebuilt as a C# file-based FTPS server (TLS 1.2/1.3, explicit `AUTH TLS` or implicit, EPSV or EPRT/PORT, `STOR` read to end; `426 Failure reading network stream.` when the data read throws, as `strict=1` did), outside the repo. Upload file `up1\nup2\n` (8 bytes). Commands, REF = curl 8.22.0 Schannel (`C:\Program Files\Git\ucrt64\bin\curl.exe`), PORT = `dotnet run --project Curl.Console`:
+  - `curl -sS -k --ssl-reqd -T up.txt ftp://127.0.0.1:P/u.txt` (FTP-2, passive): REF exit 0, empty stdout/stderr, server read 8 bytes, 226. PORT before the fix: exit 18, `curl: (18) server did not report OK, got 426`, server `IOException ... forcibly closed by the remote host`. PORT after: exit 0, empty stdout/stderr, 8 bytes, 226 - same as REF.
+  - `curl -sS -k -P 127.0.0.1 -T up.txt ftps://localhost:P/new.txt` (TPR-05, implicit active): REF exit 0, 8 bytes, 226. PORT before: exit 18 after 426 (reset). PORT after: exit 0, 8 bytes, 226.
+  - `curl -sS -k --ssl-reqd -P 127.0.0.1 -T up.txt ftp://localhost:P/new.txt` (TPR-05, explicit active): REF and PORT after both exit 0, 8 bytes, 226.
+- Unit tests in `Cgr006Tests.cs` (shutdown then drain then dispose; a reset during the drain; a server that never closes, stopped by the 2 s timer) fail on the pre-fix code (the log held only the write and the dispose) and pass after.
+- Fast tests: 43017 passed, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 0 failing members. The change is platform-neutral (fakes only, no paths or OS text), which covers Linux and macOS CI.
+
 ## Log
 
 - 2026-10-26: Created from CGR-006 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. FTPS uploads shut the data connection down and drain it before closing, so Windows no longer resets it; the server gets the whole upload and 226 as with curl 8.22.0
