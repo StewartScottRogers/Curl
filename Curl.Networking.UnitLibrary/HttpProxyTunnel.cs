@@ -32,7 +32,7 @@ internal static class HttpProxyTunnel
     /// </returns>
     public static byte[] BuildConnectRequest(string host, int port, ProxyEndpoint proxy, HttpProxyTunnelOptions options, string? proxyAuthorization)
     {
-        var authority = FormatAuthority(host, port);
+        var authority = FormatAuthority(WithoutZoneId(host), port);
         var version = proxy.Kind == ProxyKind.Http10 ? "HTTP/1.0" : "HTTP/1.1";
         HttpProxyTunnelHeader[] proxyHeaders = [.. options.ProxyHeaders.Select(value => HttpProxyTunnelHeader.Parse(RequestText(value, options)))];
         var request = new StringBuilder()
@@ -435,6 +435,24 @@ internal static class HttpProxyTunnel
         host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[')
             ? $"[{host}]:{port}"
             : $"{host}:{port}";
+
+    /// <summary>
+    /// Removes an IPv6 zone id (<c>%eth0</c>) from <paramref name="host" />, bracketed or not:
+    /// curl 8.22.0 sends <c>CONNECT [fe80::1]:8080</c> and <c>Host: [fe80::1]:8080</c> for
+    /// <c>http://[fe80::1%25eth0]:8080/</c> (measured, CGR-085).
+    /// </summary>
+    /// <param name="host">The tunnel's host, such as <c>fe80::1%eth0</c> or <c>[fe80::1%eth0]</c>.</param>
+    /// <returns><paramref name="host" /> without its zone id, or unchanged when it has none.</returns>
+    internal static string WithoutZoneId(string host)
+    {
+        var zoneStart = host.IndexOf('%', StringComparison.Ordinal);
+        if (zoneStart < 0 || !host.Contains(':', StringComparison.Ordinal))
+        {
+            return host;
+        }
+
+        return host.EndsWith(']') ? $"{host[..zoneStart]}]" : host[..zoneStart];
+    }
 
     private static int ParseStatusCode(List<byte> header)
     {
