@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr033Tests.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitLibrary/MultiCallbackQueue.cs, Curl.Engine.UnitLibrary/TransferCallbackMarshal.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitTests/Cgr033Tests.cs, Curl.Engine.UnitTests/MultiCallbackQueueTests.cs, Curl.Engine.UnitTests/TransferCallbackMarshalTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3562 — Fix CGR-033: Callbacks of multi-driven transfers run on background threads, outside curl_multi_perform
 
@@ -68,17 +68,24 @@ probe.exe C_69 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr033Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Added to touches: `ManagedEasyTransfer.Perform.cs` (the perform wraps its callbacks once, as it starts), the new `MultiCallbackQueue.cs` and `TransferCallbackMarshal.cs` with their tests, and the engine's `CLAUDE.md` section; no task in Doing on origin/work/dark-factory names any of them.
+- Fix (ADR-0817): a multi-driven `ManagedEasyTransfer` wraps every `EasyCallbackOptions` delegate; a callback called off the performing thread is queued and run by the next `curl_multi_perform`/`socket_action` on its caller's thread; a queued callback makes `GetTimeout` 0 and wakes a wait. Default taken: after each callback the perform waits up to 20 ms (`FollowUpWait`) for the next, so a transfer gets every chunk already received in one call; without it upstream test2407 (500 ms polls between performs) timed out on the ratchet.
+- Repro rebuilt as a C# file-based probe (scratch, outside the repo): loopback server sends the 200 head and 100000 body bytes, then 100000 more 200 ms later; one easy handle in a multi; loop `perform` then `Sleep(30)`; header and write callbacks record caller-thread/inside-perform. REF = Git's `libcurl-4.dll` 8.22.0 (Schannel) by P/Invoke, PORT = Libcurl's C# API. `probe.cs REF`: `REF: bytes 200000 header:caller-thread:inside-perform write:caller-thread:inside-perform`. `probe.cs PORT` after the fix: `PORT: bytes 200000 header:caller-thread:inside-perform write:caller-thread:inside-perform` (both exit 0, same 200000 bytes, one GET). Before the fix `Cgr033Tests` reproduced `other-thread, OUTSIDE perform` writes. C_70's intermittent side effect was not re-measured.
+- ADR-0482 test: `Cgr033Tests.PerformAsync_FileTransferInAMulti_CallsEveryWriteOnThePerformingThreadInsidePerform` failed before the fix (writes on thread 12 outside perform) and passes after.
+- Fast tests: whole solution green (Curl.Conformance.UnitTests 4381 passed after the follow-up wait; Curl.Engine.UnitTests 2492). Measure-CodeQuality -Library Curl.Engine.UnitLibrary: 0 failing members. The tests are platform-neutral (a temp-file `file` URL built with `new Uri(path)`, no OS text), so Linux and macOS CI should match.
+
 ## Log
 
 - 2026-10-26: Created from CGR-033 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Callbacks of multi-driven transfers run inside curl_multi_perform on the caller's thread, as libcurl 8.22.0
