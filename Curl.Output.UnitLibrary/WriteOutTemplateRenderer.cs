@@ -27,7 +27,9 @@ namespace Curl.Output;
 /// A file that cannot be opened leaves the output where it was. A header name of 256 bytes
 /// or more renders nothing, and a file name of 512 bytes or more is not opened, as curl's
 /// fixed buffers do. A <c>%{name}</c> of 24 bytes or more ends the rendering there,
-/// silently, as curl's 24-byte name buffer does. Text is written as UTF-8.
+/// silently, as curl's 24-byte name buffer does. Text is written as UTF-8, except header
+/// bytes marked by <see cref="MarkHeaderBytes"/>, which are written as the raw bytes they
+/// were (CGR-021, ADR-0816).
 /// </para>
 /// <para>
 /// The Windows curl writes all three targets in text mode, so every line feed it writes,
@@ -48,6 +50,9 @@ public sealed class WriteOutTemplateRenderer(
     private const int VariableNameBufferBytes = 24;
     private const int HeaderNameBufferBytes = 256;
     private const int FileNameBufferBytes = 512;
+    private const char FirstHighByte = '\u0080';
+    private const char LastHighByte = 'ÿ';
+    private const int RawByteOffset = 0xF700;
 
     private readonly IWriteOutFileOpener fileOpener = fileOpener ?? throw new ArgumentNullException(nameof(fileOpener));
     private readonly WriteOutTimeDialect timeDialect = timeDialect;
@@ -96,9 +101,58 @@ public sealed class WriteOutTemplateRenderer(
         }
     }
 
+    /// <summary>
+    /// Marks each character from U+0080 to U+00FF of <paramref name="headerText"/>, a header
+    /// text whose bytes are held one per character (Latin-1), so that
+    /// <see cref="RenderAsync"/> writes it back as that one byte rather than as UTF-8, as curl
+    /// writes header bytes unchanged. Every other character is kept as it is.
+    /// </summary>
+    /// <remarks>
+    /// A marked byte is carried as a character from U+F780 to U+F7FF, byte <c>b</c> as
+    /// <c>U+F700 + b</c>; a template that itself holds one of those private-use characters
+    /// therefore writes it as that raw byte.
+    /// </remarks>
+    /// <param name="headerText">The header text, one byte per character.</param>
+    /// <returns>The text with its bytes from 0x80 marked.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="headerText"/> is <see langword="null"/>.</exception>
+    public static string MarkHeaderBytes(string headerText)
+    {
+        ArgumentNullException.ThrowIfNull(headerText);
+        return string.Create(headerText.Length, headerText, static (marked, text) =>
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                char character = text[index];
+                marked[index] = character is >= FirstHighByte and <= LastHighByte ? (char)(RawByteOffset + character) : character;
+            }
+        });
+    }
+
     private byte[] Encode(string text)
     {
-        return Encoding.UTF8.GetBytes(writesLineFeedAsCrLf ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text);
+        string lines = writesLineFeedAsCrLf ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text;
+        return lines.AsSpan().IndexOfAnyInRange((char)(RawByteOffset + FirstHighByte), (char)(RawByteOffset + LastHighByte)) < 0
+            ? Encoding.UTF8.GetBytes(lines)
+            : EncodeWithRawBytes(lines);
+    }
+
+    private static byte[] EncodeWithRawBytes(string text)
+    {
+        List<byte> bytes = new(text.Length);
+        Span<byte> encoded = stackalloc byte[4];
+        foreach (Rune rune in text.EnumerateRunes())
+        {
+            if (rune.Value is >= RawByteOffset + FirstHighByte and <= RawByteOffset + LastHighByte)
+            {
+                bytes.Add((byte)(rune.Value - RawByteOffset));
+            }
+            else
+            {
+                bytes.AddRange(encoded[..rune.EncodeToUtf8(encoded)]);
+            }
+        }
+
+        return [.. bytes];
     }
 
     /// <summary>One pass over one template, holding where the output currently goes.</summary>

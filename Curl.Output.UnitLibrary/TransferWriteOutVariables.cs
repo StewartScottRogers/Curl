@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Text;
 using Curl.Api.Info;
 using Curl.Protocol.Abstractions;
 
@@ -53,7 +54,9 @@ namespace Curl.Output;
 /// code without its leading zeros), a time as its seconds, and a text value quoted, or
 /// <c>null</c> where curl has no value, as for a missing content type, error message or URL
 /// part. <c>header_json</c> prints the response headers as <see cref="WriteOutJson"/>
-/// describes. Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
+/// describes. <c>content_type</c>, <c>header_json</c> and the <c>%header{…}</c> values
+/// are marked with <see cref="WriteOutTemplateRenderer.MarkHeaderBytes"/>, so they render as
+/// the raw header bytes (CGR-021, ADR-0816). Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
 /// and BL-227.
 /// </para>
 /// <para>
@@ -128,7 +131,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         ["http_connect"] = variables => WriteOutValue.FromStatusCode((int)variables.info.HttpConnectCode),
         ["http_version"] = variables => WriteOutValue.FromText(FormatHttpVersion(variables.info.HttpVersion)),
         ["method"] = variables => WriteOutValue.FromText(variables.info.EffectiveMethod),
-        ["content_type"] = variables => WriteOutValue.FromText(variables.info.ContentType),
+        ["content_type"] = variables => WriteOutValue.FromText(MarkHeaderBytes(variables.info.ContentType)),
         ["redirect_url"] = variables => WriteOutValue.FromText(variables.info.RedirectUrl),
         ["url_effective"] = variables => WriteOutValue.FromText(variables.info.EffectiveUrl),
         ["num_redirects"] = variables => WriteOutValue.FromNumber(variables.info.RedirectCount),
@@ -329,7 +332,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         text = name switch
         {
             "json" => FormatJson(),
-            "header_json" => WriteOutJson.FormatHeaders(report.ResponseHeaders, HeaderValueWhitespace),
+            "header_json" => WriteOutTemplateRenderer.MarkHeaderBytes(WriteOutJson.FormatHeaders(report.ResponseHeaders, HeaderValueWhitespace)),
             _ => VariableFormatters.TryGetValue(name, out Func<TransferWriteOutVariables, WriteOutValue>? format) ? format(this).Text : null,
         };
         return text is not null;
@@ -340,11 +343,12 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
     public string? FindFirstHeaderValue(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
+        string headerName = HeaderBytesOf(name);
         foreach (KeyValuePair<string, string> header in report.ResponseHeaders)
         {
-            if (string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(header.Key, headerName, StringComparison.OrdinalIgnoreCase))
             {
-                return header.Value.Trim(HeaderValueWhitespace);
+                return WriteOutTemplateRenderer.MarkHeaderBytes(header.Value.Trim(HeaderValueWhitespace));
             }
         }
 
@@ -359,10 +363,11 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
     public IReadOnlyList<string> FindAllHeaderValues(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
+        string headerName = HeaderBytesOf(name);
         return report.EarlierResponseHeaders
             .Concat(report.ResponseHeaders)
-            .Where(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase))
-            .Select(header => header.Value.Trim(HeaderValueWhitespace))
+            .Where(header => string.Equals(header.Key, headerName, StringComparison.OrdinalIgnoreCase))
+            .Select(header => WriteOutTemplateRenderer.MarkHeaderBytes(header.Value.Trim(HeaderValueWhitespace)))
             .ToArray();
     }
 
@@ -445,6 +450,15 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
 
     /// <summary>The <c>%{http_version}</c> text of a <c>CURL_HTTP_VERSION_*</c> value; <c>0</c> for none.</summary>
     private static string FormatHttpVersion(long version) => HttpVersionTexts.GetValueOrDefault(version, "0");
+
+    /// <summary>
+    /// A name from the template as the header bytes it matches: its UTF-8 bytes, one per
+    /// character, as the response head holds a header name.
+    /// </summary>
+    private static string HeaderBytesOf(string name) => Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(name));
+
+    /// <summary>A content type, which is header text, with its bytes marked by <see cref="WriteOutTemplateRenderer.MarkHeaderBytes"/>.</summary>
+    private static string? MarkHeaderBytes(string? headerText) => headerText is null ? null : WriteOutTemplateRenderer.MarkHeaderBytes(headerText);
 
     private static string FormatNumber(long number)
     {
