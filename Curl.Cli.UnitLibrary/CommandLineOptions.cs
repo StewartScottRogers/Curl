@@ -2382,13 +2382,15 @@ public sealed class CommandLineOptions
     /// argument, or a line of a config file read in <see cref="ConfigFileWireTextEncoding"/>, in that
     /// encoding when it is set, since curl's Windows build gets its arguments in the ANSI code page and
     /// sends their bytes unchanged; a line of a config file read as UTF-8, an <c>--expand-</c> value
-    /// (<see cref="ApplyingExpandedValue"/>, whose variables hold UTF-8) and every value off Windows in UTF-8.
+    /// (<see cref="ApplyingExpandedValue"/>, whose variables hold UTF-8) and every value off Windows in UTF-8,
+    /// with each byte of an argument that was not valid UTF-8 sent back unchanged (<see cref="InvalidUtf8ByteEscape"/>,
+    /// CGR-016, BL-3849), so <c>-d $'\xff'</c> posts FF as curl 8.18.0 does on Linux.
     /// </summary>
     /// <param name="text">The value as parsed.</param>
     /// <returns>The value's bytes.</returns>
     internal byte[] CommandLineTextBytes(string text) =>
         ReadingUtf8ConfigFile || ApplyingExpandedValue || ConfigFileWireTextEncoding is null
-            ? Encoding.UTF8.GetBytes(text)
+            ? InvalidUtf8ByteEscape.Encoding.GetBytes(text)
             : ConfigFileWireTextEncoding.GetBytes(text);
 
     /// <summary>
