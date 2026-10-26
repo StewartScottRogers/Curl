@@ -36,3 +36,4 @@ Build, in the engine, an `IConnection` wrapper used only for a transfer in a mul
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 8351b6aa a6abc742 1e378075 877bdc24.
