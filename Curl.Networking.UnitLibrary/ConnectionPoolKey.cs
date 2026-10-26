@@ -20,7 +20,10 @@ namespace Curl.Networking;
 /// <param name="Port">The target's port.</param>
 /// <param name="UseTls">The target's TLS choice.</param>
 /// <param name="IsForwardProxy">The target's <see cref="ConnectTarget.IsForwardProxy" />.</param>
-/// <param name="Proxy">The tunnelling proxy, or <see langword="null" /> for a direct connection.</param>
+/// <param name="Proxy">
+/// The tunnelling proxy, or the target's <see cref="ConnectTarget.ForwardProxy" /> with its
+/// credential (CGR-083), or <see langword="null" /> for a direct connection.
+/// </param>
 /// <param name="AltSvcAuthority">
 /// The alternative the target dials (<see cref="ConnectTarget.AltSvcRoute" />) as upper-cased
 /// <c>host:port</c>, or <see langword="null" /> when it dials the origin.
@@ -64,7 +67,7 @@ internal sealed record ConnectionPoolKey(
                 target.Port,
                 target.UseTls,
                 target.IsForwardProxy,
-                ConnectionPoolProxyKey.Of(target.Proxy),
+                ConnectionPoolProxyKey.Of(target.Proxy ?? target.ForwardProxy),
                 AltSvcAuthorityOf(target.AltSvcRoute),
                 configuration,
                 ConnectToAuthority: ConnectToAuthorityOf(target, connectTo));

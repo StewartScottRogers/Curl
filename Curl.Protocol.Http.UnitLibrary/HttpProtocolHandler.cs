@@ -630,7 +630,7 @@ public sealed class HttpProtocolHandler(
     {
         ConnectTarget urlTarget = TargetOf(plan.Context.Url);
         ConnectTarget target = plan.ForwardProxy is { } proxy
-            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
+            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true, ForwardProxy = proxy }
             : urlTarget with
             {
                 Proxy = plan.Options.ForwardProxy,

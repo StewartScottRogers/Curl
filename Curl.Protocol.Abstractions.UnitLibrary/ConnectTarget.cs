@@ -59,6 +59,18 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     public bool IsForwardProxy { get; init; }
 
     /// <summary>
+    /// Gets the forward proxy <see cref="Host" /> and <see cref="Port" /> name when
+    /// <see cref="IsForwardProxy" /> is set, with the credential each request is sent it, or
+    /// <see langword="null" />, the default, when the pool need not tell its users apart.
+    /// </summary>
+    /// <remarks>
+    /// A connection pool keys on it, so a forward proxy connection authenticated as one user
+    /// never carries a request for another, as curl 8.22.0 opens a new connection for
+    /// <c>--next</c> with different <c>-U</c> (CGR-083). The connector never dials it.
+    /// </remarks>
+    public ProxyEndpoint? ForwardProxy { get; init; }
+
+    /// <summary>
     /// Gets where the connector reports connection and TLS events, in the order they
     /// happen; <see cref="NoTransferEvents.Instance" />, the default, when nobody is
     /// listening.

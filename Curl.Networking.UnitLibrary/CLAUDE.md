@@ -302,7 +302,8 @@ connection's own address.
 Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
 to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
 `ConnectionPoolProxyKey`) is the key: `PoolScheme`, host ignoring case, port, TLS choice,
-`IsForwardProxy` and tunnelling proxy with its credential by value; a target without `PoolScheme` is never pooled.
+`IsForwardProxy` and tunnelling proxy, or the forward proxy (`ConnectTarget.ForwardProxy`, so `--next`
+groups with different `-U` never share a plain proxy connection, CGR-083), with its credential by value; a target without `PoolScheme` is never pooled.
 The pool holds at most five idle connections in total, closing the oldest with curl's
 `Connection pool is full` and `shutting down connection #N` lines on the returning target's
 `Events`, and drops one idle longer than 118 seconds on its `TimeProvider`. It numbers

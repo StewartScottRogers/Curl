@@ -47,7 +47,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Diagnostics.Assert("connect target", "127.0.0.1:18183 forward proxy", connector.Targets.Single());
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
-            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single(), $"Chunk size {chunkSize}");
+            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single() with { ForwardProxy = null }, $"Chunk size {chunkSize}");
             Assert.IsTrue(result.Report!.UsedProxy, $"Chunk size {chunkSize}");
             HttpAuthRequest proxyRequest = authenticator.Calls.Single(call => call.Request.IsProxy).Request;
             Assert.AreEqual(
@@ -86,7 +86,7 @@ public sealed partial class HttpProtocolHandlerTests
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
             Diagnostics.Assert("output", "hello", Latin1(output.ToArray()));
             Assert.AreEqual("hello", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
-            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18332, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single(), $"Chunk size {chunkSize}");
+            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18332, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single() with { ForwardProxy = null }, $"Chunk size {chunkSize}");
         }
     }
 
@@ -216,7 +216,7 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Diff("request written", OneLine(expected), OneLine(connection.Written));
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
             Assert.AreEqual(expected, connection.Written, $"Chunk size {chunkSize}");
-            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single(), $"Chunk size {chunkSize}");
+            Assert.AreEqual(new ConnectTarget("127.0.0.1", 18183, false) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single() with { ForwardProxy = null }, $"Chunk size {chunkSize}");
         }
     }
 
@@ -238,7 +238,7 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Assert("connect target", "proxy.example:443 with TLS", connector.Targets.Single());
         Diagnostics.Act("request written", OneLine(connection.Written));
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(new ConnectTarget("proxy.example", 443, true) { PoolScheme = "http", IsForwardProxy = true }, connector.Targets.Single());
+        Assert.AreEqual(new ConnectTarget("proxy.example", 443, true) { PoolScheme = "http", IsForwardProxy = true, ForwardProxy = options.ForwardProxy }, connector.Targets.Single());
         Assert.StartsWith("GET http://example.com/ HTTP/1.1\r\n", connection.Written);
     }
 
