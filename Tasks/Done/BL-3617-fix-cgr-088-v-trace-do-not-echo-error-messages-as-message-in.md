@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests/Cgr088Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Networking.UnitLibrary/SchannelFailureEcho.cs, Curl.Networking.UnitTests/Cgr088Tests.cs, Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr088Tests.cs]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/Cgr088Tests.cs, Curl.Networking.UnitTests/TcpConnectorTests.ProxyAuthVerbose.cs, Curl.Networking.UnitTests/TcpConnectorTests.SocksFilterTrace.cs, Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnelHttpsConnectTrace.cs, Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitLibrary/FtpTransferMessages.cs, Curl.Protocol.Ftp.UnitTests/Cgr088Tests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerActiveModeTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerDataConnectionEventTests.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/Cgr088Tests.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ConnectionReuse.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.HeadInfoLines.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3617 — Fix CGR-088: -v/--trace do not echo error messages as * <message> info lines (curl's failf echo) for HTTP, FTP, CONNECT and SOCKS failures
 
@@ -93,19 +93,27 @@ curl -sv -x socks4://127.0.0.1:20600 http://127.0.0.1:8080/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr088Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (second claim, lane 1): split for size as the first claim's log asked. This task now covers the issue's explicit repro commands; the "same gap applies" list (--max-redirs, --max-filesize, bad gzip, bad chunk, -m, bad -o path, short body, FTP STOR/REST/greeting/226-451, SOCKS5 replies, --trace) is BL-3872.
+- The earlier claim measured real curl 8.22.0 (Schannel) through Record-CurlExchange.ps1 and kept the work in the stash this claim finished; the lines pinned, each the issue's Expected text: `-f` 404 -> `* The requested URL returned error: 404` before the head's empty line; empty reply -> `* Empty reply from server`, `* shutting down connection #0` (was `closing`); `-u bad:x` FTP 530 -> `* Access denied: 530`, `* closing connection #0`; FTP SIZE 550 -> `* The file does not exist` before the directory and left-intact lines (RETR 550 echoes `RETR response: 550`, curl's ftp.c failf text); `-Q BOGUS` 500 -> `* QUOT command failed with 500`, `* shutting down connection #0`; CONNECT 403 -> `* CONNECT tunnel failed, response 403`; SOCKS4 91 -> `* [SOCKS] cannot complete SOCKS4 connection to <replied address>. (91), request rejected or failed.`. Exit codes and final `curl: (N)` lines already matched and still do.
+- Decision (sensible default): the echo is written at each failing site, not as a general echo in CurlCommandRunner, since many paths (TLS, SOCKS5 GSS-API, FTP PORT) already write their failf lines and a general echo would repeat them; for the same reason the SOCKS echo covers SOCKS4/4a only. CurlCommandRunner, SchannelFailureEcho and the Console test named in the original touches were not needed and are dropped from touches.
+- Touches widened to TcpConnector.cs, HttpProtocolHandler.cs, FtpTransferMessages.cs and the existing tests pinning the old transcripts: no task in Doing on origin/work/dark-factory names them (checked: BL-3606, 3610, 3612, 3616, 3620, 3622, 3869).
+- Focused tests (ADR-0482): Curl.Protocol.Ftp.UnitTests/Cgr088Tests.cs, Curl.Protocol.Http.UnitTests/Cgr088Tests.cs, Curl.Networking.UnitTests/Cgr088Tests.cs; each fails without the production change (the lines are absent).
+- All changes are platform-neutral (event text only, no paths or OS errors), so CI on Linux and macOS follows the Windows run.
+- Measure-CodeQuality.ps1 for Ftp, Http and Networking: two methods went to complexity 12 and were split (ClosesTheConnection, ReportSocks4Failure); the rerun for Http and Networking reports 0 failing members. Full fast suite green.
 ## Log
 
 - 2026-10-26: Created from CGR-088 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3617-20261026-063535-L5.jsonl
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. -v echoes curl's failf line for -f 404, an empty reply, FTP 530/550/QUOT, CONNECT refusals and SOCKS4 rejections; the remaining failure paths are BL-3872
