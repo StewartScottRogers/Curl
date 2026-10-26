@@ -271,25 +271,70 @@ public sealed class Cgr091Tests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows | OperatingSystems.OSX)]
     public void Format_OpenSslUnprintableNames_PrintsEmptySubjectAndIssuer()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
-        // A BMPString of three bytes, which is no whole number of characters.
-        X500DistinguishedName unprintable = new([0x30, 0x0E, 0x31, 0x0C, 0x30, 0x0A, 0x06, 0x03, 0x55, 0x04, 0x03, 0x1E, 0x03, 0x00, 0x61, 0x00]);
-        using RSA key = RSA.Create(2048);
-        CertificateRequest request = new(unprintable, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        diagnostics.Arrange("name", Convert.ToHexString(unprintable.RawData));
+        diagnostics.Arrange("name", Convert.ToHexString(UnprintableName));
 
-        using X509Certificate2 certificate = request.Create(
-            unprintable,
+        string text = PeerCertificateText.FormatFor(CertificateWithUnprintableNames(), TlsBackend.OpenSsl);
+        diagnostics.Act("text", text);
+
+        StringAssert.StartsWith(text, "Subject:\nIssuer:\nVersion:2\n");
+    }
+
+    [TestMethod]
+    [OSCondition(OperatingSystems.Linux)]
+    public void Format_OpenSslUnprintableNamesOnLinux_PrintsNothingAsOpenSslCannotReadTheCertificate()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("name", Convert.ToHexString(UnprintableName));
+
+        string text = PeerCertificateText.FormatFor(CertificateWithUnprintableNames(), TlsBackend.OpenSsl);
+        diagnostics.Act("text", text);
+
+        Assert.AreEqual(string.Empty, text);
+    }
+
+    // A BMPString of three bytes, which is no whole number of characters. OpenSSL's d2i_X509
+    // refuses it, so on Linux the certificate is built by re-encoding a readable one rather
+    // than with CertificateRequest.Create, which loads what it signs.
+    private static readonly byte[] UnprintableName =
+        [0x30, 0x0E, 0x31, 0x0C, 0x30, 0x0A, 0x06, 0x03, 0x55, 0x04, 0x03, 0x1E, 0x03, 0x00, 0x61, 0x00];
+
+    private static byte[] CertificateWithUnprintableNames()
+    {
+        using RSA key = RSA.Create(2048);
+        CertificateRequest request = new(new X500DistinguishedName("CN=a"), key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        using X509Certificate2 readable = request.Create(
+            new X500DistinguishedName("CN=a"),
             X509SignatureGenerator.CreateForRSA(key, RSASignaturePadding.Pkcs1),
             new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 11, 26, 0, 0, 0, TimeSpan.Zero),
             [0x01]);
-        string text = PeerCertificateText.FormatFor(certificate.RawData, TlsBackend.OpenSsl);
-        diagnostics.Act("text", text);
 
-        StringAssert.StartsWith(text, "Subject:\nIssuer:\nVersion:2\n");
+        AsnReader certificate = new AsnReader(readable.RawData, AsnEncodingRules.DER).ReadSequence();
+        AsnReader tbs = certificate.ReadSequence();
+        AsnWriter writer = new(AsnEncodingRules.DER);
+        using (writer.PushSequence())
+        {
+            using (writer.PushSequence())
+            {
+                // version, serialNumber, signature, issuer, validity, subject, then the rest.
+                for (int field = 0; tbs.HasData; field++)
+                {
+                    ReadOnlyMemory<byte> value = tbs.ReadEncodedValue();
+                    writer.WriteEncodedValue(field is 3 or 5 ? UnprintableName : value.Span);
+                }
+            }
+
+            while (certificate.HasData)
+            {
+                writer.WriteEncodedValue(certificate.ReadEncodedValue().Span);
+            }
+        }
+
+        return writer.Encode();
     }
 
     private static string FormatCrafted(params X509Extension[] extensions)
