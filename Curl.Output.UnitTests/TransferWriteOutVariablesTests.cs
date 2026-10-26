@@ -907,7 +907,10 @@ public sealed class TransferWriteOutVariablesTests
         var diagnostics = TestDiagnostics.For(TestContext);
         // curl -k -s -o NUL -w "%{num_certs}\n%{certs}" https://127.0.0.1:18304/ (BL-303's Notes).
         diagnostics.Arrange("peer certificate count", LoopbackChain.Certificates.Length);
-        TransferWriteOutVariables variables = WithReport(new TransferReport { PeerCertificates = LoopbackChain.Certificates });
+        TransferWriteOutVariables variables = new(TransferResult.Success(0) with { Report = new TransferReport { PeerCertificates = LoopbackChain.Certificates } }, LoopbackUrl, 0, LoopbackUrl, "http", Clock)
+        {
+            TlsBackend = TlsBackend.Schannel,
+        };
 
         Variable(diagnostics, variables, "num_certs", "3");
         Variable(diagnostics, variables, "certs", LoopbackChain.CertsText);

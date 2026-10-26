@@ -69,7 +69,7 @@ namespace Curl.Output;
 /// </para>
 /// <para>
 /// <c>num_certs</c> counts <see cref="TransferReport.PeerCertificates"/> and <c>certs</c>
-/// prints each with <see cref="PeerCertificateText"/>, one after another; a transfer
+/// prints each with <see cref="PeerCertificateText"/> in the layout of <see cref="TlsBackend"/>'s curl build, one after another; a transfer
 /// without TLS has none, so <c>0</c> and nothing, as measured on 2026-09-26 against curl
 /// 8.21.0 (mingw, Schannel) for file:// and http://. See ADR-0054 and BL-303.
 /// </para>
@@ -170,7 +170,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         ["ftp_entry_path"] = variables => WriteOutValue.FromText(variables.info.FtpEntryPath),
         ["num_certs"] = variables => WriteOutValue.FromNumber(variables.report.PeerCertificates.Count),
         ["proxy_used"] = variables => WriteOutValue.FromNumber(variables.info.UsedProxy),
-        ["certs"] = variables => WriteOutValue.FromText(string.Concat(variables.report.PeerCertificates.Select(PeerCertificateText.Format))),
+        ["certs"] = variables => WriteOutValue.FromText(string.Concat(variables.report.PeerCertificates.Select(certificate => PeerCertificateText.FormatFor(certificate, variables.TlsBackend)))),
         ["referer"] = variables => WriteOutValue.FromText(variables.info.Referer),
         ["filename_effective"] = variables => WriteOutValue.FromText(variables.OutputFileName),
         ["conn_id"] = variables => WriteOutValue.FromNumber(variables.info.ConnectionId),
@@ -303,6 +303,12 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
     /// default <see cref="FormatLibraryVersion"/> for the running system. See ADR-0063.
     /// </summary>
     public string LibraryVersion { get; init; } = FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS());
+
+    /// <summary>
+    /// Gets the TLS library whose curl build <c>%{certs}</c> matches; by default
+    /// <see cref="PlatformTlsBackend.ForProcess"/> (CGR-091).
+    /// </summary>
+    public TlsBackend TlsBackend { get; init; } = PlatformTlsBackend.ForProcess;
 
     private long DeliveredSize => report.DeliveredSize ?? info.SizeDownload;
 

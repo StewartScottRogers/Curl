@@ -48,6 +48,19 @@ public static class PeerCertificateText
         }
     }
 
+    /// <summary>
+    /// Prints one certificate as the curl build for <paramref name="tlsBackend"/> does: the
+    /// Schannel build's x509asn1.c records (<see cref="Format(ReadOnlyMemory{byte})"/>) or
+    /// the OpenSSL build's <c>ossl_certchain</c> records (CGR-091).
+    /// </summary>
+    /// <param name="certificate">The certificate's DER encoding.</param>
+    /// <param name="tlsBackend">The TLS library whose curl build to match.</param>
+    /// <returns>Its lines, each ending in a line feed; empty when curl could not read it.</returns>
+    public static string FormatFor(ReadOnlyMemory<byte> certificate, TlsBackend tlsBackend)
+    {
+        return tlsBackend == TlsBackend.OpenSsl ? OpenSslPeerCertificateText.Format(certificate) : Format(certificate);
+    }
+
     private static string Format(byte[] der, X509CertificateFields fields)
     {
         var text = new StringBuilder();
@@ -66,7 +79,7 @@ public static class PeerCertificateText
         return text.ToString();
     }
 
-    private static void AppendRecord(StringBuilder text, string label, string value)
+    internal static void AppendRecord(StringBuilder text, string label, string value)
     {
         var end = value.IndexOf('\0', StringComparison.Ordinal);
         text.Append(label).Append(':').Append(end < 0 ? value : value[..end]);
@@ -187,7 +200,7 @@ public static class PeerCertificateText
     }
 
     // The whole certificate, as the TLS library handed it over, in 64-character lines.
-    private static void AppendPem(StringBuilder text, byte[] der)
+    internal static void AppendPem(StringBuilder text, byte[] der)
     {
         var base64 = Convert.ToBase64String(der);
         text.Append("-----BEGIN CERTIFICATE-----\n");
