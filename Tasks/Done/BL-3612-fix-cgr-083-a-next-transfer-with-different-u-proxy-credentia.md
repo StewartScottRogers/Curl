@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ConnectionPoolProxyKey.cs, Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitTests/Cgr083Tests.cs]
+touches: [Curl.Networking.UnitLibrary/ConnectionPoolProxyKey.cs, Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitTests/Cgr083Tests.cs, Curl.Networking.UnitLibrary/ConnectionPoolKey.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Protocol.Abstractions.UnitLibrary/ConnectTarget.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Proxy.cs, Curl.Console.UnitTests/CurlCompositionProxyTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3612 — Fix CGR-083: A --next transfer with different -U proxy credentials reuses the earlier proxy connection; curl opens a new one
 
@@ -62,17 +62,24 @@ curl -s -o NUL -w "%{num_connects}\n" -x http://127.0.0.1:20600 -U u:p http://a.
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr083Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause (2026-10-26): a plain forward-proxy `ConnectTarget` (built in `HttpProtocolHandler.TargetOf`) carried no proxy, so `ConnectionPoolKey` keyed it without the credential that `ConnectionPoolProxyKey` already compares for tunnels. Fix: new `ConnectTarget.ForwardProxy` (the forward proxy endpoint with its credential), set by the HTTP handler; `ConnectionPoolKey.Of` keys on `target.Proxy ?? target.ForwardProxy`. This matches curl's `url.c` reuse check, which compares the proxy user and password for every proxy. No ADR: no design choice beyond matching curl.
+- Touches widened (no other task in Doing on origin/work/dark-factory names these): `ConnectionPoolKey.cs` (the key), `ConnectTarget.cs` (carries the credential), `HttpProtocolHandler.cs` (sets it), `Networking/CLAUDE.md` (pool key doc), and two test files whose whole-record `ConnectTarget` expectations now compare `with { ForwardProxy = null }`, because `NetworkCredential` compares by reference (`HttpProtocolHandlerTests.Proxy.cs`, `CurlCompositionProxyTests.cs`). `ConnectionPoolProxyKey.cs` and `PoolingConnector.cs` needed no change. The TFTP and DoH forward-proxy targets are untouched; they send no proxy credential per request.
+- Measured with a throwaway C# keep-alive loopback server (answers each request head with `200`, `Content-Length: 0`, keeps the connection; Record-CurlExchange.ps1 closes after each response, so it cannot show reuse). REF = curl 8.22.0 Schannel (mingw build), PORT = Curl.Console at this commit:
+  - `curl -s -o NUL -w "%{num_connects}\n" -x http://127.0.0.1:20600 -U u:p http://a.test/1 --next -o NUL -w "%{num_connects}\n" -x http://127.0.0.1:20600 -U v:q http://a.test/2`: REF exit 0, stdout `1\n1\n`, stderr empty, two connections (conn 0 `Proxy-Authorization: Basic dTpw`, conn 1 `Basic djpx`). PORT (fixed): identical. PORT before the fix: `1\n0\n` (one connection), as the report gives it.
+  - Variant that already matched, same `-U u:p` in both groups: REF and PORT exit 0, stdout `1\n0\n`, one connection, identical wire bytes.
+- Focused test: `Curl.Networking.UnitTests/Cgr083Tests.cs`. Its different-credentials key test fails without the key change (both keys have a null proxy, so they are equal). Measure-CodeQuality over Networking, Http and Abstractions: 0 failing members. Fast tests green (the 11 failures from the first run were the record-equality expectations, fixed). Linux/macOS: the change is platform-neutral (no paths, OS text or certificates), so CI there is covered by keeping it so.
 
 ## Log
 
 - 2026-10-26: Created from CGR-083 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A --next transfer with different -U proxy credentials opens a new forward-proxy connection, as curl 8.22.0 does (CGR-083)
