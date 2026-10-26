@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpCustomHeader.cs, Curl.Protocol.Http.UnitTests/Cgr066Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3595 — Fix CGR-066: -H 'Name ;' (a blank before the semicolon) sends 'Name :' instead of the trimmed empty header 'Name:'
 
@@ -60,17 +60,27 @@ curl -sS -H " X-E;" http://127.0.0.1:20335/a
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr066Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 6): Delivered directly rather than through the full `/feature` stages: the fix is one expression in `HttpCustomHeader.Parse` (trim the name before the closing semicolon), so planning and implementing agents would cost more than the change. No ADR: there was no choice to make, only real curl's behaviour to match.
+- Measured real curl 8.22.0 (Schannel, ucrt64) with `Record-CurlExchange.ps1`, `curl -sS -H <value> http://127.0.0.1:<port>/a`, against Curl's `curl.exe` before and after the fix. The request line, exit code (0), stdout (`ok`) and stderr (empty) were compared after replacing the port and the User-Agent version. Real curl sends:
+  - `X-E ;`, ` X-E;`, `X-E<TAB>;`, `X-E;` -> `X-E:` (before the fix Curl sent `X-E :`, ` X-E:` and `X-E<TAB>:` for the first three)
+  - ` ;` -> `:`; `;` -> nothing; `X-E ; ` -> nothing (the semicolon is not last)
+  - `Accept ;` and ` Accept;` -> `Accept: */*` and then `Accept:`: only an untrimmed name overrides curl's own header. `Accept;` -> `Accept:` alone.
+  - `X-E : v` and ` X-E: v` are sent verbatim (the colon form is not trimmed)
+  After the fix all 12 variants are SAME as real curl (request bytes, stdout, stderr, exit code). The ones that already matched (`X-E;`, `;`, `X-E ; `, `Accept;`, both colon forms) still match.
+- `Cgr066Tests` (12 cases) fails 7 cases with the old `HttpCustomHeader.cs` and passes with the fix. The tests use no paths and no OS text, so they are platform-neutral. CI on Linux and macOS is covered by that and by the fast tests being green here.
+- `dotnet build` is clean (0 warnings). The fast tests pass: all 46 test projects, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-066 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. -H 'Name ;' and -H ' Name;' send the trimmed empty header 'Name:' as curl 8.22.0 does
