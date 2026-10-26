@@ -436,13 +436,16 @@ internal static class HttpProxyTunnel
     {
         // "HTTP/1.1 407 Proxy Authentication Required": the version, a space, exactly three
         // digits, then a space or the end of the line; anything else is status 0 (measured).
+        // Only HTTP/1.0 and HTTP/1.1 count: HTTP/2, HTTP/2.0 and HTTP/1.2 are status 0 (CGR-080).
         var firstLine = Encoding.Latin1.GetString([.. header[..header.IndexOf((byte)'\n')]]).TrimEnd('\r');
         var parts = firstLine.Split(' ', 3);
         return parts.Length >= 2
-            && parts[0].StartsWith("HTTP/", StringComparison.Ordinal)
+            && IsHttp10OrHttp11(parts[0])
             && parts[1].Length == 3
             && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var statusCode)
                 ? statusCode
                 : 0;
     }
+
+    private static bool IsHttp10OrHttp11(string version) => version is "HTTP/1.0" or "HTTP/1.1";
 }
