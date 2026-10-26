@@ -34,3 +34,4 @@ Find the tests that prompt: apply BL-3573's change (or temporarily make `ForProc
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: ba4b4b5e 59f0897c 779790c0.
