@@ -72,3 +72,4 @@ curl -sS -z "=Wed, 21 Oct 2015 07:28:00 GMT" http://127.0.0.1:20500/f
 ## Log
 
 - 2026-10-26: Created from CGR-073 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
