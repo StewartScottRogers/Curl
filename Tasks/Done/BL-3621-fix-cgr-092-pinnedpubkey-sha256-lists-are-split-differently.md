@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/PinnedPublicKey.cs, Curl.Networking.UnitTests/Cgr092Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3621 — Fix CGR-092: --pinnedpubkey sha256// lists are split differently: a trailing ; makes a correct pin fail, and ;; makes a later pin match
 
@@ -67,17 +67,27 @@ curl -sS -k --pinnedpubkey "sha256//AAAA=;;sha256//$PIN" ...
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr092Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Pipeline: a one-method fix, so the feature stages were done inline (measure, failing test, fix, verify) rather than through separate agents. No ADR: the behaviour is "match curl" under ADR-0193, measured; the new rule is in `PinnedPublicKey.MatchesAnyHash`'s comment and `Cgr092Tests`' summary.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1 -Tls -Response 'HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nhello tls' -CurlArgs '-sS','-k','--pinnedpubkey',<pin>,https://localhost:<port>/index.txt`, REF curl 8.22.0 Schannel, PORT `Curl.Console\bin\Debug\net10.0\curl.exe` with `-Curl`. `{H}` is the served key's hash. REF and PORT agree on every case (exit code, stdout, stderr, request.bin; only the Host port differs, as each run used its own port); no files are written:
+  - `sha256//{H};` 0 `hello tls`; `sha256//{H};x` 0; `sha256//{H};;` 0; `sha256//AAAA=;sha256//{H}` 0 (already matched before the fix); `sha256//AAAA=;sha256//{H};` 0; `sha256//AAAA=;sha256//{H};x` 0; `sha256//;sha256//{H}` 0.
+  - `sha256//AAAA=;;sha256//{H}` 90; `sha256//AAAA=;x;sha256//{H}` 90; `sha256//AAAA=; sha256//{H}` 90; `sha256//AAAA=;SHA256//{H}` 90; `sha256//AAAA=;xsha256//{H}` 90; `sha256//AAAA=sha256//{H}` 90; each with stderr `curl: (90) SSL: public key does not match pinned public key`.
+  - Before the fix PORT gave 90 for `{H};`, `{H};x` and `{H};;`, and 0 for `;;`.
+- The rule curl follows: read a hash to the next `;`, compare it whole; go on only while that `;` is followed directly by `sha256//`. Linux 8.18 agrees per the report; the code is platform-neutral and the tests are pure (no files, paths or OS text).
+- `Cgr092Tests` (13 rows): 7 failed with the old `Split` restored, all 13 pass with the fix.
+- Solution fast run: every project passed except 4 Mtls tests in `Curl.Conformance.UnitTests` failing with a file lock on `MtlsCertificates\source\test-ca.prm` (another process), unrelated to this change; they pass alone. Filed as BL-3872.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-092 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. --pinnedpubkey sha256// lists split as curl 8.22.0 does: trailing ; keeps a match, ;; ends the list
