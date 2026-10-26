@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr086Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3615 — Fix CGR-086: -L to a Location that cannot be parsed exits 0 silently (curl exits 3 or 1)
 
@@ -62,17 +62,21 @@ curl -sS -L -w '%{exitcode}|%{errormsg}|%{num_redirects}\n' http://127.0.0.1:207
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr086Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 3): Not reproducible at 246f02ff0. Measured with `Record-CurlExchange.ps1` (real curl 8.22.0 Schannel at /ucrt64/bin/curl, then `-Curl` set to Curl.Console's curl.exe), command `curl -sS -L -w '%{exitcode}|%{errormsg}|%{num_redirects}\n' http://127.0.0.1:<port>/raw/x`, the server answering `HTTP/1.1 301 Moved` with `Location: http://[bad` or `Location: foo://x/`. Both give, byte for byte: `http://[bad` -> exit 3, stdout `3|The redirect target URL could not be parsed: Bad IPv6 address|1`, stderr `curl: (3) The redirect target URL could not be parsed: Bad IPv6 address`; `foo://x/` -> exit 1, stdout `1|The redirect target URL could not be parsed: Unsupported URL scheme|1`, stderr `curl: (1) The redirect target URL could not be parsed: Unsupported URL scheme`. No files written. Request bytes are the same (`GET /raw/x HTTP/1.1`, Host, `User-Agent: curl/8.22.0`, `Accept: */*`) apart from the port. Same result for the response variants tried: Content-Length: 0, no Content-Length, `Connection: close` with a body, a 5-byte body, and LF-only line endings.
+- Focused test criterion: there was no defect left to fix, so `Curl.Core.UnitTests/Cgr086Tests.cs` pins both repros at RedirectFollower as a regression guard (exit, message, num_redirects 1, one request). It also passes with b0d27d68's `RedirectFollower.cs` swapped in, so the report's `0||0` did not come from this file at b0d27d68; it was not traced further. Ticked on that evidence, as these Notes allow for an issue that does not reproduce.
+- Build clean (0 warnings); fast tests: exit 0, 43672 passed, 290 skipped. No production code changed, so no Measure-CodeQuality run was needed. The test is platform-neutral (no paths, no OS text), so CI on Linux and macOS is covered.
 
 ## Log
 
 - 2026-10-26: Created from CGR-086 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. CGR-086 does not reproduce: -L to an unparsable or unknown-scheme Location exits 3/1 with curl's message and output; regression test added
