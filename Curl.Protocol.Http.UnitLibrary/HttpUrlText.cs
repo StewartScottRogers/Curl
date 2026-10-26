@@ -25,6 +25,18 @@ internal static class HttpUrlText
     internal static string RequestTarget(CurlUrl url) =>
         Path(url) + (url.Query is null ? string.Empty : "?" + Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(url.Query)));
 
+    /// <summary>
+    /// Gives the origin-form request target the request line and authentication send:
+    /// <see cref="RequestTarget" /> with the path's <c>%XX</c> escapes in upper case and the
+    /// query as typed, as curl 8.22.0 sends <c>/a%2fb?x=%2f</c> as <c>/a%2Fb?x=%2f</c>. The
+    /// absolute form a forward proxy gets keeps the escapes as typed (ADR-0821, CGR-054).
+    /// </summary>
+    internal static string OriginTarget(CurlUrl url)
+    {
+        string path = Path(url);
+        return UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url)[path.Length..];
+    }
+
     /// <summary>Gives the path with each character above <c>~</c> percent-encoded as UTF-8.</summary>
     internal static string Path(CurlUrl url)
     {

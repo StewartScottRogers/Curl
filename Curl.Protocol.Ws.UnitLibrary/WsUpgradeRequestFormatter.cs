@@ -69,6 +69,7 @@ internal static class WsUpgradeRequestFormatter
             AppendEncoded(target, rune);
         }
 
+        target = new(UrlPathEscapes.WithUpperCaseHexDigits(target.ToString()));
         return url.Query is null ? target.ToString() : target.Append('?').Append(Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(url.Query))).ToString();
     }
 

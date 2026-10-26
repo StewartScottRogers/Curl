@@ -259,7 +259,7 @@ internal static class HttpRequestHeadFormatter
             return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
         }
 
-        return proxiedCredentials is null ? HttpUrlText.RequestTarget(url) : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType);
+        return proxiedCredentials is null ? HttpUrlText.OriginTarget(url) : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType);
     }
 
     /// <summary>
