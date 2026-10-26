@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitTests/Cgr011Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3540 — Fix CGR-011: A CR, LF or NUL in an HTTP/2 response header value goes into the HTTP/1 header parser, so a server can inject header lines such as Set-Co...
 
@@ -75,17 +75,28 @@ curl -sS --http2-prior-knowledge -c jar.txt -D - -o /dev/null http://127.0.0.1:2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr011Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Fix: `Http2ResponseHead.HeaderLines` leaves out any field whose value holds a CR, LF or NUL, silently, as nghttp2 does for curl (ADR-0815). HTTP/3 heads share the path. Focused tests in `Cgr011Tests.cs`: all 7 fail with the filter removed and pass with it.
+- Harness (decided: REF is WSL curl 8.18.0 with nghttp2 1.68.0, the report's REF-LINUX; the Windows REF has no HTTP/2): canned h2c bytes (SETTINGS, SETTINGS ACK, HEADERS with `:status` and one literal-without-indexing field, DATA `hi\n`) served by `nc -l` inside WSL; REF runs in WSL, PORT (`Curl.Console\bin\Debug\net10.0\curl.exe`) on Windows through WSL's localhost forwarding. Script kept outside the repo (`%TEMP%\bl3540\run.ps1`, PowerShell).
+- Results after the fix, REF and PORT identical (exit, stdout, stderr, files):
+  - `curl -sS --http2-prior-knowledge -c jar.txt -D - -o out1.txt -w "nh=%{num_headers}." http://127.0.0.1:P/x`, field `x-inj: a\r\nset-cookie: evil=1; Path=/`: exit 0, stdout `HTTP/2 200 \r\n\r\nnh=0.`, stderr empty, out1.txt `hi\n`, jar has only the header comments (PORT's jar uses CRLF line ends, as a Windows build does).
+  - `-D - -w "nh=%{num_headers}."` with `a\r\nb`, `a\nb`, `a\0b`: exit 0, stdout `HTTP/2 200 \r\n\r\nhi\nnh=0.`, stderr empty. Before the fix PORT exited 8 (Header without colon / Nul byte in header).
+  - `-sS -L ... -w "nh=%{num_headers},code=%{http_code}."`, 302 with `location: /next\r\nx: y`: exit 0, stdout `HTTP/2 302 \r\n\r\nhi\nnh=0,code=302.`, no follow.
+- Two-URL variant (`.../x .../y` on one connection): REF exits 16 on transfer 2 (`nghttp2 recv error -902` / `Ignoring received invalid HTTP header field ... stream: 3, name: [], value: []`) even when the field is a valid `x-inj: ok`, so that comes from the canned second response, not from CGR-011; transfer 1 matches PORT (no injected line, empty jar), and PORT's jar is empty so request 2 carries no cookie. The report's REF (a real nghttp2 server) gave exit 0 for both transfers, which PORT now gives.
+- Platform check: the tests are pure byte formatting, no paths or OS text. CI on Linux and macOS: change is platform-neutral and the fast tests are green here.
+- Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-011 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. HTTP/2 and HTTP/3 response header fields whose value holds a CR, LF or NUL are ignored silently as curl's nghttp2 build does, so no header line or cookie can be injected
