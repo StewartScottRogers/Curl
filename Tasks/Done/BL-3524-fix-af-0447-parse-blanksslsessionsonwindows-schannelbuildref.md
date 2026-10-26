@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitTests]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3524 — Fix AF-0447: Parse_BlankSslSessionsOnWindows_...SchannelBuildRefusesItAsUnsupported only checks that the 'blank argument' line is absent, never the refusal it names
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The helper now asserts that the parse is refused (IsAccepted false, non-empty stderr) as well as that the blank-argument line is absent; every RefusedForAnotherReason option passes it. The Windows --ssl-sessions test no longer goes through the helper. It pins the Schannel refusal itself: exit code 2 (FailedInit), then `curl: option --ssl-sessions: the installed libcurl version does not support this` and the try-help line, the text CommandLineRefusal.InstalledLibcurlDoesNotSupport gives for RefusedBySchannelBuild rows. The change is test-only, so no Measure-CodeQuality run was needed. It stays platform-neutral because the Windows test keeps its OSCondition.
+- Checked: the reproduction now shows the helper's IsAccepted and refusal assertions. dotnet build is clean (0 warnings) and the fast tests are green (0 failed).
 
 ## Log
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Blank-argument helper asserts the refusal; Windows --ssl-sessions test pins the Schannel unsupported refusal and exit code 2
