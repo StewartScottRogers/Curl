@@ -4,7 +4,7 @@ title: Fix CGR-034: curl_multi_socket_action reports synthetic socket numbers, n
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3846, BL-3847]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr034Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -83,8 +83,10 @@ probe.exe C_20,C_21,C_65,C_74,C_75 2
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr034Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 5, first pass, no code changed): the fix cannot live in `ManagedMultiTransfer.cs`. Its synthetic sockets and 10 ms timer are ADR-0599/ADR-0610 design: `Curl.Networking` never hands out its `Socket`, and each transfer runs as its own async task that consumes data whenever it comes, so even with real sockets a level-triggered poll would never wake the application. Filed BL-3846 (expose the OS socket handle through `IConnection`, across Abstractions, Networking and the engine wrappers) and BL-3847 (gate socket-action transfers' I/O on readiness signals and publish OUT/IN and the earliest deadline). Once both are Done this task wires `ManagedMultiTransfer` to them: real socket in the socket callback, `CurlPoll.Out` then `In`, the timer from the deadline (-1 when none), and drops `RunningTransferCheckInterval`. The probe needs rebuilding as a C# file-based app (P/Invoke to a real libcurl-4.dll against `Libcurl`) with the expected sequences in the issue.
 
 ## Log
 
 - 2026-10-26: Created from CGR-034 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Needs BL-3846 (real OS socket through IConnection) and BL-3847 (readiness-gated socket-action I/O with OUT/IN and deadline) first
