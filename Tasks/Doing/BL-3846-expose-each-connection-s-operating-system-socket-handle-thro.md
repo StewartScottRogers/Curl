@@ -36,3 +36,4 @@ Add to `IConnection` a read-only member giving the underlying OS socket handle (
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: ffae586a fc97b2a0 39c53383 9c5e0a83.
