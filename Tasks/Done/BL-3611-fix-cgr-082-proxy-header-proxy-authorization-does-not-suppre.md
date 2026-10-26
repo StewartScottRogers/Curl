@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HttpProxyTunnel.cs, Curl.Networking.UnitTests/Cgr082Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr082Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3611 — Fix CGR-082: --proxy-header "Proxy-Authorization: ..." does not suppress the -U Proxy-Authorization on a plain proxy request (two headers sent)
 
@@ -60,10 +60,10 @@ curl -s -x http://127.0.0.1:20600 -U u:p --proxy-header 'Proxy-Authorization: cu
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,11 @@ curl -s -x http://127.0.0.1:20600 -U u:p --proxy-header 'Proxy-Authorization: cu
 
 - 2026-10-26: Created from CGR-082 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Measured with Record-CurlExchange.ps1 against real curl 8.22.0 (Schannel, Windows), each command also run through Curl's built curl.exe; exit code, stdout, stderr and request bytes compared with cmp:
+  - `curl -s -x http://127.0.0.1:P -U u:p --proxy-header 'Proxy-Authorization: custom' http://example.test/` -> exit 0, request `GET http://example.test/ HTTP/1.1`, `Host`, `User-Agent`, `Accept`, `Proxy-Connection: Keep-Alive`, `Proxy-Authorization: custom` (no Basic). Curl before the fix also sent `Proxy-Authorization: Basic dTpw` after Host; after it, all four outputs are byte-identical.
+  - Variant `-H 'Proxy-Authorization: custom'` instead: real curl sends both (Basic after Host, custom at the end); Curl already matched and still does.
+  - Variant `-H 'X-A: 1' --proxy-header 'Proxy-Authorization: custom' -H 'Proxy-Authorization: h'`: real curl sends no Basic, then `X-A`, `h`, `custom`; Curl matches.
+- Fix: `HttpRequestHeadFormatter.Format` leaves out the authenticator's `Proxy-Authorization` when a `--proxy-header` value names it (as libcurl's `Curl_checkProxyheaders` under `CURLHEADER_SEPARATE`), and still sends it beside an `-H` one. The CONNECT path (`HttpProxyTunnel.cs`) already did this, so it is unchanged. No ADR: the behaviour is real curl's, measured, with no design choice left open.
+- Focused tests in `Curl.Protocol.Http.UnitTests/Cgr082Tests.cs`; `Format_ProxyHeaderNamesProxyAuthorization_SendsOnlyIt` fails on the old `AppendAlways` line (it wrote the Basic line after Host unconditionally) and passes now.
+- `dotnet build` clean; fast tests green (46 test assemblies, 0 failed; Curl.Protocol.Http.UnitTests 2377 passed). Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary: 0 failing members. Change is platform-neutral (header text only).
+- 2026-10-26: Doing -> Done. A --proxy-header Proxy-Authorization replaces the -U one on a plain proxy request, as curl 8.22.0 does
