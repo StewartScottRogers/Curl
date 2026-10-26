@@ -77,3 +77,4 @@ curl -sS -k --cert E\pki\cli.p12:secret --cert-type P12 https://localhost:<p>/in
 ## Log
 
 - 2026-10-26: Created from CGR-096 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
