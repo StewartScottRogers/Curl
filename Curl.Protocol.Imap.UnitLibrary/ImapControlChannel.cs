@@ -9,7 +9,7 @@ namespace Curl.Protocol.Imap;
 /// </summary>
 /// <param name="connection">The connection; the caller owns and disposes it.</param>
 /// <param name="events">Where <c>-v</c> and <c>--trace</c> learn of each line and literal piece sent and each line read.</param>
-/// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
 /// <param name="diagnosticLog">
 /// Where each line sent and each tagged response's or continuation's status are logged at
 /// <c>verbose</c> (ADR-0222), a line as its sender says it may be logged;
@@ -139,6 +139,12 @@ internal sealed class ImapControlChannel(
     /// </summary>
     /// <param name="secured">The upgraded connection; the caller owns it.</param>
     public void SwitchTo(IConnection secured) => connection = secured;
+
+    /// <summary>
+    /// Gets or sets the token that cancels every send and read: the connect phase's while the
+    /// session opens, so <c>--connect-timeout</c> bounds the greeting and the login (BL-3532).
+    /// </summary>
+    public CancellationToken CancellationToken { get; set; } = cancellationToken;
 
     /// <summary>
     /// Reports and writes nothing more: curl sends <c>LOGOUT</c> once the transfer is over,
@@ -470,7 +476,7 @@ internal sealed class ImapControlChannel(
     {
         try
         {
-            return await connection.ReadAsync(destination, cancellationToken).ConfigureAwait(false);
+            return await connection.ReadAsync(destination, CancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {
@@ -483,8 +489,8 @@ internal sealed class ImapControlChannel(
     {
         try
         {
-            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(bytes, CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (IOException)
@@ -511,7 +517,7 @@ internal sealed class ImapControlChannel(
         {
             try
             {
-                await dumpHeader.WriteAsync(line, cancellationToken).ConfigureAwait(false);
+                await dumpHeader.WriteAsync(line, CancellationToken).ConfigureAwait(false);
             }
             catch (IOException)
             {

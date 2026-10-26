@@ -151,4 +151,13 @@ internal static class ImapSessionMessages
     private static readonly FrozenSet<string> ExitCodeTextOnly = FrozenSet.ToFrozenSet(
         [MalformedUrl, LoginDenied, RemoteFileNotFound, QuoteCommandFailed, WeirdServerReply, ResponseLineTooLarge, UploadFailed],
         StringComparer.Ordinal);
+
+    /// <summary>
+    /// <c>--connect-timeout</c> passed before the session was open (exit 28), curl 8.22.0's text,
+    /// <paramref name="milliseconds" /> counted from the start of the request (BL-3532).
+    /// </summary>
+    /// <param name="milliseconds">The time since the request started.</param>
+    /// <returns>The message.</returns>
+    internal static string OperationTimedOut(long milliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
 }
