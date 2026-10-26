@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/TlsVersionRange.cs, Curl.Networking.UnitTests/Cgr004Tests.cs]
+touches: [Curl.Networking.UnitLibrary/TlsVersionRange.cs, Curl.Networking.UnitTests/Cgr004Tests.cs, Curl.Networking.UnitTests/TlsVersionRangeTests.cs, Curl.Networking.UnitTests/SslStreamTlsProviderTests.VersionRange.cs, Curl.Networking.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3533 — Fix CGR-004: Windows: the default minimum TLS version is not 1.2; the ClientHello offers TLS 1.1 and 1.0 and PORT silently connects to TLS 1.0/1.1-onl...
 
@@ -77,17 +77,28 @@ curl -sS --proxy-insecure -x https://127.0.0.1:20600 http://ex.test/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr004Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Fix: `TlsVersionRange.ToSslProtocols` returns `Tls12 | Tls13` (not `SslProtocols.None`, the OS default) when no minimum is set and the ceiling is TLS 1.3 or unset; a ceiling below TLS 1.3 still starts at TLS 1.0 as ADR-0138 measured. Decision in ADR-0815. It applies on every platform, since curl's default minimum is TLS 1.2 in every backend.
+- Touches widened to `TlsVersionRangeTests.cs` and `SslStreamTlsProviderTests.VersionRange.cs` (each had a data row pinning the old `None` default) and the project's `CLAUDE.md` (one sentence on the default). No task in Doing on origin/work/dark-factory names any of them.
+- Repros measured 2026-10-26. REF is Windows' curl 8.21.0 Schannel (`C:\Windows\System32\curl.exe`; the WinGet curl here is a LibreSSL build), PORT is `dotnet run --project Curl.Console`. The server is `openssl s_server -WWW` with a self-signed localhost cert serving `index.txt` = `hello tls`:
+  - `-tls1_1 -cipher DEFAULT@SECLEVEL=0`, `curl -sS -k https://localhost:20803/index.txt`: REF and PORT both give exit 35, empty stdout, `curl: (35) schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported`. Before the fix PORT printed `hello tls` and exited 0 (report).
+  - `-tls1`: the same result for both.
+  - PC-18: a PowerShell TcpListener on 20600 records the ClientHello and then closes. For `curl -sS -k --resolve ex.test:20600:127.0.0.1 https://ex.test:20600/x` and `curl -sS --proxy-insecure -x https://127.0.0.1:20600 http://ex.test/x`, REF and PORT both send supported_versions `00 2b 00 05 04 03 04 03 03` and both exit 35 with `curl: (35) schannel: failed to receive handshake, SSL/TLS connection failed`.
+  - The `--cacert ... --ssl-no-revoke` variant of TLS-02 was not run separately. It goes through the same SslStream handshake with the same offered range, which `Cgr004Tests` pins.
+- `Cgr004Tests.ToSslProtocols_WithNoMinimum_OffersOnlyTls12AndTls13` fails before the fix (it got `None`) and passes after it.
+- Platform check: the test calls a pure function and does not depend on the platform. The fast tests are green on Windows. `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-004 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. With no TLS version option the handshake offers only TLS 1.2 and 1.3, as curl's Schannel build does; TLS 1.0/1.1-only servers get exit 35
