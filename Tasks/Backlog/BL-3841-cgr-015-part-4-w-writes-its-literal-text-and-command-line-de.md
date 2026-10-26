@@ -4,8 +4,8 @@ title: CGR-015 part 4: -w writes its literal text and command-line-derived value
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs, Curl.Output.UnitTests/Cgr015Tests.cs, Curl.Console/CurlComposition.cs, Curl.Console/CurlCommandRunner.cs]
+depends-on: [BL-3844]
+touches: [Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs, Curl.Output.UnitTests/Cgr015Tests.cs, Curl.Console/CurlComposition.cs, Curl.Console/CurlCommandRunner.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/WriteOutFileWireTextTests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -32,7 +32,16 @@ Split from BL-3544 (CGR-015 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 
 ## Notes
 
+- 2026-10-26 (lane 8, first claim, no code edited): requeued behind BL-3844, which holds `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs`. That file's `SetWriteOut` is where `-w @file` is read (`Encoding.UTF8.GetString(...)`), and it is the only place that can tell file bytes from command-line text: by the time `options.WriteOut` reaches the Console it is one string with no record of where it came from. Added it, and a new Cli test file, to `touches`.
+- Plan (decided, for the next claim):
+  1. `WriteOutTemplateRenderer` takes an `Encoding textEncoding` constructor parameter. `Encode` and `EncodeWithRawBytes` encode with it rather than `Encoding.UTF8`; header bytes marked by `MarkHeaderBytes` stay raw. Test in `Curl.Output.UnitTests/Cgr015Tests.cs` with cp1252 from `CodePagesEncodingProvider.Instance.GetEncoding(1252)`, injected so it is platform-neutral: `café ü €
+` gives `63 61 66 E9 20 FC 20 80 0A` (CR LF when `writesLineFeedAsCrLf`), `[é]` gives `5B E9 5D`, and with UTF-8 the bytes are unchanged.
+  2. `CurlCommandRunner`'s `writeOutRenderer` field passes `runsOnWindows ? ConfigFileWireText.WindowsAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)) : Encoding.UTF8`, the same hook the parser uses for `ConfigFileWireTextEncoding` (it is a primary-constructor parameter, line 299). `CurlComposition` probably needs no change.
+  3. Keep file bytes apart from command-line text with the existing BL-1848 mechanism: in `SetWriteOut`, a `-w @file` template becomes `ConfigFileWireText.Respell(text, options.ConfigFileWireTextEncoding)` when that is set (Windows), so encoding it in the ANSI code page gives the file's own UTF-8 bytes back; the inline value goes through `options.AsWireText(value)`, so a `-w` in a UTF-8 `-K` file keeps its bytes too, as curl uses config-file bytes raw. Off Windows `ConfigFileWireTextEncoding` is null, so nothing changes.
+  4. Still to do on that claim: measure with `Record-CurlExchange.ps1` (`-o NUL -w "café ü €
+"`, `-w "[é]"`, `%{url_effective}` of `http://127.0.0.1:<port>/café`, `-w @file` with UTF-8 bytes), write the ADR, then run `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary,Curl.Console,Curl.Cli.UnitLibrary`.
 ## Log
 
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: d0c40f12 a9b9a7ee f4912012 326de9ca.
+- 2026-10-26: Doing -> Backlog. Needs Curl.Cli.UnitLibrary/CommandLineOptionTable.cs (SetWriteOut, where -w @file is read), held by BL-3844 in Doing; depends-on BL-3844
