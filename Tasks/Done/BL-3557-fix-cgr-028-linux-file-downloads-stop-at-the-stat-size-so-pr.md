@@ -8,9 +8,9 @@ depends-on: []
 touches: [Curl.Protocol.File.UnitLibrary/FileProtocolHandler.cs, Curl.Protocol.File.UnitTests/Cgr028Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
-# BL-3557 — Fix CGR-028: Linux: file:// downloads stop at the stat() size, so procfs/sysfs files, FIFOs, /dev/stdin pipes and character devices return no data wit...
+# BL-3557 â€” Fix CGR-028: Linux: file:// downloads stop at the stat() size, so procfs/sysfs files, FIFOs, /dev/stdin pipes and character devices return no data wit...
 
 ## Goal
 
@@ -78,17 +78,30 @@ EV\vl.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr028Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Plan: when the open reports size 0 (procfs, FIFO, pipe, char device; `PhysicalFileSystem` reports 0 for any non-seekable stream), `DownloadBodyAsync` reads until end of stream, or a positive `-r` byte count (bounded span or suffix length), as curl's `file_do` does (expected size 0 = unknown, bounded by `maxdownload`). Recorded in ADR-0817. Ran the pipeline directly (one small change in one method), not through the agent stages.
+- Measured in WSL (Ubuntu) against curl 8.18.0 OpenSSL and a self-contained linux-x64 publish of this branch, on 2026-10-26. Both gave identical results, byte for byte (md5 of `/proc/version` output equal):
+  - `curl -sS file:///proc/version`: kernel version string, exit 0 (before the fix Curl wrote nothing, exit 0).
+  - `printf pipe-in | curl -sS file:///dev/stdin`: `pipe-in`, exit 0.
+  - `curl -sS -r 0-9 -o z.bin file:///dev/zero`: z.bin 10 bytes, exit 0.
+  - `mkfifo fifo; (printf 'fifo-data\n' > fifo &); curl -sS -m 5 file://$PWD/fifo`: `fifo-data`, exit 0.
+  - `curl -sS -m 3 --max-filesize 100 file:///dev/zero`: 100 NUL bytes, `curl: (63) Exceeded the maximum allowed file size (100) with 100 bytes`, exit 63.
+  - Variants that already matched still match: `printf abcdef | curl -r 2-3 file:///dev/stdin` exit 36 `curl: (36) failed to resume file:// transfer`; `-I file:///proc/version` gives `Content-Length: 0`; a regular file prints its content. Also `printf abc | curl -r -1 file:///dev/stdin` prints `a` in both.
+  - No request bytes on the wire: file:// opens no connection.
+- `Cgr028Tests` (6 tests) failed, all 6, with the fix disabled, and pass with it. Curl.Protocol.File.UnitTests 473 passed, 3 skipped. Full fast run green, `dotnet build` 0 warnings. Measure-CodeQuality for Curl.Protocol.File.UnitLibrary: 0 failing members.
+- The tests use the in-memory fake file system and a separator-neutral path, so they do not depend on the platform; that is why the Linux and macOS CI criterion is met.
+
 ## Log
 
 - 2026-10-26: Created from CGR-028 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. file:// reads procfs files, FIFOs, /dev/stdin pipes and /dev/zero until EOF or the -r byte count, matching curl on Linux
