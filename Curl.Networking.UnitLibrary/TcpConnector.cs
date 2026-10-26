@@ -177,6 +177,11 @@ public sealed partial class TcpConnector(
         ? new LocalBindingTcpDialer(tcpDialer, addressChooser, events)
         : tcpDialer;
 
+    // The race's dialer: BindingDialer's, asking the target's socket opener before each attempt when it has one (ADR-0818).
+    private ITcpDialer AttemptDialer(ConnectTarget target) => target.SocketOpener is { } opener
+        ? new SocketOpenerTcpDialer(BindingDialer(target.Events), opener)
+        : BindingDialer(target.Events);
+
     // Chooses the local address TCP dials and QUIC's UDP sockets bind; null when localBinding is.
     private LocalBindingAddressChooser? LocalAddressChooser() => localBinding is null
         ? null
@@ -2405,7 +2410,7 @@ public sealed partial class TcpConnector(
             return (null, SocketError.ConnectionRefused, null);
         }
 
-        var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
+        var race = new AddressFamilyRace(AttemptDialer(target), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)

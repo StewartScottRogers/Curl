@@ -141,6 +141,14 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </remarks>
     public string? TcpFirstAttemptVersion { get; init; }
 
+    /// <summary>
+    /// Gets the hook asked before each TCP connect attempt how its socket opens, and told when an
+    /// attempt's socket closes after a failed connect (libcurl's <c>CURLOPT_OPENSOCKETFUNCTION</c> and
+    /// <c>CURLOPT_CLOSESOCKETFUNCTION</c>, ADR-0818), or <see langword="null" />, the default, for the
+    /// connector's own sockets.
+    /// </summary>
+    public ITcpSocketOpener? SocketOpener { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

@@ -136,6 +136,10 @@ the console's to print. No type here constructs an `HttpClient`.
 first address's family in turn, the other family beside it once `happyEyeballsTimeout`
 (`--happy-eyeballs-timeout-ms`, 200 ms by default) has passed on its `TimeProvider` or the first
 family has failed on every address; the first connection wins and the rest are cancelled or closed.
+Per ADR-0818 (BL-3833) a target with a `SocketOpener` (`ITcpSocketOpener`) is raced through
+`SocketOpenerTcpDialer`, which asks it before each attempt to proceed, refuse (a `SocketException`, no
+socket) or use a supplied handle (adopted unowned by `TcpDialer.DialSuppliedSocketAsync`), and tells it
+`SocketClosed` when an opened attempt fails.
 
 `TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from

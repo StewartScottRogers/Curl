@@ -262,6 +262,37 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     }
 
     /// <summary>
+    /// Adopts the operating system socket <paramref name="handle" /> an application supplied
+    /// (<see cref="TcpSocketOpenDecision.Supplied" />, libcurl's <c>CURLOPT_OPENSOCKETFUNCTION</c>) without
+    /// taking ownership, so closing the connection never closes the handle, and connects it to
+    /// <paramref name="endPoint" /> unless <paramref name="alreadyConnected" /> (ADR-0818).
+    /// </summary>
+    /// <param name="handle">The socket handle.</param>
+    /// <param name="alreadyConnected">Whether the socket is already connected.</param>
+    /// <param name="endPoint">The address and port the attempt connects to.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>The connection over the adopted socket.</returns>
+    /// <exception cref="SocketException">The handle is no socket, or the connect failed.</exception>
+    internal static async ValueTask<DialedTcpConnection> DialSuppliedSocketAsync(nint handle, bool alreadyConnected, IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        var socket = new Socket(new SafeSocketHandle(handle, ownsHandle: false));
+        try
+        {
+            if (!alreadyConnected)
+            {
+                await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+            }
+
+            return Connected(socket, endPoint);
+        }
+        catch (SocketException)
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Wraps the dialed <paramref name="socket" />: in a <see cref="NetworkStream" /> when it is connected, or
     /// in a <see cref="DeferredConnectSocketStream" /> when <c>connectx</c> left its connect to the first write
     /// (BL-1158), as <see cref="NetworkStream" /> refuses a socket that is not yet connected. Either stream owns
