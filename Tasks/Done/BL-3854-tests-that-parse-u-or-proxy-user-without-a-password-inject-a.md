@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Cli.UnitTests/CaCertificateEnvironmentTests.cs, Curl.Cli.UnitTests/Cgr020Tests.cs, Curl.Cli.UnitTests/CommandLineHttp3RefusalTests.cs, Curl.Cli.UnitTests/CommandLineNoFunctionOptionTests.cs, Curl.Cli.UnitTests/CommandLineSchannelBuildRefusalTests.cs, Curl.Cli.UnitTests/CommandLineTransferEncodingOptionTests.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Curl.Cli.UnitTests/OpenSslBuildParser.cs, Curl.Cli.UnitTests/QuicBuildParser.cs, Curl.Console.UnitTests/CurlCompositionProxyTests.Http2Tunnel.cs, Curl.Console.UnitTests/OpenSslBuildParser.cs, Curl.Console.UnitTests/QuicBuildParser.cs, Curl.Engine.UnitTests/EngineCompositionProxyTests.cs]
+touches: [Curl.Cli.UnitTests/CaCertificateEnvironmentTests.cs, Curl.Cli.UnitTests/Cgr015Tests.cs, Curl.Cli.UnitTests/Cgr050Tests.cs, Curl.Cli.UnitTests/Cgr020Tests.cs, Curl.Cli.UnitTests/CommandLineHttp3RefusalTests.cs, Curl.Cli.UnitTests/CommandLineNoFunctionOptionTests.cs, Curl.Cli.UnitTests/CommandLineSchannelBuildRefusalTests.cs, Curl.Cli.UnitTests/CommandLineTransferEncodingOptionTests.cs, Curl.Cli.UnitTests/Http2OnWindowsTests.cs, Curl.Cli.UnitTests/OpenSslBuildParser.cs, Curl.Cli.UnitTests/QuicBuildParser.cs, Curl.Console.UnitTests/CurlCompositionProxyTests.Http2Tunnel.cs, Curl.Console.UnitTests/OpenSslBuildParser.cs, Curl.Console.UnitTests/QuicBuildParser.cs, Curl.Engine.UnitTests/EngineCompositionProxyTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3854 — Tests that parse -u or --proxy-user without a password inject a fake IPasswordPrompt, never the process console
 ## Goal
@@ -23,15 +23,17 @@ Find the tests that prompt: apply BL-3573's change (or temporarily make `ForProc
 
 ## Acceptance criteria
 
-- [ ] With `ConsolePasswordPrompt.ForProcessConsole` reading the real console (BL-3573's change) the fast tests of Curl.Cli.UnitTests, Curl.Console.UnitTests and Curl.Engine.UnitTests finish without waiting for console input.
-- [ ] Every changed test still asserts what it asserted before.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] With `ConsolePasswordPrompt.ForProcessConsole` reading the real console (BL-3573's change) the fast tests of Curl.Cli.UnitTests, Curl.Console.UnitTests and Curl.Engine.UnitTests finish without waiting for console input.
+- [x] Every changed test still asserts what it asserted before.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Filed by BL-3573's run, which found the hang; BL-3573 depends on this task.
+- Replaced ForProcessConsole with a per-project test fake EmptyPasswordPrompt (Curl.Cli.UnitTests/OpenSslBuildParser.cs, Curl.Console.UnitTests/OpenSslBuildParser.cs, Curl.Engine.UnitTests/EngineCompositionProxyTests.cs); added Cgr015Tests.cs and Cgr050Tests.cs to touches. Hang hunt: temporarily threw from ConsolePasswordPrompt.ReadPassword and ran the three projects; only ConsolePasswordPromptTests (the prompt's own tests, one of which, ForProcessConsole_InputRedirected_ReturnsAnEmptyPassword, calls the real prompt deliberately and belongs to BL-3573) failed, no Parse(arguments) caller reached it. Throw reverted.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: ba4b4b5e 59f0897c 779790c0.
+- 2026-10-26: Doing -> Done. Fast tests in Cli, Console and Engine no longer reach the process console prompt; fake IPasswordPrompt injected

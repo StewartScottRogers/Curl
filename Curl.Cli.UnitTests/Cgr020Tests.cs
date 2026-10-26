@@ -117,7 +117,7 @@ public sealed class Cgr020Tests
             reader.Files[path] = contents;
         }
 
-        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader, isWindows);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), reader, isWindows);
         Assert.IsNull(result.Refusal);
         return result.Options!;
     }

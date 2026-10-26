@@ -80,7 +80,7 @@ public sealed class Cgr015Tests
 
     private static CommandLineOptions Parse(string[] arguments, bool isWindows)
     {
-        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows);
         Assert.IsNull(result.Refusal);
         return result.Options!;
     }

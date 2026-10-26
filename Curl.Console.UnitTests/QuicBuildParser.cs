@@ -17,5 +17,5 @@ internal static class QuicBuildParser
 
     /// <summary>Parses <paramref name="arguments"/> as <see cref="CommandLineParser.Parse(IReadOnlyList{string}, Func{string, bool})"/> does, but as the QUIC build.</summary>
     public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists) =>
-        CommandLineParser.Parse(arguments, pathExists, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, NoDefaultConfigFile, isWindows: false, _ => null, actsAsQuicBuild: true);
+        CommandLineParser.Parse(arguments, pathExists, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, NoDefaultConfigFile, isWindows: false, _ => null, actsAsQuicBuild: true);
 }

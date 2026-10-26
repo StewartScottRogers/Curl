@@ -102,6 +102,6 @@ public sealed class Cgr050Tests
     {
         RecordingDataFileReader reader = new();
         reader.Files["k.cfg"] = contents;
-        return CommandLineParser.Parse(["-K", "k.cfg", .. arguments], _ => true, ConsolePasswordPrompt.ForProcessConsole, reader, false);
+        return CommandLineParser.Parse(["-K", "k.cfg", .. arguments], _ => true, new EmptyPasswordPrompt(), reader, false);
     }
 }

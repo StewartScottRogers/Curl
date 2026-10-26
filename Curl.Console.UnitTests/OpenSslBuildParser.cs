@@ -15,5 +15,12 @@ internal static class OpenSslBuildParser
 
     /// <summary>Parses <paramref name="arguments"/> as <see cref="CommandLineParser.Parse(IReadOnlyList{string}, Func{string, bool})"/> does, but as the OpenSSL build.</summary>
     public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists) =>
-        CommandLineParser.Parse(arguments, pathExists, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false);
+        CommandLineParser.Parse(arguments, pathExists, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, isWindows: false);
+}
+
+/// <summary>Answers every password prompt with an empty password, so a test that parses a <c>-u</c> user without a password never waits on the process console.</summary>
+internal sealed class EmptyPasswordPrompt : IPasswordPrompt
+{
+    /// <inheritdoc/>
+    public string ReadPassword(string prompt) => string.Empty;
 }

@@ -85,7 +85,7 @@ public sealed class CommandLineNoFunctionOptionTests
         string[] arguments = [argument, value, Url];
         Diagnostics.ArrangeArguments(arguments);
 
-        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows);
         Diagnostics.ActParse(result);
 
         Diagnostics.Assert("accepted", true, result.IsAccepted);

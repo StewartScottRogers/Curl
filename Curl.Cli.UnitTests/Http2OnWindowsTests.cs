@@ -82,7 +82,7 @@ public sealed class Http2OnWindowsTests
     private CommandLineParseResult ParseOnWindows(IReadOnlyList<string> arguments)
     {
         Diagnostics.ArrangeArguments(arguments);
-        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: true);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows: true);
         Diagnostics.ActParse(result);
         return result;
     }

@@ -460,7 +460,7 @@ public sealed class CommandLineTransferEncodingOptionTests
         Diagnostics.ArrangeArguments(arguments);
         Diagnostics.Bytes("k.txt", reader.Files["k.txt"]);
 
-        CommandLineParseResult result = QuicBuildParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader);
+        CommandLineParseResult result = QuicBuildParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), reader);
         WriteOutcome(result);
 
         Diagnostics.Assert("accepted", true, result.IsAccepted);
