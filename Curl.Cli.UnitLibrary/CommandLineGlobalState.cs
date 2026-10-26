@@ -117,5 +117,7 @@ internal sealed class CommandLineGlobalState
 
     public bool ApplyingValueLedByVariableBytes { get; set; }
 
+    public bool ApplyingExpandedValue { get; set; }
+
     public System.Text.Encoding? ConfigFileWireTextEncoding { get; set; }
 }

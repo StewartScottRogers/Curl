@@ -94,6 +94,13 @@ public sealed class CommandLineOptions
     internal bool ApplyingValueLedByVariableBytes { get => globals.ApplyingValueLedByVariableBytes; set => globals.ApplyingValueLedByVariableBytes = value; }
 
     /// <summary>
+    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value in
+    /// which at least one variable reference was replaced: <see cref="VariableExpansion"/> builds it from
+    /// UTF-8 bytes, so <see cref="CommandLineTextBytes"/> sends it as UTF-8 (BL-3844).
+    /// </summary>
+    internal bool ApplyingExpandedValue { get => globals.ApplyingExpandedValue; set => globals.ApplyingExpandedValue = value; }
+
+    /// <summary>
     /// The encoding the request side sends header text in, when it is not the UTF-8 a config file is
     /// written in: the ANSI code page on Windows (<see cref="ConfigFileWireText"/>); otherwise <see langword="null"/>.
     /// </summary>
@@ -2370,11 +2377,26 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
-    /// Appends the UTF-8 bytes of <paramref name="data"/> to <see cref="PostData"/>, after a single
-    /// <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.21.0 does.
+    /// The bytes <paramref name="text"/>, a <c>-d</c>-family, <c>--json</c>, <c>--data-urlencode</c> or
+    /// <c>--url-query</c> value, goes out as, as curl 8.22.0 sends it (CGR-015, BL-3844): a command-line
+    /// argument, or a line of a config file read in <see cref="ConfigFileWireTextEncoding"/>, in that
+    /// encoding when it is set, since curl's Windows build gets its arguments in the ANSI code page and
+    /// sends their bytes unchanged; a line of a config file read as UTF-8, an <c>--expand-</c> value
+    /// (<see cref="ApplyingExpandedValue"/>, whose variables hold UTF-8) and every value off Windows in UTF-8.
+    /// </summary>
+    /// <param name="text">The value as parsed.</param>
+    /// <returns>The value's bytes.</returns>
+    internal byte[] CommandLineTextBytes(string text) =>
+        ReadingUtf8ConfigFile || ApplyingExpandedValue || ConfigFileWireTextEncoding is null
+            ? Encoding.UTF8.GetBytes(text)
+            : ConfigFileWireTextEncoding.GetBytes(text);
+
+    /// <summary>
+    /// Appends the bytes of <paramref name="data"/> (<see cref="CommandLineTextBytes"/>) to <see cref="PostData"/>,
+    /// after a single <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.22.0 does.
     /// </summary>
     /// <param name="data">A <c>-d</c> / <c>--data</c> value, possibly empty.</param>
-    internal void AppendPostData(string data) => AppendPostData(Encoding.UTF8.GetBytes(data));
+    internal void AppendPostData(string data) => AppendPostData(CommandLineTextBytes(data));
 
     /// <summary>
     /// Appends <paramref name="data"/> to <see cref="PostData"/>, after a single <c>&amp;</c> when

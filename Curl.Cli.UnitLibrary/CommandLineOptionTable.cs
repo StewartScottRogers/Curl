@@ -825,15 +825,15 @@ public static partial class CommandLineOptionTable
         AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, options.AppendJsonData);
 
     /// <summary>
-    /// Hands <paramref name="append"/> the UTF-8 bytes of <paramref name="value"/>, or, when it starts
-    /// with <c>@</c>, the unchanged bytes of the file it names. A file that cannot be read is refused
+    /// Hands <paramref name="append"/> the bytes of <paramref name="value"/> (<see cref="CommandLineOptions.CommandLineTextBytes"/>),
+    /// or, when it starts with <c>@</c>, the unchanged bytes of the file it names. A file that cannot be read is refused
     /// with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
     /// </summary>
     private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, Action<byte[]> append)
     {
         if (!value.StartsWith('@'))
         {
-            append(Encoding.UTF8.GetBytes(value));
+            append(options.CommandLineTextBytes(value));
             return null;
         }
 
@@ -969,14 +969,14 @@ public static partial class CommandLineOptionTable
 
         if (split < 0)
         {
-            encoded = UrlEncodedContent.Escape(Encoding.UTF8.GetBytes(value));
+            encoded = UrlEncodedContent.Escape(options.CommandLineTextBytes(value));
             return null;
         }
 
         string name = value[..split];
         if (value[split] == '=')
         {
-            encoded = NameAndEscapedContent(name, Encoding.UTF8.GetBytes(value[(split + 1)..]));
+            encoded = NameAndEscapedContent(name, options.CommandLineTextBytes(value[(split + 1)..]));
             return null;
         }
 
