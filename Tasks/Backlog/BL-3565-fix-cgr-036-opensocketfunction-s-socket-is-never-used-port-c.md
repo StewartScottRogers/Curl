@@ -4,7 +4,7 @@ title: Fix CGR-036: OPENSOCKETFUNCTION's socket is never used: PORT connects its
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3833]
 touches: [Curl.Engine.UnitLibrary/SocketCallbackConnector.cs, Curl.Engine.UnitTests/Cgr036Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -74,9 +74,11 @@ probe.exe C_45,C_46,C_47 2
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr036Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
+- 2026-10-26 (lane 7, first claim): the fix needs a seam outside Curl.Engine. `SocketCallbackConnector.ConnectAsync` calls `inner.ConnectAsync` first because the TCP sockets are opened inside `Curl.Networking`'s `AddressFamilyRace` (built in `TcpConnector.cs` ~2408) and nothing per transfer reaches it before a dial. Filed BL-3833 for a per-attempt socket-open hook on `ConnectTarget` (refuse, supply an OS socket handle, closed notice); this task then moves the open-socket, socket-option and close-socket callbacks into that hook. No code was changed in this claim.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
 ## Log
 
 - 2026-10-26: Created from CGR-036 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3833: the open-socket hook must reach Curl.Networking's address race before the connect
