@@ -557,8 +557,17 @@ public sealed class RedirectFollower(
         return namesScheme && !SchemesCurlParses.Contains(target[..colon].ToLowerInvariant());
     }
 
+    /// <summary>
+    /// Why curl 8.22.0 cannot parse <paramref name="target" />: no slash after its scheme
+    /// (<c>http:</c>, CGR-062), else what its authority holds.
+    /// </summary>
     private static string UnparsableUrlReason(string target)
     {
+        if (!target.AsSpan(target.IndexOf(':', StringComparison.Ordinal) + 1).StartsWith("/"))
+        {
+            return ProxyUrlParser.SlashesReason;
+        }
+
         ReadOnlySpan<char> authority = target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2);
         authority = authority[..IndexOrLength(authority, authority.IndexOfAny('/', '?', '#'))];
         authority = authority[(authority.LastIndexOf('@') + 1)..];

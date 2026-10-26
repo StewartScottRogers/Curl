@@ -57,17 +57,27 @@ internal static class HttpRedirectLocation
     /// <param name="requestUrl">The URL the request was sent to.</param>
     /// <param name="location">The non-empty <c>Location</c> value, without surrounding blanks.</param>
     /// <returns>The target URL as curl reports it.</returns>
-    internal static string Resolve(CurlUrl requestUrl, string location)
+    internal static string Resolve(CurlUrl requestUrl, string location) => Resolve(requestUrl, location, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Resolves a <c>Location</c> value against the request URL with the drive-letter rules of
+    /// the chosen platform, so both can be tested on either.
+    /// </summary>
+    /// <param name="requestUrl">The URL the request was sent to.</param>
+    /// <param name="location">The non-empty <c>Location</c> value, without surrounding blanks.</param>
+    /// <param name="driveLetters">Whether a <c>file</c> path may start with a drive letter, as on Windows.</param>
+    /// <returns>The target URL as curl reports it.</returns>
+    internal static string Resolve(CurlUrl requestUrl, string location, bool driveLetters)
     {
         if (HasScheme(location))
         {
-            return HeaderByteText.Mark(NormalizeAbsolute(location));
+            return HeaderByteText.Mark(NormalizeAbsolute(location, driveLetters));
         }
 
         string reference = Encode(location);
         if (reference.StartsWith("//", StringComparison.Ordinal))
         {
-            return NormalizeAbsolute(requestUrl.Scheme + ":" + reference);
+            return NormalizeAbsolute(requestUrl.Scheme + ":" + reference, driveLetters);
         }
 
         (string path, string query, string fragment) = Split(reference);
@@ -89,8 +99,12 @@ internal static class HttpRedirectLocation
     /// <summary>
     /// Lowercases an absolute URL's scheme and, when it names an authority, removes its dot
     /// segments and makes an empty path <c>/</c>; a value that is not a valid URL is kept whole.
+    /// As curl 8.22.0 does (CGR-062, ADR-0828): a scheme other than <c>file</c> followed by one or
+    /// three slashes names its host after them (<c>http:/b</c> is <c>http://b/</c>), and on
+    /// Windows a <c>file</c> URL whose path starts with a drive letter loses the slash before it
+    /// and its authority (<c>file:///c:/x</c> is <c>file://c:/x</c>).
     /// </summary>
-    private static string NormalizeAbsolute(string url)
+    private static string NormalizeAbsolute(string url, bool driveLetters)
     {
         // curl follows with CURLU_ALLOW_SPACE, so a space does not make the target invalid.
         if (!CurlUrl.TryParse(url.Replace(" ", "%20", StringComparison.Ordinal), pathAsIs: false, out _))
@@ -100,7 +114,7 @@ internal static class HttpRedirectLocation
 
         int colon = url.IndexOf(':', StringComparison.Ordinal);
         string scheme = url[..colon].ToLowerInvariant();
-        string rest = url[(colon + 1)..];
+        string rest = WithHostAfterSlashes(scheme, url[(colon + 1)..]);
         if (!rest.StartsWith("//", StringComparison.Ordinal))
         {
             return scheme + ":" + rest;
@@ -109,8 +123,22 @@ internal static class HttpRedirectLocation
         int authorityEnd = rest.IndexOfAny(AuthorityEnds, 2);
         int pathStart = authorityEnd < 0 ? rest.Length : authorityEnd;
         (string path, string query, string fragment) = Split(rest[pathStart..]);
-        return scheme + ":" + rest[..pathStart] + (path.Length == 0 ? "/" : RemoveDotSegments(path)) + query + fragment;
+        string normalizedPath = path.Length == 0 ? "/" : RemoveDotSegments(path);
+        return scheme + ":" + (StartsWithDrive(scheme, normalizedPath, driveLetters) ? "//" + normalizedPath[1..] : rest[..pathStart] + normalizedPath) + query + fragment;
     }
+
+    /// <summary>
+    /// The text after a URL's scheme and colon with the slashes before its host made two, for a
+    /// scheme other than <c>file</c> that has one or more; <paramref name="rest" /> otherwise.
+    /// </summary>
+    private static string WithHostAfterSlashes(string scheme, string rest) =>
+        scheme != "file" && rest.StartsWith('/') ? "//" + rest.TrimStart('/') : rest;
+
+    /// <summary>
+    /// Whether <paramref name="path" /> is a Windows <c>file</c> path naming a drive, <c>/c:/x</c>.
+    /// </summary>
+    private static bool StartsWithDrive(string scheme, string path, bool driveLetters) =>
+        driveLetters && scheme == "file" && path.Length > 2 && char.IsAsciiLetter(path[1]) && path[2] == ':';
 
     /// <summary>
     /// Splits a reference into its path, its query with the <c>?</c>, and its fragment with the
@@ -150,7 +178,9 @@ internal static class HttpRedirectLocation
 
     /// <summary>
     /// Removes <c>.</c> and <c>..</c> segments from a path that starts with <c>/</c>, as
-    /// RFC 3986 section 5.2.4 does; a trailing dot segment leaves a trailing <c>/</c>.
+    /// RFC 3986 section 5.2.4 does; a trailing dot segment leaves a trailing <c>/</c>. A dot
+    /// written <c>%2E</c> (any case) counts as one, as curl 8.22.0 sends <c>/a/%2e%2e/b</c> as
+    /// <c>/b</c> (CGR-062).
     /// </summary>
     private static string RemoveDotSegments(string path)
     {
@@ -158,7 +188,7 @@ internal static class HttpRedirectLocation
         List<string> kept = [];
         for (int index = 1; index < segments.Length; index++)
         {
-            string segment = segments[index];
+            string segment = segments[index].Replace("%2E", ".", StringComparison.OrdinalIgnoreCase);
             if (segment == "..")
             {
                 RemoveLast(kept);
@@ -170,7 +200,7 @@ internal static class HttpRedirectLocation
                 continue;
             }
 
-            kept.Add(segment);
+            kept.Add(segments[index]);
         }
 
         return "/" + string.Join('/', kept);
