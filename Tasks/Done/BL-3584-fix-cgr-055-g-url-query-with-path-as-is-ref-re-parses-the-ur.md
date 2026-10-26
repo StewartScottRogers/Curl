@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/QueryUrl.cs, Curl.Cli.UnitTests/Cgr055Tests.cs, Curl.Console.UnitTests/Cgr055Tests.cs, Curl.Console/CurlCommandRunner.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3584 — Fix CGR-055: -G/--url-query with --path-as-is: REF re-parses the URL and removes dot segments, but PORT keeps them
 
@@ -61,17 +61,28 @@ curl -sS --url-query a=b --path-as-is "http://127.0.0.1:20200/x/../y"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr055Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Measured 2026-10-26 with local curl 8.22.0 (Schannel) via Record-CurlExchange.ps1 on port 20601, `-sS ... --path-as-is -w %{url_effective}`; all exit 0, stderr empty:
+  - `-G -d a=b .../x/../y`: `GET /y?a=b`, url_effective `http://127.0.0.1:20601/y?a=b`.
+  - `--url-query a=b .../x/../y`: `GET /y?a=b`, same url_effective.
+  - `-G -d '' .../x/../y`: `GET /y`, `http://127.0.0.1:20601/y` (an empty query still re-parses).
+  - `--url-query a=b .../x/%2e%2e/y/./z`: `GET /y/z?a=b`.
+  - no query, `.../x/../y`: `GET /x/../y` (already matched; still matches).
+  Curl before the fix sent `GET /x/../y?a=b`; after it, every case above matches byte for byte (Curl.Console.UnitTests/Cgr055Tests.cs drives the runner over a ScriptedConnector; 4 of its 5 cases fail without the runner change).
+- Fix: `QueryUrl.KeepsPathAsIs(options)` is `--path-as-is` and no query to append, as curl's tool re-parses the URL without CURLU_PATH_AS_IS whenever it appends one; CurlCommandRunner uses it wherever it parsed or normalised the appended URL with `options.PathAsIs`. Matches measured curl, so no ADR.
+- Linux/macOS: the tests use loopback URLs only, platform-neutral; fast tests green here (Windows). Measure-CodeQuality -Library Curl.Cli.UnitLibrary,Curl.Console: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-055 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A -G or --url-query query under --path-as-is now removes dot segments as curl does
