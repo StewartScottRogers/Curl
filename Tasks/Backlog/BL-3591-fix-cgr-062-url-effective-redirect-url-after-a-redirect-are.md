@@ -4,7 +4,7 @@ title: Fix CGR-062: %{url_effective} / %{redirect_url} after a redirect are the 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3864]
 touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr062Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs, Curl.Protocol.Http.UnitTests/Cgr062Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -91,8 +91,18 @@ curl -sS[L] -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr062Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 3, first claim, no code edited): measured with `Record-CurlExchange.ps1` on Windows, REF = curl 8.22.0 Schannel (`/ucrt64/bin/curl`), PORT = Curl at c96dfaacc. Request `http://127.0.0.1:P/a/b`; first response `HTTP/1.1 302 Found\r\nLocation: X\r\nContent-Length: 0\r\n\r\n`, then `200` with `Content-Length: 0`. `-w W` with W = `'%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n'` unless said.
+  - X=`https:/x`, `-sS -L -w %{url_effective}`: REF exit 6 `https://x/`; PORT exit 6 `https:/x`. Stderr both `curl: (6) Could not resolve host: x`.
+  - X=`/a/%2e%2e/b`, `-sS -L -w %{url_effective}`: REF exit 0 `http://127.0.0.1:P/b`; PORT exit 0 `http://127.0.0.1:P/a/%2E%2E/b`. Both send `GET /b`.
+  - X=`http:/b`, `-L`: REF exit 6 `302 1 http://b/` (the -L line prints only three fields: redirect_url empty); PORT `302 1 http:/b`. Without `-L`: REF exit 0 `302 0 http://127.0.0.1:P/a/b http://b/`; PORT `... http:/b`.
+  - X=`file:///c:/windows/win.ini`, `-L`: REF exit 1 `302 1 file://c:/windows/win.ini`, `curl: (1) Protocol "file" is disabled (in redirect)`; PORT `file:///c:/...`. Without `-L`: REF `... file://c:/windows/win.ini`; PORT `file:///c:/...`. Windows only (report: Linux matches).
+  - X=`http://\xE9.invalid/b`: REF writes the single byte E9, PORT writes `C3 A9`, with and without `-L` (exit codes and stderr match). Split to BL-3864: it needs the redirect URL to carry which characters are header bytes across Http, Core and Output, which is too wide for this task's touches.
+  - X=`http:`: without `-L` both `302 0 http://127.0.0.1:P/a/b http:` (matches). With `-L`: both exit 3, `302 1 http://127.0.0.1:P/a/b`; REF stderr `...could not be parsed: Unsupported number of slashes following scheme`, PORT `...: Port number was not a decimal number between 0 and 65535`.
+  - Where the fixes land: `%{url_effective}` after a followed hop should be the parsed `CurlUrl`'s normalised text rather than the target string (`RedirectFollower`, `RedirectChain.Followed`, and the `ReachesTarget` refusal URL); `HttpRedirectLocation.NormalizeAbsolute` should give curl's normalised text for `scheme:/path` (`http://b/`) and Windows `file:///c:/` (`file://c:/`); `RedirectFollower.UnparsableUrlReason` needs the `Unsupported number of slashes following scheme` reason for `http:` (check `CurlUrl`'s parse failure for it). Measurement script used: a PowerShell loop over the cases calling `Record-CurlExchange.ps1 -Port P -Response <302>,<200> -Connections 2`.
+- Requeued behind BL-3864 (the E9 byte repro), so this task's first criterion can be met whole; no code was edited.
 
 ## Log
 
 - 2026-10-26: Created from CGR-062 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3864 (the raw E9 byte repro of CGR-062, which needs header-byte provenance across Http, Core and Output); measurements and fix sites are in Notes
