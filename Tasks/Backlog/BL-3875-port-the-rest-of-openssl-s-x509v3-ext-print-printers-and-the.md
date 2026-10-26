@@ -1,5 +1,5 @@
 ---
-id: BL-3871
+id: BL-3875
 title: Port the rest of OpenSSL's X509V3_EXT_print printers and the DSA and DH key records for %{certs}
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3871 — Port the rest of OpenSSL's X509V3_EXT_print printers and the DSA and DH key records for %{certs}
+# BL-3875 — Port the rest of OpenSSL's X509V3_EXT_print printers and the DSA and DH key records for %{certs}
 
 ## Goal
 

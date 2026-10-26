@@ -1,5 +1,5 @@
 ---
-id: BL-3872
+id: BL-3876
 title: CURLINFO_CERTINFO in the layout of the platform's curl build (OpenSSL records off Windows)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3872 — CURLINFO_CERTINFO in the layout of the platform's curl build (OpenSSL records off Windows)
+# BL-3876 — CURLINFO_CERTINFO in the layout of the platform's curl build (OpenSSL records off Windows)
 
 ## Goal
 
