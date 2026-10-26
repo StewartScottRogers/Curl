@@ -75,15 +75,24 @@ public sealed class HandBuiltKerberosSourcesTests
     }
 
     [TestMethod]
-    public void CreateKdcClient_Configuration_MakesAClient()
+    public async Task CreateKdcClient_Configuration_MakesAClientThatContactsTheConfiguredKdcThroughTheTransport()
     {
-        Diagnostics.Arrange("configuration", "KerberosConfiguration.Empty");
+        MemoryFiles files = new() { ["/etc/krb5.conf"] = "[realms]\n EXAMPLE.TEST = {\n kdc = kdc.example.test:750\n }\n" };
+        UnreachableKdc transport = new();
+        HandBuiltKerberosSources sources = new(files, new NoFileWriter(), _ => null, () => 1000, new NoSrvRecords(), transport, new RecordingProxy(), TimeProvider.System);
+        KerberosKdcClient client = sources.CreateKdcClient(sources.ReadConfiguration());
+        using CredentialCache cache = new(null, new KerberosPrincipal(1, Realm, ["alice"]), [TicketGrantingTicket()]);
+        Diagnostics.Arrange("kdc", "kdc.example.test:750");
 
-        KerberosKdcClient client = Sources(new MemoryFiles(), _ => null).CreateKdcClient(KerberosConfiguration.Empty);
-        Diagnostics.Act("client is null", client is null);
+        KerberosKdcException failure = await Assert.ThrowsExactlyAsync<KerberosKdcException>(
+            () => client.GetServiceTicketAsync(new KerberosPrincipal(3, Realm, ["HTTP", "server.example.test"]), cache, CancellationToken.None));
+        Diagnostics.Act("failure error", failure.Error);
+        Diagnostics.Act("contacted", string.Join("|", transport.Contacted));
 
-        Diagnostics.Assert("client is null", false, client is null);
-        Assert.IsNotNull(client);
+        Diagnostics.Assert("failure error", KerberosKdcError.KdcUnreachable, failure.Error);
+        Assert.AreEqual(KerberosKdcError.KdcUnreachable, failure.Error);
+        Diagnostics.Assert("contacted", "kdc.example.test:750", string.Join("|", transport.Contacted.Distinct()));
+        CollectionAssert.AreEqual(new[] { "kdc.example.test:750" }, transport.Contacted.Distinct().ToArray());
     }
 
     [TestMethod]
@@ -134,13 +143,22 @@ public sealed class HandBuiltKerberosSourcesTests
             Task.FromResult<IReadOnlyList<KerberosSrvRecord>>([]);
     }
 
+    /// <summary>A KDC transport that records each KDC it is asked to reach as <c>host:port</c> and never reaches it.</summary>
     private sealed class UnreachableKdc : IKerberosKdcTransport
     {
-        public Task<byte[]> ExchangeDatagramAsync(string host, int port, ReadOnlyMemory<byte> request, CancellationToken cancellationToken) =>
-            throw new IOException("unreachable");
+        public List<string> Contacted { get; } = [];
 
-        public Task<Stream> ConnectStreamAsync(string host, int port, CancellationToken cancellationToken) =>
+        public Task<byte[]> ExchangeDatagramAsync(string host, int port, ReadOnlyMemory<byte> request, CancellationToken cancellationToken)
+        {
+            Contacted.Add($"{host}:{port}");
             throw new IOException("unreachable");
+        }
+
+        public Task<Stream> ConnectStreamAsync(string host, int port, CancellationToken cancellationToken)
+        {
+            Contacted.Add($"{host}:{port}");
+            throw new IOException("unreachable");
+        }
     }
 
     private static CachedCredential TicketGrantingTicket() => new()
