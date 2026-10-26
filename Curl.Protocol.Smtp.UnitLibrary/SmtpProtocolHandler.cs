@@ -210,8 +210,10 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
                 Trace = trace,
             };
 
-            // curl decodes the path once connected, so a malformed one still costs a connect.
-            TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain
+            // curl reads the login options and decodes the path once connected, so malformed
+            // ones still cost a connect (CGR-104).
+            TransferResult result = SmtpSaslAuthentication.AreLoginOptionsValid(context.Mail?.LoginOptions ?? url.Options)
+                && SmtpEhloDomain.Read(url, localHostName) is { } domain
                 ? await RunSessionAsync(channel, context, connectPhase, domain, implicitTls, connectEvents.Opened, KeptConnectionOf(connected, loginKey, context)).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
             ReportConnectionEnd(context.Events, result, channel, target, connected.ConnectionNumber);
