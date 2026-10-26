@@ -76,3 +76,4 @@ curl -s -d $'\xff' URL
 - 2026-10-26: Created from CGR-016 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Split for size: waits on BL-3849, BL-3850, BL-3851, BL-3852 and BL-3853 (raw argv bytes on Linux and macOS, then body, headers and cookies, URL, -w and -o paths)
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
