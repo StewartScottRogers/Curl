@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr005Tests.cs]
+touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr005Tests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTlsTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3534 — Fix CGR-005: FTPS with PROT P in passive mode hangs: PORT does the data-connection TLS handshake before sending TYPE/SIZE/RETR, deadlocking with serve...
 
@@ -81,17 +81,29 @@ E\verify\vlin.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr005Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Fix (ADR-0815): `FtpSession` no longer runs the TLS handshake right after a passive (`EPSV`/`PASV`) data dial; `ReadyDataConnectionAsync` runs it after the transfer command is answered, in passive mode as in active mode. A concurrent handshake (closer to curl's non-blocking one) was rejected: its `-v` lines would come from a second thread in no fixed order.
+- `touches` widened by `Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTlsTests.cs`: two tests there pinned the old order (handshake before `TYPE I`; a failed data handshake after `EPSV`). No other task in Doing on `origin/work/dark-factory` names an FTP file.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1 -Ftp -FtpData 'hello ftp'`, whose server starts data TLS only after `RETR`/`LIST` (the vsftpd ordering the issue needs). REF is curl 8.22.0 Schannel; PORT is `Curl.Console\bin\Debug\net10.0\curl.exe` with the fix. Each pair is identical: exit 0, stdout `hello ftp`, stderr empty, and the same commands on the wire:
+  - `-sS -k --ssl-reqd ftp://127.0.0.1:<p>/file.txt`: AUTH SSL, USER, PASS, PBSZ 0, PROT P, PWD, EPSV, TYPE I, SIZE file.txt, RETR file.txt, QUIT.
+  - `-sS -k ftps://127.0.0.1:<p>/file.txt` (`-Tls`, implicit): the same without AUTH SSL.
+  - `-sS -k --ssl-reqd --disable-epsv ftp://...`: PASV in place of EPSV.
+  - `-sS -k --ssl ftp://127.0.0.1:<p>/` (directory LIST): ... EPSV, TYPE A, LIST, QUIT.
+  - The Linux (OpenSSL) build was not measured. The change is platform-neutral and the unit tests use no platform-specific paths or text.
+- Under `-v` the data connection's `schannel:` lines differ from curl's step-by-step ones, before this change and after it; this is not part of the issue's `-sS` repro (ADR-0815, Consequences).
+- Focused tests: `Cgr005Tests` (EPSV and PASV) check the control bytes sent by the time the data handshake starts. Before the fix that text ended at `EPSV`/`PASV`, which the old `ExecuteAsync_PassiveProtP_RunsTheDataHandshakeBeforeTypeI` pinned; after it, it ends with `RETR a.txt`.
+- `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-005 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. FTPS with PROT P in passive mode sends TYPE, SIZE and RETR before the data TLS handshake, so vsftpd/proftpd-style servers no longer deadlock
