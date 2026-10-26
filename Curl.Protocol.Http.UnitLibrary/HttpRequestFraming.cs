@@ -235,11 +235,22 @@ internal sealed class HttpRequestFraming
 
         if (options.Body is not { } body)
         {
-            return new HttpRequestFraming(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), null, null, false, false, false);
+            return OfNoBody(options.CustomMethod ?? (noBody ? "HEAD" : "GET"), customHeaders);
         }
 
         return OfBody(options.CustomMethod ?? "POST", body, customHeaders, IsHttp10(options), rangeText: DataRangeOf(body, rangeText), convertLineEndings: convertLineEndings);
     }
+
+    /// <summary>
+    /// Decides the framing for a request with no body. When the first <c>Transfer-Encoding</c>
+    /// <c>-H</c> value asks for <c>chunked</c>, curl 8.22.0 still sends the body's last chunk,
+    /// <c>0\r\n\r\n</c>, after the head (measured, CGR-068, BL-3597 Notes), so the request then
+    /// carries an empty chunked body with no <c>Content-Type</c>.
+    /// </summary>
+    private static HttpRequestFraming OfNoBody(string method, HttpCustomHeader[] customHeaders) =>
+        AsksForChunked(customHeaders)
+            ? new HttpRequestFraming(method, new BytesBody(ReadOnlyMemory<byte>.Empty, string.Empty), 0, true, false, false)
+            : new HttpRequestFraming(method, null, null, false, false, false);
 
     /// <summary>
     /// Tells whether the request goes out as HTTP/1.0: for <c>-0</c>, or after an earlier hop's
