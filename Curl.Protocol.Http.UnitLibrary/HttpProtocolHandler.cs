@@ -2486,7 +2486,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static TransferResult Succeeded(HttpBodyDelivery delivery, HttpResponseHead head, TransferReport report)
     {
-        long? lastModified = HttpLastModified.Find(head);
+        long? lastModified = HttpLastModified.FindFileTime(head);
         return delivery == HttpBodyDelivery.TimeConditionUnmet
             ? TransferResult.TimeConditionNotMet() with { SourceLastWriteUnixSeconds = lastModified, Report = report with { ResponseCode = 304 } }
             : TransferResult.Success(report.DownloadSize) with { SourceLastWriteUnixSeconds = lastModified, Report = report };

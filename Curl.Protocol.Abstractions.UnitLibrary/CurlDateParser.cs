@@ -160,6 +160,33 @@ public static class CurlDateParser
     /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
     public static bool TryParse(string text, out long unixSeconds)
     {
+        bool parsed = TryReadUnixSeconds(text, out unixSeconds);
+        unixSeconds = unixSeconds == -1 ? 0 : unixSeconds;
+        return parsed;
+    }
+
+    /// <summary>
+    /// Reads a response header's date as curl 8.22.0 reads <c>Last-Modified</c> into its document
+    /// time: a date <see cref="TryParse"/> accepts gives its instant, and text it refuses gives 0,
+    /// the epoch. Unlike <see cref="TryParse"/>, the instant one second before the epoch stays -1,
+    /// which curl then treats as no time at all.
+    /// </summary>
+    /// <remarks>
+    /// Measured on curl 8.22.0 (Windows) on 2026-10-26 through <c>-R</c> and <c>-z</c> (BL-3576,
+    /// ADR-0821): <c>Last-Modified: garbage</c> sets the downloaded file's time to the epoch, and
+    /// <c>Wed, 31 Dec 1969 23:59:59 GMT</c> leaves it at the download time.
+    /// </remarks>
+    /// <param name="text">The header's value.</param>
+    /// <returns>The instant in seconds since the Unix epoch, or 0 when the text is not a date.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
+    public static long ParseOrEpoch(string text) => TryReadUnixSeconds(text, out long unixSeconds) ? unixSeconds : 0;
+
+    /// <summary>
+    /// Reads <paramref name="text"/> as <see cref="TryParse"/> documents, keeping the instant one
+    /// second before the epoch as -1.
+    /// </summary>
+    private static bool TryReadUnixSeconds(string text, out long unixSeconds)
+    {
         ArgumentNullException.ThrowIfNull(text);
 
         DateParts parts = new();
@@ -418,9 +445,8 @@ public static class CurlDateParser
         }
 
         /// <summary>
-        /// Turns the fields into seconds since the Unix epoch, as <c>parsedate</c> and
-        /// <c>Curl_getdate_capped</c> finish: a year before <see cref="EarliestYear"/> is refused, and
-        /// a real -1, which curl's failure value would hide, moves to 0.
+        /// Turns the fields into seconds since the Unix epoch, as <c>parsedate</c> finishes: a year
+        /// before <see cref="EarliestYear"/> is refused.
         /// </summary>
         public bool TryGetUnixSeconds(out long unixSeconds)
         {
@@ -435,8 +461,7 @@ public static class CurlDateParser
                 return false;
             }
 
-            long seconds = SecondsSinceEpoch() + ZoneSecondsOrZero();
-            unixSeconds = seconds == -1 ? 0 : seconds;
+            unixSeconds = SecondsSinceEpoch() + ZoneSecondsOrZero();
             return true;
         }
 
