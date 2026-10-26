@@ -31,8 +31,8 @@ internal static class CurlUrlParser
     /// user information in the authority is rejected before its host and port are checked. With
     /// <paramref name="allowEmptyHost" />, as libcurl's <c>CURLU_NO_AUTHORITY</c>, at most two
     /// slashes follow the scheme and an empty authority is an empty host. With
-    /// <paramref name="keepFileBackslashes" />, as libcurl's own <c>parse_file</c>, a <c>file</c> URL's
-    /// backslashes stay as typed; without it they become slashes after <c>file://</c>, as the curl tool's do.
+    /// <paramref name="keepFileBackslashes" /> nothing changes: a <c>file</c> URL's backslashes stay as typed
+    /// either way, as both libcurl's <c>parse_file</c> and the curl tool keep them (BL-3589); BL-3862 removes it.
     /// With <paramref name="fileSchemeWithoutSlash" />, as <c>Curl_is_absolute_url</c> when it does not guess
     /// schemes, text starting <c>file:</c> is a <c>file</c> URL even with no <c>/</c> after the colon.
     /// With <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a host name that
@@ -62,7 +62,8 @@ internal static class CurlUrlParser
             return ParseWithAuthority(text, scheme, new AuthorityRules(pathAsIs, disallowUser, allowEmptyHost, refuseUnconvertibleName), out rejection);
         }
 
-        CurlUrl? url = ParseFile(text, pathAsIs, driveLetters, keepFileBackslashes);
+        _ = keepFileBackslashes;
+        CurlUrl? url = ParseFile(text, pathAsIs, driveLetters);
         rejection = url is null ? CurlUrlRejection.BadFileUrl : CurlUrlRejection.None;
 
         return url;
@@ -171,10 +172,10 @@ internal static class CurlUrlParser
     /// <c>file:./</c>, <c>file:?q</c> and <c>file:#f</c> are rejected (lib1560; the curl tool,
     /// measured, exits 3 for each).
     /// </summary>
-    private static CurlUrl? ParseFile(string text, bool pathAsIs, bool driveLetters, bool keepBackslashes)
+    private static CurlUrl? ParseFile(string text, bool pathAsIs, bool driveLetters)
     {
         string afterScheme = text[(FileScheme.Length + 1)..];
-        string? rest = afterScheme.Length < 2 ? null : SkipFileAuthority(afterScheme, keepBackslashes);
+        string? rest = afterScheme.Length < 2 ? null : SkipFileAuthority(afterScheme);
         string? path = rest is null || !StartsAsFilePath(rest) ? null : ApplyDriveLetterRule(rest, driveLetters);
 
         return path is null ? null : Build(text, FileScheme, CurlUrlAuthority.None, path, pathAsIs);
@@ -198,13 +199,13 @@ internal static class CurlUrlParser
     }
 
     /// <summary>
-    /// Returns what follows <c>file:</c> with its backslashes converted and its
-    /// authority, if any, skipped, or <see langword="null" /> when the authority is not
-    /// one curl accepts. With <paramref name="keepBackslashes" /> the backslashes stay as typed.
+    /// Returns what follows <c>file:</c> with its authority, if any, skipped, or
+    /// <see langword="null" /> when the authority is not one curl accepts. Backslashes stay
+    /// as typed, so <c>file://\server</c> has the authority <c>\server</c> and is rejected
+    /// (curl 8.21.0 Schannel, measured, BL-3589).
     /// </summary>
-    private static string? SkipFileAuthority(string rest, bool keepBackslashes)
+    private static string? SkipFileAuthority(string rest)
     {
-        rest = ConvertBackslashesAfterDoubleSlash(rest, keepBackslashes);
         bool hasAuthority = rest.StartsWith("//", StringComparison.Ordinal);
         if (hasAuthority)
         {
@@ -240,28 +241,6 @@ internal static class CurlUrlParser
     private static bool IsDriveSeparator(char character) => character == ':' || character == '|';
 
     private static bool IsSlash(char character) => character == '/' || character == '\\';
-
-    /// <summary>
-    /// Turns each <c>\</c> before the first <c>?</c> or <c>#</c> into <c>/</c> when the
-    /// text after <c>file:</c> starts with <c>//</c>, as curl 8.21.0 on Windows was
-    /// measured to do for a <c>file</c> URL; after a single slash, or with <paramref name="keepBackslashes" />,
-    /// they stay as typed.
-    /// </summary>
-    private static string ConvertBackslashesAfterDoubleSlash(string text, bool keepBackslashes)
-    {
-        if (keepBackslashes || !text.StartsWith("//", StringComparison.Ordinal))
-        {
-            return text;
-        }
-
-        int end = text.AsSpan().IndexOfAny('?', '#');
-        if (end < 0)
-        {
-            end = text.Length;
-        }
-
-        return string.Concat(text[..end].Replace('\\', '/'), text.AsSpan(end));
-    }
 
     /// <summary>
     /// Splits the fragment at the first <c>#</c> and the query at the first <c>?</c>

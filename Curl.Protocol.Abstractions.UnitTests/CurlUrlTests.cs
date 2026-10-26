@@ -135,8 +135,8 @@ public sealed class CurlUrlTests
     [DataRow("file:///c|/x", false, "c|/x")]
     [DataRow("file:////server/share", false, "//server/share")]
     [DataRow("file:////server/../x", false, "//x")]
-    [DataRow("file:///C:/dir\\..\\x", false, "C:/x")]
-    [DataRow("file:///C:/dir\\..\\x", true, "C:/dir/../x")]
+    [DataRow("file:///C:/dir\\..\\x", false, "C:/dir\\..\\x")]
+    [DataRow("file:///C:/dir\\..\\x", true, "C:/dir\\..\\x")]
     [DataRow("file://C:", false, "C:")]
     [DataRow("file:///C:", false, "C:")]
     [DataRow("file:///Q:dir/../x", false, "/x")]
@@ -230,12 +230,9 @@ public sealed class CurlUrlTests
     [DataRow("file:/C:/nope", "C:/nope")]
     [DataRow("file:///", "/")]
     [DataRow("file:///C:/a/%2e%2e/nope", "C:/nope")]
-    [DataRow("file:///C:\\x\\y", "C:/x/y")]
-    [DataRow("file://\\C:/x", "C:/x")]
+    [DataRow("file:///C:\\x\\y", "C:\\x\\y")]
     [DataRow("file:/\\C:/x", "/\\C:/x")]
     [DataRow("file:/C:\\x", "C:\\x")]
-    [DataRow("file://\\\\C:/x", "//C:/x")]
-    [DataRow("file://\\server\\share", "/server/share")]
     public void TryParse_WithAFileUrl_KeepsThePathCurlKeepsOnWindows(string text, string path)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);

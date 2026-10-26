@@ -513,10 +513,10 @@ public sealed class FileUrlPathTests
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
 
-    // curl 8.21.0 opens C:/secret.txt for file:///C:/dir\..\secret.txt: every backslash
-    // becomes a slash, and only then are the dot segments removed.
+    // curl 8.21.0 (Schannel) and 8.18.0 (mingw) quote file:///C:/dir\..\secret.txt as
+    // C:/dir\..\secret.txt: a backslash stays as typed and is no separator for dot segments (BL-3589).
     [TestMethod]
-    public void TryParse_BackslashDotDotSegments_ResolveBeforeTheOpen()
+    public void TryParse_BackslashDotDotSegments_StayAsTyped()
     {
         Diagnostics.Arrange("url", @"file:///tmp/dir\..\secret.txt");
         var url = CurlUrl.Parse(@"file:///tmp/dir\..\secret.txt");
@@ -528,16 +528,16 @@ public sealed class FileUrlPathTests
         Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
-        Diagnostics.Assert("url path", "/tmp/secret.txt", path.UrlPath);
-        Diagnostics.Assert("os path", "/tmp/secret.txt", Slashed(path.OsPath));
-        Assert.AreEqual("/tmp/secret.txt", path.UrlPath);
-        Assert.AreEqual(NativePath("/tmp/secret.txt"), path.OsPath);
+        Diagnostics.Assert("url path", @"/tmp/dir\..\secret.txt", path.UrlPath);
+        Diagnostics.Assert("os path", Slashed(NativePath(@"/tmp/dir\..\secret.txt")), Slashed(path.OsPath));
+        Assert.AreEqual(@"/tmp/dir\..\secret.txt", path.UrlPath);
+        Assert.AreEqual(NativePath(@"/tmp/dir\..\secret.txt"), path.OsPath);
     }
 
-    // /tmp/b holds only if the backslash became a separator before the .. was resolved:
-    // resolved first, "a\.." is one ordinary segment and the path would stay /tmp/a\../b.
+    // The backslash is no separator, so "a\.." is one ordinary segment and the path stays
+    // /tmp/a\../b, as curl keeps it (BL-3589).
     [TestMethod]
-    public void TryParse_BackslashBeforeDotDot_BecomesASeparatorBeforeTheDotDotIsResolved()
+    public void TryParse_BackslashBeforeDotDot_IsPartOfAnOrdinarySegment()
     {
         Diagnostics.Arrange("url", @"file:///tmp/a\../b");
         var url = CurlUrl.Parse(@"file:///tmp/a\../b");
@@ -549,10 +549,10 @@ public sealed class FileUrlPathTests
         Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
-        Diagnostics.Assert("url path", "/tmp/b", path.UrlPath);
-        Diagnostics.Assert("os path", "/tmp/b", Slashed(path.OsPath));
-        Assert.AreEqual("/tmp/b", path.UrlPath);
-        Assert.AreEqual(NativePath("/tmp/b"), path.OsPath);
+        Diagnostics.Assert("url path", @"/tmp/a\../b", path.UrlPath);
+        Diagnostics.Assert("os path", Slashed(NativePath(@"/tmp/a\../b")), Slashed(path.OsPath));
+        Assert.AreEqual(@"/tmp/a\../b", path.UrlPath);
+        Assert.AreEqual(NativePath(@"/tmp/a\../b"), path.OsPath);
     }
 
     [TestMethod]
@@ -780,8 +780,7 @@ public sealed class FileUrlPathTests
     [DataRow("file:////server/share/../../../x", "/x")]
     [DataRow("file://localhost/tmp/dir/../nosuch.txt", "/tmp/nosuch.txt")]
     [DataRow("file:///tmp/dir/..?q=1", "/tmp/")]
-    [DataRow(@"file://localhost\tmp/dir/../nosuch.txt", "/tmp/nosuch.txt")]
-    [DataRow(@"file:///tmp\dir\..\nosuch.txt", "/tmp/nosuch.txt")]
+    [DataRow(@"file:///tmp\dir\..\nosuch.txt", @"/tmp\dir\..\nosuch.txt")]
     public void TryParse_DotSegments_AreRemovedAsCurlQuotesThem(string urlText, string expected)
     {
         Diagnostics.Arrange("url", urlText);
@@ -795,7 +794,7 @@ public sealed class FileUrlPathTests
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
         Diagnostics.Assert("url path", expected, path.UrlPath);
-        Diagnostics.Assert("os path", expected, Slashed(path.OsPath));
+        Diagnostics.Assert("os path", Slashed(NativePath(expected)), Slashed(path.OsPath));
         Assert.AreEqual(expected, path.UrlPath);
         Assert.AreEqual(NativePath(expected), path.OsPath);
     }
@@ -810,8 +809,7 @@ public sealed class FileUrlPathTests
     [DataRow("file:///C|/dir/../nosuch.txt", "C|/nosuch.txt")]
     [DataRow("file://localhost/C:/dir/../nosuch.txt", "C:/nosuch.txt")]
     [DataRow("file:///C:/dir/..?q=1", "C:/")]
-    [DataRow(@"file://localhost\C:/dir/../nosuch.txt", "C:/nosuch.txt")]
-    [DataRow(@"file:///C:\dir\..\nosuch.txt", "C:/nosuch.txt")]
+    [DataRow(@"file:///C:\dir\..\nosuch.txt", @"C:\dir\..\nosuch.txt")]
     public void TryParse_DotSegmentsAfterADrive_AreRemovedAsCurlQuotesThem(
         string urlText,
         string expected)
@@ -827,7 +825,7 @@ public sealed class FileUrlPathTests
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
         Diagnostics.Assert("url path", expected, path.UrlPath);
-        Diagnostics.Assert("os path", expected, Slashed(path.OsPath));
+        Diagnostics.Assert("os path", Slashed(NativePath(expected)), Slashed(path.OsPath));
         Assert.AreEqual(expected, path.UrlPath);
         Assert.AreEqual(NativePath(expected), path.OsPath);
     }
@@ -894,10 +892,10 @@ public sealed class FileUrlPathTests
         Assert.AreEqual(NativePath("/tmp/x"), path.OsPath);
     }
 
-    // curl 8.21.0 with --path-as-is quotes file:///C:/dir\..\x as C:/dir/../x: the dot
-    // segments survive, the backslashes do not.
+    // curl 8.21.0 with --path-as-is quotes file:///C:/dir\..\x as C:/dir\..\x: the dot
+    // segments and the backslashes survive (BL-3589).
     [TestMethod]
-    public void TryParse_PathAsIs_KeepsDotDotButStillConvertsBackslashes()
+    public void TryParse_PathAsIs_KeepsDotDotAndBackslashes()
     {
         Diagnostics.Arrange("url", @"file:///tmp/dir\..\x (path as is)");
         var url = CurlUrl.Parse(@"file:///tmp/dir\..\x", pathAsIs: true);
@@ -909,10 +907,10 @@ public sealed class FileUrlPathTests
         Diagnostics.Act("os path", Slashed(path?.OsPath));
         Assert.IsTrue(parsed);
         Assert.IsNotNull(path);
-        Diagnostics.Assert("url path", "/tmp/dir/../x", path.UrlPath);
-        Diagnostics.Assert("os path", "/tmp/dir/../x", Slashed(path.OsPath));
-        Assert.AreEqual("/tmp/dir/../x", path.UrlPath);
-        Assert.AreEqual(NativePath("/tmp/dir/../x"), path.OsPath);
+        Diagnostics.Assert("url path", @"/tmp/dir\..\x", path.UrlPath);
+        Diagnostics.Assert("os path", Slashed(NativePath(@"/tmp/dir\..\x")), Slashed(path.OsPath));
+        Assert.AreEqual(@"/tmp/dir\..\x", path.UrlPath);
+        Assert.AreEqual(NativePath(@"/tmp/dir\..\x"), path.OsPath);
     }
 
     [TestMethod]
