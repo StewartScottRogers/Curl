@@ -4,8 +4,8 @@ title: Fix CGR-072: --location-trusted with Digest reuses the previous host's no
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitTests/Cgr072Tests.cs]
+depends-on: [BL-3867]
+touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr072Tests.cs, Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitTests/Cgr072Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -72,8 +72,10 @@ curl -sSL --location-trusted --digest -u user:pass http://127.0.0.1:20500/a
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr072Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 8, before any edit): The cause is not in `DigestAuthenticator`, which cannot see the previous host (a sent value carries only the uri). `Curl.Core.UnitLibrary/RedirectFollower.cs:255` passes the previous hop's `DigestAuthorizationSent` as `KeptDigestAuthorization` to every hop that may be sent credentials, which with `--location-trusted` includes another host or port; `HttpProtocolHandler.RepeatKeptDigestAuthorization` then sends it with `nc=00000002` before any challenge, and the 401 to that kept answer is taken as a refusal. Fix: keep `KeptDigestAuthorization` only when `IsSameOrigin(hop.Url, next)` (scheme, host and port), whatever `--location-trusted` says; the anyauth variant needs nothing more, as Digest never answers before a challenge. Focused test in `Curl.Core.UnitTests/Cgr072Tests.cs` (a trusted redirect to another host and to another port sends no kept Digest value; same origin still does, test1286). `touches` changed to `RedirectFollower.cs` and that test file (the Authentication entries kept, unneeded); BL-3867 in Doing on origin/work/dark-factory holds `RedirectFollower.cs`, so `depends-on: [BL-3867]` and back to Backlog. Still to do: measure real curl with `Record-CurlExchange.ps1` for the three repro variants and record both results here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-072 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3867, which holds Curl.Core.UnitLibrary/RedirectFollower.cs where the kept Digest answer must be limited to same-origin hops
