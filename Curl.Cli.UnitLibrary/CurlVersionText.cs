@@ -23,7 +23,7 @@ public static class CurlVersionText
     /// and <c>ipfs</c>/<c>ipns</c>, which the tool serves by rewriting to a gateway as curl does and which
     /// every curl 8.21.0 build lists (ADR-0021 amendment, BL-1417). The same line on every platform.
     /// No <c>smb</c> or <c>smbs</c>: neither the Schannel reference build nor the OpenSSL reference build of
-    /// curl 8.22.0 lists them, and <c>smb://</c> and <c>smbs://</c> URLs are refused as disabled (ADR-0453, ADR-0523, ADR-0829).
+    /// curl 8.22.0 lists them, and <c>smb://</c> and <c>smbs://</c> URLs are refused as disabled (ADR-0453, ADR-0523, ADR-0835).
     /// </summary>
     public const string ProtocolsLine = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
 

@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Conformance;
 
 // Upstream's smb server, smbserver.py, on %SMBPORT (BL-2860). The platform does not report the smb protocol, as curl 8.22.0's
-// reference builds and Curl have none, so upstream's smb cases are skipped (ADR-0829).
+// reference builds and Curl have none, so upstream's smb cases are skipped (ADR-0835).
 internal sealed class UpstreamSmbFront : UpstreamStandInFront
 {
     public override UpstreamStandInStage Stage => UpstreamStandInStage.Gopher;

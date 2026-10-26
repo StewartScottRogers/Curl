@@ -8,7 +8,7 @@ namespace Curl.Engine;
 /// <summary>
 /// Pins CGR-043 part 1 (BL-3887) through the composed handlers: curl 8.22.0 (Schannel, Windows), measured on
 /// 2026-10-26, answers <c>curl -sS smb://127.0.0.1:20002/share/x</c> with exit 1 and
-/// <c>curl: (1) Protocol "smb" is disabled</c>, <c>smbs://</c> the same, and connects nowhere (ADR-0829).
+/// <c>curl: (1) Protocol "smb" is disabled</c>, <c>smbs://</c> the same, and connects nowhere (ADR-0835).
 /// </summary>
 [TestClass]
 public sealed class Cgr043SmbUrlTests

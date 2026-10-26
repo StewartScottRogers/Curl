@@ -533,4 +533,4 @@ Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransf
 
 ## smb and smbs disabled (BL-3887)
 
-`CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0829). `Curl.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.
+`CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0835). `Curl.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.

@@ -172,7 +172,7 @@ public sealed class SmbServerConnectorTests
     }
 
     // Runs each URL through Curl's SMB handler as user curltest, as curl -u curltest:curltest did before
-    // curl 8.22.0's reference builds turned smb off (ADR-0829), stopping at the first failure.
+    // curl 8.22.0's reference builds turned smb off (ADR-0835), stopping at the first failure.
     private static async Task<(int ExitCode, string Output, string Error)> RunSmbAsync(string sections, Stream? upload, params string[] urls)
     {
         SmbProtocolHandler handler = new(new SmbServerConnector(ParsedTestCase.From(sections), new RecordingConnector()));

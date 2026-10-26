@@ -1,4 +1,4 @@
-# ADR-0829 — `smb` and `smbs` are disabled, as in curl 8.22.0's reference builds
+# ADR-0835 — `smb` and `smbs` are disabled, as in curl 8.22.0's reference builds
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

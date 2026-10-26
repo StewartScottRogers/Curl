@@ -46,7 +46,7 @@ internal static partial class EngineComposition
     /// (ADR-0128); <c>rtsp</c> over <paramref name="connector" />, sending one <c>OPTIONS *</c>
     /// request per transfer with a pre-emptive <c>Authorization</c> from the same authenticator
     /// (ADR-0169); <c>smb</c> and <c>smbs</c> refused as disabled, as curl 8.22.0's reference builds leave them out
-    /// (ADR-0829); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
+    /// (ADR-0835); <c>scp</c> and <c>sftp</c> over <paramref name="connector" />, reading the known-hosts
     /// and key files from the disk and offering the Windows curl's libssh2 algorithms on Windows and the
     /// OpenSSL build's elsewhere (ADR-0122); and <c>tftp</c> over
     /// <paramref name="datagramConnector" />, sending its MASQUE request through an HTTP or HTTPS

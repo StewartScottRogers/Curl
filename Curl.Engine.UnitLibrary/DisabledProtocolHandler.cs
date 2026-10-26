@@ -6,7 +6,7 @@ namespace Curl.Engine;
 /// Refuses every transfer for <paramref name="schemes" />, schemes curl knows by name but its reference
 /// builds leave out, with exit 1 (<see cref="CurlExitCode.UnsupportedProtocol" />) and
 /// <c>Protocol "&lt;scheme&gt;" is disabled</c>, before any connection, as curl 8.22.0 refuses
-/// <c>smb://</c> and <c>smbs://</c> (measured, BL-3887 Notes; ADR-0829).
+/// <c>smb://</c> and <c>smbs://</c> (measured, BL-3887 Notes; ADR-0835).
 /// </summary>
 /// <param name="schemes">The disabled schemes, lowercase.</param>
 internal sealed class DisabledProtocolHandler(IReadOnlyCollection<string> schemes) : IProtocolHandler

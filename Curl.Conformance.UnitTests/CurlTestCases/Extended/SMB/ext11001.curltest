@@ -9,7 +9,7 @@ SMB disabled
 
 # The reference curl (8.22.0, Schannel build, measured 2026-10-26 for BL-3887) is built without SMB:
 # curl -sS smb://127.0.0.1:20002/share/x exits 1 with curl: (1) Protocol "smb" is disabled, connecting
-# nowhere, and Curl does the same (ADR-0829).
+# nowhere, and Curl does the same (ADR-0835).
 
 # Client-side
 <client>

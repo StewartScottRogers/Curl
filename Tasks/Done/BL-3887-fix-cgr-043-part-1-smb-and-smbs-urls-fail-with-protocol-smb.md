@@ -37,7 +37,7 @@ Part 1 of 3 split from BL-3572 (CGR-043 of `Documentation/Reviews/Curl-Gap-Repor
   `curl -sS smbs://127.0.0.1:20002/share/x` -> both exit 1, stdout 0 bytes, stderr `curl: (1) Protocol "smbs" is disabled`;
   `-v smb://...` -> both `* Protocol "smb" is disabled` then the `curl: (1)` line. No connection is opened: the refusal
   comes before any connect, which `Cgr043SmbUrlTests` pins with a recording connector that sees no target.
-- Fix (ADR-0829, renumbered from the stash's ADR-0819, which other lanes took): `EngineComposition` serves smb and smbs with
+- Fix (ADR-0835, renumbered from the stash's ADR-0819, which other lanes took): `EngineComposition` serves smb and smbs with
   `DisabledProtocolHandler` (from the BL-3572 stash). The SMB end-to-end tests that drove Curl's SMB client through the
   composed curl went with it (ext11002-ext11005, `UpstreamConformanceTests.SmbCases.cs`,
   `CurlCommandRunnerSmbTransferEventTests.cs`); ext11001 now pins the refusal, upstream 1451 and 1850 leave the ratchet
