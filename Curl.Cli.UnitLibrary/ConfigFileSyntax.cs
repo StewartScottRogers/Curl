@@ -11,7 +11,8 @@ namespace Curl.Cli;
 /// <remarks>
 /// The rules, ported from the source and each measured with the local curl 8.21.0 on 2026-09-26:
 /// <list type="bullet">
-/// <item>The bytes are read in the given encoding and every CR LF as LF, as a Windows text-mode read does; lines end at LF.</item>
+/// <item>Every CR LF is read as LF, as a Windows text-mode read does; lines end at LF, and a NUL byte
+/// cuts its read chunk short (<see cref="ReadLineBytes"/>). Each line's bytes are read in the given encoding.</item>
 /// <item>A line that is empty, all spaces and tabs, or whose first non-blank character is <c>#</c> is skipped
 /// and not counted, so line numbers count only option lines.</item>
 /// <item>The option runs from the first character of the line, not the first non-blank one (so
@@ -30,7 +31,7 @@ namespace Curl.Cli;
 /// It is probably a mistake. Consider double quotes.</c> and keeps the quote. An empty unquoted
 /// parameter is no parameter.</item>
 /// </list>
-/// Not modelled: a NUL byte ending a line early. The 10 MiB line limit is <see cref="ReadableLength"/>.
+/// The 10 MiB line limit is <see cref="ReadableLength"/>.
 /// </remarks>
 internal static class ConfigFileSyntax
 {
@@ -84,10 +85,10 @@ internal static class ConfigFileSyntax
     /// <returns>The option lines in file order.</returns>
     internal static IReadOnlyList<ConfigFileLine> ReadLines(string file, byte[] contents, Encoding encoding, int terminalColumns)
     {
-        string text = encoding.GetString(contents).Replace("\r\n", "\n", StringComparison.Ordinal);
         List<ConfigFileLine> lines = [];
-        foreach (string line in text.Split('\n'))
+        foreach (byte[] lineBytes in ReadLineBytes(WithLineFeedLineEnds(contents)))
         {
+            string line = encoding.GetString(lineBytes);
             if (!IsBlankOrComment(line))
             {
                 lines.Add(ReadLine(file, lines.Count + 1, line, terminalColumns));
@@ -95,6 +96,74 @@ internal static class ConfigFileSyntax
         }
 
         return lines;
+    }
+
+    /// <summary>
+    /// The size of the buffer curl 8.22.0's <c>Curl_get_line</c> (<c>lib/curl_get_line.c</c>) hands
+    /// <c>fgets</c>, so each read takes at most 127 bytes: a line is read in such chunks.
+    /// </summary>
+    private const int ReadBufferSize = 128;
+
+    /// <summary><paramref name="contents"/> with every CR LF read as LF, as a Windows text-mode read does.</summary>
+    private static byte[] WithLineFeedLineEnds(byte[] contents)
+    {
+        List<byte> bytes = new(contents.Length);
+        for (int index = 0; index < contents.Length; index++)
+        {
+            if (contents[index] != '\r' || index + 1 == contents.Length || contents[index + 1] != '\n')
+            {
+                bytes.Add(contents[index]);
+            }
+        }
+
+        return [.. bytes];
+    }
+
+    /// <summary>
+    /// Splits <paramref name="bytes"/> into lines without their LF the way curl 8.22.0's
+    /// <c>Curl_get_line</c> reads them: in <c>fgets</c> chunks of up to 127 bytes or through the next
+    /// LF, each kept only up to its first NUL (curl takes the chunk's <c>strlen</c>). A chunk cut by a
+    /// NUL loses its LF, so the line goes on into the next chunk, the next line's; a chunk that starts
+    /// with a NUL stops the read, dropping the line it is part of and every line after it, silently.
+    /// Measured with the local curl 8.22.0 on 2026-10-26 (BL-3579): <c>bog</c> NUL <c>us</c> LF
+    /// <c>write-out = "C"</c> is the unknown option <c>bogwrite-out</c>, a NUL 113 bytes into a
+    /// 300-byte parameter keeps 188 of its bytes, and a UTF-16LE file is ignored.
+    /// </summary>
+    private static List<byte[]> ReadLineBytes(byte[] bytes)
+    {
+        List<byte[]> lines = [];
+        List<byte> line = [];
+        int chunkStart = 0;
+        while (chunkStart < bytes.Length)
+        {
+            int chunkEnd = ChunkEnd(bytes, chunkStart);
+            int nul = Array.IndexOf(bytes, (byte)0, chunkStart, chunkEnd - chunkStart);
+            int keptLength = (nul < 0 ? chunkEnd : nul) - chunkStart;
+            if (keptLength == 0)
+            {
+                return lines;
+            }
+
+            line.AddRange(bytes.AsSpan(chunkStart, keptLength));
+            if (line[^1] == '\n')
+            {
+                lines.Add([.. line[..^1]]);
+                line.Clear();
+            }
+
+            chunkStart = chunkEnd;
+        }
+
+        lines.Add([.. line]);
+        return lines;
+    }
+
+    /// <summary>Where the <c>fgets</c> chunk starting at <paramref name="chunkStart"/> ends: after its LF, after 127 bytes, or at the end.</summary>
+    private static int ChunkEnd(byte[] bytes, int chunkStart)
+    {
+        int limit = Math.Min(bytes.Length, chunkStart + ReadBufferSize - 1);
+        int lineFeed = Array.IndexOf(bytes, (byte)'\n', chunkStart, limit - chunkStart);
+        return lineFeed < 0 ? limit : lineFeed + 1;
     }
 
     private static bool IsBlankOrComment(string line)

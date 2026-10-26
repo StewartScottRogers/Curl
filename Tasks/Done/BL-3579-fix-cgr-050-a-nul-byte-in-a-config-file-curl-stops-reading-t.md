@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/ConfigFileSyntax.cs, Curl.Cli.UnitTests/Cgr050Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3579 — Fix CGR-050: A NUL byte in a config file: curl stops reading the line/file at the NUL, PORT keeps parsing (different requests, exit codes and diagnost...
 
@@ -88,17 +88,29 @@ curl -s http://127.0.0.1:21200/echo
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr050Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Plan (2026-10-26): `ConfigFileSyntax.ReadLines` now reads the bytes as curl 8.22.0's `Curl_get_line` does: `fgets` chunks of up to 127 bytes (128-byte buffer) or through the next LF, each kept up to its first NUL (`strlen`). A NUL drops the rest of its chunk with its LF, so the line runs on into the next one; a chunk that starts with a NUL stops the file silently, dropping the partial line (which is why a UTF-16LE `.curlrc` is ignored). CR LF is still read as LF first. No ADR: this is a measured match of curl, not a choice.
+- Measured with the local curl 8.22.0 (mingw, Schannel) in Git Bash, `curl -sS -o NUL -K k.cfg file:///.../global.json`, write-out lines read back: `bog`NUL`us`LF`write-out = "C"` is `config file option 'bogwrite-out' is unknown` (also with CR LF); `"\0\n"` as a line stops the file with exit 0 and no message; a NUL 1 byte into a 300-byte parameter keeps 188 bytes (chunks of 127); a UTF-16LE file with an LF is ignored silently, one with no LF is the unknown option `ÿþh` (exit 2).
+- Repro (Record-CurlExchange.ps1, loopback server on 20112, each side in its own HOME/USERPROFILE/APPDATA, real curl `C:\Program Files\Git\ucrt64\bin\curl.exe` against `Curl.Console\bin\Debug\net10.0\curl.exe`), after the fix, exit code, stdout, stderr and request bytes all equal:
+  - n1 `url = $U/k70`NUL`junk`, `curl -sS -K k.cfg`: both exit 0, `GET /k70`, no stderr.
+  - n2 `header = "X-A: a`NUL`b"\nurl = $U/nb01\n`: both exit 2, `curl: (2) no URL specified` and the try-help line, no request.
+  - n4 `url = "$U/nb04"`NUL`\nheader = X-Next:1\n`: both exit 0, `GET /nb04` with no X-Next header.
+  - ENV-13 NUL `.curlrc`, `curl -s $U/echo`: both exit 0, request with `X-A: 1` only, stderr `...\.curlrc:2 config file option 'bogheader' is unknown` (same apart from the per-side directory name).
+  - ENV-13 UTF-16LE `.curlrc`: both exit 0, no stderr, request with no extra header.
+  - Before the fix (from the issue): n1 exit 3, n2 sent `X-A: a b`, n4 sent X-Next, the NUL rc said `'bog us'`, the UTF-16 rc warned.
+- Cgr050Tests: 9 of its 10 tests fail on the old `ConfigFileSyntax.cs` and all pass on the new one (the tenth pins lone CRs, which already matched). Full fast run: every project green apart from that one test, fixed and rerun green. Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary: 0 failing members.
+- The Linux and macOS behaviour is the same source (`Curl_get_line`); the tests are platform-neutral (in-memory files, `isWindows: false`). CI on those platforms is left to the shift's CI watch.
 
 ## Log
 
 - 2026-10-26: Created from CGR-050 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A NUL byte in a config file or .curlrc now cuts its fgets chunk as curl 8.22.0 does, joining the next line and stopping at a chunk that starts with NUL, so UTF-16 .curlrc files are ignored
