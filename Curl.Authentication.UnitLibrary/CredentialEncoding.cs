@@ -18,11 +18,13 @@ public static class CredentialEncoding
     /// <see langword="true" /> on Windows, where the reference curl receives its arguments
     /// in the system's ANSI code page (Windows-1252 on an English system), unmappable
     /// characters best-fitted; <see langword="false" /> elsewhere, where curl sends the
-    /// argument's bytes as given, which is UTF-8.
+    /// argument's bytes as given, which is UTF-8, and a percent-decoded URL credential's bytes
+    /// as they are, so a byte outside a valid UTF-8 sequence is kept as a surrogate escape
+    /// (<see cref="InvalidUtf8ByteEscapingEncoding" />, CGR-053).
     /// </param>
     /// <returns>
     /// The system ANSI code page on Windows, or Windows-1252 when Windows behaviour is asked
-    /// for on a host that has no ANSI code page; UTF-8 elsewhere.
+    /// for on a host that has no ANSI code page; byte-keeping UTF-8 elsewhere.
     /// </returns>
     public static Encoding ForPlatform(bool isWindows) =>
         ForPlatformGivenSystemAnsiCodePage(isWindows, ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)));
@@ -55,10 +57,11 @@ public static class CredentialEncoding
     /// </param>
     /// <returns>
     /// <paramref name="systemAnsiCodePage" /> on Windows, Windows-1252 when that is
-    /// <see langword="null" />; UTF-8 elsewhere.
+    /// <see langword="null" />; elsewhere UTF-8 that keeps every byte
+    /// (<see cref="InvalidUtf8ByteEscapingEncoding" />, CGR-053).
     /// </returns>
     internal static Encoding ForPlatformGivenSystemAnsiCodePage(bool isWindows, Encoding? systemAnsiCodePage) =>
         isWindows
             ? systemAnsiCodePage ?? CodePagesEncodingProvider.Instance.GetEncoding(Windows1252CodePage)!
-            : Encoding.UTF8;
+            : InvalidUtf8ByteEscapingEncoding.Instance;
 }
