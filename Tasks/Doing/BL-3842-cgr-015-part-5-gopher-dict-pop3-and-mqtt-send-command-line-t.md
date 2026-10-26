@@ -35,3 +35,4 @@ Today `GopherSelector.cs`, `DictRequest.cs`, `Pop3Command.cs`/`Pop3MessageId.cs`
 ## Log
 
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 7cf24dc8 a9b9a7ee f4912012 326de9ca.
