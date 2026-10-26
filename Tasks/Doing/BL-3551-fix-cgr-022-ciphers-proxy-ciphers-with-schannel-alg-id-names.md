@@ -5,7 +5,7 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr022Tests.cs]
+touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr022Tests.cs, Curl.Networking.UnitLibrary/SchannelAlgorithmList.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-26
 completed:
@@ -60,15 +60,20 @@ curl -sS -k --ciphers CALG_AES_128 https://localhost:<p>/index.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr022Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+- Touches widened to the new `SchannelAlgorithmList.cs` (shared by both providers), `TlsFailureMessages.cs` (the exit 35 text) and the project `CLAUDE.md` (its --ciphers sentence); no other task in Doing names them.
+- Decision (ADR-0816): Schannel `--ciphers` is ALG_IDs as curl's `set_ssl_ciphers`; accepted algorithms do not narrow the offered suites (not needed by any measured case); a list caps the range at TLS 1.2. `SslStreamTlsProvider` keeps its given options object (EngineCompositionTests pins identity) and caps only the offered protocols.
+- Measured (curl 8.22.0 Schannel and Curl, `-sS -k --ciphers X https://localhost:<p>/index.txt`, `openssl s_server -WWW -tls1_2`): CALG_AES_128, USE_STRONG_CRYPTO, CALG_AES_256, CALG_AES_128:CALG_SHA_256, 26128 -> both exit 0 `hello tls`; CALG_3DES -> both exit 35 `schannel: AcquireCredentialsHandle failed: SEC_E_ALGORITHM_MISMATCH (0x80090331) - The client and server cannot communicate, because they do not possess a common algorithm.`; ECDHE-RSA-AES128-GCM-SHA256 and BOGUS -> both exit 59 `schannel: Failed setting algorithm cipher list` (already matched, still matches). Against `-tls1_3`: CALG_AES_256 -> both exit 35 `schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported`; CALG_3DES -> both the exit 35 mismatch. `--proxy-ciphers CALG_3DES -x https://localhost:<p>` -> both the exit 35 mismatch. No files written; request bytes are the same TLS handshake path as without --ciphers.
+- Cgr022Tests fails before the fix (SchannelAlgorithmList did not exist; the providers returned 59 for every list) and passes after. Measure-CodeQuality for Curl.Networking.UnitLibrary: 100/100, 0 failing members. Full fast suite green (46 projects passed). Platform-neutral: the tests call the parser directly, no OS text or paths.
 
 ## Log
 

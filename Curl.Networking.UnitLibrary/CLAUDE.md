@@ -107,7 +107,7 @@ first reads the value as a store path (`CurrentUser\MY\<thumbprint>`, parsed by
 opens (`SystemClientCertificateStore`, through `X509Store`, in production; a fake in tests). A certificate that does not
 load is exit 58; in the OpenSSL build a key that does not load is exit 43, as curl reports
 it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
-ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls13-ciphers`;
+ADR-0011: the Schannel build reads `--ciphers` as ALG_IDs through `SchannelAlgorithmList` (ADR-0816: an entry naming none is exit 59, a list Schannel accepts none of exit 35, and a list stops the range at TLS 1.2) and ignores `--tls13-ciphers`;
 the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
 the hand-written OpenSSL-name table in OpenSSL's `ALL` order, `--ciphers` expanded as an OpenSSL
 cipher string by `OpenSslCipherString` (ADR-0817), and a list left with no suite is exit 59. On

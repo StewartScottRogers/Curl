@@ -735,10 +735,17 @@ internal static class TlsFailureMessages
     public const string OpenSslPrivateKeyTypePkcs12Refused = "file type P12 for private key not supported";
 
     /// <summary>
-    /// The Schannel build's message for exit 59: it refuses every <c>--ciphers</c> value
-    /// (ADR-0011).
+    /// The Schannel build's message for exit 59: a <c>--ciphers</c> entry names no ALG_ID
+    /// (ADR-0011, ADR-0816).
     /// </summary>
     public const string SchannelCipherListRefused = "schannel: Failed setting algorithm cipher list";
+
+    /// <summary>
+    /// The Schannel build's message for exit 35 when AcquireCredentialsHandle accepts none of
+    /// the <c>--ciphers</c> algorithms (ADR-0816, measured with curl 8.22.0).
+    /// </summary>
+    public const string SchannelAlgorithmMismatch =
+        "schannel: AcquireCredentialsHandle failed: SEC_E_ALGORITHM_MISMATCH (0x80090331) - The client and server cannot communicate, because they do not possess a common algorithm.";
 
     /// <summary>
     /// The OpenSSL build's message for exit 59: no entry of the <c>--ciphers</c> list names a
