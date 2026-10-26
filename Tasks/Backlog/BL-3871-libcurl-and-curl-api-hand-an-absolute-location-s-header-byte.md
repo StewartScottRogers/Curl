@@ -1,5 +1,5 @@
 ---
-id: BL-3869
+id: BL-3871
 title: Libcurl and Curl.Api hand an absolute Location's header bytes out as libcurl byte text, not HeaderByteText marks
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3869 — Libcurl and Curl.Api hand an absolute Location's header bytes out as libcurl byte text, not HeaderByteText marks
+# BL-3871 — Libcurl and Curl.Api hand an absolute Location's header bytes out as libcurl byte text, not HeaderByteText marks
 
 ## Goal
 

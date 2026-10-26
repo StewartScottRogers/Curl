@@ -39,5 +39,5 @@ keeps the request URL's authority, which is command-line text such as the IDN ho
   command line is written as UTF-8 as before.
 - Libcurl's `CURLINFO_REDIRECT_URL` and `CURLINFO_EFFECTIVE_URL`, and `Curl.Api`'s `TransferInfo`, hand such a
   URL out with its marks (U+F7E9 where they gave U+00E9) only when the `Location` held a byte from 0x80;
-  every other URL is unchanged. BL-3869 turns them into the libcurl byte text (`UrlByteText`) those readers
+  every other URL is unchanged. BL-3871 turns them into the libcurl byte text (`UrlByteText`) those readers
   should give.
