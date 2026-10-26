@@ -158,3 +158,4 @@ curl -s -T - http://127.0.0.1:22000/a --next -d @- http://127.0.0.1:22000/b
 ## Log
 
 - 2026-10-26: Created from CGR-017 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
