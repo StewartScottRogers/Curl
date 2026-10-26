@@ -160,6 +160,9 @@ public sealed class RedirectFollower(
 
     private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
 
+    // curl's Windows build reads a single letter and a colon as a drive prefix, not a scheme.
+    private readonly bool driveLetterIsNotScheme = runsOnWindows ?? OperatingSystem.IsWindows();
+
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
             "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap",
@@ -167,6 +170,9 @@ public sealed class RedirectFollower(
             "smtp", "smtps", "telnet", "tftp", "ws", "wss",
         ],
         StringComparer.Ordinal);
+
+    private static readonly System.Buffers.SearchValues<char> SchemeCharacters =
+        System.Buffers.SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.");
 
     /// <summary>
     /// Performs the transfer, following redirects when
@@ -398,14 +404,9 @@ public sealed class RedirectFollower(
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
         }
 
-        if (!CurlUrl.TryParse(EncodedForFollow(target), first.PathAsIs, out next))
+        if (ParseRefusal(target, first.PathAsIs, out next) is { } parseRefusal)
         {
-            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
-        }
-
-        if (!SchemesCurlParses.Contains(next.Scheme))
-        {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
+            return parseRefusal;
         }
 
         first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
@@ -414,8 +415,30 @@ public sealed class RedirectFollower(
             first.Events.ReportInfo(methodSwitchMessage);
         }
 
-        next = SwitchedToHttps(ref target, next, first);
+        next = SwitchedToHttps(ref target, next!, first);
         return ProtocolDisabledRefusal(next.Scheme, policy, first);
+    }
+
+    /// <summary>
+    /// curl's refusal of a <paramref name="target" /> that names a scheme it does not know
+    /// (exit 1) or does not parse (exit 3), or <see langword="null" /> with the parsed URL in
+    /// <paramref name="next" />. The scheme is checked first, as curl's <c>parseurl</c> does, so a
+    /// target naming no scheme it knows is never parsed with a guessed one (CGR-018).
+    /// </summary>
+    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? ParseRefusal(
+        string target,
+        bool pathAsIs,
+        out CurlUrl? next)
+    {
+        next = null;
+        if (NamesSchemeCurlCannotParse(target))
+        {
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
+        }
+
+        return CurlUrl.TryParse(EncodedForFollow(target), pathAsIs, out next)
+            ? null
+            : (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
     }
 
     /// <summary>
@@ -511,6 +534,21 @@ public sealed class RedirectFollower(
         > '~' and <= 'ÿ' => "%" + ((int)character).ToString("X2", CultureInfo.InvariantCulture),
         _ => character.ToString(),
     };
+
+    /// <summary>
+    /// Whether <paramref name="target" /> starts with an RFC 3986 scheme and a colon, with or
+    /// without <c>//</c>, that curl does not know: curl 8.22.0 reads <c>localhost:20200/x</c> as
+    /// the scheme <c>localhost</c> and refuses it, where a URL typed on the command line would
+    /// have its scheme guessed (CGR-018).
+    /// </summary>
+    private bool NamesSchemeCurlCannotParse(string target)
+    {
+        int colon = target.IndexOf(':', StringComparison.Ordinal);
+        bool namesScheme = colon > (driveLetterIsNotScheme ? 1 : 0)
+            && char.IsAsciiLetter(target[0])
+            && !target.AsSpan(1, colon - 1).ContainsAnyExcept(SchemeCharacters);
+        return namesScheme && !SchemesCurlParses.Contains(target[..colon].ToLowerInvariant());
+    }
 
     private static string UnparsableUrlReason(string target)
     {
