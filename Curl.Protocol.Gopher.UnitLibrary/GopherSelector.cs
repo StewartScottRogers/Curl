@@ -16,7 +16,8 @@ namespace Curl.Protocol.Gopher;
 /// fewer gives an empty selector. The fragment is never sent.
 /// </para>
 /// <para>
-/// The path is read from <see cref="CurlUrl.OriginalString" />, as UTF-8 bytes, and its
+/// The path is read from <see cref="CurlUrl.OriginalString" />, as its command-line bytes
+/// (<see cref="GopherCommandLineText" />: the ANSI code page on Windows, UTF-8 elsewhere), and its
 /// dot segments are removed here, counting only literal dots, so the two characters
 /// removed are the two written after the authority.
 /// </para>
@@ -41,9 +42,21 @@ internal static class GopherSelector
     /// The decoded selector bytes, or <see langword="null" /> when it decodes to a NUL
     /// byte, which curl refuses with exit 3.
     /// </returns>
-    internal static byte[]? FromUrl(CurlUrl url)
+    internal static byte[]? FromUrl(CurlUrl url) => FromUrl(url, GopherCommandLineText.Platform);
+
+    /// <summary>
+    /// Builds the selector for <paramref name="url" />, without its terminating CRLF, reading
+    /// literal characters as <paramref name="commandLineText" />'s bytes.
+    /// </summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="commandLineText">The encoding the platform's curl received the URL in.</param>
+    /// <returns>
+    /// The decoded selector bytes, or <see langword="null" /> when it decodes to a NUL
+    /// byte, which curl refuses with exit 3.
+    /// </returns>
+    internal static byte[]? FromUrl(CurlUrl url, GopherCommandLineText commandLineText)
     {
-        byte[] pathAndQuery = Encoding.UTF8.GetBytes(ReadPathAndQuery(url.OriginalString.Trim()));
+        byte[] pathAndQuery = commandLineText.GetBytes(ReadPathAndQuery(url.OriginalString.Trim()));
         if (pathAndQuery.Length <= PrefixLength)
         {
             return [];

@@ -675,7 +675,7 @@ public sealed class MqttProtocolHandlerTests
 
         TransferResult result = await RunAsync(
             FakeConnector.For(connection),
-            "mqtt://h/" + new string('\u20AC', 21846),
+            "mqtt://h/" + string.Concat(Enumerable.Repeat("%E2%82%AC", 21846)),
             new RecordingStream());
 
         Diagnostics.AssertResult(new TransferResult(CurlExitCode.UrlMalformat, 0, "Too long MQTT topic"), result);
@@ -724,7 +724,7 @@ public sealed class MqttProtocolHandlerTests
     {
         ScriptedConnection connection = new(Connack);
 
-        await RunAsync(FakeConnector.For(connection), "mqtt://h/" + new string('\u20AC', 21845), new RecordingStream());
+        await RunAsync(FakeConnector.For(connection), "mqtt://h/" + string.Concat(Enumerable.Repeat("%E2%82%AC", 21845)), new RecordingStream());
 
         Diagnostics.Diff("SUBSCRIBE's first 8 bytes", Bytes("82 84 80 04 00 01 FF FF"), connection.Written.AsSpan(MeasuredConnect.Length).Slice(0, Math.Min(8, connection.Written.Length - MeasuredConnect.Length)));
         CollectionAssert.AreEqual(Bytes("82 84 80 04 00 01 FF FF"), connection.Written[MeasuredConnect.Length..][..8]);

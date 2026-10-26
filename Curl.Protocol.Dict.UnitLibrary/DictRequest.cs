@@ -63,11 +63,26 @@ internal static class DictRequest
     /// <c>lookup word is missing</c>.
     /// </param>
     /// <returns><see langword="true" /> unless the decoded path holds a byte below <c>0x20</c>.</returns>
-    public static bool TryEncode(string escapedPath, out byte[] request, out bool wordMissing)
+    public static bool TryEncode(string escapedPath, out byte[] request, out bool wordMissing) =>
+        TryEncode(escapedPath, DictCommandLineText.Platform, out request, out wordMissing);
+
+    /// <summary>
+    /// Encodes the request for <paramref name="escapedPath" />, reading its literal characters
+    /// as <paramref name="commandLineText" />'s bytes, or refuses a path that decodes to a
+    /// control character.
+    /// </summary>
+    /// <param name="escapedPath">The URL's path, still percent-encoded.</param>
+    /// <param name="commandLineText">The encoding the platform's curl received the URL in.</param>
+    /// <param name="request">The whole request, or empty when refused.</param>
+    /// <param name="wordMissing">
+    /// <see langword="true" /> when the lookup word is empty or missing, so <c>default</c> was sent.
+    /// </param>
+    /// <returns><see langword="true" /> unless the decoded path holds a byte below <c>0x20</c>.</returns>
+    public static bool TryEncode(string escapedPath, DictCommandLineText commandLineText, out byte[] request, out bool wordMissing)
     {
         ArgumentNullException.ThrowIfNull(escapedPath);
 
-        byte[] path = PercentDecode(escapedPath);
+        byte[] path = PercentDecode(commandLineText.GetBytes(escapedPath));
         if (path.Any(static value => value < 0x20))
         {
             request = [];
@@ -171,12 +186,11 @@ internal static class DictRequest
 
     /// <summary>
     /// Decodes each <c>%</c> followed by two hexadecimal digits to one byte and copies
-    /// every other character as its UTF-8 bytes, so a stray <c>%</c> stays as it is, as
+    /// every other byte as it is, so a stray <c>%</c> stays as it is, as
     /// curl leaves one.
     /// </summary>
-    private static byte[] PercentDecode(string escaped)
+    private static byte[] PercentDecode(byte[] encoded)
     {
-        byte[] encoded = Encoding.UTF8.GetBytes(escaped);
         var decoded = new List<byte>(encoded.Length);
         int index = 0;
         while (index < encoded.Length)

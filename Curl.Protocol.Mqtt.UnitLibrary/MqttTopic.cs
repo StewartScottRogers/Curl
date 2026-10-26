@@ -31,7 +31,17 @@ internal static class MqttTopic
     /// curl's <c>Curl_urldecode</c> rejects with <c>REJECT_CTRL</c>; upstream test 2109), or
     /// the topic is over 65535 bytes; all three are exit 3.
     /// </exception>
-    internal static byte[] Decode(CurlUrl url)
+    internal static byte[] Decode(CurlUrl url) => Decode(url, MqttCommandLineText.Platform);
+
+    /// <summary>
+    /// Decodes the topic from <paramref name="url" />, reading literal characters as
+    /// <paramref name="commandLineText" />'s bytes.
+    /// </summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="commandLineText">The encoding the platform's curl received the URL in.</param>
+    /// <returns>The topic's bytes, never empty.</returns>
+    /// <exception cref="MqttTransferException">The topic is missing, holds a control byte or is too long; exit 3.</exception>
+    internal static byte[] Decode(CurlUrl url, MqttCommandLineText commandLineText)
     {
         string path = url.AbsolutePath;
         if (path.Length <= 1)
@@ -39,7 +49,7 @@ internal static class MqttTopic
             throw new MqttTransferException(CurlExitCode.UrlMalformat, MqttTransferMessages.NoTopic);
         }
 
-        byte[] topic = PercentDecode(Encoding.UTF8.GetBytes(path[1..]));
+        byte[] topic = PercentDecode(commandLineText.GetBytes(path[1..]));
         if (topic.AsSpan().IndexOfAnyInRange((byte)0x00, (byte)0x1F) >= 0)
         {
             throw new MqttTransferException(CurlExitCode.UrlMalformat, MqttTransferMessages.ControlByteInTopic);
