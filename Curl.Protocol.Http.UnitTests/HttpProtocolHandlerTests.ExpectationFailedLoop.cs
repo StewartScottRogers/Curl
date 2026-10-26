@@ -71,8 +71,9 @@ public sealed partial class HttpProtocolHandlerTests
 
     /// <summary>
     /// <c>--max-redirs -1</c> sets no limit, so the loop goes on while 417s come; here a 200
-    /// on the third connection, answered during its wait so its body is never sent, ends it
-    /// with two resends counted as redirects.
+    /// on the third connection, answered during its wait, ends it with two resends counted as
+    /// redirects; that connection still sends the body once the wait runs out, as curl 8.22.0
+    /// does after an early 2xx (CGR-067, BL-3596 Notes).
     /// </summary>
     [TestMethod]
     public async Task ExecuteAsync_CustomExpect417WhileSendingWithoutALimit_ResendsUntilAnotherStatus()
@@ -94,8 +95,8 @@ public sealed partial class HttpProtocolHandlerTests
             WriteResult(result);
             Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
             Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
-            Diagnostics.Diff("third written", CustomExpectPut, third.Written);
-            Assert.AreEqual(CustomExpectPut, third.Written, $"Chunk size {chunkSize}");
+            Diagnostics.Diff("third written", CustomExpectPut + BigBody, third.Written);
+            Assert.AreEqual(CustomExpectPut + BigBody, third.Written, $"Chunk size {chunkSize}");
             Diagnostics.Diff("output", "ok", Latin1(output.ToArray()));
             Assert.AreEqual("ok", Latin1(output.ToArray()), $"Chunk size {chunkSize}");
             Diagnostics.Assert("connection count", 3, result.Report!.ConnectionCount);

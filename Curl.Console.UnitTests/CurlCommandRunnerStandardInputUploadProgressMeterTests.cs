@@ -39,7 +39,7 @@ public sealed class CurlCommandRunnerStandardInputUploadProgressMeterTests
         Diagnostics.Assert("stderr ends with", "a status line, no newline", Lf(StandardErrorText));
         Assert.AreEqual(0, exitCode);
         Assert.IsFalse(StandardErrorText.EndsWith('\n'));
-        Assert.EndsWith(ProgressMeterLines.ZeroStatusLine, StandardErrorText);
+        Assert.StartsWith("100     15   0      0   0     15      0", StandardErrorText[(StandardErrorText.LastIndexOf('\r') + 1)..]);
     }
 
     [TestMethod]
