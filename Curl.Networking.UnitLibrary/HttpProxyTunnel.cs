@@ -218,7 +218,7 @@ internal static class HttpProxyTunnel
             return ParseReply(header, forConnectUdp);
         }
 
-        if (lineStart == 0 && !StartsWithHttpVersion(header))
+        if (IsHeaderLineWithoutColon(header, lineStart))
         {
             return HttpProxyTunnelReply.Failed(InvalidResponseHeader) with { FailureExitCode = CurlExitCode.BadFunctionArgument };
         }
@@ -228,8 +228,10 @@ internal static class HttpProxyTunnel
     }
 
     /// <summary>
-    /// The message curl 8.21.0 fails a reply with, exit 43, once its first line has ended and
-    /// does not start with <c>HTTP/</c> (measured, upstream test750, BL-1857).
+    /// The message curl 8.22.0 fails a reply with, exit 43, once a line after the first has ended
+    /// that is neither a folded continuation (starting with a space or tab) nor holds a colon
+    /// (measured, upstream test750, BL-1857, CGR-081/BL-3610). A first line that is not
+    /// <c>HTTP/1.x</c> is no failure of its own: it leaves the status 0, exit 7.
     /// </summary>
     internal const string InvalidResponseHeader = "Invalid response header";
 
@@ -248,8 +250,10 @@ internal static class HttpProxyTunnel
             Head = header[..lineStart].ToArray(),
         };
 
-    private static bool StartsWithHttpVersion(List<byte> header) =>
-        System.Runtime.InteropServices.CollectionsMarshal.AsSpan(header).StartsWith("HTTP/"u8);
+    // The line from lineStart to the LF just read follows the status line, does not start with
+    // a space or tab, and holds no colon: curl's header list refuses it.
+    private static bool IsHeaderLineWithoutColon(List<byte> header, int lineStart) =>
+        lineStart > 0 && header[lineStart] is not ((byte)' ' or (byte)'\t') && header.IndexOf((byte)':', lineStart) < 0;
 
     // The line from lineStart to the LF just read holds nothing but that LF, or a CR and it.
     private static bool IsEmptyLine(List<byte> header, int lineStart) =>
