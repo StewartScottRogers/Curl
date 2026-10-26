@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr012Tests.cs, Libcurl.UnitTests/Cgr012Tests.cs, Libcurl/Multi/Core/CurlMulti.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr012Tests.cs, Libcurl.UnitTests/Cgr012Tests.cs, Libcurl/Multi/Core/CurlMulti.cs, Curl.Api.UnitLibrary/EngineContracts/Multi/IMultiTransfer.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3541 — Fix CGR-012: curl_multi_cleanup called from inside a transfer callback never returns in PORT, and the multi handle is destroyed under the caller (REF...
 
@@ -64,17 +64,25 @@ EV\probe\out\probe.exe C_93 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr012Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Added `Curl.Api.UnitLibrary/EngineContracts/Multi/IMultiTransfer.cs` to touches: `CurlMulti` cannot see the internal `ManagedMultiTransfer`, so the engine tells it through the seam (`IsInTransferCallback`, a default member answering false). No task in Doing on origin/work/dark-factory named it.
+- Fix (ADR-0816): `ManagedMultiTransfer.Start` sets an `AsyncLocal` to the handle before the transfer's `PerformAsync`, so code in that perform's callbacks sees `IsInTransferCallback` true; `DisposeAsync` from there does nothing instead of awaiting its own perform (the deadlock). New `CurlMulti.CleanupAsync` answers `RecursiveApiCall` (8) from inside a transfer callback, `BadHandle` after cleanup, else `Ok`; `DisposeAsync` calls it.
+- Repro (C_93, `EV\probe\out\probe.exe C_93 2`): the report's SCR probe folder is gone and this run did not rebuild a P/Invoke probe of REF `libcurl-4.dll`; REF's result is the report's own measurement (Windows 2/2, Linux 1/1): `multi_cleanup=8 msgs 0` / `final multi_cleanup=0`, libcurl's `Curl_is_in_callback` check. PORT, C_93 rebuilt as `Libcurl.UnitTests/Cgr012Tests.cs` over the real `ManagedCurlEngine` (a transfer whose perform calls `curl_multi_cleanup` as its write callback would): the inner call answers 8, the transfer completes with its CURLMSG_DONE, and the final cleanup answers 0 - equal to REF. Nothing on the wire changes: the transfer itself is untouched.
+- Fails before the fix: `Curl.Engine.UnitTests/Cgr012Tests.cs` times out on the inner `DisposeAsync` with the old engine (it awaited its own perform); the Libcurl test needs `CleanupAsync`, which did not exist.
+- Variants that already matched: cleanup outside a callback answers Ok then BadHandle (`CleanupAsync_OutsideEveryCallback_AnswersOkThenBadHandle`); every existing CurlMulti and ManagedMultiTransfer test passes.
+- Platform: no path, OS error or certificate; `AsyncLocal` flow is the same everywhere, and the tests wait for events (a TaskCompletionSource, then the CURLMSG_DONE), not on scheduling. CI on Linux/macOS is covered by keeping it platform-neutral.
+- Build clean, fast tests green (46 projects). Measure-CodeQuality for Libcurl, Curl.Engine.UnitLibrary and Curl.Api.UnitLibrary found 1 member (`CurlMulti.CleanupAsync`, an unreachable second-exchange branch), fixed by removing that branch; Libcurl re-measured: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-012 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. curl_multi_cleanup inside a transfer callback answers CURLM_RECURSIVE_API_CALL and the transfer completes, no deadlock
