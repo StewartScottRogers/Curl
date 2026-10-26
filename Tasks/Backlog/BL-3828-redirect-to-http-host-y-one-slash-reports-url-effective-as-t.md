@@ -1,5 +1,5 @@
 ---
-id: BL-3827
+id: BL-3828
 title: Redirect to http:/host/y (one slash) reports url_effective as the raw text where curl normalises it to http://host/y
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3827 — Redirect to http:/host/y (one slash) reports url_effective as the raw text where curl normalises it to http://host/y
+# BL-3828 — Redirect to http:/host/y (one slash) reports url_effective as the raw text where curl normalises it to http://host/y
 
 ## Goal
 
