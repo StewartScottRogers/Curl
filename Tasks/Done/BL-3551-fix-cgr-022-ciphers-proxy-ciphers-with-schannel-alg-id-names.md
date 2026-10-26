@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr022Tests.cs, Curl.Networking.UnitLibrary/SchannelAlgorithmList.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3551 — Fix CGR-022: --ciphers / --proxy-ciphers with Schannel ALG_ID names (CALG_*, USE_STRONG_CRYPTO) is rejected with exit 59
 
@@ -79,3 +79,4 @@ curl -sS -k --ciphers CALG_AES_128 https://localhost:<p>/index.txt
 
 - 2026-10-26: Created from CGR-022 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Schannel --ciphers/--proxy-ciphers read CALG_* ALG_IDs as curl 8.22.0: exit 0, 35 or 59 as measured
