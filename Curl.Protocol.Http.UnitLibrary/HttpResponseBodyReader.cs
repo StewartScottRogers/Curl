@@ -170,6 +170,17 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         !noBody && head.StatusLine.StatusCode is not (204 or 304);
 
     /// <summary>
+    /// Gives the headers that frame and encode a response's body: none for a final
+    /// <c>101 Switching Protocols</c>, whose body curl 8.22.0 reads to the close as it arrives
+    /// whatever its Content-Length, Transfer-Encoding or Content-Encoding say, since it reads
+    /// those of a 1xx head as framing nothing (CGR-070, measured, BL-3599 Notes); else all of them.
+    /// </summary>
+    /// <param name="head">The final response's head.</param>
+    /// <returns>The headers that frame the body.</returns>
+    internal static IReadOnlyList<HttpResponseHeader> FramingHeadersOf(HttpResponseHead head) =>
+        head.StatusLine.StatusCode == 101 ? [] : head.Headers;
+
+    /// <summary>
     /// Finds the first header curl 8.21.0 refuses while it reads the head, in the order the
     /// headers arrived (measured, BL-364, BL-412 and BL-1387 Notes): an invalid Content-Length (exit 8),
     /// or, under <see cref="LimitsFileSize" />, one too large for a 64-bit integer (exit 63),
@@ -186,16 +197,17 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// <returns>The refused header and its failure, or <see langword="null" /> when none is refused.</returns>
     internal HttpHeadRefusal? FindHeadRefusal(HttpResponseHead head, bool noBody, bool decodeContent)
     {
+        IReadOnlyList<HttpResponseHeader> headers = FramingHeadersOf(head);
         if (!HasBody(head, noBody: false))
         {
             return null;
         }
 
-        int? codingIndex = decodeContent ? HttpContentDecoder.IndexPastCodingLimit(head.Headers) : null;
-        int checkedCount = codingIndex ?? head.Headers.Count;
-        if (FramingFailure(head.Headers, checkedCount, noBody) is not null)
+        int? codingIndex = decodeContent ? HttpContentDecoder.IndexPastCodingLimit(headers) : null;
+        int checkedCount = codingIndex ?? headers.Count;
+        if (FramingFailure(headers, checkedCount, noBody) is not null)
         {
-            return FirstFramingRefusal(head.Headers, checkedCount, noBody);
+            return FirstFramingRefusal(headers, checkedCount, noBody);
         }
 
         return codingIndex is { } index
@@ -313,8 +325,9 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
             return;
         }
 
-        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(head.Headers, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
-        IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(head.Headers) : [];
+        IReadOnlyList<HttpResponseHeader> framingHeaders = FramingHeadersOf(head);
+        HttpResponseBodyFraming framing = HttpResponseBodyFraming.Of(framingHeaders, PassesTransferCoding, IgnoresContentLength, DecodesTransferCoding);
+        IEnumerable<string> contentCodings = decodeContent ? HttpContentDecoder.ContentCodings(framingHeaders) : [];
         IEnumerable<string> transferCodings = decodeTransfer ? framing.TransferCodings : [];
         string[] decodedCodings = [.. contentCodings.Concat(transferCodings)];
         Log.BodyFramed(framing, decodedCodings);
@@ -329,6 +342,21 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         finally
         {
             contentDecoder?.Dispose();
+        }
+
+        ThrowIfSwitchingProtocolsBodyEmpty(head);
+    }
+
+    /// <summary>
+    /// Fails a final <c>101 Switching Protocols</c> whose body ran to the close without a byte
+    /// as curl 8.22.0 does: exit 52, <c>Empty reply from server</c>, after writing its head to
+    /// <c>-i</c>'s output (CGR-070, measured, BL-3599 Notes).
+    /// </summary>
+    private void ThrowIfSwitchingProtocolsBodyEmpty(HttpResponseHead head)
+    {
+        if (head.StatusLine.StatusCode == 101 && BytesWritten == 0)
+        {
+            throw new HttpTransferException(CurlExitCode.GotNothing, HttpTransferMessages.EmptyReply);
         }
     }
 

@@ -74,9 +74,9 @@ internal sealed class HttpResponseHeadReader
     internal bool HasReceived => lines.HasReceived;
 
     /// <summary>
-    /// Gets a value indicating whether a <c>101 Switching Protocols</c> head was read before
-    /// the final one, after which the connection no longer speaks HTTP/1.1 and is never reused
-    /// (ADR-0050).
+    /// Gets a value indicating whether a <c>101 Switching Protocols</c> head was read, as an
+    /// interim head before an h2c upgrade's stream 1 or as the final head, after which the
+    /// connection no longer speaks HTTP/1.1 and is never reused (ADR-0050).
     /// </summary>
     internal bool SwitchedProtocols { get; private set; }
 
@@ -151,6 +151,14 @@ internal sealed class HttpResponseHeadReader
     /// <see cref="HttpStatusLine.ParseHttp2OrHttp3" /> rather than as HTTP/1.x.
     /// </summary>
     internal bool IsHttp2OrHttp3 { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the request asked to upgrade to h2c
+    /// (<see cref="HttpH2cUpgradeConnection" />), so a <c>101</c> head is an interim one before
+    /// stream 1's response. Otherwise curl 8.22.0 takes an unsolicited <c>101</c> as the final
+    /// head and the bytes after it as its body (CGR-070, measured, BL-3599 Notes).
+    /// </summary>
+    internal bool AsksH2cUpgrade { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether <c>--http0.9</c> accepts an HTTP/0.9 response: when the
@@ -303,7 +311,7 @@ internal sealed class HttpResponseHeadReader
                 return HeadBeforeRefusalOrThrow(statusLine, failure);
             }
 
-            if (!statusLine.IsInformational)
+            if (!IsInterim(statusLine))
             {
                 EndedAtEmptyLine = !closed;
                 HttpResponseHead head = builder.Build(statusLine, closed ? [] : lines.TakeRemaining());
@@ -520,6 +528,14 @@ internal sealed class HttpResponseHeadReader
             : HttpStatusLine.Parse(line);
     }
 
+    /// <summary>
+    /// Decides whether a head is an interim one another head follows: a 1xx, except a
+    /// <c>101</c> on HTTP/1.x that no h2c upgrade asked for, which curl 8.22.0 takes as final
+    /// (<see cref="AsksH2cUpgrade" />).
+    /// </summary>
+    private bool IsInterim(HttpStatusLine statusLine) =>
+        statusLine.IsInformational && (statusLine.StatusCode != 101 || AsksH2cUpgrade || IsHttp2OrHttp3);
+
     private async ValueTask<HttpStatusLine> ReadStatusLineAsync(CancellationToken cancellationToken)
     {
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
@@ -551,7 +567,7 @@ internal sealed class HttpResponseHeadReader
     /// <returns><see langword="true" /> when the peer closed before the empty line.</returns>
     private async ValueTask<bool> ReadHeaderLinesAsync(HttpStatusLine statusLine, CancellationToken cancellationToken)
     {
-        bool informational = statusLine.IsInformational;
+        bool informational = IsInterim(statusLine);
         holdsWholeHeaders = !informational;
         headStatusLine = statusLine;
         while (await lines.ReadLineAsync(false, cancellationToken).ConfigureAwait(false) is { } bytes)

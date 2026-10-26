@@ -404,7 +404,7 @@ public sealed class HttpResponseHeadReaderTests
         Diagnostics.Arrange("scripted response", "HTTP/1.1 101, then the upgraded stream's HTTP/2 200");
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes("HTTP/1.1 101 Switching Protocols\r\n\r\nHTTP/2 200 \r\n\r\n"), 65536);
         int statusLinesRead = 0;
-        HttpResponseHeadReader reader = new(connection) { IsSwitchedToHttp2 = () => statusLinesRead++ > 0 };
+        HttpResponseHeadReader reader = new(connection) { IsSwitchedToHttp2 = () => statusLinesRead++ > 0, AsksH2cUpgrade = true };
 
         HttpResponseHead head = await reader.ReadAsync(CancellationToken.None);
 
@@ -442,7 +442,6 @@ public sealed class HttpResponseHeadReaderTests
     [DataRow("HT", DisplayName = "Part of HTTP/")]
     [DataRow("HTTP/1.1 20", DisplayName = "Part of a status line")]
     [DataRow("HTTP/1.1 100 Continue\r\n\r\n", DisplayName = "Only 100 Continue")]
-    [DataRow("HTTP/1.1 101 Switching\r\nContent-Length: 0\r\n\r\n", DisplayName = "101 with no upgrade asked for")]
     [DataRow("HTTP/1.1 199 X\r\n\r\n", DisplayName = "199")]
     [DataRow("HTTP/1.1 100 Continue\r\nX-A: 1\r\n", DisplayName = "Inside a 1xx head")]
     [DataRow("HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 20", DisplayName = "Part of the status line after a 1xx")]

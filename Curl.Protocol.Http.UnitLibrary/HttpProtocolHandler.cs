@@ -1575,6 +1575,7 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = IsThroughHttpProxy(options),
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            AsksH2cUpgrade = connection is HttpH2cUpgradeConnection,
             DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
     }
@@ -1960,7 +1961,9 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportNoEndOfMessageIndicator(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader)
     {
+        // curl 8.22.0 writes no such line for a final 101's body (measured, BL-3599 Notes).
         if (headReader.EndedAtEmptyLine
+            && head.StatusLine.StatusCode != 101
             && HttpConnectionPersistence.LacksEndOfMessageIndicator(head, plan.Context.NoBody, plan.Options.IgnoreContentLength))
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NoEndOfMessageIndicator);
@@ -2052,7 +2055,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         if (HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
         {
-            return HttpResponseBodyFraming.Of(head.Headers, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
+            return HttpResponseBodyFraming.Of(HttpResponseBodyReader.FramingHeadersOf(head), options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
         }
 
         return options.IgnoreContentLength || HttpTransferEncoding.ListsChunked(head.Headers) ? null : HttpContentLength.Find(head.Headers);
@@ -2321,7 +2324,7 @@ public sealed class HttpProtocolHandler(
         }
 
         HttpRequestOptions options = plan.Options;
-        if (HttpResponseBodyFraming.Of(head.Headers, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
+        if (HttpResponseBodyFraming.Of(HttpResponseBodyReader.FramingHeadersOf(head), options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
         {
             string message = HttpTransferMessages.TransferClosedWithBytesRemaining(remaining);
             plan.Context.Events.ReportInfo(message);
