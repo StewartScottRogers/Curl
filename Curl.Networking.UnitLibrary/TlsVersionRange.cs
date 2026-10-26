@@ -28,13 +28,15 @@ internal static class TlsVersionRange
     /// The versions to offer, from <paramref name="minimum" /> up to <paramref name="maximum" />.
     /// </summary>
     /// <param name="minimum">
-    /// The lowest version; <see cref="TlsVersion.SystemDefault" /> starts the range at TLS 1.0,
-    /// as curl's Schannel build does, when a ceiling below TLS 1.3 is set.
+    /// The lowest version; <see cref="TlsVersion.SystemDefault" /> starts the range at TLS 1.2,
+    /// as curl 8.22.0's Schannel build does, when no ceiling or a TLS 1.3 ceiling is set
+    /// (CGR-004), and at TLS 1.0, as that build does, when a ceiling below TLS 1.3 is set.
     /// </param>
     /// <param name="maximum">The highest version; <see cref="TlsVersion.SystemDefault" /> is TLS 1.3.</param>
     /// <returns>
-    /// <see cref="SslProtocols.None" />, which leaves the choice to the operating system, when
-    /// neither end is set or only a TLS 1.3 ceiling is; otherwise every version in the range.
+    /// TLS 1.2 and TLS 1.3 when neither end is set or only a TLS 1.3 ceiling is, never
+    /// <see cref="SslProtocols.None" />, which would let the operating system offer TLS 1.0 and
+    /// TLS 1.1 too; otherwise every version in the range.
     /// </returns>
     /// <exception cref="ArgumentException">Both ends are set and the minimum is above the ceiling.</exception>
     internal static SslProtocols ToSslProtocols(TlsVersion minimum, TlsVersion maximum)
@@ -47,7 +49,7 @@ internal static class TlsVersionRange
         }
 
         return minimum == TlsVersion.SystemDefault && highest == TlsVersion.Tls13
-            ? SslProtocols.None
+            ? SslProtocols.Tls12 | SslProtocols.Tls13
             : EveryVersionBetween(lowest, highest);
     }
 

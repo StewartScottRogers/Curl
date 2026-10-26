@@ -25,8 +25,8 @@ public sealed class TlsVersionRangeTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [DataRow(TlsVersion.SystemDefault, TlsVersion.SystemDefault, SslProtocols.None)]
-    [DataRow(TlsVersion.SystemDefault, TlsVersion.Tls13, SslProtocols.None)]
+    [DataRow(TlsVersion.SystemDefault, TlsVersion.SystemDefault, SslProtocols.Tls12 | SslProtocols.Tls13)]
+    [DataRow(TlsVersion.SystemDefault, TlsVersion.Tls13, SslProtocols.Tls12 | SslProtocols.Tls13)]
     [DataRow(TlsVersion.SystemDefault, TlsVersion.Tls12, Tls10 | Tls11 | Tls12)]
     [DataRow(TlsVersion.SystemDefault, TlsVersion.Tls11, Tls10 | Tls11)]
     [DataRow(TlsVersion.SystemDefault, TlsVersion.Tls10, Tls10)]

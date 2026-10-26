@@ -118,7 +118,8 @@ only from tests) reports exit 59 instead of throwing. The provider builds the po
 the policy into `SslClientAuthenticationOptions` on Windows too (BL-268).
 Per ADR-0138 (BL-502) the handshake offers every TLS version from `TlsClientOptions.MinimumVersion`
 to `MaximumVersion` (`TlsVersion`; `--tlsv1.x`, `--tls-max`), as `TlsVersionRange` computes it,
-the one place here that names the obsolete TLS 1.0 and 1.1 members; a minimum above the ceiling
+the one place here that names the obsolete TLS 1.0 and 1.1 members; with neither set, or only a
+TLS 1.3 ceiling, it offers TLS 1.2 and 1.3, never the system default (ADR-0815, CGR-004); a minimum above the ceiling
 throws, since the parser refuses it. With a ceiling of TLS 1.0 or 1.1 the Schannel build reports
 any security status as `failed to receive handshake`, as curl's did in every measured case.
 Per ADR-0364 (BL-1152) the hand-built OpenSSL build refuses such a ceiling before any hello, as
