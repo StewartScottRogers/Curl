@@ -95,6 +95,12 @@ internal sealed class SshTransport
     internal string? ServerIdentification => serverIdentification;
 
     /// <summary>
+    /// Gets a value indicating whether the server's identification line has arrived, which
+    /// it has from the moment the client's <c>KEXINIT</c> is sent (BL-3539).
+    /// </summary>
+    internal bool HasServerIdentificationArrived { get; private set; }
+
+    /// <summary>
     /// Gets the session identifier: the exchange hash of the first key exchange, which a
     /// <c>publickey</c> signature covers (RFC 4252 section 7).
     /// </summary>
@@ -120,6 +126,7 @@ internal sealed class SshTransport
     internal async ValueTask<SshNegotiatedHandshake> NegotiateAlgorithmsAsync(CancellationToken cancellationToken)
     {
         string serverIdentificationLine = await SshIdentificationExchange.ExchangeAsync(connection, connectionReader, cancellationToken).ConfigureAwait(false);
+        HasServerIdentificationArrived = true;
         try
         {
             byte[] clientPayload = await SendClientKexInitAsync(cancellationToken).ConfigureAwait(false);

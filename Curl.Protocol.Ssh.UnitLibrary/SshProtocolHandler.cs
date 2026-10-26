@@ -149,6 +149,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        using SshConnectPhaseLimit connectPhase = new(context);
         SshOptions options = context.Ssh ?? new SshOptions();
         CurlUrl url = context.Url;
         int port = url.IsDefaultPort ? DefaultPort : url.Port;
@@ -170,7 +171,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await RunSessionAsync(context, target, connection, connect.ConnectionNumber).ConfigureAwait(false);
+            return await RunSessionAsync(context, target, connection, connect.ConnectionNumber, connectPhase).ConfigureAwait(false);
         }
     }
 
@@ -193,8 +194,9 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
     // The -v lines libssh2's session start writes, then the session. A failure before the
     // transfer started, or one that ends the connection, closes it; a transfer's own
-    // outcome leaves it intact (ADR-0262).
-    private async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, long connectionNumber)
+    // outcome leaves it intact (ADR-0262). The handshake and the authentication are held to
+    // --connect-timeout (CGR-010, BL-3539).
+    private async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, long connectionNumber, SshConnectPhaseLimit connectPhase)
     {
         ITransferEvents events = context.Events;
         ReportSessionStart(context);
@@ -204,7 +206,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         SshDiagnosticLog log = new(context.DiagnosticLog);
         try
         {
-            TransferResult result = await HandshakeAndTransferAsync(context, target, connection, log, trace).ConfigureAwait(false);
+            TransferResult result = await HandshakeAndTransferAsync(context, target, connection, log, trace, connectPhase.Token).ConfigureAwait(false);
             events.ReportInfo(FailedWhileTransferring(result, ListsDirectory(context))
                 ? SshInfoLines.ClosingConnection(connectionNumber)
                 : SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
@@ -221,6 +223,14 @@ public sealed class SshProtocolHandler : IProtocolHandler
             trace.Fail(exception.ExitCode);
             events.ReportInfo(SshInfoLines.ClosingConnection(connectionNumber));
             return TransferResult.Failure(exception.ExitCode, exception.Message);
+        }
+        catch (OperationCanceledException) when (connectPhase.HasPassed)
+        {
+            TransferResult timedOut = connectPhase.Failure();
+            events.ReportInfo(timedOut.ErrorMessage!);
+            trace.Fail(timedOut.ExitCode);
+            events.ReportInfo(SshInfoLines.ClosingConnection(connectionNumber));
+            return timedOut;
         }
     }
 
@@ -260,23 +270,19 @@ public sealed class SshProtocolHandler : IProtocolHandler
         context.Url.Scheme != ScpScheme && context.Upload is null && SftpRemotePath.NamesDirectory(context.Url.AbsolutePath);
 
     // The handshake, then the rest of the session, which always ends with DISCONNECT.
-    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log, SshStateTrace trace)
+    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log, SshStateTrace trace, CancellationToken connectPhase)
     {
         SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(
             preferences.WithCompression(target.Options.Compression), target.Host, target.Port, target.Options, target.KnownHosts, context.Events);
         SshTransport transport = new(connection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource, log);
-        SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(context.CancellationToken).ConfigureAwait(false);
-        log.HandshakeNegotiated(handshake);
-        long started = context.TimeProvider.GetTimestamp();
-        SshKeyExchangeResult keys = await transport.ExchangeKeysAsync(handshake, context.CancellationToken).ConfigureAwait(false);
-        log.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
+        SshKeyExchangeResult keys = await ExchangeKeysAsync(context, transport, log, connectPhase).ConfigureAwait(false);
         // Not an await in a finally: the compiler's rethrow for one tests whether the captured
         // object is an Exception, a branch no C# code can take the other way (BL-1357).
         TransferResult? result = null;
         ExceptionDispatchInfo? failure = null;
         try
         {
-            result = await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey, trace).ConfigureAwait(false);
+            result = await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey, trace, connectPhase).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -288,16 +294,46 @@ public sealed class SshProtocolHandler : IProtocolHandler
         return result!;
     }
 
-    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey, SshStateTrace trace)
+    // The identification exchange and the key exchange. Cancelled once the server's
+    // identification has arrived, the session still ends with DISCONNECT, as curl 8.22.0's
+    // does when --connect-timeout passes there (measured 2026-10-26, BL-3539).
+    private static async ValueTask<SshKeyExchangeResult> ExchangeKeysAsync(ITransferContext context, SshTransport transport, SshDiagnosticLog log, CancellationToken connectPhase)
+    {
+        // Not an await in a catch, for the reason HandshakeAndTransferAsync gives (BL-1357).
+        SshKeyExchangeResult? keys = null;
+        ExceptionDispatchInfo? cancelled = null;
+        try
+        {
+            SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(connectPhase).ConfigureAwait(false);
+            log.HandshakeNegotiated(handshake);
+            long started = context.TimeProvider.GetTimestamp();
+            keys = await transport.ExchangeKeysAsync(handshake, connectPhase).ConfigureAwait(false);
+            log.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
+        }
+        catch (OperationCanceledException exception) when (transport.HasServerIdentificationArrived)
+        {
+            cancelled = ExceptionDispatchInfo.Capture(exception);
+        }
+
+        if (cancelled is not null)
+        {
+            await DisconnectIgnoringFailureAsync(transport, context.CancellationToken).ConfigureAwait(false);
+        }
+
+        cancelled?.Throw();
+        return keys!;
+    }
+
+    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey, SshStateTrace trace, CancellationToken connectPhase)
     {
         ITransferEvents events = context.Events;
         SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
         SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector) { Trace = trace };
-        await authentication.RequestServiceAsync(context.CancellationToken).ConfigureAwait(false);
+        await authentication.RequestServiceAsync(connectPhase).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyPresented(hostKey);
-        await CheckHostKeyAsync(hostKey, target, events, trace, context.CancellationToken).ConfigureAwait(false);
+        await CheckHostKeyAsync(hostKey, target, events, trace, connectPhase).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyAccepted(target.Options, target.KnownHosts);
-        await authentication.AuthenticateAsync(context.Credentials, context.CancellationToken).ConfigureAwait(false);
+        await authentication.AuthenticateAsync(context.Credentials, connectPhase).ConfigureAwait(false);
         trace.Enter(SshUserAuthentication.AuthDoneState);
         events.ReportInfo(SshInfoLines.AuthenticationComplete);
         bool overScp = context.Url.Scheme == ScpScheme;
