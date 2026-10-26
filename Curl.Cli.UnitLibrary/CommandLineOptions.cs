@@ -299,6 +299,17 @@ public sealed class CommandLineOptions
     public bool ActsAsQuicBuild { get => globals.ActsAsQuicBuild; internal set => globals.ActsAsQuicBuild = value; }
 
     /// <summary>
+    /// <see langword="true"/> when the command line is read as a curl built with ECH reads it (<c>--enable-ech</c>
+    /// with a TLS library that has ECH): <c>--ech</c> is accepted and runs over Curl's hand-built TLS 1.3 client
+    /// (ADR-0327). <see langword="false"/> as every reference build reads it - Schannel on Windows, OpenSSL without
+    /// ECH on Linux and macOS - which refuses <c>--ech</c> with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutEch"/>,
+    /// ADR-0822). The executable never sets it; tests and the conformance harness ask
+    /// <see cref="CommandLineParser"/> for it to reach the ECH code.
+    /// </summary>
+    public bool ActsAsEchBuild { get => globals.ActsAsEchBuild; internal set => globals.ActsAsEchBuild = value; }
+
+    /// <summary>
     /// Reads an environment variable for <c>--variable %name</c>; <see langword="null"/> when it is not set.
     /// This process's environment unless <see cref="CommandLineParser"/> is given the run's own reader (BL-1943).
     /// </summary>

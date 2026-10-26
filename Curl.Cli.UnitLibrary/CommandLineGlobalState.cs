@@ -49,6 +49,8 @@ internal sealed class CommandLineGlobalState
 
     public bool ActsAsQuicBuild { get; set; }
 
+    public bool ActsAsEchBuild { get; set; }
+
     public Func<string, string?> ReadEnvironmentVariable { get; set; } = Environment.GetEnvironmentVariable;
 
     public bool Silent { get; set; }

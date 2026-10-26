@@ -24,6 +24,10 @@ public static class CurlAiHelpText
     private const string NoQuicRefusalLine =
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) have no QUIC library.";
 
+    /// <summary>The line an option's section carries when every reference build refuses it for want of ECH (ADR-0822).</summary>
+    private const string NoEchRefusalLine =
+        "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) are built without ECH.";
+
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own diagnostic-log
     /// options. <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
@@ -191,6 +195,7 @@ public static class CurlAiHelpText
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && !row.RefusedWhenTurnedOn) ? [] : ["- Not supported by this build yet: curl refuses it with exit 2."]);
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByWindowsSchannelBuild) ? [SchannelBuildRefusalLine] : []);
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByEveryReferenceBuild) ? [NoQuicRefusalLine] : []);
+        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByBuildsWithoutEch) ? [NoEchRefusalLine] : []);
         lines.AddRange([string.Empty, CurlManualMarkdown.Escape(entry.Description) + "."]);
         lines.AddRange(CurlManualMarkdown.TryGetOptionMarkdown(longName, out IReadOnlyList<string> manual) ? [string.Empty, .. manual] : []);
         return lines;

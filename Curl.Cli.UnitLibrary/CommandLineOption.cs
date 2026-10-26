@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedByEveryReferenceBuild = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedByEveryReferenceBuild = false, bool refusedWithoutEch = false)
     {
         RefusedWhenTurnedOn = refusedWhenTurnedOn;
         LongName = longName;
@@ -20,6 +20,7 @@ public sealed class CommandLineOption
         ShortNameTurnsOff = shortNameTurnsOff;
         RefusedByWindowsSchannelBuild = refusedByWindowsSchannelBuild;
         RefusedByEveryReferenceBuild = refusedByEveryReferenceBuild;
+        RefusedByBuildsWithoutEch = refusedWithoutEch;
     }
 
     /// <summary>
@@ -79,6 +80,13 @@ public sealed class CommandLineOption
     /// and so does Curl unless the parse reads as a QUIC build (<see cref="CommandLineOptions.ActsAsQuicBuild"/>, ADR-0540).
     /// </summary>
     public bool RefusedByEveryReferenceBuild { get; }
+
+    /// <summary>
+    /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutEch"/>: every reference build -
+    /// Schannel on Windows, OpenSSL built without ECH on Linux and macOS - refuses the option with exit 2, and so
+    /// does Curl unless the parse reads as an ECH build (<see cref="CommandLineOptions.ActsAsEchBuild"/>, ADR-0822).
+    /// </summary>
+    public bool RefusedByBuildsWithoutEch { get; }
 
     /// <summary>
     /// <see langword="true"/> for a row built with <see cref="UnsupportedFlagTurnedOffQuietly"/>: turning the
@@ -155,6 +163,30 @@ public sealed class CommandLineOption
             ShortNameTurnsOff,
             warnsAboutLeadingUnicode: false,
             refusedByEveryReferenceBuild: true);
+    }
+
+    /// <summary>
+    /// Returns this value row refused with <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> unless
+    /// the parse reads as a curl built with ECH (<see cref="CommandLineOptions.ActsAsEchBuild"/>), and otherwise
+    /// applied as before. curl builds ECH only on request, so no reference build has it - curl 8.22.0's Schannel
+    /// build answers <c>curl: option --ech: the installed libcurl version does not support this</c> and exit 2
+    /// (measured 2026-10-26, BL-3571), as does the OpenSSL build from the release tarball - and <c>--ech</c> is
+    /// refused on every platform (CGR-042, ADR-0822).
+    /// </summary>
+    /// <returns>The row, refused on every reference build.</returns>
+    public CommandLineOption RefusedWithoutEch()
+    {
+        return new CommandLineOption(
+            LongName,
+            ShortName,
+            TakesValue,
+            Refusing(options => !options.ActsAsEchBuild, Apply),
+            negate: null,
+            TakesSubject,
+            EndsBundle,
+            ShortNameTurnsOff,
+            warnsAboutLeadingUnicode: false,
+            refusedWithoutEch: true);
     }
 
     /// <summary>

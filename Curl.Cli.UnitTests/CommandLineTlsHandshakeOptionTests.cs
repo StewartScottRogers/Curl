@@ -358,10 +358,10 @@ public sealed class CommandLineTlsHandshakeOptionTests
     }
 
     private CommandLineParseResult Parse(IReadOnlyList<string> arguments) =>
-        WriteDiagnostics(arguments, () => OpenSslBuildParser.Parse(arguments));
+        WriteDiagnostics(arguments, () => EchBuildParser.Parse(arguments));
 
     private CommandLineParseResult Parse(IReadOnlyList<string> arguments, IDataFileReader reader) =>
-        WriteDiagnostics(arguments, () => OpenSslBuildParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader));
+        WriteDiagnostics(arguments, () => EchBuildParser.Parse(arguments, _ => true, new UnexpectedPasswordPrompt(), reader));
 
     private CommandLineParseResult WriteDiagnostics(IReadOnlyList<string> arguments, Func<CommandLineParseResult> parse)
     {

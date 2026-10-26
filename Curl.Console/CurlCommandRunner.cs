@@ -287,6 +287,11 @@ namespace Curl.Console;
 /// </para>
 /// </remarks>
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
+/// <param name="parsesAsEchBuild">
+/// Whether the command line is read as a curl built with ECH reads it (<see cref="CommandLineOptions.ActsAsEchBuild" />),
+/// accepting <c>--ech</c>; off by default, as every reference build refuses it (ADR-0822). Tests and the conformance
+/// harness turn it on to reach the hand-built ECH.
+/// </param>
 /// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>
 /// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
@@ -322,7 +327,8 @@ internal sealed class CurlCommandRunner(
     bool parsesAsQuicBuild = false,
     ICurlEngine? curlEngine = null,
     Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null,
-    DebugWriteOutStandIn? debugWriteOut = null)
+    DebugWriteOutStandIn? debugWriteOut = null,
+    bool parsesAsEchBuild = false)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -1422,7 +1428,8 @@ internal sealed class CurlCommandRunner(
             defaultConfigFileSearch ?? NoDefaultConfigFile,
             parsesAsWindowsBuild ?? OperatingSystem.IsWindows(),
             EnvironmentVariables,
-            parsesAsQuicBuild);
+            parsesAsQuicBuild,
+            parsesAsEchBuild);
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL

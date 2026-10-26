@@ -40,7 +40,7 @@ public static class CurlVersionText
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
     /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
     /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
-    /// No <c>ECH</c>: no reference build lists it, since curl builds ECH only on request, though <c>--ech</c> still works (ADR-0448, ADR-0520, BL-2329).
+    /// No <c>ECH</c>: no reference build lists it, since curl builds ECH only on request, and <c>--ech</c> is refused as every reference build refuses it (ADR-0448, ADR-0520, ADR-0822).
     /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
     /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).
     /// <c>SSLS-EXPORT</c> off Windows, after <c>SSL</c>, as the OpenSSL reference build lists it, because
@@ -53,7 +53,7 @@ public static class CurlVersionText
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
     /// Schannel reference build lists it, because NTLM, Negotiate and Kerberos answer through SSPI on
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
-    /// the Schannel reference build does not list, though <c>--ech</c> still works (ADR-0448, BL-1822), and
+    /// the Schannel reference build does not list, refusing <c>--ech</c> as it does (ADR-0448, ADR-0822), and
     /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
     /// Kerberos answer through SSPI there (ADR-0449, BL-1823), without <c>HTTP2</c> or <c>HTTPSRR</c>, which the
     /// Schannel reference build does not list, though Curl's own HTTP/2 and HTTPS records still work there (ADR-0808, BL-3359), and without

@@ -264,7 +264,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.Text("curves", null, (options, curves) => options.Curves = curves),
         CommandLineOption.Text("sigalgs", null, (options, algorithms) => options.SignatureAlgorithms = algorithms),
         CommandLineOption.NegatableFlag("tls-earlydata", null, (options, on) => options.TlsEarlyData = on),
-        CommandLineOption.Value("ech", null, SetEch),
+        CommandLineOption.Value("ech", null, SetEch).RefusedWithoutEch(),
         CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file).RefusedBySchannelBuild(),
         CommandLineOption.Text("engine", null, SetEngine),
         CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),

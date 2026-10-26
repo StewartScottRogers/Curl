@@ -206,6 +206,7 @@ public sealed partial class UpstreamConformanceTests
             honoursAltSvcHttpVariable: true,
             honoursDnsServerVariable: true,
             parsesAsQuicBuild: true,
+            parsesAsEchBuild: true,
             extendedAttributeWriter: ExtendedAttributeWriterFor(invocation),
             honoursDebugWriteOutVariables: true,
             webSocketRandomSource: WebSocketRandomSourceFor(invocation.EnvironmentVariables),
