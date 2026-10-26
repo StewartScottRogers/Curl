@@ -223,10 +223,12 @@ public sealed class RedirectFollower(
         {
             TransferResult result = await DispatchAsync(hop, policy);
             chain.Add(result.Report, hop.Http!.Referer);
-            if (RedirectTarget(result) is not { } target)
+            if (RedirectTarget(result) is not { } redirectUrl)
             {
                 return chain.Merge(result);
             }
+
+            string target = chain.Targeted(redirectUrl);
 
             int responseCode = result.Report!.ResponseCode;
             receivedHttp10 |= result.Report.HttpVersion == HttpVersion.Version10;
@@ -899,6 +901,7 @@ public sealed class RedirectFollower(
         private long requestSize;
         private int connectionCount;
         private bool redirectUrlCleared;
+        private bool targetHoldsHeaderBytes;
         private readonly List<KeyValuePair<string, string>> earlierResponseHeaders = [];
 
         public int RedirectCount { get; private set; }
@@ -920,11 +923,26 @@ public sealed class RedirectFollower(
             RedirectCount += report.RedirectCount;
         }
 
+        /// <summary>
+        /// Takes the last hop's <see cref="TransferReport.RedirectUrl" /> as the next target: the
+        /// target with its header bytes unmarked (<see cref="HeaderByteText" />), for parsing and
+        /// following. A target that held marked bytes came whole from an absolute <c>Location</c>,
+        /// so the effective URL it becomes is marked again, and <c>%{url_effective}</c> writes
+        /// those bytes back as curl 8.22.0 does (CGR-062, ADR-0824).
+        /// </summary>
+        public string Targeted(string redirectUrl)
+        {
+            targetHoldsHeaderBytes = HeaderByteText.HasMarks(redirectUrl);
+            return HeaderByteText.Unmark(redirectUrl);
+        }
+
         public void Followed(string url)
         {
-            effectiveUrl = url;
+            effectiveUrl = AsEffectiveUrl(url);
             RedirectCount++;
         }
+
+        private string AsEffectiveUrl(string url) => targetHoldsHeaderBytes ? HeaderByteText.Mark(url) : url;
 
         /// <summary>
         /// Records that the last hop's redirect target was refused, clearing its
@@ -939,7 +957,7 @@ public sealed class RedirectFollower(
         /// </summary>
         public void CountRefused(string? reachedUrl)
         {
-            effectiveUrl = reachedUrl ?? effectiveUrl;
+            effectiveUrl = reachedUrl is null ? effectiveUrl : AsEffectiveUrl(reachedUrl);
             RedirectCount++;
         }
 

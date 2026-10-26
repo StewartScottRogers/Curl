@@ -417,11 +417,12 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
     /// <summary>
     /// One part of <paramref name="text"/> as curl's <c>urlpart</c> prints it: parsed
     /// without path-as-is, and <see langword="null"/>, which prints nothing, when the URL
-    /// does not parse or has no such part.
+    /// does not parse or has no such part. Header bytes an effective URL carries marked
+    /// (<see cref="HeaderByteText"/>) are parsed as their Latin-1 characters.
     /// </summary>
     private static string? FindUrlPart(string text, Func<CurlUrl, string?> read)
     {
-        return CurlUrl.TryParse(text, pathAsIs: false, out CurlUrl? parsed) ? read(parsed) : null;
+        return CurlUrl.TryParse(HeaderByteText.Unmark(text), pathAsIs: false, out CurlUrl? parsed) ? read(parsed) : null;
     }
 
     /// <summary>

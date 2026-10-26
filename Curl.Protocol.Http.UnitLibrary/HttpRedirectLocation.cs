@@ -14,7 +14,9 @@ namespace Curl.Protocol.Http;
 /// <para>
 /// An absolute value (one with a scheme) keeps its bytes, spaces and percent escapes as
 /// sent, with its scheme lowercased and, when it names an authority, its dot segments
-/// removed and an empty path made <c>/</c>; one that is not a valid URL is kept whole.
+/// removed and an empty path made <c>/</c>; one that is not a valid URL is kept whole. Its bytes from
+/// 0x80 are marked (<see cref="HeaderByteText" />), so <c>%{redirect_url}</c> and, once followed,
+/// <c>%{url_effective}</c> write each back as that one byte, as curl 8.22.0 does (CGR-062, ADR-0824).
 /// </para>
 /// <para>
 /// Any other value is a reference resolved by RFC 3986 section 5.2: scheme-relative
@@ -59,7 +61,7 @@ internal static class HttpRedirectLocation
     {
         if (HasScheme(location))
         {
-            return NormalizeAbsolute(location);
+            return HeaderByteText.Mark(NormalizeAbsolute(location));
         }
 
         string reference = Encode(location);
