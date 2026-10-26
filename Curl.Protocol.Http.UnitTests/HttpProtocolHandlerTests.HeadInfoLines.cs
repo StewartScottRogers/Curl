@@ -141,12 +141,12 @@ public sealed partial class HttpProtocolHandlerTests
         Diagnostics.Assert("exit code", CurlExitCode.HttpReturnedError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.HttpReturnedError, result.ExitCode);
         WriteExpectedLines(
-            "events 4 to 6",
-            ["< X: y\r\n", NoEndOfMessageLine, "< \r\n"],
-            events.Events.Skip(4).Take(3).ToArray());
+            "events 4 to 7",
+            ["< X: y\r\n", NoEndOfMessageLine, "* The requested URL returned error: 404", "< \r\n"],
+            events.Events.Skip(4).Take(4).ToArray());
         CollectionAssert.AreEqual(
-            new[] { "< X: y\r\n", NoEndOfMessageLine, "< \r\n" },
-            events.Events.Skip(4).Take(3).ToArray());
+            new[] { "< X: y\r\n", NoEndOfMessageLine, "* The requested URL returned error: 404", "< \r\n" },
+            events.Events.Skip(4).Take(4).ToArray());
     }
 
     [TestMethod]

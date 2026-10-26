@@ -1254,9 +1254,16 @@ public sealed class HttpProtocolHandler(
         outcome switch
         {
             { ReportsLeftIntact: true } => LeftIntactLine(target, connect),
-            { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
+            { DiedBeforeResponse: false } when ClosesTheConnection(outcome.Result.ExitCode) => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
             _ => HttpConnectionInfoLines.ShuttingDown(connect.ConnectionNumber),
         };
+
+    /// <summary>
+    /// Tells whether a failure that came once a response began ends with <c>closing connection
+    /// #N</c>: every one but an empty reply, whose connection curl 8.22.0 shuts down (measured, BL-3617).
+    /// </summary>
+    private static bool ClosesTheConnection(CurlExitCode exitCode) =>
+        exitCode is not (CurlExitCode.Ok or CurlExitCode.GotNothing);
 
     /// <summary>
     /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
@@ -1390,13 +1397,41 @@ public sealed class HttpProtocolHandler(
         bool reusedConnection,
         HttpTransferException failure)
     {
+        ReportReturnedError(plan.Context.Events, failure);
         headReader.ReportHeldLines();
         ReportReceiveFailure(plan.Context.Events, failure);
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
         { Report = WithHeadBeforeFailure(exchange.Report(body), failure) };
-        return FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
+        HttpAttemptOutcome outcome = FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
+        ReportEmptyReply(plan.Context.Events, failure, outcome);
+        return outcome;
+    }
+
+    /// <summary>
+    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c> as a <c>-v</c> line, as
+    /// curl 8.22.0's <c>failf</c> does, before the head's held empty line (measured, BL-3617).
+    /// </summary>
+    private static void ReportReturnedError(ITransferEvents events, HttpTransferException failure)
+    {
+        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        {
+            events.ReportInfo(failure.Message);
+        }
+    }
+
+    /// <summary>
+    /// Echoes <c>Empty reply from server</c> as a <c>-v</c> line, as curl 8.22.0's <c>failf</c>
+    /// does, when the transfer ends with it rather than sending the request again on a new
+    /// connection (measured, BL-3617).
+    /// </summary>
+    private static void ReportEmptyReply(ITransferEvents events, HttpTransferException failure, HttpAttemptOutcome outcome)
+    {
+        if (failure.Message == HttpTransferMessages.EmptyReply && outcome.Retry is null)
+        {
+            events.ReportInfo(failure.Message);
+        }
     }
 
     /// <summary>
