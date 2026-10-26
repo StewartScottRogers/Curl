@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 
 namespace Curl.Output;
@@ -29,7 +30,9 @@ namespace Curl.Output;
 /// fixed buffers do. A <c>%{name}</c> of 24 bytes or more ends the rendering there,
 /// silently, as curl's 24-byte name buffer does. Text is written as UTF-8, except header
 /// bytes marked by <see cref="MarkHeaderBytes"/>, which are written as the raw bytes they
-/// were (CGR-021, ADR-0816).
+/// were (CGR-021, ADR-0816), and lone surrogates U+DC80 to U+DCFF, which stand for argument
+/// bytes that were not valid UTF-8 (CGR-016, ADR-0822), which are written as those bytes, as
+/// curl writes its arguments unchanged.
 /// </para>
 /// <para>
 /// The Windows curl writes all three targets in text mode, so every line feed it writes,
@@ -53,6 +56,17 @@ public sealed class WriteOutTemplateRenderer(
     private const char FirstHighByte = '\u0080';
     private const char LastHighByte = 'ÿ';
     private const int RawByteOffset = 0xF700;
+    private const char FirstInvalidByteEscape = '\uDC80';
+    private const char LastInvalidByteEscape = '\uDCFF';
+
+    /// <summary>
+    /// The characters written as one raw byte each: a marked header byte (U+F780 to U+F7FF)
+    /// and an invalid UTF-8 argument byte kept as a lone surrogate (U+DC80 to U+DCFF, ADR-0822);
+    /// byte <c>b</c> is the character's low eight bits either way.
+    /// </summary>
+    private static readonly SearchValues<char> RawByteCharacters = SearchValues.Create(
+        CharactersFrom((char)(RawByteOffset + FirstHighByte), (char)(RawByteOffset + LastHighByte))
+        + CharactersFrom(FirstInvalidByteEscape, LastInvalidByteEscape));
 
     private readonly IWriteOutFileOpener fileOpener = fileOpener ?? throw new ArgumentNullException(nameof(fileOpener));
     private readonly WriteOutTimeDialect timeDialect = timeDialect;
@@ -131,25 +145,39 @@ public sealed class WriteOutTemplateRenderer(
     private byte[] Encode(string text)
     {
         string lines = writesLineFeedAsCrLf ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text;
-        return lines.AsSpan().IndexOfAnyInRange((char)(RawByteOffset + FirstHighByte), (char)(RawByteOffset + LastHighByte)) < 0
+        return lines.AsSpan().IndexOfAny(RawByteCharacters) < 0
             ? Encoding.UTF8.GetBytes(lines)
             : EncodeWithRawBytes(lines);
     }
+
+    private static string CharactersFrom(char first, char last) =>
+        string.Create(last - first + 1, first, static (characters, start) =>
+        {
+            for (int index = 0; index < characters.Length; index++)
+            {
+                characters[index] = (char)(start + index);
+            }
+        });
 
     private static byte[] EncodeWithRawBytes(string text)
     {
         List<byte> bytes = new(text.Length);
         Span<byte> encoded = stackalloc byte[4];
-        foreach (Rune rune in text.EnumerateRunes())
+        ReadOnlySpan<char> rest = text;
+        while (!rest.IsEmpty)
         {
-            if (rune.Value is >= RawByteOffset + FirstHighByte and <= RawByteOffset + LastHighByte)
+            Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed);
+            char first = rest[0];
+            if (RawByteCharacters.Contains(first))
             {
-                bytes.Add((byte)(rune.Value - RawByteOffset));
+                bytes.Add((byte)first);
             }
             else
             {
                 bytes.AddRange(encoded[..rune.EncodeToUtf8(encoded)]);
             }
+
+            rest = rest[consumed..];
         }
 
         return [.. bytes];
