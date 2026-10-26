@@ -46,4 +46,4 @@ The OpenSSL build's form (`matchesSspiBuild` false) is unchanged.
   wrong response.
 - SSPI sends `nc=00000002` in its first answer when the 401 closed the connection (it sends
   `nc=00000001` on a kept connection); the authenticator keeps no connection state, so that is
-  left to BL-3869.
+  left to BL-3874.

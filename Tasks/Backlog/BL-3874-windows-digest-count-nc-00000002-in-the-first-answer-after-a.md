@@ -1,5 +1,5 @@
 ---
-id: BL-3869
+id: BL-3874
 title: Windows Digest: count nc=00000002 in the first answer after a 401 that closed the connection, as SSPI curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3869 — Windows Digest: count nc=00000002 in the first answer after a 401 that closed the connection, as SSPI curl does
+# BL-3874 — Windows Digest: count nc=00000002 in the first answer after a 401 that closed the connection, as SSPI curl does
 
 ## Goal
 
