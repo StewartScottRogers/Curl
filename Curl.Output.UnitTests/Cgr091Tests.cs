@@ -133,7 +133,15 @@ public sealed class Cgr091Tests
             names.WriteOctetString([1, 2, 3, 4, 5], new Asn1Tag(TagClass.ContextSpecific, 7));
             using (names.PushSequence(new Asn1Tag(TagClass.ContextSpecific, 4, isConstructed: true)))
             {
-                names.WriteEncodedValue(new X500DistinguishedName("CN=café").RawData);
+                // Written by hand: X500DistinguishedName encodes "café" as a BMPString on Windows
+                // but as a UTF8String on Linux and macOS.
+                using (names.PushSequence())
+                using (names.PushSetOf())
+                using (names.PushSequence())
+                {
+                    names.WriteObjectIdentifier("2.5.4.3");
+                    names.WriteCharacterString(UniversalTagNumber.BMPString, "café");
+                }
             }
         }
 
