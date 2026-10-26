@@ -251,7 +251,7 @@ public sealed class EngineCompositionDohTests
     }
 
     [TestMethod]
-    public async Task UnusableDohUrlResolver_ResolvesEveryNameToNoAddress()
+    public async Task UnusableDohUrlResolver_ResolvesANameToNoAddress()
     {
         Diagnostics.Arrange("name", "example.test");
 

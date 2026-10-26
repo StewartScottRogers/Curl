@@ -62,8 +62,8 @@ internal static partial class EngineComposition
     /// <summary>
     /// Creates the resolver <c>--doh-url</c> asks for: a <see cref="DohDnsResolver" /> over
     /// <paramref name="connector" /> for the URL <see cref="DohUrlOf" /> makes of the value, or, when it
-    /// makes none, an <see cref="UnusableDohUrlResolver" />, so every name fails to resolve with exit 6
-    /// as curl 8.21.0 fails <c>--doh-url bogus</c> and an <c>ftp://</c> DoH URL (measured, BL-642).
+    /// makes none, an <see cref="UnusableDohUrlResolver" />, so every name but an IP literal or <c>localhost</c> fails
+    /// to resolve with exit 6 as curl 8.22.0 fails <c>--doh-url bogus</c> and an <c>ftp://</c> DoH URL (measured, BL-642).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <param name="connector">Opens each DoH connection: <see cref="CreateDohConnector" />'s in production.</param>
