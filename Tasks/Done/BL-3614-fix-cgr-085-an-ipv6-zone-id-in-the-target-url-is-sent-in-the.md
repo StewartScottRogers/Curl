@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HttpProxyTunnel.cs, Curl.Networking.UnitTests/Cgr085Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3614 — Fix CGR-085: An IPv6 zone id in the target URL is sent in the CONNECT request line and CONNECT Host header; curl strips it
 
@@ -60,17 +60,24 @@ curl -s -p -x http://127.0.0.1:20600 "http://[fe80::1%25eth0]:8080/x"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr085Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Small single-file fix, so it was done directly rather than through the full /feature stages (sensible default, rule 1): `HttpProxyTunnel.BuildConnectRequest` now passes the host through the new `WithoutZoneId` (drops `%<zone>` from an IPv6 host, bracketed or not) before `FormatAuthority`. CONNECT-UDP and the proxy's own authority are unchanged. No ADR: it matches measured curl, no design choice.
+- Measured with `Record-CurlExchange.ps1 -Port 20614 -Connections 2 -Response 'HTTP/1.1 200 Connection established\r\n\r\n','HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n' -CurlArgs '-s','-p','-x','http://127.0.0.1:20614','http://[fe80::1%25eth0]:8080/x'` (the recorder closes after the CONNECT reply, so both exit 56 and the tunnelled GET is not reached). REF (curl 8.22.0 Schannel): exit 56, empty stdout and stderr, `CONNECT [fe80::1]:8080 HTTP/1.1\r\nHost: [fe80::1]:8080\r\nUser-Agent: curl/8.22.0\r\nProxy-Connection: Keep-Alive\r\n\r\n`. PORT before the fix: exit 56, `CONNECT [fe80::1%eth0]:8080` and `Host: [fe80::1%eth0]:8080`. PORT after: request.bin, stdout.bin, stderr.txt and exitcode.txt byte-identical to REF.
+- Variant that already matched: `http://[fe80::1]:8080/x` (no zone) - all four files identical to REF after the fix.
+- `Cgr085Tests.BuildConnectRequest_HostWithZoneId_SendsTheAddressWithoutIt` failed both data rows with the call reverted and passes with it. The tests are pure string building, platform-neutral; Linux's answer is the same per the report (Both), so CI on Linux and macOS is covered by keeping the change platform-neutral.
+- Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 0 failing members. `dotnet build` clean; fast tests 43825 passed, 0 failed.
+
 ## Log
 
 - 2026-10-26: Created from CGR-085 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. The CONNECT request line and Host header drop an IPv6 zone id, as curl 8.22.0 does (CGR-085)
