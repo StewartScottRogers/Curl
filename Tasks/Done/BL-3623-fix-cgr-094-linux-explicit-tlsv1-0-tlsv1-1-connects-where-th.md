@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/Cgr094Tests.cs]
+touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/Cgr094Tests.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.LegacyVersions.cs, Curl.Networking.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3623 — Fix CGR-094: Linux: explicit --tlsv1.0 / --tlsv1.1 connects where the OpenSSL reference refuses at the default security level
 
@@ -60,17 +60,23 @@ curl -sS -k --tlsv1.1 https://localhost:<p>/index.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr094Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 7): Measured in WSL with curl 8.18.0 (OpenSSL 3.5.5; no 8.22.0 OpenSSL build is on this machine, and the refusal comes from OpenSSL 3's security level, not the curl version) against `openssl s_server -accept P -cert c.pem -key k.pem -WWW -tls1_1 -cipher DEFAULT@SECLEVEL=0` (and `-tls1`), serving `index.txt` = `hello tls`. REF: `curl -sS -k --tlsv1.1 https://localhost:P/index.txt` and `--tlsv1.0` exit 35 with `curl: (35) TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version`, no stdout; the server logs a ClientHello whose legacy version is 0x0303 (supported_versions TLS 1.3 and 1.2 only). Variants: `--tlsv1.1 --tls-max 1.2` exit 35 `error:0A000102:SSL routines::unsupported protocol`; `--tlsv1.0 --tls-max 1.1` exit 35 `error:0A0000BF:SSL routines::no protocols available` (already matched); `--tlsv1.1 --ciphers DEFAULT@SECLEVEL=0` exit 0 `hello tls` from the TLS 1.1 server and the alert from the TLS 1.0 one.
+- PORT before the fix: exit 0, `hello tls`. Cause: the hand-built client offered the `--tlsv1.x` minimum in the OpenSSL build, which OpenSSL 3's default security level 1 never does. Fix (ADR-0827): `HandBuiltTlsProvider.WithSecurityLevelMinimum` raises a TLS 1.0/1.1 minimum under a TLS 1.2+ ceiling to TLS 1.2 in the OpenSSL build unless the last `@SECLEVEL=` of `--ciphers` is 0. PORT after the fix (a linux-x64 publish of Curl.Console run in the same WSL against the same servers): all ten command/server combinations above give the same exit code, stdout and stderr as REF. No file is written by either; the hello now offers what curl's does (pinned by `Cgr094Tests`).
+- `Cgr094Tests` (9 cases) fail 6 of 9 with the fix disabled and pass with it. Two OpenSSL rows of `HandBuiltTlsProviderTests.LegacyVersions`' legacy-minimum-alone test pinned the old (wrong) behaviour and were removed, so that file was added to `touches`, with the library's `CLAUDE.md` for one sentence on ADR-0827; no task in Doing on origin/work/dark-factory named either.
+- Choice: the legacy ceiling with `@SECLEVEL=0` (`--tlsv1.0 --tls-max 1.1 --ciphers DEFAULT@SECLEVEL=0`) still refuses before any hello (ADR-0364); not part of CGR-094, filed as BL-3873.
+- Build clean; fast tests green in all 46 unit test projects; `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 100% line, 100% branch, 0 failing members (a first version at complexity 12 was split). The change is platform-neutral (the tests name the build explicitly), so CI on Linux and macOS is covered by the fast run here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-094 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Linux OpenSSL build raises a --tlsv1.0/--tlsv1.1 minimum to TLS 1.2 as OpenSSL 3's security level does (CGR-094)
