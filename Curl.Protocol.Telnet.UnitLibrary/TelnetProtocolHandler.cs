@@ -70,6 +70,13 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private const int BufferSize = 16384;
 
     /// <summary>
+    /// How long the telnet loop waits for the server before it sends the upload's next
+    /// buffer: curl 8.22.0's <c>telnet_do</c> polls the socket for 100 ms between reads of an
+    /// upload (<c>wait_timeout</c> on Windows, <c>interval_ms</c> elsewhere).
+    /// </summary>
+    private static readonly TimeSpan UploadInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
     /// The most bytes read from the server at once: curl 8.21.0's telnet reads the socket
     /// at most 4096 bytes at a time, so no single output write is ever larger.
     /// </summary>
@@ -181,22 +188,17 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         TelnetOutbox outbox,
         long startedAt)
     {
-        var sendLock = new SemaphoreSlim(1, 1);
-        var uploadSendFailed = new TaskCompletionSource<IOException>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var uploadCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
-        Task upload = context.Upload is { } source
-            ? SendUploadAsync(source, connection, sendLock, uploadSendFailed, uploadCancellation.Token)
-            : Task.CompletedTask;
-
+        TelnetUploadReader? upload = context.Upload is { } source ? new TelnetUploadReader(source, uploadCancellation.Token) : null;
         try
         {
-            return await ReceiveUntilClosedAsync(connection, context, receiver, outbox, sendLock, uploadSendFailed.Task, startedAt)
+            return await ReceiveUntilClosedAsync(connection, context, receiver, outbox, upload, startedAt)
                 .ConfigureAwait(false);
         }
         finally
         {
             uploadCancellation.Cancel();
-            ObserveFault(upload);
+            upload?.Abandon();
         }
     }
 
@@ -211,63 +213,116 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
+    /// <summary>
+    /// Runs curl 8.22.0's telnet loop (<c>telnet_do</c>): each turn waits for the server's next
+    /// read, or with an upload at most <see cref="UploadInterval" /> for it, handles what the
+    /// read brought and sends every reply it calls for, and only then sends the next buffer of
+    /// the upload. Everything goes out from this one loop, so upload bytes never land between
+    /// the writes of a negotiation reply and the upload follows the replies to the server's
+    /// opening negotiation, as curl's does (BL-3536, CGR-007).
+    /// </summary>
     private static async Task<TransferResult> ReceiveUntilClosedAsync(
         IConnection connection,
         ITransferContext context,
         TelnetReceiver receiver,
         TelnetOutbox outbox,
-        SemaphoreSlim sendLock,
-        Task<IOException> uploadSendFailed,
+        TelnetUploadReader? upload,
         long startedAt)
     {
         CancellationToken cancellationToken = context.CancellationToken;
         var buffer = new byte[ReceiveBufferSize];
         var data = new List<byte>();
         long bytesWritten = 0;
+        Task<int>? read = null;
 
         while (true)
         {
-            Task<int> read = ReadOrClosedAsync(connection, buffer, cancellationToken);
-            if (await Task.WhenAny(uploadSendFailed, read).ConfigureAwait(false) == uploadSendFailed)
+            read ??= ReadOrClosedAsync(connection, buffer, cancellationToken);
+            if (await ReadCompletedAsync(read, upload, context).ConfigureAwait(false))
             {
-                ObserveFault(read);
-                return SendFailure(await uploadSendFailed.ConfigureAwait(false), bytesWritten);
+                Task<int> completed = read;
+                read = null;
+                (TransferResult? ended, bytesWritten) = await HandleReadAsync(
+                    completed, buffer, data, connection, context, receiver, outbox, bytesWritten, startedAt).ConfigureAwait(false);
+                if (ended is not null)
+                {
+                    await SendReadyUploadAsync(ended, upload, connection, cancellationToken).ConfigureAwait(false);
+                    return ended;
+                }
             }
 
-            int count;
-            try
+            if (await TrySendUploadAsync(upload, connection, cancellationToken).ConfigureAwait(false) is { } uploadFailure)
             {
-                count = await read.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (MaxTimePassed(context, startedAt))
-            {
-                return new TransferResult(CurlExitCode.OperationTimedOut, bytesWritten, TimedOutMessage);
-            }
-
-            if (count == 0)
-            {
-                return TransferResult.Success(bytesWritten);
-            }
-
-            data.Clear();
-            TelnetReceiveError error = receiver.Receive(buffer.AsSpan(0, count), data, outbox);
-            if (await WriteReceivedDataAsync(context, data, bytesWritten).ConfigureAwait(false) is { } writeFailure)
-            {
-                return writeFailure;
-            }
-
-            bytesWritten += data.Count;
-            context.Progress.ReportDownloaded(bytesWritten, null);
-            if (await TrySendRepliesAsync(outbox, connection, sendLock, cancellationToken).ConfigureAwait(false) is { } sendFailure)
-            {
-                return SendFailure(sendFailure, bytesWritten);
-            }
-
-            if (error != TelnetReceiveError.None)
-            {
-                return ToFailure(error, bytesWritten);
+                ObserveFault(read ?? Task.CompletedTask);
+                return SendFailure(uploadFailure, bytesWritten);
             }
         }
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="read" />, or, while an upload still has bytes to send, at
+    /// most <see cref="UploadInterval" />: curl's telnet loop polls the socket that long
+    /// before it reads the upload again. Returns whether the read completed.
+    /// </summary>
+    private static async Task<bool> ReadCompletedAsync(Task<int> read, TelnetUploadReader? upload, ITransferContext context)
+    {
+        if (upload is null || upload.Finished)
+        {
+            await ((Task)read).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            return true;
+        }
+
+        Task interval = Task.Delay(UploadInterval, context.TimeProvider, context.CancellationToken);
+        return await Task.WhenAny(read, interval).ConfigureAwait(false) == read;
+    }
+
+    /// <summary>
+    /// Handles one completed read: the server closing ends the session with exit 0, the
+    /// <c>-m</c> watchdog cancelling it with exit 28; otherwise its data is written and its
+    /// replies sent. Returns the result the session ends with, or <see langword="null" /> when
+    /// it goes on, and the bytes written so far.
+    /// </summary>
+    private static async Task<(TransferResult? Ended, long BytesWritten)> HandleReadAsync(
+        Task<int> read,
+        byte[] buffer,
+        List<byte> data,
+        IConnection connection,
+        ITransferContext context,
+        TelnetReceiver receiver,
+        TelnetOutbox outbox,
+        long bytesWritten,
+        long startedAt)
+    {
+        int count;
+        try
+        {
+            count = await read.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (MaxTimePassed(context, startedAt))
+        {
+            return (new TransferResult(CurlExitCode.OperationTimedOut, bytesWritten, TimedOutMessage), bytesWritten);
+        }
+
+        if (count == 0)
+        {
+            return (TransferResult.Success(bytesWritten), bytesWritten);
+        }
+
+        data.Clear();
+        TelnetReceiveError error = receiver.Receive(buffer.AsSpan(0, count), data, outbox);
+        if (await WriteReceivedDataAsync(context, data, bytesWritten).ConfigureAwait(false) is { } writeFailure)
+        {
+            return (writeFailure, bytesWritten);
+        }
+
+        bytesWritten += data.Count;
+        context.Progress.ReportDownloaded(bytesWritten, null);
+        if (await TrySendRepliesAsync(outbox, connection, context.CancellationToken).ConfigureAwait(false) is { } sendFailure)
+        {
+            return (SendFailure(sendFailure, bytesWritten), bytesWritten);
+        }
+
+        return (error == TelnetReceiveError.None ? null : ToFailure(error, bytesWritten), bytesWritten);
     }
 
     /// <summary>
@@ -401,23 +456,34 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
             _ => new TransferResult(CurlExitCode.RecvError, bytesWritten, SuboptionErrorMessage),
         };
 
-    private static async Task SendUploadAsync(
-        Stream upload,
+    /// <summary>
+    /// Sends the upload's next buffer, IAC doubled, when its read has completed, returning
+    /// <see langword="null" /> when it went or there was none to send, or the failure when
+    /// the connection did not take it.
+    /// </summary>
+    private static async Task<IOException?> TrySendUploadAsync(
+        TelnetUploadReader? upload,
         IConnection connection,
-        SemaphoreSlim sendLock,
-        TaskCompletionSource<IOException> sendFailed,
+        CancellationToken cancellationToken) =>
+        upload?.TakeCompletedBuffer() is { } bytes
+            ? await TrySendAsync(connection, EscapeInterpretAsCommand(bytes), cancellationToken).ConfigureAwait(false)
+            : null;
+
+    /// <summary>
+    /// When the server closed (<paramref name="ended" /> is exit 0), sends every buffer of the
+    /// upload whose read has already completed, a failed write ending it quietly: curl 8.21.0
+    /// sent standard input to a telnet server that closed without a byte (BL-316).
+    /// </summary>
+    private static async Task SendReadyUploadAsync(
+        TransferResult ended,
+        TelnetUploadReader? upload,
+        IConnection connection,
         CancellationToken cancellationToken)
     {
-        var buffer = new byte[BufferSize];
-        int read;
-        while ((read = await upload.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        while (ended.ExitCode == CurlExitCode.Ok
+            && upload?.TakeCompletedBuffer() is { } bytes
+            && await TrySendAsync(connection, EscapeInterpretAsCommand(bytes), cancellationToken).ConfigureAwait(false) is null)
         {
-            byte[] escaped = EscapeInterpretAsCommand(buffer.AsSpan(0, read));
-            if (await TrySendAsync(connection, sendLock, escaped, cancellationToken).ConfigureAwait(false) is { } failure)
-            {
-                sendFailed.SetResult(failure);
-                return;
-            }
         }
     }
 
@@ -446,12 +512,11 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     private static async Task<IOException?> TrySendRepliesAsync(
         TelnetOutbox outbox,
         IConnection connection,
-        SemaphoreSlim sendLock,
         CancellationToken cancellationToken)
     {
         try
         {
-            await outbox.SendPendingAsync(reply => SendReplyAsync(connection, sendLock, reply, cancellationToken)).ConfigureAwait(false);
+            await outbox.SendPendingAsync(reply => SendReplyAsync(connection, reply, cancellationToken)).ConfigureAwait(false);
             return null;
         }
         catch (IOException failure)
@@ -467,11 +532,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// </summary>
     private static async Task<SocketException?> SendReplyAsync(
         IConnection connection,
-        SemaphoreSlim sendLock,
         byte[] reply,
         CancellationToken cancellationToken)
     {
-        await sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await connection.WriteAsync(reply, cancellationToken).ConfigureAwait(false);
@@ -482,10 +545,6 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         {
             return socketError;
         }
-        finally
-        {
-            sendLock.Release();
-        }
     }
 
     /// <summary>
@@ -494,11 +553,9 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
     /// </summary>
     private static async Task<IOException?> TrySendAsync(
         IConnection connection,
-        SemaphoreSlim sendLock,
         byte[] bytes,
         CancellationToken cancellationToken)
     {
-        await sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
@@ -509,9 +566,56 @@ public sealed class TelnetProtocolHandler(IConnector connector) : IProtocolHandl
         {
             return failure;
         }
-        finally
+    }
+
+    /// <summary>
+    /// Reads the upload one buffer at a time without the telnet loop ever waiting on it: a
+    /// read is started and its buffer taken only once it has completed, so an upload that
+    /// never yields (a terminal's standard input) leaves the session receiving. An upload
+    /// whose read fails ends there and the session goes on, as before.
+    /// </summary>
+    /// <param name="source">The upload.</param>
+    /// <param name="cancellationToken">Cancels a read still waiting when the session ends.</param>
+    private sealed class TelnetUploadReader(Stream source, CancellationToken cancellationToken)
+    {
+        private readonly byte[] buffer = new byte[BufferSize];
+
+        private Task<int>? read;
+
+        /// <summary>Gets a value indicating whether the upload has ended or failed.</summary>
+        public bool Finished { get; private set; }
+
+        /// <summary>
+        /// Takes the bytes of the upload's read when it has completed, starting the next one
+        /// first when none is waiting; returns <see langword="null" /> while the read waits,
+        /// and from the end of the upload or a failed read on.
+        /// </summary>
+        /// <returns>The bytes read, or <see langword="null" />.</returns>
+        public byte[]? TakeCompletedBuffer()
         {
-            sendLock.Release();
+            if (Finished)
+            {
+                return null;
+            }
+
+            read ??= ReadAsync();
+            if (!read.IsCompleted)
+            {
+                return null;
+            }
+
+            Task<int> completed = read;
+            read = null;
+            int count = completed.IsCompletedSuccessfully ? completed.GetAwaiter().GetResult() : 0;
+            ObserveFault(completed);
+            Finished = count == 0;
+            return Finished ? null : buffer.AsSpan(0, count).ToArray();
         }
+
+        /// <summary>Observes the fault of a read still waiting when the session ends.</summary>
+        public void Abandon() => ObserveFault(read ?? Task.CompletedTask);
+
+        /// <summary>Reads the upload, a read that throws at once ending as a faulted task.</summary>
+        private async Task<int> ReadAsync() => await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
     }
 }
