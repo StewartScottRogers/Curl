@@ -18,7 +18,7 @@ On Linux and macOS, a `file://` URL whose `%XX` escapes decode to bytes that are
 
 ## Context
 
-CGR-114 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (filed from BL-3643). Upstream passes the decoded bytes to `open()` unchanged: with a file named by the raw bytes `café.txt`, `curl -sS file://$PWD/caf%E9.txt` prints it and exits 0 (curl 8.18.0 OpenSSL, Linux). Curl exits 37, because `FileUrlPath` decodes escapes as UTF-8 into a .NET string, and .NET's file APIs cannot name a non-UTF-8 file.
+CGR-114 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (filed from BL-3643). Upstream passes the decoded bytes to `open()` unchanged: with a file named by the raw bytes `cafï¿½.txt`, `curl -sS file://$PWD/caf%E9.txt` prints it and exits 0 (curl 8.18.0 OpenSSL, Linux). Curl exits 37, because `FileUrlPath` decodes escapes as UTF-8 into a .NET string, and .NET's file APIs cannot name a non-UTF-8 file.
 This task provides the hook only: a way for `Curl.Protocol.File.UnitLibrary` (which references only `Curl.Protocol.Abstractions.UnitLibrary`) to hand `IFileSystem` a path holding arbitrary bytes, for example a byte-keeping text form in `Curl.Protocol.Abstractions.UnitLibrary/RawBytePath.cs` (the idea of `Curl.Authentication.UnitLibrary/InvalidUtf8ByteEscapingEncoding.cs`, CGR-053: each byte outside valid UTF-8 kept as a lone surrogate), and `PhysicalFileSystem` opening such a path on Unix through the raw bytes (`open(2)` via `LibraryImport`, AOT-safe, then a `FileStream` on the handle). Using it from `FileUrlPath` is BL-3643's work. Windows is unchanged.
 
 ## Acceptance criteria
@@ -33,3 +33,4 @@ This task provides the hook only: a way for `Curl.Protocol.File.UnitLibrary` (wh
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: fb155554 f361d830 002d20a6 779790c0.
