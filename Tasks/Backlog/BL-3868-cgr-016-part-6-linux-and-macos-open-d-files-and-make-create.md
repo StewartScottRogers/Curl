@@ -1,5 +1,5 @@
 ---
-id: BL-3858
+id: BL-3868
 title: CGR-016 part 6: Linux and macOS open -D files and make --create-dirs directories whose names hold invalid UTF-8 argument bytes under those raw bytes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3858 — CGR-016 part 6: Linux and macOS open -D files and make --create-dirs directories whose names hold invalid UTF-8 argument bytes under those raw bytes
+# BL-3868 — CGR-016 part 6: Linux and macOS open -D files and make --create-dirs directories whose names hold invalid UTF-8 argument bytes under those raw bytes
 
 ## Goal
 

@@ -34,7 +34,7 @@ lines need. Every other name, and every name on Windows (whose arguments are nev
 the `IFileSystem` as before. Since `--output-dir` is put in front of the `-o` name before the stream gets
 it, `--output-dir` with such bytes is covered too.
 
-`-D` files and the directories `--create-dirs` makes do not go through this stream; they are BL-3858's.
+`-D` files and the directories `--create-dirs` makes do not go through this stream; they are BL-3868's.
 
 ## Consequences
 
