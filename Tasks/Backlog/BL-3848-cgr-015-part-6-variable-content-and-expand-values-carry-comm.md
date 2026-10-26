@@ -1,5 +1,5 @@
 ---
-id: BL-3845
+id: BL-3848
 title: CGR-015 part 6: --variable content and --expand- values carry command-line text in the ANSI code page on Windows
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3845 — CGR-015 part 6: --variable content and --expand- values carry command-line text in the ANSI code page on Windows
+# BL-3848 — CGR-015 part 6: --variable content and --expand- values carry command-line text in the ANSI code page on Windows
 
 ## Goal
 
