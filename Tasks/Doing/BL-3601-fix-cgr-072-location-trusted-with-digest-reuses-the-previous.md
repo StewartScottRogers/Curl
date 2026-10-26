@@ -79,3 +79,4 @@ curl -sSL --location-trusted --digest -u user:pass http://127.0.0.1:20500/a
 - 2026-10-26: Created from CGR-072 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3867, which holds Curl.Core.UnitLibrary/RedirectFollower.cs where the kept Digest answer must be limited to same-origin hops
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
