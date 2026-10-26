@@ -41,3 +41,4 @@ Suggested shape (Decided by Claude under Stewart's delegation when BL-3565 was s
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: a4e2fcec 5f3b82ff 8d39f34c ece5cec8 67ad3778 779790c0.
