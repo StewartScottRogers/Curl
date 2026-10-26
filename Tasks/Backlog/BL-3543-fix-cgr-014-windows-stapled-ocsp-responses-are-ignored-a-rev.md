@@ -4,7 +4,7 @@ title: Fix CGR-014: Windows: stapled OCSP responses are ignored. A revoked stapl
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3825]
+depends-on: [BL-3826]
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/Cgr014Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -70,11 +70,11 @@ E\v.ps1 -Only staple
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr014Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
-- 2026-10-26 lane 4: requeued before any code edit. The repro needs a revocation PKI with good and revoked OCSP staples served by `openssl s_server -status_file`; the report's SCR scratchpad is gone and nothing in the repository builds one, so BL-3825 builds it (`Record-StapledOcspExchange.ps1`) and this task depends on it.
-- Findings for the fix: the default connection goes through `SslStream`, which exposes no stapled response (`TlsClientOptions.RequireCertificateStatus` doc; `TlsClientRouting` sends `--cert-status` to the hand-built handshake, which asks for the staple and judges it with `Curl.Tls.UnitLibrary/OcspStapleVerifier.cs`). `ServerCertificateVerification.ReadChainAnchors`/`SystemStoreChainPolicy` build an `X509ChainPolicy` with `RevocationMode.Online` and no staple, and `RevocationBestEffortTolerates` then accepts RevocationStatusUnknown. Likely fix directions: on the Schannel build, have the hand-built handshake ask for the staple (status_request) whenever revocation is checked and let a good/revoked staple decide the revocation verdict before the online check; or route through it only when a staple is present. Decide with an ADR once BL-3825 has measured real curl.
+- 2026-10-26 lane 4: requeued before any code edit. The repro needs a revocation PKI with good and revoked OCSP staples served by `openssl s_server -status_file`; the report's SCR scratchpad is gone and nothing in the repository builds one, so BL-3826 builds it (`Record-StapledOcspExchange.ps1`) and this task depends on it.
+- Findings for the fix: the default connection goes through `SslStream`, which exposes no stapled response (`TlsClientOptions.RequireCertificateStatus` doc; `TlsClientRouting` sends `--cert-status` to the hand-built handshake, which asks for the staple and judges it with `Curl.Tls.UnitLibrary/OcspStapleVerifier.cs`). `ServerCertificateVerification.ReadChainAnchors`/`SystemStoreChainPolicy` build an `X509ChainPolicy` with `RevocationMode.Online` and no staple, and `RevocationBestEffortTolerates` then accepts RevocationStatusUnknown. Likely fix directions: on the Schannel build, have the hand-built handshake ask for the staple (status_request) whenever revocation is checked and let a good/revoked staple decide the revocation verdict before the online check; or route through it only when a staple is present. Decide with an ADR once BL-3826 has measured real curl.
 
 ## Log
 
 - 2026-10-26: Created from CGR-014 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Backlog. Waits on BL-3825: the stapled-OCSP repro setup CGR-014 needs to measure real curl
+- 2026-10-26: Doing -> Backlog. Waits on BL-3826: the stapled-OCSP repro setup CGR-014 needs to measure real curl

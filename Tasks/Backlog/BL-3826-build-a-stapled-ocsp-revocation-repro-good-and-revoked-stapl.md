@@ -1,5 +1,5 @@
 ---
-id: BL-3825
+id: BL-3826
 title: Build a stapled-OCSP revocation repro (good and revoked staples) for CGR-014
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3825 — Build a stapled-OCSP revocation repro (good and revoked staples) for CGR-014
+# BL-3826 — Build a stapled-OCSP revocation repro (good and revoked staples) for CGR-014
 
 ## Goal
 
