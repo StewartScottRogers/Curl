@@ -93,7 +93,7 @@ curl -s -S -OJ http://127.0.0.1:20400/j_high
   - The `?cdhex=` URLs of CGO-08 differ only in the URL, which `-J` does not use once the header names the file, so they take the same path.
 - Fix (ADR-0821): `ContentDispositionFileName.Find` now takes the encoding to read the name in. `RemoteHeaderNameStream` passes `CredentialEncoding.ForPlatform(OperatingSystem.IsWindows())` (the system ANSI code page on Windows, UTF-8 elsewhere) unless a test gives one. I chose to compute the default in the stream rather than pass it from `CurlCommandRunner.cs`, because BL-3584 (in Doing) holds that file.
 - Touches widened to `Curl.Console/RemoteHeaderNameStream.cs` (the encoding seam) and `Curl.Console.UnitTests/ContentDispositionFileNameTests.cs` (its calls take the new argument). No task in Doing on origin/work/dark-factory names either file.
-- Linux: valid UTF-8 names still decode as UTF-8, so the variant that already matched still matches (`Cgr051Tests.Find_Utf8BytesInUtf8_GivesTheUtf8Name`). The raw non-UTF-8 byte case off Windows (`caf\351.txt`) cannot be created through `System.IO` string paths, so it is filed as BL-3855. The new tests use an explicit Windows-1252 or UTF-8 encoding, so their results do not depend on the platform (CI on Linux and macOS: platform-neutral, fast tests green here).
+- Linux: valid UTF-8 names still decode as UTF-8, so the variant that already matched still matches (`Cgr051Tests.Find_Utf8BytesInUtf8_GivesTheUtf8Name`). The raw non-UTF-8 byte case off Windows (`caf\351.txt`) cannot be created through `System.IO` string paths, so it is filed as BL-3858. The new tests use an explicit Windows-1252 or UTF-8 encoding, so their results do not depend on the platform (CI on Linux and macOS: platform-neutral, fast tests green here).
 - `Cgr051Tests` (4 tests) pins the code-page names. The old `Find` read UTF-8 on every platform, which gave `caf�.txt` and `café.txt` for the 1252 cases, so these tests fail against it.
 - Gates: `dotnet build` clean (0 warnings); fast tests passed in all 46 assemblies, 0 failures; `Measure-CodeQuality.ps1 -Library Curl.Console` reports 0 failing members; `dotnet format --verify-no-changes` is clean on the changed files.
 
@@ -101,4 +101,4 @@ curl -s -S -OJ http://127.0.0.1:20400/j_high
 
 - 2026-10-26: Created from CGR-051 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Done. -J reads the Content-Disposition name in the ANSI code page on Windows, matching curl 8.22.0 Schannel for both CGR-051 repros; Linux raw bytes filed as BL-3855
+- 2026-10-26: Doing -> Done. -J reads the Content-Disposition name in the ANSI code page on Windows, matching curl 8.22.0 Schannel for both CGR-051 repros; Linux raw bytes filed as BL-3858

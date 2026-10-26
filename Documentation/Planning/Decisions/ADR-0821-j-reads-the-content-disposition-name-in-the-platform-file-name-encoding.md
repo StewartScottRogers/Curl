@@ -28,9 +28,9 @@ the same Unicode name the ANSI API would, so both measured names match.
 
 Off Windows the name stays UTF-8: a valid UTF-8 name is already the raw bytes curl writes. A name that is
 not valid UTF-8 cannot be created through `System.IO`, whose paths are UTF-8 strings, so it keeps U+FFFD
-until BL-3855 carries the name as bytes down to the open.
+until BL-3858 carries the name as bytes down to the open.
 
 ## Consequences
 
 - `-J` on Windows writes the file the Schannel build writes for any byte in the name.
-- The Linux raw-byte case is BL-3855's.
+- The Linux raw-byte case is BL-3858's.

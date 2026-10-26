@@ -1,5 +1,5 @@
 ---
-id: BL-3855
+id: BL-3858
 title: -J off Windows: write a Content-Disposition filename that is not valid UTF-8 as its raw bytes, as the OpenSSL build does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3855 — -J off Windows: write a Content-Disposition filename that is not valid UTF-8 as its raw bytes, as the OpenSSL build does
+# BL-3858 — -J off Windows: write a Content-Disposition filename that is not valid UTF-8 as its raw bytes, as the OpenSSL build does
 
 ## Goal
 
