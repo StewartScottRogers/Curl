@@ -80,3 +80,4 @@ curl -sS -w '%{conn_id}\n' http://127.0.0.1:20700/ka http://127.0.0.1:20700/clos
 ## Log
 
 - 2026-10-26: Created from CGR-090 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
