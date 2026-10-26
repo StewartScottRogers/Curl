@@ -60,6 +60,16 @@ internal sealed partial class ManagedEasyTransfer
     internal IHttpPushedResponse? PushedResponse { get; private set; }
 
     /// <summary>
+    /// Gets or sets what puts the callbacks of the perform a multi handle starts through that handle's
+    /// <see cref="MultiCallbackQueue" />, so they run inside its perform on its caller's thread (CGR-033);
+    /// <see langword="null" /> for a perform outside any multi handle. <see cref="ManagedMultiTransfer" /> sets it before
+    /// each perform it starts, and the perform reads it once, as it starts.
+    /// </summary>
+    internal TransferCallbackMarshal? MultiCallbacks { get; set; }
+
+    private EasyOptions MarshalledOf(EasyOptions options) => MultiCallbacks is { } marshal ? options with { Callbacks = marshal.Over(options.Callbacks) } : options;
+
+    /// <summary>
     /// A duplicate of this handle bound to <paramref name="response" />, as curl 8.22.0's <c>push_promise</c> makes
     /// the pushed transfer with <c>curl_easy_duphandle</c> of the parent (BL-2469).
     /// </summary>
@@ -94,7 +104,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformPushedAsync(IHttpPushedResponse pushed, CancellationToken cancellationToken)
     {
-        EngineToolTransferOutputs outputs = OwnOutputsOf(Options.Callbacks, pauseGate: null, headers);
+        EngineToolTransferOutputs outputs = OwnOutputsOf(MarshalledOf(Options).Callbacks, pauseGate: null, headers);
         try
         {
             await PushedResponseCopier.CopyAsync(pushed.Content, outputs.HeaderOutput!, outputs.Output, cancellationToken).ConfigureAwait(false);
@@ -194,7 +204,7 @@ internal sealed partial class ManagedEasyTransfer
     /// <returns>The transfer's code.</returns>
     private async Task<CurlCode> PerformFromOptionsOverCachesAsync(CancellationToken cancellationToken)
     {
-        EasyOptions options = UrlPortOverride.Apply(UrlHandleOverride.Apply(WithoutPostFieldsUnderHttpGet(ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options)));
+        EasyOptions options = MarshalledOf(UrlPortOverride.Apply(UrlHandleOverride.Apply(WithoutPostFieldsUnderHttpGet(ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options))));
         LastResult = null;
         LastContext = null;
         if (options.Network.Url is not { } urlText)

@@ -53,6 +53,7 @@ internal sealed class ManagedMultiTransfer(
     private readonly List<CurlMultiMessage> messages = [];
     private readonly List<(CurlMultiNotification Notification, IEasyTransfer Transfer)> pendingNotifications = [];
     private readonly Lock wakeupLock = new();
+    private readonly MultiCallbackQueue callbackQueue = new();
     private Task idleConnectionsClosing = Task.CompletedTask;
     private MultiOptions options = new();
     private uint enabledNotifications;
@@ -382,7 +383,7 @@ internal sealed class ManagedMultiTransfer(
             return (CurlMultiCode.BadHandle, -1);
         }
 
-        if (entries.Exists(HasWorkForPerform))
+        if (entries.Exists(HasWorkForPerform) || callbackQueue.HasQueued)
         {
             return (CurlMultiCode.Ok, 0);
         }
@@ -687,10 +688,38 @@ internal sealed class ManagedMultiTransfer(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        MoveEveryTransferOn();
+        int previousThread = callbackQueue.EnterPerform();
+        try
+        {
+            RunQueuedCallbacks();
+            MoveEveryTransferOn();
+        }
+        finally
+        {
+            callbackQueue.LeavePerform(previousThread);
+        }
+
         SendNotifications();
         CurlMultiCode code = UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
         return ValueTask.FromResult((code, entries.Count(entry => !entry.Done)));
+    }
+
+    /// <summary>
+    /// Runs the callbacks the running transfers have asked for since the last call, on this thread and as
+    /// code inside this handle's transfers (<see cref="IsInTransferCallback" />), as libcurl's perform calls them (CGR-033).
+    /// </summary>
+    private void RunQueuedCallbacks()
+    {
+        ManagedMultiTransfer? previous = PerformingHandle.Value;
+        PerformingHandle.Value = this;
+        try
+        {
+            callbackQueue.RunQueued();
+        }
+        finally
+        {
+            PerformingHandle.Value = previous;
+        }
     }
 
     /// <summary>The started transfers first, so a slot one of them frees goes to a pending one in this call.</summary>
@@ -837,7 +866,20 @@ internal sealed class ManagedMultiTransfer(
         entry.Origin = OriginOf(entry.Transfer);
         entry.Multiplexed = IsMultiplexed(entry.Transfer, entry.Origin);
         PerformingHandle.Value = this;
-        return await entry.Transfer.PerformAsync(entry.Cancellation.Token).ConfigureAwait(false);
+        TransferCallbackMarshal callbacks = new(callbackQueue, entry.Cancellation.Token);
+        if (entry.Transfer is ManagedEasyTransfer easy)
+        {
+            easy.MultiCallbacks = callbacks;
+        }
+
+        try
+        {
+            return await entry.Transfer.PerformAsync(entry.Cancellation.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            callbacks.Stop();
+        }
     }
 
     private long RemainingMilliseconds(MultiEntry entry)
@@ -887,7 +929,7 @@ internal sealed class ManagedMultiTransfer(
     private static bool HasSocketReadyUntilNextPerform(MultiEntry entry) => entry.SocketReadyUntilNextPerform && !entry.Done;
 
     private int CountReady(Span<CurlWaitSocket> extraSockets) =>
-        MarkReadySockets(extraSockets) + entries.Count(IsFinishedUnreported) + entries.Count(HasSocketReadyUntilNextPerform);
+        MarkReadySockets(extraSockets) + entries.Count(IsFinishedUnreported) + entries.Count(HasSocketReadyUntilNextPerform) + (callbackQueue.HasQueued ? 1 : 0);
 
     private TimeSpan WaitLimit(TimeSpan timeout)
     {
@@ -904,7 +946,7 @@ internal sealed class ManagedMultiTransfer(
     /// loop spun at full CPU (BL-3206).
     /// </summary>
     internal long WaitTimerMilliseconds() =>
-        entries.Exists(HasWorkForPerform) ? 0 : entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds > 0).DefaultIfEmpty(-1).Min();
+        entries.Exists(HasWorkForPerform) || callbackQueue.HasQueued ? 0 : entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds > 0).DefaultIfEmpty(-1).Min();
 
     private int MarkReadySockets(Span<CurlWaitSocket> sockets)
     {
@@ -972,6 +1014,7 @@ internal sealed class ManagedMultiTransfer(
         TimeSpan delay = checkSockets && left > SocketPollInterval ? SocketPollInterval : left;
         List<Task> events = [.. entries.Select(entry => entry.Perform).OfType<Task>().Where(perform => !perform.IsCompleted)];
         events.Add(Task.Delay(TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, int.MaxValue)), timeProvider, stopDelay.Token));
+        events.Add(callbackQueue.Arrived);
         if (poll)
         {
             events.Add(wakeupSignal.Task);

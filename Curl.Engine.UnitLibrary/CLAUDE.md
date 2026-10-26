@@ -526,3 +526,7 @@ Under `EasyBehaviourOptions.Verbose` with no `EasyCallbackOptions.Debug`, `Manag
 ## CURLOPT_PIPEWAIT in the connection pool (BL-3351)
 
 `ManagedCurlEngine.CreateTransports` builds a library handle's `EngineToolOptions` with `Parallel` from `EasyHttpOptions.PipeWait` and `ParallelImmediate` false, so the pool's `WaitsForMultiplexing` is `CURLOPT_PIPEWAIT`, as the curl tool's is `-Z` without `--parallel-immediate` (ADR-0806). Its tests are `ManagedCurlEngineTests.Transports.cs`.
+
+## Callbacks of multi-driven transfers run inside perform (BL-3562)
+
+Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransfer` a `TransferCallbackMarshal` (`MultiCallbacks`), which the perform reads once to wrap every `EasyCallbackOptions` delegate. A wrapped callback called on the thread inside the multi handle's perform runs at once; from any other thread it is queued on the handle's `MultiCallbackQueue` and the transfer's thread waits until the next `PerformAsync` or `SocketActionAsync` runs it on its caller's thread, as code inside the transfer (`IsInTransferCallback`), waiting up to `MultiCallbackQueue.FollowUpWait` (20 ms) after each for the next. A queued callback makes `GetTimeout` 0 and counts as one ready socket in a wait. Once the transfer's token is cancelled (removed, or the handle cleaned up) or its perform has ended, a callback runs where it is called (CGR-033, ADR-0817). Their tests are `MultiCallbackQueueTests`, `TransferCallbackMarshalTests` and `Cgr033Tests`.
