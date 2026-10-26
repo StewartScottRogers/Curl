@@ -1,4 +1,4 @@
-# ADR-0830: A dialer publishes each socket it creates before connecting it
+# ADR-0832: A dialer publishes each socket it creates before connecting it
 
 - Status: Accepted
 - Date: 2026-10-26

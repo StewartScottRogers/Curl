@@ -28,7 +28,7 @@ BL-3563 (ADR-0828) wires `ManagedMultiTransfer` to `TransferSocketWait`: the soc
 
 ## Notes
 
-- Design (ADR-0830): `ITcpDialer.PublishingSocketsTo(Action<nint>)` is a default interface member returning the dialer itself; `TcpDialer` returns a new dialer over the same options that hands each socket's handle to the hook after its options are set and before it connects (`PrepareToConnect`/`PublishCreated`, Unix socket too). A per-dial view, not a mutable hook on the shared dialer, so concurrent transfers never cross; the handle, not the `Socket`, crosses into the engine.
+- Design (ADR-0832): `ITcpDialer.PublishingSocketsTo(Action<nint>)` is a default interface member returning the dialer itself; `TcpDialer` returns a new dialer over the same options that hands each socket's handle to the hook after its options are set and before it connects (`PrepareToConnect`/`PublishCreated`, Unix socket too). A per-dial view, not a mutable hook on the shared dialer, so concurrent transfers never cross; the handle, not the `Socket`, crosses into the engine.
 - `SocketActionGatedTcpDialer` dials through `inner.PublishingSocketsTo(wait.ConnectingOn)`; `TransferSocketWait` gains `internal nint? Socket { get; private set; }` (as BL-3563's stash has it) and `ConnectingOn`, which sets it. `EndConnect` is left as it was so BL-3563's `EndConnect(nint? socket = null)` applies; `ManagedMultiTransfer.cs` untouched.
 - Verified: dotnet build clean; fast tests green in all 46 test projects (Networking 3604 passed, Engine 2563 passed); Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary,Curl.Engine.UnitLibrary: 0 failing members. Tests are platform-neutral (sockets opened and closed unconnected, fake handles).
 
