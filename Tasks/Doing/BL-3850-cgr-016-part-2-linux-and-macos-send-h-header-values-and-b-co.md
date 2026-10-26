@@ -35,3 +35,4 @@ Needs BL-3849's lossless argument decoding (`InvalidUtf8ByteEscape`). The reques
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: d57f3b92 56067fdf dd7dccc9 c285e6d4 779790c0.
