@@ -49,6 +49,12 @@ internal static class Http2ResponseHead
     internal static byte[] FormatTrailers(IReadOnlyList<HeaderField> fields) =>
         Encoding.Latin1.GetBytes(HeaderLines(fields));
 
+    /// <summary>
+    /// Joins a line for each header that is not a pseudo-header, leaving out any field whose
+    /// value holds a CR, LF or NUL: nghttp2 treats such a field as malformed (RFC 9113 section
+    /// 8.2.1) and curl ignores it without a message, so a server cannot inject header lines
+    /// (CGR-011).
+    /// </summary>
     private static string HeaderLines(IReadOnlyList<HeaderField> fields) =>
-        string.Concat(fields.Where(field => !field.Name.StartsWith(':')).Select(field => $"{field.Name}: {field.Value}\r\n"));
+        string.Concat(fields.Where(field => !field.Name.StartsWith(':') && !field.Value.AsSpan().ContainsAny("\r\n\0")).Select(field => $"{field.Name}: {field.Value}\r\n"));
 }
