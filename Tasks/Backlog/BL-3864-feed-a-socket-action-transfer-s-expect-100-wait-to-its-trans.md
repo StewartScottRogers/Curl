@@ -1,5 +1,5 @@
 ---
-id: BL-3860
+id: BL-3864
 title: Feed a socket-action transfer's expect-100 wait to its TransferSocketWait
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3860 — Feed a socket-action transfer's expect-100 wait to its TransferSocketWait
+# BL-3864 — Feed a socket-action transfer's expect-100 wait to its TransferSocketWait
 
 ## Goal
 
