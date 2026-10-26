@@ -2022,9 +2022,40 @@ internal sealed class FtpSession(
     /// <see langword="null" /> for any other reply or an unreadable count.
     /// </summary>
     private static long? SizeOf(FtpReply size) =>
-        size.Code == 213 && long.TryParse(size.LastLine.AsSpan(3), System.Globalization.NumberStyles.AllowLeadingWhite, System.Globalization.CultureInfo.InvariantCulture, out long bytes)
+        size.Code == 213 ? TrailingSizeOf(size.LastLine) : null;
+
+    /// <summary>
+    /// Reads a <c>213</c> line's count as curl 8.22.0's <c>ftp_state_size_resp</c> does, so a
+    /// server may put text before it (CGR-097): from the line's last character after the code
+    /// and its space, step back over the digits just before it and read the digits from
+    /// there, so <c>213 -5</c> and <c>213 size 5</c> are 5, <c>213 18 </c> and <c>213 7x</c>
+    /// are 18 and 7, and <c>213 7  </c> (two characters after the digits) is unknown.
+    /// </summary>
+    /// <param name="line">The reply's last line, such as <c>213 18</c>.</param>
+    /// <returns>The count, or <see langword="null" /> when no digit starts there or it overflows.</returns>
+    private static long? TrailingSizeOf(string line)
+    {
+        const int CountStart = 4;
+        int start = line.Length - 1;
+        while (start > CountStart && char.IsAsciiDigit(line[start - 1]))
+        {
+            start--;
+        }
+
+        return start >= CountStart ? LeadingCountOf(line.AsSpan(start)) : null;
+    }
+
+    /// <summary>Reads the digits <paramref name="text" /> starts with as a count, as curl's <c>curlx_str_number</c> does.</summary>
+    /// <param name="text">The text from the count's first character, such as <c>18 </c>.</param>
+    /// <returns>The count, or <see langword="null" /> when the text starts with no digit or the count overflows.</returns>
+    private static long? LeadingCountOf(ReadOnlySpan<char> text)
+    {
+        int end = text.IndexOfAnyExceptInRange('0', '9');
+        ReadOnlySpan<char> digits = end < 0 ? text : text[..end];
+        return long.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long bytes)
             ? bytes
             : null;
+    }
 
     /// <summary>
     /// Ends the download with exit 63 when the <c>SIZE</c> count, the whole file's whatever

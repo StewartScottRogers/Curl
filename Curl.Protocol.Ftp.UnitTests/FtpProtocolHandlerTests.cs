@@ -906,7 +906,7 @@ public sealed class FtpProtocolHandlerTests
     [DataRow("500 not supported")]
     [DataRow("213 ")]
     [DataRow("213 many")]
-    [DataRow("213 -5")]
+    [DataRow("213 7  ")]
     public async Task ExecuteAsync_SizeUnknown_DownloadsWhateverArrives(string reply)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
