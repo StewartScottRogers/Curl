@@ -4,7 +4,7 @@ title: Fix CGR-016: Linux: invalid UTF-8 bytes in arguments are replaced with U+
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3849, BL-3850, BL-3851, BL-3852, BL-3853]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitTests/Cgr016Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr016Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -69,7 +69,10 @@ curl -s -d $'\xff' URL
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr016Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Split for size (2026-10-26, lane 8, before any code): the fix needs Linux and macOS to read argv as raw bytes and then five separate byte paths changed (request body, headers and cookies, URL, `-w` output, `-o` file names, the last needing a libc `open` P/Invoke since .NET cannot name a file with an invalid UTF-8 byte). Filed BL-3849 (raw argv with a lossless surrogate-escape decoding, plus `-d` and `--data-urlencode`), BL-3850 (`-H`, `-b`), BL-3851 (URL), BL-3852 (`-w`) and BL-3853 (`-o`); BL-3850 to BL-3853 depend on BL-3849. Once they are Done this task only re-measures every repro against curl 8.18.0 in WSL, records both results here, and adds the `Cgr016Tests.cs` checks its touches name.
+
 ## Log
 
 - 2026-10-26: Created from CGR-016 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Split for size: waits on BL-3849, BL-3850, BL-3851, BL-3852 and BL-3853 (raw argv bytes on Linux and macOS, then body, headers and cookies, URL, -w and -o paths)
