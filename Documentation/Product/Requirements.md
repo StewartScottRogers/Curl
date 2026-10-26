@@ -8,8 +8,8 @@
 > although the code implements much more: FTP and FTPS, IMAP, POP3, SMTP, LDAP,
 > RTSP, WebSocket, HTTP/2 and HTTP/3, the TLS options, `-v` and `--trace`, `-O` and
 > output naming, retries and `--limit-rate`, `--parallel`, netrc and `-K` config
-> files; SFTP, SCP and SMB have handler libraries that `Curl.Console` does not
-> register (tasks BL-576, BL-598). Each row ends with the tests that show it built,
+> files; SFTP, SCP and SMB are registered in `Curl.Console` too. Each row ends
+> with the tests that show it built,
 > or says which part is missing and names the task that covers it (checked
 > 2026-09-29).
 
