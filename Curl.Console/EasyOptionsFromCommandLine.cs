@@ -725,6 +725,7 @@ internal static class EasyOptionsFromCommandLine
         transfer with
         {
             TimeCondition = options.TimeCondition is not { } condition ? EasyTimeCondition.None
+                : condition.SentAsLastModified ? EasyTimeCondition.LastModified
                 : condition.Kind == TimeConditionKind.IfModifiedSince ? EasyTimeCondition.IfModifiedSince
                 : EasyTimeCondition.IfUnmodifiedSince,
             TimeValue = options.TimeCondition?.ValueUnixSeconds ?? transfer.TimeValue,

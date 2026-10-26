@@ -67,6 +67,7 @@ public sealed partial class EasyOptionsFromCommandLineTests
         GivenTransfer("-z", o => o.TimeCondition, TimeCondition.IfModifiedSince, "-z", "Sun, 06 Nov 1994 08:49:37 GMT"),
         GivenTransfer("-z time", o => o.TimeValue, ConditionDate.ToUnixTimeSeconds(), "-z", "Sun, 06 Nov 1994 08:49:37 GMT"),
         GivenTransfer("-z -", o => o.TimeCondition, TimeCondition.IfUnmodifiedSince, "-z", "-Sun, 06 Nov 1994 08:49:37 GMT"),
+        GivenTransfer("-z =", o => o.TimeCondition, TimeCondition.LastModified, "-z", "=Sun, 06 Nov 1994 08:49:37 GMT"),
         GivenTransfer("-B", o => o.TransferText, true, "-B"),
         GivenTransfer("--crlf", o => o.Crlf, true, "--crlf"),
         GivenTransfer("-Y", o => o.LowSpeedLimit, 500L, "-Y", "500"),

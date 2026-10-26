@@ -1721,7 +1721,9 @@ public static partial class CommandLineOptionTable
     /// Records a <c>-z</c>/<c>--time-cond</c> value as curl 8.21.0's tool reads it: a leading <c>-</c>
     /// asks for the resource only when it is not newer than the date
     /// (<see cref="TimeConditionKind.IfUnmodifiedSince"/>); a leading <c>+</c>, a leading <c>=</c> or
-    /// none asks for it only when it is newer (<see cref="TimeConditionKind.IfModifiedSince"/>). The
+    /// none asks for it only when it is newer (<see cref="TimeConditionKind.IfModifiedSince"/>), and a
+    /// leading <c>=</c> is curl's <c>CURL_TIMECOND_LASTMOD</c>, sent as a <c>Last-Modified</c> header
+    /// (<see cref="TimeCondition.SentAsLastModified"/>, CGR-073). The
     /// rest is read by <see cref="CurlDateParser"/>; when it is not a date it is taken as a file name,
     /// and that file's modification time, read through <paramref name="dataFileReader"/>, is the date.
     /// A value that is neither, empty included, is never refused: it clears any earlier condition and
@@ -1735,7 +1737,7 @@ public static partial class CommandLineOptionTable
         string date = value.StartsWith('-') || value.StartsWith('+') || value.StartsWith('=') ? value[1..] : value;
         if (TryReadTimeConditionDate(date, dataFileReader, out long unixSeconds, out string? failureReason))
         {
-            options.TimeCondition = TimeCondition.FromUnixSeconds(unixSeconds, kind);
+            options.TimeCondition = TimeCondition.FromUnixSeconds(unixSeconds, kind) with { SentAsLastModified = value.StartsWith('=') };
             return null;
         }
 

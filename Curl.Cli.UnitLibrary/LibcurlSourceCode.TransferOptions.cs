@@ -90,13 +90,18 @@ public static partial class LibcurlSourceCode
         lines.AddRange(QuoteLines(options, variables));
         if (options.TimeCondition is { } condition)
         {
-            string kind = condition.Kind == TimeConditionKind.IfModifiedSince ? "CURL_TIMECOND_IFMODSINCE" : "CURL_TIMECOND_IFUNMODSINCE";
-            lines.Add(Setopt("CURLOPT_TIMECONDITION", $"(long){kind}"));
+            lines.Add(Setopt("CURLOPT_TIMECONDITION", $"(long){TimeConditionName(condition)}"));
             lines.Add(Setopt("CURLOPT_TIMEVALUE_LARGE", $"(curl_off_t){condition.Value.ToUnixTimeSeconds()}"));
         }
 
         return lines;
     }
+
+    /// <summary>The <c>CURL_TIMECOND_*</c> name a <c>-z</c> condition is written with: <c>-z =date</c> is <c>CURL_TIMECOND_LASTMOD</c>.</summary>
+    private static string TimeConditionName(TimeCondition condition) =>
+        condition.SentAsLastModified ? "CURL_TIMECOND_LASTMOD"
+            : condition.Kind == TimeConditionKind.IfModifiedSince ? "CURL_TIMECOND_IFMODSINCE"
+            : "CURL_TIMECOND_IFUNMODSINCE";
 
     /// <summary>The <c>--interface</c>, <c>--telnet-option</c>, <c>--connect-timeout</c>, <c>--doh-url</c>, <c>--max-filesize</c>, <c>-4</c> and <c>-6</c> lines, in that order.</summary>
     private static List<string> ConnectionLines(CommandLineOptions options, LibcurlSourceVariables variables)

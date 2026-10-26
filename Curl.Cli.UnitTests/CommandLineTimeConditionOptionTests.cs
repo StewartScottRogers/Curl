@@ -65,12 +65,14 @@ public sealed class CommandLineTimeConditionOptionTests
         Assert.AreEqual(new DateTimeOffset(1994, 11, 6, 8, 49, 37, TimeSpan.Zero), result.Options.TimeCondition?.Value);
     }
 
-    /// <summary>curl 8.21.0: <c>-z "+1 Jan 2030"</c> and <c>-z "=1 Jan 2030"</c> both skip a 2026 file as not new enough.</summary>
+    /// <summary>
+    /// curl 8.21.0: <c>-z "+1 Jan 2030"</c> skips a 2026 file as not new enough. <c>-z "=1 Jan 2030"</c>
+    /// does too, but is sent as <c>Last-Modified</c>; <see cref="Cgr073Tests"/> pins it.
+    /// </summary>
     /// <param name="value">The value after <c>-z</c>.</param>
     [TestMethod]
     [DataRow("+1 Jan 2030")]
-    [DataRow("=1 Jan 2030")]
-    public void Parse_TimeCondPlusOrEqualsDate_IsIfModifiedSinceThatDate(string value)
+    public void Parse_TimeCondPlusDate_IsIfModifiedSinceThatDate(string value)
     {
         CommandLineParseResult result = Parse([$"--time-cond={value}", Url]);
 
@@ -200,7 +202,6 @@ public sealed class CommandLineTimeConditionOptionTests
     [DataRow("CLAUDE.md", TimeConditionKind.IfModifiedSince)]
     [DataRow("-CLAUDE.md", TimeConditionKind.IfUnmodifiedSince)]
     [DataRow("+CLAUDE.md", TimeConditionKind.IfModifiedSince)]
-    [DataRow("=CLAUDE.md", TimeConditionKind.IfModifiedSince)]
     public void Parse_TimeCondFileName_IsThatFilesModificationTime(string value, TimeConditionKind expectedKind)
     {
         DateTimeOffset modified = new(2026, 9, 26, 21, 5, 24, TimeSpan.Zero);
