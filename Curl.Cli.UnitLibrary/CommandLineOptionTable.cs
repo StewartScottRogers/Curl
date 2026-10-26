@@ -1027,12 +1027,33 @@ public static partial class CommandLineOptionTable
     /// <paramref name="value"/> as the request side must hold a <c>-b</c> cookie string or <c>-X</c> method
     /// to send it as curl 8.22.0 does: while a config file is read, re-spelled one character per byte of
     /// the file's own bytes, since the request side writes those values one character per byte
-    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise unchanged.
+    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise with each
+    /// byte of an argument that was not valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>) given as that
+    /// byte's one character, so <c>-b $'a=\xff'</c> sends the byte FF as curl 8.18.0 does on Linux
+    /// (CGR-016, BL-3850), and every other character unchanged.
     /// </summary>
     private static string AsRawWireText(CommandLineOptions options, string value) =>
         options.ReadingConfigFile
             ? Encoding.Latin1.GetString((options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : Encoding.UTF8).GetBytes(value))
-            : value;
+            : WithEscapedBytesAsCharacters(value);
+
+    /// <summary>
+    /// <paramref name="value"/> with each lone surrogate U+DC80 to U+DCFF, an argument byte that was not
+    /// valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>), replaced by the character U+0080 to U+00FF
+    /// whose Latin-1 byte it stands for; a surrogate that ends a valid pair is kept.
+    /// </summary>
+    private static string WithEscapedBytesAsCharacters(string value) =>
+        string.Create(value.Length, value, static (characters, text) =>
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                characters[index] = IsEscapedByte(text, index) ? (char)(text[index] - 0xDC00) : text[index];
+            }
+        });
+
+    /// <summary>Whether the character at <paramref name="index"/> is a lone surrogate U+DC80 to U+DCFF.</summary>
+    private static bool IsEscapedByte(string text, int index) =>
+        text[index] is >= '\uDC80' and <= '\uDCFF' && (index == 0 || !char.IsHighSurrogate(text[index - 1]));
 
     private static CommandLineRefusal? AddProxyHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
         AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader, options.AddProxyHeader);
