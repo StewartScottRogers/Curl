@@ -533,6 +533,10 @@ redirected standard output becomes an unbuffered `FileStream` over the process's
 handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
 `ClosedStandardOutputStream` whose writes throw.
 
+Standard error is wrapped in `StandardErrorFailureIgnoringStream`, which ignores an
+`IOException` from any write or flush, as curl ignores a failed `fputs` to `stderr`: with
+`2>/dev/full` (ENOSPC) the exit code stays the transfer's (ADR-0815, CGR-008, BL-3537).
+
 Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
 `-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;
 the bytes are unchanged (BL-491).
