@@ -78,3 +78,4 @@ E\v.ps1 -Only staple
 - 2026-10-26: Created from CGR-014 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3826: the stapled-OCSP repro setup CGR-014 needs to measure real curl
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
