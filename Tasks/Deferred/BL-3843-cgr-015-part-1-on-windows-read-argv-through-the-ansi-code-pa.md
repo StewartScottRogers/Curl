@@ -38,3 +38,4 @@ Add `AnsiCodePageArguments` (Curl.Console) applied in `Program.Main` on Windows 
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: b8bb145c c458aac4 a9b9a7ee f4912012 326de9ca.
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3843-20261026-063535-L8.jsonl
+- 2026-10-26: Backlog -> Deferred. Split into BL-3892 and BL-3893 after hitting its cost cap

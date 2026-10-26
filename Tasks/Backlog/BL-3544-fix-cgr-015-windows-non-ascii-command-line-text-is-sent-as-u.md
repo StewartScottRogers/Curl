@@ -4,7 +4,7 @@ title: Fix CGR-015: Windows: non-ASCII command-line text is sent as UTF-8 for bo
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3843, BL-3844, BL-3840, BL-3841, BL-3842]
+depends-on: [BL-3892, BL-3893, BL-3844, BL-3840, BL-3841, BL-3842]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr015Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr015Tests.cs, Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs, Curl.Output.UnitTests/Cgr015Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitLibrary/HttpUrlText.cs, Curl.Protocol.Http.UnitTests/Cgr015Tests.cs]
 requirement: none
 created: 2026-10-26
