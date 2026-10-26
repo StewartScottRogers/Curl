@@ -11,35 +11,74 @@ namespace Curl.Protocol.Http;
 /// <remarks>
 /// curl 8.21.0 was measured (BL-294 Notes) sending <c>http://h/ä?ö=1</c> as
 /// <c>GET /%E4?</c>, the byte <c>0xF6</c>, <c>=1</c>: it percent-encodes each byte above <c>0x7F</c> in the path and
-/// sends the query's bytes as they are. The bytes it had were the console's code page; the
-/// bytes here are the text's UTF-8, as <see cref="CurlUrl.IdnHost" /> reads a host
-/// (ADR-0010).
+/// sends the query's bytes as they are. The bytes it had were its <c>argv</c>'s code page; the
+/// request line takes them in <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.CommandLineTextEncoding" />
+/// (CGR-015, BL-3840), while a redirect's URL and the lines <c>-v</c> prints use the text's
+/// UTF-8, as <see cref="CurlUrl.IdnHost" /> reads a host (ADR-0010).
 /// </remarks>
 internal static class HttpUrlText
 {
     /// <summary>
     /// Gives the origin-form request target as the characters of a head written in Latin-1:
-    /// <see cref="Path" />, then <c>?</c> and the query when the URL has one, each of the
+    /// <see cref="Path(CurlUrl)" />, then <c>?</c> and the query when the URL has one, each of the
     /// query's bytes (<see cref="UrlByteText.ToBytes" />: its UTF-8, an argument byte that was not
     /// valid UTF-8 itself) one character, so the head carries them unchanged.
     /// </summary>
-    internal static string RequestTarget(CurlUrl url) =>
-        Path(url) + (url.Query is null ? string.Empty : "?" + Encoding.Latin1.GetString(UrlByteText.ToBytes(url.Query)));
+    internal static string RequestTarget(CurlUrl url) => RequestTarget(url, Encoding.UTF8);
+
+    /// <summary>
+    /// Gives the origin-form request target from the URL's text as its bytes in
+    /// <paramref name="encoding" />: <see cref="Path(CurlUrl, Encoding)" />, then <c>?</c> and the
+    /// query's bytes one character each, unencoded. curl 8.22.0 on Windows, whose <c>argv</c> is
+    /// the ANSI code page, sends <c>http://h/é?q=é</c> as <c>GET /%E9?q=</c> and the byte
+    /// <c>0xE9</c> (measured with cp1252, CGR-015, BL-3840).
+    /// </summary>
+    internal static string RequestTarget(CurlUrl url, Encoding encoding) =>
+        Path(url, encoding) + (url.Query is null ? string.Empty : "?" + HttpRequestHeadFormatter.WireText(url.Query, encoding));
 
     /// <summary>
     /// Gives the origin-form request target the request line and authentication send:
-    /// <see cref="RequestTarget" /> with the path's <c>%XX</c> escapes in upper case and the
+    /// <see cref="RequestTarget(CurlUrl)" /> with the path's <c>%XX</c> escapes in upper case and the
     /// query as typed, as curl 8.22.0 sends <c>/a%2fb?x=%2f</c> as <c>/a%2Fb?x=%2f</c>. The
     /// absolute form a forward proxy gets keeps the escapes as typed (ADR-0821, CGR-054).
     /// </summary>
-    internal static string OriginTarget(CurlUrl url)
+    internal static string OriginTarget(CurlUrl url) => OriginTarget(url, Encoding.UTF8);
+
+    /// <summary>
+    /// Gives <see cref="OriginTarget(CurlUrl)" /> from the URL's text as its bytes in
+    /// <paramref name="encoding" /> (<see cref="RequestTarget(CurlUrl, Encoding)" />).
+    /// </summary>
+    internal static string OriginTarget(CurlUrl url, Encoding encoding)
     {
-        string path = Path(url);
-        return UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url)[path.Length..];
+        string path = Path(url, encoding);
+        return UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url, encoding)[path.Length..];
     }
 
     /// <summary>Gives the path with each byte above <c>~</c> percent-encoded, <see cref="CurlUrl.RequestPath" />.</summary>
     internal static string Path(CurlUrl url) => url.RequestPath;
+
+    /// <summary>
+    /// Gives the path as its bytes in <paramref name="encoding" />
+    /// (<see cref="HttpRequestHeadFormatter.WireText" />) with each byte above <c>~</c>
+    /// percent-encoded: <c>/café</c> in cp1252 is <c>/caf%E9</c>, in UTF-8 <c>/caf%C3%A9</c>.
+    /// </summary>
+    internal static string Path(CurlUrl url, Encoding encoding)
+    {
+        StringBuilder encoded = new(url.AbsolutePath.Length);
+        foreach (char value in HttpRequestHeadFormatter.WireText(url.AbsolutePath, encoding))
+        {
+            if (value <= '~')
+            {
+                encoded.Append(value);
+            }
+            else
+            {
+                encoded.Append('%').Append(((int)value).ToString("X2", CultureInfo.InvariantCulture));
+            }
+        }
+
+        return encoded.ToString();
+    }
 
     /// <summary>
     /// Gives <c>?</c> and the query as written, or the empty string when the URL has no

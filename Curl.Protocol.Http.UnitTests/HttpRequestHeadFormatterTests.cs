@@ -719,7 +719,7 @@ public sealed partial class HttpRequestHeadFormatterTests
     [TestMethod]
     public void Format_RequestTargetAboveAscii_SendsItsUtf8Bytes()
     {
-        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(new HttpRequestOptions { RequestTarget = "/ä" }));
+        byte[] head = HttpRequestHeadFormatter.Format(ArrangedUrl(Url), Arranged(new HttpRequestOptions { RequestTarget = "/ä", CommandLineTextEncoding = Encoding.UTF8 }));
 
         byte[] expected = [.. "GET /"u8, 0xC3, 0xA4, .. " HTTP/1.1\r\n"u8];
         Diagnostics.Act("head length", head.Length);

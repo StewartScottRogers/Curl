@@ -248,20 +248,24 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
-    /// verbatim when given, its UTF-8 bytes one character each as
-    /// <see cref="HttpUrlText.RequestTarget" /> writes a query; otherwise the absolute form
+    /// verbatim when given, its bytes in <see cref="HttpRequestOptions.CommandLineTextEncoding" />
+    /// one character each (<see cref="WireText" />); otherwise the absolute form
     /// for a forward proxy (<paramref name="proxiedCredentials" /> not <see langword="null" />)
-    /// and the path and query for the origin. curl 8.21.0 was measured (BL-186 Notes) sending
-    /// <c>--request-target</c> in place of both forms.
+    /// and the path and query for the origin, both from the URL's bytes in that encoding
+    /// (<see cref="HttpUrlText.RequestTarget(CurlUrl, Encoding)" />, CGR-015). curl 8.21.0 was
+    /// measured (BL-186 Notes) sending <c>--request-target</c> in place of both forms, and 8.22.0
+    /// on Windows sending <c>--request-target /é</c> as <c>/</c> and the cp1252 byte <c>0xE9</c> (BL-3840).
     /// </summary>
     private static string TargetOf(CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options)
     {
         if (options.RequestTarget is { } target)
         {
-            return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
+            return WireText(target, options.CommandLineTextEncoding);
         }
 
-        return proxiedCredentials is null ? HttpUrlText.OriginTarget(url) : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType);
+        return proxiedCredentials is null
+            ? HttpUrlText.OriginTarget(url, options.CommandLineTextEncoding)
+            : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType, options.CommandLineTextEncoding);
     }
 
     /// <summary>
@@ -357,9 +361,9 @@ internal static class HttpRequestHeadFormatter
     /// closing bracket, as curl 8.22.0 sends <c>GET http://[fe80::1%25eth0]:8080/x</c> while its
     /// <c>Host</c> line is <c>[fe80::1]:8080</c> (measured, CGR-056, BL-3585).
     /// </summary>
-    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType) =>
+    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType, Encoding encoding) =>
         $"{url.Scheme}://{FtpUserInformation(url, credentials)}{ZonedHostAndPort(url)}"
-        + HttpUrlText.RequestTarget(url).Insert(HttpUrlText.Path(url).Length, FtpTypeOf(url, proxyTransferType));
+        + HttpUrlText.RequestTarget(url, encoding).Insert(HttpUrlText.Path(url, encoding).Length, FtpTypeOf(url, proxyTransferType));
 
     /// <summary>
     /// Gives <see cref="HttpUrlText.WireHostAndPort" /> with the URL's IPv6 zone id, when it has

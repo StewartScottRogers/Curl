@@ -335,7 +335,7 @@ public sealed class HttpProtocolHandler(
         new(
             framing.Method,
             context.Url,
-            options.RequestTarget ?? HttpUrlText.OriginTarget(context.Url),
+            options.RequestTarget ?? HttpUrlText.OriginTarget(context.Url, options.CommandLineTextEncoding),
             context.Credentials,
             options.BearerToken,
             AllowedSchemesOf(options),
