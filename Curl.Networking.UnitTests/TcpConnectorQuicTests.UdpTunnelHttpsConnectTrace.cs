@@ -46,8 +46,8 @@ public sealed partial class TcpConnectorQuicTests
     public async Task ConnectAsync_AfterTheUdpTunnelWasRefusedForTheSameTarget_StartsH2OnTheSameFilterThroughTheProxy()
     {
         // curl 8.22.0 --http3 -x http://127.0.0.1:18320 https://example.com/, the proxy answering 403
-        // twice. curl's "CONNECT tunnel failed, response 403" before "all attempts failed" is the TCP
-        // CONNECT path's failure message, which the connector does not write as a -v line.
+        // twice: curl's failf writes "CONNECT tunnel failed, response 403" before "all attempts failed"
+        // as a -v line (BL-3617).
         var events = new RecordingTransferEvents();
         var connector = TracingTunnelConnector(_ => new CapsuleQuicProxyConnection(ForbiddenReply, null), "h2");
         var target = TunnelTarget(events);
@@ -80,6 +80,7 @@ public sealed partial class TcpConnectorQuicTests
                 OneSocketConnecting,
                 OneSocketPolled,
                 "< HTTP/1.1 403 Forbidden",
+                "* CONNECT tunnel failed, response 403",
                 "* [HTTPS-CONNECT] connect, all attempts failed",
                 "* [HTTPS-CONNECT] connect -> 7, done=0",
             ],

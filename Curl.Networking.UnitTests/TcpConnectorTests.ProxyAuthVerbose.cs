@@ -58,7 +58,8 @@ public sealed partial class TcpConnectorTests
                 RequestLines(BasicConnect),
                 BasicChallengeLines[..2],
                 ["* Basic authentication problem, ignoring."],
-                BasicChallengeLines[2..]),
+                BasicChallengeLines[2..],
+                ["* CONNECT tunnel failed, response 407"]),
             events.Transcript);
     }
 
@@ -229,7 +230,8 @@ public sealed partial class TcpConnectorTests
                 RequestLines(isBasic ? BasicConnect : DigestConnect),
                 challengeLines[..2],
                 [$"* {scheme} authentication problem, ignoring."],
-                challengeLines[2..]),
+                challengeLines[2..],
+                ["* CONNECT tunnel failed, response 407"]),
             events.Transcript);
     }
 

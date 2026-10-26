@@ -1713,7 +1713,9 @@ public sealed partial class TcpConnector(
             // The proxy connection is disposed whether the handshake failed or could not be sent or read.
             await connection.DisposeAsync().ConfigureAwait(false);
             exception?.Throw();
-            return failure!;
+
+            ReportSocks4Failure(target.Events, socks, failure!);
+            return failure;
         }
 
         // curl 8.21.0 names the destination as given, not the address SOCKS4 or SOCKS5 sent for it,
@@ -1801,7 +1803,7 @@ public sealed partial class TcpConnector(
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -1834,11 +1836,12 @@ public sealed partial class TcpConnector(
         HttpProxyTunnelReply reply,
         ExceptionDispatchInfo? exception,
         string? redialAuthorization,
-        string? firstSspiFailure)
+        string? firstSspiFailure,
+        ITransferEvents events)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure, events), null) : (null, redialAuthorization);
     }
 
     /// <summary>
@@ -2054,10 +2057,34 @@ public sealed partial class TcpConnector(
                 lastSocketError: opened.LastSocketError)
             : opened;
 
-    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
-        reply.FailureMessage is { } failureMessage
-            ? ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}", null, 0, reply.StatusCode);
+    /// <summary>
+    /// Gives the failure of a CONNECT the proxy refused: the reply's own failure, or exit 7
+    /// <c>CONNECT tunnel failed, response N</c>, which curl 8.22.0's <c>failf</c> also writes as a
+    /// <c>-v</c> line (measured, BL-3617).
+    /// </summary>
+    /// <summary>
+    /// Writes a failed SOCKS4 or SOCKS4a handshake's message as a <c>-v</c> line, as curl 8.22.0's
+    /// <c>failf</c> does (measured, BL-3617); SOCKS5's failures already wrote theirs.
+    /// </summary>
+    private static void ReportSocks4Failure(ITransferEvents events, ProxyEndpoint socks, ConnectResult failure)
+    {
+        if (socks.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a)
+        {
+            events.ReportInfo(failure.ErrorMessage!);
+        }
+    }
+
+    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure, ITransferEvents events)
+    {
+        if (reply.FailureMessage is { } failureMessage)
+        {
+            return ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage);
+        }
+
+        var refused = $"CONNECT tunnel failed, response {reply.StatusCode}";
+        events.ReportInfo(refused);
+        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode);
+    }
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
         DialedSocket dialed,
