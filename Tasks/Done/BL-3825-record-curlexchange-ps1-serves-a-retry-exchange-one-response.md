@@ -8,7 +8,7 @@ depends-on: []
 touches: [Record-CurlExchange.ps1]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3825 — Record-CurlExchange.ps1 serves a --retry exchange: one response per attempt across connections, without hanging
 
@@ -22,12 +22,15 @@ BL-3531's run (2026-10-26) ran `Record-CurlExchange.ps1 -Port <n> -Response 'HTT
 
 ## Acceptance criteria
 
-- [ ] The command above, with `-T`, `-F f=@<file>` and `-F f=value`, finishes through real curl 8.21.0 on Windows within 30 s and `request.bin` holds every attempt's request with its body.
-- [ ] Existing uses of `-Response` with one entry record the same bytes as before.
+- [x] The command above, with `-T`, `-F f=@<file>` and `-F f=value`, finishes through real curl 8.21.0 on Windows within 30 s and `request.bin` holds every attempt's request with its body.
+- [x] Existing uses of `-Response` with one entry record the same bytes as before.
 
 ## Notes
+
+Cause: the recorder served one connection by default, so the retry connection was never accepted. It now serves one connection per -Response entry unless -Connections is given or -AnswerHeldRequests is used; a single Response behaves as before. Measured through C:windowssystem32rl.exe: -T, -F f=@file and -F f=value each finished in under 3 s with both requests in request.bin.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 437073dc 3e4a4efe.
+- 2026-10-26: Doing -> Done. Record-CurlExchange.ps1 serves one connection per -Response entry, so --retry exchanges record and exit

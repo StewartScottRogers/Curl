@@ -64,7 +64,7 @@
     files there are overwritten.
 
 .PARAMETER Connections
-    How many connections to serve. Default 1. Use more for a run that makes several
+    How many connections to serve. Default one per Response entry (1 for a single Response). Use more for a run that makes several
     requests, such as several URLs or a followed redirect.
 
 .PARAMETER ResponseDelayMilliseconds
@@ -3206,7 +3206,9 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse).AddArgument($RequestReadMilliseconds)
+        # One connection per Response entry unless -Connections says otherwise, so a --retry attempt after a 503 is answered with the next entry (BL-3825).
+        $serveConnectionCount = if ($PSBoundParameters.ContainsKey('Connections') -or $AnswerHeldRequests -gt 0) { $Connections } else { [Math]::Max(1, $Response.Count) }
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($serveConnectionCount).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse).AddArgument($RequestReadMilliseconds)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 
