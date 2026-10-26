@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3826]
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/Cgr014Tests.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/Cgr014Tests.cs, Curl.Networking.UnitLibrary/TlsClientRouting.cs, Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs, Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.UnitTests/TlsClientRoutingTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3543 — Fix CGR-014: Windows: stapled OCSP responses are ignored. A revoked staple is accepted under --ssl-revoke-best-effort, and a good staple still fails w...
 
@@ -60,10 +60,10 @@ E\v.ps1 -Only staple
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -71,7 +71,12 @@ E\v.ps1 -Only staple
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
 - 2026-10-26 lane 4: requeued before any code edit. The repro needs a revocation PKI with good and revoked OCSP staples served by `openssl s_server -status_file`; the report's SCR scratchpad is gone and nothing in the repository builds one, so BL-3826 builds it (`Record-StapledOcspExchange.ps1`) and this task depends on it.
-- Findings for the fix: the default connection goes through `SslStream`, which exposes no stapled response (`TlsClientOptions.RequireCertificateStatus` doc; `TlsClientRouting` sends `--cert-status` to the hand-built handshake, which asks for the staple and judges it with `Curl.Tls.UnitLibrary/OcspStapleVerifier.cs`). `ServerCertificateVerification.ReadChainAnchors`/`SystemStoreChainPolicy` build an `X509ChainPolicy` with `RevocationMode.Online` and no staple, and `RevocationBestEffortTolerates` then accepts RevocationStatusUnknown. Likely fix directions: on the Schannel build, have the hand-built handshake ask for the staple (status_request) whenever revocation is checked and let a good/revoked staple decide the revocation verdict before the online check; or route through it only when a staple is present. Decide with an ADR once BL-3826 has measured real curl.
+- Findings for the fix: the default connection goes through `SslStream`, which exposes no stapled response (`TlsClientOptions.RequireCertificateStatus` doc; `TlsClientRouting` sends `--cert-status` to the hand-built handshake, which asks for the staple and judges it with `Curl.Tls.UnitLibrary/OcspStapleVerifier.cs`). `ServerCertificateVerification.ReadChainAnchors`/`SystemStoreChainPolicy` build an `X509ChainPolicy` with `RevocationMode.Online` and no staple, and `RevocationBestEffortTolerates` then accepts RevocationStatusUnknown. Likely fix directions: on the Schannel build, have the hand-built handshake ask for the staple (status_request) whenever revocation is checked and let a good/revoked staple decide the revocation verdict before the online check; or route through it only when a staple is present. Decide with an ADR once BL-3826 has measured real curl.- 2026-10-26 lane 3: probe (C# file-based app, outside the repo) over `Record-StapledOcspExchange.ps1`'s PKI: the certificate `SslStream`'s validation callback gets carries no `CERT_OCSP_RESPONSE_PROP_ID`, and its chain (and one rebuilt Online from it) reports RevocationStatusUnknown|OfflineRevocation for good and revoked staples alike. So the staple is reachable only through the hand-built handshake. Decision in ADR-0828: the Schannel build routes a revocation-checked `--cacert` connection (no `-k`, no `--ssl-no-revoke`) to the hand-built client (`TlsClientRouting.ReasonInBuild`), and `ServerCertificateVerification.Judge` takes the staple (`HandBuiltCertificateVerifier` passes `ServerCertificateChain.OcspResponse`): good masks an unknown/offline revocation status, revoked is exit 60 `TlsFailureMessages.SchannelChainRevoked` (exit 35 CRYPT_E_REVOKED without `--cacert`), anything else leaves the online check. The staple's issuer is looked for among the sent certificates and the chain built, since s_server sends only the leaf (first attempt failed for that reason).
+- Touches widened (no task in Doing on origin/work/dark-factory names these files): `TlsClientRouting.cs` (the route), `HandBuiltCertificateVerifier.cs` (passes the staple), `TlsFailureMessages.cs` (the exit 60 revoked text lives there), `TlsClientRoutingTests.cs` (its plain `--cacert` row now adds `--ssl-no-revoke`, since on Windows a revocation-checked `--cacert` is no longer plain).
+- Result, `.\Record-StapledOcspExchange.ps1` after the fix (real curl 8.21.0 Schannel as REF), `curl -sS --cacert rca.crt [flags] https://localhost:P/index.txt`, every flag set (none, `--ssl-revoke-best-effort`, `--cert-status`, both): good staple REF and PORT exit 0, stdout `stapled ocsp ok`, stderr empty; revoked staple REF and PORT exit 60, `curl: (60) schannel: trust for this certificate or one of the certificates in the certificate chain has been revoked` plus the same `More details here` block. Nothing written to files; request is one GET of `/index.txt` on both. Before: PORT good/default and `--cert-status` exit 60 "revocation status is unknown", revoked + best-effort exit 0.
+- Unit tests: `Cgr014Tests` (Judge with good/revoked/unknown staples, the builds and flags that ignore a staple, and the routing row); the good-staple and revoked-under-best-effort tests fail without the fix. Fast tests green on the whole solution; Measure-CodeQuality for Curl.Networking.UnitLibrary: 100% line and branch, one member over complexity (`Judge`, 14), split into `RevocationCheckIncomplete` and `Refusal` (same code paths, re-tested green).
+- Platform check: the new tests use in-memory certificates and `ReadChainStatus`, no paths or OS text; routing is tested through `ReasonInBuild` with the build named, so they pass on Linux and macOS.
+- Known limits (ADR-0828 Consequences): the system-store path (no `--cacert`) keeps `SslStream` and so still ignores a staple; a good staple masks an intermediate's unknown status too.
 
 ## Log
 
@@ -79,3 +84,4 @@ E\v.ps1 -Only staple
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3826: the stapled-OCSP repro setup CGR-014 needs to measure real curl
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. On Windows a good stapled OCSP response satisfies the --cacert revocation check, and a revoked one fails with exit 60 even under --ssl-revoke-best-effort, as curl does
