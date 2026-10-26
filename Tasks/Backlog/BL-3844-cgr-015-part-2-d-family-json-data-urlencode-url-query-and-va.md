@@ -1,5 +1,5 @@
 ---
-id: BL-3839
+id: BL-3844
 title: CGR-015 part 2: -d family, --json, --data-urlencode, --url-query and --variable encode command-line text in the ANSI code page on Windows
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3839 — CGR-015 part 2: -d family, --json, --data-urlencode, --url-query and --variable encode command-line text in the ANSI code page on Windows
+# BL-3844 — CGR-015 part 2: -d family, --json, --data-urlencode, --url-query and --variable encode command-line text in the ANSI code page on Windows
 # CGR-015 part 2: -d family, --json, --data-urlencode, --url-query and --variable encode command-line text in the ANSI code page on Windows
 
 ## Goal

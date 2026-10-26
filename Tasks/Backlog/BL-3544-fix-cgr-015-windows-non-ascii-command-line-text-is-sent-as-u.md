@@ -4,7 +4,7 @@ title: Fix CGR-015: Windows: non-ASCII command-line text is sent as UTF-8 for bo
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3838, BL-3839, BL-3840, BL-3841, BL-3842]
+depends-on: [BL-3843, BL-3844, BL-3840, BL-3841, BL-3842]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr015Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr015Tests.cs, Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs, Curl.Output.UnitTests/Cgr015Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitLibrary/HttpUrlText.cs, Curl.Protocol.Http.UnitTests/Cgr015Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -223,10 +223,10 @@ curl -s -o NUL -w "[é]" http://127.0.0.1:21370/x
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr015Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
-- 2026-10-26 (lane 9, first pass, no code changed): split by library because the fix spans Curl.Console, Curl.Cli, Curl.Protocol.Http, Curl.Output and the gopher, dict, POP3 and MQTT libraries, too much for one run. Decision, decided by Claude under Stewart's delegation: on Windows match the designated ANSI-argv reference (Git for Windows ucrt64 curl 8.22.0, the one `Record-CurlExchange.ps1` runs), i.e. command-line text goes out in the system ANSI code page with best fit; off Windows UTF-8 is unchanged. Reason: the lane rules name that build as the oracle, and the existing header, credential, SMTP and IMAP paths already use the ANSI code page, so this makes Curl consistent with itself. BL-3838 writes the ADR. Filed BL-3838 (argv best fit, stderr echo, ADR), BL-3839 (-d family, --data-urlencode, --url-query, --variable; also MQTT payloads), BL-3840 (HTTP URL path, query, --request-target), BL-3841 (-w) and BL-3842 (gopher, dict, POP3, MQTT topic). Once they are Done this task runs every repro against real curl and ticks the criteria.
+- 2026-10-26 (lane 9, first pass, no code changed): split by library because the fix spans Curl.Console, Curl.Cli, Curl.Protocol.Http, Curl.Output and the gopher, dict, POP3 and MQTT libraries, too much for one run. Decision, decided by Claude under Stewart's delegation: on Windows match the designated ANSI-argv reference (Git for Windows ucrt64 curl 8.22.0, the one `Record-CurlExchange.ps1` runs), i.e. command-line text goes out in the system ANSI code page with best fit; off Windows UTF-8 is unchanged. Reason: the lane rules name that build as the oracle, and the existing header, credential, SMTP and IMAP paths already use the ANSI code page, so this makes Curl consistent with itself. BL-3843 writes the ADR. Filed BL-3843 (argv best fit, stderr echo, ADR), BL-3844 (-d family, --data-urlencode, --url-query, --variable; also MQTT payloads), BL-3840 (HTTP URL path, query, --request-target), BL-3841 (-w) and BL-3842 (gopher, dict, POP3, MQTT topic). Once they are Done this task runs every repro against real curl and ticks the criteria.
 
 ## Log
 
 - 2026-10-26: Created from CGR-015 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Backlog. Split by library: waits on BL-3838, BL-3839, BL-3840, BL-3841 and BL-3842
+- 2026-10-26: Doing -> Backlog. Split by library: waits on BL-3843, BL-3844, BL-3840, BL-3841 and BL-3842

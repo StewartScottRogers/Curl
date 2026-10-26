@@ -1,5 +1,5 @@
 ---
-id: BL-3838
+id: BL-3843
 title: CGR-015 part 1: on Windows, read argv through the ANSI code page with best fit, and echo argv text to stderr in it
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3838 — CGR-015 part 1: on Windows, read argv through the ANSI code page with best fit, and echo argv text to stderr in it
+# BL-3843 — CGR-015 part 1: on Windows, read argv through the ANSI code page with best fit, and echo argv text to stderr in it
 # CGR-015 part 1: on Windows, read argv through the ANSI code page with best fit, and echo argv text to stderr in it
 
 ## Goal
