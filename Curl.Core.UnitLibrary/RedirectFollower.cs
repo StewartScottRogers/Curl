@@ -86,11 +86,12 @@ namespace Curl.Core;
 /// is sent to the next hop before any challenge, as libcurl 8.21.0 does (upstream test1088, BL-1819).
 /// </para>
 /// <para>
-/// Every hop that may be sent credentials is sent the previous hop's
-/// <see cref="TransferReport.DigestAuthorizationSent" /> as
+/// Every hop to the previous hop's scheme, host and port that may be sent credentials is sent the
+/// previous hop's <see cref="TransferReport.DigestAuthorizationSent" /> as
 /// <see cref="HttpRequestOptions.KeptDigestAuthorization" />, so a Digest answer goes to the next
 /// hop again with its nonce counted on, as curl 8.22.0 sends <c>nc=00000002</c> after a same-host
-/// redirect (upstream test1286, BL-2252); a hop that may not is sent none.
+/// redirect (upstream test1286, BL-2252); any other hop, even one <c>--location-trusted</c> sends
+/// credentials to, is sent none and waits for its own challenge (CGR-072, BL-3601).
 /// </para>
 /// <para>
 /// Every hop after one whose response was HTTP/1.0 is sent
@@ -254,7 +255,7 @@ public sealed class RedirectFollower(
             }
 
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped, policy) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped, policy) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = KeptDigestAuthorization(hop.Url, next!, result.Report), EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -717,6 +718,15 @@ public sealed class RedirectFollower(
         bodyDropped || uploadStart is not null || context.Upload is not IUploadRewinder { HasBeenRead: true } rewinder
             ? null
             : rewinder.RewindToStart();
+
+    /// <summary>
+    /// The Digest answer the hop to <paramref name="next" /> repeats before any challenge: the one
+    /// the hop at <paramref name="previous" /> sent when both share scheme, host and port, and none
+    /// otherwise, as curl 8.22.0 starts a fresh Digest exchange after a <c>--location-trusted</c>
+    /// redirect to another host or port (CGR-072, BL-3601).
+    /// </summary>
+    private static string? KeptDigestAuthorization(CurlUrl previous, CurlUrl next, TransferReport report) =>
+        IsSameOrigin(previous, next) ? report.DigestAuthorizationSent : null;
 
     internal static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
