@@ -421,7 +421,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> TransferOverScpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace) =>
         context.Upload is { } upload
             ? await new ScpFileUpload(transport, context.Events) { Trace = trace }.UploadAsync(context.Url.AbsolutePath, context.CreateFileMode, upload, context.Progress, context.CancellationToken).ConfigureAwait(false)
-            : await new ScpFileDownload(transport) { Trace = trace }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken, context.MaxFileSize).ConfigureAwait(false);
+            : await new ScpFileDownload(transport) { Trace = trace, NoBody = context.NoBody }.DownloadAsync(context.Url.AbsolutePath, output, context.Progress, context.CancellationToken, context.MaxFileSize).ConfigureAwait(false);
 
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with
@@ -437,7 +437,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
         return SftpRemotePath.NamesDirectory(urlPath)
             ? await new SftpDirectoryListing(transport) { Trace = trace }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes, context.MaxFileSize).ConfigureAwait(false)
-            : await new SftpFileDownload(transport) { Trace = trace }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize, context.RangeText).ConfigureAwait(false);
+            : await new SftpFileDownload(transport) { Trace = trace, NoBody = context.NoBody }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize, context.RangeText).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

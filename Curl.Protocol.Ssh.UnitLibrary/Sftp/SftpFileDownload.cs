@@ -25,6 +25,14 @@ internal sealed class SftpFileDownload(SshTransport transport)
     internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
 
     /// <summary>
+    /// Gets whether to stop before the first read, curl's <c>-I</c> (CGR-030): as measured,
+    /// curl asks for the file time with <c>STAT</c> first, then opens the file, asks its size
+    /// and closes it with nothing read or written; a range or <c>-C</c> offset the file cannot
+    /// serve still fails.
+    /// </summary>
+    internal bool NoBody { get; init; }
+
+    /// <summary>
     /// Downloads the file at <paramref name="urlPath" /> into <paramref name="output" />.
     /// </summary>
     /// <param name="urlPath">The URL's path, with its percent-escapes.</param>
@@ -78,6 +86,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 Trace.Enter("SSH_SFTP_QUOTE_INIT");
                 await quotes.RunBeforeTransferAsync(session, homeDirectory, path, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_GETINFO");
+                await StatForTheFileTimeIfNoBodyAsync(session, path, cancellationToken).ConfigureAwait(false);
                 Trace.Enter("SSH_SFTP_TRANS_INIT");
                 Trace.Enter("SSH_SFTP_DOWNLOAD_INIT");
                 if (await OpenUnlessTheConnectionEndsAsync(session, path, createFileMode, cancellationToken).ConfigureAwait(false) is not { } handle)
@@ -96,6 +105,18 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 return result;
             },
             cancellationToken).ConfigureAwait(false);
+    }
+
+    // Curl's -I asks for the file time, so libssh2 sends STAT for the path and curl ignores
+    // the answer (CGR-030), as it does for a directory (BL-1207).
+    private async ValueTask StatForTheFileTimeIfNoBodyAsync(SftpSession session, byte[] path, CancellationToken cancellationToken)
+    {
+        if (NoBody)
+        {
+            Trace.Enter("SSH_SFTP_FILETIME");
+            await SshConnectionFailure.ReportAsSshLayerErrorAsync(
+                () => session.StatAsync(path, cancellationToken)).ConfigureAwait(false);
+        }
     }
 
     // Measured (BL-1046): curl takes a connection closed or reset while it waits for the
@@ -138,8 +159,9 @@ internal sealed class SftpFileDownload(SshTransport transport)
     }
 
     // Measured: a range or -C offset the file cannot serve reads nothing, and the handle
-    // is still closed.
-    private static async ValueTask<TransferResult> CopyPartAsync(
+    // is still closed. With -I nothing is read, as curl's transfer layer sets up no
+    // receive for a transfer that wants no body (CGR-030).
+    private async ValueTask<TransferResult> CopyPartAsync(
         SftpSession session,
         byte[] handle,
         long? size,
@@ -158,6 +180,11 @@ internal sealed class SftpFileDownload(SshTransport transport)
         catch (SshTransferException failure)
         {
             return TransferResult.Failure(failure.ExitCode, failure.Message);
+        }
+
+        if (NoBody)
+        {
+            return TransferResult.Success(0);
         }
 
         Copy copy = new(new SftpReadAhead(session, handle, part), part.Length, new DownloadSizeLimit(maxFileSize), output, progress);
