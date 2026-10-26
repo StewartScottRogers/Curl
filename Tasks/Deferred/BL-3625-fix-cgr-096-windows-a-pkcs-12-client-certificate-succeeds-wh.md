@@ -81,3 +81,4 @@ curl -sS -k --cert E\pki\cli.p12:secret --cert-type P12 https://localhost:<p>/in
 - 2026-10-26: Created from CGR-096 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Blocked. Stewart: CGR-096 asks Curl to fail every P12 client certificate on Windows as Schannel curl does (text varies by Windows build); ADR-0826 keeps ADR-0794's choice to present it - accept the difference and close the task, or reverse ADR-0826?
+- 2026-10-26: Blocked -> Deferred. Interactive session, 2026-10-26: ADR-0794 and ADR-0826 are Claude's decisions under Stewart's delegation, not Stewart's, so this needs no question to him. Curl keeps presenting the P12 certificate; Schannel curl's failure varies by Windows build and is not behaviour a script can rely on. CGR-096 is an accepted difference. Revisit only if Stewart says otherwise.

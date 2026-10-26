@@ -39,3 +39,4 @@ Lanes test only on Windows, so reproduce with `gh run view 40348984024 --log-fai
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 10cc6e68.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3831, which covers WriteRefusalAsync's untaken branch, the only member outside a gate
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 10cc6e68.
