@@ -18,7 +18,7 @@ public sealed class TlsClientRoutingTests
     [
         [new TlsClientOptions()],
         [new TlsClientOptions(Insecure: true)],
-        [new TlsClientOptions(CaCertificateFile: "ca.pem", CaCertificateDirectory: "certs")],
+        [new TlsClientOptions(CaCertificateFile: "ca.pem", CaCertificateDirectory: "certs", SkipRevocationCheck: true)],
         [new TlsClientOptions(ClientCertificate: "client.p12", Passphrase: "secret")],
         [new TlsClientOptions(Ciphers: "ECDHE-RSA-AES128-GCM-SHA256", Tls13Ciphers: "TLS_AES_128_GCM_SHA256")],
         [new TlsClientOptions(SkipRevocationCheck: true, RevocationCheckBestEffort: true, UseAlpn: false)],

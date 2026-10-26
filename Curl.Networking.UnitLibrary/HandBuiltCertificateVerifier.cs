@@ -99,7 +99,7 @@ internal sealed class HandBuiltCertificateVerifier(
             ? SslPolicyErrors.RemoteCertificateNotAvailable
             : BuildChain(chain, sent);
         var (observed, failure) = verification.Judge(
-            errors, sent.Count == 0 ? null : chain, targetHost, anchorsBesideSystemStore, revocationLists, PeerCertificates);
+            errors, sent.Count == 0 ? null : chain, targetHost, anchorsBesideSystemStore, revocationLists, PeerCertificates, Presented!.OcspResponse);
         Observed = observed;
         return failure is { } rejected ? ServerCertificateVerdict.Rejected(rejected) : ServerCertificateVerdict.Accepted;
     }

@@ -4,6 +4,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 using Curl.Protocol.Abstractions;
+using Curl.Tls;
 
 namespace Curl.Networking;
 
@@ -167,6 +168,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
     /// <param name="revocationLists">The <c>--crlfile</c> lists <see cref="ReadTrustAnchors" /> read, or <see langword="null" />.</param>
     /// <param name="peerCertificates">The DER of what the server sent, its own certificate first.</param>
+    /// <param name="stapledResponse">The OCSP response the server stapled, or <see langword="null" /> for none: the Schannel build lets a good or revoked one answer for the server's certificate.</param>
     /// <returns>The observation for the handshake event and the failure, or <see langword="null" /> to accept.</returns>
     internal (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Judge(
         SslPolicyErrors errors,
@@ -174,16 +176,18 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         string targetHost,
         X509Certificate2Collection anchorsBesideSystemStore,
         CertificateRevocationListFile? revocationLists,
-        ReadOnlyMemory<byte>[] peerCertificates)
+        ReadOnlyMemory<byte>[] peerCertificates,
+        byte[]? stapledResponse = null)
     {
+        var stapled = StapledRevocationStatus(stapledResponse, chain, peerCertificates);
+        errors = WithoutUnavailableRevocationAGoodStapleAnswers(errors, chain, stapled);
         var anchoredErrors = WithTheNameCheckCurlRuns(
             WithoutChainErrorsCurlTolerates(errors, chain, anchorsBesideSystemStore), chain, targetHost);
         var observed = ObservePeerVerification(anchoredErrors, chain, peerCertificates) with
         {
-            RevocationCheckIncomplete = !options.Insecure && RevocationBestEffortTolerates(chain),
+            RevocationCheckIncomplete = RevocationCheckIncomplete(chain, stapled),
         };
-        var refusal = VerifyPeer(anchoredErrors, chain, targetHost, [])
-            ?? RevocationListRefusal(revocationLists, chain);
+        var refusal = Refusal(anchoredErrors, chain, targetHost, revocationLists, stapled);
         if (JudgesPinnedPublicKeyBeforeVerification)
         {
             var pinned = JudgePinnedPublicKey(observed, peerCertificates);
@@ -192,6 +196,52 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
         return refusal is null ? JudgePinnedPublicKey(observed, peerCertificates) : (observed, refusal);
     }
+
+    // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
+    // attached the server's stapled OCSP response to, so a staple that says good or revoked
+    // answers for the server's own certificate before any online check (CGR-014, ADR-0828).
+    // A staple that says neither, or none, leaves the online check to decide; -k and
+    // --ssl-no-revoke check nothing, and the OpenSSL build reads a staple only for --cert-status.
+    private OcspStapleStatus? StapledRevocationStatus(byte[]? stapledResponse, X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates) =>
+        !matchesSchannelBuild || options.Insecure || options.SkipRevocationCheck || stapledResponse is null || peerCertificates.Length == 0
+            ? null
+            : OcspStapleVerifier.Verify(stapledResponse, IssuerCandidates(chain, peerCertificates), timeProvider.GetUtcNow()).Status;
+
+    // What the server sent, its own certificate first, then the chain built, which holds the
+    // --cacert root a server that sends only its own certificate leaves out: the staple's issuer.
+    private static byte[][] IssuerCandidates(X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates) =>
+        [.. peerCertificates.Select(der => der.ToArray()), .. (chain?.ChainElements.Select(element => element.Certificate.RawData) ?? [])];
+
+    // --ssl-revoke-best-effort let a revocation status no staple answered go unchecked.
+    private bool RevocationCheckIncomplete(X509Chain? chain, OcspStapleStatus? stapled) =>
+        !options.Insecure && stapled != OcspStapleStatus.Good && RevocationBestEffortTolerates(chain);
+
+    // The first refusal: a revoked staple, the chain or name, then a --crlfile list.
+    private (CurlExitCode ExitCode, string Message)? Refusal(
+        SslPolicyErrors anchoredErrors,
+        X509Chain? chain,
+        string targetHost,
+        CertificateRevocationListFile? revocationLists,
+        OcspStapleStatus? stapled) =>
+        RevokedStapleRefusal(stapled)
+            ?? VerifyPeer(anchoredErrors, chain, targetHost, [])
+            ?? RevocationListRefusal(revocationLists, chain);
+
+    // A good staple answers the revocation status the online check could not fetch.
+    private SslPolicyErrors WithoutUnavailableRevocationAGoodStapleAnswers(SslPolicyErrors errors, X509Chain? chain, OcspStapleStatus? stapled) =>
+        stapled == OcspStapleStatus.Good && HasOnlyUnavailableRevocationStatus(ReadChainStatus(chain))
+            ? errors & ~SslPolicyErrors.RemoteCertificateChainErrors
+            : errors;
+
+    // A revoked staple fails as a revoked chain does, --ssl-revoke-best-effort or not (measured
+    // with curl 8.21.0, BL-3826): exit 60 with --cacert, which curl's Schannel build checks
+    // after the handshake, else the handshake's own CRYPT_E_REVOKED, exit 35.
+    private (CurlExitCode ExitCode, string Message)? RevokedStapleRefusal(OcspStapleStatus? stapled) =>
+        stapled != OcspStapleStatus.Revoked
+            ? null
+            : options.HasCaCertificates
+                ? (CurlExitCode.PeerFailedVerification, TlsFailureMessages.SchannelChainRevoked)
+                : (CurlExitCode.SslConnectError, SchannelCertificateRevoked);
 
     // With --cacert curl's Schannel build validates the chain itself after the handshake, and
     // checks the pin before that, so a wrong pin is exit 90 even where the chain would fail

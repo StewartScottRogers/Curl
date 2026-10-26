@@ -40,6 +40,13 @@ internal static class TlsFailureMessages
 
     private const string SchannelRevocationStatusUnknown = "schannel: the revocation status is unknown";
 
+    /// <summary>
+    /// The Schannel build's message for exit 60 when, with <c>--cacert</c>, a certificate of the
+    /// chain is revoked (curl 8.21.0, measured with a revoked stapled OCSP response, BL-3826).
+    /// </summary>
+    internal const string SchannelChainRevoked =
+        "schannel: trust for this certificate or one of the certificates in the certificate chain has been revoked";
+
     // The Schannel build with --cacert checks the name itself (BL-150, measured): an IP
     // literal against a certificate with no subjectAltName extension, an IP literal against
     // one with it (no message of its own, so libcurl's text for exit 60), and a host name.
