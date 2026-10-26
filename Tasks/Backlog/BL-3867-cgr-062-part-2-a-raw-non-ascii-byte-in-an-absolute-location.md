@@ -1,5 +1,5 @@
 ---
-id: BL-3864
+id: BL-3867
 title: CGR-062 part 2: a raw non-ASCII byte in an absolute Location is written back as that byte by %{redirect_url} and %{url_effective}
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3864 — CGR-062 part 2: a raw non-ASCII byte in an absolute Location is written back as that byte by %{redirect_url} and %{url_effective}
+# BL-3867 — CGR-062 part 2: a raw non-ASCII byte in an absolute Location is written back as that byte by %{redirect_url} and %{url_effective}
 
 ## Goal
 
