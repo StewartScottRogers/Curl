@@ -81,10 +81,20 @@ public sealed class CurlMcpHostTests
     }
 
     [TestMethod]
-    public void Build_OverTheProcess_BuildsAHost()
+    public async Task Build_OverTheProcess_ReadsTheResponseCapFromTheProcessEnvironment()
     {
-        using McpStdioHost host = CurlMcpHost.Build();
+        string? before = Environment.GetEnvironmentVariable(McpResponseCap.VariableName);
+        Environment.SetEnvironmentVariable(McpResponseCap.VariableName, "lots");
+        try
+        {
+            using McpStdioHost host = CurlMcpHost.Build();
 
-        Assert.IsNotNull(host);
+            McpConfigurationException refused = await Assert.ThrowsExactlyAsync<McpConfigurationException>(() => host.RunAsync(CancellationToken.None));
+            StringAssert.Contains(refused.Message, McpResponseCap.VariableName);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(McpResponseCap.VariableName, before);
+        }
     }
 }

@@ -1,3 +1,4 @@
+using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Mime;
 using Curl.Api.Info;
@@ -110,10 +111,14 @@ public sealed class Lib555Tests
     [TestMethod]
     public async Task RunAsync_SetsTheIoctlCallbackAndPerforms()
     {
-        var run = new PortRun(new FakeCurlEngine(), 555, "http://x/555", "http://proxy", "u:p");
+        var engine = new FakeCurlEngine();
+        var run = new PortRun(engine, 555, "http://x/555", "http://proxy", "u:p");
 
         LibTestResult result = await new Lib555(TimeProvider.System).RunAsync(run.Context, CancellationToken.None);
 
+        IoctlCallback? ioctl = engine.Multi.Added!.Options.Callbacks.Ioctl;
+        Assert.IsNotNull(ioctl);
+        Assert.AreEqual(IoctlResult.Ok, ioctl(IoctlCommand.RestartRead));
         Assert.AreEqual((int)CurlCode.Ok, result.ExitCode);
         Assert.AreEqual("lib555", new Lib555(TimeProvider.System).ProgramName);
     }

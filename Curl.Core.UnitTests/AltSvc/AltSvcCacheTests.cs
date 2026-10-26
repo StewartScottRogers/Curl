@@ -340,8 +340,16 @@ public sealed class AltSvcCacheTests
         var entry = cache.Find(AltSvcAlpn.H1, "a.example", 443, AnyAlpn);
 
         Diagnostics.Act("entry", entry?.ToString() ?? "(null)");
-        Diagnostics.Assert("entry found", true, entry is not null);
+        var expectedExpiry = new DateTimeOffset(2026, 9, 29, 5, 21, 56, TimeSpan.Zero);
+        Diagnostics.Assert("source host", "a.example", entry?.SourceHost);
+        Diagnostics.Assert("destination alpn", AltSvcAlpn.H2, entry?.DestinationAlpn);
+        Diagnostics.Assert("destination port", 1, entry?.DestinationPort);
+        Diagnostics.Assert("expires", expectedExpiry, entry?.Expires);
         Assert.IsNotNull(entry);
+        Assert.AreEqual("a.example", entry.SourceHost);
+        Assert.AreEqual(AltSvcAlpn.H2, entry.DestinationAlpn);
+        Assert.AreEqual(1, entry.DestinationPort);
+        Assert.AreEqual(expectedExpiry, entry.Expires);
     }
 
     [TestMethod]
