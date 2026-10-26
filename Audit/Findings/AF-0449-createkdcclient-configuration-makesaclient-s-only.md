@@ -3,12 +3,12 @@ id: AF-0449
 title: CreateKdcClient_Configuration_MakesAClient's only assertion is IsNotNull on a constructed client
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Engine.UnitTests/HandBuiltKerberosSourcesTests.cs:CreateKdcClient_Configuration_MakesAClient:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3526
+tasks: BL-3526
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/HandBuiltKerberosSourcesTests.cs -Patt
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.
