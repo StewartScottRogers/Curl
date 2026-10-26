@@ -120,13 +120,27 @@ internal static class PinnedPublicKey
     internal static string HashOf(byte[] subjectPublicKeyInfo) =>
         Convert.ToBase64String(SHA256.HashData(subjectPublicKeyInfo));
 
-    // curl cuts the list at each ";sha256//" and compares each hash, case and all, whole.
+    // curl reads the list hash after hash, each running to the next ';' and compared, case and
+    // all, whole; the list goes on only while that ';' is followed by another "sha256//", so a
+    // trailing ';' or text after it ends the list, and so does ";;" before a later hash (CGR-092).
     private static bool MatchesAnyHash(string pinnedPublicKey, byte[] subjectPublicKeyInfo)
     {
         var hash = HashOf(subjectPublicKeyInfo);
-        return pinnedPublicKey[HashPrefix.Length..]
-            .Split(";" + HashPrefix)
-            .Contains(hash, StringComparer.Ordinal);
+        var rest = pinnedPublicKey.AsSpan();
+        while (rest.StartsWith(HashPrefix, StringComparison.Ordinal))
+        {
+            rest = rest[HashPrefix.Length..];
+            var end = rest.IndexOf(';');
+            var pin = end < 0 ? rest : rest[..end];
+            if (pin.SequenceEqual(hash.AsSpan()))
+            {
+                return true;
+            }
+
+            rest = end < 0 ? [] : rest[(end + 1)..];
+        }
+
+        return false;
     }
 
     private static bool MatchesKeyFile(string path, byte[] subjectPublicKeyInfo)
