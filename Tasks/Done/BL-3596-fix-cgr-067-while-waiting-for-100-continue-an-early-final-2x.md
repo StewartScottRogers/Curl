@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs, Curl.Protocol.Http.UnitTests/Cgr067Tests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpContinueWaitConnection.cs, Curl.Protocol.Http.UnitTests/Cgr067Tests.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.ExpectationFailedLoop.cs, Curl.Console.UnitTests/CurlCommandRunnerStandardInputUploadProgressMeterTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3596 — Fix CGR-067: While waiting for 100 Continue, an early final 2xx response makes Curl drop the request body. curl sends the body anyway.
 
@@ -64,17 +64,24 @@ curl -sS -H "Expect: 100-continue" -d abcde http://127.0.0.1:20335/a
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr067Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Measured curl 8.22.0 (mingw, Schannel, /ucrt64/bin/curl) on 2026-10-26 with `Record-CurlExchange.ps1 -RespondAfterBodyBytes 0 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nok\n'` (the server answers as soon as the request head arrives and keeps reading). `printf abcde | curl -sS -T - http://127.0.0.1:20341/a` sends `PUT` head (chunked, `Expect: 100-continue`) then `5\r\nabcde\r\n0\r\n\r\n`, exit 0, stdout `ok\n`, stderr empty. `curl -sS -H "Expect: 100-continue" -d abcde http://127.0.0.1:20342/a` sends the POST head then `abcde`, exit 0, stdout `ok\n`, stderr empty. With `-v`, curl prints the 200 response, logs `cr_exp100_read, AWAITING_CONTINUE, not expired`, then `Done waiting for 100-continue` and sends the body after the full second (1080 ms): it waits the timer out after an early 2xx, then sends.
+- Before the fix Curl sent only the head for both (the issue's Actual). Fix: `HttpContinueWaitConnection.WaitForContinueAsync` (through the new `WhenWaitEndsAsync`) now waits out `ContinueWait` after a final 2xx and returns true with `WaitRanOut`, so the body goes and `Done waiting for 100-continue` is reported, as curl does. A status of 300 or above still leaves the body unsent.
+- After the fix, the PORT run (Curl.Console/bin/Debug/net10.0/curl.exe, same recorder and ports) gives request.bin, stdout.bin, stderr.txt and exitcode.txt byte-identical to REF for both repros. Variants: an early `401` with `-H "Expect: 100-continue" -d abcde` (REF and PORT both send only the head, stdout `no`) and the issue's 1 MiB+1 `--data-binary @file` (REF and PORT both send 1048754 request bytes, stdout `ok`) are identical too. Files written: none in any case.
+- Focused test `Cgr067Tests.WaitForContinueAsync_FinalSuccessArrivesFirst_WaitsTheSecondOutAndSendsTheBody` fails before the fix (the wait ended at once) and passes after.
+- Touches widened (no live task in Doing on origin/work/dark-factory names them): two older tests pinned the old behaviour and are updated to the measured one. `HttpProtocolHandlerTests.ExpectationFailedLoop.cs` (the third connection answered 200 during the wait now sends its 1 MiB+1 body after the wait) and `CurlCommandRunnerStandardInputUploadProgressMeterTests.cs` (`-T .` against an early 200: real curl's meter ends with a `100     15   0      0   0     15` status line and no newline, measured the same way; the test asserted the zero line only because the body used to go unsent).
+- No ADR: no design choice beyond matching measured curl. Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: 100% line, 100% branch, 0 failing members (the first run put WaitForContinueAsync at complexity 16, so the 2xx wait moved into `WhenWaitEndsAsync`). Fast tests: 46 test projects passed, 0 failed. CI on Linux and macOS: the change and tests are platform-neutral (no paths, OS text or certificates), so that criterion is met by the green Windows run.
 
 ## Log
 
 - 2026-10-26: Created from CGR-067 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. An early final 2xx during the 100-continue wait no longer drops the body: Curl waits the timeout out and sends it, byte-identical to curl 8.22.0
