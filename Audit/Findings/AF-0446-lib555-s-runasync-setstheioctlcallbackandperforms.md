@@ -3,12 +3,12 @@ id: AF-0446
 title: Lib555's RunAsync_SetsTheIoctlCallbackAndPerforms never checks that the ioctl callback is set
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs:RunAsync_SetsTheIoctlCallbackAndPerforms:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3523
+tasks: BL-3523
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

@@ -3,12 +3,12 @@ id: AF-0450
 title: Build_OverTheProcess_BuildsAHost asserts only that CurlMcpHost.Build() is not null
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Mcp.UnitTests/CurlMcpHostTests.cs:Build_OverTheProcess_BuildsAHost:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3527
+tasks: BL-3527
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Mcp.UnitTests/CurlMcpHostTests.cs -Pattern 'Build_OverT
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

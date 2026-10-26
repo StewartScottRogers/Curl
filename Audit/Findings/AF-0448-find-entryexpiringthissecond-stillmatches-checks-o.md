@@ -3,12 +3,12 @@ id: AF-0448
 title: Find_EntryExpiringThisSecond_StillMatches checks only that some entry is found, not that it is the h2 :1 entry
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs:Find_EntryExpiringThisSecond_StillMatches:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3525
+tasks: BL-3525
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs -Pattern 'Fin
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

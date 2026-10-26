@@ -3,12 +3,12 @@ id: AF-0447
 title: Parse_BlankSslSessionsOnWindows_...SchannelBuildRefusesItAsUnsupported only checks that the 'blank argument' line is absent, never the refusal it names
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs:Parse_BlankSslSessionsOnWindows_IsNotRefusedAsBlankAsTheSchannelBuildRefusesItAsUnsupported:name-lies
 reproduction: none
-task: none
-tasks:
+task: BL-3524
+tasks: BL-3524
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs -Pattern
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.
