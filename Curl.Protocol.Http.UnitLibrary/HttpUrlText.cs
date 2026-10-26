@@ -20,10 +20,11 @@ internal static class HttpUrlText
     /// <summary>
     /// Gives the origin-form request target as the characters of a head written in Latin-1:
     /// <see cref="Path" />, then <c>?</c> and the query when the URL has one, each of the
-    /// query's UTF-8 bytes one character, so the head carries them unchanged.
+    /// query's bytes (<see cref="UrlByteText.ToBytes" />: its UTF-8, an argument byte that was not
+    /// valid UTF-8 itself) one character, so the head carries them unchanged.
     /// </summary>
     internal static string RequestTarget(CurlUrl url) =>
-        Path(url) + (url.Query is null ? string.Empty : "?" + Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(url.Query)));
+        Path(url) + (url.Query is null ? string.Empty : "?" + Encoding.Latin1.GetString(UrlByteText.ToBytes(url.Query)));
 
     /// <summary>
     /// Gives the origin-form request target the request line and authentication send:
@@ -37,17 +38,8 @@ internal static class HttpUrlText
         return UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url)[path.Length..];
     }
 
-    /// <summary>Gives the path with each character above <c>~</c> percent-encoded as UTF-8.</summary>
-    internal static string Path(CurlUrl url)
-    {
-        StringBuilder encoded = new(url.AbsolutePath.Length);
-        foreach (Rune rune in url.AbsolutePath.EnumerateRunes())
-        {
-            AppendEncoded(encoded, rune);
-        }
-
-        return encoded.ToString();
-    }
+    /// <summary>Gives the path with each byte above <c>~</c> percent-encoded, <see cref="CurlUrl.RequestPath" />.</summary>
+    internal static string Path(CurlUrl url) => url.RequestPath;
 
     /// <summary>
     /// Gives <c>?</c> and the query as written, or the empty string when the URL has no
@@ -115,20 +107,5 @@ internal static class HttpUrlText
         }
 
         return url.Password is null ? url.User + "@" : $"{url.User}:{url.Password}@";
-    }
-
-    private static void AppendEncoded(StringBuilder encoded, Rune rune)
-    {
-        if (rune.Value <= '~')
-        {
-            encoded.Append((char)rune.Value);
-            return;
-        }
-
-        Span<byte> octets = stackalloc byte[4];
-        foreach (byte octet in octets[..rune.EncodeToUtf8(octets)])
-        {
-            encoded.Append('%').Append(octet.ToString("X2", CultureInfo.InvariantCulture));
-        }
     }
 }
