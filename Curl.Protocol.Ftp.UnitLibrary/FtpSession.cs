@@ -1192,9 +1192,36 @@ internal sealed class FtpSession(
         }
 
         dataConnection = null;
-        await data.DisposeAsync().ConfigureAwait(false);
+        await CloseUploadDataConnectionAsync(data).ConfigureAwait(false);
         context.Events.ReportInfo(FtpTransferMessages.UploadSent(bytesTransferred));
         return null;
+    }
+
+    /// <summary>
+    /// Ends an upload's data connection without a reset: <c>close_notify</c> and FIN, then reads
+    /// whatever the server still sends - a TLS 1.3 session ticket, its own <c>close_notify</c> -
+    /// until it closes its side, for at most curl 8.22.0's two-second shutdown timeout. A socket
+    /// closed with unread bytes is reset on Windows, and the reset throws away the upload the
+    /// server has not read yet (CGR-006, ADR-0816).
+    /// </summary>
+    private async ValueTask CloseUploadDataConnectionAsync(IConnection data)
+    {
+        await ShutDownSendingQuietlyAsync(data).ConfigureAwait(false);
+        using var timeout = new CancellationTokenSource(DataShutdownTimeout, context.TimeProvider);
+        try
+        {
+            byte[] unread = new byte[ReadBufferSize];
+            while (await data.ReadAsync(unread, timeout.Token).ConfigureAwait(false) > 0)
+            {
+                // A server's last bytes are read only so the close is not a reset.
+            }
+        }
+        catch (Exception failure) when (failure is IOException or OperationCanceledException)
+        {
+            // The server reset the connection, or kept it open past the timeout.
+        }
+
+        await data.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2725,6 +2752,9 @@ internal sealed class FtpSession(
 
     /// <summary>How long curl 8.22.0's <c>ftp_done</c> waits for a pending control reply: "only a minute".</summary>
     private static readonly TimeSpan ControlReplyWaitAfterFailure = TimeSpan.FromSeconds(60);
+
+    /// <summary>How long curl 8.22.0 waits for a peer to end a connection it shuts down (<c>DEFAULT_SHUTDOWN_TIMEOUT_MS</c>).</summary>
+    private static readonly TimeSpan DataShutdownTimeout = TimeSpan.FromSeconds(2);
 
     private FtpControlConversationFailedException Failed(CurlExitCode exitCode, string message) =>
         new(TransferResult.Failure(exitCode, message, bytesTransferred));
