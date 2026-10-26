@@ -36,3 +36,4 @@ Add `AnsiCodePageArguments` (Curl.Console) applied in `Program.Main` on Windows 
 ## Log
 
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: b8bb145c c458aac4 a9b9a7ee f4912012 326de9ca.
