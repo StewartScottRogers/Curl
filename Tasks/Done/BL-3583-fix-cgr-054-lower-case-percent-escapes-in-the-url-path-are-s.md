@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/UrlPartText.cs, Curl.Engine.UnitTests/Cgr054Tests.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlParser.cs, Curl.Protocol.Abstractions.UnitTests/Cgr054Tests.cs]
+touches: [Curl.Engine.UnitLibrary/UrlPartText.cs, Curl.Engine.UnitTests/Cgr054Tests.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlParser.cs, Curl.Protocol.Abstractions.UnitTests/Cgr054Tests.cs, Curl.Protocol.Abstractions.UnitLibrary/UrlPathEscapes.cs, Curl.Protocol.Http.UnitLibrary/HttpUrlText.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/Cgr054Tests.cs, Curl.Protocol.Ws.UnitLibrary/WsUpgradeRequestFormatter.cs, Curl.Protocol.Ws.UnitTests/Cgr054Tests.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3583 — Fix CGR-054: Lower-case percent-escapes in the URL path are sent as typed; curl 8.22.0 upper-cases them (/a%2fb becomes /a%2Fb), which also changes AW...
 
@@ -112,17 +112,38 @@ curl -sS --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H 'X-Amz-Date: 2025010
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr054Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Touches widened (BL-3583 run): the fix cannot sit in `CurlUrlParser` because `CurlUrl.AbsolutePath` feeds `%{url_effective}` (which curl keeps lower case) and the proxy absolute form (measured as typed), so it went to the request-target builders: new `Curl.Protocol.Abstractions.UnitLibrary/UrlPathEscapes.cs`, `HttpUrlText.cs` (`OriginTarget`), `HttpRequestHeadFormatter.cs`, `HttpProtocolHandler.cs` (auth target), `WsUpgradeRequestFormatter.cs`, `AwsSigV4HttpAuthenticator.cs`, and a `Cgr054Tests.cs` in the Http and Ws test projects. No task in Doing on `origin/work/dark-factory` named any of them. `CurlUrlParser.cs` and `UrlPartText.cs` were not changed. Decision recorded in ADR-0821.
+- Measured 2026-10-26, `Record-CurlExchange.ps1` on port 20583, REF = Git for Windows ucrt64 curl 8.22.0 (Schannel), PORT = this branch's `Curl.Console\bin\Debug\net10.0\curl.exe`. Exit code, stdout, stderr and request line (plus `Authorization` for SigV4) were identical for all 12 commands:
+  1. `-sS http://P/a%2fb%7e` -> `GET /a%2Fb%7E`, exit 0
+  2. `-sS --path-as-is http://P/a/%2e%2e/b` -> `GET /a/%2E%2E/b`
+  3. `-sS http://P/%7euser/%e2%82%ac` -> `GET /%7Euser/%E2%82%AC`
+  4. `-sS "http://P/a%2fb%c3%bc?x=%2f"` -> `GET /a%2Fb%C3%BC?x=%2f` (query as typed)
+  5. `-sS http://P/a%0d%0ab%2fc` -> `GET /a%0D%0Ab%2Fc`
+  6. `-sS http://P/a/%2e%2e/b` -> `GET /b` (already matched)
+  7. `-sS http://P/a%zz%2/b%a` -> `GET /a%zz%2/b%a`
+  8. `-sS -w %{url_effective} http://P/a%2fb` -> `GET /a%2Fb`, stdout `http://127.0.0.1:20583/a%2fb` (already matched)
+  9. `-sS --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H "X-Amz-Date: 20250101T000000Z" http://P/a%2fb%c3%bc` -> `GET /a%2Fb%C3%BC`, `Signature=c12822d857213145443eee04286c029d0057b90da2e0abf9acfd15b23cc00332` (the report's `de9fa8b6...` was signed for its own host and port)
+  10. `-sS -x http://P http://example.com/a%2fb` -> `GET http://example.com/a%2fb` (proxy absolute form as typed; already matched)
+  11. `-sS ws://P/a%2fb%3d` -> `GET /a%2Fb%3D`, exit 22 `curl: (22) Refused WebSocket upgrade: 200`
+  12. `-sS -p -x http://P http://example.com/a%2fb` -> exit 56 `curl: (56) Recv failure: Connection was aborted` (already matched)
+  `-O` file names come from the URL text and are unchanged (the report shows they already matched).
+- Found while measuring: on a Digest 401 retry curl 8.22.0 also upper-cases the query (`GET /a%2Fb?q=%2F`), which is not one of this issue's repros; filed as BL-3849.
+- Quality (`Measure-CodeQuality.ps1` over Abstractions, Http, Ws and Engine): Abstractions, Http and Ws 100%/100%; Engine's one failing member is BL-3562's `MultiCallbackQueue.QueuedCallback.WaitUntilRun` (a timing-dependent branch this task did not touch), filed as BL-3850. Every member this task changed passes.
+- Fails before the fix: before it the request line, upgrade target and SigV4 path carried the typed lower-case escapes (measured above as the report's Actual), so every `Cgr054Tests` assertion on upper case fails there; `UrlPathEscapes` and `HttpUrlText.OriginTarget` did not exist.
+- CI on Linux and macOS: the new tests are pure string computation with no path, OS or certificate, so they are platform-neutral; fast tests green here (exit 0).
+
 ## Log
 
 - 2026-10-26: Created from CGR-054 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Lower-case percent-escapes in the URL path go out upper-cased in the request line, WebSocket upgrade and SigV4 signature, matching curl 8.22.0 on every CGR-054 repro
