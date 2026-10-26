@@ -307,8 +307,8 @@ public sealed class Http2SessionTests
     {
         byte[] scripted = Frames(
             [new Http2Setting(Http2SettingIdentifier.MaxConcurrentStreams, 1)],
-            Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.RefusedStream));
-        Diagnostics.Arrange("server frames", "SETTINGS MAX_CONCURRENT_STREAMS 1, RST_STREAM 1 REFUSED_STREAM");
+            Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.Cancel));
+        Diagnostics.Arrange("server frames", "SETTINGS MAX_CONCURRENT_STREAMS 1, RST_STREAM 1 CANCEL");
         Diagnostics.Bytes("scripted server bytes", scripted);
         ScriptedConnection connection = new(scripted, 65536);
         Http2Session session = new(connection);

@@ -370,7 +370,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// Gives the transfer failure curl reports for a failure of the stream or its connection,
     /// or <see langword="null" /> for one that passes through, such as an <see cref="IOException" />.
     /// </summary>
-    private HttpTransferException? FailureOf(Exception exception) => exception switch
+    private HttpTransferException? FailureOf(Exception exception) => IsRefusal(exception) ? Refused() : exception switch
     {
         Http2StreamResetException reset => new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode)),
         Http2ProtocolException error => new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode)),
@@ -378,6 +378,24 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         EndOfStreamException => Closed(),
         _ => null,
     };
+
+    /// <summary>
+    /// Tells whether the server refused this stream: reset it with REFUSED_STREAM, or sent a
+    /// GOAWAY whose last stream ID is below it, which nghttp2 closes the stream for with
+    /// REFUSED_STREAM too.
+    /// </summary>
+    private bool IsRefusal(Exception exception) =>
+        exception is Http2StreamResetException { ErrorCode: Http2ErrorCode.RefusedStream }
+        || (exception is Http2GoAwayException goAway && goAway.GoAway.LastStreamId < streamId);
+
+    /// <summary>
+    /// Gives the failure for a stream the server refused (<see cref="IsRefusal" />): exit 56 marked
+    /// <see cref="HttpTransferException.IsStreamRefused" />, which the handler sends again on a
+    /// new connection as curl 8.18.0 with nghttp2 does, with no <c>-v</c> line of its own
+    /// (measured, BL-3560 Notes).
+    /// </summary>
+    private static HttpTransferException Refused() =>
+        new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed) { IsStreamRefused = true };
 
     private void ThrowIfClosed()
     {

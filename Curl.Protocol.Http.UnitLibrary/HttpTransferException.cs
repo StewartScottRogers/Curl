@@ -19,9 +19,11 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal CurlExitCode ExitCode { get; } = exitCode;
 
     /// <summary>
-    /// Gets a value indicating whether the server refused the request's HTTP/3 stream with
-    /// <c>H3_REQUEST_REJECTED</c>, so the handler may send it again on a new connection
-    /// (ADR-0187). The message is then the <c>-v</c> line that reports the refusal.
+    /// Gets a value indicating whether the server refused the request's stream, so the handler
+    /// may send it again on a new connection: an HTTP/3 stream reset with
+    /// <c>H3_REQUEST_REJECTED</c> (ADR-0187), or an HTTP/2 stream reset with
+    /// <c>REFUSED_STREAM</c> or left unprocessed by a GOAWAY (BL-3560). Any <c>-v</c> line that
+    /// reports the refusal is among <see cref="InfoLines" />.
     /// </summary>
     internal bool IsStreamRefused { get; init; }
 

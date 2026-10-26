@@ -300,7 +300,8 @@ internal sealed class Http3StreamConnection(Http3Session session, string scheme,
         catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.RequestRejected)
         {
             session.StopNewStreams();
-            throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.Http3StreamRefused(stream!.StreamId)) { IsStreamRefused = true };
+            string refusal = HttpTransferMessages.Http3StreamRefused(stream!.StreamId);
+            throw new HttpTransferException(CurlExitCode.RecvError, refusal) { IsStreamRefused = true, InfoLines = [refusal] };
         }
         catch (MultiplexedStreamResetException reset) when (reset.ApplicationErrorCode == (long)Http3ErrorCode.NoError || (isFinalHeadReceived && ignoresBody))
         {

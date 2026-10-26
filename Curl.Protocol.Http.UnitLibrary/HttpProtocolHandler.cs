@@ -2056,12 +2056,13 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reports a read a socket error failed as the <c>-v</c> line curl 8.21.0's <c>failf</c> prints
     /// for it, such as <c>Recv failure: Connection was reset</c>, before the connection's end is
-    /// reported (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
-    /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187), then the failure's own <see cref="HttpTransferException.InfoLines" />. Any other failure is left to the transfer's result.
+    /// reported (measured, BL-449 Notes), then the failure's own <see cref="HttpTransferException.InfoLines" />,
+    /// such as the line curl 8.21.0's <c>cf-ngtcp2.c</c> prints for an HTTP/3 stream the server refused
+    /// (ADR-0187). Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.IsStreamRefused || failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
+        if (failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
         {
             events.ReportInfo(failure.Message);
         }
@@ -2073,7 +2074,7 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Builds the outcome of an exchange whose HTTP/3 stream the server refused, as curl
+    /// Builds the outcome of an exchange whose HTTP/3 or HTTP/2 stream the server refused, as curl
     /// 8.21.0's <c>Curl_retry_request</c> does (ADR-0187): when no byte of the response had
     /// arrived, the request is sent again on a new connection up to
     /// <see cref="MaximumStreamRefusedRetries" /> times, and the refusal after that fails with
@@ -2142,7 +2143,7 @@ public sealed class HttpProtocolHandler(
 
     /// <summary>
     /// Builds the outcome of an exchange that failed with <paramref name="failure" />: as
-    /// <see cref="StreamRefusedOutcome" /> says when the server refused its HTTP/3 stream; sent
+    /// <see cref="StreamRefusedOutcome" /> says when the server refused its stream; sent
     /// again once on a fresh connection when a connection that already carried a request died
     /// before the response
     /// (<see cref="DiedBeforeResponse" />); and final otherwise.
