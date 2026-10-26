@@ -290,12 +290,12 @@ public static partial class CommandLineOptionTable
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
         CommandLineOption.NegatableFlag("xattr", null, (options, on) => options.ExtendedAttributes = on),
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
-        CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
+        CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = AsRawWireText(options, method)),
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
-        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
+        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') ? AsRawWireText(options, cookie) : cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
         CommandLineOption.NegatableFlag("follow", null, SetFollow),
@@ -1005,6 +1005,17 @@ public static partial class CommandLineOptionTable
     /// a <c>-H</c> value, warning with <see cref="CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader(string)"/>
     /// instead, as curl 8.21.0 does.
     /// </summary>
+    /// <summary>
+    /// <paramref name="value"/> as the request side must hold a <c>-b</c> cookie string or <c>-X</c> method
+    /// to send it as curl 8.22.0 does: while a config file is read, re-spelled one character per byte of
+    /// the file's own bytes, since the request side writes those values one character per byte
+    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise unchanged.
+    /// </summary>
+    private static string AsRawWireText(CommandLineOptions options, string value) =>
+        options.ReadingConfigFile
+            ? Encoding.Latin1.GetString((options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : Encoding.UTF8).GetBytes(value))
+            : value;
+
     private static CommandLineRefusal? AddProxyHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
         AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader, options.AddProxyHeader);
 
@@ -1035,7 +1046,7 @@ public static partial class CommandLineOptionTable
         CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
         if (refusal is null)
         {
-            foreach (string line in Encoding.UTF8.GetString(contents).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            foreach (string line in HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             {
                 addHeader(line);
             }

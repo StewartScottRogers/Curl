@@ -194,10 +194,41 @@ internal static class HttpRequestHeadFormatter
     /// Gives command-line <paramref name="text" /> as its bytes in
     /// <see cref="HttpRequestOptions.CommandLineTextEncoding" />, one character per byte, so the
     /// head's closing <see cref="Encoding.Latin1" /> step puts those bytes on the wire unchanged.
+    /// A lone surrogate from U+DC80 to U+DCFF stands for the byte U+DC00 below it, which a header
+    /// file held but UTF-8 could not read, and is given as that byte (CGR-020, BL-3549).
     /// </summary>
     [return: NotNullIfNotNull(nameof(text))]
     private static string? HeadText(string? text, HttpRequestOptions options) =>
-        text is null ? null : Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
+        text is null ? null : WireText(text, options.CommandLineTextEncoding);
+
+    /// <summary>
+    /// Gives <paramref name="text" /> as its bytes in <paramref name="encoding" />, one character
+    /// per byte, with each escaped byte (<see cref="EscapedByteOf" />) given as itself.
+    /// </summary>
+    internal static string WireText(string text, Encoding encoding)
+    {
+        StringBuilder wire = new(text.Length);
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (EscapedByteOf(text, index) is { } escaped)
+            {
+                wire.Append(Encoding.Latin1.GetString(encoding.GetBytes(text[runStart..index]))).Append(escaped);
+                runStart = index + 1;
+            }
+        }
+
+        return wire.Append(Encoding.Latin1.GetString(encoding.GetBytes(text[runStart..]))).ToString();
+    }
+
+    /// <summary>
+    /// The byte the character at <paramref name="index" /> stands for when it is a lone surrogate
+    /// from U+DC80 to U+DCFF, one character per byte; otherwise <see langword="null" />.
+    /// </summary>
+    private static char? EscapedByteOf(string text, int index) =>
+        text[index] is >= '\uDC80' and <= '\uDCFF' && (index == 0 || !char.IsHighSurrogate(text[index - 1]))
+            ? (char)(text[index] - 0xDC00)
+            : null;
 
     /// <summary>
     /// Gives <paramref name="framing" />, or the framing <see cref="HttpRequestFraming.Of" />

@@ -182,7 +182,7 @@ internal sealed class FormPartParameterReader
         string file = ReadTrimmedWord();
         if (dataFileReader.TryReadFile(file, out byte[] contents))
         {
-            AddHeaderFileLines(part.Headers, Encoding.UTF8.GetString(contents));
+            AddHeaderFileLines(part.Headers, HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding));
         }
         else
         {
