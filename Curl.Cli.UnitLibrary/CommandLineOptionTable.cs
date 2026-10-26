@@ -1123,7 +1123,7 @@ public static partial class CommandLineOptionTable
     {
         if (!value.StartsWith('@'))
         {
-            options.WriteOut = value;
+            options.WriteOut = options.AsWireText(value);
             return null;
         }
 
@@ -1141,7 +1141,8 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        options.WriteOut = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
+        string template = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
+        options.WriteOut = options.ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(template, wireEncoding) : template;
         return null;
     }
 

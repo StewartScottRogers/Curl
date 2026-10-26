@@ -68,6 +68,12 @@ public sealed partial class UpstreamConformanceTests
     // cases are run and reported but not held to the list (BL-1949).
     private static readonly IReadOnlySet<int> NeedsTls13ServerCases = new HashSet<int> { 4001 };
 
+    // Listed cases whose -w output holds non-ASCII command-line text, which upstream's runner hands
+    // curl as UTF-8 bytes. On Windows Curl writes -w in the ANSI code page, as the ANSI-argv curl 8.22.0
+    // does (ADR-0828, BL-3841), so there these cases are run and reported but not held to the list;
+    // Linux and macOS judge them.
+    private static readonly IReadOnlySet<int> NeedsUtf8ArgumentsCases = new HashSet<int> { 2046, 2047 };
+
     /// <summary>
     /// One row per vendored <c>test*.curltest</c> file, in test-number order, named by
     /// <see cref="UpstreamCaseDisplayName"/> and carrying one test category per server the case
@@ -97,7 +103,7 @@ public sealed partial class UpstreamConformanceTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         byte[] testFile = await File.ReadAllBytesAsync(Path.Combine(UpstreamTestDataFolder, $"test{testNumber}{UpstreamTestFileExtension}"));
-        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber)) && IsHeldOnThisPlatform(testFile);
+        bool isListed = PassingCases.Contains(testNumber) && !(OperatingSystem.IsMacOS() && NeedsTls13ServerCases.Contains(testNumber)) && !(OperatingSystem.IsWindows() && NeedsUtf8ArgumentsCases.Contains(testNumber)) && IsHeldOnThisPlatform(testFile);
         diagnostics.Arrange("upstream case number", testNumber);
         diagnostics.Arrange("case is on the passing list", isListed);
         UpstreamCaseOutcome outcome;

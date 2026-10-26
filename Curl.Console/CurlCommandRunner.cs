@@ -478,16 +478,23 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Renders each transfer's <c>-w</c> template. It writes line feeds as they are; the
-    /// runner decides which targets are in text mode.
+    /// runner decides which targets are in text mode. On Windows it writes its text in the ANSI
+    /// code page, as the ANSI-argv curl writes its argument bytes (CGR-015, ADR-0828).
     /// </summary>
-    private readonly WriteOutTemplateRenderer writeOutRenderer = new(
-        new WriteFailureIgnoringWriteOutFileOpener(writeOutFileOpener ?? new RefusingWriteOutFileOpener()),
-        writesLineFeedAsCrLf: false,
-        writeOutTimeDialect,
-        DebugWriteOutStandIn.OrNone(debugWriteOut).ClockOr(timeProvider ?? TimeProvider.System));
+    private readonly WriteOutTemplateRenderer writeOutRenderer = CreateWriteOutRenderer(
+        writeOutFileOpener, writeOutTimeDialect, DebugWriteOutStandIn.OrNone(debugWriteOut), timeProvider, runsOnWindows);
 
     /// <summary>What <c>-w</c> prints in place of the measured values under curl's debug-build test variables (ADR-0732, BL-2909).</summary>
     private readonly DebugWriteOutStandIn debugWriteOut = DebugWriteOutStandIn.OrNone(debugWriteOut);
+
+    private static WriteOutTemplateRenderer CreateWriteOutRenderer(
+        IWriteOutFileOpener? fileOpener, WriteOutTimeDialect timeDialect, DebugWriteOutStandIn debugWriteOut, TimeProvider? clock, bool runsOnWindows) =>
+        new(
+            new WriteFailureIgnoringWriteOutFileOpener(fileOpener ?? new RefusingWriteOutFileOpener()),
+            writesLineFeedAsCrLf: false,
+            timeDialect,
+            debugWriteOut.ClockOr(clock ?? TimeProvider.System),
+            runsOnWindows ? ConfigFileWireText.WindowsAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)) : Encoding.UTF8);
 
     /// <summary>
     /// The exit code and message of a transfer whose write to standard output failed, laid over the handler's

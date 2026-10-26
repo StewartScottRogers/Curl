@@ -28,7 +28,9 @@ namespace Curl.Output;
 /// A file that cannot be opened leaves the output where it was. A header name of 256 bytes
 /// or more renders nothing, and a file name of 512 bytes or more is not opened, as curl's
 /// fixed buffers do. A <c>%{name}</c> of 24 bytes or more ends the rendering there,
-/// silently, as curl's 24-byte name buffer does. Text is written as UTF-8, except header
+/// silently, as curl's 24-byte name buffer does. Text is written in the text encoding the
+/// renderer was given (UTF-8, or on Windows the ANSI code page curl's arguments arrive in,
+/// CGR-015, ADR-0828), except header
 /// bytes marked by <see cref="MarkHeaderBytes"/>, which are written as the raw bytes they
 /// were (CGR-021, ADR-0816), and lone surrogates U+DC80 to U+DCFF, which stand for argument
 /// bytes that were not valid UTF-8 (CGR-016, ADR-0822), which are written as those bytes, as
@@ -44,12 +46,24 @@ namespace Curl.Output;
 /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
 /// <param name="timeDialect">The C runtime whose <c>strftime</c> <c>%time{format}</c> follows: the Windows one, or glibc for Linux and macOS.</param>
 /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
+/// <param name="textEncoding">The encoding text is written in: UTF-8, or the ANSI code page on Windows, as curl writes its argument bytes.</param>
 public sealed class WriteOutTemplateRenderer(
     IWriteOutFileOpener fileOpener,
     bool writesLineFeedAsCrLf,
     WriteOutTimeDialect timeDialect,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Encoding textEncoding)
 {
+    /// <summary>Creates a renderer that writes its text as UTF-8.</summary>
+    /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
+    /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
+    /// <param name="timeDialect">The C runtime whose <c>strftime</c> <c>%time{format}</c> follows.</param>
+    /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
+    public WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf, WriteOutTimeDialect timeDialect, TimeProvider timeProvider)
+        : this(fileOpener, writesLineFeedAsCrLf, timeDialect, timeProvider, Encoding.UTF8)
+    {
+    }
+
     private const int VariableNameBufferBytes = 24;
     private const int HeaderNameBufferBytes = 256;
     private const int FileNameBufferBytes = 512;
@@ -71,6 +85,7 @@ public sealed class WriteOutTemplateRenderer(
     private readonly IWriteOutFileOpener fileOpener = fileOpener ?? throw new ArgumentNullException(nameof(fileOpener));
     private readonly WriteOutTimeDialect timeDialect = timeDialect;
     private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    private readonly Encoding textEncoding = textEncoding ?? throw new ArgumentNullException(nameof(textEncoding));
 
     /// <summary>
     /// The warning line, without its line terminator, curl writes to standard error for a
@@ -146,7 +161,7 @@ public sealed class WriteOutTemplateRenderer(
     {
         string lines = writesLineFeedAsCrLf ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text;
         return lines.AsSpan().IndexOfAny(RawByteCharacters) < 0
-            ? Encoding.UTF8.GetBytes(lines)
+            ? textEncoding.GetBytes(lines)
             : EncodeWithRawBytes(lines);
     }
 
@@ -159,28 +174,36 @@ public sealed class WriteOutTemplateRenderer(
             }
         });
 
-    private static byte[] EncodeWithRawBytes(string text)
+    private byte[] EncodeWithRawBytes(string text)
     {
         List<byte> bytes = new(text.Length);
-        Span<byte> encoded = stackalloc byte[4];
+        StringBuilder textRun = new();
         ReadOnlySpan<char> rest = text;
         while (!rest.IsEmpty)
         {
-            Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed);
+            Rune.DecodeFromUtf16(rest, out _, out int consumed);
             char first = rest[0];
             if (RawByteCharacters.Contains(first))
             {
+                AppendEncodedRun(bytes, textRun);
                 bytes.Add((byte)first);
             }
             else
             {
-                bytes.AddRange(encoded[..rune.EncodeToUtf8(encoded)]);
+                textRun.Append(rest[..consumed]);
             }
 
             rest = rest[consumed..];
         }
 
+        AppendEncodedRun(bytes, textRun);
         return [.. bytes];
+    }
+
+    private void AppendEncodedRun(List<byte> bytes, StringBuilder textRun)
+    {
+        bytes.AddRange(textEncoding.GetBytes(textRun.ToString()));
+        textRun.Clear();
     }
 
     /// <summary>One pass over one template, holding where the output currently goes.</summary>
@@ -311,7 +334,7 @@ public sealed class WriteOutTemplateRenderer(
             }
 
             // curl's name buffer refuses a name this long, and its loop ends there silently.
-            if (Encoding.UTF8.GetByteCount(name) >= VariableNameBufferBytes)
+            if (renderer.textEncoding.GetByteCount(name) >= VariableNameBufferBytes)
             {
                 position = template.Length;
                 return;
@@ -375,7 +398,7 @@ public sealed class WriteOutTemplateRenderer(
                 return;
             }
 
-            if (Encoding.UTF8.GetByteCount(content) >= HeaderNameBufferBytes)
+            if (renderer.textEncoding.GetByteCount(content) >= HeaderNameBufferBytes)
             {
                 return;
             }
@@ -428,7 +451,7 @@ public sealed class WriteOutTemplateRenderer(
                 return;
             }
 
-            if (Encoding.UTF8.GetByteCount(path) >= FileNameBufferBytes)
+            if (renderer.textEncoding.GetByteCount(path) >= FileNameBufferBytes)
             {
                 return;
             }
