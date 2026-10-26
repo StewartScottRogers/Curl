@@ -1,5 +1,5 @@
 ---
-id: BL-3872
+id: BL-3880
 title: Echo curl's failf message as a -v line for the CGR-088 failure paths BL-3617 left: --max-redirs, --max-filesize, bad gzip, bad chunk, -m, bad -o path, short body, FTP STOR/REST/greeting/226-451, SOCKS5 replies, --trace
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3872 — Echo curl's failf message as a -v line for the CGR-088 failure paths BL-3617 left: --max-redirs, --max-filesize, bad gzip, bad chunk, -m, bad -o path, short body, FTP STOR/REST/greeting/226-451, SOCKS5 replies, --trace
+# BL-3880 — Echo curl's failf message as a -v line for the CGR-088 failure paths BL-3617 left: --max-redirs, --max-filesize, bad gzip, bad chunk, -m, bad -o path, short body, FTP STOR/REST/greeting/226-451, SOCKS5 replies, --trace
 
 ## Goal
 
