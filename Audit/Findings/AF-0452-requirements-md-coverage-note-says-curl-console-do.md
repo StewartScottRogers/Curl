@@ -3,12 +3,12 @@ id: AF-0452
 title: Requirements.md coverage note says Curl.Console does not register SFTP, SCP and SMB, but they are registered
 auditor: truthfulness
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: truthfulness:Documentation/Product/Requirements.md:Coverage-SftpScpSmbUnregistered:false-statement
 reproduction: none
-task: none
-tasks:
+task: BL-3529
+tasks: BL-3529
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Product/Requirements.md, Curl.Engine.UnitLibra
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

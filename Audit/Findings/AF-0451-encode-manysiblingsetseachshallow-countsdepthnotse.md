@@ -3,12 +3,12 @@ id: AF-0451
 title: Encode_ManySiblingSetsEachShallow_CountsDepthNotSetsAndEncodes checks only that some bytes came back, not the encoding
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: Stewart accepted it on 2026-10-25.
 key: quality:Curl.Protocol.Ldap.UnitTests/LdapAdversarialTests.cs:Encode_ManySiblingSetsEachShallow_CountsDepthNotSetsAndEncodes:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-3528
+tasks: BL-3528
 found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
@@ -45,3 +45,4 @@ Select-String -Path Curl.Protocol.Ldap.UnitTests/LdapAdversarialTests.cs -Patter
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> accepted.

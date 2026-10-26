@@ -3,8 +3,8 @@ id: AF-0445
 title: RunAsync_UploadFileThatCannotBeOpened_Exits26AndStopsTheRun asserts exit 25 and 'curl: (25)', so it passes while -T with a missing file exits 25 instead of curl's 26
 auditor: quality
 severity: Critical
-status: proposed
-reason:
+status: rejected
+reason: Stewart rejected it on 2026-10-25: clean master's test asserts exit 26 and 'curl: (26)'; the 25 is only in the planted tree, from planted defect PD-301 in Curl.Console/CurlCommandRunner.cs (run 20261025-154225's manifest).
 key: quality:Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs:RunAsync_UploadFileThatCannotBeOpened_Exits26AndStopsTheRun:name-lies
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Console.UnitTests/CurlCommandRunnerUploadTests.cs -Patt
 ## Log
 
 - 2026-10-25: filed proposed.
+- 2026-10-25: proposed -> rejected.
