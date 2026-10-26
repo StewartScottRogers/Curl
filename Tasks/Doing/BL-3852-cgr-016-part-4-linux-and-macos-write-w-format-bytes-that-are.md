@@ -35,3 +35,4 @@ Needs BL-3849's lossless argument decoding: each invalid byte b arrives as the l
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 6fd990b3 fa400498 03933128 f9e9638a 779790c0.
