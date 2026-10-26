@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/Cgr079Tests.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/Cgr079Tests.cs, Curl.Engine.UnitLibrary/TransferProxySelection.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitTests/EasyProxyOptionsReadingTests.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Proxy.cs, Curl.Console.UnitTests/CurlCompositionProxyTests.cs, Documentation/Planning/Decisions/ADR-0677-library-handle-proxy-credentials-reach-the-proxy.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3608 — Fix CGR-079: Proxy credentials in the proxy URL lose to -U/--proxy-user; curl lets the URL's user info win
 
@@ -65,17 +65,29 @@ http_proxy=http://a:b@127.0.0.1:20600 curl -s -U c:d http://example.test/
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr079Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause: `TransferProxySelection.WithProxyUser` replaced the selected proxy's credential with `-U`'s unconditionally. Fix: only when the proxy's own `Credential` is null (no user information in the proxy URL), as libcurl's `parse_proxy` lets the URL's user and password replace the `-U` ones. Decision recorded in ADR-0825; ADR-0677's status line notes the amendment.
+- Touches widened: `TransferProxySelection.cs` (the fix, `ProxyCredentialsOf` only builds the credential), the Engine CLAUDE.md line and ADR-0677 that stated the old rule, and three existing tests that pinned it (`EasyProxyOptionsReadingTests`, `ManagedEasyTransferTests.Proxy`, `CurlCompositionProxyTests`, now using a proxy URL without user information or expecting the URL's credential). No task in Doing on origin/work/dark-factory names any of them. Upstream test1588 is unaffected: its proxy URL has no user information.
+- Measured on Windows with `Record-CurlExchange.ps1`, REF = curl 8.22.0 Schannel (`C:\Program Files\Git\ucrt64\bin\curl.exe`; note `curl.exe` on PATH in PowerShell is System32's 8.21.0), PORT = this build, server answering `HTTP/1.1 200 OK`, `-U c:d` in each:
+  - `-s -x http://a:b@127.0.0.1:20601 http://example.test/`: both exit 0, empty stdout and stderr, `Proxy-Authorization: Basic YTpi`.
+  - `http_proxy=http://a:b@127.0.0.1:20601 curl -s http://example.test/`: both `Basic YTpi`.
+  - `-x http://a@127.0.0.1:20601`: both `Basic YTo=`. `-x http://:b@...`: both `Basic OmI=`. `-x http://127.0.0.1:20601` (already matched): both `Basic Yzpk`.
+  - `-x socks5://a:b@127.0.0.1:20601 http://127.0.0.1:8080/x` (scripted SOCKS5 server): both send `05 03 00 01 02`, then `01 01 61 01 62`, exit 0, stdout `ok`.
+  - `-x socks4://a@127.0.0.1:20601 http://127.0.0.1:8080/x`: both send `04 01 1f 90 7f 00 00 01 61 00` (USERID `a`), exit 0, stdout `ok`.
+  - Every request.bin identical once the User-Agent version is normalised (report section 1). Before the fix PORT sent `Basic Yzpk` / `01 01 63 01 64` / USERID `c`, as the report says.
+- `Cgr079Tests` failed 6 of 7 cases with the old `WithProxyUser` and passes with the fix. No files are written in any repro. Linux (curl 8.18.0 OpenSSL) runs the same `parse_proxy`; the change and the tests are platform-neutral, so CI on Linux and macOS is covered by keeping them so.
+- `dotnet build` clean; fast tests green (Curl.Engine.UnitTests 2557 passed after updating the two Engine tests; every other project passed in the full run). `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-079 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. The proxy URL's user information wins over -U/--proxy-user for HTTP, SOCKS4 and SOCKS5 proxies and http_proxy, as curl 8.22.0 does
