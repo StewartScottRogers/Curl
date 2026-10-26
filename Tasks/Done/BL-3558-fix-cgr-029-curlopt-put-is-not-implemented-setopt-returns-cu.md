@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Libcurl.UnitTests/Cgr029Tests.cs, Libcurl/Options/EasyOptionDispatch.cs]
+touches: [Libcurl.UnitTests/Cgr029Tests.cs, Libcurl/Options/EasyOptionDispatch.cs, Libcurl/Options/Transfer/EasyTransferOptionSetters.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3558 — Fix CGR-029: CURLOPT_PUT is not implemented: setopt returns CURLE_NOT_BUILT_IN and the transfer goes out as a GET with no body
 
@@ -61,17 +61,22 @@ probe.exe sweep
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr029Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Fix: the setter lives in `Libcurl/Options/Transfer/EasyTransferOptionSetters.cs`, not in `EasyOptionDispatch.cs`, so that file was added to `touches`; no task in Doing on origin/work/dark-factory names it. `CURLOPT_PUT` now goes to the same `SetUpload` as `CURLOPT_UPLOAD`, as curl 8.22.0's `setopt.c` handles both in one `case`: any non-zero value turns the upload on, 0 turns it off, and the answer is always `CURLE_OK`. This is curl's own behaviour, so it needs no ADR. The engine already sends an upload over HTTP as a PUT with the read callback's body (`ManagedEasyTransferTests.InFileSize.cs`).
+- Focused test `Libcurl.UnitTests/Cgr029Tests.cs`: all 4 of its tests failed with the fix line removed and pass with it in.
+- Repro (a C# file-based probe in %TEMP%, deleted afterwards, calling `C:\Program Files\Git\ucrt64\bin\libcurl-4.dll` through P/Invoke and the port's `Libcurl` against one loopback server; URL `http://127.0.0.1:<port>/f`, `PUT=1`, `INFILESIZE_LARGE=15`, a READFUNCTION supplying 15 bytes). REF: setopt URL/PUT/INFILESIZE_LARGE/READFUNCTION = 0/0/0/0, perform 0, EFFECTIVE_METHOD=PUT, SIZE_UPLOAD_T=15, wire `PUT /f HTTP/1.1`, `Host`, `Accept: */*`, `Content-Length: 15`, then the 15 body bytes. PORT, after the fix: identical on every one of those. The sweep (values -3 to 40): upstream answers 0 for every long value; the tests cover -3, 1, 40 and 0.
+- Quality: `Measure-CodeQuality.ps1 -Library Libcurl` gave 0 failing members. Build clean; fast tests all green (Libcurl.UnitTests 1428 passed, 1 skipped). The change is platform-neutral (no paths, OS text or certificates).
 
 ## Log
 
 - 2026-10-26: Created from CGR-029 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. CURLOPT_PUT is CURLOPT_UPLOAD's alias: setopt answers OK and the transfer goes out as a PUT with its body

@@ -49,6 +49,7 @@ internal static class EasyTransferOptionSetters
         setters[CurlOption.Dirlistonly] = new(SetDirListOnly);
         setters[CurlOption.Nobody] = new(SetNoBody);
         setters[CurlOption.Upload] = new(SetUpload);
+        setters[CurlOption.Put] = new(SetUpload);
         setters[CurlOption.Transfertext] = new(SetTransferText);
         setters[CurlOption.Crlf] = new(SetCrlf);
         setters[CurlOption.ProxyTransferMode] = new(SetProxyTransferMode);
