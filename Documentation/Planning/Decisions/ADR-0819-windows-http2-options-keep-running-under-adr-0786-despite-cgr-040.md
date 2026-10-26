@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-26
-- Decision: Decided by Claude under Stewart's delegation (BL-3569); reversing it is Stewart's, since ADR-0786 is his
+- Decision: Decided by Claude under Stewart's delegation (BL-3569); confirmed by Stewart on 2026-10-26 ("Keep HTTP/2 on"), so ADR-0786 stands
 - Relates to: [ADR-0786](ADR-0786-windows-build-runs-http2.md), [ADR-0808](ADR-0808-windows-features-line-omits-http2-and-httpsrr.md)
 
 ## Context

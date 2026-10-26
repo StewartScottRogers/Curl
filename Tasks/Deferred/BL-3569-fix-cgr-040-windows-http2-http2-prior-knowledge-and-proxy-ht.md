@@ -97,3 +97,4 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
 - 2026-10-26: Created from CGR-040 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Blocked. Stewart: CGR-040 asks Windows to refuse --http2/--http2-prior-knowledge/--proxy-http2 (exit 2) as Schannel curl does, reversing your ADR-0786 - keep ADR-0786 (ADR-0819) and close CGR-040 as accepted, or refuse them?
+- 2026-10-26: Blocked -> Deferred. Stewart, 2026-10-26: keep HTTP/2 on Windows (ADR-0786, ADR-0819); CGR-040 is an accepted difference from the Schannel build, not a defect. Revisit only if Stewart reverses ADR-0786.
