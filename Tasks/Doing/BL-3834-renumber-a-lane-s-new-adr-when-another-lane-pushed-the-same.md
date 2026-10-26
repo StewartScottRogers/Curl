@@ -34,3 +34,4 @@ Do the same as task dedupe: after the rebase in `DarkFactory/Integrate.ps1`, ADR
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: a2edeb28 67279eb4 01381fd7 779790c0.
