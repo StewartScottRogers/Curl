@@ -77,3 +77,4 @@ curl -sS -L "http://127.0.0.1:20200/__loc=localhost:20200/x" -w "[%{url_effectiv
 ## Log
 
 - 2026-10-26: Created from CGR-018 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
