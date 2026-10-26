@@ -41,7 +41,7 @@ Split from BL-3532 (CGR-003 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25
   IMAP path could end with exit 28 at the greeting, so the first test failed (it hung on the
   transfer's token). The existing IMAP tests still pass for servers that greet (the variants that
   already matched).
-- Decision recorded in ADR-0829.
+- Decision recorded in ADR-0833.
 - The stash also held POP3 and SMTP work. That belongs to BL-3881 (in Doing on another lane) and
   BL-3883, so this task's commits leave it out (outside `touches`).
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Imap.UnitLibrary` reported 0 failing
@@ -52,4 +52,4 @@ Split from BL-3532 (CGR-003 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: ba67c2c6 9470e243 b084e04d 779790c0.
-- 2026-10-26: Doing -> Done. IMAP holds its greeting and login to --connect-timeout and ends with exit 28 as curl does (ADR-0829)
+- 2026-10-26: Doing -> Done. IMAP holds its greeting and login to --connect-timeout and ends with exit 28 as curl does (ADR-0833)

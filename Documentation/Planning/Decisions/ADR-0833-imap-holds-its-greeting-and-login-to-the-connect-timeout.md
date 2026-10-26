@@ -1,4 +1,4 @@
-# ADR-0829: IMAP holds its greeting and login to `--connect-timeout`
+# ADR-0833: IMAP holds its greeting and login to `--connect-timeout`
 
 - Status: Accepted
 - Date: 2026-10-26
