@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitTests/Cgr017Tests.cs, Curl.Console.UnitTests/Cgr017Tests.cs, Curl.Console/Program.cs, Curl.Console/UnhandledExceptionGuard.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitTests/Cgr017Tests.cs, Curl.Cli.UnitTests/DiskDataFileReaderTests.cs, Curl.Console.UnitTests/Cgr017Tests.cs, Curl.Console/Program.cs, Curl.Console/UnhandledExceptionGuard.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3546 — Fix CGR-017: Reading stdin twice in one command line (two @- consumers, -K - plus @-, or @- across --next) aborts with exit 2 and a .NET "Cannot acces...
 
@@ -145,17 +145,25 @@ curl -s -T - http://127.0.0.1:22000/a --next -d @- http://127.0.0.1:22000/b
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr017Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 7): Root cause confirmed: `DiskDataFileReader.ReadStandardInput` disposed the stream `openStandardInput` returned, which is the process stdin `Program.Main` owns, so every later read hit a closed stream. Fix: `ReadStandardInput` no longer disposes the stream (its owner does); a later read gets end of file, empty data, as curl does. Pipeline `feature` run as a direct change: a one-line root-cause fix needs no architect plan. No ADR: this matches curl, no design choice was made.
+- Touches widened by `Curl.Cli.UnitTests/DiskDataFileReaderTests.cs`: its `ReadStandardInput_Always_ReturnsEveryByteAndClosesTheStream` pinned the bug, now `..._LeavesTheStreamOpen`. No task in Doing on origin/work/dark-factory names that file. `Curl.Console/*` and `CommandLineOptionTable.cs` needed no change.
+- Focused test `Curl.Cli.UnitTests/Cgr017Tests.cs` reads stdin twice through one stream: before the fix the second read throws ObjectDisposedException, after it returns empty.
+- Measured with Record-CurlExchange.ps1 (server `200 OK`, `Content-Length: 3`, `Connection: close`, two Response entries), REF curl 8.22.0 Schannel vs PORT `dotnet curl.dll`, host:port and User-Agent normalised. Exit code, stdout, stderr and request bytes all equal for: `-sS -d @- -d @- U/a` (stdin `abc\n`, exit 0, body `abc&`); `-sS -H @- -d @- U/a` (`X-A: 1\n`, 0, Content-Length 0); `-sS -H @- -H @- U/s7`; `-sS -d @- -H @- U/s6` (`X-H: 1\n`, 0); `-sS -K - -d @-`, `-K - -H @-`, `-K - -K -` (stdin `url = U/s\n`, 0, `POST /s` Content-Length 0); `-sS -d @- U/a --next -d @- U/b` (`abc`, 0); `-s -Z -d @- U/a --next -d @- U/b`, `-s --json @- U/a --next --json @- U/b`, `-s -d @- U/a --next -T - U/b`, `-s -T - U/a --next -d @- U/b` (`STDIN-DATA-123`, 0); `-sS -H @- -T - U/a` (`X-A: 1\n`, 0, PUT chunked `0\r\n\r\n`); `-s -d @- --data-binary @- U/` (`line1\nline2\n`, 0). Before the fix PORT gave exit 2 `Cannot access a closed Stream.` per the report.
+- `-T -` twice across `--next` (noted by the report as not failing, not among the repros, not on the changed path) still exits 0 with equal stdout but differs on the wire: curl sends `abc` on the second PUT, Curl sends no body. Filed as BL-3827.
+- Platform-neutral: the change and tests use only MemoryStream; no path, OS error or certificate. Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-017 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Reading stdin twice in one command line gives later readers empty data, as curl does, instead of exit 2

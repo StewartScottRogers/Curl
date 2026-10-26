@@ -87,7 +87,7 @@ public sealed class DiskDataFileReaderTests
     }
 
     [TestMethod]
-    public void ReadStandardInput_Always_ReturnsEveryByteAndClosesTheStream()
+    public void ReadStandardInput_Always_ReturnsEveryByteAndLeavesTheStreamOpen()
     {
         MemoryStream standardInput = new([0x71, 0x20, 0x72, 0x0A]);
         Diagnostics.Arrange("standard input", Convert.ToHexString(standardInput.ToArray()));
@@ -98,9 +98,9 @@ public sealed class DiskDataFileReaderTests
         Diagnostics.Act("standard input still readable", standardInput.CanRead);
 
         Diagnostics.Diff("contents", new byte[] { 0x71, 0x20, 0x72, 0x0A }, contents);
-        Diagnostics.Assert("standard input still readable", false, standardInput.CanRead);
+        Diagnostics.Assert("standard input still readable", true, standardInput.CanRead);
         CollectionAssert.AreEqual(new byte[] { 0x71, 0x20, 0x72, 0x0A }, contents);
-        Assert.IsFalse(standardInput.CanRead);
+        Assert.IsTrue(standardInput.CanRead);
     }
 
     [TestMethod]

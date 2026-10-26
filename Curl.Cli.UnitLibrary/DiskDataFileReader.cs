@@ -95,9 +95,14 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The stream is left open for its owner to dispose: curl reads standard input once, and every
+    /// later <c>@-</c>, <c>-K -</c> or <c>-T -</c> in the command line reads end of file, which is
+    /// empty data, rather than failing on a closed stream (CGR-017).
+    /// </remarks>
     public byte[] ReadStandardInput()
     {
-        using Stream standardInput = openStandardInput();
+        Stream standardInput = openStandardInput();
         using MemoryStream contents = new();
         standardInput.CopyTo(contents);
         return contents.ToArray();
