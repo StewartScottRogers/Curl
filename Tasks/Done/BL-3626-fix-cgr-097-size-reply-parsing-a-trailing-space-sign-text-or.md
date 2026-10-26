@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr097Tests.cs]
+touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTests.cs, Curl.Protocol.Ftp.UnitTests/Cgr097Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3626 — Fix CGR-097: SIZE reply parsing: a trailing space, sign, text or non-digit suffix makes PORT ignore the size
 
@@ -66,17 +66,24 @@ curl -sSv ftp://127.0.0.1:20960/file.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
-- Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr097Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
-- If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
-
+- 2026-10-26 (lane 8): Cause: `FtpSession.SizeOf` parsed the text after the code with `long.TryParse` (leading white only). Now `TrailingSizeOf` reads it as curl 8.22.0's `ftp_state_size_resp` does: from the line's last character, step back over the digits just before it, then read the digits from there (`curlx_str_number`). So `213 -5` and `213 size 5` are 5, `213 18 ` is 18, `213 7x` is 7, and `213 7  ` (two characters after the digits), `213 many`, `213 ` and an overflow are unknown (-1). This matches real curl (measured below) and needs no ADR, since it only follows curl.
+- Measured with `Record-CurlExchange.ps1 -Ftp -Port 20960 -FtpData "line1`nline2`nline3`n" -FtpReply 'SIZE=<reply>'`, first with real curl 8.22.0 (Schannel, ucrt64) and then with `-Curl Curl.Console\bin\Debug\net10.0\curl.exe`:
+  - `SIZE=213 18 `, `curl -sS -I ftp://127.0.0.1:20960/file.txt`: REF exit 0, stdout `Last-Modified: Sun, 27 Sep 2026 12:34:56 GMT` / `Content-Length: 18` / `Accept-ranges: bytes`, stderr empty. PORT: identical stdout, exit and request bytes.
+  - `SIZE=213 -5` and `SIZE=213 size 5`, `curl -sSv ftp://127.0.0.1:20960/file.txt`: REF exit 0, `* Getting file with size: 5`, stdout `line1`. PORT: same exit, stdout and request bytes; stderr equal apart from the reference debug build's own lines (`!!! WARNING !!!`, `sendrecv_dl`, `{ [0 bytes data]`) and the data port.
+  - Extra variants: `SIZE=213 7x` gives size 7 (`line1\nl`), and `SIZE=213 7  ` size -1 (all 18 bytes) in both; they match too.
+- Before the fix, `Cgr097Tests` failed on the sign, text and suffix rows; after it they pass. `FtpProtocolHandlerTests.ExecuteAsync_SizeUnknown_DownloadsWhateverArrives` pinned `213 -5` as an unknown size, which was the defect, so that row is now `213 7  `, a reply curl was measured to treat as unknown. That file was added to `touches` (no other task in Doing on origin/work/dark-factory names it).
+- Linux: the parsing is the same in curl 8.18.0 (the report lists `v_size_neg` on Linux as well), and the test uses no path, OS error text or certificate, so it is platform-neutral. The fast tests pass on Windows.
+- Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary: 0 failing members, after splitting out `LeadingCountOf` so complexity stays under the limit.
+- Put the focused unit test (ADR-0482) in Cgr097Tests.cs, which 	ouches names.
 ## Log
 
 - 2026-10-26: Created from CGR-097 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. SIZE replies are now parsed from their trailing digits as curl 8.22.0 does; all repros match
