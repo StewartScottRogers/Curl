@@ -385,6 +385,13 @@ internal sealed class CurlCommandRunner(
     private static readonly Func<string, string?> NoEnvironmentVariables = new(ReadNoEnvironmentVariable);
 
     /// <summary>
+    /// Lists the <c>--ssl-sessions</c> file's load lines, created once with <see langword="new" /> so no
+    /// use of it carries the compiler's method-group cache (BL-3837).
+    /// </summary>
+    private static readonly Func<TlsSessionCache, CommandLineOptions, IReadOnlyList<string>> LoadTlsSessionFileLines =
+        new(TlsSessionFileLines.Load);
+
+    /// <summary>
     /// Gets what reads an environment variable: the function the runner was given, else
     /// <see cref="NoEnvironmentVariables" />.
     /// </summary>
@@ -1200,7 +1207,7 @@ internal sealed class CurlCommandRunner(
     private async Task<CurlExitCode?> TransferAllGroupsAsync(IReadOnlyList<CommandLineOptions> groups)
     {
         standardError = writeGate.Guard(standardError);
-        await WriteTlsSessionLinesAsync(groups[0], TlsSessionFileLines.Load).ConfigureAwait(false);
+        await WriteTlsSessionLinesAsync(groups[0], LoadTlsSessionFileLines).ConfigureAwait(false);
         parallelRun = groups[0].Parallel ? NewParallelRun(groups[0]) : null;
 
         return await ThenCleanUpAsync(TransferGroupsAndEndRunAsync(groups), () => CloseRunAsync(groups[0])).ConfigureAwait(false);
@@ -5173,7 +5180,7 @@ internal sealed class CurlCommandRunner(
         if (refusal.FoundAtTransferSetup)
         {
             await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
-            await WriteTlsSessionLinesAsync(optionsRead, TlsSessionFileLines.Load).ConfigureAwait(false);
+            await WriteTlsSessionLinesAsync(optionsRead, LoadTlsSessionFileLines).ConfigureAwait(false);
             await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
             await WriteTlsSessionLinesAsync(optionsRead, (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
         }
