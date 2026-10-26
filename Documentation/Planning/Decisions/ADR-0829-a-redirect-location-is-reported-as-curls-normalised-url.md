@@ -1,4 +1,4 @@
-# ADR-0828: A redirect Location is reported as curl's normalised URL
+# ADR-0829: A redirect Location is reported as curl's normalised URL
 
 - Status: Accepted
 - Date: 2026-10-26

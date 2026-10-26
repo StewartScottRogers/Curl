@@ -99,7 +99,7 @@ internal static class HttpRedirectLocation
     /// <summary>
     /// Lowercases an absolute URL's scheme and, when it names an authority, removes its dot
     /// segments and makes an empty path <c>/</c>; a value that is not a valid URL is kept whole.
-    /// As curl 8.22.0 does (CGR-062, ADR-0828): a scheme other than <c>file</c> followed by one or
+    /// As curl 8.22.0 does (CGR-062, ADR-0829): a scheme other than <c>file</c> followed by one or
     /// three slashes names its host after them (<c>http:/b</c> is <c>http://b/</c>), and on
     /// Windows a <c>file</c> URL whose path starts with a drive letter loses the slash before it
     /// and its authority (<c>file:///c:/x</c> is <c>file://c:/x</c>).

@@ -4,7 +4,7 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Core;
 
 /// <summary>
-/// Pins CGR-062 (BL-3591, ADR-0828): curl 8.22.0 refuses a redirect to <c>http:</c>, with no slash
+/// Pins CGR-062 (BL-3591, ADR-0829): curl 8.22.0 refuses a redirect to <c>http:</c>, with no slash
 /// after the scheme, as <c>Unsupported number of slashes following scheme</c>, exit 3.
 /// </summary>
 [TestClass]

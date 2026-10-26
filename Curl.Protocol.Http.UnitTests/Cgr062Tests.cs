@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Http;
 
 /// <summary>
-/// Pins CGR-062 (BL-3591, ADR-0828): <c>%{redirect_url}</c>, and so <c>%{url_effective}</c> once
+/// Pins CGR-062 (BL-3591, ADR-0829): <c>%{redirect_url}</c>, and so <c>%{url_effective}</c> once
 /// followed, is the <c>Location</c> as curl 8.22.0 normalises it - the host after a single slash,
 /// a <c>%2E</c> dot segment removed and, on Windows, a drive-letter <c>file</c> path without the
 /// slash before it.
