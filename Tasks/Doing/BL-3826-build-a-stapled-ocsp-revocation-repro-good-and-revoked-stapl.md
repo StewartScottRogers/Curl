@@ -35,3 +35,4 @@ Cases to record (each against REF `curl.exe` and PORT Curl): good staple with de
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: ec85a772 129ecda6 779790c0.
