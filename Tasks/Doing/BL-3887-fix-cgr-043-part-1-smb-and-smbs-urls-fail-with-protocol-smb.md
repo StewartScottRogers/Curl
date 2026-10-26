@@ -36,3 +36,4 @@ Part 1 of 3 split from BL-3572 (CGR-043 of `Documentation/Reviews/Curl-Gap-Repor
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 97a232e4 9e6c559a 5a7f2942 b084e04d 779790c0.
