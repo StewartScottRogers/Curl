@@ -1,5 +1,5 @@
 ---
-id: BL-3856
+id: BL-3860
 title: CGR-016 part 3: --proxy-header, RTSP and WebSocket headers give invalid UTF-8 argument bytes unchanged
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3856 — CGR-016 part 3: --proxy-header, RTSP and WebSocket headers give invalid UTF-8 argument bytes unchanged
+# BL-3860 — CGR-016 part 3: --proxy-header, RTSP and WebSocket headers give invalid UTF-8 argument bytes unchanged
 
 ## Goal
 

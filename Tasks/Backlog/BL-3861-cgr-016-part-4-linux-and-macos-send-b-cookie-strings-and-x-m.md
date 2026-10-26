@@ -1,5 +1,5 @@
 ---
-id: BL-3857
+id: BL-3861
 title: CGR-016 part 4: Linux and macOS send -b cookie strings and -X methods with non-ASCII UTF-8 as their UTF-8 bytes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3857 — CGR-016 part 4: Linux and macOS send -b cookie strings and -X methods with non-ASCII UTF-8 as their UTF-8 bytes
+# BL-3861 — CGR-016 part 4: Linux and macOS send -b cookie strings and -X methods with non-ASCII UTF-8 as their UTF-8 bytes
 
 ## Goal
 
