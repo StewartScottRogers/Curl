@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HttpProxyTunnel.cs, Curl.Networking.UnitTests/Cgr080Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3609 — Fix CGR-080: A CONNECT reply with status line HTTP/2, HTTP/3, HTTP/2.0 or HTTP/1.2 is accepted as a tunnel; curl fails with exit 7
 
@@ -60,17 +60,22 @@ curl -sS -p -x http://127.0.0.1:20600 http://example.test/
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr080Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 9): Measured with `Record-CurlExchange.ps1 -Response '<status line>\r\n\r\n','HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nhello\n' -CurlArgs '-sS','-p','-x','http://127.0.0.1:<port>','http://example.test/'`, first real curl 8.22.0 (Schannel), then Curl (`-Curl Curl.Console\bin\Debug\net10.0\curl.exe`). For the status lines `HTTP/2 200`, `HTTP/3 200`, `HTTP/2.0 200`, `HTTP/1.2 200 OK`, `HTTP/1. 200 OK`, `HTTP/1.10 200 OK`, `HTTP/1.x 200 OK` and `HTTP/11 200`, real curl exits 7 with `curl: (7) CONNECT tunnel failed, response 0` and empty stdout, and sends only the CONNECT (114 bytes). `HTTP/1.0 200 OK` and `HTTP/1.1 200 OK` open the tunnel: curl sends the GET, and the recorder (one reply per connection) closes the connection, so both builds exit 56 with `Recv failure: Connection was aborted`. With the fix, Curl matches real curl in all ten cases: same exit code, stderr, stdout and request bytes (compared by hash). Neither writes any files.
+- Fix: `HttpProxyTunnel.ParseStatusCode` now reads a status only after exactly `HTTP/1.0` or `HTTP/1.1`. The check is in its own method, `IsHttp10OrHttp11`, so the method's complexity stays at 10 or below. Any other `HTTP/` version is status 0, which already gives curl's exit 7 `response 0`. The `HTTP/` prefix check on the first line (exit 43) is unchanged, because curl exits 7, not 43, for these lines. No ADR: the fix matches measured curl and makes no design choice.
+- Focused test `Cgr080Tests.ReadReplyAsync_StatusLineNotHttp10OrHttp11_IsStatusZero`. The old `StartsWith("HTTP/")` check read status 200 for its first seven rows, so those rows fail without the fix and pass with it. The HTTP/1.0 and HTTP/1.1 rows (the variants that already matched) still give 200.
+- Platform: the test runs on in-memory bytes (`ScriptedConnection`) with no path, OS text or certificate, so its result is the same on every platform, and the issue says Linux behaves the same. The fast tests are all green. Measure-CodeQuality for Curl.Networking.UnitLibrary: 100% line, 100% branch, 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-080 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A CONNECT reply whose status line is not HTTP/1.0 or HTTP/1.1 is response 0, exit 7, as curl
