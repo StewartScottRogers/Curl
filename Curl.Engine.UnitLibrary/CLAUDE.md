@@ -530,3 +530,7 @@ Under `EasyBehaviourOptions.Verbose` with no `EasyCallbackOptions.Debug`, `Manag
 ## Callbacks of multi-driven transfers run inside perform (BL-3562)
 
 Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransfer` a `TransferCallbackMarshal` (`MultiCallbacks`), which the perform reads once to wrap every `EasyCallbackOptions` delegate. A wrapped callback called on the thread inside the multi handle's perform runs at once; from any other thread it is queued on the handle's `MultiCallbackQueue` and the transfer's thread waits until the next `PerformAsync` or `SocketActionAsync` runs it on its caller's thread, as code inside the transfer (`IsInTransferCallback`), waiting up to `MultiCallbackQueue.FollowUpWait` (20 ms) after each for the next. A queued callback makes `GetTimeout` 0 and counts as one ready socket in a wait. Once the transfer's token is cancelled (removed, or the handle cleaned up) or its perform has ended, a callback runs where it is called (CGR-033, ADR-0817). Their tests are `MultiCallbackQueueTests`, `TransferCallbackMarshalTests` and `Cgr033Tests`.
+
+## smb and smbs disabled (BL-3887)
+
+`CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0829). `Curl.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.

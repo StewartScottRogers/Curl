@@ -3,40 +3,31 @@
 <info>
 <keywords>
 SMB
-SMB empty file
+SMB disabled
 </keywords>
 </info>
 
-# Expected bytes are the file the smb server serves from <reply><data>, as in upstream's SMB cases: the
-# reference curl (8.22.0, Schannel build, Record-CurlExchange.ps1) is built without SMB, so no exchange
-# could be recorded; curl's output for a downloaded file is those bytes unchanged.
-
-# Server-side
-<reply>
-<data nocheck="yes">
-</data>
-</reply>
+# The reference curl (8.22.0, Schannel build, measured 2026-10-26 for BL-3887) is built without SMB:
+# curl -sS smb://127.0.0.1:20002/share/x exits 1 with curl: (1) Protocol "smb" is disabled, connecting
+# nowhere, and Curl does the same (ADR-0829).
 
 # Client-side
 <client>
 <server>
-smb
+none
 </server>
-<features>
-smb
-</features>
 <name>
-SMB download of an empty file prints nothing and reports size 0
+SMB download is refused as a disabled protocol
 </name>
 <command>
--u 'curltest:curltest' -w '%{size_download}\n' smb://%HOSTIP:%SMBPORT/TESTS/%TESTNUMBER
+-sS smb://%HOSTIP:%SMBPORT/TESTS/%TESTNUMBER
 </command>
 </client>
 
 # Verify data after the test has been "shot"
 <verify>
-<stdout>
-0
-</stdout>
+<errorcode>
+1
+</errorcode>
 </verify>
 </testcase>
