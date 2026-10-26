@@ -198,7 +198,9 @@ internal sealed partial class ManagedEasyTransfer
     /// connection the report does not (BL-3316): a <c>tftp</c> transfer (its socket is the connection), a transfer under
     /// <c>CURLOPT_FRESH_CONNECT</c> or <c>CURLOPT_FORBID_REUSE</c> that succeeded (libcurl always opens a new connection
     /// for it; this engine does not yet, see BL-3316 Notes), and one a watchdog cut off after the response head came, as the
-    /// low-speed timeout does, and one that timed out with no report, whose attempted connection libcurl counts (BL-3302).
+    /// low-speed timeout does, one that timed out with no report, whose attempted connection libcurl counts (BL-3302),
+    /// and one whose proxy refused the tunnel - a <c>CONNECT</c> answered with a status, or a SOCKS handshake that
+    /// failed with a <c>CURLPX_*</c> code - whose connection to the proxy libcurl counts (CGR-084, BL-3613).
     /// </summary>
     /// <param name="info">The info with the report's count.</param>
     /// <param name="result">The transfer's result.</param>
@@ -212,8 +214,14 @@ internal sealed partial class ManagedEasyTransfer
             return info.NumConnects;
         }
 
-        return ForcesNewConnection(options.Network, result) || CutOffAfterHead(info, result) || TimedOutWithNoReport(result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        return ForcesNewConnection(options.Network, result) || CountsAFailedConnection(info, result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
     }
+
+    private static bool CountsAFailedConnection(TransferInfo info, TransferResult result) =>
+        CutOffAfterHead(info, result) || TimedOutWithNoReport(result) || ProxyRefusedTheTunnel(info);
+
+    private static bool ProxyRefusedTheTunnel(TransferInfo info) =>
+        info.HttpConnectCode > 0 || info.ProxyError > 0;
 
     private static bool ForcesNewConnection(EasyNetworkOptions network, TransferResult result) =>
         (network.FreshConnect || network.ForbidReuse) && result.ExitCode == CurlExitCode.Ok;
