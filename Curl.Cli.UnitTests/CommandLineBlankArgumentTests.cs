@@ -106,14 +106,22 @@ public sealed class CommandLineBlankArgumentTests
 
         string blankLine = $"curl: option --{longName}: blank argument where content is expected";
         TestDiagnostics.For(TestContext).Assert("not refused as blank", blankLine, result.Refusal?.StandardErrorLines.FirstOrDefault());
-        CollectionAssert.DoesNotContain((result.Refusal?.StandardErrorLines ?? []).ToArray(), blankLine);
+        Assert.IsFalse(result.IsAccepted, "curl refuses an empty --" + longName + " for another reason");
+        Assert.IsNotEmpty(result.Refusal.StandardErrorLines);
+        CollectionAssert.DoesNotContain(result.Refusal.StandardErrorLines.ToArray(), blankLine);
     }
 
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
     public void Parse_BlankSslSessionsOnWindows_IsNotRefusedAsBlankAsTheSchannelBuildRefusesItAsUnsupported()
     {
-        Parse_BlankArgument_IsNotRefusedAsBlankWhereCurlRefusesItForAnotherReason(SslSessions);
+        CommandLineParseResult result = ParseWithBlankArgument(SslSessions);
+
+        string[] expected = ["curl: option --ssl-sessions: the installed libcurl version does not support this", CommandLineRefusal.TryHelpLine];
+        TestDiagnostics.For(TestContext).Assert("stderr", string.Join(" | ", expected), string.Join(" | ", result.Refusal?.StandardErrorLines ?? []));
+        Assert.IsFalse(result.IsAccepted);
+        Assert.AreEqual(CurlExitCode.FailedInit, result.Refusal.ExitCode);
+        CollectionAssert.AreEqual(expected, result.Refusal.StandardErrorLines.ToArray());
     }
 
     [TestMethod]
