@@ -37,3 +37,4 @@ Cause: `HttpRedirectLocation` reads the header as Latin-1 (one char per byte) an
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: f3912fd8 f457ad6c d8a159f1 779790c0.
