@@ -57,6 +57,9 @@ internal sealed class SslStreamConnection(
     /// <summary>Gets the plaintext connection's local endpoint.</summary>
     public EndPoint? LocalEndPoint => plaintext.LocalEndPoint;
 
+    /// <summary>Gets the plaintext connection's socket handle.</summary>
+    public nint? SocketHandle => plaintext.SocketHandle;
+
     /// <summary>Asks the plaintext connection TLS runs over whether the peer has closed it.</summary>
     public bool HasPeerClosed => plaintext.HasPeerClosed;
 

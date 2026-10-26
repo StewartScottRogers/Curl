@@ -25,6 +25,8 @@ internal sealed class EarlyDataTlsConnection(
 
     public EndPoint? LocalEndPoint => plaintext.LocalEndPoint;
 
+    public nint? SocketHandle => plaintext.SocketHandle;
+
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
         await (await ConnectedAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false)).ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
 

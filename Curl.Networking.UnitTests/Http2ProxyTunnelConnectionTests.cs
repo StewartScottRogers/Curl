@@ -171,6 +171,18 @@ public sealed class Http2ProxyTunnelConnectionTests
     }
 
     [TestMethod]
+    public async Task SocketHandle_OfTheTunnel_IsTheProxyConnections()
+    {
+        var proxy = new ScriptedConnection(TcpConnectorTests.ProxyFrames(TcpConnectorTests.StatusHeaders(1, "200"))) { SocketHandle = 4242 };
+        var tunnel = await OpenTunnelAsync(proxy);
+
+        var handle = tunnel.SocketHandle;
+
+        Assert.AreEqual((nint)4242, handle);
+        await tunnel.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task TheTunnel_TakesItsSecurityEndPointsFlushAndDisposalFromTheProxysConnection()
     {
         var proxy = new ScriptedConnection(TcpConnectorTests.ProxyFrames(TcpConnectorTests.StatusHeaders(1, "200")));

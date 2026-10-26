@@ -38,6 +38,19 @@ public interface IConnection : IAsyncDisposable
     EndPoint? LocalEndPoint => null;
 
     /// <summary>
+    /// Gets the operating system handle of the socket the connection runs on (a file
+    /// descriptor on Linux and macOS, a <c>SOCKET</c> on Windows), or <see langword="null" />,
+    /// the default, when it runs on none, as an in-memory connection or a test fake does.
+    /// </summary>
+    /// <remarks>
+    /// The TCP connection gives its socket's handle; every connection that wraps another (TLS,
+    /// the pool, a trace, a tunnel through an HTTP/2 proxy) gives its inner connection's, so
+    /// through a proxy it is the socket to the proxy, as in libcurl. The multi handle hands it to
+    /// a libcurl application's socket callback to poll (ADR-0820, BL-3846).
+    /// </remarks>
+    nint? SocketHandle => null;
+
+    /// <summary>
     /// Reads up to <paramref name="buffer" /> bytes from the peer.
     /// </summary>
     /// <param name="buffer">The destination for the bytes read.</param>

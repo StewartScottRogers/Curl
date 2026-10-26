@@ -33,6 +33,12 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// <inheritdoc />
     public EndPoint? LocalEndPoint { get; } = localEndPoint;
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The handle of the socket under a <see cref="NetworkStream" />; any other stream has none.
+    /// </remarks>
+    public nint? SocketHandle => _stream is NetworkStream network ? network.Socket.Handle : null;
+
     /// <summary>
     /// Gets whether a read failing with <see cref="SocketError.ConnectionAborted" /> is reported as
     /// <see cref="SocketError.ConnectionReset" />: <see langword="true" /> on Windows, set by tests on any

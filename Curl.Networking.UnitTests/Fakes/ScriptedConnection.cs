@@ -57,6 +57,11 @@ public sealed class ScriptedConnection(byte[] bytesToRead) : IConnection
     /// <inheritdoc />
     public EndPoint? RemoteEndPoint => null;
 
+    /// <summary>
+    /// Gets or sets the value <see cref="IConnection.SocketHandle" /> reports.
+    /// </summary>
+    public nint? SocketHandle { get; set; }
+
     /// <inheritdoc />
     public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {

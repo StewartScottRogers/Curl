@@ -698,6 +698,19 @@ public sealed class PoolingConnectorTests
     }
 
     [TestMethod]
+    public async Task SocketHandle_OfALease_IsItsUnderlyingConnections()
+    {
+        await using var pool = CreatePool();
+        var lease = await pool.ConnectAsync(Target(), CancellationToken.None);
+        _inner.Opened[0].SocketHandle = 4242;
+
+        var handle = lease.Connection!.SocketHandle;
+
+        Assert.AreEqual((nint)4242, handle);
+        await lease.Connection.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task HasPeerClosed_OfALeaseWhoseConnectionReportsItsPeerClosed_IsTrue()
     {
         await using var pool = CreatePool();

@@ -27,6 +27,9 @@ internal sealed class SocketCallbackConnection(IConnection inner, CurlSocketClos
     public EndPoint? LocalEndPoint => inner.LocalEndPoint;
 
     /// <inheritdoc />
+    public nint? SocketHandle => inner.SocketHandle;
+
+    /// <inheritdoc />
     public IConnectionSession? Session => inner.Session;
 
     /// <inheritdoc />
