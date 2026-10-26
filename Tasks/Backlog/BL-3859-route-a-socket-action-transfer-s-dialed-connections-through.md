@@ -1,5 +1,5 @@
 ---
-id: BL-3849
+id: BL-3859
 title: Route a socket-action transfer's dialed connections through SocketActionGatedConnection and feed its deadlines
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3849 — Route a socket-action transfer's dialed connections through SocketActionGatedConnection and feed its deadlines
+# BL-3859 — Route a socket-action transfer's dialed connections through SocketActionGatedConnection and feed its deadlines
 
 ## Goal
 

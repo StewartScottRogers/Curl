@@ -50,7 +50,7 @@ cancellation token, which ends the wait. A perform (not a socket action) signals
 
 ## Consequences
 
-- The two types are built and unit tested; nothing routes a transfer through them yet. BL-3849 wraps the
+- The two types are built and unit tested; nothing routes a transfer through them yet. BL-3859 wraps the
   transfer's dialer and calls `Start`, `BeginConnect`, `EndConnect` and the expect-100 pair; BL-3563 has
   `ManagedMultiTransfer` signal each socket from `SocketActionAsync` and report `Waiting` and
   `EarliestDeadline` through the callbacks, and then removes ADR-0599's `RunningTransferCheckInterval`
