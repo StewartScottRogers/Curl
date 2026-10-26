@@ -43,3 +43,4 @@ Lanes test only on Windows, so reproduce with `gh run view 40348984024 --log-fai
 - 2026-10-26: Doing -> Backlog. Waits on BL-3831, which covers WriteRefusalAsync's untaken branch, the only member outside a gate
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 10cc6e68.
 - 2026-10-26: Doing -> Blocked. Quality gates (windows-latest) now passes: CI run 40414014932 on the fix commit 85b5f4962 is green on Windows, macOS and every quality job. Only Build and test (ubuntu-latest) fails, on Format_OpenSslUnprintableNames_PrintsEmptySubjectAndIssuer, which is BL-3878. Clears when BL-3878 lands and a CI run is green on all three platforms; then tick the criterion and move to Done. Claude clears it.
+- 2026-10-26: Blocked -> Backlog. Unblocked: BL-3878 now Done
