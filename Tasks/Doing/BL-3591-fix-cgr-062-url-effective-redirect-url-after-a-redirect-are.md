@@ -106,3 +106,4 @@ curl -sS[L] -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n
 - 2026-10-26: Created from CGR-062 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3867 (the raw E9 byte repro of CGR-062, which needs header-byte provenance across Http, Core and Output); measurements and fix sites are in Notes
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
