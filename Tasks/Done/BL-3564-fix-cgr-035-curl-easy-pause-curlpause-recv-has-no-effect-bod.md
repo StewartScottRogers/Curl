@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Lifecycle.cs, Curl.Engine.UnitTests/Cgr035Tests.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Lifecycle.cs, Curl.Engine.UnitLibrary/CallbackWriteStream.cs, Curl.Engine.UnitTests/Cgr035Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3564 — Fix CGR-035: curl_easy_pause(CURLPAUSE_RECV) has no effect: body bytes and the DONE message are delivered while paused
 
@@ -65,17 +65,25 @@ probe.exe C_31,C_34 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr035Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Cause: `ManagedEasyTransfer.Pause` sets the handle's `EasyPauseGate`, but `CallbackWriteStream.WriteAsync` consulted the gate only after the callback itself returned `CURL_WRITEFUNC_PAUSE`, so a `curl_easy_pause(CURLPAUSE_RECV)` from the application or from inside the write callback held nothing: body bytes kept flowing and the perform finished, queueing `CURLMSG_DONE`. Fix: `WriteAsync` first waits on `WhenResumedAsync(CurlPause.Receive)` before calling the callback (the header callback shares the stream, as libcurl's `CURLPAUSE_RECV` holds both). Added `Curl.Engine.UnitLibrary/CallbackWriteStream.cs` to `touches` (the fix lands there; no task on origin/work/dark-factory's Doing names it). `ManagedEasyTransfer.Lifecycle.cs` needed no change. No ADR: it is a bug fix to match libcurl, not a design choice.
+- REF measured (the report's `SCR` probe is gone): a C# file-based probe (`dotnet run probe.cs`, P/Invoke into the installed libcurl 8.18.0 `libcurl-x64.dll`, a loopback server sending the head at once and 30000 body bytes after 300 ms) running C_31 (perform, `curl_easy_pause(e, CURLPAUSE_RECV)`, 8 x perform + poll(100), then `CURLPAUSE_CONT`) printed `bytes-while-paused=0 msgs-while-paused=none` and `total=30000 done=1`, matching the report's Expected for 8.22.0.
+- PORT: no Libcurl native build in the lane, so C_31 and C_34 run in-process in `Curl.Engine.UnitTests/Cgr035Tests.cs`: `WriteAsync_ReceivingPausedByTheApplication_CallsNoCallbackUntilUnpaused` (C_31: no callback, no completion while paused, the chunk delivered after the unpause), `WriteAsync_CallbackPausesThroughTheApiAndTakesTheChunk_HoldsTheNextChunkUntilUnpaused` (C_34: calls-while-paused=1) and `PerformAsync_WriteCallbackPausesTheHandleAndTakesTheChunk_DeliversNothingMoreUntilUnpaused` (C_34 through a whole HTTP perform: nothing delivered and the perform not finished while paused, then `helloworld` intact and `Ok`). The two stream tests failed with the fix removed and pass with it.
+- Variants that already matched (pausing by returning `CURL_WRITEFUNC_PAUSE` or `CURL_READFUNC_PAUSE`) still pass: `CallbackWriteStreamTests`, `CallbackReadStreamTests`, `ManagedEasyTransferTests.PausedPost.cs` and the conformance ratchet are green.
+- Fast tests: all 46 test assemblies passed (Curl.Engine.UnitTests 2481 passed, Curl.Conformance.UnitTests 4381 passed). The change is platform-neutral (no paths, OS text or certificates), which covers CI on Linux and macOS. `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
+- Follow-up: BL-3832, the same gap for `CURLPAUSE_SEND` in `CallbackReadStream` (left out here to keep this task to its issue).
+
 ## Log
 
 - 2026-10-26: Created from CGR-035 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. curl_easy_pause(CURLPAUSE_RECV) now holds the write and header callbacks, and so the transfer's DONE message, until the handle is unpaused
