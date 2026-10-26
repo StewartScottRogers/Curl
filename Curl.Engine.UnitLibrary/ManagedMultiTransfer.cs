@@ -63,6 +63,12 @@ internal sealed class ManagedMultiTransfer(
     private bool abortedByCallback;
     private bool disposed;
 
+    // The multi handle whose transfer's perform the current code runs in, or null outside every perform.
+    private static readonly AsyncLocal<ManagedMultiTransfer?> PerformingHandle = new();
+
+    /// <inheritdoc />
+    public bool IsInTransferCallback => PerformingHandle.Value == this;
+
     /// <summary>
     /// Gets the first socket number the handle gives a running transfer. The managed engine's
     /// connections are not operating system descriptors the application could wait on, so each running
@@ -283,12 +289,14 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_cleanup</c>: removes every transfer, cancelling the running ones, and waits for
-    /// their performs to end; later calls answer <see cref="CurlMultiCode.BadHandle" />.
+    /// their performs to end; later calls answer <see cref="CurlMultiCode.BadHandle" />. Called from inside
+    /// one of its own transfers (<see cref="IsInTransferCallback" />) it does nothing, as libcurl refuses
+    /// that call, since waiting for the perform it runs in would never end.
     /// </summary>
     /// <returns>A task that completes once every perform has ended.</returns>
     public async ValueTask DisposeAsync()
     {
-        if (disposed)
+        if (disposed || IsInTransferCallback)
         {
             return;
         }
@@ -821,12 +829,15 @@ internal sealed class ManagedMultiTransfer(
         return handleTimeout < 0 ? check : Math.Min(handleTimeout, check);
     }
 
-    private Task<CurlCode> Start(MultiEntry entry)
+    // Marks the code a transfer's perform runs, its callbacks included, with the handle that started it
+    // (IsInTransferCallback); the value flows into the perform and never back out to the caller.
+    private async Task<CurlCode> Start(MultiEntry entry)
     {
         entry.StartTimestamp = timeProvider.GetTimestamp();
         entry.Origin = OriginOf(entry.Transfer);
         entry.Multiplexed = IsMultiplexed(entry.Transfer, entry.Origin);
-        return entry.Transfer.PerformAsync(entry.Cancellation.Token).AsTask();
+        PerformingHandle.Value = this;
+        return await entry.Transfer.PerformAsync(entry.Cancellation.Token).ConfigureAwait(false);
     }
 
     private long RemainingMilliseconds(MultiEntry entry)
