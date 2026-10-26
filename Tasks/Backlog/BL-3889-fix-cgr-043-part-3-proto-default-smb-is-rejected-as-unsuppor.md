@@ -1,16 +1,16 @@
 ---
-id: BL-3883
+id: BL-3889
 title: Fix CGR-043 part 3: --proto-default smb is rejected as unsupported protocol (exit 1)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3882]
+depends-on: [BL-3888]
 touches: [Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs, Curl.Cli.UnitTests/Cgr043SmbProtoDefaultTests.cs]
 requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3883 — Fix CGR-043 part 3: --proto-default smb is rejected as unsupported protocol (exit 1)
+# BL-3889 — Fix CGR-043 part 3: --proto-default smb is rejected as unsupported protocol (exit 1)
 
 ## Goal
 

@@ -1,16 +1,16 @@
 ---
-id: BL-3882
+id: BL-3888
 title: Fix CGR-043 part 2: --proto =smb is rejected as unrecognized protocol (exit 2)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3881]
+depends-on: [BL-3887]
 touches: [Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs, Curl.Cli.UnitTests/Cgr043SmbProtoTests.cs]
 requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3882 — Fix CGR-043 part 2: --proto =smb is rejected as unrecognized protocol (exit 2)
+# BL-3888 — Fix CGR-043 part 2: --proto =smb is rejected as unrecognized protocol (exit 2)
 
 ## Goal
 
@@ -18,7 +18,7 @@ On Windows `curl --proto =smb -sS smb://127.0.0.1:20002/share/x` behaves as curl
 
 ## Context
 
-Part 2 of 3 split from BL-3572 (CGR-043 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`). Today Curl accepts `--proto =smb` and tries to connect (exit 7). Start at `Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs`, which part 1 (BL-3881) also changes, so it runs after it. Measure real curl before pinning text.
+Part 2 of 3 split from BL-3572 (CGR-043 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`). Today Curl accepts `--proto =smb` and tries to connect (exit 7). Start at `Curl.Cli.UnitLibrary/CommandLineProtocolSet.cs`, which part 1 (BL-3887) also changes, so it runs after it. Measure real curl before pinning text.
 
 ## Acceptance criteria
 
