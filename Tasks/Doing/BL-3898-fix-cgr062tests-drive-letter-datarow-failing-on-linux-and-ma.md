@@ -30,3 +30,4 @@ Found by BL-3837 in CI run 40420942031 (commit 9be076388): `Build and test (ubun
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 5ba1e835 93e41246.
