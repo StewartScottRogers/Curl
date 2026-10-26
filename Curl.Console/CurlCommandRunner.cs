@@ -332,6 +332,13 @@ internal sealed class CurlCommandRunner(
     internal const string FailedWritingBodyLine = "curl: Failed writing body";
 
     /// <summary>
+    /// The line curl 8.18.0 prints, its prefix doubled, when a successful transfer's <c>-o</c>
+    /// file cannot be flushed as it is closed (<c>fclose</c> failing on <c>/dev/full</c>, measured
+    /// 2026-10-26, CGR-026).
+    /// </summary>
+    internal const string OutputFileCloseFailureLine = "curl: curl: (23) Failed writing body";
+
+    /// <summary>
     /// curl 8.21.0's message for a resumed transfer whose <c>-o</c> file cannot be opened
     /// for appending, measured on <c>-C 3 -o</c> naming a directory.
     /// </summary>
@@ -3154,6 +3161,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="message">The message to print.</param>
     /// <returns>
     /// <see cref="FailedWritingBodyLine" /> when standard output could not be written;
+    /// <see cref="OutputFileCloseFailureLine" /> when the <c>-o</c> file could not be flushed as it closed;
     /// otherwise <c>curl: (N) &lt;message&gt;</c>.
     /// </returns>
     private static string FormatErrorLine(TransferResult result, string? message)
@@ -3161,6 +3169,11 @@ internal sealed class CurlCommandRunner(
         if (ReferenceEquals(result.ErrorMessage, StandardOutputWriteFailure.ErrorMessage))
         {
             return FailedWritingBodyLine;
+        }
+
+        if (ReferenceEquals(result.ErrorMessage, DeferredOutputFileStream.CloseFailureMessage))
+        {
+            return OutputFileCloseFailureLine;
         }
 
         string code = ((int)result.ExitCode).ToString(CultureInfo.InvariantCulture);

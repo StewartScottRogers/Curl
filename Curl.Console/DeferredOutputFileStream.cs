@@ -78,6 +78,14 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     private Stream? file;
 
     /// <summary>
+    /// The <c>%{errormsg}</c> of a successful transfer whose file could not be flushed when it
+    /// was closed: curl 8.18.0's <c>Failed writing received data to disk/application</c>,
+    /// measured with <c>-o /dev/full</c>. It is its own string instance, compared by reference,
+    /// so the error line printed for it is curl's <c>curl: curl: (23) Failed writing body</c>.
+    /// </summary>
+    internal static readonly string CloseFailureMessage = new(CurlCommandRunner.WriteReceivedDataFailedMessage.AsSpan());
+
+    /// <summary>
     /// How the next open treats existing content: the constructor's write mode, until
     /// <see cref="TryOpenUnderNameAsync" /> switches it for a <c>-J</c> name.
     /// </summary>
@@ -265,12 +273,37 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
             return WriteFailure(length) with { Report = result.Report };
         }
 
-        bool createsEmptyFile = file is null && CreatesEmptyFileAfter(result);
+        if (file is { } open)
+        {
+            return result.IsSuccess && !await TryFlushAsync(open).ConfigureAwait(false)
+                ? TransferResult.Failure(CurlExitCode.WriteError, CloseFailureMessage) with { Report = result.Report }
+                : result;
+        }
+
+        bool createsEmptyFile = CreatesEmptyFileAfter(result);
         CreatedEmptyAfterTransfer = createsEmptyFile;
 
         return createsEmptyFile && await TryOpenAsync(CancellationToken.None).ConfigureAwait(false) is null
             ? new TransferResult(CurlExitCode.WriteError, 0)
             : result;
+    }
+
+    /// <summary>
+    /// Flushes what the open file still buffers, as curl's <c>fclose</c> of the file does.
+    /// </summary>
+    /// <param name="open">The open file.</param>
+    /// <returns><see langword="false" /> when the flush failed (a full disk, <c>/dev/full</c>).</returns>
+    private static async ValueTask<bool> TryFlushAsync(Stream open)
+    {
+        try
+        {
+            await open.FlushAsync().ConfigureAwait(false);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -401,20 +434,39 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// A write the file's close cannot finish is ignored, as curl ignores its <c>fclose</c>
+    /// failing after a failed transfer; after a successful one <see cref="CompleteAsync" /> has
+    /// already flushed the file and reported the failure.
+    /// </remarks>
     public override async ValueTask DisposeAsync()
     {
-        if (file is not null)
+        try
         {
-            await file.DisposeAsync().ConfigureAwait(false);
+            if (file is not null)
+            {
+                await file.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+        catch (IOException)
+        {
         }
 
         await base.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
+    /// <remarks>A write the file's close cannot finish is ignored, as in <see cref="DisposeAsync" />.</remarks>
     protected override void Dispose(bool disposing)
     {
-        file?.Dispose();
+        try
+        {
+            file?.Dispose();
+        }
+        catch (IOException)
+        {
+        }
+
         base.Dispose(disposing);
     }
 
