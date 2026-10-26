@@ -1,5 +1,5 @@
 ---
-id: BL-3881
+id: BL-3891
 title: CGR-015 part 3b: a relative redirect and the -v retry line keep the command-line URL's path in the command-line text encoding
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3881 — CGR-015 part 3b: a relative redirect and the -v retry line keep the command-line URL's path in the command-line text encoding
+# BL-3891 — CGR-015 part 3b: a relative redirect and the -v retry line keep the command-line URL's path in the command-line text encoding
 
 ## Goal
 
