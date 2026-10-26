@@ -1,5 +1,5 @@
 ---
-id: BL-3824
+id: BL-3825
 title: Record-CurlExchange.ps1 serves a --retry exchange: one response per attempt across connections, without hanging
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3824 — Record-CurlExchange.ps1 serves a --retry exchange: one response per attempt across connections, without hanging
+# BL-3825 — Record-CurlExchange.ps1 serves a --retry exchange: one response per attempt across connections, without hanging
 
 ## Goal
 

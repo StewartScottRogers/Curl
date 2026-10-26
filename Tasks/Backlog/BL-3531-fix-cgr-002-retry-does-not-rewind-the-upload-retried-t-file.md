@@ -4,7 +4,7 @@ title: Fix CGR-002: --retry does not rewind the upload: retried -T <file> PUTs a
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3824]
+depends-on: [BL-3825]
 touches: [Curl.Core.UnitLibrary/TransferRetrier.cs, Curl.Core.UnitTests/Cgr002Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Protocol.Http.UnitTests/Cgr002Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/AttemptUploadRewinder.cs, Curl.Console.UnitTests/Cgr002Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -92,10 +92,10 @@ curl -sS --retry 2 --retry-delay 1 -F f=value http://127.0.0.1:20500/p
 
 - 2026-10-26 (lane 3): the retry loop the curl tool runs is `Curl.Console/CurlCommandRunner.cs`'s `FollowRetryingThroughAsync`, not `TransferRetrier` (its context has no `Upload`); each attempt's inputs come from the `TransferAttemptPieces.Inputs` lambda (`AttemptInputsOf`), which hands the same `-T` stream and `-F` `StreamBody` to every attempt unrewound. Added `Curl.Console/CurlCommandRunner.cs`, `Curl.Console/AttemptUploadRewinder.cs` and `Curl.Console.UnitTests/Cgr002Tests.cs` to touches (no task in Doing on origin/work/dark-factory names them). Work in the stash: `AttemptUploadRewinder` (records the seekable `-T` and `-F` stream positions before the first attempt, seeks back before each attempt's inputs) plus `Cgr002Tests`; builds clean, not yet tested.
 - Measured with that change: Curl's `-F f=value` and `-F f=@u.txt` retries still print `curl: (26) client mime read EOF fail, only 0/153` (0/198) and exit 26 after sending the first POST; so the `-F` body sent is not (only) the runner's `formBody`: next look at the engine's MIMEPOST path (`ManagedEasyTransfer.PostBody.cs` `MimePostFormUnlessToolGaveAsync`, `CurlMimeFromFormBody`), which may build the form once and reuse its consumed stream across performs.
-- Real curl could not be measured: `Record-CurlExchange.ps1` with two `-Response` entries hangs on every retried exchange through real curl (and Curl's `-T` run), with or without `Connection: close`. Filed BL-3824 for that and made it a dependency.
+- Real curl could not be measured: `Record-CurlExchange.ps1` with two `-Response` entries hangs on every retried exchange through real curl (and Curl's `-T` run), with or without `Connection: close`. Filed BL-3825 for that and made it a dependency.
 
 ## Log
 
 - 2026-10-26: Created from CGR-002 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Backlog. Waits on BL-3824: Record-CurlExchange.ps1 hangs on a --retry exchange, so real curl cannot be measured; rewind fix for -T started, -F still exits 26
+- 2026-10-26: Doing -> Backlog. Waits on BL-3825: Record-CurlExchange.ps1 hangs on a --retry exchange, so real curl cannot be measured; rewind fix for -T started, -F still exits 26
