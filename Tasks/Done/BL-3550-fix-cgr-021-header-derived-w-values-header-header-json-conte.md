@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitLibrary/WriteOutJson.cs, Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs, Curl.Output.UnitTests/Cgr021Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3550 — Fix CGR-021: Header-derived -w values (%header{}, %{header_json}, %{content_type}, %header{location}) re-encode header bytes Latin-1 to UTF-8, corrupt...
 
@@ -73,17 +73,25 @@ curl -s -S -o NUL -w "[%header{x-a}][%{content_type}]" http://127.0.0.1:20400/m_
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr021Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Measured 2026-10-26 with `Record-CurlExchange.ps1` against curl 8.22.0 (mingw, Schannel) and then `-Curl Curl.Console\bin\Debug\net10.0\curl.exe`:
+  - WV-03: `-Response 'HTTP/1.1 200 OK\r\nX-Hi: caf\xc3\xa9 \xff\xfe end\r\nContent-Type: text/\xe9\r\nX-\xc3\xa9: v\r\nContent-Length: 2\r\n\r\nok' -CurlArgs -s,-o,NUL,-w,'%{content_type}|%header{x-hi}|%{header_json}|%{json}\n',http://127.0.0.1:20951/`. Both write `text/\xe9|caf\xc3\xa9 \xff\xfe end|{"x-hi":["caf\xc3\xa9 \xff\xfe end"],\r\n"content-type":["text/\xe9"],\r\n"x-\xc3\xa9":["v"],...}` and `%{json}` with `"content_type":"text/\xe9"`. Exit 0, stderr empty, request bytes equal. Once `local_port` and the times are masked, stdout differs only in the library list of `curl_version` (Curl's own build, which this task does not change). Before the fix Curl wrote `text/\xc3\xa9`, and the header name came out as `x-\xc3\xa3\xc2\xa9`, because `ToLowerInvariant` also lowercased Latin-1 letters; it now lowers ASCII only, as curl does.
+  - HR-7: `-Response 'HTTP/1.1 200 OK\r\nX-A: caf\xe9 \xc3\xa9\r\nContent-Type: t/\xe9\r\nContent-Length: 2\r\n\r\nok' -CurlArgs -s,-S,-o,NUL,-w,'[%header{x-a}][%{content_type}]',http://127.0.0.1:20952/`. Both write `[caf\xe9 \xc3\xa9][t/\xe9]`, exit 0, empty stderr, the same request bytes.
+- The design is ADR-0816: header bytes are carried through the renderer as private-use characters by `WriteOutTemplateRenderer.MarkHeaderBytes`. It needs no change to `IWriteOutVariableSource`. `%{redirect_url}` is unchanged; see the ADR.
+- `Cgr021Tests` pins both repros, ASCII-only name lowering and non-ASCII `%header{}` name matching. Before the fix the renderer's plain `Encoding.UTF8.GetBytes` wrote `\xc3\xa9` for `\xe9`, so the byte-pinning tests fail without it (the first run, with only the lowercasing left to fix, failed at the name byte).
+- Platform-neutral: the tests pass `writesLineFeedAsCrLf` explicitly and touch no file, path or OS text. Fast tests: 46 projects passed. `Measure-CodeQuality.ps1 -Library Curl.Output.UnitLibrary`: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-021 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. CGR-021 fixed: -w header values keep their raw bytes; both repros match curl 8.22.0
