@@ -8,7 +8,7 @@ namespace Curl.Cli;
 /// Where curl 8.22.0's Windows <c>getpass_r</c> reads a password from
 /// (<see href="https://github.com/curl/curl/blob/master/src/tool_getpass.c"/>): the CRT's <c>_getch</c>,
 /// which reads the console input buffer (<c>CONIN$</c>) one character at a time with every input mode
-/// turned off, so nothing is echoed and standard input, redirected or not, is never read (ADR-0819).
+/// turned off, so nothing is echoed and standard input, redirected or not, is never read (ADR-0828).
 /// </summary>
 /// <remarks>
 /// <c>CONIN$</c> is opened on the first key read and kept for the rest of the process, so a second

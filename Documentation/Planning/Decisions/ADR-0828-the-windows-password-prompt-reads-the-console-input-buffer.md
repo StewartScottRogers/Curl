@@ -1,4 +1,4 @@
-# ADR-0819: The Windows password prompt reads the console input buffer, not standard input
+# ADR-0828: The Windows password prompt reads the console input buffer, not standard input
 
 - Status: Accepted
 - Date: 2026-10-26

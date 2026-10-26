@@ -50,7 +50,7 @@ public sealed class ConsolePasswordPrompt(TextWriter standardError, Func<Console
 
     /// <summary>
     /// On Windows, keys read from the console input buffer by <see cref="WindowsConsolePasswordInput"/>,
-    /// whether or not standard input is redirected (ADR-0819); off Windows,
+    /// whether or not standard input is redirected (ADR-0828); off Windows,
     /// <see cref="PosixTerminalPasswordInput"/>'s <c>/dev/tty</c> or standard input with its echo control.
     /// </summary>
     /// <param name="isWindows">Whether the prompt is for Windows.</param>
