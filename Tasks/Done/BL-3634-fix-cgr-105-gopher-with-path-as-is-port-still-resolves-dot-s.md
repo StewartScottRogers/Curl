@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Gopher.UnitLibrary/GopherSelector.cs, Curl.Protocol.Gopher.UnitTests/Cgr105Tests.cs]
+touches: [Curl.Protocol.Gopher.UnitLibrary/GopherSelector.cs, Curl.Protocol.Gopher.UnitLibrary/GopherProtocolHandler.cs, Curl.Protocol.Gopher.UnitLibrary/CLAUDE.md, Curl.Protocol.Gopher.UnitTests/Cgr105Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3634 — Fix CGR-105: Gopher with --path-as-is: PORT still resolves dot segments in the selector
 
@@ -61,17 +61,30 @@ curl -s -S --path-as-is "gopher://127.0.0.1:21001/0/a/../x"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr105Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Fix: `GopherSelector.FromUrl` takes `pathAsIs` and keeps the written path's dot segments when it is set; `GopherProtocolHandler` passes `ITransferContext.PathAsIs`. No design choice beyond matching curl, so no ADR.
+- Touches widened to `GopherProtocolHandler.cs` (the call that must pass the flag) and the library's `CLAUDE.md` (its selector description); no other task in Doing on origin/work/dark-factory names a Gopher file.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1` (server answers `hi\r\n`), `curl -s -S --path-as-is gopher://127.0.0.1:PORT<path>`, real curl 8.22.0 (Git ucrt64) and Curl's `curl.exe` after the fix, byte-identical in exit code, request, stderr and stdout:
+  - `/0/a/../x`: exit 0, request `/a/../x\r\n`, stdout `hi\r\n`, stderr empty
+  - `/0/../x`: exit 0, request `/../x\r\n`
+  - `/0/./x`: exit 0, request `/./x\r\n`
+  - `/1/../../a`: exit 0, request `/../../a\r\n`
+  - `/../x`: exit 0, request `./x\r\n`
+  - Before the fix Curl sent `/x`, empty, `/x`, empty, empty (the report's Actual). No files are written in any variant.
+- `Cgr105Tests`: 6 of its 8 cases failed with the selector change reverted and all pass with it. Without `--path-as-is` dot segments are still removed (pinned in `FromUrl_NotPathAsIs_RemovesDotSegments`; the existing Gopher tests stay green).
+- Linux/macOS: the tests hold ASCII-only URLs and no paths, so they are platform-neutral; the report's Linux REF gives the same selectors.
+- Gates: `dotnet build` clean (0 warnings); fast tests 46 projects passed, 0 failed; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Gopher.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-105 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Gopher under --path-as-is sends the selector with its dot segments as written, byte-identical to curl 8.22.0 for all five CGR-105 repros
