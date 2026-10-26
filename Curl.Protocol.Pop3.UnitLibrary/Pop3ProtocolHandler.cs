@@ -127,7 +127,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            Pop3KeptConnection? reused = connected.IsReused ? connection.Session as Pop3KeptConnection : null;
+            Pop3KeptConnection? reused = connected.IsReused ? (connection.Session as Pop3KeptConnection)?.ResumedOn(connection) : null;
             Pop3KeptConnection kept = reused ?? new Pop3KeptConnection(connection, loginKey, context.TimeProvider);
             var session = new Pop3Session(
                 new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened, kept, reused is not null);

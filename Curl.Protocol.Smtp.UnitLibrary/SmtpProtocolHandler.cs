@@ -283,7 +283,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// </summary>
     private static SmtpKeptConnection KeptConnectionOf(ConnectResult connected, string loginKey, ITransferContext context)
         => connected is { IsReused: true, Connection.Session: SmtpKeptConnection reused }
-            ? reused
+            ? reused.ResumedOn(connected.Connection!)
             : new SmtpKeptConnection(connected.Connection!, loginKey, context.TimeProvider);
 
     private async ValueTask<TransferResult> RunSessionAsync(
