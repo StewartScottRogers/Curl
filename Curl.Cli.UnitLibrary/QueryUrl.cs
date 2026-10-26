@@ -35,11 +35,35 @@ public static class QueryUrl
         ArgumentNullException.ThrowIfNull(url);
         ArgumentNullException.ThrowIfNull(options);
 
-        string? query = options.DataInQuery && options.PostData is { } body
-            ? Encoding.UTF8.GetString(body.Span)
-            : options.UrlQuery;
+        string? query = QueryToAppend(options);
         return query is null ? url : AppendQuery(url, UpperCasePercentEscapes(query));
     }
+
+    /// <summary>
+    /// Returns whether <c>--path-as-is</c> still keeps the URL's dot segments once <see cref="Append" /> has run:
+    /// only when <paramref name="options"/> asks for <c>--path-as-is</c> and there is no query to append.
+    /// </summary>
+    /// <remarks>
+    /// curl 8.22.0 appends a <c>-G</c> / <c>--url-query</c> query by parsing the URL with its URL API, without
+    /// <c>CURLU_PATH_AS_IS</c>, and reading it back, so the dot segments are gone before the transfer sees
+    /// <c>--path-as-is</c>. Measured on Windows on 2026-10-26 (BL-3584 Notes): <c>-G -d a=b --path-as-is
+    /// http://h/x/../y</c> and <c>--url-query a=b</c> both request <c>/y?a=b</c>, <c>-G -d ''</c> requests
+    /// <c>/y</c>, and without a query <c>/x/../y</c> is requested as it is.
+    /// </remarks>
+    /// <param name="options">The parsed command line.</param>
+    /// <returns><see langword="true"/> when the URL's path is sent as it is.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    public static bool KeepsPathAsIs(CommandLineOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        return options.PathAsIs && QueryToAppend(options) is null;
+    }
+
+    private static string? QueryToAppend(CommandLineOptions options) =>
+        options.DataInQuery && options.PostData is { } body
+            ? Encoding.UTF8.GetString(body.Span)
+            : options.UrlQuery;
 
     /// <summary>
     /// Upper-cases the hex digits of every complete percent escape in <paramref name="query"/>, as curl

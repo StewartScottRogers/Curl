@@ -2843,7 +2843,7 @@ internal sealed class CurlCommandRunner(
     {
         string url = QueryUrl.Append(transferUrl, options);
 
-        return UrlEffective.Normalize(url, transferUrl.Length == 0 ? url : QueryUrl.Append(givenUrl, options), options.PathAsIs);
+        return UrlEffective.Normalize(url, transferUrl.Length == 0 ? url : QueryUrl.Append(givenUrl, options), QueryUrl.KeepsPathAsIs(options));
     }
 
     /// <summary>
@@ -3531,7 +3531,7 @@ internal sealed class CurlCommandRunner(
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
             selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
 
-        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, options.PathAsIs, out CurlUrl? transferUrl, out CurlUrlRejection rejection))
+        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, QueryUrl.KeepsPathAsIs(options), out CurlUrl? transferUrl, out CurlUrlRejection rejection))
         {
             return TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
         }
@@ -3839,7 +3839,7 @@ internal sealed class CurlCommandRunner(
     private static bool FallsBackToDefaultRemoteName(CommandLineOptions options, string url, UrlTransfer transfer) =>
         transfer.OutputFileName is null
         && transfer.UsesRemoteName
-        && TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, options.PathAsIs, out CurlUrl? parsed, out _)
+        && TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, QueryUrl.KeepsPathAsIs(options), out CurlUrl? parsed, out _)
         && RemoteFileName.FromUrlPath(RemoteNameUrlPath(transfer, parsed)) is null;
 
     /// <summary>
@@ -4436,7 +4436,7 @@ internal sealed class CurlCommandRunner(
         TransferResult completed)
     {
         IReadOnlyList<KeyValuePair<string, string>> attributes = OutputFileExtendedAttributes.For(
-            UrlEffective.Normalize(url.OriginalString, options.PathAsIs),
+            UrlEffective.Normalize(url.OriginalString, QueryUrl.KeepsPathAsIs(options)),
             completed.Report?.Referer ?? options.Referer,
             completed.Report?.ContentType);
         if (OutputFileExtendedAttributes.Write(writer, outputFile, attributes) is { } warning && !options.Silent)
