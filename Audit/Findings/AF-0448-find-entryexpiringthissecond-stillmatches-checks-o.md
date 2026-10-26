@@ -1,0 +1,47 @@
+---
+id: AF-0448
+title: Find_EntryExpiringThisSecond_StillMatches checks only that some entry is found, not that it is the h2 :1 entry
+auditor: quality
+severity: Low
+status: proposed
+reason:
+key: quality:Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs:Find_EntryExpiringThisSecond_StillMatches:weak-assertion
+reproduction: none
+task: none
+tasks:
+found: 2026-10-25
+found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
+scorecard: 2026-10-25_1542.md
+duplicate-of:
+closed:
+closed-how:
+closed-by:
+---
+# AF-0448 - Find_EntryExpiringThisSecond_StillMatches checks only that some entry is found, not that it is the h2 :1 entry
+
+## Summary
+
+Low finding from the quality auditor at `Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs:344`: Find_EntryExpiringThisSecond_StillMatches checks only that some entry is found, not that it is the h2 :1 entry. Reported by an auditor flagged unreliable in 2026-10-25_1542.md.
+
+## Evidence
+
+Location: `Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs:344`
+
+The only assertion is Assert.IsNotNull(entry) after Apply(cache, "h2=\":1\"; ma=10", ...) and a 10.9 s advance. A Find that returned a wrong entry (wrong ALPN, port or expiry) would pass.
+
+## Reproduction
+
+Run from the repository root:
+
+```powershell
+Select-String -Path Curl.Core.UnitTests/AltSvc/AltSvcCacheTests.cs -Pattern 'Find_EntryExpiringThisSecond_StillMatches' -Context 0,14
+```
+
+- Expected: The test asserts the found entry's ALPN (h2) and port (1).
+- Actual: The only assertion is Assert.IsNotNull(entry);
+
+## Re-audits
+
+## Log
+
+- 2026-10-25: filed proposed.

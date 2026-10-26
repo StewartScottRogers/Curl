@@ -43,6 +43,8 @@ ShiftEnd.ps1:84
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the reproduction: 'The board branch is the only one this script force-pushes' no longer matches in RunDarkFactory.ps1; only DarkFactory/ShiftEnd.ps1:84 (the factory/merge-<stamp> force push) matches. The help at RunDarkFactory.ps1:369-370 now says 'This script force-pushes two branches: the board branch (Stewart, 2026-09-28) and, at the shift-end merge, the pin branch factory/merge-<stamp>', which matches the code.
+
 ## Log
 
 - 2026-10-25: filed proposed.

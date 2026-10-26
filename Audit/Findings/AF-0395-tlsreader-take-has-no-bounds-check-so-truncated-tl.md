@@ -3,8 +3,8 @@ id: AF-0395
 title: TlsReader.Take has no bounds check, so truncated TLS input throws and about 30 fast tests across three projects fail unmutated
 auditor: quality
 severity: High
-status: accepted
-reason: 
+status: closed
+reason: Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).
 key: quality:Curl.Tls.UnitLibrary/TlsReader.cs:Take:failing-baseline
 reproduction: none
 task: BL-3442
@@ -13,9 +13,9 @@ found: 2026-10-23
 found-at: 94da765e1b4eb040511b48ff68f7b42c5226e207
 scorecard: 2026-10-23_2322.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: consecutive
+closed-by: 2026-10-25_0941.md, 2026-10-25_1542.md
 ---
 # AF-0395 - TlsReader.Take has no bounds check, so truncated TLS input throws and about 30 fast tests across three projects fail unmutated
 
@@ -45,8 +45,10 @@ dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration"
 - 2026-10-24 | 2026-10-24_0845.md | reproduces: yes | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": Passed 1266, Failed 8, then the test run was aborted when the host crashed in Tls12ClientConnectionTests.ServerFlightSplitAcrossRecordsCompletesTheHandshake. The finding's named cause is fixed: TlsReader.Take now returns false when end - position < count. The failures now come from HandshakeMessageReader.Read (System.ArgumentOutOfRangeException at line 32: buffer[HeaderLength..total] with no buffer.Length >= total check), filed as its own finding. Curl.Networking.UnitTests also still has 5 TcpConnectorQuicTests failing unmutated (excluded by the mutation baseline).
 - 2026-10-24 | 2026-10-24_2106.md | not re-audited | overlaps planted defect PD-103 in Curl.Tls.UnitLibrary/HandshakeMessageReader.cs, so the auditor's verdict (reproduces yes) is set aside: Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": the first run did not finish in 25 minutes; the rerun with --blame-hang-timeout 5m gave 'Failed: 8, Passed: 1266' and 'Test Run Aborted' after the hang. The failures are ArgumentOutOfRangeException on truncated or fragmented TLS input, so the reproduction still gives its defective result. The throw now comes from HandshakeMessageReader.Read (HandshakeMessageReader.cs:32), and TlsReader.Take has its bounds check (TlsReader.cs:128: end - position < count -> Fail(DecodeError)); filed separately as quality:Curl.Tls.UnitLibrary/HandshakeMessageReader.cs:Read:failing-test.
 - 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration": Passed! Failed: 0, Passed: 1275, Skipped: 0, Total: 1275. TlsReader.Take now checks 'end - position < count' and fails with DecodeError rather than throwing.
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran dotnet test Curl.Tls.UnitTests --filter "TestCategory!=Integration" on a clean scratch worktree of the audited HEAD: Passed! Failed: 0, Passed: 1275, Skipped: 0, exit 0.
 
 ## Log
 
 - 2026-10-23: filed proposed.
 - 2026-10-24: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).

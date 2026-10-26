@@ -3,8 +3,8 @@ id: AF-0430
 title: CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher checks only that a dispatcher is not null
 auditor: quality
 severity: Low
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).
 key: quality:Curl.Engine.UnitTests/ManagedEasyTransferTests.Wildcard.cs:CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher:weak-assertion
 reproduction: none
 task: BL-3496
@@ -13,9 +13,9 @@ found: 2026-10-24
 found-at: 456765a13655caedad49326c988f9e4eec86da8b
 scorecard: 2026-10-24_2106.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: consecutive
+closed-by: 2026-10-25_0941.md, 2026-10-25_1542.md
 ---
 # AF-0430 - CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher checks only that a dispatcher is not null
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Engine.UnitTests/ManagedEasyTransferTests.Wildcard.cs -
 ## Re-audits
 
 - 2026-10-25 | 2026-10-25_0941.md | reproduces: no | Ran the Select-String reproduction: CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher (ManagedEasyTransferTests.Wildcard.cs:147) now asserts Assert.IsTrue(dispatcher.Serves(scheme)) for ftp, ftps and rtsp, and Assert.IsFalse(dispatcher.Serves("bogus")), not just that the dispatcher is not null.
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the Select-String reproduction. CreateDispatcher_WildcardMatchAndInterleaveSet_BuildsTheDispatcher now asserts Assert.IsTrue(dispatcher.Serves(scheme)) for ftp, ftps and rtsp, and Assert.IsFalse(dispatcher.Serves("bogus")), not just IsNotNull.
 
 ## Log
 
 - 2026-10-24: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1542.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_0941.md, 2026-10-25_1542.md).

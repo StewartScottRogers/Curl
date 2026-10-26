@@ -3,8 +3,8 @@ id: AF-0437
 title: Lib1515.TestAsync's i < RequestCount can become <= with no test failing, adding a DNS-timeout wait after the last request
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-25_1542.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
 key: quality:Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:TestAsync-lt:surviving-mutant
 reproduction: mutation Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:74:<
 task: BL-3515
@@ -13,9 +13,9 @@ found: 2026-10-25
 found-at: 03fe150efe7a6f73cd1a1c8fbd2c7bda2248009b
 scorecard: 2026-10-25_0941.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-25
+closed-how: mechanical
+closed-by: 2026-10-25_1542.md
 ---
 # AF-0437 - Lib1515.TestAsync's i < RequestCount can become <= with no test failing, adding a DNS-timeout wait after the last request
 
@@ -42,7 +42,10 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1542.md | reproduces: no | Ran the -Site Curl.Conformance.LibTest.UnitLibrary/Lib1515.cs:74:< -Member TestAsync command: resolvedLine 74, outcome killed. Runner's targeted mutation rerun on the clean audited commit: killed.
+
 ## Log
 
 - 2026-10-25: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-25: accepted -> closed. Re-audit 2026-10-25_1542.md: the reproduction no longer reproduces, and the runner's targeted mutant was killed on the clean audited commit.
