@@ -72,6 +72,8 @@ public sealed class ProxyUrlParserTests
     [DataRow("http://a%7eb:1111", ProxyKind.Http, "a~b", 1111)]
     [DataRow("http://ex%41mple:1111", ProxyKind.Http, "exAmple", 1111)]
     [DataRow("http://@127.0.0.1:1111", ProxyKind.Http, "127.0.0.1", 1111)]
+    [DataRow("http://127.1:1111", ProxyKind.Http, "127.0.0.1", 1111)]
+    [DataRow("socks5h://2130706433:1111", ProxyKind.Socks5Hostname, "127.0.0.1", 1111)]
     public void TryParse_MeasuredProxy_GivesKindHostAndPort(string text, ProxyKind kind, string host, int port)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
