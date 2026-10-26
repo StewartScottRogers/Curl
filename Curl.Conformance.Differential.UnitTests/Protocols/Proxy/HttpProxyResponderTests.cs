@@ -48,7 +48,7 @@ public sealed class HttpProxyResponderTests
     {
         var request = "CONNECT host.test:8443 HTTP/1.1\r\nHost: host.test:8443\r\n\r\nhello";
 
-        var (output, _, connector) = await RunAsync(request, false);
+        var (output, _, connector) = await RunAsync(request, false, holdClientEndUntilRemoteEnds: true);
 
         Assert.AreEqual(Established + "from remote", output);
         Assert.AreEqual("host.test", connector.Host);
@@ -95,11 +95,12 @@ public sealed class HttpProxyResponderTests
         Assert.AreEqual(request, log);
     }
 
-    private static async Task<(string Output, string Log, FakeConnector Connector)> RunAsync(string input, bool needAuth, bool reachable = true)
+    private static async Task<(string Output, string Log, FakeConnector Connector)> RunAsync(string input, bool needAuth, bool reachable = true, bool holdClientEndUntilRemoteEnds = false)
     {
         var log = new ProtocolWireLog();
         var connector = new FakeConnector(reachable);
-        using var connection = new DuplexMemoryStream(Encoding.Latin1.GetBytes(input));
+        using var connection = new DuplexMemoryStream(
+            Encoding.Latin1.GetBytes(input), endOfInputWaitsFor: holdClientEndUntilRemoteEnds ? connector.Remote.InputEnded : null);
 
         await new HttpProxyResponder(log, connector, needAuth).RespondAsync(connection, CancellationToken.None);
 
@@ -108,6 +109,9 @@ public sealed class HttpProxyResponderTests
 
     private sealed class FakeConnector(bool reachable) : IProxyTunnelConnector
     {
+        /// <summary>The target's side of the tunnel, made up front so a test can wait for its end.</summary>
+        public DuplexMemoryStream Remote { get; } = new("from remote"u8.ToArray());
+
         public string? Host { get; private set; }
 
         public int Port { get; private set; }
@@ -116,7 +120,7 @@ public sealed class HttpProxyResponderTests
         {
             Host = host;
             Port = port;
-            return Task.FromResult<Stream?>(reachable ? new DuplexMemoryStream("from remote"u8.ToArray()) : null);
+            return Task.FromResult<Stream?>(reachable ? Remote : null);
         }
     }
 }
