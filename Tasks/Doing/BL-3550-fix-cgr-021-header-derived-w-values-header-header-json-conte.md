@@ -86,3 +86,4 @@ curl -s -S -o NUL -w "[%header{x-a}][%{content_type}]" http://127.0.0.1:20400/m_
 ## Log
 
 - 2026-10-26: Created from CGR-021 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
