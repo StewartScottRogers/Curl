@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Protocol.Http.UnitTests/Cgr062HeaderByteTests.cs, Curl.Output.UnitTests/Cgr062HeaderByteTests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Protocol.Http.UnitTests/Cgr062HeaderByteTests.cs, Curl.Output.UnitTests/Cgr062HeaderByteTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HeaderByteText.cs, Curl.Protocol.Abstractions.UnitTests/HeaderByteTextTests.cs, Curl.Core.UnitTests/Cgr062RedirectFollowerTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3867 — CGR-062 part 2: a raw non-ASCII byte in an absolute Location is written back as that byte by %{redirect_url} and %{url_effective}
 
@@ -27,10 +27,10 @@ Cause: `HttpRedirectLocation` reads the header as Latin-1 (one char per byte) an
 
 ## Acceptance criteria
 
-- [ ] The repro above, run through real curl and through Curl on Windows, with and without `-L`, gives the same exit code, stdout bytes and stderr text; commands and results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] A relative `Location` after a request to an IDN host still writes the host as UTF-8 text in `%{url_effective}` and `%{redirect_url}`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The repro above, run through real curl and through Curl on Windows, with and without `-L`, gives the same exit code, stdout bytes and stderr text; commands and results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] A relative `Location` after a request to an IDN host still writes the host as UTF-8 text in `%{url_effective}` and `%{redirect_url}`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -38,3 +38,4 @@ Cause: `HttpRedirectLocation` reads the header as Latin-1 (one char per byte) an
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: f3912fd8 f457ad6c d8a159f1 779790c0.
+- 2026-10-26: Doing -> Done. An absolute Location's raw byte 0x80-0xFF is written back as that byte by %{redirect_url} and %{url_effective}, as curl 8.22.0 Schannel does
