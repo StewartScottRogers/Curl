@@ -199,7 +199,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     // The Schannel build checks revocation with CertGetCertificateChain on the context Schannel
     // attached the server's stapled OCSP response to, so a staple that says good or revoked
-    // answers for the server's own certificate before any online check (CGR-014, ADR-0828).
+    // answers for the server's own certificate before any online check (CGR-014, ADR-0834).
     // A staple that says neither, or none, leaves the online check to decide; -k and
     // --ssl-no-revoke check nothing, and the OpenSSL build reads a staple only for --cert-status.
     private OcspStapleStatus? StapledRevocationStatus(byte[]? stapledResponse, X509Chain? chain, ReadOnlyMemory<byte>[] peerCertificates) =>

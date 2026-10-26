@@ -1,4 +1,4 @@
-# ADR-0828: The Schannel build lets a stapled OCSP response answer a --cacert chain's revocation
+# ADR-0834: The Schannel build lets a stapled OCSP response answer a --cacert chain's revocation
 
 - Status: Accepted
 - Date: 2026-10-26

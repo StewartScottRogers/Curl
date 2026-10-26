@@ -8,7 +8,7 @@ using Curl.Tls;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-014 (BL-3543, ADR-0828): the Schannel build lets the OCSP response the server stapled
+/// CGR-014 (BL-3543, ADR-0834): the Schannel build lets the OCSP response the server stapled
 /// answer for its certificate's revocation, as curl 8.21.0's Schannel build does: a good staple
 /// answers a revocation status the online check could not fetch, and a revoked one fails the
 /// certificate, <c>--ssl-revoke-best-effort</c> or not; and with <c>--cacert</c> it routes the

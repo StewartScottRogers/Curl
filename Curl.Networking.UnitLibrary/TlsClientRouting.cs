@@ -68,7 +68,7 @@ public static class TlsClientRouting
 
     private const string StapledRevocationReason = "the Schannel build checks the --cacert chain's revocation, which a stapled OCSP response answers";
 
-    // The stapled-revocation row (ADR-0828, CGR-014): curl's Schannel build checks a --cacert
+    // The stapled-revocation row (ADR-0834, CGR-014): curl's Schannel build checks a --cacert
     // chain's revocation against the OCSP response the server stapled, which SslStream never
     // hands over, so that check runs on the hand-built client, whose hello asks for the staple.
     private static bool ChecksCaCertificateFileRevocationOnSchannel(TlsClientOptions options, bool matchesSchannelBuild) =>
