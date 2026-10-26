@@ -1,5 +1,5 @@
 ---
-id: BL-3828
+id: BL-3832
 title: Send escaped header-file bytes unchanged in multipart part headers and CONNECT proxy headers (CGR-020 follow-up)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3828 — Send escaped header-file bytes unchanged in multipart part headers and CONNECT proxy headers (CGR-020 follow-up)
+# BL-3832 — Send escaped header-file bytes unchanged in multipart part headers and CONNECT proxy headers (CGR-020 follow-up)
 
 ## Goal
 

@@ -31,5 +31,5 @@ carried in a string the request side turns back into them.
 
 - Every repro of CGR-020 matches curl byte for byte on Windows; off Windows `-H @file` and forward-proxy
   `--proxy-header @file` do too. A multipart part header and a CONNECT proxy header still turn the
-  escapes into U+FFFD off Windows until BL-3828 teaches those encoders the same rule.
+  escapes into U+FFFD off Windows until BL-3832 teaches those encoders the same rule.
 - A lone surrogate never comes from valid text, so the escape cannot collide with a typed header.
