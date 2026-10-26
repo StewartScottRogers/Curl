@@ -110,10 +110,20 @@ internal sealed class HttpResponseHeadBuilder
     }
 
     /// <summary>
-    /// Ends the current head where the peer closed, keeping the headers already received.
+    /// Ends the current head where the peer closed, keeping the headers already received and
+    /// the unfinished line the peer sent last when it is a lone carriage return, which curl
+    /// 8.22.0 writes with the head (measured, BL-3556 Notes).
     /// </summary>
+    /// <param name="unfinishedLine">The bytes after the last whole line.</param>
     /// <exception cref="HttpTransferException">The heads grew past <see cref="MaximumHeadSize" /> (exit 56).</exception>
-    internal void EndHeadAtClose() => CommitPendingHeader();
+    internal void EndHeadAtClose(ReadOnlySpan<byte> unfinishedLine)
+    {
+        CommitPendingHeader();
+        if (unfinishedLine is [(byte)'\r'])
+        {
+            Append(string.Empty, "\r");
+        }
+    }
 
     /// <summary>
     /// Builds the final head.
