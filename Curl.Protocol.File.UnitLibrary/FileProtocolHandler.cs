@@ -662,8 +662,38 @@ public sealed class FileProtocolHandler(IFileSystem fileSystem, IConnectionNumbe
                     FileTransferMessages.ResumeFailed));
         }
 
-        return CopyWindowAsync(context, source, count);
+        return CopyWindowAsync(context, source, length > 0 ? count : CountOfUnknownSize(context));
     }
+
+    /// <summary>
+    /// How many bytes to send from a source whose size reads as zero - a procfs or sysfs
+    /// file, a FIFO, <c>/dev/stdin</c> from a pipe, a character device - whose real size
+    /// is unknown until its end. curl 8.18.0's <c>file_do</c> treats an expected size of
+    /// zero as unknown and reads until end of file, or the range's byte count when one asks
+    /// for a positive count (<c>-r 0-9</c> of <c>/dev/zero</c> is ten bytes, <c>-r -1</c> of
+    /// a pipe its first byte), as measured in BL-3557.
+    /// </summary>
+    /// <param name="context">The transfer being performed.</param>
+    /// <returns>The range's positive byte count, or <see cref="long.MaxValue" /> for until the end.</returns>
+    private static long CountOfUnknownSize(ITransferContext context)
+    {
+        long requested = context.ResumeFrom is null && context.Range is { } range
+            ? RequestedByteCount(range)
+            : 0;
+
+        return requested > 0 ? requested : long.MaxValue;
+    }
+
+    /// <summary>
+    /// The number of bytes a range asks for regardless of the source's size: a suffix's
+    /// length, a bounded range's span, or zero for an open-ended <c>first-</c> range.
+    /// </summary>
+    /// <param name="range">The requested range.</param>
+    /// <returns>The byte count asked for, or zero when the range names none.</returns>
+    private static long RequestedByteCount(ByteRange range) =>
+        range.Kind == ByteRangeKind.Suffix
+            ? range.SuffixLength.GetValueOrDefault()
+            : range.LastBytePosition is { } last ? last - range.FirstBytePosition.GetValueOrDefault() + 1 : 0;
 
     /// <summary>
     /// Moves <paramref name="count" /> bytes from the source's current position to the
