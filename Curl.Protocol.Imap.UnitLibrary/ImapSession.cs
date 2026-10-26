@@ -572,7 +572,7 @@ internal sealed class ImapSession(
     private bool TryDecodeCustomCommand(out string? customCommand)
     {
         string? typed = context.Mail?.CustomCommand;
-        customCommand = typed is null ? null : ImapUrlPath.Decode(typed);
+        customCommand = typed is null ? null : ImapUrlPath.Decode(ImapCommandLineText.Platform.ToWire(typed));
         return typed is null || customCommand is not null;
     }
 

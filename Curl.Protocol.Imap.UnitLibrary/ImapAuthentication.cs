@@ -448,8 +448,8 @@ internal sealed class ImapAuthentication(ImapControlChannel channel, ISaslAuthen
     /// <summary>Sends <c>LOGIN</c>; other than <c>OK</c> is exit 67 <c>Access denied. </c>.</summary>
     private async ValueTask<TransferResult?> LoginAsync(System.Net.NetworkCredential credential)
     {
-        string user = "LOGIN " + ImapQuoting.AtomOrQuoted(credential.UserName) + " ";
-        await channel.SendCommandAsync(user + ImapQuoting.AtomOrQuoted(credential.Password), user + ImapDiagnosticLogLines.PasswordNotLogged)
+        string user = "LOGIN " + ImapQuoting.AtomOrQuoted(ImapCommandLineText.Platform.ToWire(credential.UserName)) + " ";
+        await channel.SendCommandAsync(user + ImapQuoting.AtomOrQuoted(ImapCommandLineText.Platform.ToWire(credential.Password)), user + ImapDiagnosticLogLines.PasswordNotLogged)
             .ConfigureAwait(false);
         ImapResponse response = await channel.ReadResponseAsync(NoUntagged).ConfigureAwait(false)
             ?? throw new ImapResponseMissingException();
