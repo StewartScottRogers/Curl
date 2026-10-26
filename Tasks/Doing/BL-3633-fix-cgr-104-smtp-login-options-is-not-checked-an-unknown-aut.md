@@ -76,3 +76,4 @@ curl -s -S -u u:p --login-options FOO=BAR smtp://127.0.0.1:21001 --mail-rcpt x
 ## Log
 
 - 2026-10-26: Created from CGR-104 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
