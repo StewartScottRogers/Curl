@@ -42,6 +42,8 @@ Select-String -Path Curl.Cli.UnitTests/CommandLineBlankArgumentTests.cs -Pattern
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Parse_BlankSslSessionsOnWindows_IsNotRefusedAsBlankAsTheSchannelBuildRefusesItAsUnsupported (CommandLineBlankArgumentTests.cs:115-124) has its own body now. It asserts exit code FailedInit and CollectionAssert.AreEqual on both stderr lines: 'curl: option --ssl-sessions: the installed libcurl version does not support this' and the try-help line. The shared test at line 103 also asserts IsFalse(IsAccepted) and non-empty stderr.
+
 ## Log
 
 - 2026-10-25: filed proposed.

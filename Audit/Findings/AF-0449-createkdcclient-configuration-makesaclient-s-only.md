@@ -42,6 +42,8 @@ Select-String -Path Curl.Engine.UnitTests/HandBuiltKerberosSourcesTests.cs -Patt
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Select-String finds no CreateKdcClient_Configuration_MakesAClient as the old test. It is now CreateKdcClient_Configuration_MakesAClientThatContactsTheConfiguredKdcThroughTheTransport (HandBuiltKerberosSourcesTests.cs:78). It asserts KerberosKdcException with Error KdcUnreachable, and that the transport contacted exactly kdc.example.test:750.
+
 ## Log
 
 - 2026-10-25: filed proposed.

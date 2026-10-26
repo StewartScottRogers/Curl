@@ -42,6 +42,8 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 
 ## Re-audits
 
+- 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Lib554To566Tests.cs:119-121 reads the Ioctl callback off the added handle's options, asserts IsNotNull, then calls it: Assert.AreEqual(IoctlResult.Ok, ioctl(IoctlCommand.RestartRead)), and checks the exit code is Ok.
+
 ## Log
 
 - 2026-10-25: filed proposed.

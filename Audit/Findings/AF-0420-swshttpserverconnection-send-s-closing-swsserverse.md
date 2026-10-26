@@ -45,6 +45,7 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Confo
 - 2026-10-24 | 2026-10-24_2106.md | not re-audited | Ran the -Site command: outcome site-missing, resolvedLine null. SwsHttpServerConnection.Send now marks a close by queuing an empty SwsServerSend([], serverBusyUntil) (line 445) and passes no 'true' argument, so the mutant cannot be run. Not re-audited.
 - 2026-10-25 | 2026-10-25_0941.md | not re-audited | Ran the -Site reproduction (SwsHttpServerConnection.cs:441:true, -Member Send): outcome site-missing, resolvedLine null, no mutant run. Send now adds 'new SwsServerSend([], serverBusyUntil)' under 'if (closes)', and SwsServerSend has no closing flag left. Not re-audited.
 - 2026-10-25 | 2026-10-25_1542.md | not re-audited | Ran the -Site Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true -Member Send command: outcome site-missing. SwsServerSend is now built with no boolean argument (lines 360, 433, 445), so no mutant ran and this is not re-audited.
+- 2026-10-25 | 2026-10-25_1944.md | not re-audited | Ran Invoke-MutationTest.ps1 -Site Curl.Conformance.UnitLibrary/SwsHttpServerConnection.cs:441:true -Member Send -ExcludeBaselineFailures -TimeoutSeconds 600: outcome site-missing (baseline 60078 ms, no mutants). SwsHttpServerConnection.cs no longer has a SwsServerSend(..., true) call (its SwsServerSend constructions at lines 241, 360, 433 and 445 take two arguments). Not re-audited.
 
 ## Log
 
