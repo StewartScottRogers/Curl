@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests/Cgr024Tests.cs]
+touches: [Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests/Cgr024Tests.cs, Curl.Protocol.Ftp.UnitTests/Fakes/FtpAsciiOutput.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerGracefulDataCloseTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerListingRequestTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerRangeTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerSizeDownloadTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTransferTypeTests.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerWildcardTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3553 — Fix CGR-024: On Linux, FTP ASCII transfers (LIST, NLST, ;type=a, -B) keep CRLF; curl converts CRLF and lone CR to LF on non-Windows platforms
 
@@ -66,17 +66,31 @@ EV\vl.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr024Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Touches widened (2026-10-26): added `Curl.Protocol.Ftp.UnitTests/Fakes/FtpAsciiOutput.cs` (new) and seven existing test files whose ASCII/listing output assertions pinned CRLF, which would turn red on Linux and macOS CI once the conversion lands (found by running the suite with the conversion forced on). No task in Doing on origin/work/dark-factory names any Ftp file.
+- Fix: `FtpDownloadLineEndings` ports curl's `ftp_cw_lc_write` (CRLF and lone CR to LF, a CR at the end of one read held to the next byte or the end); `FtpSession.DownloadAsync` makes one per download, converting only for ASCII (listing, `-B`, `;type=a`) off Windows. Decision recorded in ADR-0818. Byte counts stay raw, as curl counts before its content writers.
+- Measured (Record-CurlExchange.ps1 -Ftp -ListenAddress 172.26.96.1 -Curl wsl.exe; REF-LINUX curl 8.18.0 OpenSSL; PORT = Curl.Console published linux-x64 and run in WSL), `curl -sS <url>`, all exit 0, empty stderr, identical command transcripts:
+  - `ftp://H:20986/dir/`, LIST data `drw d.txt\r\n-rw e.txt\r\n`: REF `drw d.txt\n-rw e.txt\n`; PORT before (report) kept CRLF, PORT now `drw d.txt\n-rw e.txt\n`.
+  - `'ftp://H:20986/crlf.txt;type=a'`, data `a\r\nb\r\nc\r\n`: REF and PORT `a\nb\nc\n`.
+  - `ftp://H:20986/dir/`, LIST data `a\rb\r\n` (v_lonecr): REF and PORT `a\nb\n`.
+  - `-l ftp://H:20986/dir/` (NLST), `a\r\nb\r\n`: REF and PORT `a\nb\n`.
+  - `-B ftp://H:20986/f.txt`, `a\r\nb\rc\r`: REF and PORT `a\nb\nc\n`.
+  - Binary `ftp://H:20986/f.txt`, `a\r\nb\r\n` (v_bin, already matched): REF and PORT `a\r\nb\r\n`.
+- Windows (already matched, still matches): curl 8.22.0 Schannel and Curl.Console both write `drw d.txt\r\n-rw e.txt\r\n` for the listing and `a\r\nb\rc\r` for `;type=a`, exit 0, empty stderr.
+- Focused test: `Cgr024Tests` (converter cases from every repro, across reads, passthrough on Windows/binary; a Linux/macOS-only session test and a Windows-only one). The converter type did not exist before the fix, so the tests could not pass before it.
+- Gates: dotnet build 0 warnings 0 errors; fast tests 46 projects passed, 0 failed; `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 0 failing members; `dotnet format --verify-no-changes` clean on the test project. Linux/macOS CI is met by keeping the tests platform-neutral (`FtpAsciiOutput.Of`, OSCondition on the session tests).
+
 ## Log
 
 - 2026-10-26: Created from CGR-024 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. On Linux and macOS an ASCII FTP download (LIST, NLST, -B, ;type=a) writes CRLF and lone CR as LF, as curl does; Windows and binary downloads unchanged
