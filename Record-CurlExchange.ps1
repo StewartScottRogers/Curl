@@ -510,6 +510,13 @@
     status line's reason phrase is "Connection established" for 200, "Proxy Authentication
     Required" for 407, and "Status" otherwise.
 
+.PARAMETER Http2ResetCode
+    With -Http2Origin, answer every HTTP/2 request with RST_STREAM carrying this error code
+    instead of a HEADERS frame, and serve every connection curl opens rather than one, so a
+    retry on a new connection is recorded too (BL-3561: 13, HTTP_1_1_REQUIRED, makes curl
+    resend over HTTP/1.1, which gets the first Response). Default -1, no reset.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2ResetCode 13 -Port 18080 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nh1 hello\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-reset-13
+
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
     to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
@@ -694,6 +701,7 @@ param(
     [ValidateSet('', 'h2c-upgrade', 'h2c-upgrade-ignored', 'prior-knowledge', 'alpn')] [string] $Http2Origin = '',
     [ValidateRange(100, 999)] [int] $ProxyStatus = 200,
     [ValidateSet('h2', 'http/1.1')] [string] $ProxyAlpn = 'h2',
+    [int] $Http2ResetCode = -1,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -2203,8 +2211,11 @@ public sealed class RecorderHttp2Proxy
     private readonly HuffmanDecoder _huffman;
     private Thread _thread;
 
-    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin)
+    private readonly int _resetCode;
+
+    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode)
     {
+        _resetCode = resetCode;
         _origin = origin;
         _listener = listener;
         _certificate = certificate;
@@ -2241,12 +2252,31 @@ public sealed class RecorderHttp2Proxy
         return Encoding.Latin1.GetString(bytes, offset, count).Replace("\r", "\\r").Replace("\n", "\\n");
     }
 
+    // One connection, or with a reset code every connection, each on a thread of its own since
+    // curl holds the first open while it retries on the next, until Finish stops the listener.
     private void Serve()
+    {
+        var connections = new List<Thread>();
+        for (int number = 1; ServeConnection(number, connections) && _resetCode >= 0; number++) { }
+        foreach (Thread connection in connections) { connection.Join(6000); }
+    }
+
+    private bool ServeConnection(int number, List<Thread> connections)
     {
         TcpClient client;
         try { client = _listener.AcceptTcpClient(); }
-        catch (SocketException) { Note("= curl opened no connection"); return; }
-        catch (ObjectDisposedException) { Note("= curl opened no connection"); return; }
+        catch (SocketException) { if (number == 1) { Note("= curl opened no connection"); } return false; }
+        catch (ObjectDisposedException) { if (number == 1) { Note("= curl opened no connection"); } return false; }
+        if (_resetCode < 0) { ServeClient(client); return true; }
+        Note("= connection " + number);
+        var thread = new Thread(() => ServeClient(client)) { IsBackground = true };
+        connections.Add(thread);
+        thread.Start();
+        return true;
+    }
+
+    private void ServeClient(TcpClient client)
+    {
         using (client)
         {
             try
@@ -2257,7 +2287,7 @@ public sealed class RecorderHttp2Proxy
                 {
                     ServerCertificate = _certificate,
                     EnabledSslProtocols = SslProtocols.Tls12,
-                    ApplicationProtocols = new List<SslApplicationProtocol> { _alpn == "h2" ? SslApplicationProtocol.Http2 : SslApplicationProtocol.Http11 }
+                    ApplicationProtocols = _resetCode >= 0 ? new List<SslApplicationProtocol> { SslApplicationProtocol.Http2, SslApplicationProtocol.Http11 } : new List<SslApplicationProtocol> { _alpn == "h2" ? SslApplicationProtocol.Http2 : SslApplicationProtocol.Http11 }
                 };
                 tls.AuthenticateAsServer(options);
                 tls.ReadTimeout = 5000;
@@ -2453,6 +2483,12 @@ public sealed class RecorderHttp2Proxy
     // request that is not a CONNECT (a forwarded GET), has no body and ends the stream.
     private void AnswerConnect(Stream stream, int streamId, bool connect)
     {
+        if (_resetCode >= 0)
+        {
+            WriteFrame(stream, 3, 0, streamId, BigEndian32(_resetCode));
+            Note("< RST_STREAM stream " + streamId + " error " + _resetCode);
+            return;
+        }
         var block = new List<byte> { 0x08 };
         AppendLiteral(block, _status.ToString());
         bool refused = _status / 100 != 2 || !connect;
@@ -2594,7 +2630,7 @@ public sealed class RecorderHttp2Proxy
 '@
     $server.Dispose()
     $server = $null
-    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }))
+    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode)
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
