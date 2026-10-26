@@ -8,7 +8,7 @@ depends-on: [BL-3867]
 touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr062Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs, Curl.Protocol.Http.UnitTests/Cgr062Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3591 — Fix CGR-062: %{url_effective} / %{redirect_url} after a redirect are the raw Location text instead of curl's normalised URL (also for unusual absolute...
 
@@ -82,10 +82,10 @@ curl -sS[L] -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -100,6 +100,16 @@ curl -sS[L] -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n
   - X=`http:`: without `-L` both `302 0 http://127.0.0.1:P/a/b http:` (matches). With `-L`: both exit 3, `302 1 http://127.0.0.1:P/a/b`; REF stderr `...could not be parsed: Unsupported number of slashes following scheme`, PORT `...: Port number was not a decimal number between 0 and 65535`.
   - Where the fixes land: `%{url_effective}` after a followed hop should be the parsed `CurlUrl`'s normalised text rather than the target string (`RedirectFollower`, `RedirectChain.Followed`, and the `ReachesTarget` refusal URL); `HttpRedirectLocation.NormalizeAbsolute` should give curl's normalised text for `scheme:/path` (`http://b/`) and Windows `file:///c:/` (`file://c:/`); `RedirectFollower.UnparsableUrlReason` needs the `Unsupported number of slashes following scheme` reason for `http:` (check `CurlUrl`'s parse failure for it). Measurement script used: a PowerShell loop over the cases calling `Record-CurlExchange.ps1 -Port P -Response <302>,<200> -Connections 2`.
 - Requeued behind BL-3867 (the E9 byte repro), so this task's first criterion can be met whole; no code was edited.
+- 2026-10-26 (lane 4, fix): decided in ADR-0828. The follower already takes `%{redirect_url}` as its next target and reports that text as `%{url_effective}`, so rather than rebuilding the effective URL from the parsed `CurlUrl` (its `AbsolutePath` is percent-encoded, which would undo BL-3867's raw E9 bytes), the fix is in `HttpRedirectLocation`: after a parse that succeeds, a scheme other than `file` followed by one or more slashes takes its host after them (`http:/b` -> `http://b/`); a `%2E` dot segment (any case) is removed as a dot is (`/a/%2e%2e/b` -> `/b`, for relative and absolute Locations); and with drive-letter rules (a `driveLetters` parameter, `OperatingSystem.IsWindows()` in production, so both platforms are tested on either) a `file` path naming a drive becomes `file://c:/x`. `RedirectFollower.UnparsableUrlReason` gives `Unsupported number of slashes following scheme` for a target with no slash after its scheme (`http:`). `touches` was not widened.
+- Re-measured after the fix with `Record-CurlExchange.ps1` on Windows (REF curl 8.22.0 Schannel, PORT this tree's `curl.exe`; same server script as above, host:port shown as H). Each pair is equal in exit code, stdout, stderr and request lines:
+  - X=`https:/x` `-sS -L -w %{url_effective}`: both exit 6 `https://x/`, `curl: (6) Could not resolve host: x`.
+  - X=`/a/%2e%2e/b` same args: both exit 0 `http://H/b`; both send `GET /a/b` then `GET /b`.
+  - X=`http:/b` `-L -w W`: both exit 6 `302 1 http://b/`; without `-L` both exit 0 `302 0 http://H/a/b http://b/`.
+  - X=`file:///c:/windows/win.ini` `-L`: both exit 1 `302 1 file://c:/windows/win.ini`, `curl: (1) Protocol "file" is disabled (in redirect)`; without `-L` both `302 0 http://H/a/b file://c:/windows/win.ini`.
+  - X=`http:` `-L`: both exit 3 `302 1 http://H/a/b`, `curl: (3) The redirect target URL could not be parsed: Unsupported number of slashes following scheme`; without `-L` both `302 0 http://H/a/b http:` (already matched, still matches).
+  - X=`http://\xE9.invalid/b` `-w %{redirect_url}`: both exit 0, stdout bytes `68 74 74 70 3A 2F 2F E9 2E 69 6E 76 61 6C 69 64 2F 62` (BL-3867's fix, still matching).
+- Focused tests: `Curl.Protocol.Http.UnitTests/Cgr062Tests.cs` (one-slash and three-slash hosts, `%2E` dot segments, `http:` kept, the drive-letter `file` path under both platforms' rules) and `Curl.Core.UnitTests/Cgr062Tests.cs` (`http:` and `http:b` refused for slashes). Each fails on the code before the fix, which gave `http:/b`, `/a/%2E%2E/b`, `file:///c:/...` and `Port number was not a decimal number...` as measured above.
+- Gates: `dotnet build` 0 warnings; the fast tests passed across all test projects (one wrong expectation in the new test, fixed, then that project passed); `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary,Curl.Protocol.Http.UnitLibrary` reported 0 failing members. Linux and macOS: the change is platform-neutral (the drive rule is a parameter, and both answers are pinned without an OS condition); the fast tests are green here.
 
 ## Log
 
@@ -107,3 +117,4 @@ curl -sS[L] -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3867 (the raw E9 byte repro of CGR-062, which needs header-byte provenance across Http, Core and Output); measurements and fix sites are in Notes
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. %{url_effective} and %{redirect_url} after a redirect are curl's normalised URL for every CGR-062 repro
