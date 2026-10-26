@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/FormPartParameterReader.cs, Curl.Cli.UnitTests/Cgr020Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr020Tests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/HeaderFileText.cs, Curl.Cli.UnitLibrary/FormPartParameterReader.cs, Curl.Cli.UnitTests/Cgr020Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr020Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3549 — Fix CGR-020: Header text read from a file (-H @file, --proxy-header @file, -F ...;headers=@file, and -K cookie/request values) is decoded and re-encod...
 
@@ -104,17 +104,31 @@ curl -s -F "a=b;headers=@h.txt" http://127.0.0.1:21200/echo
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr020Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Added `Curl.Cli.UnitLibrary/HeaderFileText.cs` to `touches`: a new file holding the header-file reader both the `-H` table and the `-F` reader use; no other Doing task can hold a file that did not exist.
+- Plan and decision (ADR-0817): `HeaderFileText.Read` reads a header file in the Windows ANSI code page when that round-trips its bytes, otherwise as UTF-8 with each unreadable byte escaped as lone surrogate U+DC00+byte; `HttpRequestHeadFormatter.WireText` writes those escapes back as bytes. `-K` `cookie` (values with `=`) and `request` values are re-spelled one character per file byte, since the request side writes them in Latin-1. Command-line `-b`/`-X` are unchanged (not part of this issue). A non-ASCII `-X` from a `-K` file used by a non-HTTP protocol would now be re-spelled too; no repro covers it.
+- Measured real curl 8.22.0 (Schannel, `/ucrt64/bin/curl.exe`) and Curl with `Record-CurlExchange.ps1` on Windows, each against a recording server answering `200`, request bytes compared with the Host port and multipart boundary normalised:
+  - `curl -sS -H @h1.txt URL` (h1 = `X: C3 A9 E4 B8 AD`): both exit 0, empty stdout/stderr, `X: C3 A9 E4 B8 AD`. Before the fix Curl sent `X: E9 3F`.
+  - `curl -sS -H @h2.txt URL` (h2 = `X: E9 FF`): both `X: E9 FF`.
+  - `curl -sS -K k1.txt URL` (`cookie = "c=C3 A9"`): both `Cookie: c=C3 A9`.
+  - `curl -sS -K k2.txt URL` (`request = "C3 A9"`): both send the request line `C3 A9 /a HTTP/1.1`.
+  - `curl -s -F "a=b;headers=@h1.txt" URL`: both send part header `X: C3 A9 E4 B8 AD`.
+  - `curl -s -F "a=b;headers=@h3.txt" URL` (h3 = `X-C: FF 80 C3 28`): both send `X-C: FF 80 C3 28`.
+  - All six: exit codes, stdout bytes, stderr text and request bytes equal; no files written by either.
+- Linux and macOS (lanes test only on Windows): the Linux answers are pinned platform-neutrally by `Curl.Cli.UnitTests/Cgr020Tests.cs` parsing as the non-Windows build (`-H @file` of `E9 FF` gives the escapes, `-K` cookie/request give the file bytes) and `Curl.Protocol.Http.UnitTests/Cgr020Tests.cs` (escapes go out as bytes over UTF-8). Off Windows, a `-F ...;headers=@file` or CONNECT-tunnel `--proxy-header @file` holding bytes that are not valid UTF-8 still sends U+FFFD, as before: those encoders live in Curl.Core and Curl.Networking, outside this task's touches, and are filed as BL-3828. Valid UTF-8 header files (the ENV-02 `X-C: æ—¥æœ¬` repros) match on Linux.
+- Focused tests: `Curl.Cli.UnitTests/Cgr020Tests.cs` (13) and `Curl.Protocol.Http.UnitTests/Cgr020Tests.cs` (4). Not re-run against the old code; they fail there by construction: the old reader decoded the files as plain UTF-8 (U+FFFD for `E9 FF`, and CJK text cp1252 cannot round-trip), the old cookie and request values held the decoded characters, and `WireText` did not exist.
+- `dotnet build` clean; fast tests green (46 test projects, 0 failed). `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary,Curl.Protocol.Http.UnitLibrary`: 0 failing members.
 ## Log
 
 - 2026-10-26: Created from CGR-020 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. -H @file, --proxy-header @file, -F ;headers=@file and -K cookie/request values reach the wire as the file's bytes, matching curl 8.22.0
