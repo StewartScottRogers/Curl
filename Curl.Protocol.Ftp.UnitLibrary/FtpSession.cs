@@ -265,6 +265,8 @@ internal sealed class FtpSession(
 
     private FtpDownloadWindow window;
 
+    private FtpDownloadLineEndings lineEndings = new(useAscii: false, runsOnWindows: true);
+
     private long? fileSize;
 
     private long? expectedSize;
@@ -983,6 +985,7 @@ internal sealed class FtpSession(
         bool listing = IsListing(path);
         bool ascii = listing || typeCode.UseAscii;
         window = DownloadWindowOf(listing);
+        lineEndings = new FtpDownloadLineEndings(ascii, OperatingSystem.IsWindows());
         return await OpenDownloadDataConnectionAsync(DownloadPretArgument(path, listing)).ConfigureAwait(false)
             ?? await SetTypeAsync(ascii).ConfigureAwait(false)
             ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
@@ -2117,6 +2120,7 @@ internal sealed class FtpSession(
 
             trace.TransferInitiated();
             return await CopyDataAsync().ConfigureAwait(false)
+                ?? await WriteOutputAsync(lineEndings.Finish()).ConfigureAwait(false)
                 ?? await (window.MaxDownload is null ? ReadTransferCompleteAsync() : EndRangeAsync()).ConfigureAwait(false);
         }
 
@@ -2163,7 +2167,7 @@ internal sealed class FtpSession(
                 return null;
             }
 
-            if (await WriteOutputAsync(buffer.AsMemory(0, allowed)).ConfigureAwait(false) is { } writeFailed)
+            if (await WriteOutputAsync(lineEndings.Convert(buffer.AsMemory(0, allowed))).ConfigureAwait(false) is { } writeFailed)
             {
                 return writeFailed;
             }

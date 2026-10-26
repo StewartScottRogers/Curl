@@ -208,7 +208,7 @@ public sealed class FtpProtocolHandlerWildcardTests
         WildcardRun run = await RunAsync(hooks, Listed + Bye, [Listing], "ftp://127.0.0.1:47380/d/");
 
         Assert.AreEqual(ListedSent + "QUIT\r\n", run.Sent);
-        Assert.AreEqual(Listing, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(Listing), run.OutputText);
         Assert.IsEmpty(hooks.Calls);
     }
 

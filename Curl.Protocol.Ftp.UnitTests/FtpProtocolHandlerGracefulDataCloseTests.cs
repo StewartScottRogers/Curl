@@ -52,7 +52,7 @@ public sealed class FtpProtocolHandlerGracefulDataCloseTests
         (TransferResult result, string output) = await RunAsync("ftp://127.0.0.1:18321/dir/", control, data);
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
-        Assert.AreEqual(listing, output);
+        Assert.AreEqual(FtpAsciiOutput.Of(listing), output);
         Assert.IsTrue(control.AnsweredComplete);
     }
 

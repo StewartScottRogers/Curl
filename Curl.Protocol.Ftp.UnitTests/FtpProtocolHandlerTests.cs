@@ -989,8 +989,8 @@ public sealed class FtpProtocolHandlerTests
         string expectedSent = LoginSent + "CWD dir\r\nEPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n";
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
-        diagnostics.Diff("output", FtpDiagnostics.Escape("drw a\r\n"), FtpDiagnostics.Escape(run.OutputText));
-        Assert.AreEqual("drw a\r\n", run.OutputText);
+        diagnostics.Diff("output", FtpDiagnostics.Escape(FtpAsciiOutput.Of("drw a\r\n")), FtpDiagnostics.Escape(run.OutputText));
+        Assert.AreEqual(FtpAsciiOutput.Of("drw a\r\n"), run.OutputText);
         diagnostics.Assert("result", TransferResult.Success(7), run.Result);
         Assert.AreEqual(TransferResult.Success(7), run.Result);
     }

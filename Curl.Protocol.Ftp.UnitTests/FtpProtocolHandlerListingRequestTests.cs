@@ -41,7 +41,7 @@ public sealed class FtpProtocolHandlerListingRequestTests
         FtpRun run = await RunAsync(RootUrl, Login + Passive + Opened, Names, c => new TransferContext { Url = c.Url, Output = c.Output, Http = new HttpRequestOptions { CustomMethod = command } });
 
         AssertSent(RootTypeSent + command + "\r\nQUIT\r\n", run);
-        Assert.AreEqual(Names, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(Names), run.OutputText);
         Assert.AreEqual(TransferResult.Success(Names.Length), run.Result);
     }
 
