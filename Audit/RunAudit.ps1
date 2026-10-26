@@ -69,6 +69,18 @@
 .PARAMETER Seed
     The seeder's seed. Default: from the clock; recorded in the manifest.
 
+.PARAMETER ReauditOnly
+    Re-audit only: no seeding and no auditor method, so no new findings (Stewart, 2026-10-25: "only
+    do the reaudit, and do not start a new audit"). Step 3 makes a clean tree at -Ref, step 4 plants
+    nothing and writes a manifest with no defects, and step 5 runs only the selected auditors that
+    have open findings to re-audit, telling each to run those reproductions and nothing else. The
+    runner keeps each auditor's reply as reports\<auditor>.full.md and scores reports\<auditor>.md,
+    the same reply with its report block's findings emptied, so a new finding is never filed.
+    With no method counts and no planted defect to catch, every auditor is unreliable on the
+    scorecard, as ADR-0422 requires of an auditor whose reliability was not measured: a finding
+    closes only when the mechanical rerun on the clean commit agrees, or on a second verdict
+    running. -Planted is ignored. Decided by Claude under Stewart's delegation.
+
 .PARAMETER AlongsideShift
     Run even while a dark factory shift runs. Shifts started with -Continuous chain into the
     next with no gap, so "between shifts" may never come; this switch lets an interactive session
@@ -99,12 +111,15 @@
     Audit\RunAudit.cmd -NewTab
 .EXAMPLE
     Audit\RunAudit.cmd -Auditors truthfulness,process -Planted 2
+.EXAMPLE
+    Audit\RunAudit.cmd -NewTab -ReauditOnly -AlongsideShift
 #>
 param(
     [string]$Ref = 'origin/work/dark-factory',
     [string[]]$Auditors = @('quality', 'security', 'conformance', 'truthfulness', 'process'),
     [ValidateRange(1, 10)][int]$Planted = 8,
     [int]$Seed = -1,
+    [switch]$ReauditOnly,
     [switch]$DryRun,
     [switch]$AlongsideShift,
     [switch]$NewTab,
@@ -349,6 +364,24 @@ function Get-AvoidPromptLines([object[]]$Awaited) {
     return @($byFile.Keys | ForEach-Object { "- $_ ($($byFile[$_] -join ', '))" })
 }
 
+function Remove-ReportFindings([string]$Reply) {
+    # A -ReauditOnly reply with its last json report block's findings emptied, so a re-audit-only run
+    # files no new finding however the auditor answers. A reply with no parseable block is returned
+    # as it is: the scorecard marks that auditor unreliable for it.
+    $blocks = [regex]::Matches($Reply, '(?s)```json\s*\r?\n(.*?)```')
+    if (-not $blocks.Count) { return $Reply }
+    $last = $blocks[$blocks.Count - 1]
+    try { $report = $last.Groups[1].Value | ConvertFrom-Json } catch { return $Reply }
+    if ($report.PSObject.Properties['findings']) { $report.findings = @() } else { $report | Add-Member findings @() }
+    $json = $report | ConvertTo-Json -Depth 20
+    return $Reply.Substring(0, $last.Index) + "``````json`n$json`n``````" + $Reply.Substring($last.Index + $last.Length)
+}
+
+function Get-ReauditOnlyPrompt([string]$Tree, [string]$Commit, [string]$Fingerprint, [string]$LogsLine, [string]$Scratch, [string[]]$Open, [string]$MethodName) {
+    # The -ReauditOnly prompt: the listed re-audits and nothing else.
+    return "Re-audit only. Do not run your method's steps and report no new findings: this run only re-audits, so write `"findings`": [] and leave out the method counts. The tree is $Tree (commit $Commit; auditor fingerprint $Fingerprint).$LogsLine Your temporary folder is $Scratch. Re-audit these open findings by running each reproduction, and give each a verdict in `"reaudits`":`n$($Open -join "`n")`nFollow Audit/Instructions/Auditor-Rules.md, and the re-audit section of Audit/Instructions/$MethodName.md, in that tree, and end with exactly one json report block."
+}
+
 # ------------------------------------------------------------------ self-test
 
 if ($SelfTest) {
@@ -420,6 +453,15 @@ if ($SelfTest) {
         $bad = [pscustomobject]@{ planted = @([pscustomobject]@{ id = 'PD-201'; auditor = 'conformance'; file = 'Curl.Console\CurlCommandRunner.cs' }); unseeded = @([pscustomobject]@{ auditor = 'quality'; reason = 'every quality entry fits only avoided files' }) }
         $problems = @(Get-SeedingProblems $bad @('quality', 'conformance', 'process') $avoid)
         Check 'an unseeded auditor is reported with the seeder''s reason, a silent gap too, and a plant in an avoided file' ($problems.Count -eq 3 -and $problems[0] -like 'Could not seed quality: every quality entry*' -and $problems[1] -like 'Could not seed process: the manifest names no defect*' -and $problems[2] -like 'Planted defect PD-201 *CurlCommandRunner.cs*') ($problems -join ' / ')
+
+        # -ReauditOnly: a reply's new findings are dropped, its re-audits kept; the prompt asks for re-audits only.
+        $reply = "Notes.`n``````json`n{ `"auditor`": `"quality`", `"findings`": [ { `"key`": `"k`" } ], `"reaudits`": [ { `"finding`": `"AF-0010`", `"reproduces`": false } ] }`n```````nAfter."
+        $stripped = Remove-ReportFindings $reply
+        $block = ([regex]::Match($stripped, '(?s)```json\s*\r?\n(.*?)```').Groups[1].Value | ConvertFrom-Json)
+        Check '-ReauditOnly drops a reply''s new findings and keeps its re-audits and text' (@($block.findings).Count -eq 0 -and $block.reaudits[0].finding -eq 'AF-0010' -and $stripped.StartsWith('Notes.') -and $stripped.EndsWith('After.')) "findings $(@($block.findings).Count)"
+        Check '-ReauditOnly leaves a reply with no report block as it is' ((Remove-ReportFindings 'no block') -eq 'no block') 'unchanged'
+        $onlyPrompt = Get-ReauditOnlyPrompt 'T' 'c' 'f' '' 'S' @('- AF-0010 - x. Reproduction: y') 'Quality'
+        Check '-ReauditOnly prompts for the listed re-audits only, with no method and no findings' ($onlyPrompt -like 'Re-audit only. Do not run your method*' -and $onlyPrompt.Contains('"findings": []') -and $onlyPrompt -like '*- AF-0010 - x. Reproduction: y*' -and $onlyPrompt -notlike '*in full*') $onlyPrompt.Substring(0, 40)
     }
     finally { Remove-Item -Recurse -Force -LiteralPath $scratch -ErrorAction SilentlyContinue }
 
@@ -493,8 +535,23 @@ if ($refusal) { Write-Host $refusal; Exit-Audit 'refused' 1 }
 $Auditors = @($Auditors | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })
 foreach ($a in $Auditors) { if ($Order -notcontains $a) { Write-Host (Get-UnknownAuditorMessage $a); Exit-Audit 'refused' 1 } }
 $Selected = @($Order | Where-Object { $Auditors -contains $_ })
-if ($Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; Exit-Audit 'refused' 1 }
+if (-not $ReauditOnly -and $Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; Exit-Audit 'refused' 1 }
 if ($Seed -lt 0) { $Seed = [int]($Started.Ticks % 1000000007) }
+
+if ($DryRun -and $ReauditOnly) {
+    Write-Host "Re-audit-only dry run, $Stamp. Would run, from ${repo}:"
+    Write-Host "  2. git fetch origin; the audit branch's worktree; git merge origin/master there"
+    Write-Host "  3. git worktree add --detach $RunDir\planted $Ref (clean: nothing is planted); overlay the audit definitions; copy the logs"
+    Write-Host "  4. no seeder: $RunDir\manifest.json with no planted defects"
+    $taskPaths = @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $Ref, '--', 'Tasks') -AllowFailure)
+    foreach ($a in $Selected) {
+        $open = @(Get-OpenFindings (Join-Path $PSScriptRoot 'Findings') $a $taskPaths)
+        if ($open.Count) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... re-audits only, $($open.Count) findings; findings emptied in $RunDir\reports\$a.md" } else { Write-Host "  5. $a skipped: no open findings to re-audit" }
+    }
+    Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -RerunReproductions; Write-AuditScorecard.ps1"
+    Write-Host "  7. git commit -m 'audit: re-audit $Stamp'; git push origin audit; gh pr create (unless one is open)"
+    Exit-Audit 'done' 0
+}
 
 if ($DryRun) {
     Write-Host "Audit dry run, $Stamp. Would run, from ${repo}:"
@@ -513,7 +570,7 @@ if ($DryRun) {
 }
 
 New-Item -ItemType Directory -Force $RunDir, (Join-Path $RunDir 'reports'), (Join-Path $RunDir 'scratch'), (Join-Path $RunDir 'logs') | Out-Null
-Write-Step "audit $Stamp of $Ref; auditors $($Selected -join ', '); $Planted planted; seed $Seed"
+Write-Step "audit $Stamp of $Ref; auditors $($Selected -join ', '); $(if ($ReauditOnly) { 're-audit only, nothing planted' } else { "$Planted planted; seed $Seed" })"
 Set-Caption 'preparing'
 $plantedTree = Join-Path $RunDir 'planted'
 try {
@@ -570,6 +627,12 @@ try {
     $avoidLines = @(Get-AvoidPromptLines $awaited)
     [IO.File]::WriteAllText((Join-Path $RunDir 'avoid-files.txt'), (($avoidLines | ForEach-Object { "$_`r`n" }) -join ''), $Utf8)
     Write-Step "seeder avoids $($avoidFiles.Count) files named by $($awaited.Count) findings awaiting a re-audit$(if ($avoidFiles.Count) { ': ' + ($avoidFiles -join ', ') })"
+    if ($ReauditOnly) {
+        [IO.File]::WriteAllText($manifest, '{ "planted": [], "unseeded": [], "reauditOnly": true }', $Utf8)
+        $seedingProblems = @()
+        Write-Step 're-audit only: nothing planted'
+    }
+    else {
     $avoidPrompt = if ($avoidLines.Count) { " Avoided files - plant nothing in these, because findings awaiting a re-audit name them (a path starting logs/ is that file in the log copy):`n" + ($avoidLines -join "`n") + "`n" } else { ' Avoided files: none.' }
     $seedPrompt = "Seed an audit. Worktree: $plantedTree (detached at $auditedCommit). Log copy: $logs. Manifest path: $manifest. Seed: $Seed. Count: $Planted. Plant at least one defect for each of these auditors: $($Selected -join ', '), and only for them.$avoidPrompt Follow your instructions exactly; change nothing outside the worktree, the log copy and the manifest path."
     $null = Invoke-Agent 'audit-seeder' $Models.seeder $seedPrompt $auditTree (Join-Path $RunDir 'seeder.md')
@@ -578,6 +641,7 @@ try {
     Write-Step "seeded: $(@($seeded.planted).Count) defects"
     $seedingProblems = @(Get-SeedingProblems $seeded $Selected $avoidFiles)
     $seedingProblems | ForEach-Object { Write-Step "Warning: $_" }
+    }
 
     # 5. the auditors
     $changedTree = @()
@@ -586,10 +650,14 @@ try {
         $scratch = Join-Path $RunDir "scratch\$a"
         New-Item -ItemType Directory -Force $scratch | Out-Null
         $open = @(Get-OpenFindings (Join-Path $auditTree 'Audit\Findings') $a $auditedTaskPaths)
+        if ($ReauditOnly -and -not $open.Count) { Write-Step "$a skipped: no open findings to re-audit"; continue }
         $reaudit = if ($open.Count) { "Re-audit these open findings by running each reproduction:`n" + ($open -join "`n") } else { 'There are no findings to re-audit.' }
         $logsLine = if ($a -eq 'process') { " The factory's log folder is $logs; the previous scorecard's date is $($since.ToString('yyyy-MM-dd'))." } else { '' }
-        $prompt = "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. Do every step of your method in full and report its method counts; the re-audits below come on top of it, never instead. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block."
-        $exit = Invoke-Agent "audit-$a" $Models[$a] $prompt $plantedTree (Join-Path $RunDir "reports\$a.md")
+        $prompt = if ($ReauditOnly) { Get-ReauditOnlyPrompt $plantedTree $auditedCommit $fingerprint $logsLine $scratch $open $Method[$a] }
+        else { "Audit the tree at $plantedTree (commit $auditedCommit; auditor fingerprint $fingerprint).$logsLine Your temporary folder is $scratch. Do every step of your method in full and report its method counts; the re-audits below come on top of it, never instead. $reaudit Follow Audit/Instructions/Auditor-Rules.md and Audit/Instructions/$($Method[$a]).md in that tree, and end with exactly one json report block." }
+        $replyPath = Join-Path $RunDir "reports\$a.md"
+        $exit = Invoke-Agent "audit-$a" $Models[$a] $prompt $plantedTree $(if ($ReauditOnly) { Join-Path $RunDir "reports\$a.full.md" } else { $replyPath })
+        if ($ReauditOnly) { [IO.File]::WriteAllText($replyPath, (Remove-ReportFindings ([IO.File]::ReadAllText((Join-Path $RunDir "reports\$a.full.md")))), $Utf8) }
         $dirty = @(Invoke-Git @('-C', $plantedTree, 'status', '--porcelain') | Where-Object { $_ })
         if ($dirty.Count) {
             $changedTree += $a
@@ -618,14 +686,14 @@ try {
 
     # 7. commit, push, pull request
     Invoke-Git @('-C', $auditTree, 'add', '-A', '--', 'Audit/Findings', 'Audit/Scorecards') | Out-Null
-    Invoke-Git @('-C', $auditTree, '-c', 'user.name=Audit runner', '-c', 'user.email=audit-runner@example.invalid', 'commit', '-q', '-m', "audit: scorecard $Stamp", '-m', "$findingsLine. Audited $auditedCommit; auditors $($Selected -join ', '); seed $Seed.$(if ($seedingProblems.Count) { ' ' + ($seedingProblems -join ' ') })") | Out-Null
+    Invoke-Git @('-C', $auditTree, '-c', 'user.name=Audit runner', '-c', 'user.email=audit-runner@example.invalid', 'commit', '-q', '-m', "audit: $(if ($ReauditOnly) { 're-audit' } else { 'scorecard' }) $Stamp", '-m', "$findingsLine. Audited $auditedCommit; auditors $($Selected -join ', '); $(if ($ReauditOnly) { 're-audit only, nothing planted' } else { "seed $Seed" }).$(if ($seedingProblems.Count) { ' ' + ($seedingProblems -join ' ') })") | Out-Null
     Invoke-Git @('-C', $auditTree, 'push', '-q', 'origin', 'audit') | Out-Null
     $openPr = "$(& gh pr list --head audit --base master --state open --json url --jq '.[0].url' 2>$null)".Trim()
     if (-not $openPr) {
         $table = ((Get-Content -LiteralPath $scorecard -Raw) -split '## Process')[0]
         $body = Join-Path $RunDir 'pr-body.md'
         [IO.File]::WriteAllText($body, "Audit $Stamp of ``$auditedCommit`` ($Ref).`n`n$table`nAn interactive session merges this once CI is green on all three platforms (Stewart's standing exception, 2026-09-30); this runner never merges it. Stewart accepts or rejects each finding (Audit/Triage.md).`n", $Utf8)
-        $openPr = "$(& gh pr create --base master --head audit --title "Audit $Stamp" --body-file $body 2>&1)".Trim()
+        $openPr = "$(& gh pr create --base master --head audit --title "$(if ($ReauditOnly) { 'Re-audit' } else { 'Audit' }) $Stamp" --body-file $body 2>&1)".Trim()
     }
     Write-Step "pull request $openPr"
     Set-Caption 'done, read'
