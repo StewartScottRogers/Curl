@@ -30,3 +30,4 @@ BL-3531's run (2026-10-26) ran `Record-CurlExchange.ps1 -Port <n> -Response 'HTT
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 437073dc 3e4a4efe.
