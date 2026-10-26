@@ -16,6 +16,10 @@ namespace Curl.Authentication;
 /// </param>
 /// <param name="algorithm">The algorithm it names; MD5 when absent.</param>
 /// <param name="userHash"><see langword="true" /> when <c>userhash</c> is <c>true</c>, in any case.</param>
+/// <param name="sendsUtf8Charset">
+/// <see langword="true" /> when the answer ends <c>charset=utf-8</c>, as SSPI's does for a
+/// <c>charset=UTF-8</c> challenge (<see cref="DigestSspiChallenge" />).
+/// </param>
 internal sealed class DigestChallenge(
     string? realm,
     string nonce,
@@ -23,7 +27,8 @@ internal sealed class DigestChallenge(
     string? qop,
     string? algorithmName,
     DigestAlgorithm algorithm,
-    bool userHash)
+    bool userHash,
+    bool sendsUtf8Charset = false)
 {
     private const string Scheme = "Digest";
 
@@ -48,6 +53,9 @@ internal sealed class DigestChallenge(
     /// <summary>Gets whether the user name is sent hashed.</summary>
     internal bool UserHash { get; } = userHash;
 
+    /// <summary>Gets whether the answer ends <c>charset=utf-8</c>.</summary>
+    internal bool SendsUtf8Charset { get; } = sendsUtf8Charset;
+
     /// <summary>
     /// Reads the first Digest challenge among the header values, as curl does: each value
     /// is split at every comma, blanks after a comma are skipped, and an element that
@@ -63,6 +71,24 @@ internal sealed class DigestChallenge(
     /// </returns>
     internal static DigestChallenge? ReadFirst(IReadOnlyList<string> challenges)
     {
+        _ = TryReadFirst(challenges, DigestChallengeParameters.Read, out DigestChallenge? found);
+        return found;
+    }
+
+    /// <summary>
+    /// Finds the first Digest challenge among the header values as
+    /// <see cref="ReadFirst(IReadOnlyList{string})" /> does, and reads its parameters with
+    /// <paramref name="readParameters" />.
+    /// </summary>
+    /// <param name="challenges">The header values, verbatim and in the order received.</param>
+    /// <param name="readParameters">
+    /// Reads the parameters from the header value and the index just after <c>Digest</c>;
+    /// <see langword="null" /> when they are refused.
+    /// </param>
+    /// <param name="found">What <paramref name="readParameters" /> read; <see langword="null" /> when it refused it or there is none.</param>
+    /// <returns><see langword="true" /> when there is a Digest challenge.</returns>
+    internal static bool TryReadFirst(IReadOnlyList<string> challenges, Func<string, int, DigestChallenge?> readParameters, out DigestChallenge? found)
+    {
         foreach (string challenge in challenges)
         {
             int start = DigestChallengeParameters.SkipBlanks(challenge, 0);
@@ -70,14 +96,16 @@ internal sealed class DigestChallenge(
             {
                 if (IsDigestAt(challenge, start))
                 {
-                    return DigestChallengeParameters.Read(challenge, start + Scheme.Length);
+                    found = readParameters(challenge, start + Scheme.Length);
+                    return true;
                 }
 
                 start = NextElement(challenge, start);
             }
         }
 
-        return null;
+        found = null;
+        return false;
     }
 
     // The start of the element after the next comma, blanks skipped; -1 when there is none.

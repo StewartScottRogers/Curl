@@ -10,8 +10,9 @@ namespace Curl.Authentication;
 /// builds in its own Digest code, the one the OpenSSL build uses (ADR-0025), or laid out as its
 /// Schannel build's SSPI lays it out (<c>matchesSspiBuild</c>): MD5, SHA-256
 /// and SHA-512-256, their <c>-sess</c> variants, <c>qop=auth</c> and <c>auth-int</c>, and
-/// <c>userhash</c>. Matching the Schannel build, a SHA-256 or SHA-512-256 challenge fails
-/// with exit 94, as SSPI answers only MD5 and MD5-sess (ADR-0791).
+/// <c>userhash</c>. Matching the Schannel build, the challenge is read as SSPI reads it
+/// (<see cref="DigestSspiChallenge" />) and one SSPI refuses, such as a SHA-256 or SHA-512-256
+/// one, fails with exit 94 (ADR-0791, BL-3606).
 /// </summary>
 /// <param name="credentialEncoding">
 /// The encoding the user name and password are hashed and sent in; see
@@ -48,33 +49,77 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
 
     private const uint FirstNonceCount = 1;
 
+    private const string LoginDeniedMessage = "Login denied";
+
     /// <inheritdoc />
     /// <exception cref="HttpAuthenticationFailedException">
-    /// <c>matchesSspiBuild</c> is set and the challenge names a SHA-256 or SHA-512-256
-    /// algorithm, which SSPI does not answer: exit 94, as curl's Schannel build (ADR-0791).
+    /// <c>matchesSspiBuild</c> is set and SSPI refuses the challenge (<see cref="DigestSspiChallenge" />)
+    /// or a user name with a control character: exit 94; or the user name is empty: exit 67,
+    /// "Login denied", as curl's Schannel build (ADR-0791, BL-3606).
     /// </exception>
     public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(challenges);
 
-        return (request.AllowedSchemes & HttpAuthSchemes.Digest) != 0
-            && request.Credential is { } credential
-            && DigestChallenge.ReadFirst(challenges) is { } challenge
-                ? CreateFirstAnswer(challenge, credential, request)
+        if ((request.AllowedSchemes & HttpAuthSchemes.Digest) == 0 || request.Credential is not { } credential)
+        {
+            return null;
+        }
+
+        return matchesSspiBuild
+            ? CreateSspiAnswer(challenges, credential, request)
+            : DigestChallenge.ReadFirst(challenges) is { } challenge
+                ? CreateFirstAnswer(challenge, credential.UserName, challenge.Realm, credential, request)
                 : null;
     }
 
-    private string CreateFirstAnswer(DigestChallenge challenge, NetworkCredential credential, HttpAuthRequest request)
+    // The Schannel build's answer: the user name's domain, when it has one, is the realm.
+    private string? CreateSspiAnswer(IReadOnlyList<string> challenges, NetworkCredential credential, HttpAuthRequest request)
     {
-        if (matchesSspiBuild && !challenge.Algorithm.IsAnsweredBySspi)
+        if (!DigestChallenge.TryReadFirst(challenges, DigestSspiChallenge.Read, out DigestChallenge? challenge))
         {
-            log.Failed(SchemeName, CurlExitCode.AuthError, NtlmHttpAuthenticator.AuthErrorMessage);
-            throw new HttpAuthenticationFailedException(CurlExitCode.AuthError, NtlmHttpAuthenticator.AuthErrorMessage);
+            return null;
         }
 
+        return challenge is null
+            ? throw Refuse(CurlExitCode.AuthError, NtlmHttpAuthenticator.AuthErrorMessage)
+            : CreateSspiAnswer(challenge, credential, request);
+    }
+
+    // SSPI refuses an empty user name (exit 67) and one with a control character (exit 94).
+    private string CreateSspiAnswer(DigestChallenge challenge, NetworkCredential credential, HttpAuthRequest request)
+    {
+        (string user, string? domain) = SplitSspiUser(credential.UserName);
+        if (credential.UserName.Length == 0)
+        {
+            throw Refuse(CurlExitCode.LoginDenied, LoginDeniedMessage);
+        }
+
+        return user.AsSpan().IndexOfAnyInRange('\0', '\u001f') >= 0
+            ? throw Refuse(CurlExitCode.AuthError, NtlmHttpAuthenticator.AuthErrorMessage)
+            : CreateFirstAnswer(challenge, user, domain is null ? challenge.Realm : ToByteString(domain), credential, request);
+    }
+
+    private HttpAuthenticationFailedException Refuse(CurlExitCode exitCode, string message)
+    {
+        log.Failed(SchemeName, exitCode, message);
+        return new HttpAuthenticationFailedException(exitCode, message);
+    }
+
+    // Curl_create_sspi_identity: the domain is what comes before the first backslash, or
+    // else the first slash; an empty one is no domain.
+    private static (string User, string? Domain) SplitSspiUser(string userName)
+    {
+        int separator = userName.IndexOf('\\');
+        separator = separator < 0 ? userName.IndexOf('/') : separator;
+        return (userName[(separator + 1)..], separator > 0 ? userName[..separator] : null);
+    }
+
+    private string CreateFirstAnswer(DigestChallenge challenge, string userName, string? realm, NetworkCredential credential, HttpAuthRequest request)
+    {
         log.DigestParametersChosen(challenge.AlgorithmName, challenge.Qop);
-        return SchemeName + " " + CreateResponse(challenge, credential, request, createClientNonce(), FirstNonceCount);
+        return SchemeName + " " + CreateResponse(challenge, userName, realm, credential.Password, request, createClientNonce(), FirstNonceCount);
     }
 
     /// <summary>
@@ -94,9 +139,13 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(sentAuthorization);
 
-        return request.Credential is { } credential && ReadSentAnswer(sentAuthorization) is { } sent
-            ? SchemeName + " " + CreateResponse(sent.Challenge, credential, request, sent.ClientNonce, sent.NonceCount + 1)
-            : sentAuthorization;
+        if (request.Credential is not { } credential || ReadSentAnswer(sentAuthorization) is not { } sent)
+        {
+            return sentAuthorization;
+        }
+
+        string userName = matchesSspiBuild ? SplitSspiUser(credential.UserName).User : credential.UserName;
+        return SchemeName + " " + CreateResponse(sent.Challenge, userName, sent.Challenge.Realm, credential.Password, request, sent.ClientNonce, sent.NonceCount + 1);
     }
 
     // What counting a sent answer on needs: its challenge's parameters, cnonce and nc.
@@ -118,14 +167,15 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
     private static string? ValueOf(IReadOnlyList<KeyValuePair<string, string>> pairs, string key) =>
         pairs.Where(pair => pair.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Select(pair => pair.Value).LastOrDefault();
 
-    private string CreateResponse(DigestChallenge challenge, NetworkCredential credential, HttpAuthRequest request, string clientNonce, uint nonceCountValue)
+    // The realm is the challenge's, or the SSPI user name's domain; no realm hashes as empty.
+    private string CreateResponse(DigestChallenge challenge, string userName, string? challengeRealm, string password, HttpAuthRequest request, string clientNonce, uint nonceCountValue)
     {
         DigestAlgorithm algorithm = challenge.Algorithm;
-        string user = ToByteString(credential.UserName);
-        string realm = challenge.Realm ?? string.Empty;
+        string realm = challengeRealm ?? string.Empty;
+        string user = ToByteString(userName);
         string nonceCount = nonceCountValue.ToString("x8", CultureInfo.InvariantCulture);
 
-        string ha1 = algorithm.HashToHex(user + ":" + realm + ":" + ToByteString(credential.Password));
+        string ha1 = algorithm.HashToHex(user + ":" + realm + ":" + ToByteString(password));
         ha1 = algorithm.IsSession ? algorithm.HashToHex(ha1 + ":" + challenge.Nonce + ":" + clientNonce) : ha1;
         string a2 = request.Method + ":" + request.RequestTarget;
         a2 += challenge.Qop == "auth-int" ? ":" + algorithm.HashToHex(string.Empty) : string.Empty;
@@ -142,20 +192,22 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
             : FormatOwnValue(challenge, uri, username, realm, clientNonce, nonceCount, response);
 
     // The order SSPI writes, measured from curl 8.21.0's Schannel build (BL-2022): no blank
-    // after a comma, algorithm before the response, qop quoted after it, and opaque last.
+    // after a comma, algorithm before the response, qop quoted after it, then opaque and
+    // charset. Only the user name and realm are escaped; the nonce, uri and opaque are sent
+    // as they are (BL-3606).
     private static string FormatSspiValue(DigestChallenge challenge, string uri, string username, string realm, string clientNonce, string nonceCount, string response)
     {
         StringBuilder value = new();
-        value.Append("username=\"").Append(DigestQuoting.Quote(username));
-        value.Append("\",realm=\"").Append(DigestQuoting.Quote(realm));
-        value.Append("\",nonce=\"").Append(DigestQuoting.Quote(challenge.Nonce));
-        value.Append("\",uri=\"").Append(DigestQuoting.Quote(uri)).Append("\",");
+        value.Append("username=\"").Append(DigestQuoting.QuoteAsSspi(username));
+        value.Append("\",realm=\"").Append(DigestQuoting.QuoteAsSspi(realm));
+        value.Append("\",nonce=\"").Append(challenge.Nonce);
+        value.Append("\",uri=\"").Append(uri).Append("\",");
         value.Append(challenge.Qop is null ? string.Empty : $"cnonce=\"{clientNonce}\",nc={nonceCount},");
         value.Append(challenge.AlgorithmName is null ? string.Empty : "algorithm=" + challenge.AlgorithmName + ",");
         value.Append("response=\"").Append(response).Append('"');
         value.Append(challenge.Qop is null ? string.Empty : $",qop=\"{challenge.Qop}\"");
-        value.Append(challenge.Opaque is null ? string.Empty : ",opaque=\"" + DigestQuoting.Quote(challenge.Opaque) + "\"");
-        value.Append(challenge.UserHash ? ",userhash=true" : string.Empty);
+        value.Append(challenge.Opaque is null ? string.Empty : ",opaque=\"" + challenge.Opaque + "\"");
+        value.Append(challenge.SendsUtf8Charset ? ",charset=utf-8" : string.Empty);
         return value.ToString();
     }
 
