@@ -35,3 +35,4 @@ Split from BL-3544 (CGR-015 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 ## Log
 
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: d0c40f12 a9b9a7ee f4912012 326de9ca.
