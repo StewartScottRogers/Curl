@@ -35,3 +35,4 @@ Today they use `Encoding.UTF8.GetBytes` (`CommandLineOptions.AppendPostData` aro
 ## Log
 
 - 2026-10-26: Created by BL-3544's run, which split CGR-015 by library.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: c9d5bfe4 a9b9a7ee f4912012 326de9ca.
