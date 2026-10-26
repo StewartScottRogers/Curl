@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/NoProxyMatcher.cs, Curl.Core.UnitTests/Cgr009Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3538 — Fix CGR-009: An empty dotted label in no_proxy / NO_PROXY / --noproxy (e.g. .1, .0.0.1, foo,.x) crashes the port with exit 2 when the URL host is an I...
 
@@ -76,17 +76,29 @@ http_proxy=http://127.0.0.1:21211 no_proxy=.0.0.1 ~/curlnet/curl -s http://127.0
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr009Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Delivered directly rather than through the full `/feature` stages: the fix is one guard in `NoProxyMatcher.TryParseOctet`, which now requires `digits.Length is > 0 and <= 3`, so an empty label from `Split('.')` is "not an IPv4 address" (curl's `inet_pton` fails the same text) instead of reading `digits[0]` of an empty span. No ADR: nothing was decided beyond matching curl.
+- `Curl.Core.UnitTests/Cgr009Tests.cs` (`.1`, `.0.0.1`, `foo,.x`, `127..0.1`, `127.0.0.`, `.0.0.1/8` against host `127.0.0.1`): 6 of 6 failed with `IndexOutOfRangeException` with the guard reverted, 6 of 6 pass with it.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1` (server on 18931 answering `200 ok`), REF = curl 8.18.0 (WinGet; System32 is 8.21.0), PORT = this build:
+  - `curl -s --noproxy .1 http://127.0.0.1:18931/echo`: both exit 0, stdout `ok`, stderr empty, request `GET /echo` direct.
+  - `curl -s --noproxy foo,.x http://127.0.0.1:18931/echo`: same as above in both.
+  - `no_proxy=.1 curl -s http://127.0.0.1:18931/echo`: same as above in both.
+  - `http_proxy=http://127.0.0.1:18931 no_proxy=.0.0.1 curl -s http://127.0.0.1:18999/echo`: both exit 0, stdout `ok`, stderr empty, request `GET http://127.0.0.1:18999/echo` through the proxy with `Proxy-Connection: Keep-Alive`.
+  - Request bytes differ only in the `User-Agent` version (8.18.0 against 8.22.0), which the report's section 1 normalises. Neither wrote any files.
+- The variant that already matched (`--noproxy .1` with a `localhost` URL) goes through the host-name path, which the change does not touch; `NoProxyMatcherTests` still pass.
+- The Linux repros use the same code path; the change and test are platform-neutral, and CI runs the fast tests on Linux and macOS.
+- `dotnet build` clean; fast tests green (no failures). `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-009 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. An empty dotted label in no_proxy/--noproxy no longer crashes with exit 2 on an IPv4 host; the entry does not match, as in curl
