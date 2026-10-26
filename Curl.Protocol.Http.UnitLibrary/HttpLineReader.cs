@@ -15,9 +15,14 @@ internal sealed class HttpLineReader(IConnection connection)
     /// </summary>
     internal const int MaximumLineLength = 102400;
 
-    private const int InitialBufferSize = 16384;
+    /// <summary>
+    /// The size of the first read, as large as curl 8.22.0's receive buffer, so the bytes after a
+    /// short body arrive in the read that ends its head, as curl's <c>Excess found</c> count shows
+    /// (measured, BL-3530 Notes).
+    /// </summary>
+    private const int InitialBufferSize = MaximumLineLength;
 
-    private byte[] buffer = new byte[InitialBufferSize];
+    private readonly byte[] buffer = new byte[InitialBufferSize];
 
     private int start;
 
@@ -158,18 +163,13 @@ internal sealed class HttpLineReader(IConnection connection)
 
     /// <summary>
     /// Leaves room after <see cref="end" /> for the next read: moves the unread bytes to the
-    /// front when earlier lines were taken, or doubles the buffer when a line fills it.
+    /// front when earlier lines were taken. The buffer never needs to grow: it is
+    /// <see cref="MaximumLineLength" /> long, so a line that fills it is refused first.
     /// </summary>
     private void MakeRoom()
     {
         if (end < buffer.Length)
         {
-            return;
-        }
-
-        if (start == 0)
-        {
-            Array.Resize(ref buffer, buffer.Length * 2);
             return;
         }
 

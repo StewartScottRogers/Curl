@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Curl.Protocol.Abstractions;
 
@@ -121,6 +122,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
     /// not chunked read until the peer closes, as <c>--ignore-content-length</c> asks.
     /// </summary>
     internal bool IgnoresContentLength { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether bytes followed the body in the read that ended it - past a
+    /// Content-Length, or any bytes after the head of a 204 or 304 - so the connection cannot carry
+    /// another request: curl 8.22.0 prints <c>Excess found writing body</c> and shuts the
+    /// connection down rather than read those bytes as the next response (CGR-001, BL-3530 Notes).
+    /// </summary>
+    internal bool FoundExcess { get; private set; }
 
     /// <summary>
     /// Gets the Content-Length of the body being read, once reading has started and the body
@@ -300,6 +309,7 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         if (!HasBody(head, noBody))
         {
             ReportUnreadBody(head, noBody);
+            ReportBytesAfterBodilessHead(head, noBody);
             return;
         }
 
@@ -360,8 +370,9 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
         long remaining = contentLength ?? long.MaxValue;
         ReadOnlyMemory<byte> prefix = bodyPrefix[..(int)Math.Min(bodyPrefix.Length, remaining)];
-        ReportReceived(prefix);
+        ReportReceived(bodyPrefix);
         remaining -= await WriteAsync(output, prefix, cancellationToken).ConfigureAwait(false);
+        ReportExcess(bodyPrefix.Length - prefix.Length);
 
         byte[] buffer = new byte[ReceiveSize];
         while (remaining > 0)
@@ -508,6 +519,34 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         if (!leftovers.IsEmpty)
         {
             Events.ReportInfo(HttpConnectionInfoLines.LeftoversAfterChunking(leftovers.Length));
+        }
+    }
+
+    /// <summary>
+    /// Reports the bytes read along with the head of a 204 or 304 as received and as excess
+    /// (<see cref="ReportExcess" />), as curl 8.22.0 does; nothing for <c>-I</c>, whose body is
+    /// left unread (measured, BL-3530 Notes).
+    /// </summary>
+    private void ReportBytesAfterBodilessHead(HttpResponseHead head, bool noBody)
+    {
+        ReadOnlyMemory<byte> excess = noBody ? default : head.BodyPrefix;
+        ReportReceived(excess);
+        ReportExcess(excess.Length);
+    }
+
+    /// <summary>
+    /// Reports curl 8.22.0's <c>Excess found writing body</c> line and sets
+    /// <see cref="FoundExcess" /> when <paramref name="excess" /> bytes followed the body in the read
+    /// that completed it; does nothing when there are none (measured, BL-3530 Notes).
+    /// </summary>
+    private void ReportExcess(int excess)
+    {
+        if (excess > 0)
+        {
+            FoundExcess = true;
+            Events.ReportInfo(string.Create(
+                CultureInfo.InvariantCulture,
+                $"Excess found writing body: excess = {excess}, size = {BytesWritten}, maxdownload = {BytesWritten}, bytecount = {BytesWritten}"));
         }
     }
 

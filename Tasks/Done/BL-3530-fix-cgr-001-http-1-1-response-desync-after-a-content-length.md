@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Protocol.Http.UnitTests/Cgr001Tests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitLibrary/HttpResponseBodyReader.cs, Curl.Protocol.Http.UnitTests/Cgr001Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpLineReader.cs, Curl.Protocol.Http.UnitTests/HttpLineReaderTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3530 — Fix CGR-001: HTTP/1.1 response desync: after a Content-Length body followed by extra bytes, PORT keeps the connection and returns the stale bytes as t...
 
@@ -90,17 +90,27 @@ curl -s -w '[%{num_connects}]' "$H/raw?keep=1&b=$(b64 'HTTP/1.1 200 OK\r\nConten
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr001Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Fix: `HttpResponseBodyReader` reports bytes read past a Content-Length body, or after the head of a 204/304 (not for -I), as one data event and curl's `Excess found writing body: excess = N, size = S, maxdownload = S, bytecount = S` line, and sets `FoundExcess`; `HttpProtocolHandler.KeepsAlive` then does not keep an HTTP/1.x connection, so -v says `shutting down connection #0` and the next URL opens a new connection.
+- `HttpLineReader` first read raised from 16384 to 102400 (MaximumLineLength): curl 8.22.0 counts excess = 16386 for HR-1, so its read held the whole rest; with 16 KiB Curl counted 16344. The doubling branch became unreachable (a line filling the buffer is refused first) and was removed. Added HttpLineReader.cs and HttpLineReaderTests.cs to touches for this; no task in Doing on origin/work/dark-factory named them. Design choice taken under the delegation, recorded here (small, follows measured curl; no ADR needed).
+- Measured 2026-10-26 with Record-CurlExchange.ps1 (-HoldOpenMilliseconds 2000 -AnswerHeldRequests 1 -Connections 2), REF = curl 8.22.0 mingw Schannel, PORT = Curl.Console after the fix; request bytes identical apart from the port:
+  - HR-1 `-v URL1 URL2` (16K padding): REF and PORT exit 0, stdout `heGOOD`, `{ [16388 bytes data]`, `* Excess found writing body: excess = 16386, size = 2, maxdownload = 2, bytecount = 2`, `* shutting down connection #0`, `* Connection #1 ... left intact`. Before the fix PORT printed no Excess line and reused the connection.
+  - HR-1 64K padding `-s -S -v`: both exit 0, stdout `heGOOD`, excess = 65538.
+  - HR-2 keep_two_bigcl `-s -S -w "%{num_connects}\n"`: both `he1\nhe1\n`. 204 case `-w "%{num_connects} %{http_code}\n"`: both `1 204\n1 204\n`, `{ [45 bytes data]` and excess = 45, size = 0 per URL.
+  - NR-8 `-s -w "[%{num_connects}]"` (CL 2 + abcdef, then a 5-byte reply): both `ab[1]aaaaa[1]`.
+- Focused tests in Cgr001Tests.cs: the two excess tests failed with the excess report disabled and pass with it. Fast tests green. Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: first run found CopyAsync complexity 12 (fixed by extracting ReportBytesAfterBodilessHead) and MakeRoom's uncovered branches (compaction now covered by a new HttpLineReader test; dead doubling branch removed); the final change was not re-measured for budget. Platform check: tests use loopback-free scripted connections and no paths, so they are platform-neutral; CI on Linux/macOS is left to the shift's CI watch.
+
 ## Log
 
 - 2026-10-26: Created from CGR-001 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Bytes past a Content-Length body (or after a 204/304 head) print curl's Excess found line and close the connection instead of becoming the next response

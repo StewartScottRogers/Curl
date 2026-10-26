@@ -1364,7 +1364,7 @@ public sealed class HttpProtocolHandler(
         ReportTransferDone(requestStream, connect);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection), body.FoundExcess))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
             UpgradedSession = UpgradedSessionOf(connection),
@@ -2173,10 +2173,10 @@ public sealed class HttpProtocolHandler(
     /// carries another request once the exchange ran whole unless the peer sent GOAWAY or
     /// closed it (<see cref="IHttpStreamSession.AcceptsNewStreams" />).
     /// </remarks>
-    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
+    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams, bool foundExcess) =>
         DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
-                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options)));
+                ?? (!foundExcess && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options))));
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it

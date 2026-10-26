@@ -42,6 +42,20 @@ public sealed class HttpLineReaderTests
     }
 
     [TestMethod]
+    public async Task ReadLineAsync_LineRunningPastAFullBufferAfterATakenLine_MovesItToTheFrontAndReturnsItWhole()
+    {
+        string first = new('a', 100000);
+        string second = new('b', 10000);
+        HttpLineReader reader = new(new ScriptedConnection(Encoding.ASCII.GetBytes($"{first}\r\n{second}\r\n"), 102400));
+
+        byte[]? firstLine = await reader.ReadLineAsync(false, CancellationToken.None);
+        byte[]? secondLine = await reader.ReadLineAsync(false, CancellationToken.None);
+
+        Assert.AreEqual(first + "\r\n", Encoding.ASCII.GetString(firstLine!));
+        Assert.AreEqual(second + "\r\n", Encoding.ASCII.GetString(secondLine!));
+    }
+
+    [TestMethod]
     [DataRow(false, 1, DisplayName = "Any line, 1-byte reads")]
     [DataRow(false, 65536, DisplayName = "Any line, one read")]
     [DataRow(true, 65536, DisplayName = "Status line, one read")]
