@@ -1,0 +1,81 @@
+---
+id: BL-3613
+title: Fix CGR-084: %{num_connects} is 0 after a refused CONNECT (403/407) or a failed SOCKS handshake; curl reports 1
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitTests/Cgr084Tests.cs]
+requirement: none
+created: 2026-10-26
+completed:
+---
+# BL-3613 — Fix CGR-084: %{num_connects} is 0 after a refused CONNECT (403/407) or a failed SOCKS handshake; curl reports 1
+
+## Goal
+
+Curl behaves as curl 8.22.0 does for every repro in third-party gap report issue CGR-084 (severity Medium): same exit code, stdout bytes, stderr text, files written and bytes on the wire.
+
+## Context
+
+From the third-party functional review `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (2026-10-25, Curl master at b0d27d68 against curl 8.22.0 Schannel on Windows and curl 8.18.0 OpenSSL on Linux). Its section 1 explains the method, the normalisations and the names `REF`, `PORT`, `SCR` and `EV`. The `SCR` evidence folder was a temporary scratchpad and may be gone; every issue states the server behaviour it needs, so rebuild the repro with `Record-CurlExchange.ps1` or a C# file-based server (no Python, CLAUDE.md). Line numbers are at b0d27d68 and may have moved. Measure real curl before pinning output text.
+
+The issue as the report gives it:
+
+#### CGR-084: %{num_connects} is 0 after a refused CONNECT (403/407) or a failed SOCKS handshake; curl reports 1
+
+- **Severity:** Medium
+- **Area:** proxy-connect
+- **Platform(s):** Both (Windows and Linux)
+- **Confidence:** Confirmed
+- **Related existing finding (GF/AF):** none
+- **Source findings:** `proxy-connect PC-06`
+
+**Reproduction**
+
+- *Setup (proxy-connect):* EV = `SCR\evidence\proxy-connect`. Scripted recording server: `EV\srv\out\srv.exe <port> <log> '<script for conn 1>' ['<script for conn 2>' ...]` (Linux `EV/srv/outlinux/srv`); steps are `;`-separated: `H` read a request head, `HN` read a head and answer nothing yet, `OK`/`CE`/`403`/`403B`/`407B` canned replies, `W:<bytes>` write literal bytes, `S4`/`S5G`/`S5U`/`S5R` read SOCKS messages, `E` record raw bytes until EOF. In repros `srv` means this binary. Harnesses `EV\harness.ps1` and `EV\lharness.sh`; verifier `EV\v_win*.ps1`, `EV\v_linux.sh`, `EV\v_l3.sh`.
+- *(CONNECT):* run `srv 20600 log 'HN;407B'`, then `curl -s -o NUL -w "%{http_connect} %{num_connects}\n" -p -x http://127.0.0.1:20600 http://example.test/`.
+- *(SOCKS5):* run with script `S5G;S5NONE`, then `curl -s -o NUL -w "%{num_connects} %{http_code} %{http_connect}\n" -x socks5://127.0.0.1:20600 http://127.0.0.1:8080/x`.
+
+Commands (run each with REF and with PORT):
+
+```sh
+srv 20600 log 'HN;407B'
+curl -s -o NUL -w "%{http_connect} %{num_connects}\n" -p -x http://127.0.0.1:20600 http://example.test/
+curl -s -o NUL -w "%{num_connects} %{http_code} %{http_connect}\n" -x socks5://127.0.0.1:20600 http://127.0.0.1:8080/x
+```
+
+**Expected (real curl)**
+
+- prints `407 1` and `1 000 000`.
+
+**Actual (Curl)**
+
+- prints `407 0` and `0 000 000`.
+
+**Notes**
+
+- *Verifier cases:* v11, v12, VL09 and VL10.
+
+**Suspected location in source**
+
+- `Curl.Engine.UnitLibrary\ManagedEasyTransfer.Finish.cs:208` (`NumConnectsOf`).
+
+**Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
+
+
+## Acceptance criteria
+
+- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [ ] Repro variants in the issue that already matched curl still match.
+- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+
+## Notes
+
+- Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr084Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
+- If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+## Log
+
+- 2026-10-26: Created from CGR-084 of the third-party gap report.
