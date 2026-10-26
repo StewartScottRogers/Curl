@@ -124,7 +124,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     {
         _sessions = sessions;
         _echConfigs = echConfigs;
-        _options = SchannelAlgorithmList.WithLegacyCredentialRange(options ?? throw new ArgumentNullException(nameof(options)), matchesSchannelBuild);
+        _options = WithSecurityLevelMinimum(
+            SchannelAlgorithmList.WithLegacyCredentialRange(options ?? throw new ArgumentNullException(nameof(options)), matchesSchannelBuild),
+            matchesSchannelBuild);
         _ = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
@@ -154,6 +156,27 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // OpenSSL 3's default security level allows no version below TLS 1.2, so the OpenSSL
     // build has nothing to offer under a lower ceiling (measured, BL-1152, ADR-0364).
     private bool RefusesItsVersionRange => !_matchesSchannelBuild && OffersOnlyVersionsBelowTls12;
+
+    // Under a TLS 1.2 or later ceiling, the same security level raises a --tlsv1.0 or
+    // --tlsv1.1 minimum to TLS 1.2 in the OpenSSL build, unless --ciphers ends at
+    // @SECLEVEL=0: a server speaking only TLS 1.1 then alerts protocol_version (measured
+    // against curl 8.18.0 OpenSSL 3.5.5, BL-3623, ADR-0364).
+    private static TlsClientOptions WithSecurityLevelMinimum(TlsClientOptions options, bool matchesSchannelBuild) =>
+        !matchesSchannelBuild && HasALegacyMinimumUnderAModernCeiling(options) && !LowersSecurityLevelToZero(options.Ciphers)
+            ? options with { MinimumVersion = TlsVersion.Tls12 }
+            : options;
+
+    private static bool HasALegacyMinimumUnderAModernCeiling(TlsClientOptions options) =>
+        options.MinimumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
+        && options.MaximumVersion is not (TlsVersion.Tls10 or TlsVersion.Tls11);
+
+    // OpenSSL applies a cipher string's @SECLEVEL=n commands in turn, so the last one counts.
+    private static bool LowersSecurityLevelToZero(string? ciphers)
+    {
+        const string command = "@SECLEVEL=";
+        var at = ciphers?.LastIndexOf(command, StringComparison.Ordinal) ?? -1;
+        return at >= 0 && ciphers!.AsSpan(at + command.Length).StartsWith("0", StringComparison.Ordinal);
+    }
 
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(

@@ -126,6 +126,8 @@ any security status as `failed to receive handshake`, as curl's did in every mea
 Per ADR-0364 (BL-1152) the hand-built OpenSSL build refuses such a ceiling before any hello, as
 OpenSSL 3's security level does: the trust event, a `protocol_version` alert record
 (`ProtocolVersionAlertRecord`) and exit 35 with `TlsFailureMessages.OpenSslNoProtocolsAvailable`;
+per ADR-0827 (BL-3623) it raises a TLS 1.0 or 1.1 minimum under a later ceiling to TLS 1.2
+(`WithSecurityLevelMinimum`) unless `--ciphers` ends at `@SECLEVEL=0`;
 and below a TLS 1.3 ceiling the Schannel build's hello is in a record of the ceiling's version
 (`ClientHelloProfile.Tls12RecordVersionIsTheCeiling`), OpenSSL's in a TLS 1.0 one.
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in

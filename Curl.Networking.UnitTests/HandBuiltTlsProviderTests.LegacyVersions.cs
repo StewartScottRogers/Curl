@@ -156,12 +156,11 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.HasCount(7, serverReceived);
     }
 
-    // ADR-0360 (BL-1143): --tlsv1.0 or --tlsv1.1 alone reaches a server speaking only that version.
+    // ADR-0360 (BL-1143): --tlsv1.0 or --tlsv1.1 alone reaches a server speaking only that version
+    // in the Schannel build; the OpenSSL build raises the minimum to TLS 1.2 (CGR-094, Cgr094Tests).
     [TestMethod]
     [DataRow(SchannelBuild, TlsVersion.Tls10, TlsProtocolVersion.Tls10)]
-    [DataRow(OpenSslBuild, TlsVersion.Tls10, TlsProtocolVersion.Tls10)]
     [DataRow(SchannelBuild, TlsVersion.Tls11, TlsProtocolVersion.Tls11)]
-    [DataRow(OpenSslBuild, TlsVersion.Tls11, TlsProtocolVersion.Tls11)]
     public async Task AuthenticateAsClientAsync_WithALegacyMinimumAndNoCeiling_CompletesATransferWithAServerSpeakingOnlyIt(
         bool matchesSchannelBuild,
         TlsVersion legacyVersion,
