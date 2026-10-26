@@ -23,8 +23,8 @@ Measured with `Record-CurlExchange.ps1 -Curl wsl.exe` against curl 8.18.0 (OpenS
   surrogate only when the launching process passed ill-formed UTF-16 that no shell produces; every
   `-w` text a Windows shell can pass is written as before. A switch would add a branch the Windows
   test run cannot cover, for a case curl's own Windows build cannot meet in practice.
-- `-w @file` (the file's bytes are still decoded as plain UTF-8, BL-3856) and `%output{}` file names
-  (BL-3857) are left to their own tasks.
+- `-w @file` (the file's bytes are still decoded as plain UTF-8, BL-3862) and `%output{}` file names
+  (BL-3863) are left to their own tasks.
 
 ## Consequences
 

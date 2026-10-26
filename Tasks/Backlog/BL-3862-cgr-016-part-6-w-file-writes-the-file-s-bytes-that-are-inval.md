@@ -1,5 +1,5 @@
 ---
-id: BL-3856
+id: BL-3862
 title: CGR-016 part 6: -w @file writes the file's bytes that are invalid UTF-8 unchanged
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3856 — CGR-016 part 6: -w @file writes the file's bytes that are invalid UTF-8 unchanged
+# BL-3862 — CGR-016 part 6: -w @file writes the file's bytes that are invalid UTF-8 unchanged
 
 ## Goal
 

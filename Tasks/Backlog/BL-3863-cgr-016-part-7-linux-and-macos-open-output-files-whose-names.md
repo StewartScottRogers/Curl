@@ -1,5 +1,5 @@
 ---
-id: BL-3857
+id: BL-3863
 title: CGR-016 part 7: Linux and macOS open %output{} files whose names hold invalid UTF-8 under their raw bytes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3857 — CGR-016 part 7: Linux and macOS open %output{} files whose names hold invalid UTF-8 under their raw bytes
+# BL-3863 — CGR-016 part 7: Linux and macOS open %output{} files whose names hold invalid UTF-8 under their raw bytes
 
 ## Goal
 
