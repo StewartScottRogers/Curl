@@ -11,7 +11,7 @@ namespace Curl.Protocol.Smtp;
 /// Where <c>-v</c> and <c>--trace</c> learn of each command sent, as a request header, each
 /// line read, as a response header, and each piece of the message, as data sent.
 /// </param>
-/// <param name="cancellationToken">Cancels every send and read.</param>
+/// <param name="cancellationToken">Cancels every send and read, until <see cref="CancellationToken" /> is set.</param>
 /// <param name="diagnosticLog">
 /// Where each command sent and each complete reply's code are logged at <c>verbose</c>
 /// (ADR-0222), a command as its sender says it may be logged.
@@ -93,6 +93,12 @@ internal sealed class SmtpControlChannel(
     /// </summary>
     /// <param name="secured">The upgraded connection; the caller owns it.</param>
     public void SwitchTo(IConnection secured) => connection = secured;
+
+    /// <summary>
+    /// Gets or sets the token that cancels every send and read: the connect phase's while the
+    /// session opens, so <c>--connect-timeout</c> bounds the greeting and the login (BL-3532).
+    /// </summary>
+    public CancellationToken CancellationToken { get; set; } = cancellationToken;
 
     /// <summary>
     /// Sends <paramref name="command" /> followed by CRLF.
@@ -237,8 +243,8 @@ internal sealed class SmtpControlChannel(
     {
         try
         {
-            await connection.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-            await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            await connection.WriteAsync(bytes, CancellationToken).ConfigureAwait(false);
+            await connection.FlushAsync(CancellationToken).ConfigureAwait(false);
         }
         catch (IOException failure)
         {
@@ -277,7 +283,7 @@ internal sealed class SmtpControlChannel(
                 reporting.ReportResponseHeader(bytes);
                 if (dumping is { } dump)
                 {
-                    await dump.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+                    await dump.WriteAsync(bytes, CancellationToken).ConfigureAwait(false);
                 }
 
                 return Encoding.Latin1.GetString(bytes, 0, bytes.Length - 1);
@@ -292,7 +298,7 @@ internal sealed class SmtpControlChannel(
         bufferStart = 0;
         try
         {
-            bufferEnd = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            bufferEnd = await connection.ReadAsync(buffer, CancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {

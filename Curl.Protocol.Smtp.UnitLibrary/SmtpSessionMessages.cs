@@ -90,4 +90,13 @@ internal static class SmtpSessionMessages
     /// <summary><c>--ssl-reqd</c> and <c>STARTTLS</c> was answered with something other than 220 (exit 64).</summary>
     internal static string StartTlsDenied(int code) =>
         string.Create(CultureInfo.InvariantCulture, $"STARTTLS denied, code {code}");
+
+    /// <summary>
+    /// <c>--connect-timeout</c> passed before the session was open (exit 28), curl 8.22.0's text,
+    /// <paramref name="milliseconds" /> counted from the start of the request (BL-3532).
+    /// </summary>
+    /// <param name="milliseconds">The time since the request started.</param>
+    /// <returns>The message.</returns>
+    internal static string OperationTimedOut(long milliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
 }

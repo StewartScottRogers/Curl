@@ -50,7 +50,8 @@ internal sealed class SmtpSession(
     bool implicitTls,
     SmtpCommandLineText commandLineText,
     ConnectionOpenedEvent? opened,
-    SmtpKeptConnection kept) : IAsyncDisposable
+    SmtpKeptConnection kept,
+    SmtpConnectPhaseLimit connectPhase) : IAsyncDisposable
 {
     private const int StartTlsAccepted = 220;
 
@@ -154,7 +155,7 @@ internal sealed class SmtpSession(
             return null;
         }
 
-        TransferResult? failure = await OpenAsync().ConfigureAwait(false) ?? await AuthenticateAsync().ConfigureAwait(false);
+        TransferResult? failure = await OpenAndAuthenticateAsync().ConfigureAwait(false);
         kept.Capabilities = capabilities;
         kept.IsAuthenticated = authenticated;
         channel.KeptConnection = kept;
@@ -173,6 +174,28 @@ internal sealed class SmtpSession(
         TransferResult? failure = await authentication.AuthenticateAsync(ehlo).ConfigureAwait(false);
         authenticated = authentication.IsAuthenticated;
         return failure;
+    }
+
+    /// <summary>
+    /// Opens and authenticates with every send and read on the connect phase's token, so a
+    /// server that never greets or never answers ends the transfer at <c>--connect-timeout</c>
+    /// with exit 28, as curl 8.22.0 does (BL-3532).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenAndAuthenticateAsync()
+    {
+        channel.CancellationToken = connectPhase.Token;
+        try
+        {
+            return await OpenAsync().ConfigureAwait(false) ?? await AuthenticateAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (connectPhase.HasPassed)
+        {
+            return connectPhase.Failure();
+        }
+        finally
+        {
+            channel.CancellationToken = context.CancellationToken;
+        }
     }
 
     private async ValueTask<TransferResult?> OpenAsync()
@@ -262,7 +285,7 @@ internal sealed class SmtpSession(
     {
         channel.Trace.Enter("UPGRADETLS");
         ConnectResult secured = await tlsProvider
-            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
+            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, channel.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {

@@ -148,7 +148,8 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         long started = context.TimeProvider.GetTimestamp();
-        TransferResult result = await TransferAsync(context).ConfigureAwait(false);
+        using var connectPhase = new SmtpConnectPhaseLimit(context, started);
+        TransferResult result = await TransferAsync(context, connectPhase).ConfigureAwait(false);
         SmtpDiagnosticLogLines.TransferEnded(context.DiagnosticLog, result, context.TimeProvider, started);
         return result;
     }
@@ -162,7 +163,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
     /// <summary>
     /// Connects, runs the session and writes the lines <c>-v</c> ends the transfer with.
     /// </summary>
-    private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, SmtpConnectPhaseLimit connectPhase)
     {
         if (HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password))
         {
@@ -170,14 +171,14 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, SmtpSessionMessages.CredentialsHaveControlCode);
         }
 
-        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+        return await ConnectAndTransferAsync(context, connectPhase).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Connects, runs the session once the EHLO domain is read from the URL and writes the
     /// lines <c>-v</c> ends the transfer with.
     /// </summary>
-    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context, SmtpConnectPhaseLimit connectPhase)
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
@@ -211,7 +212,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
             // curl decodes the path once connected, so a malformed one still costs a connect.
             TransferResult result = SmtpEhloDomain.Read(url, localHostName) is { } domain
-                ? await RunSessionAsync(channel, context, domain, implicitTls, connectEvents.Opened, KeptConnectionOf(connected, loginKey, context)).ConfigureAwait(false)
+                ? await RunSessionAsync(channel, context, connectPhase, domain, implicitTls, connectEvents.Opened, KeptConnectionOf(connected, loginKey, context)).ConfigureAwait(false)
                 : TransferResult.Failure(CurlExitCode.UrlMalformat, SmtpSessionMessages.MalformedUrl);
             ReportConnectionEnd(context.Events, result, channel, target, connected.ConnectionNumber);
             return result;
@@ -287,9 +288,9 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             : new SmtpKeptConnection(connected.Connection!, loginKey, context.TimeProvider);
 
     private async ValueTask<TransferResult> RunSessionAsync(
-        SmtpControlChannel channel, ITransferContext context, string domain, bool implicitTls, ConnectionOpenedEvent? opened, SmtpKeptConnection kept)
+        SmtpControlChannel channel, ITransferContext context, SmtpConnectPhaseLimit connectPhase, string domain, bool implicitTls, ConnectionOpenedEvent? opened, SmtpKeptConnection kept)
     {
-        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls, commandLineText, opened, kept);
+        var session = new SmtpSession(channel, tlsProvider, saslAuthenticator, context, domain, implicitTls, commandLineText, opened, kept, connectPhase);
         await using (session.ConfigureAwait(false))
         {
             return await session.RunAsync().ConfigureAwait(false);
