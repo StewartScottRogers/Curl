@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr061Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRedirectLocation.cs, Curl.Protocol.Http.UnitTests/Cgr061Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3590 — Fix CGR-061: A redirect Location containing control characters: a relative Location with TAB/0x01-0x1F fails with exit 3 Bad hostname where curl perce...
 
@@ -80,12 +80,27 @@ curl -sSL -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n' 
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Measured with `Record-CurlExchange.ps1` (port 18590; first reply `302` with `Location: <L>`, second `200` with body `final\n`), command
+  `curl <flags> -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n' http://127.0.0.1:18590/a/b`, against curl 8.22.0 Schannel (Windows).
+  The UP-19 commands are the same shape (relative `/a<TAB>b`, `/a<0x01>b`) and are covered by the `rel-*` rows. Real curl:
+  - `-sSL`, L = `/b<TAB>c`, `/b<01>c`, `/b<1F>c`, `/b<7F>c`: exit 0, stdout `final\n200 1 http://127.0.0.1:18590/b%09c ` (`%01`, `%1F`, `%7F`), second request `GET /b%09c` (and so on), stderr empty.
+  - `-sS` (no -L), L = `/b<TAB>c`, `/b<01>c`: exit 0, stdout `302 0 http://127.0.0.1:18590/a/b http://127.0.0.1:18590/b%09c\n` (`%01`).
+  - `-sSL`, L = `/b?x<TAB>y` -> `GET /b?x%09y`; `/b#x<TAB>y` -> effective `.../b#x%09y`, `GET /b`; `b<01>c` -> `GET /a/b%01c`; `//127.0.0.1:18590/b<01>c` -> `GET /b%01c`; all exit 0.
+  - `-sSL`, L = `http://127.0.0.1:18590/b<01>c`, `<09>`, `<7F>`: exit 3, stdout `302 1 http://127.0.0.1:18590/a/b \n`, stderr `curl: (3) The redirect target URL could not be parsed: Malformed input to a URL function`, one request.
+  - `-sS`, absolute L with `<7F>` or `<01>`: exit 0, redirect_url keeps the raw byte (`.../b<7F>c`).
+  - No files written in any case.
+- Curl before the fix: every relative C0 case and absolute C0 case exited 3 `Bad hostname` with one request; without -L redirect_url held the raw byte; absolute DEL was followed to `GET /b%7Fc`, exit 0. Relative DEL and both absolute no-L cases already matched.
+- Curl after the fix: all 15 rows identical to real curl (exit, stdout bytes, stderr, request lines), compared with `Compare-Object`.
+- Fix: `HttpRedirectLocation.AppendUnescaped` now escapes bytes at or below 0x20 in a relative Location (it already escaped space and above 0x7E); `RedirectFollower.ParseRefusal` refuses a target holding 0x00-0x1F or DEL with `Malformed input to a URL function` (`ProxyUrlParser.MalformedReason`), as curl's URL parser does. No ADR: this matches measured curl and needs no design choice. Pipeline `feature` run as a direct change: two one-line fixes in files the task names, no seams to plan.
+- Focused tests: `Curl.Protocol.Http.UnitTests/Cgr061Tests.cs` (relative escaping; absolute kept) and `Curl.Core.UnitTests/Cgr061Tests.cs` (absolute C0/DEL refused with exit 3 Malformed, no second request). Each row pins a behaviour the pre-fix measurement shows Curl got wrong (raw byte kept, `Bad hostname`, DEL followed), so they fail before the fix.
+- Fast tests: 46 assemblies, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary,Curl.Protocol.Http.UnitLibrary`: 0 failing members. Platform-neutral: no paths, OS errors or certificates; the Linux build (OpenSSL) shares the URL parser, so the same answers hold there (report: HS-8 confirmed on both).
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr061Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
@@ -94,3 +109,4 @@ curl -sSL -w '%{http_code} %{num_redirects} %{url_effective} %{redirect_url}\n' 
 
 - 2026-10-26: Created from CGR-061 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A relative redirect Location with control bytes is percent-encoded and followed, and an absolute one with a control byte or DEL exits 3 Malformed input, as curl 8.22.0 does
