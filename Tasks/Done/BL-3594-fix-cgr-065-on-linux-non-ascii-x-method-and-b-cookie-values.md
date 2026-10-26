@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr065Tests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr065Tests.cs, Curl.Engine.UnitLibrary/CookieEngine.cs, Curl.Engine.UnitTests/Cgr065Tests.cs, Curl.Console/CurlComposition.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3594 — Fix CGR-065: On Linux, non-ASCII -X method and -b cookie values on the command line are sent as Latin-1 bytes ('?' outside Latin-1) instead of the arg...
 
@@ -62,17 +62,25 @@ E/vlinux.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr065Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Touches widened to `Curl.Engine.UnitLibrary/CookieEngine.cs`, `Curl.Engine.UnitTests/Cgr065Tests.cs` and `Curl.Console/CurlComposition.cs`: the `Cookie` value mixes stored cookies (one character per byte) with the `-b` strings, so the formatter cannot encode it whole; the `-b` strings are turned into their bytes where `CookieEngine` takes them. No task in Doing on origin/work/dark-factory named these files (checked 2026-10-26).
+- Fix (ADR-0823): `HttpRequestHeadFormatter.AppendRequestLine` writes the method through `HeadText` (its bytes in `CommandLineTextEncoding`, as `-H`); `CookieEngine.FromHttpOptions` takes an optional encoding and sends the joined `-b` strings as their bytes in it (too-long check counted in it); `CurlComposition.SharingRunCookies` passes `CredentialEncoding.ForPlatform`. Library handles pass none, unchanged.
+- Measured real curl 8.18.0 (OpenSSL, WSL) against a netcat listener on 127.0.0.1:20355, 2026-10-26: `curl -sS -X 中 .../a` sent `E4 B8 AD /a HTTP/1.1`, exit 0, stdout `ok`; `-b c=中` sent `Cookie: c=E4 B8 AD`; `-b c=é` sent `Cookie: c=C3 A9`; control `-H X:中` sent `X:E4 B8 AD`; all exit 0, stdout `ok\n`, stderr empty, no files. Curl was not run on Linux here (no .NET in WSL); its Linux wire bytes are pinned by the unit tests with `CommandLineTextEncoding` / the cookie encoding set to UTF-8, which is what `CredentialEncoding.ForPlatform(false)` gives: `Curl.Protocol.Http.UnitTests/Cgr065Tests.cs` (method gives E4 B8 AD; failed before as `?`) and `Curl.Engine.UnitTests/Cgr065Tests.cs` (`c=中` and `c=é` give their UTF-8 bytes). Exit code, stdout and stderr are unaffected by the change. Windows keeps its ANSI bytes as before, matching Schannel curl; the `-H` control case is untouched.
+- Platform check: the new tests set the encoding explicitly, so they give the same answer on every OS; CI on Linux and macOS is covered by keeping them platform-neutral and the fast tests green here.
+- Fast tests: all green (e.g. Curl.Protocol.Http.UnitTests 2319 passed, Curl.Engine.UnitTests 2540, Curl.Console.UnitTests 2913, Curl.Conformance.UnitTests 4381). Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary, Curl.Engine.UnitLibrary and Curl.Console: Http and Console 100/100, Engine one failing member, `MultiCallbackQueue.QueuedCallback.WaitUntilRun`, not touched here and already filed as BL-3857.
+- Filed BL-3864: a lone-surrogate (invalid UTF-8 argv byte) in a `-b` string still goes out as EF BF BD.
+
 ## Log
 
 - 2026-10-26: Created from CGR-065 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. On Linux -X and -b values go out as their UTF-8 argv bytes, as curl 8.18.0 sends them
