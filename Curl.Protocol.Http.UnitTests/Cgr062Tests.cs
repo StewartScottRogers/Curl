@@ -30,13 +30,20 @@ public sealed class Cgr062Tests
     }
 
     [TestMethod]
-    [DataRow(true, "file://c:/windows/win.ini", DisplayName = "Windows")]
-    [DataRow(false, "file:///c:/windows/win.ini", DisplayName = "elsewhere")]
-    public void Resolve_FileLocationNamingADrive_DropsTheSlashBeforeTheDriveOnWindows(bool driveLetters, string expected)
+    [OSCondition(OperatingSystems.Windows)]
+    public void Resolve_FileLocationNamingADrive_DropsTheSlashBeforeTheDriveOnWindows()
     {
-        string resolved = HttpRedirectLocation.Resolve(RequestUrl, "file:///c:/windows/win.ini", driveLetters);
+        string resolved = HttpRedirectLocation.Resolve(RequestUrl, "file:///c:/windows/win.ini", driveLetters: true);
 
-        Assert.AreEqual(expected, resolved);
+        Assert.AreEqual("file://c:/windows/win.ini", resolved);
+    }
+
+    [TestMethod]
+    public void Resolve_FileLocationNamingADriveWithoutDriveLetters_IsUnchanged()
+    {
+        string resolved = HttpRedirectLocation.Resolve(RequestUrl, "file:///c:/windows/win.ini", driveLetters: false);
+
+        Assert.AreEqual("file:///c:/windows/win.ini", resolved);
     }
 
     [TestMethod]
