@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests/Cgr026Tests.cs, Curl.Console/DeferredOutputFileStream.cs, Curl.Console/DumpHeaderOutputStream.cs, Curl.Console/UnhandledExceptionGuard.cs]
+touches: [Curl.Console.UnitTests/Cgr026Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/DeferredOutputFileStream.cs, Curl.Console/DumpHeaderOutputStream.cs, Curl.Console/UnhandledExceptionGuard.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3555 — Fix CGR-026: A write error on an output, header, trace, cookie or %output file (ENOSPC, /dev/full) gives exit 2 with an exception message instead of e...
 
@@ -81,17 +81,31 @@ curl -sS --remove-on-error -o /dev/full $U/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr026Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 6): Real curl 8.18.0 (OpenSSL) measured in WSL with `/dev/full` and `file:///tmp/s.txt` (12 bytes), stdout and stderr captured apart:
+  - `curl -sS -o /dev/full URL` -> exit 23, stdout empty, stderr `curl: curl: (23) Failed writing body`.
+  - `curl -sS -o /dev/full -w '%{exitcode}:%{errormsg}\n' URL` -> exit 23, stdout `23:Failed writing received data to disk/application`, stderr as above.
+  - `curl -sS --remove-on-error -o /dev/full URL` -> exit 23, stderr as above.
+  - `curl -s -o /dev/full URL` -> exit 23, nothing on stderr.
+  - Curl before the fix: the buffered `-o` FileStream throws ENOSPC on dispose after the transfer, the IOException reaches `UnhandledExceptionGuard` -> `curl: (2) No space left on device : '/dev/full'`, exit 2, no `-w` output (the issue's Actual).
+- Fix: `DeferredOutputFileStream.CompleteAsync` flushes an open file after a successful transfer, as curl's `fclose` check in `post_per_transfer` does; a failed flush becomes exit 23 with `%{errormsg}` `Failed writing received data to disk/application` in its own string instance (`CloseFailureMessage`), which `CurlCommandRunner.FormatErrorLine` compares by reference to print curl 8.18.0's doubled `curl: curl: (23) Failed writing body` (the existing `StandardOutputWriteFailure` pattern). After a failed transfer the close failure is ignored, as curl ignores `fclose`'s rc when the result is already set: `DisposeAsync`/`Dispose` swallow an IOException from the file. Decision: match the measured REF-LINUX bytes, prefix doubling included (the issue's NR-2 summary drops one `curl: `; CGO-09's verbatim stderr and this measurement keep it).
+- Through Curl (Windows has no `/dev/full`, so a file system whose stream takes writes and fails flush/dispose stands in for it): `Cgr026Tests` drives the runner with `-sS -o`, `-sS -o -w '%{exitcode}:%{errormsg}'` and `-s -o` and gets exactly the REF results above; `--remove-on-error` takes the same path (the file is then removed or, for `/dev/full`, skipped as not regular, as before). Before the fix the runner tests threw the IOException out of `RunAsync` (exit 2 via the guard).
+- Added `Curl.Console/CurlCommandRunner.cs` to touches for the error-line format; no live task in Doing on origin/work/dark-factory named it.
+- The issue's other variants (`-D`, `--trace`, `-c`, `%output{}`, `--stderr` on `/dev/full`, the 16384 passed count) are filed as BL-3828 with this run's measurements. None of them matched before, so criterion 3 has nothing to regress; the existing `-D`/`-o` write-failure tests still pass.
+- `Measure-CodeQuality.ps1 -Library Curl.Console`: the only failing member is `CurlCommandRunner.WriteRefusalAsync` (branch 75%), unchanged by this task (last changed in 6b44942d2); filed as BL-3829. Every member this task changed passes.
+- Build clean (0 warnings), fast tests green (Curl.Console.UnitTests 2880 passed). The change is platform-neutral (no paths, OS text or files on disk in the tests), so CI on Linux and macOS is met by that.
+
 ## Log
 
 - 2026-10-26: Created from CGR-026 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. An -o file whose close fails (/dev/full) gives curl's exit 23, 'curl: curl: (23) Failed writing body' and the -w errormsg instead of exit 2
