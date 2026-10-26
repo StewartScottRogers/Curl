@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-25
-completed:
+completed: 2026-10-25
 ---
 # BL-3529 — Fix AF-0452: Requirements.md coverage note says Curl.Console does not register SFTP, SCP and SMB, but they are registered
 
@@ -52,3 +52,4 @@ Docs-only: corrected the Coverage note; no code touched, build and tests unaffec
 
 - 2026-10-25: Created.
 - 2026-10-25: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-25: Doing -> Done. Requirements.md coverage note corrected
