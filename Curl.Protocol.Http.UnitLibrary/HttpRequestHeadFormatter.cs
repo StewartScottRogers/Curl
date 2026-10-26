@@ -28,7 +28,7 @@ namespace Curl.Protocol.Http;
 /// <c>http://host[:port]/path?query</c>, with no fragment and no user information but an
 /// <c>ftp</c> URL's (<see cref="FtpUserInformation" />). The <c>-H</c> values follow in
 /// command-line order, then, through a forward proxy only, the <c>--proxy-header</c> values under the
-/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A body of unknown length gets
+/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes) and <c>Proxy-Authorization</c>, which a <c>--proxy-header</c> value naming it leaves out where an <c>-H</c> one does not (measured, BL-3611 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A body of unknown length gets
 /// <c>Transfer-Encoding: chunked</c> just after <c>Proxy-Connection</c>, ahead of the <c>Cookie</c> and the
 /// <c>-H</c> values, as curl 8.21.0 places it (upstream test60). A request with a body ends with
 /// <c>Content-Length</c> when its length is known, <c>Content-Type</c> and
@@ -138,7 +138,7 @@ internal static class HttpRequestHeadFormatter
         AppendRequestLine(head, framing.Method, url, forwardProxy ? credentials ?? NoCredentials : null, options);
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
-        AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
+        AppendUnlessOverridden(head, proxyHeaders, "Proxy-Authorization", proxyAuthorization);
         AppendAuthorization(head, customHeaders, authorization, options.HttpSignature is not null);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
@@ -447,7 +447,7 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Appends a line whatever the <c>-H</c> values name, as curl 8.21.0 sends its cookie
-    /// engine's <c>Cookie</c> and its <c>Proxy-Authorization</c> beside custom ones (BL-182 and
+    /// engine's <c>Cookie</c> beside custom ones (BL-182 and
     /// BL-183 Notes).
     /// </summary>
     private static void AppendLines(StringBuilder head, string? lines)
