@@ -4,8 +4,8 @@ title: Fix CGR-078: SigV4 with a non-ASCII query on Windows signs one byte form 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Authentication.UnitLibrary/AwsSigV4Request.cs, Curl.Authentication.UnitLibrary/AwsSigV4UriEncoding.cs, Curl.Authentication.UnitTests/Cgr078Tests.cs]
+depends-on: [BL-3840]
+touches: [Curl.Authentication.UnitLibrary/AwsSigV4Request.cs, Curl.Authentication.UnitLibrary/AwsSigV4UriEncoding.cs, Curl.Authentication.UnitTests/Cgr078Tests.cs, Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -73,8 +73,10 @@ curl -sS -g --aws-sigv4 aws:amz:us-east-1:s3 -u AKID:SECRET -H 'X-Amz-Date: 2025
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr078Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 4, before any edit): the wire half of both repros is BL-3840's work (HTTP percent-encodes the path, and sends the query bytes, in `HttpRequestOptions.CommandLineTextEncoding`: `/ü` -> `/%FC`, `?k=ä` -> raw `0xE4`). The signer already signs the query in the argument encoding (`AwsSigV4Signer` passes `argumentEncoding` to `CanonicalQuery`), which is why the query signature already matches real curl's `251a1c08...`; only the bytes sent differ, so the query case is fixed entirely by BL-3840. The path case also needs the signed path to follow: `Curl.Engine.UnitLibrary/AwsSigV4HttpAuthenticator.cs` `SigningRequestOf` sets `Path = UrlPathEscapes.WithUpperCaseHexDigits(request.Url.AbsolutePath)`, and `System.Uri` escapes `ü` as UTF-8 `%C3%BC`, so `s3` (which signs the path as given) signs `/%C3%BC` (`8c86e160...`) instead of `/%FC` (`3ff4f5d1...`). Plan for the next claim: once BL-3840 gives `HttpUrlText.Path` an `Encoding`, build the signed path from the same function with the command-line text encoding (the signer's `argumentEncoding`), so the signed path is the path on the request line; add `AwsSigV4HttpAuthenticator.cs` to touches (added; no task in Doing held it) and pin both repros in `Cgr078Tests.cs` with a cp1252 encoding. Requeued on BL-3840.
 
 ## Log
 
 - 2026-10-26: Created from CGR-078 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3840: the request line must carry the path and query in the command-line encoding before the signed path can follow it
