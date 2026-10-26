@@ -1,4 +1,4 @@
-# ADR-0828: -w writes command-line text in the ANSI code page on Windows
+# ADR-0830: -w writes command-line text in the ANSI code page on Windows
 
 - Status: Accepted
 - Date: 2026-10-26

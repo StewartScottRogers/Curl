@@ -4,7 +4,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins how <c>-w</c> keeps file bytes apart from command-line text (CGR-015 part 4, BL-3841,
-/// ADR-0828): on Windows the renderer writes <c>-w</c> in the ANSI code page, so a <c>-w @file</c>
+/// ADR-0830): on Windows the renderer writes <c>-w</c> in the ANSI code page, so a <c>-w @file</c>
 /// template, and a <c>-w</c> in a UTF-8 config file, are re-spelled in that code page so their UTF-8
 /// bytes come out unchanged, as real curl writes file bytes raw; an argument stays as typed.
 /// </summary>

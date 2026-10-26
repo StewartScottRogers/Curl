@@ -70,7 +70,7 @@ public sealed partial class UpstreamConformanceTests
 
     // Listed cases whose -w output holds non-ASCII command-line text, which upstream's runner hands
     // curl as UTF-8 bytes. On Windows Curl writes -w in the ANSI code page, as the ANSI-argv curl 8.22.0
-    // does (ADR-0828, BL-3841), so there these cases are run and reported but not held to the list;
+    // does (ADR-0830, BL-3841), so there these cases are run and reported but not held to the list;
     // Linux and macOS judge them.
     private static readonly IReadOnlySet<int> NeedsUtf8ArgumentsCases = new HashSet<int> { 2046, 2047 };
 

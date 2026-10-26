@@ -7,7 +7,7 @@ namespace Curl.Output;
 /// Pins CGR-015 part 4 (BL-3841): on Windows the ANSI-argv curl 8.22.0 (Git for Windows ucrt64)
 /// writes <c>-w</c>'s literal text and values from the command line in the ANSI code page, so with
 /// cp1252 <c>-w "[é]"</c> writes <c>5B E9 5D</c>, while a <c>-w @file</c> of UTF-8 bytes writes
-/// those bytes unchanged (ADR-0828). The encoding is injected, so these pass on every platform.
+/// those bytes unchanged (ADR-0830). The encoding is injected, so these pass on every platform.
 /// </summary>
 [TestClass]
 public sealed class Cgr015Tests

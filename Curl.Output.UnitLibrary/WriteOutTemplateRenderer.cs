@@ -30,7 +30,7 @@ namespace Curl.Output;
 /// fixed buffers do. A <c>%{name}</c> of 24 bytes or more ends the rendering there,
 /// silently, as curl's 24-byte name buffer does. Text is written in the text encoding the
 /// renderer was given (UTF-8, or on Windows the ANSI code page curl's arguments arrive in,
-/// CGR-015, ADR-0828), except header
+/// CGR-015, ADR-0830), except header
 /// bytes marked by <see cref="MarkHeaderBytes"/>, which are written as the raw bytes they
 /// were (CGR-021, ADR-0816), and lone surrogates U+DC80 to U+DCFF, which stand for argument
 /// bytes that were not valid UTF-8 (CGR-016, ADR-0822), which are written as those bytes, as
