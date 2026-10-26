@@ -1,5 +1,5 @@
 ---
-id: BL-3828
+id: BL-3830
 title: Finish CGR-026: map write errors on -D, --trace, -c, %output and --stderr files and the 16 KiB passed count as curl does
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3828 — Finish CGR-026: map write errors on -D, --trace, -c, %output and --stderr files and the 16 KiB passed count as curl does
+# BL-3830 — Finish CGR-026: map write errors on -D, --trace, -c, %output and --stderr files and the 16 KiB passed count as curl does
 
 ## Goal
 

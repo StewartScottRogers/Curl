@@ -1,5 +1,5 @@
 ---
-id: BL-3829
+id: BL-3831
 title: Cover WriteRefusalAsync's untaken branch in Curl.Console (quality gate: branch 75%)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3829 — Cover WriteRefusalAsync's untaken branch in Curl.Console (quality gate: branch 75%)
+# BL-3831 — Cover WriteRefusalAsync's untaken branch in Curl.Console (quality gate: branch 75%)
 
 ## Goal
 
