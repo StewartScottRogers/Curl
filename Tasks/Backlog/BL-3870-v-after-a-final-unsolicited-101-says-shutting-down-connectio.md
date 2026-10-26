@@ -1,5 +1,5 @@
 ---
-id: BL-3867
+id: BL-3870
 title: -v after a final unsolicited 101 says shutting down connection where curl 8.22.0 says left intact
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3867 — -v after a final unsolicited 101 says shutting down connection where curl 8.22.0 says left intact
+# BL-3870 — -v after a final unsolicited 101 says shutting down connection where curl 8.22.0 says left intact
 
 ## Goal
 

@@ -89,7 +89,7 @@ curl -sSi "$H/raw?b=$(b64 'HTTP/1.1 101 Switching\r\n\r\nabc')"
   - `-sSi`, the same with `Upgrade: h2c` and `Connection: Upgrade` (l_101b): exit 0, stdout is the head, then `abc`.
   - `-sSi`, a 101 followed by an `HTTP/1.1 200` head: exit 0, and the 200 head is written as the 101's body.
   - Before the fix, PORT exited 8 with `Invalid status line` on each of these (as the report says; the new `Cgr070Tests` fail the same way without the fix).
-- Measured more for REF: a 101 with an empty body (`...101 Switching\r\nContent-Length: 0\r\n\r\n` or `A: 1`, then close) exits 52, `Empty reply from server`, after writing the head with `-i`. With `-v`, curl writes no `no chunk, no close, no size` line, and ends with `left intact`. Curl now matches all of this except `left intact`: it still shuts the connection down after a 101 (ADR-0050), so that `-v` line is filed as BL-3867.
+- Measured more for REF: a 101 with an empty body (`...101 Switching\r\nContent-Length: 0\r\n\r\n` or `A: 1`, then close) exits 52, `Empty reply from server`, after writing the head with `-i`. With `-v`, curl writes no `no chunk, no close, no size` line, and ends with `left intact`. Curl now matches all of this except `left intact`: it still shuts the connection down after a 101 (ADR-0050), so that `-v` line is filed as BL-3870.
 - Decision recorded in ADR-0824. A 101 is interim only when the request asked for an h2c upgrade (`HttpH2cUpgradeConnection`) or the heads come from an HTTP/2 or HTTP/3 stream.
 - Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary: 0 failing members. Fast tests are green on Windows. The tests need no file system, path or OS error text, so they are platform-neutral for CI on Linux and macOS.
 
