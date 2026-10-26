@@ -32,6 +32,7 @@ Interactive only: ci.yml is a guard file and changes only through the `audit` br
 - [ ] The shift-end merge and the coordinator's CI watch still find a completed `CI` run for each commit they check (Notes cite a shift-end merge that went through after the change).
 
 ## Notes
+- 2026-10-25 19:40 Arizona (interactive session): measured after PR #238. Run 40233303425 (13:59, no competing PRs) went first job start to last job end in 14.5 min. Runs 40253936975 (18:25, 25.1 min) and 40255860809 (18:51, 20.8 min) overlapped the CI of gap PR #243 and audit PRs #244 and #245, which compete for the Windows runners; the last job in both was Quality gates (windows-latest). The shift-end merge PR #246 (19:12) found its completed CI run and went through. Criterion 2 is not met yet: no run after the change that overlapped a shift-end merge finished under 15 min. Stays in Backlog.
 
 ## Log
 
