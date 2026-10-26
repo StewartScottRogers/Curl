@@ -1,4 +1,4 @@
-# ADR-0828: The open-socket and socket-option callbacks run before each TCP attempt
+# ADR-0831: The open-socket and socket-option callbacks run before each TCP attempt
 
 - Status: Accepted
 - Date: 2026-10-26
