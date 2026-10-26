@@ -5,11 +5,11 @@ area: behaviour
 platform: windows
 key: behaviour:reference-curl-built-without-http2
 severity: High
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-23_1637
-closed:
+closed: 2026-10-25_1542
 regression: false
 items: [behaviour:test1704]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -33,9 +33,11 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary alre
 ## Measurements
 
 - 2026-10-23_1637: 1 of 1 items are gaps.
+- 2026-10-25_1542: 0 of 1 items are gaps.
 
 ## Log
 
 - 2026-10-23_1637: Opened by gap-behaviour.
 - 2026-10-23_1729: Filed BL-3431.
 - 2026-10-23_2330: Stewart decided 'Keep HTTP/2 on': ADR-0786 stands, so the Windows build keeps HTTP/2 and Curl will not refuse it to match the Schannel reference. Gap/Baselines/platform-exclusions.json now has Measure-GapAreas.ps1 measure behaviour:test1704 as excluded with reason decided:ADR-0786 on Windows only; this finding closes on the next run that measures them so (findings close only on measurement).
+- 2026-10-25_1542: Closed: run 2026-10-25_1542 measured every item as match or excluded on windows.

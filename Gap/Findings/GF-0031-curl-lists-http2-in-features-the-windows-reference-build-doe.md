@@ -5,11 +5,11 @@ area: features
 platform: windows
 key: features:http2-not-in-reference
 severity: Medium
-status: open
+status: closed
 scope: target
 introduced-in:
 opened: 2026-10-08_1640
-closed:
+closed: 2026-10-25_1542
 regression: true
 items: [features:HTTP2]
 touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests]
@@ -50,6 +50,7 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 - 2026-10-19_1329: 0 of 1 items are gaps.
 - 2026-10-22_0148: 0 of 1 items are gaps.
 - 2026-10-23_1637: 1 of 1 items are gaps.
+- 2026-10-25_1542: 0 of 1 items are gaps.
 
 ## Log
 
@@ -58,3 +59,4 @@ In Curl.Cli.UnitLibrary/CurlVersionText.cs, make FeaturesLine platform-specific 
 - 2026-10-10_0657: Closed: run 2026-10-10_0657 measured every item as match or excluded.
 - 2026-10-23_1637: Reopened as a regression: run 2026-10-23_1637 measured features:HTTP2 as gap again on windows.
 - 2026-10-23_1729: Filed BL-3430.
+- 2026-10-25_1542: Closed: run 2026-10-25_1542 measured every item as match or excluded on windows.
