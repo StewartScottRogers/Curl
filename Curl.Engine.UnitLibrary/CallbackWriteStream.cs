@@ -15,7 +15,9 @@ namespace Curl.Engine;
 /// <c>Failure writing output to destination, passed N returned M</c>, as libcurl does. A callback that
 /// returns <see cref="WriteCallbackResult.Pause" /> pauses receiving on <paramref name="pauseGate" />, and
 /// the write waits until the handle is unpaused and hands the same chunk to the callback again, as
-/// libcurl keeps the paused data for later; with no gate, or on the synchronous path, which cannot wait,
+/// libcurl keeps the paused data for later. A write that starts while <c>curl_easy_pause</c> has receiving
+/// paused waits for the unpause before calling the callback at all, as libcurl holds received data while
+/// <c>CURLPAUSE_RECV</c> is set (CGR-035); with no gate, or on the synchronous path, which cannot wait,
 /// it fails with libcurl's <c>Write callback asked for PAUSE when not supported</c> (ADR-0573).
 /// </summary>
 /// <param name="callback">Receives each chunk and returns how many bytes it took.</param>
@@ -88,6 +90,7 @@ internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callbac
     /// <inheritdoc />
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        await (pauseGate?.WhenResumedAsync(CurlPause.Receive, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
         int unpauses = pauseGate?.Unpauses ?? 0;
         long returned = callback(buffer.Span);
         while (returned == WriteCallbackResult.Pause)
