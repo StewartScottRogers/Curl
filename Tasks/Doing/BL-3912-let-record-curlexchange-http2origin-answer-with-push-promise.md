@@ -35,3 +35,4 @@ Suggested shape: one new parameter, e.g. `-Http2Answer push|status:<value>|nosta
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: cfa31551 e65894b0 c50e4ce8.
