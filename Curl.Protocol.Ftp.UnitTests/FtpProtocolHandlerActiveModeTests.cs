@@ -612,7 +612,8 @@ public sealed class FtpProtocolHandlerActiveModeTests
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
         Assert.IsFalse(clock.Waits.Contains(TimeSpan.FromSeconds(60)));
-        var expectedResult = TransferResult.Failure(CurlExitCode.FtpAcceptFailed, "FTP: The server failed to connect to data port");
+        // SIZE gave 5, so curl 8.22.0's message is its partial-file one (measured, CGR-099).
+        var expectedResult = TransferResult.Failure(CurlExitCode.FtpAcceptFailed, "Received only partial file: 0 bytes");
         diagnostics.Assert("result", expectedResult, run.Result);
         Assert.AreEqual(expectedResult, run.Result);
     }

@@ -181,6 +181,13 @@ internal static class FtpTransferMessages
     internal const string ServerFailedToConnectToDataPort = "FTP: The server failed to connect to data port";
 
     /// <summary>
+    /// The exit 10 message curl 8.22.0's <c>ftp_done</c> sets when that reply ends a download
+    /// whose size was known, as its partial-file check runs before the error text is chosen
+    /// (measured with <c>SIZE</c> answered and with it refused, CGR-099).
+    /// </summary>
+    internal static string ReceivedOnlyPartialFile(long bytes) => Format($"Received only partial file: {bytes} bytes");
+
+    /// <summary>
     /// The exit 64 message for an <c>AUTH</c> refused under <c>--ssl-reqd</c> or
     /// <c>--ftp-ssl-control</c>, or a <c>PROT P</c> refused under <c>--ssl-reqd</c> (BL-437).
     /// </summary>

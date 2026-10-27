@@ -1709,7 +1709,8 @@ internal sealed class FtpSession(
     /// after <c>QUIT</c> when it does not, and a failed accept's exit code after <c>QUIT</c>.
     /// A 4xx or 5xx reply already read behind the transfer command's <c>150</c> (a server's
     /// <c>425</c> or <c>421</c> for a data connection it could not open) is read and ends the
-    /// wait with exit 10 after <c>QUIT</c>, as curl 8.21.0 does (upstream tests 1206 and 1207, BL-1978).
+    /// wait with exit 10 after <c>QUIT</c>, as curl 8.21.0 does (upstream tests 1206 and 1207, BL-1978),
+    /// and so does one that arrives while the wait goes on (CGR-099).
     /// </summary>
     private async ValueTask<TransferResult?> AcceptDataConnectionAsync(IPendingConnection pending)
     {
@@ -1718,23 +1719,26 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
         if (control.HasBufferedNegativeReply)
         {
-            context.Events.ReportInfo(FtpTransferMessages.NegativeReplyWhileAwaitingServerConnect);
-            await ReadReplyIgnoringItsFailureAsync().ConfigureAwait(false);
-            return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
+            return await FailOnNegativeReplyAwaitingConnectAsync().ConfigureAwait(false);
         }
 
         using var timeout = new CancellationTokenSource(context.FtpAcceptTimeout, context.TimeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, timeout.Token);
-        ConnectResult accepted;
+        ConnectResult? accepted;
         try
         {
             accepted = acceptedEarly is { } early
                 ? ConnectResult.Connected(early)
-                : await pending.AcceptAsync(linked.Token).ConfigureAwait(false);
+                : await AcceptWatchingControlAsync(pending, linked.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!context.CancellationToken.IsCancellationRequested)
         {
             return await QuitAndFailAsync(CurlExitCode.FtpAcceptTimeout, FtpTransferMessages.AcceptTimeout).ConfigureAwait(false);
+        }
+
+        if (accepted is null)
+        {
+            return await FailOnNegativeReplyAwaitingConnectAsync().ConfigureAwait(false);
         }
 
         acceptedEarly = null;
@@ -1747,6 +1751,48 @@ internal sealed class FtpSession(
         ReportAccepted(dataConnection.RemoteEndPoint, (IPEndPoint)pending.LocalEndPoint);
         log.ActiveDataAccepted();
         return null;
+    }
+
+    /// <summary>
+    /// Accepts the server's data connection while watching the control connection, as curl
+    /// 8.22.0's <c>ReceivedServerConnect</c> polls both: a 4xx or 5xx reply arriving first stops
+    /// the accept (CGR-099). Bytes already read, or any other reply, leave the accept to finish.
+    /// </summary>
+    /// <returns>The accept's result, or <see langword="null" /> when a 4xx or 5xx reply came first.</returns>
+    private async ValueTask<ConnectResult?> AcceptWatchingControlAsync(IPendingConnection pending, CancellationToken cancellationToken)
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task<ConnectResult> accept = pending.AcceptAsync(stop.Token).AsTask();
+        Task replied = control.HasBufferedBytes ? Task.CompletedTask : control.WaitForBytesAsync();
+        await Task.WhenAny(accept, replied).ConfigureAwait(false);
+        if (accept.IsCompleted || !control.HasBufferedNegativeReply)
+        {
+            return await accept.ConfigureAwait(false);
+        }
+
+        await stop.CancelAsync().ConfigureAwait(false);
+        await ((Task)accept).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        return null;
+    }
+
+    /// <summary>
+    /// Reads the 4xx or 5xx reply that ends the wait for the server's data connection and
+    /// sends <c>QUIT</c>: exit 10, with curl 8.22.0's partial-file message for a download whose
+    /// size was known and is not yet read, otherwise <c>curl_easy_strerror</c>'s (CGR-099).
+    /// </summary>
+    private async ValueTask<TransferResult> FailOnNegativeReplyAwaitingConnectAsync()
+    {
+        context.Events.ReportInfo(FtpTransferMessages.NegativeReplyWhileAwaitingServerConnect);
+        await ReadReplyIgnoringItsFailureAsync().ConfigureAwait(false);
+        if (expectedSize is { } expected && expected != bytesTransferred)
+        {
+            ReportRememberedDirectory();
+            string partial = FtpTransferMessages.ReceivedOnlyPartialFile(bytesTransferred);
+            context.Events.ReportInfo(partial);
+            return await QuitAndFailWithoutEchoAsync(CurlExitCode.FtpAcceptFailed, partial).ConfigureAwait(false);
+        }
+
+        return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
     }
 
     /// <summary>

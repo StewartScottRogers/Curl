@@ -87,6 +87,9 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
 
     private int bufferEnd;
 
+    /// <summary>The read <see cref="WaitForBytesAsync" /> started, which the next reply takes over.</summary>
+    private Task<bool>? pendingFill;
+
     /// <summary>The bytes the reply being read has taken so far, line ends included.</summary>
     private int replyByteCount;
 
@@ -237,9 +240,26 @@ internal sealed class FtpControlChannel(IConnection connection, ITransferEvents 
         }
     }
 
+    /// <summary>
+    /// Starts reading the next bytes from the connection, which the next reply then reads
+    /// first, so the server's control connection can be watched while the active-mode data
+    /// connection is awaited, as curl 8.22.0's <c>ReceivedServerConnect</c> polls it (CGR-099).
+    /// Called only with no bytes buffered and no such read pending.
+    /// </summary>
+    /// <returns>A task whose result says whether any bytes arrived.</returns>
+    public Task<bool> WaitForBytesAsync() => pendingFill = FillAsync();
+
     private async ValueTask<bool> TryFillAsync()
     {
+        Task<bool> fill = pendingFill ?? FillAsync();
+        pendingFill = null;
+        return await fill.ConfigureAwait(false);
+    }
+
+    private async Task<bool> FillAsync()
+    {
         bufferStart = 0;
+        bufferEnd = 0;
         try
         {
             bufferEnd = await connection.ReadAsync(buffer, CancellationToken).ConfigureAwait(false);
