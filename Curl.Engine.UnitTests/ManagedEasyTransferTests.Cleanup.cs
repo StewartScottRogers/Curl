@@ -63,18 +63,32 @@ public sealed partial class ManagedEasyTransferTests
         first.Options = options;
         await using IMultiTransfer multi = engine.CreateMulti();
         multi.Add(first);
-        await first.PerformAsync(CancellationToken.None);
+        await PerformInMultiAsync(multi);
         multi.Remove(first);
 
         await first.DisposeAsync();
         await using IEasyTransfer second = engine.CreateEasy();
         second.Options = options;
         multi.Add(second);
-        CurlCode code = await second.PerformAsync(CancellationToken.None);
+        CurlCode code = await PerformInMultiAsync(multi);
         multi.Remove(second);
 
         Assert.AreEqual(CurlCode.Ok, code);
         Assert.HasCount(1, connector.Targets);
+    }
+
+    // Drives the multi handle until its one transfer is done, as curl_easy_perform of a handle in a multi handle is refused (CGR-147).
+    private static async Task<CurlCode> PerformInMultiAsync(IMultiTransfer multi)
+    {
+        CurlMultiMessage? message;
+        do
+        {
+            await multi.PerformAsync(CancellationToken.None);
+            await multi.WaitAsync(Memory<CurlWaitSocket>.Empty, TimeSpan.FromMilliseconds(10), CancellationToken.None);
+        }
+        while (!multi.TryReadInfo(out message, out _));
+
+        return message.Result;
     }
 
     private const string LearnsAltSvc = "HTTP/1.1 200 OK\r\nAlt-Svc: h2=\"alt:443\"; ma=3600; persist=1\r\nContent-Length: 0\r\n\r\n";

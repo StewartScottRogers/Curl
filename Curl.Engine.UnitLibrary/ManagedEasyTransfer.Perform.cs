@@ -32,6 +32,16 @@ internal sealed partial class ManagedEasyTransfer
             return CurlCode.RecursiveApiCall;
         }
 
+        // The multi handle gives the marshal of each perform it starts just before starting it, so a perform of a
+        // handle in a multi handle with none is the application's curl_easy_perform, which curl 8.22.0 refuses (CGR-147).
+        runningMultiCallbacks = MultiCallbacks;
+        MultiCallbacks = null;
+        if (runningMultiCallbacks is null && shared.MultiOwners.ContainsKey(this))
+        {
+            ErrorText = "easy handle already used in multi handle";
+            return CurlCode.FailedInit;
+        }
+
         ConnectOnly.PerformRunning = true;
         try
         {
@@ -70,11 +80,14 @@ internal sealed partial class ManagedEasyTransfer
     /// Gets or sets what puts the callbacks of the perform a multi handle starts through that handle's
     /// <see cref="MultiCallbackQueue" />, so they run inside its perform on its caller's thread (CGR-033);
     /// <see langword="null" /> for a perform outside any multi handle. <see cref="ManagedMultiTransfer" /> sets it before
-    /// each perform it starts, and the perform reads it once, as it starts.
+    /// each perform it starts, and the perform takes it once, as it starts, leaving it <see langword="null" /> again.
     /// </summary>
     internal TransferCallbackMarshal? MultiCallbacks { get; set; }
 
-    private EasyOptions MarshalledOf(EasyOptions options) => MultiCallbacks is { } marshal ? options with { Callbacks = marshal.Over(options.Callbacks) } : options;
+    /// <summary>The <see cref="MultiCallbacks" /> the latest perform took as it started, <see langword="null" /> outside a multi handle.</summary>
+    private TransferCallbackMarshal? runningMultiCallbacks;
+
+    private EasyOptions MarshalledOf(EasyOptions options) => runningMultiCallbacks is { } marshal ? options with { Callbacks = marshal.Over(options.Callbacks) } : options;
 
     /// <summary>
     /// A duplicate of this handle bound to <paramref name="response" />, as curl 8.22.0's <c>push_promise</c> makes
