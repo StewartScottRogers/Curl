@@ -584,6 +584,22 @@ internal sealed class CurlCommandRunner(
         TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
 
     /// <summary>
+    /// The line curl 8.21.0 prints when <c>-G</c> or <c>--url-query</c> asks for a query on an
+    /// <c>ipfs://</c> or <c>ipns://</c> URL (measured 2026-10-26, CGR-161, BL-3690 Notes).
+    /// </summary>
+    private const string IpfsQueryMessage = "curl: (1) Could not parse the URL, failed to set query";
+
+    /// <summary>
+    /// The result of <c>-G</c> or <c>--url-query</c> on an <c>ipfs://</c> or <c>ipns://</c> URL:
+    /// exit 1, whose <c>%{errormsg}</c> curl 8.21.0 prints as <c>Unsupported protocol</c>, before
+    /// any gateway is looked up, with no transfer number and no connection (measured 2026-10-26,
+    /// BL-3690 Notes). It is compared by reference, so that <see cref="TransferAllAsync" /> stops
+    /// before the remaining URLs, as curl does, and its own line replaces the <c>curl: (1)</c> line.
+    /// </summary>
+    private static readonly TransferResult IpfsQueryFailure =
+        TransferResult.Failure(CurlExitCode.UnsupportedProtocol, "Unsupported protocol");
+
+    /// <summary>
     /// The result of an <c>ipfs://</c> or <c>ipns://</c> URL whose gateway, or rewritten URL, curl
     /// rejects: exit 3, whose <c>%{errormsg}</c> curl 8.21.0 prints as its generic text for the
     /// code (measured 2026-09-27, BL-240 Notes). It is compared by reference, so that
@@ -2199,7 +2215,7 @@ internal sealed class CurlCommandRunner(
         runningTransfer.Value = state;
         anyTransferReported = true;
         LogTransferEnded(transfer, state, result);
-        if (ShowsErrors(options) && result.ErrorMessage is not null && !IsIpfsGatewayFailure(result))
+        if (ShowsErrors(options) && HasFailureLinesToWrite(result))
         {
             await WriteFailureLinesAsync(result).ConfigureAwait(false);
         }
@@ -2347,6 +2363,11 @@ internal sealed class CurlCommandRunner(
         if (TakesRemoteNameFromIpfsUrl(transfer))
         {
             return (await RefuseIpfsRemoteNameAsync(options).ConfigureAwait(false), transfer.Url, string.Empty);
+        }
+
+        if (AppendsQueryToIpfsUrl(options, transfer))
+        {
+            return (await RefuseQueryOnIpfsUrlAsync(options, transfer).ConfigureAwait(false), transfer.Url, string.Empty);
         }
 
         if (!TryRewriteIpfsUrl(options, transfer.Url, out string givenUrl, out IpfsGatewayFailure? ipfsFailure))
@@ -2592,6 +2613,39 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Tells whether <c>-G</c> with a <c>-d</c> body, or <c>--url-query</c>, asks for a query on an
+    /// <c>ipfs://</c> or <c>ipns://</c> URL, which curl 8.21.0 appends with <c>curl_url_set</c> before
+    /// the IPFS rewrite and cannot, as libcurl's URL API knows no such scheme (CGR-161, BL-3690).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <returns><see langword="true" /> when a query, even an empty one, is to be appended to an IPFS URL.</returns>
+    private static bool AppendsQueryToIpfsUrl(CommandLineOptions options, UrlTransfer transfer) =>
+        ((options.DataInQuery && options.PostData is not null) || options.UrlQuery is not null)
+        && CurlUrl.TryParse(transfer.Url, pathAsIs: false, out CurlUrl? parsed)
+        && IpfsGatewayRewriter.IsIpfsUrl(parsed);
+
+    /// <summary>
+    /// Prints curl's <see cref="IpfsQueryMessage" /> line unless <c>-s</c> was given without
+    /// <c>-S</c>, as curl 8.21.0's <c>errorf</c> does, before any gateway is looked up. curl has
+    /// named the <c>-o</c> file by then, so <c>%{filename_effective}</c> prints it, though
+    /// nothing is opened.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="transfer">The transfer, which names its output.</param>
+    /// <returns><see cref="IpfsQueryFailure" />.</returns>
+    private async Task<TransferResult> RefuseQueryOnIpfsUrlAsync(CommandLineOptions options, UrlTransfer transfer)
+    {
+        Running.OutputFileName = transfer.OutputFileName is { } fileName ? InOutputDirectory(options, fileName) : null;
+        if (ShowsErrors(options))
+        {
+            await WriteErrorLineAsync(IpfsQueryMessage).ConfigureAwait(false);
+        }
+
+        return IpfsQueryFailure;
+    }
+
+    /// <summary>
     /// Rewrites <paramref name="url" /> to its IPFS gateway URL when it is an <c>ipfs://</c> or
     /// <c>ipns://</c> URL, with <see cref="IpfsGatewayRewriter" />.
     /// </summary>
@@ -2671,6 +2725,16 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Tells whether <paramref name="result" /> has <c>curl: (N)</c> lines for <see cref="ReportAsync" /> to write:
+    /// a failure with a message, other than an IPFS gateway failure or <see cref="IpfsQueryFailure" />, which print
+    /// their own lines.
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when the result's failure lines are still to be written.</returns>
+    private static bool HasFailureLinesToWrite(TransferResult result) =>
+        result.ErrorMessage is not null && !IsIpfsGatewayFailure(result) && !ReferenceEquals(result, IpfsQueryFailure);
+
+    /// <summary>
     /// Tells whether <paramref name="result" /> is an IPFS URL's failure to be rewritten, which
     /// prints its own lines, uses no connection and has no transfer number.
     /// </summary>
@@ -2692,7 +2756,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="result">The transfer's result.</param>
     /// <returns><see langword="true" /> when the transfer has no number.</returns>
     private static bool HasNoTransferNumber(TransferResult result) =>
-        IsIpfsGatewayFailure(result) || ReferenceEquals(result, IpfsRemoteNameFailure);
+        IsIpfsGatewayFailure(result) || ReferenceEquals(result, IpfsRemoteNameFailure) || ReferenceEquals(result, IpfsQueryFailure);
 
     /// <summary>
     /// The <c>-T</c> file uploaded to the URL at <paramref name="index" />: the Nth <c>-T</c> value
@@ -2964,9 +3028,14 @@ internal sealed class CurlCommandRunner(
     /// <returns>The request URL.</returns>
     private static string WriteOutRequestUrl(CommandLineOptions options, string transferUrl, string givenUrl)
     {
+        if (transferUrl.Length == 0)
+        {
+            return string.Empty;
+        }
+
         string url = QueryUrl.Append(transferUrl, options);
 
-        return UrlEffective.Normalize(url, transferUrl.Length == 0 ? url : QueryUrl.Append(givenUrl, options), QueryUrl.KeepsPathAsIs(options));
+        return UrlEffective.Normalize(url, QueryUrl.Append(givenUrl, options), QueryUrl.KeepsPathAsIs(options));
     }
 
     /// <summary>
@@ -3237,6 +3306,7 @@ internal sealed class CurlCommandRunner(
         IpfsMalformedGatewayOptionFailure,
         IpfsMalformedTargetUrlFailure,
         IpfsRemoteNameFailure,
+        IpfsQueryFailure,
         TransferPerformer.InterfaceSetoptFailure,
         TransferPerformer.EchSetoptFailure,
     };
