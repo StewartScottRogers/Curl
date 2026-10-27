@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
@@ -89,6 +90,48 @@ internal sealed partial class ManagedEasyTransfer
         : -1;
 
     /// <summary>
+    /// <c>CURLINFO_CONTENT_LENGTH_UPLOAD</c> once an <c>http</c> or <c>https</c> request has been sent, as libcurl 8.22.0
+    /// sets it from the last request's body (CGR-127): 0 for a request with no body (a plain <c>GET</c>,
+    /// <c>CURLOPT_NOBODY</c>, <c>CURLOPT_HTTPGET</c>, or a post a followed redirect turned into a <c>GET</c>), -1 for a
+    /// body sent chunked under a <c>Transfer-Encoding: chunked</c> header, else <see cref="ContentLengthUploadOf(EasyOptions)" />.
+    /// An upload, a form body, another scheme or a transfer that sent no request keeps that answer.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="report">The transfer's report, or <see langword="null" />.</param>
+    /// <param name="requestUrl">The URL the transfer requested.</param>
+    /// <returns>The size, or -1.</returns>
+    internal static long ContentLengthUploadOf(EasyOptions options, TransferReport? report, string requestUrl) =>
+        SentAnHttpRequest(report, requestUrl) && HasNoUploadOrForm(options)
+            ? HttpRequestBodyLengthOf(options, report)
+            : ContentLengthUploadOf(options);
+
+    private static bool SentAnHttpRequest([NotNullWhen(true)] TransferReport? report, string requestUrl) =>
+        report is { RequestSize: > 0 } && IsHttpUrl(requestUrl);
+
+    private static bool IsHttpUrl(string url) =>
+        url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasNoUploadOrForm(EasyOptions options) =>
+        !options.Transfer.Upload && options.Http.MimePost is null && options.Http.HttpPost is null;
+
+    private static long HttpRequestBodyLengthOf(EasyOptions options, TransferReport report)
+    {
+        long declared = ContentLengthUploadOf(options);
+        return SendsNoBody(options, declared) || RedirectDroppedTheBody(report) ? 0
+            : options.Http.HttpHeaders.Any(IsChunkedTransferEncoding) ? -1
+            : declared;
+    }
+
+    private static bool SendsNoBody(EasyOptions options, long declared) =>
+        (declared < 0 && !options.Http.Post) || options.Transfer.NoBody || (options.Http.HttpGet && !options.Http.Post);
+
+    private static bool RedirectDroppedTheBody(TransferReport report) =>
+        report.RedirectCount > 0 && report.Method is "GET" or "HEAD";
+
+    private static bool IsChunkedTransferEncoding(string header) =>
+        header.StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) && header.Contains("chunked", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Records a performed transfer's outcome: the result's code, message and <see cref="Info" />, or
     /// <see cref="CurlCode.AbortedByCallback" /> with <paramref name="abortedText" /> when the progress or read
     /// callback aborted it. <see cref="TransferInfo.CookieList" /> is the cookie engine's list either way.
@@ -175,7 +218,7 @@ internal sealed partial class ManagedEasyTransfer
             TransferId = transferId,
             ConnectionId = connectionId,
             CookieList = cookieList,
-            ContentLengthUpload = ContentLengthUploadOf(options),
+            ContentLengthUpload = ContentLengthUploadOf(options, result.Report, requestUrl),
         };
         info = info with { SizeDelivered = lastWriteCallbackOutput?.BytesDelivered ?? info.SizeDownload };
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };

@@ -538,3 +538,7 @@ Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransf
 ## CURLINFO_SIZE_DELIVERED (BL-3655)
 
 `CallbackWriteStream.BytesDelivered` counts the bytes the write callback took, and a perform from the options puts that count of the body output its last context wrote to on `TransferInfo.SizeDelivered` (`lastWriteCallbackOutput`): the body after content decoding, with the header lines under `CURLOPT_HEADER`, as libcurl 8.22.0 counts what it passes the write callback (CGR-126). With no write callback, or under the runner's `ToolOutputs`, it is `SizeDownload`. Its tests are `Cgr126Tests`.
+
+## CURLINFO_CONTENT_LENGTH_UPLOAD after an HTTP request (BL-3656)
+
+Once an `http` or `https` request has been sent and the transfer is neither an upload nor a form post, `TransferInfo.ContentLengthUpload` is the last request's body size (`ManagedEasyTransfer.ContentLengthUploadOf(EasyOptions, TransferReport?, string)`): 0 with no body (no post, `CURLOPT_NOBODY`, `CURLOPT_HTTPGET`, or a redirect followed with `GET` or `HEAD`), -1 under a `Transfer-Encoding: chunked` header, else the post's size, as libcurl 8.22.0 sets it from each request's reader (CGR-127, ADR-0843). Its tests are `Cgr127Tests`.
