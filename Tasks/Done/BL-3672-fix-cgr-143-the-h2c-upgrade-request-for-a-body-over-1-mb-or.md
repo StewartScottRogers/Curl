@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpRequestFraming.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr143Tests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestFraming.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitTests/Cgr143Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3672 — Fix CGR-143: The h2c Upgrade request for a body over 1 MB, or for a chunked -T - upload, carries Expect: 100-continue; REF sends no Expect on an Upgra...
 
@@ -64,17 +64,26 @@ curl -sS --http2 -T - http://127.0.0.1:P/echo < /dev/null
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr143Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 3): Added `Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs` to touches: the wait for `100 Continue` is decided by the plan's framing in the handler, not the head formatter, and the h2c decision is only known there (the exchange's `HttpH2cUpgradeConnection`). No other task in Doing named it.
+- Fix: `HttpRequestFraming.ForH2cUpgrade` drops curl's own `Expect: 100-continue` line and its wait; chunking stays and an `-H Expect: 100-continue` still waits. `HttpProtocolHandler.ExchangeAsync` uses it when the exchange runs on an h2c upgrade connection (`PlanForConnection`). No ADR: this matches measured curl and takes no design choice.
+- Measured REF-LINUX (WSL curl 8.18.0, nghttp2 1.68.0) against `nc -l`: `curl -sS --http2 --data-binary @2m.bin http://127.0.0.1:P/echo` sends `POST /echo HTTP/1.1`, Host, User-Agent, `Accept: */*`, `Upgrade: h2c`, `HTTP2-Settings: AAMAAABkAAQAAQAAAAIAAAAA`, `Content-Length: 2097152`, `Content-Type: application/x-www-form-urlencoded`, `Connection: Upgrade, HTTP2-Settings`, then the body at once, with no Expect. `curl -sS --http2 -T - http://127.0.0.1:P/echo < /dev/null` sends `PUT /echo HTTP/1.1`, Host, User-Agent, Accept, `Transfer-Encoding: chunked`, Upgrade, HTTP2-Settings, Connection, then `0\r\n\r\n` at once.
+- End to end against a PowerShell TcpListener h2c server (it reads the head and any Content-Length body, answers `HTTP/1.1 101`, an empty SETTINGS, a SETTINGS ACK and HEADERS `:status 200` END_STREAM on stream 1, then logs everything until the close). REF-LINUX ran from WSL against the Windows host; Curl ran via `dotnet run --project Curl.Console`. Both commands, with `-w "[%{http_version} %{http_code} %{num_connects}]"`: REF exit 0, stdout `[2 200 1]`, stderr empty; Curl exit 0, stdout `[2 200 1]`, stderr empty. Both write no files. With Host and User-Agent normalised, the bytes on the wire are identical: 311 bytes for `-T -`, and 2,097,505 bytes for the 2 MiB POST (HTTP/1.1 head and body, then the HTTP/2 preface and frames).
+- The report's exit 16 (`Error in the HTTP2 framing layer`, `[1.1 101 1]`) for `-T -` came from its scripted nghttp2 server's answer, not from curl. Against the server above, real curl 8.18.0 exits 0, and Curl now sends it the same bytes and does the same. Before the fix, Curl's Expect wait was what the server answered differently (exit 56 in the report). Curl 8.22.0 has no HTTP/2 on Windows, so REF-LINUX 8.18.0 is the curl measured here.
+- Repro variants that already matched still match: the POST's head and the `-T -` head are otherwise unchanged (`HttpRequestHeadFormatterTests.H2cUpgrade` and `HttpProtocolHandlerTests.H2cUpgrade` pass), and an Upgrade request with a body under 1 MiB never carried Expect.
+- Found while measuring: a server that answers the Upgrade before reading the body gets 589,898 bytes from REF and the whole 2 MiB body from Curl. That case differs from this issue's, so it is filed as BL-3910.
+- Unit tests `Cgr143Tests` (2) both failed with the fix turned off (the Expect line in the head) and pass with it on. Fast tests: 46 projects green, no failures (Curl.Protocol.Http.UnitTests 2437 passed, 19 skipped). `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members. The change is platform-neutral (no paths or OS text), which covers CI on Linux and macOS.
 
 ## Log
 
 - 2026-10-26: Created from CGR-143 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. An h2c Upgrade request sends no Expect: 100-continue of curl's own and sends its body at once, as curl does
