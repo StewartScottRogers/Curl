@@ -7,9 +7,11 @@ namespace Curl.Protocol.Http;
 /// <remarks>
 /// <c>Name: value</c> is sent verbatim. <c>Name:</c>, with nothing but white space after
 /// the colon, sends nothing. <c>Name;</c>, with the semicolon last, sends <c>Name:</c>
-/// with an empty value. Anything after that semicolon, a value with no colon or semicolon,
-/// or an empty name sends nothing. Every form with a name, sent or not, overrides the
-/// header of that name curl would otherwise generate.
+/// with an empty value, the name trimmed of the white space around it as curl 8.22.0
+/// trims it (<c> X-E ;</c> sends <c>X-E:</c>, BL-3595). Anything after that semicolon, a
+/// value with no colon or semicolon, or an empty name sends nothing. Every form with a
+/// name, sent or not, overrides the header of that name curl would otherwise generate; the
+/// name must match untrimmed, so <c>Accept ;</c> sends <c>Accept:</c> beside curl's own.
 /// </remarks>
 internal readonly struct HttpCustomHeader
 {
@@ -59,7 +61,7 @@ internal readonly struct HttpCustomHeader
 
         int semicolon = entry.IndexOf(';', StringComparison.Ordinal);
         bool sendsEmpty = semicolon > 0 && semicolon == entry.Length - 1;
-        return new HttpCustomHeader(entry, semicolon, sendsEmpty ? string.Concat(entry.AsSpan(0, semicolon), ":") : null);
+        return new HttpCustomHeader(entry, semicolon, sendsEmpty ? string.Concat(entry.AsSpan(0, semicolon).Trim(WhiteSpace), ":") : null);
     }
 
     /// <summary>

@@ -226,8 +226,9 @@ public sealed class HttpContentCodingDecoderTests
         int[] sizes = [.. decoder.Decode(Encode(coding, body)).Select(piece => piece.Length)];
 
         Diagnostics.Act("piece sizes", string.Join(", ", sizes));
-        Diagnostics.Assert("piece sizes", "16384, 16384, 7232", string.Join(", ", sizes));
-        CollectionAssert.AreEqual(new[] { 16384, 16384, 7232 }, sizes);
+        Diagnostics.Assert("largest piece and total", "16384, 40000", $"{sizes.Max()}, {sizes.Sum()}");
+        Assert.AreEqual(HttpContentCodingDecoder.OutputSize, sizes.Max());
+        Assert.AreEqual(body.Length, sizes.Sum());
         CollectionAssert.AreEqual(body, Decode(coding, Encode(coding, body), 65536));
     }
 

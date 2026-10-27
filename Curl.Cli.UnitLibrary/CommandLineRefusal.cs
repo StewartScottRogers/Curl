@@ -37,9 +37,10 @@ public sealed class CommandLineRefusal
     /// <summary>The deepest <c>-K</c> nesting curl 8.21.0 reads: <c>CONFIG_MAX_LEVELS</c>.</summary>
     internal const int MaximumConfigFileDepth = 5;
 
-    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, string spelledOption, string reason)
+    private CommandLineRefusal(CurlExitCode exitCode, IReadOnlyList<string> errorLines, string spelledOption, string reason, bool echoesConfigFileText = false)
     {
         ExitCode = exitCode;
+        EchoesConfigFileText = echoesConfigFileText;
         ErrorLines = errorLines;
         Reason = reason;
         StandardErrorLines = [.. errorLines, $"curl: option {spelledOption}: {reason}", TryHelpLine];
@@ -87,6 +88,14 @@ public sealed class CommandLineRefusal
     /// note (measured 2026-09-27, BL-352).
     /// </summary>
     public bool FoundAtTransferSetup { get; }
+
+    /// <summary>
+    /// <see langword="true"/> when <see cref="StandardErrorLines"/> echo a config file's text, which curl
+    /// writes as the file's bytes (UTF-8): a refused config file line
+    /// (<see cref="ConfigFileOptionRefused"/>). <see langword="false"/> when they echo only command-line
+    /// text, which curl on Windows writes in the system ANSI code page it read that text in (ADR-0840, BL-3893).
+    /// </summary>
+    public bool EchoesConfigFileText { get; }
 
     /// <summary>
     /// The lines of <see cref="StandardErrorLines"/> curl prints as error messages before the
@@ -631,7 +640,8 @@ public sealed class CommandLineRefusal
             lineRefusal.ExitCode,
             ConfigFileLineErrorLines(file, lineNumber, option, lineRefusal, errorsHidden),
             spelledOption,
-            lineRefusal.Reason == UnknownOptionReason ? "found an unknown config option" : lineRefusal.Reason);
+            lineRefusal.Reason == UnknownOptionReason ? "found an unknown config option" : lineRefusal.Reason,
+            echoesConfigFileText: true);
     }
 
     /// <summary>

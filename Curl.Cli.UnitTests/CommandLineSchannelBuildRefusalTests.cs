@@ -79,7 +79,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
         reader.Files["k.txt"] = "ssl-sessions = x\n"u8.ToArray();
         Diagnostics.Bytes("k.txt", reader.Files["k.txt"]);
 
-        CommandLineParseResult result = Parse(["-K", "k.txt", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, reader, isWindows: true));
+        CommandLineParseResult result = Parse(["-K", "k.txt", Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), reader, isWindows: true));
 
         Diagnostics.AssertRefusal(
             result,
@@ -171,7 +171,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
     public void Parse_ProxyHttp3OnEitherBuild_IsRefusedAsNotSupported(bool isWindows)
     {
         Diagnostics.Arrange("is windows", isWindows);
-        CommandLineParseResult result = Parse(["-s", "--proxy-http3", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows));
+        CommandLineParseResult result = Parse(["-s", "--proxy-http3", Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows));
 
         AssertRefused(result, $"curl: option --proxy-http3: {NotSupported}");
     }
@@ -183,7 +183,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
     {
         // curl --no-proxy-http3 -s http://127.0.0.1:1/ (curl 8.21.0 Schannel, 2026-10-08) -> exit 7, nothing about the option
         Diagnostics.Arrange("is windows", isWindows);
-        CommandLineParseResult result = Parse(["-s", "--no-proxy-http3", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows));
+        CommandLineParseResult result = Parse(["-s", "--no-proxy-http3", Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows));
 
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);
@@ -208,7 +208,7 @@ public sealed class CommandLineSchannelBuildRefusalTests
             parsed => CommandLineParser.Parse(
                 parsed,
                 _ => false,
-                ConsolePasswordPrompt.ForProcessConsole,
+                new EmptyPasswordPrompt(),
                 new RecordingDataFileReader(),
                 new DefaultConfigFileSearch(_ => null, isWindows: true, null, null),
                 isWindows: true));
@@ -254,10 +254,10 @@ public sealed class CommandLineSchannelBuildRefusalTests
     }
 
     private CommandLineParseResult ParseAsWindowsBuild(IReadOnlyList<string> arguments) =>
-        Parse(arguments, parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: true));
+        Parse(arguments, parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows: true));
 
     private CommandLineParseResult ParseAsOpenSslBuild(IReadOnlyList<string> arguments) =>
-        Parse(arguments, parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false));
+        Parse(arguments, parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows: false));
 
     private void AssertRefused(CommandLineParseResult result, string optionLine)
     {

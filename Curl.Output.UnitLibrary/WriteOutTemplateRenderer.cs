@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text;
 
 namespace Curl.Output;
@@ -27,7 +28,13 @@ namespace Curl.Output;
 /// A file that cannot be opened leaves the output where it was. A header name of 256 bytes
 /// or more renders nothing, and a file name of 512 bytes or more is not opened, as curl's
 /// fixed buffers do. A <c>%{name}</c> of 24 bytes or more ends the rendering there,
-/// silently, as curl's 24-byte name buffer does. Text is written as UTF-8.
+/// silently, as curl's 24-byte name buffer does. Text is written in the text encoding the
+/// renderer was given (UTF-8, or on Windows the ANSI code page curl's arguments arrive in,
+/// CGR-015, ADR-0830), except header
+/// bytes marked by <see cref="MarkHeaderBytes"/>, which are written as the raw bytes they
+/// were (CGR-021, ADR-0816), and lone surrogates U+DC80 to U+DCFF, which stand for argument
+/// bytes that were not valid UTF-8 (CGR-016, ADR-0822), which are written as those bytes, as
+/// curl writes its arguments unchanged.
 /// </para>
 /// <para>
 /// The Windows curl writes all three targets in text mode, so every line feed it writes,
@@ -39,19 +46,46 @@ namespace Curl.Output;
 /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
 /// <param name="timeDialect">The C runtime whose <c>strftime</c> <c>%time{format}</c> follows: the Windows one, or glibc for Linux and macOS.</param>
 /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
+/// <param name="textEncoding">The encoding text is written in: UTF-8, or the ANSI code page on Windows, as curl writes its argument bytes.</param>
 public sealed class WriteOutTemplateRenderer(
     IWriteOutFileOpener fileOpener,
     bool writesLineFeedAsCrLf,
     WriteOutTimeDialect timeDialect,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Encoding textEncoding)
 {
+    /// <summary>Creates a renderer that writes its text as UTF-8.</summary>
+    /// <param name="fileOpener">Opens the <c>%output{file}</c> targets.</param>
+    /// <param name="writesLineFeedAsCrLf"><see langword="true"/> to write each line feed as CR LF, as the Windows curl does.</param>
+    /// <param name="timeDialect">The C runtime whose <c>strftime</c> <c>%time{format}</c> follows.</param>
+    /// <param name="timeProvider">Supplies the time <c>%time{format}</c> renders.</param>
+    public WriteOutTemplateRenderer(IWriteOutFileOpener fileOpener, bool writesLineFeedAsCrLf, WriteOutTimeDialect timeDialect, TimeProvider timeProvider)
+        : this(fileOpener, writesLineFeedAsCrLf, timeDialect, timeProvider, Encoding.UTF8)
+    {
+    }
+
     private const int VariableNameBufferBytes = 24;
     private const int HeaderNameBufferBytes = 256;
     private const int FileNameBufferBytes = 512;
+    private const char FirstHighByte = '\u0080';
+    private const char LastHighByte = 'ÿ';
+    private const int RawByteOffset = 0xF700;
+    private const char FirstInvalidByteEscape = '\uDC80';
+    private const char LastInvalidByteEscape = '\uDCFF';
+
+    /// <summary>
+    /// The characters written as one raw byte each: a marked header byte (U+F780 to U+F7FF)
+    /// and an invalid UTF-8 argument byte kept as a lone surrogate (U+DC80 to U+DCFF, ADR-0822);
+    /// byte <c>b</c> is the character's low eight bits either way.
+    /// </summary>
+    private static readonly SearchValues<char> RawByteCharacters = SearchValues.Create(
+        CharactersFrom((char)(RawByteOffset + FirstHighByte), (char)(RawByteOffset + LastHighByte))
+        + CharactersFrom(FirstInvalidByteEscape, LastInvalidByteEscape));
 
     private readonly IWriteOutFileOpener fileOpener = fileOpener ?? throw new ArgumentNullException(nameof(fileOpener));
     private readonly WriteOutTimeDialect timeDialect = timeDialect;
     private readonly TimeProvider timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+    private readonly Encoding textEncoding = textEncoding ?? throw new ArgumentNullException(nameof(textEncoding));
 
     /// <summary>
     /// The warning line, without its line terminator, curl writes to standard error for a
@@ -96,9 +130,80 @@ public sealed class WriteOutTemplateRenderer(
         }
     }
 
+    /// <summary>
+    /// Marks each character from U+0080 to U+00FF of <paramref name="headerText"/>, a header
+    /// text whose bytes are held one per character (Latin-1), so that
+    /// <see cref="RenderAsync"/> writes it back as that one byte rather than as UTF-8, as curl
+    /// writes header bytes unchanged. Every other character is kept as it is.
+    /// </summary>
+    /// <remarks>
+    /// A marked byte is carried as a character from U+F780 to U+F7FF, byte <c>b</c> as
+    /// <c>U+F700 + b</c>; a template that itself holds one of those private-use characters
+    /// therefore writes it as that raw byte.
+    /// </remarks>
+    /// <param name="headerText">The header text, one byte per character.</param>
+    /// <returns>The text with its bytes from 0x80 marked.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="headerText"/> is <see langword="null"/>.</exception>
+    public static string MarkHeaderBytes(string headerText)
+    {
+        ArgumentNullException.ThrowIfNull(headerText);
+        return string.Create(headerText.Length, headerText, static (marked, text) =>
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                char character = text[index];
+                marked[index] = character is >= FirstHighByte and <= LastHighByte ? (char)(RawByteOffset + character) : character;
+            }
+        });
+    }
+
     private byte[] Encode(string text)
     {
-        return Encoding.UTF8.GetBytes(writesLineFeedAsCrLf ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text);
+        string lines = writesLineFeedAsCrLf ? text.Replace("\n", "\r\n", StringComparison.Ordinal) : text;
+        return lines.AsSpan().IndexOfAny(RawByteCharacters) < 0
+            ? textEncoding.GetBytes(lines)
+            : EncodeWithRawBytes(lines);
+    }
+
+    private static string CharactersFrom(char first, char last) =>
+        string.Create(last - first + 1, first, static (characters, start) =>
+        {
+            for (int index = 0; index < characters.Length; index++)
+            {
+                characters[index] = (char)(start + index);
+            }
+        });
+
+    private byte[] EncodeWithRawBytes(string text)
+    {
+        List<byte> bytes = new(text.Length);
+        StringBuilder textRun = new();
+        ReadOnlySpan<char> rest = text;
+        while (!rest.IsEmpty)
+        {
+            Rune.DecodeFromUtf16(rest, out _, out int consumed);
+            char first = rest[0];
+            if (RawByteCharacters.Contains(first))
+            {
+                AppendEncodedRun(bytes, textRun);
+                bytes.Add((byte)first);
+            }
+            else
+            {
+                textRun.Append(rest[..consumed]);
+            }
+
+            rest = rest[consumed..];
+        }
+
+        AppendEncodedRun(bytes, textRun);
+        return [.. bytes];
+    }
+
+    private void AppendEncodedRun(List<byte> bytes, StringBuilder textRun)
+    {
+        bytes.AddRange(textEncoding.GetBytes(textRun.ToString()));
+        textRun.Clear();
     }
 
     /// <summary>One pass over one template, holding where the output currently goes.</summary>
@@ -229,7 +334,7 @@ public sealed class WriteOutTemplateRenderer(
             }
 
             // curl's name buffer refuses a name this long, and its loop ends there silently.
-            if (Encoding.UTF8.GetByteCount(name) >= VariableNameBufferBytes)
+            if (renderer.textEncoding.GetByteCount(name) >= VariableNameBufferBytes)
             {
                 position = template.Length;
                 return;
@@ -293,7 +398,7 @@ public sealed class WriteOutTemplateRenderer(
                 return;
             }
 
-            if (Encoding.UTF8.GetByteCount(content) >= HeaderNameBufferBytes)
+            if (renderer.textEncoding.GetByteCount(content) >= HeaderNameBufferBytes)
             {
                 return;
             }
@@ -346,7 +451,7 @@ public sealed class WriteOutTemplateRenderer(
                 return;
             }
 
-            if (Encoding.UTF8.GetByteCount(path) >= FileNameBufferBytes)
+            if (renderer.textEncoding.GetByteCount(path) >= FileNameBufferBytes)
             {
                 return;
             }

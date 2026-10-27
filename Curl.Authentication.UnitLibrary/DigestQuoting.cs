@@ -29,4 +29,13 @@ internal static class DigestQuoting
 
         return quoted.ToString();
     }
+
+    /// <summary>
+    /// Puts a backslash before each double quote and backslash and leaves every other byte as
+    /// it is, as the SSPI behind curl's Schannel build writes a user name and realm (BL-3606).
+    /// </summary>
+    /// <param name="byteString">One character per byte.</param>
+    /// <returns>The escaped text, without the surrounding quotes.</returns>
+    internal static string QuoteAsSspi(string byteString) =>
+        byteString.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
 }

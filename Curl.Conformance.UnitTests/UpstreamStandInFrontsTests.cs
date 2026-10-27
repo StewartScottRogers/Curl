@@ -26,11 +26,11 @@ public sealed class UpstreamStandInFrontsTests
     }
 
     [TestMethod]
-    public void WithFeatures_ReportsTheSmbProtocol()
+    public void WithFeatures_DoesNotReportTheSmbProtocol()
     {
         UpstreamCurlPlatform platform = UpstreamStandInFronts.Create(null, null, null).WithFeatures(UpstreamCurlPlatform.All[0]);
 
-        Assert.Contains("smb", platform.Features);
+        Assert.DoesNotContain("smb", platform.Features);
     }
 
     [TestMethod]

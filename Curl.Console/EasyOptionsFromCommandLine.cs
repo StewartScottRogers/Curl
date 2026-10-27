@@ -126,6 +126,10 @@ internal static class EasyOptionsFromCommandLine
     // The type curl's tool gives a pkcs11: certificate or key without --cert-type or --key-type.
     private const string EnginePkcs11Type = "ENG";
 
+    // The most whole seconds a TimeSpan holds. On Linux and macOS curl reads --keepalive-time and
+    // --speed-time as a 64-bit long, past what a TimeSpan holds; such a wait never ends (CGR-039, BL-3568).
+    private const long MostTimeSpanSeconds = long.MaxValue / TimeSpan.TicksPerSecond;
+
     // The versions the parser records, as SslProtocols, and the CURL_SSLVERSION_* each is as a minimum.
     private static readonly FrozenDictionary<SslProtocols, SslVersion> SslVersionsByProtocol = new Dictionary<SslProtocols, SslVersion>
     {
@@ -229,6 +233,14 @@ internal static class EasyOptionsFromCommandLine
             },
         };
 
+    // A --keepalive-time or --speed-time held to what a TimeSpan holds.
+    internal static long AtMostTimeSpanSeconds(long seconds) => Math.Min(seconds, MostTimeSpanSeconds);
+
+    // A --connect-timeout or -m held to the longest wait a .NET timer takes: on Linux and macOS curl takes
+    // one longer, which ends no sooner than this (CGR-039, BL-3568).
+    internal static TimeSpan AtMostLongestTimerWait(TimeSpan wait) =>
+        wait < Core.MaxTimeWatchdog.LongestTimerWait ? wait : Core.MaxTimeWatchdog.LongestTimerWait;
+
     // The keepalive switch and timings. curl sets the timings only with keepalive on, and only those given.
     private static EasyNetworkOptions WithKeepAlive(CommandLineOptions options, EasyNetworkOptions network)
     {
@@ -236,8 +248,8 @@ internal static class EasyOptionsFromCommandLine
         return network with
         {
             TcpKeepAlive = options.TcpKeepAlive,
-            TcpKeepIdle = keepAliveTimeGiven ? TimeSpan.FromSeconds(options.TcpKeepAliveSeconds) : network.TcpKeepIdle,
-            TcpKeepInterval = keepAliveTimeGiven ? TimeSpan.FromSeconds(options.TcpKeepAliveSeconds) : network.TcpKeepInterval,
+            TcpKeepIdle = keepAliveTimeGiven ? TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.TcpKeepAliveSeconds)) : network.TcpKeepIdle,
+            TcpKeepInterval = keepAliveTimeGiven ? TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.TcpKeepAliveSeconds)) : network.TcpKeepInterval,
             TcpKeepCount = options.TcpKeepAlive && options.TcpKeepAliveProbeCount > 0 ? (int)options.TcpKeepAliveProbeCount : network.TcpKeepCount,
         };
     }
@@ -259,7 +271,7 @@ internal static class EasyOptionsFromCommandLine
     private static EasyNetworkOptions WithTimeoutsAndSecurity(CommandLineOptions options, EasyNetworkOptions network) =>
         network with
         {
-            ConnectTimeout = options.ConnectTimeout is { } connect && connect > TimeSpan.Zero ? connect : network.ConnectTimeout,
+            ConnectTimeout = options.ConnectTimeout is { } connect && connect > TimeSpan.Zero ? AtMostLongestTimerWait(connect) : network.ConnectTimeout,
             HappyEyeballsTimeout = options.HappyEyeballsTimeout is { } eyeballs && eyeballs > TimeSpan.Zero ? eyeballs : network.HappyEyeballsTimeout,
             UseSsl = UseSslOf(options),
         };
@@ -713,6 +725,7 @@ internal static class EasyOptionsFromCommandLine
         transfer with
         {
             TimeCondition = options.TimeCondition is not { } condition ? EasyTimeCondition.None
+                : condition.SentAsLastModified ? EasyTimeCondition.LastModified
                 : condition.Kind == TimeConditionKind.IfModifiedSince ? EasyTimeCondition.IfModifiedSince
                 : EasyTimeCondition.IfUnmodifiedSince,
             TimeValue = options.TimeCondition?.ValueUnixSeconds ?? transfer.TimeValue,
@@ -725,7 +738,7 @@ internal static class EasyOptionsFromCommandLine
         transfer with
         {
             LowSpeedLimit = options.SpeedLimit ?? (options.SpeedTimeSeconds is null ? 0 : 1),
-            LowSpeedTime = TimeSpan.FromSeconds(options.SpeedTimeSeconds ?? (options.SpeedLimit is null ? 0 : 30)),
+            LowSpeedTime = TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.SpeedTimeSeconds ?? (options.SpeedLimit is null ? 0 : 30))),
         };
 
     // --limit-rate both ways; the tool's receive buffer is 100 KiB, or a smaller --limit-rate; -m is set only when positive.
@@ -737,7 +750,7 @@ internal static class EasyOptionsFromCommandLine
             MaxSendSpeed = rate,
             MaxReceiveSpeed = rate,
             BufferSize = rate is > 0 and < ToolBufferSize ? rate : ToolBufferSize,
-            Timeout = options.MaxTime is { } maxTime && maxTime > TimeSpan.Zero ? maxTime : transfer.Timeout,
+            Timeout = options.MaxTime is { } maxTime && maxTime > TimeSpan.Zero ? AtMostLongestTimerWait(maxTime) : transfer.Timeout,
         };
     }
 

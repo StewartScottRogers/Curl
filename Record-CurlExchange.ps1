@@ -64,7 +64,7 @@
     files there are overwritten.
 
 .PARAMETER Connections
-    How many connections to serve. Default 1. Use more for a run that makes several
+    How many connections to serve. Default one per Response entry (1 for a single Response). Use more for a run that makes several
     requests, such as several URLs or a followed redirect.
 
 .PARAMETER ResponseDelayMilliseconds
@@ -166,7 +166,8 @@
     Overrides for the FTP reply table, each 'VERB=reply' with the same backslash escapes
     as Response, e.g. 'PASS=430 Access denied'. The reply is sent as given with CRLF
     appended. VERB is a command name in capitals, GREETING for the greeting, or RETRDONE
-    for the reply sent after RETR's or LIST's data, or STORDONE for the reply sent after
+    for the reply sent after RETR's or LIST's data, RETROPEN for the 150 sent before it
+    (still opening the data connection, e.g. 'RETROPEN=150 Opening (5 bytes)', BL-3627), or STORDONE for the reply sent after
     STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, NLST, STOR or APPE sends
     only the reply: no data connection is offered. The reply CLOSE closes the control
     connection instead of answering, e.g. 'PWD=CLOSE', and the reply STALL sends nothing and
@@ -174,7 +175,9 @@
     answered in the order given, one per command, the last repeating for the rest, e.g.
     'CWD=550 No such directory' 'CWD=250 OK' (BL-436). In a reply, {DATAPORT} stands for
     the data listener's port and {DATAPORT_HI} and {DATAPORT_LO} for its two PASV numbers,
-    e.g. 'PASV=227 Entering Passive Mode (127,0,0,2,{DATAPORT_HI},{DATAPORT_LO})'.
+    e.g. 'PASV=227 Entering Passive Mode (127,0,0,2,{DATAPORT_HI},{DATAPORT_LO})'. A line
+    {PAUSE} between reply lines sends the lines before it, waits a second and sends the
+    rest, e.g. 'RETR=150 Opening\r\n{PAUSE}\r\n425 Cannot open data connection' (CGR-099).
 
 .PARAMETER FtpData
     The file served by RETR, and the listing served by LIST, in -Ftp mode, with the
@@ -510,6 +513,28 @@
     status line's reason phrase is "Connection established" for 200, "Proxy Authentication
     Required" for 407, and "Status" otherwise.
 
+.PARAMETER Http2ResetCode
+    With -Http2Origin, answer every HTTP/2 request with RST_STREAM carrying this error code
+    instead of a HEADERS frame, and serve every connection curl opens rather than one, so a
+    retry on a new connection is recorded too (BL-3561: 13, HTTP_1_1_REQUIRED, makes curl
+    resend over HTTP/1.1, which gets the first Response). Default -1, no reset.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2ResetCode 13 -Port 18080 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nh1 hello\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-reset-13
+
+.PARAMETER Http2Answer
+    With -Http2Origin, how every HTTP/2 request is answered instead of a plain :status plus
+    content-length 0 (BL-3912): `push` sends a PUSH_PROMISE (END_HEADERS, promised stream 2,
+    a GET / request header block) on the request's stream before the HEADERS `:status: 200`;
+    `status:<value>` answers with that exact string as `:status` (`status:2x0`,
+    `status:20`, `status:200 ` with a trailing space); `nostatus` answers with a HEADERS
+    block holding only content-length 0. Default empty, the ordinary answer.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Answer push -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-push
+
+.PARAMETER Http2NoSettings
+    With -Http2 or -Http2Origin, never send the server's SETTINGS frame: the first frame curl
+    gets is the answer's HEADERS (BL-3668, CGR-139: curl answers GOAWAY "SETTINGS expected"
+    and exits 16). A GOAWAY's debug data is noted after its error code.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2NoSettings -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-no-settings
+
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
     to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
@@ -694,6 +719,9 @@ param(
     [ValidateSet('', 'h2c-upgrade', 'h2c-upgrade-ignored', 'prior-knowledge', 'alpn')] [string] $Http2Origin = '',
     [ValidateRange(100, 999)] [int] $ProxyStatus = 200,
     [ValidateSet('h2', 'http/1.1')] [string] $ProxyAlpn = 'h2',
+    [int] $Http2ResetCode = -1,
+    [ValidatePattern('^(|push|nostatus|status:.*)$')] [string] $Http2Answer = '',
+    [switch] $Http2NoSettings,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -722,6 +750,7 @@ if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is
 if ($Tftp -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $UdpSink)) { throw '-Tftp serves one TFTP transfer on UDP -Port, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket or -UdpSink.' }
 if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
 if ($Http2Origin) { $Http2 = [switch] $true }
+if ($Http2Answer -and -not $Http2Origin) { throw '-Http2Answer answers an HTTP/2 origin, so it needs -Http2Origin.' }
 if ($Http2Origin -eq 'alpn' -and -not $Tls) { throw '-Http2Origin alpn is an HTTPS origin that picks h2 or http/1.1 by ALPN, so it needs -Tls.' }
 if ($Http2Origin -and $Http2Origin -ne 'alpn' -and $Tls) { throw '-Http2Origin h2c-upgrade, h2c-upgrade-ignored and prior-knowledge are plain TCP, so they cannot be combined with -Tls.' }
 if ($Http2 -and -not $Tls -and -not $Http2Origin) { throw '-Http2 is an HTTPS proxy that picks h2 by ALPN, so it needs -Tls.' }
@@ -1034,10 +1063,18 @@ $serveFtpSession = {
     function Send-Reply {
         param($Stream, [string] $Reply)
         $Reply = $Reply.Replace('{DATAPORT_HI}', [string] [Math]::Floor($dataPort / 256)).Replace('{DATAPORT_LO}', [string] ($dataPort % 256)).Replace('{DATAPORT}', [string] $dataPort)
-        $bytes = $latin1.GetBytes($Reply + "`r`n")
-        $Stream.Write($bytes, 0, $bytes.Length)
-        $Stream.Flush()
-        foreach ($line in ($Reply -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+        # A {PAUSE} line sends the lines before it, waits a second, then sends the rest (CGR-099).
+        $parts = $Reply -split [regex]::Escape("`r`n{PAUSE}`r`n")
+        for ($index = 0; $index -lt $parts.Length; $index++) {
+            if ($index -gt 0) {
+                [System.Threading.Thread]::Sleep(1000)
+                [void] $Transcript.Append("= paused 1000 ms`r`n")
+            }
+            $bytes = $latin1.GetBytes($parts[$index] + "`r`n")
+            $Stream.Write($bytes, 0, $bytes.Length)
+            $Stream.Flush()
+            foreach ($line in ($parts[$index] -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+        }
     }
 
     try {
@@ -1125,7 +1162,8 @@ $serveFtpSession = {
                     'EPSV' { Send-Reply -Stream $stream -Reply "229 Entering Extended Passive Mode (|||$dataPort|)" }
                     'PASV' { Send-Reply -Stream $stream -Reply "227 Entering Passive Mode ($($ListenAddress.ToString().Replace('.', ',')),$([Math]::Floor($dataPort / 256)),$($dataPort % 256))" }
                     { $_ -eq 'RETR' -or $_ -eq 'LIST' -or $_ -eq 'NLST' } {
-                        Send-Reply -Stream $stream -Reply '150 Opening BINARY mode data connection'
+                        $opening = if ($Overrides.ContainsKey('RETROPEN')) { Get-Override -Verb 'RETROPEN' } else { '150 Opening BINARY mode data connection' }
+                        Send-Reply -Stream $stream -Reply $opening
                         $dataClient, $dataStream = Open-DataConnection -Verb $verb -ActiveEndPoint $activeEndPoint -Protect $protectData
                         try {
                             $start = [int] [Math]::Max(0, [Math]::Min($restOffset, $DataBytes.Length))
@@ -2203,8 +2241,13 @@ public sealed class RecorderHttp2Proxy
     private readonly HuffmanDecoder _huffman;
     private Thread _thread;
 
-    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin)
+    private readonly int _resetCode;
+    public bool OmitSettings { get; set; }
+    public string Answer { get; set; } = "";
+
+    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode)
     {
+        _resetCode = resetCode;
         _origin = origin;
         _listener = listener;
         _certificate = certificate;
@@ -2241,12 +2284,31 @@ public sealed class RecorderHttp2Proxy
         return Encoding.Latin1.GetString(bytes, offset, count).Replace("\r", "\\r").Replace("\n", "\\n");
     }
 
+    // One connection, or with a reset code every connection, each on a thread of its own since
+    // curl holds the first open while it retries on the next, until Finish stops the listener.
     private void Serve()
+    {
+        var connections = new List<Thread>();
+        for (int number = 1; ServeConnection(number, connections) && _resetCode >= 0; number++) { }
+        foreach (Thread connection in connections) { connection.Join(6000); }
+    }
+
+    private bool ServeConnection(int number, List<Thread> connections)
     {
         TcpClient client;
         try { client = _listener.AcceptTcpClient(); }
-        catch (SocketException) { Note("= curl opened no connection"); return; }
-        catch (ObjectDisposedException) { Note("= curl opened no connection"); return; }
+        catch (SocketException) { if (number == 1) { Note("= curl opened no connection"); } return false; }
+        catch (ObjectDisposedException) { if (number == 1) { Note("= curl opened no connection"); } return false; }
+        if (_resetCode < 0) { ServeClient(client); return true; }
+        Note("= connection " + number);
+        var thread = new Thread(() => ServeClient(client)) { IsBackground = true };
+        connections.Add(thread);
+        thread.Start();
+        return true;
+    }
+
+    private void ServeClient(TcpClient client)
+    {
         using (client)
         {
             try
@@ -2257,7 +2319,7 @@ public sealed class RecorderHttp2Proxy
                 {
                     ServerCertificate = _certificate,
                     EnabledSslProtocols = SslProtocols.Tls12,
-                    ApplicationProtocols = new List<SslApplicationProtocol> { _alpn == "h2" ? SslApplicationProtocol.Http2 : SslApplicationProtocol.Http11 }
+                    ApplicationProtocols = _resetCode >= 0 ? new List<SslApplicationProtocol> { SslApplicationProtocol.Http2, SslApplicationProtocol.Http11 } : new List<SslApplicationProtocol> { _alpn == "h2" ? SslApplicationProtocol.Http2 : SslApplicationProtocol.Http11 }
                 };
                 tls.AuthenticateAsServer(options);
                 tls.ReadTimeout = 5000;
@@ -2359,8 +2421,15 @@ public sealed class RecorderHttp2Proxy
         Buffer.BlockCopy(already, 0, preface, 0, already.Length);
         Buffer.BlockCopy(more, 0, preface, already.Length, more.Length);
         Note("> PREFACE " + Escape(preface, 0, preface.Length));
-        WriteFrame(stream, 4, 0, 0, new byte[0]);
-        Note("< SETTINGS");
+        if (OmitSettings)
+        {
+            Note("= no SETTINGS sent");
+        }
+        else
+        {
+            WriteFrame(stream, 4, 0, 0, new byte[0]);
+            Note("< SETTINGS");
+        }
         var headerBlock = new MemoryStream();
         var tunnel = new MemoryStream();
         int tunnelStream = 0;
@@ -2441,7 +2510,7 @@ public sealed class RecorderHttp2Proxy
                     if ((flags & 0x1) == 0) { WriteFrame(stream, 6, 1, 0, payload); Note("< PING ACK"); }
                     break;
                 case 7:
-                    Note("> GOAWAY last stream " + (((payload[0] & 0x7f) << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]) + " error " + ((payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]));
+                    Note("> GOAWAY last stream " + (((payload[0] & 0x7f) << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]) + " error " + ((payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]) + (length > 8 ? " debug " + Escape(payload, 8, length - 8) : ""));
                     return;
                 case 8: Note("> WINDOW_UPDATE" + frame + " increment " + ((payload[0] & 0x7f) << 24 | (payload[1] << 16) | (payload[2] << 8) | payload[3])); break;
                 default: Note("> frame type " + type + frame + " " + length + " bytes"); break;
@@ -2453,6 +2522,13 @@ public sealed class RecorderHttp2Proxy
     // request that is not a CONNECT (a forwarded GET), has no body and ends the stream.
     private void AnswerConnect(Stream stream, int streamId, bool connect)
     {
+        if (_resetCode >= 0)
+        {
+            WriteFrame(stream, 3, 0, streamId, BigEndian32(_resetCode));
+            Note("< RST_STREAM stream " + streamId + " error " + _resetCode);
+            return;
+        }
+        if (Answer.Length > 0 && !connect) { AnswerScenario(stream, streamId); return; }
         var block = new List<byte> { 0x08 };
         AppendLiteral(block, _status.ToString());
         bool refused = _status / 100 != 2 || !connect;
@@ -2468,6 +2544,31 @@ public sealed class RecorderHttp2Proxy
         Note("< HEADERS stream " + streamId + " flags 0x" + flags.ToString("x2"));
         Note("<   :status: " + _status);
         if (refused) { Note("<   content-length: 0"); }
+    }
+
+    // BL-3912: push, status:<value> and nostatus answers; each ends the stream with content-length 0.
+    private void AnswerScenario(Stream stream, int streamId)
+    {
+        if (Answer == "push")
+        {
+            var promise = new List<byte> { 0, 0, 0, 2, 0x82, 0x86, 0x84 };
+            WriteFrame(stream, 5, 0x04, streamId, promise.ToArray());
+            Note("< PUSH_PROMISE stream " + streamId + " flags 0x04 promised stream 2");
+        }
+        var block = new List<byte>();
+        string status = Answer.StartsWith("status:") ? Answer.Substring(7) : Answer == "push" ? "200" : null;
+        if (status != null)
+        {
+            block.Add(0x08);
+            AppendLiteral(block, status);
+        }
+        block.Add(0x0f);
+        block.Add(0x0d);
+        AppendLiteral(block, "0");
+        WriteFrame(stream, 1, 0x05, streamId, block.ToArray());
+        Note("< HEADERS stream " + streamId + " flags 0x05");
+        Note(status != null ? "<   :status: " + status : "<   (no :status)");
+        Note("<   content-length: 0");
     }
 
     private static void AppendLiteral(List<byte> block, string value)
@@ -2594,7 +2695,9 @@ public sealed class RecorderHttp2Proxy
 '@
     $server.Dispose()
     $server = $null
-    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }))
+    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode)
+    $http2Proxy.OmitSettings = [bool]$Http2NoSettings
+    $http2Proxy.Answer = $Http2Answer
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
@@ -3206,7 +3309,9 @@ try {
     } elseif ($Script) {
         [void] $server.AddScript($serveScriptedSession).AddArgument($listener).AddArgument($scriptSteps).AddArgument($transcript).AddArgument($tlsCertificate).AddArgument([bool] $Tls).AddArgument($ScriptIdleMilliseconds).AddArgument($ScriptGapMilliseconds).AddArgument($sessionHelpers.ToString())
     } else {
-        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($Connections).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse).AddArgument($RequestReadMilliseconds)
+        # One connection per Response entry unless -Connections says otherwise, so a --retry attempt after a 503 is answered with the next entry (BL-3825).
+        $serveConnectionCount = if ($PSBoundParameters.ContainsKey('Connections') -or $AnswerHeldRequests -gt 0) { $Connections } else { [Math]::Max(1, $Response.Count) }
+        [void] $server.AddScript($serveConnections).AddArgument($listener).AddArgument($responseBytes).AddArgument($serveConnectionCount).AddArgument($ResponseDelayMilliseconds).AddArgument([bool] $Reset).AddArgument($RespondAfterBodyBytes).AddArgument($tlsCertificate).AddArgument($HoldOpenMilliseconds).AddArgument([bool] $TlsCloseNotify).AddArgument($AnswerHeldRequests).AddArgument([bool] $ResetAfterResponse).AddArgument([bool] $HalfCloseAfterResponse).AddArgument($RequestReadMilliseconds)
     }
     if ($null -ne $server) { $serverRun = $server.BeginInvoke() }
 

@@ -18,7 +18,7 @@ namespace Curl.Core;
 /// A hop is followed when it succeeded with a 3xx status and a redirect URL. Before
 /// following, the limit is checked (exit 47, <c>Maximum (N) redirects followed</c>), then
 /// whether the target parses (exit 3, <c>The redirect target URL could not be parsed:
-/// Bad IPv6 address</c>, <c>Bad hostname</c> or the port reason), then the target's scheme: one this curl build cannot parse fails with exit 1,
+/// Malformed input to a URL function</c> for a control byte or DEL, <c>Bad IPv6 address</c>, <c>Bad hostname</c> or the port reason), then the target's scheme: one this curl build cannot parse fails with exit 1,
 /// <c>The redirect target URL could not be parsed: Unsupported URL scheme</c>, and one
 /// <see cref="RedirectPolicy.AllowedSchemes" /> (<c>--proto-redir</c>) or
 /// <see cref="RedirectPolicy.AllowedTransferSchemes" /> (<c>--proto</c>) does not allow with exit 1,
@@ -86,11 +86,12 @@ namespace Curl.Core;
 /// is sent to the next hop before any challenge, as libcurl 8.21.0 does (upstream test1088, BL-1819).
 /// </para>
 /// <para>
-/// Every hop that may be sent credentials is sent the previous hop's
-/// <see cref="TransferReport.DigestAuthorizationSent" /> as
+/// Every hop to the previous hop's scheme, host and port that may be sent credentials is sent the
+/// previous hop's <see cref="TransferReport.DigestAuthorizationSent" /> as
 /// <see cref="HttpRequestOptions.KeptDigestAuthorization" />, so a Digest answer goes to the next
 /// hop again with its nonce counted on, as curl 8.22.0 sends <c>nc=00000002</c> after a same-host
-/// redirect (upstream test1286, BL-2252); a hop that may not is sent none.
+/// redirect (upstream test1286, BL-2252); any other hop, even one <c>--location-trusted</c> sends
+/// credentials to, is sent none and waits for its own challenge (CGR-072, BL-3601).
 /// </para>
 /// <para>
 /// Every hop after one whose response was HTTP/1.0 is sent
@@ -160,6 +161,9 @@ public sealed class RedirectFollower(
 
     private readonly bool rewindFailsAsReadError = runsOnWindows ?? OperatingSystem.IsWindows();
 
+    // curl's Windows build reads a single letter and a colon as a drive prefix, not a scheme.
+    private readonly bool driveLetterIsNotScheme = runsOnWindows ?? OperatingSystem.IsWindows();
+
     private static readonly HashSet<string> SchemesCurlParses = new(
         [
             "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap",
@@ -167,6 +171,9 @@ public sealed class RedirectFollower(
             "smtp", "smtps", "telnet", "tftp", "ws", "wss",
         ],
         StringComparer.Ordinal);
+
+    private static readonly System.Buffers.SearchValues<char> SchemeCharacters =
+        System.Buffers.SearchValues.Create("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.");
 
     /// <summary>
     /// Performs the transfer, following redirects when
@@ -217,10 +224,12 @@ public sealed class RedirectFollower(
         {
             TransferResult result = await DispatchAsync(hop, policy);
             chain.Add(result.Report, hop.Http!.Referer);
-            if (RedirectTarget(result) is not { } target)
+            if (RedirectTarget(result) is not { } redirectUrl)
             {
                 return chain.Merge(result);
             }
+
+            string target = chain.Targeted(redirectUrl);
 
             int responseCode = result.Report!.ResponseCode;
             receivedHttp10 |= result.Report.HttpVersion == HttpVersion.Version10;
@@ -246,7 +255,7 @@ public sealed class RedirectFollower(
             }
 
             // No stop means the target parsed, so next is set.
-            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped, policy) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = result.Report.DigestAuthorizationSent, EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
+            hop = NextHop(context, hop.Url, next!, HopMethod(http, methodDropped, policy) with { RedirectsFollowed = chain.RedirectCount, ResponseHeadersStored = result.Report.ResponseHeadersStored, AuthSchemePicked = result.Report.AuthSchemePicked, KeptDigestAuthorization = KeptDigestAuthorization(hop.Url, next!, result.Report), EarlierResponseWasHttp10 = receivedHttp10 }, hopProxy, bodyDropped, policy.LocationTrusted || IsSameOrigin(context.Url, next!), operationStarted, selectHopAltSvc, selectHopCredentials);
         }
     }
 
@@ -398,14 +407,9 @@ public sealed class RedirectFollower(
             return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
         }
 
-        if (!CurlUrl.TryParse(EncodedForFollow(target), first.PathAsIs, out next))
+        if (ParseRefusal(target, first.PathAsIs, out next) is { } parseRefusal)
         {
-            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
-        }
-
-        if (!SchemesCurlParses.Contains(next.Scheme))
-        {
-            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
+            return parseRefusal;
         }
 
         first.Events.ReportInfo(IssueAnotherRequestMessagePrefix + target + "'");
@@ -414,8 +418,35 @@ public sealed class RedirectFollower(
             first.Events.ReportInfo(methodSwitchMessage);
         }
 
-        next = SwitchedToHttps(ref target, next, first);
+        next = SwitchedToHttps(ref target, next!, first);
         return ProtocolDisabledRefusal(next.Scheme, policy, first);
+    }
+
+    /// <summary>
+    /// curl's refusal of a <paramref name="target" /> that names a scheme it does not know
+    /// (exit 1) or does not parse (exit 3), or <see langword="null" /> with the parsed URL in
+    /// <paramref name="next" />. The scheme is checked first, as curl's <c>parseurl</c> does, so a
+    /// target naming no scheme it knows is never parsed with a guessed one (CGR-018).
+    /// </summary>
+    private (CurlExitCode ExitCode, string Message, bool KeepsRedirectUrl, bool ReachesTarget)? ParseRefusal(
+        string target,
+        bool pathAsIs,
+        out CurlUrl? next)
+    {
+        next = null;
+        if (NamesSchemeCurlCannotParse(target))
+        {
+            return (CurlExitCode.UnsupportedProtocol, "The redirect target URL could not be parsed: Unsupported URL scheme", false, false);
+        }
+
+        if (HasControlByte(target))
+        {
+            return (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {ProxyUrlParser.MalformedReason}", false, false);
+        }
+
+        return CurlUrl.TryParse(EncodedForFollow(target), pathAsIs, out next)
+            ? null
+            : (CurlExitCode.UrlMalformat, $"The redirect target URL could not be parsed: {UnparsableUrlReason(target)}", false, false);
     }
 
     /// <summary>
@@ -512,8 +543,32 @@ public sealed class RedirectFollower(
         _ => character.ToString(),
     };
 
+    /// <summary>
+    /// Whether <paramref name="target" /> starts with an RFC 3986 scheme and a colon, with or
+    /// without <c>//</c>, that curl does not know: curl 8.22.0 reads <c>localhost:20200/x</c> as
+    /// the scheme <c>localhost</c> and refuses it, where a URL typed on the command line would
+    /// have its scheme guessed (CGR-018).
+    /// </summary>
+    private bool NamesSchemeCurlCannotParse(string target)
+    {
+        int colon = target.IndexOf(':', StringComparison.Ordinal);
+        bool namesScheme = colon > (driveLetterIsNotScheme ? 1 : 0)
+            && char.IsAsciiLetter(target[0])
+            && !target.AsSpan(1, colon - 1).ContainsAnyExcept(SchemeCharacters);
+        return namesScheme && !SchemesCurlParses.Contains(target[..colon].ToLowerInvariant());
+    }
+
+    /// <summary>
+    /// Why curl 8.22.0 cannot parse <paramref name="target" />: no slash after its scheme
+    /// (<c>http:</c>, CGR-062), else what its authority holds.
+    /// </summary>
     private static string UnparsableUrlReason(string target)
     {
+        if (!target.AsSpan(target.IndexOf(':', StringComparison.Ordinal) + 1).StartsWith("/"))
+        {
+            return ProxyUrlParser.SlashesReason;
+        }
+
         ReadOnlySpan<char> authority = target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2);
         authority = authority[..IndexOrLength(authority, authority.IndexOfAny('/', '?', '#'))];
         authority = authority[(authority.LastIndexOf('@') + 1)..];
@@ -527,6 +582,14 @@ public sealed class RedirectFollower(
             ? ProxyUrlParser.BadPortReason
             : ProxyUrlParser.BadHostnameReason;
     }
+
+    /// <summary>
+    /// Whether <paramref name="target" /> holds a control byte (0x00-0x1F) or DEL, which curl 8.22.0's
+    /// URL parser refuses as malformed input: the HTTP handler escapes them in a relative
+    /// <c>Location</c>, so only an absolute one still holds them (CGR-061).
+    /// </summary>
+    private static bool HasControlByte(string target) =>
+        target.AsSpan().ContainsAnyInRange('\0', '\x1f') || target.Contains('\x7f', StringComparison.Ordinal);
 
     private static int IndexOrLength(ReadOnlySpan<char> text, int index) => index < 0 ? text.Length : index;
 
@@ -655,6 +718,15 @@ public sealed class RedirectFollower(
         bodyDropped || uploadStart is not null || context.Upload is not IUploadRewinder { HasBeenRead: true } rewinder
             ? null
             : rewinder.RewindToStart();
+
+    /// <summary>
+    /// The Digest answer the hop to <paramref name="next" /> repeats before any challenge: the one
+    /// the hop at <paramref name="previous" /> sent when both share scheme, host and port, and none
+    /// otherwise, as curl 8.22.0 starts a fresh Digest exchange after a <c>--location-trusted</c>
+    /// redirect to another host or port (CGR-072, BL-3601).
+    /// </summary>
+    private static string? KeptDigestAuthorization(CurlUrl previous, CurlUrl next, TransferReport report) =>
+        IsSameOrigin(previous, next) ? report.DigestAuthorizationSent : null;
 
     internal static bool IsSameOrigin(CurlUrl first, CurlUrl next) =>
         string.Equals(first.Scheme, next.Scheme, StringComparison.Ordinal)
@@ -848,6 +920,7 @@ public sealed class RedirectFollower(
         private long requestSize;
         private int connectionCount;
         private bool redirectUrlCleared;
+        private bool targetHoldsHeaderBytes;
         private readonly List<KeyValuePair<string, string>> earlierResponseHeaders = [];
 
         public int RedirectCount { get; private set; }
@@ -869,11 +942,26 @@ public sealed class RedirectFollower(
             RedirectCount += report.RedirectCount;
         }
 
+        /// <summary>
+        /// Takes the last hop's <see cref="TransferReport.RedirectUrl" /> as the next target: the
+        /// target with its header bytes unmarked (<see cref="HeaderByteText" />), for parsing and
+        /// following. A target that held marked bytes came whole from an absolute <c>Location</c>,
+        /// so the effective URL it becomes is marked again, and <c>%{url_effective}</c> writes
+        /// those bytes back as curl 8.22.0 does (CGR-062, ADR-0824).
+        /// </summary>
+        public string Targeted(string redirectUrl)
+        {
+            targetHoldsHeaderBytes = HeaderByteText.HasMarks(redirectUrl);
+            return HeaderByteText.Unmark(redirectUrl);
+        }
+
         public void Followed(string url)
         {
-            effectiveUrl = url;
+            effectiveUrl = AsEffectiveUrl(url);
             RedirectCount++;
         }
+
+        private string AsEffectiveUrl(string url) => targetHoldsHeaderBytes ? HeaderByteText.Mark(url) : url;
 
         /// <summary>
         /// Records that the last hop's redirect target was refused, clearing its
@@ -888,7 +976,7 @@ public sealed class RedirectFollower(
         /// </summary>
         public void CountRefused(string? reachedUrl)
         {
-            effectiveUrl = reachedUrl ?? effectiveUrl;
+            effectiveUrl = reachedUrl is null ? effectiveUrl : AsEffectiveUrl(reachedUrl);
             RedirectCount++;
         }
 

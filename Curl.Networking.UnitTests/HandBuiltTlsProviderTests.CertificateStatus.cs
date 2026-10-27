@@ -24,7 +24,7 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         using var pki = new OcspTestPki();
         Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
-        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("options", "CaCertificateFile: the test CA, SkipRevocationCheck: true, RequireCertificateStatus: true");
         Diagnostics.Arrange("server", "TLS 1.3 staples a good OCSP response");
 
         ConnectResult result;
@@ -47,7 +47,7 @@ public sealed partial class HandBuiltTlsProviderTests
         using var pki = new OcspTestPki();
         var revoked = (pki.Response(DateTimeOffset.UtcNow) with { CertStatus = OcspStapleStatus.Revoked, RevocationReason = 1 }).Build();
         Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
-        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("options", "CaCertificateFile: the test CA, SkipRevocationCheck: true, RequireCertificateStatus: true");
         Diagnostics.Arrange("server", "TLS 1.3 staples a revoked OCSP response, reason 1");
         Diagnostics.Bytes("stapled response", revoked);
 
@@ -77,7 +77,7 @@ public sealed partial class HandBuiltTlsProviderTests
     {
         using var pki = new OcspTestPki();
         Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
-        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("options", "CaCertificateFile: the test CA, SkipRevocationCheck: true, RequireCertificateStatus: true");
         Diagnostics.Arrange("server", "TLS 1.3 staples nothing");
 
         ConnectResult result;
@@ -141,7 +141,7 @@ public sealed partial class HandBuiltTlsProviderTests
         using var pki = new OcspTestPki();
         var events = new RecordingTransferEvents();
         Diagnostics.Arrange("build", "Schannel");
-        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("options", "CaCertificateFile: the test CA, SkipRevocationCheck: true, RequireCertificateStatus: true");
         Diagnostics.Arrange("server", "TLS 1.3 staples nothing");
 
         ConnectResult result;
@@ -220,20 +220,54 @@ public sealed partial class HandBuiltTlsProviderTests
         await result.Connection!.DisposeAsync();
     }
 
-    // A server that sends the leaf and its CA, stapling the response to the leaf unless it is null.
-    private static Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithStaplingServerAsync(
+    // Under -k the OpenSSL build trusts no OCSP responder, so even a good staple is exit 91
+    // (CGR-167, ADR-0862).
+    [TestMethod]
+    [DataRow(SchannelBuild)]
+    [DataRow(OpenSslBuild)]
+    public async Task AuthenticateAsClientAsync_WithCertStatusUnderInsecureAndAGoodStapledResponse_FailsWithExit91VerificationFailed(bool matchesSchannelBuild)
+    {
+        using var pki = new OcspTestPki();
+        var events = new RecordingTransferEvents();
+        Diagnostics.Arrange("build", matchesSchannelBuild ? "Schannel" : "OpenSSL");
+        Diagnostics.Arrange("options", "Insecure: true, RequireCertificateStatus: true");
+        Diagnostics.Arrange("server", "TLS 1.3 staples a good OCSP response");
+
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            (result, _) = await HandshakeWithStaplingServerAsync(pki, pki.Response(DateTimeOffset.UtcNow).Build(), matchesSchannelBuild, events, insecure: true);
+        }
+
+        ActConnectResult(result);
+        Diagnostics.Act("info lines", events.Info.Count);
+        Diagnostics.Assert("exit code", CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Diagnostics.Assert("error message", "OCSP response verification failed", result.ErrorMessage);
+        Diagnostics.Assert("info lines", 0, events.Info.Count);
+        Assert.AreEqual(CurlExitCode.SslInvalidCertStatus, result.ExitCode);
+        Assert.AreEqual("OCSP response verification failed", result.ErrorMessage);
+        Assert.IsNull(result.Connection);
+        Assert.IsEmpty(events.Info);
+    }
+
+    // A server that sends the leaf and its CA, stapling the response to the leaf unless it is
+    // null, to a client that trusts the CA through --cacert (no revocation check), or under -k.
+    private Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithStaplingServerAsync(
         OcspTestPki pki,
         byte[]? response,
         bool matchesSchannelBuild,
-        RecordingTransferEvents? events = null)
+        RecordingTransferEvents? events = null,
+        bool insecure = false)
     {
         var testServer = new Tls13TestServer(pki.LeafCredential)
         {
             IssuerCertificates = [pki.Ca.RawData],
             LeafExtensions = response is null ? [] : [StatusRequestExtension.EncodeOcspResponse(response)],
         };
-        return HandshakeWithTestServerAsync(
-            Provider(new TlsClientOptions(Insecure: true, RequireCertificateStatus: true), matchesSchannelBuild), testServer, events);
+        var options = insecure
+            ? new TlsClientOptions(Insecure: true, RequireCertificateStatus: true)
+            : new TlsClientOptions(CaCertificateFile: WriteFile("ocsp-ca.pem", pki.Ca.ExportCertificatePem()), SkipRevocationCheck: true, RequireCertificateStatus: true);
+        return HandshakeWithTestServerAsync(Provider(options, matchesSchannelBuild), testServer, events);
     }
 
     private static async Task<(ConnectResult Result, bool PlaintextDisposed)> HandshakeWithTestServerAsync(

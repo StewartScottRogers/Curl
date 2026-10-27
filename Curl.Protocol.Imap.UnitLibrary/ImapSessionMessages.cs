@@ -77,6 +77,12 @@ internal static class ImapSessionMessages
     /// <summary>An upload's URL names no mailbox to <c>APPEND</c> to (exit 3).</summary>
     internal const string AppendWithoutMailbox = "Cannot APPEND without a mailbox.";
 
+    /// <summary>
+    /// <c>--crlf</c> was given with an upload, whose converted size cannot be known before
+    /// <c>APPEND</c> announces it (exit 25).
+    /// </summary>
+    internal const string AppendWithCrlfConversion = "Cannot APPEND with CRLF conversion making size unknown";
+
     /// <summary>An upload's size is not known before it is sent, as with <c>-T -</c> (exit 25).</summary>
     internal const string AppendWithUnknownSize = "Cannot APPEND with unknown input file size";
 
@@ -145,4 +151,13 @@ internal static class ImapSessionMessages
     private static readonly FrozenSet<string> ExitCodeTextOnly = FrozenSet.ToFrozenSet(
         [MalformedUrl, LoginDenied, RemoteFileNotFound, QuoteCommandFailed, WeirdServerReply, ResponseLineTooLarge, UploadFailed],
         StringComparer.Ordinal);
+
+    /// <summary>
+    /// <c>--connect-timeout</c> passed before the session was open (exit 28), curl 8.22.0's text,
+    /// <paramref name="milliseconds" /> counted from the start of the request (BL-3532).
+    /// </summary>
+    /// <param name="milliseconds">The time since the request started.</param>
+    /// <returns>The message.</returns>
+    internal static string OperationTimedOut(long milliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
 }

@@ -6,7 +6,7 @@ namespace Curl.Engine;
 
 /// <summary>
 /// Passes every event on to <paramref name="inner" /> unchanged and keeps what libcurl still reports after a
-/// transfer ends with <c>CURLE_OPERATION_TIMEDOUT</c> because it was too slow: the last response code, the bytes
+/// transfer ends with <c>CURLE_OPERATION_TIMEDOUT</c> because it was too slow: the last response code and HTTP version, the bytes
 /// of the response heads, the bytes of the request heads, the body bytes received, the connections opened and
 /// the end points of the first. The handler that was
 /// cancelled returns no report, so <see cref="ReportOn" /> builds one from these (BL-3321).
@@ -17,6 +17,7 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     private const string StatusLinePrefix = "HTTP/";
 
     private int responseCode;
+    private Version? httpVersion;
     private long headerSize;
     private long requestSize;
     private long downloadSize;
@@ -37,6 +38,7 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
                 Report = new TransferReport
                 {
                     ResponseCode = responseCode,
+                    HttpVersion = httpVersion,
                     HeaderSize = headerSize,
                     RequestSize = requestSize,
                     DownloadSize = downloadSize,
@@ -96,9 +98,10 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
     public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
     {
         headerSize += bytes.Length;
-        if (StatusCodeOf(bytes) is int code)
+        if (StatusOf(bytes) is (int code, var version))
         {
             responseCode = code;
+            httpVersion = version;
         }
 
         inner.ReportResponseHeader(bytes);
@@ -114,13 +117,21 @@ internal sealed class AbortedHeadRecordingTransferEvents(ITransferEvents inner) 
         inner.ReportDataReceived(bytes);
     }
 
-    /// <summary>The status of a status line (<c>HTTP/1.1 200 OK</c>), or <see langword="null" /> for any other header bytes.</summary>
-    private static int? StatusCodeOf(ReadOnlySpan<byte> bytes)
+    /// <summary>
+    /// The status and HTTP version of a status line (<c>HTTP/1.1 200 OK</c>, <c>HTTP/2 200</c>, the version without a
+    /// minor number read as <c>.0</c>, and a version that does not parse as <see langword="null" />), or
+    /// <see langword="null" /> for any other header bytes.
+    /// </summary>
+    private static (int Code, Version? Version)? StatusOf(ReadOnlySpan<byte> bytes)
     {
         string text = Encoding.ASCII.GetString(bytes);
         string[] parts = text.Split(' ', 3);
         return text.StartsWith(StatusLinePrefix, StringComparison.Ordinal) && parts.Length > 1 && int.TryParse(parts[1].AsSpan(0, Math.Min(3, parts[1].Length)), out int code)
-            ? code
+            ? (code, VersionOf(parts[0][StatusLinePrefix.Length..]))
             : null;
     }
+
+    /// <summary>The version a status line's <c>HTTP/</c> token names (<c>1.1</c>, <c>2</c>), or <see langword="null" /> when it names none.</summary>
+    private static Version? VersionOf(string token) =>
+        Version.TryParse(token.Contains('.', StringComparison.Ordinal) ? token : token + ".0", out Version? version) ? version : null;
 }

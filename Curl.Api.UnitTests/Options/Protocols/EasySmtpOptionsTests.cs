@@ -14,6 +14,7 @@ public sealed class EasySmtpOptionsTests
         Assert.IsEmpty(Defaults.MailRecipients);
         Assert.IsNull(Defaults.MailAuth);
         Assert.IsFalse(Defaults.MailRecipientAllowFails);
+        Assert.AreEqual((byte)16, Defaults.UploadFlags);
     }
 
     [TestMethod]
@@ -23,6 +24,7 @@ public sealed class EasySmtpOptionsTests
         OptionRecordAssert.ChangesOnly(Defaults, Defaults with { MailRecipients = ["b@example.com"] }, o => o with { MailRecipients = Defaults.MailRecipients });
         OptionRecordAssert.ChangesOnly(Defaults, Defaults with { MailAuth = "a@example.com" }, o => o with { MailAuth = Defaults.MailAuth });
         OptionRecordAssert.ChangesOnly(Defaults, Defaults with { MailRecipientAllowFails = true }, o => o with { MailRecipientAllowFails = Defaults.MailRecipientAllowFails });
-        Assert.HasCount(4, typeof(EasySmtpOptions).GetProperties());
+        OptionRecordAssert.ChangesOnly(Defaults, Defaults with { UploadFlags = 1 }, o => o with { UploadFlags = Defaults.UploadFlags });
+        Assert.HasCount(5, typeof(EasySmtpOptions).GetProperties());
     }
 }

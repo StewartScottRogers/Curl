@@ -53,6 +53,7 @@ internal sealed class ManagedMultiTransfer(
     private readonly List<CurlMultiMessage> messages = [];
     private readonly List<(CurlMultiNotification Notification, IEasyTransfer Transfer)> pendingNotifications = [];
     private readonly Lock wakeupLock = new();
+    private readonly MultiCallbackQueue callbackQueue = new();
     private Task idleConnectionsClosing = Task.CompletedTask;
     private MultiOptions options = new();
     private uint enabledNotifications;
@@ -62,6 +63,12 @@ internal sealed class ManagedMultiTransfer(
     private long reportedTimerMilliseconds = -1;
     private bool abortedByCallback;
     private bool disposed;
+
+    // The multi handle whose transfer's perform the current code runs in, or null outside every perform.
+    private static readonly AsyncLocal<ManagedMultiTransfer?> PerformingHandle = new();
+
+    /// <inheritdoc />
+    public bool IsInTransferCallback => PerformingHandle.Value == this;
 
     /// <summary>
     /// Gets the first socket number the handle gives a running transfer. The managed engine's
@@ -139,7 +146,8 @@ internal sealed class ManagedMultiTransfer(
     /// of the engine already, <see cref="CurlMultiCode.BadEasyHandle" /> for <see langword="null" /> and
     /// <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed. As libcurl does, it gives the
     /// timer callback 0 (act at once), and answers <see cref="CurlMultiCode.AbortedByCallback" /> when that
-    /// returns -1.
+    /// returns -1. Called from inside one of its own transfers' callbacks (<see cref="IsInTransferCallback" />)
+    /// it adds nothing and answers <see cref="CurlMultiCode.RecursiveApiCall" />, as libcurl does (CGR-146).
     /// </returns>
     public CurlMultiCode Add(IEasyTransfer transfer)
     {
@@ -153,11 +161,19 @@ internal sealed class ManagedMultiTransfer(
             return CurlMultiCode.BadEasyHandle;
         }
 
-        if (!owners.TryAdd(transfer, this))
+        // Before the added-already check: curl 8.22.0 refuses a handle already in the multi handle with 8 here too.
+        if (IsInTransferCallback)
         {
-            return CurlMultiCode.AddedAlready;
+            return CurlMultiCode.RecursiveApiCall;
         }
 
+        return owners.TryAdd(transfer, this) ? AddEntry(transfer) : CurlMultiCode.AddedAlready;
+    }
+
+    // Adds a transfer this handle now owns; also the engine's own add of an HTTP/2 pushed transfer, which
+    // runs inside a transfer and so skips the recursive-call check.
+    private CurlMultiCode AddEntry(IEasyTransfer transfer)
+    {
         entries.Add(new MultiEntry(transfer));
         transfersAdded++;
         return UpdateTimer(timerFired: false);
@@ -172,7 +188,8 @@ internal sealed class ManagedMultiTransfer(
     /// <returns>
     /// <see cref="CurlMultiCode.Ok" />, also for a transfer in no multi handle;
     /// <see cref="CurlMultiCode.BadEasyHandle" /> for <see langword="null" /> or one in another multi handle,
-    /// and <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed.
+    /// and <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed; called from inside one of its
+    /// own transfers' callbacks it removes nothing and answers <see cref="CurlMultiCode.RecursiveApiCall" /> (CGR-146).
     /// </returns>
     public CurlMultiCode Remove(IEasyTransfer transfer)
     {
@@ -196,6 +213,11 @@ internal sealed class ManagedMultiTransfer(
             return CurlMultiCode.BadEasyHandle;
         }
 
+        if (IsInTransferCallback)
+        {
+            return CurlMultiCode.RecursiveApiCall;
+        }
+
         RemoveEntry(entries.Find(candidate => candidate.Transfer == transfer)!);
         return CurlMultiCode.Ok;
     }
@@ -208,11 +230,12 @@ internal sealed class ManagedMultiTransfer(
     /// <param name="cancellationToken">Stops the call before it starts anything.</param>
     /// <returns>
     /// <see cref="CurlMultiCode.Ok" /> and the transfers not yet finished, or
-    /// <see cref="CurlMultiCode.BadHandle" /> and 0 once this handle is disposed. It tells the socket and
-    /// timer callbacks what changed as <see cref="SocketActionAsync" /> does.
+    /// <see cref="CurlMultiCode.BadHandle" /> and 0 once this handle is disposed. It tells the timer
+    /// callback what changed as <see cref="SocketActionAsync" /> does, but never the socket callback, as
+    /// curl 8.22.0's perform does not (CGR-148).
     /// </returns>
     public ValueTask<(CurlMultiCode Code, int RunningTransfers)> PerformAsync(CancellationToken cancellationToken) =>
-        MoveTransfersOnAsync(timerFired: false, cancellationToken);
+        MoveTransfersOnAsync(socketAction: false, timerFired: false, cancellationToken);
 
     /// <summary>
     /// <c>curl_multi_socket_action</c>: moves every transfer on as <see cref="PerformAsync" /> does - the
@@ -221,8 +244,10 @@ internal sealed class ManagedMultiTransfer(
     /// <see cref="CurlPoll.In" />) or finished (<see cref="CurlPoll.Remove" />, with the value
     /// <see cref="Assign" /> gave), and <see cref="MultiOptions.Timer" /> of the next timeout when it changed,
     /// or always after <see cref="CurlMultiSockets.Timeout" />, whose timer is spent. Once either callback
-    /// returns -1, every unfinished transfer ends with <see cref="CurlCode.AbortedByCallback" /> on the
-    /// next call, as libcurl's dead multi handle does.
+    /// returns -1 the handle is dead, as libcurl's: every later socket action answers
+    /// <see cref="CurlMultiCode.Ok" /> and the unfinished transfers without moving any on or calling either
+    /// callback, and the next <see cref="PerformAsync" /> ends every unfinished transfer with
+    /// <see cref="CurlCode.AbortedByCallback" /> (CGR-148).
     /// </summary>
     /// <param name="socket">The socket with the event, or <see cref="CurlMultiSockets.Timeout" /> for the timer.</param>
     /// <param name="events">The events on the socket; not read.</param>
@@ -233,7 +258,7 @@ internal sealed class ManagedMultiTransfer(
     /// <see cref="CurlMultiCode.BadHandle" /> and 0 once this handle is disposed.
     /// </returns>
     public ValueTask<(CurlMultiCode Code, int RunningTransfers)> SocketActionAsync(CurlSocket socket, CurlSocketSelect events, CancellationToken cancellationToken) =>
-        MoveTransfersOnAsync(socket == CurlMultiSockets.Timeout, cancellationToken);
+        MoveTransfersOnAsync(socketAction: true, socket == CurlMultiSockets.Timeout, cancellationToken);
 
     /// <summary>
     /// <c>curl_multi_assign</c>: the value the socket callback receives with <paramref name="socket" />
@@ -265,10 +290,13 @@ internal sealed class ManagedMultiTransfer(
     /// <summary><c>curl_multi_info_read</c>: takes the oldest queued message.</summary>
     /// <param name="message">The message, or <see langword="null" /> when none waits.</param>
     /// <param name="remainingMessages">The messages still queued after this one.</param>
-    /// <returns><see langword="true" /> when a message was taken.</returns>
+    /// <returns>
+    /// <see langword="true" /> when a message was taken; <see langword="false" /> from inside one of the handle's
+    /// own transfers' callbacks, where libcurl's call answers no message (CGR-146).
+    /// </returns>
     public bool TryReadInfo([NotNullWhen(true)] out CurlMultiMessage? message, out int remainingMessages)
     {
-        if (messages.Count == 0)
+        if (messages.Count == 0 || IsInTransferCallback)
         {
             message = null;
             remainingMessages = 0;
@@ -283,12 +311,14 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_cleanup</c>: removes every transfer, cancelling the running ones, and waits for
-    /// their performs to end; later calls answer <see cref="CurlMultiCode.BadHandle" />.
+    /// their performs to end; later calls answer <see cref="CurlMultiCode.BadHandle" />. Called from inside
+    /// one of its own transfers (<see cref="IsInTransferCallback" />) it does nothing, as libcurl refuses
+    /// that call, since waiting for the perform it runs in would never end.
     /// </summary>
     /// <returns>A task that completes once every perform has ended.</returns>
     public async ValueTask DisposeAsync()
     {
-        if (disposed)
+        if (disposed || IsInTransferCallback)
         {
             return;
         }
@@ -374,12 +404,18 @@ internal sealed class ManagedMultiTransfer(
             return (CurlMultiCode.BadHandle, -1);
         }
 
-        if (entries.Exists(HasWorkForPerform))
+        return IsInTransferCallback ? (CurlMultiCode.RecursiveApiCall, -1) : (CurlMultiCode.Ok, TimeoutMilliseconds());
+    }
+
+    // GetTimeout's milliseconds for a live handle.
+    private long TimeoutMilliseconds()
+    {
+        if (entries.Exists(HasWorkForPerform) || callbackQueue.HasQueued)
         {
-            return (CurlMultiCode.Ok, 0);
+            return 0;
         }
 
-        return (CurlMultiCode.Ok, entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds >= 0).DefaultIfEmpty(-1).Min());
+        return entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds >= 0).DefaultIfEmpty(-1).Min();
     }
 
     /// <summary>
@@ -461,7 +497,7 @@ internal sealed class ManagedMultiTransfer(
     /// <paramref name="notification" /> to <see cref="MultiOptions.Notify" />: <see cref="CurlMultiNotification.InfoRead" />
     /// when a message is queued with none queued before it, then <see cref="CurlMultiNotification.EasyDone" />
     /// for each transfer whose message is queued, each with that transfer, once the call has moved every
-    /// transfer on and before it tells the socket and timer callbacks.
+    /// transfer on and before it tells the socket callback (on a socket action) and the timer callback.
     /// </summary>
     /// <param name="notification">The notification to switch on; any number from 0 to 31 is kept.</param>
     /// <returns>
@@ -511,7 +547,8 @@ internal sealed class ManagedMultiTransfer(
         }
 
         // The timer's answer to the add is the handle's to report on its next call, not the push's.
-        Add(pushed);
+        owners[pushed] = this;
+        AddEntry(pushed);
         return CurlPushResult.Ok;
     }
 
@@ -671,18 +708,72 @@ internal sealed class ManagedMultiTransfer(
         owners.TryRemove(entry.Transfer, out _);
     }
 
-    private ValueTask<(CurlMultiCode Code, int RunningTransfers)> MoveTransfersOnAsync(bool timerFired, CancellationToken cancellationToken)
+    private ValueTask<(CurlMultiCode Code, int RunningTransfers)> MoveTransfersOnAsync(bool socketAction, bool timerFired, CancellationToken cancellationToken)
     {
         if (disposed)
         {
             return ValueTask.FromResult((CurlMultiCode.BadHandle, 0));
         }
 
+        if (IsInTransferCallback)
+        {
+            return ValueTask.FromResult((CurlMultiCode.RecursiveApiCall, 0));
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
-        MoveEveryTransferOn();
+        return ValueTask.FromResult(socketAction && abortedByCallback ? (CurlMultiCode.Ok, UnfinishedCount()) : MoveOnAndTellCallbacks(socketAction, timerFired));
+    }
+
+    private (CurlMultiCode Code, int RunningTransfers) MoveOnAndTellCallbacks(bool socketAction, bool timerFired)
+    {
+        int previousThread = callbackQueue.EnterPerform();
+        try
+        {
+            RunQueuedCallbacks();
+            MoveEveryTransferOn();
+        }
+        finally
+        {
+            callbackQueue.LeavePerform(previousThread);
+        }
+
         SendNotifications();
-        CurlMultiCode code = UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
-        return ValueTask.FromResult((code, entries.Count(entry => !entry.Done)));
+        CurlMultiCode code = TellCallbacks(socketAction, timerFired);
+        return (code, UnfinishedCount());
+    }
+
+    private int UnfinishedCount() => entries.Count(entry => !entry.Done);
+
+    /// <summary>
+    /// Tells the socket callback (on a socket action only) and the timer callback what changed; a handle a
+    /// callback killed in an earlier call tells neither again, as curl 8.22.0's dead multi handle (CGR-148).
+    /// </summary>
+    private CurlMultiCode TellCallbacks(bool socketAction, bool timerFired)
+    {
+        if (abortedByCallback)
+        {
+            return CurlMultiCode.Ok;
+        }
+
+        return !socketAction || UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
+    }
+
+    /// <summary>
+    /// Runs the callbacks the running transfers have asked for since the last call, on this thread and as
+    /// code inside this handle's transfers (<see cref="IsInTransferCallback" />), as libcurl's perform calls them (CGR-033).
+    /// </summary>
+    private void RunQueuedCallbacks()
+    {
+        ManagedMultiTransfer? previous = PerformingHandle.Value;
+        PerformingHandle.Value = this;
+        try
+        {
+            callbackQueue.RunQueued();
+        }
+        finally
+        {
+            PerformingHandle.Value = previous;
+        }
     }
 
     /// <summary>The started transfers first, so a slot one of them frees goes to a pending one in this call.</summary>
@@ -811,7 +902,7 @@ internal sealed class ManagedMultiTransfer(
 
     private long TimerMilliseconds()
     {
-        long handleTimeout = GetTimeout().TimeoutMilliseconds;
+        long handleTimeout = TimeoutMilliseconds();
         if (!entries.Exists(entry => !entry.Done))
         {
             return handleTimeout;
@@ -821,12 +912,28 @@ internal sealed class ManagedMultiTransfer(
         return handleTimeout < 0 ? check : Math.Min(handleTimeout, check);
     }
 
-    private Task<CurlCode> Start(MultiEntry entry)
+    // Marks the code a transfer's perform runs, its callbacks included, with the handle that started it
+    // (IsInTransferCallback); the value flows into the perform and never back out to the caller.
+    private async Task<CurlCode> Start(MultiEntry entry)
     {
         entry.StartTimestamp = timeProvider.GetTimestamp();
         entry.Origin = OriginOf(entry.Transfer);
         entry.Multiplexed = IsMultiplexed(entry.Transfer, entry.Origin);
-        return entry.Transfer.PerformAsync(entry.Cancellation.Token).AsTask();
+        PerformingHandle.Value = this;
+        TransferCallbackMarshal callbacks = new(callbackQueue, entry.Cancellation.Token);
+        if (entry.Transfer is ManagedEasyTransfer easy)
+        {
+            easy.MultiCallbacks = callbacks;
+        }
+
+        try
+        {
+            return await entry.Transfer.PerformAsync(entry.Cancellation.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            callbacks.Stop();
+        }
     }
 
     private long RemainingMilliseconds(MultiEntry entry)
@@ -846,6 +953,11 @@ internal sealed class ManagedMultiTransfer(
         if (disposed)
         {
             return (CurlMultiCode.BadHandle, 0);
+        }
+
+        if (IsInTransferCallback)
+        {
+            return (CurlMultiCode.RecursiveApiCall, 0);
         }
 
         if (timeout < TimeSpan.Zero)
@@ -876,7 +988,7 @@ internal sealed class ManagedMultiTransfer(
     private static bool HasSocketReadyUntilNextPerform(MultiEntry entry) => entry.SocketReadyUntilNextPerform && !entry.Done;
 
     private int CountReady(Span<CurlWaitSocket> extraSockets) =>
-        MarkReadySockets(extraSockets) + entries.Count(IsFinishedUnreported) + entries.Count(HasSocketReadyUntilNextPerform);
+        MarkReadySockets(extraSockets) + entries.Count(IsFinishedUnreported) + entries.Count(HasSocketReadyUntilNextPerform) + (callbackQueue.HasQueued ? 1 : 0);
 
     private TimeSpan WaitLimit(TimeSpan timeout)
     {
@@ -893,7 +1005,7 @@ internal sealed class ManagedMultiTransfer(
     /// loop spun at full CPU (BL-3206).
     /// </summary>
     internal long WaitTimerMilliseconds() =>
-        entries.Exists(HasWorkForPerform) ? 0 : entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds > 0).DefaultIfEmpty(-1).Min();
+        entries.Exists(HasWorkForPerform) || callbackQueue.HasQueued ? 0 : entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds > 0).DefaultIfEmpty(-1).Min();
 
     private int MarkReadySockets(Span<CurlWaitSocket> sockets)
     {
@@ -961,6 +1073,7 @@ internal sealed class ManagedMultiTransfer(
         TimeSpan delay = checkSockets && left > SocketPollInterval ? SocketPollInterval : left;
         List<Task> events = [.. entries.Select(entry => entry.Perform).OfType<Task>().Where(perform => !perform.IsCompleted)];
         events.Add(Task.Delay(TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, int.MaxValue)), timeProvider, stopDelay.Token));
+        events.Add(callbackQueue.Arrived);
         if (poll)
         {
             events.Add(wakeupSignal.Task);

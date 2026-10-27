@@ -373,31 +373,12 @@ public sealed class HttpProxyTunnelTests
     }
 
     [TestMethod]
-    public async Task ReadReplyAsync_WhenTheFirstLineDoesNotStartWithHttp_FailsWithInvalidResponseHeader()
+    public async Task ReadReplyAsync_WhenTheSecondLineHoldsNoColon_FailsWithInvalidResponseHeader()
     {
-        // Upstream test750: curl 8.21.0 fails the reply once its first line ends, exit 43.
+        // Upstream test750: curl 8.22.0 fails the reply once its second line, "<head>", ends
+        // holding no colon, exit 43 (the first line not starting with HTTP/ alone is exit 7, CGR-081).
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes("<html>\r\n<head>\r\n"));
         ArrangeReply("<html>\r\n<head>\r\n");
-
-        var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
-
-        ActReply(result);
-        Diagnostics.Assert("failure exit code", CurlExitCode.BadFunctionArgument, result.FailureExitCode);
-        Diagnostics.Assert("failure message", "Invalid response header", result.FailureMessage);
-        Assert.AreEqual(CurlExitCode.BadFunctionArgument, result.FailureExitCode);
-        Assert.AreEqual("Invalid response header", result.FailureMessage);
-        Assert.IsTrue(result.Head.IsEmpty);
-    }
-
-    [TestMethod]
-    [DataRow("garbage\r\n\r\n")]
-    [DataRow("garbage\n\n")]
-    [DataRow("garbage\r\n")]
-    public async Task ReadReplyAsync_WhenOnlyTheFirstLineIsNotHttp_FailsAtOnceWithInvalidResponseHeader(string reply)
-    {
-        // The first line is checked as soon as it ends: a blank line after it, or a stall, never reaches ParseReply.
-        var connection = new ScriptedConnection(Encoding.Latin1.GetBytes(reply));
-        ArrangeReply(reply);
 
         var result = await HttpProxyTunnel.ReadReplyAsync(connection, CancellationToken.None);
 
@@ -472,7 +453,7 @@ public sealed class HttpProxyTunnelTests
     [DataRow("Proxy-Connection: Keep-Alive, Close\r\n", 0L, false)]
     [DataRow("Transfer-Encoding: gzip, chunked\r\n", 0L, true)]
     [DataRow("Transfer-Encoding: gzip\r\n", 0L, true)]
-    [DataRow(": close\r\nno colon\r\n", 0L, true)]
+    [DataRow(": close\r\n", 0L, true)]
     public async Task ReadReplyAsync_ReadsTheBodyLengthAndWhetherTheConnectionIsReusable(string fields, long contentLength, bool reusable)
     {
         var connection = new ScriptedConnection(Encoding.Latin1.GetBytes($"HTTP/1.1 407 Proxy Authentication Required\r\n{fields}\r\n"));

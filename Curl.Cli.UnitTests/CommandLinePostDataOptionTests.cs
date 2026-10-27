@@ -104,7 +104,8 @@ public sealed class CommandLinePostDataOptionTests
     }
 
     [TestMethod]
-    public void Parse_DataUrlencodeNonAsciiText_EncodesItsUtf8Bytes()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_DataUrlencodeNonAsciiTextOffWindows_EncodesItsUtf8Bytes()
     {
         CommandLineParseResult result = Parse(["--data-urlencode", "é", Url], new RecordingDataFileReader());
 

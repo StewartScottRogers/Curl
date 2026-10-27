@@ -118,7 +118,7 @@ public sealed class TcpConnectorHttpsRecordReportTests
     }
 
     private static TcpConnector Connector(IDnsResolver resolver) =>
-        new(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+        new(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider()) { AsksHttpsRecords = true };
 
     private static ConnectTarget Target(string host, ITransferEvents events) =>
         new(host, 443, UseTls: true) { PoolScheme = "https", Events = events };

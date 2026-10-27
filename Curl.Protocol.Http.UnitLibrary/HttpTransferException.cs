@@ -19,11 +19,27 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal CurlExitCode ExitCode { get; } = exitCode;
 
     /// <summary>
-    /// Gets a value indicating whether the server refused the request's HTTP/3 stream with
-    /// <c>H3_REQUEST_REJECTED</c>, so the handler may send it again on a new connection
-    /// (ADR-0187). The message is then the <c>-v</c> line that reports the refusal.
+    /// Gets a value indicating whether the server refused the request's stream, so the handler
+    /// may send it again on a new connection: an HTTP/3 stream reset with
+    /// <c>H3_REQUEST_REJECTED</c> (ADR-0187), or an HTTP/2 stream reset with
+    /// <c>REFUSED_STREAM</c> or left unprocessed by a GOAWAY (BL-3560). Any <c>-v</c> line that
+    /// reports the refusal is among <see cref="InfoLines" />.
     /// </summary>
     internal bool IsStreamRefused { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the server reset the request's HTTP/2 stream with
+    /// <c>HTTP_1_1_REQUIRED</c>, so the handler sends it again over HTTP/1.1 on a new
+    /// connection, as curl 8.18.0 with nghttp2 does (CGR-032).
+    /// </summary>
+    internal bool RequiresHttp11 { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the failure ended only the request's HTTP/2 stream - the
+    /// server reset it - so its connection stays open for the next transfer, as curl 8.18.0 with
+    /// nghttp2 leaves a multiplexed connection intact after one stream fails (CGR-140).
+    /// </summary>
+    internal bool LeavesConnectionIntact { get; init; }
 
     /// <summary>
     /// Gets the <c>-v</c> lines the handler reports for the failure, in order, once the head

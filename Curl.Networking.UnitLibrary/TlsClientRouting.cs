@@ -49,12 +49,30 @@ public static class TlsClientRouting
     /// </summary>
     /// <param name="options">The connection's TLS options.</param>
     /// <returns>The reason, or <see langword="null" /> when no row holds and <c>SslStream</c> runs the handshake.</returns>
-    public static string? Reason(TlsClientOptions options)
+    public static string? Reason(TlsClientOptions options) => ReasonInBuild(options, OperatingSystem.IsWindows());
+
+    /// <summary>
+    /// Says why the hand-built client is chosen for <paramref name="options" /> in the named build,
+    /// as <see cref="Reason(TlsClientOptions)" /> does for the build the platform usually runs.
+    /// </summary>
+    /// <param name="options">The connection's TLS options.</param>
+    /// <param name="matchesSchannelBuild">Whether this is the Schannel build.</param>
+    /// <returns>The reason, or <see langword="null" /> when no row holds and <c>SslStream</c> runs the handshake.</returns>
+    internal static string? ReasonInBuild(TlsClientOptions options, bool matchesSchannelBuild)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return HandBuiltRows.FirstOrDefault(row => row.Holds(options)).Reason;
+        return HandBuiltRows.FirstOrDefault(row => row.Holds(options)).Reason
+            ?? (ChecksCaCertificateFileRevocationOnSchannel(options, matchesSchannelBuild) ? StapledRevocationReason : null);
     }
+
+    private const string StapledRevocationReason = "the Schannel build checks the --cacert chain's revocation, which a stapled OCSP response answers";
+
+    // The stapled-revocation row (ADR-0834, CGR-014): curl's Schannel build checks a --cacert
+    // chain's revocation against the OCSP response the server stapled, which SslStream never
+    // hands over, so that check runs on the hand-built client, whose hello asks for the staple.
+    private static bool ChecksCaCertificateFileRevocationOnSchannel(TlsClientOptions options, bool matchesSchannelBuild) =>
+        matchesSchannelBuild && options.HasCaCertificates && !options.SkipRevocationCheck && !options.Insecure;
 
     // The --ssl-allow-beast row (ADR-0151, BL-713): SslStream cannot turn off the TLS 1.0 CBC
     // split, so a range that reaches TLS 1.0 runs on the hand-built client. A TLS 1.0 or 1.1

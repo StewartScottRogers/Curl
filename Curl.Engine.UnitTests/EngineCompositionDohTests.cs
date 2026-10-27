@@ -251,7 +251,7 @@ public sealed class EngineCompositionDohTests
     }
 
     [TestMethod]
-    public async Task UnusableDohUrlResolver_ResolvesEveryNameToNoAddress()
+    public async Task UnusableDohUrlResolver_ResolvesANameToNoAddress()
     {
         Diagnostics.Arrange("name", "example.test");
 
@@ -302,8 +302,9 @@ public sealed class EngineCompositionDohTests
 
         Diagnostics.Assert("DoH-only insecure", true, dohOnly.Insecure);
         Assert.IsTrue(dohOnly.Insecure);
-        Diagnostics.Assert("DoH-only requires certificate status", true, dohOnly.RequireCertificateStatus);
-        Assert.IsTrue(dohOnly.RequireCertificateStatus);
+        // The Schannel build ignores --doh-cert-status (CGR-154).
+        Diagnostics.Assert("DoH-only requires certificate status", !OperatingSystem.IsWindows(), dohOnly.RequireCertificateStatus);
+        Assert.AreEqual(!OperatingSystem.IsWindows(), dohOnly.RequireCertificateStatus);
         Diagnostics.Assert("transferOnly", new TlsClientOptions(), transferOnly);
         Assert.AreEqual(new TlsClientOptions(), transferOnly);
     }
@@ -412,7 +413,8 @@ public sealed class EngineCompositionDohTests
     private CommandLineOptions Parse(params string[] arguments)
     {
         Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://example.test:48712/")));
-        CommandLineParseResult parsed = OpenSslBuildParser.Parse([.. arguments, "http://example.test:48712/"], _ => true);
+        // As the OpenSSL build with c-ares reads it, so --dns-servers is accepted beside --doh-url (ADR-0841).
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://example.test:48712/"], _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
     }

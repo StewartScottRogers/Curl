@@ -34,6 +34,11 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
 
     private int switchingHeadLength;
 
+    private bool isRequestWritten;
+
+    /// <summary>Whether the upgraded request, the first one written, is a HEAD, whose response on stream 1 has no body (BL-3667).</summary>
+    private bool isHeadRequest;
+
     /// <summary>
     /// Gets a value indicating whether the connection has switched to HTTP/2, so the heads read
     /// from it now are an HTTP/2 stream's.
@@ -90,8 +95,16 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
     }
 
     /// <inheritdoc />
-    public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) =>
-        transport.WriteAsync(buffer, cancellationToken);
+    public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+    {
+        if (!isRequestWritten)
+        {
+            isRequestWritten = true;
+            isHeadRequest = buffer.Span.StartsWith("HEAD "u8);
+        }
+
+        return transport.WriteAsync(buffer, cancellationToken);
+    }
 
     /// <inheritdoc />
     public ValueTask FlushAsync(CancellationToken cancellationToken) => transport.FlushAsync(cancellationToken);
@@ -184,7 +197,7 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
         frameTrace?.SessionCreatedByUpgrade();
         UpgradedSession = new Http2Session(new HttpPrefixedConnection(afterHead, transport));
         Http2StreamConnection stream = new(UpgradedSession, scheme, 0, frameTrace: frameTrace);
-        await stream.StartUpgradedAsync(cancellationToken).ConfigureAwait(false);
+        await stream.StartUpgradedAsync(isHeadRequest, cancellationToken).ConfigureAwait(false);
         return stream;
     }
 }

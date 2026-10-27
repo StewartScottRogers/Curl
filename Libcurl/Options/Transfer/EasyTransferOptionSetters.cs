@@ -49,6 +49,7 @@ internal static class EasyTransferOptionSetters
         setters[CurlOption.Dirlistonly] = new(SetDirListOnly);
         setters[CurlOption.Nobody] = new(SetNoBody);
         setters[CurlOption.Upload] = new(SetUpload);
+        setters[CurlOption.Put] = new(SetUpload);
         setters[CurlOption.Transfertext] = new(SetTransferText);
         setters[CurlOption.Crlf] = new(SetCrlf);
         setters[CurlOption.ProxyTransferMode] = new(SetProxyTransferMode);
@@ -88,7 +89,12 @@ internal static class EasyTransferOptionSetters
 
     private static CurlCode SetDirListOnly(ref EasyOptions o, object? v) => Set(ref o, t => t with { DirListOnly = IsOn(v) });
 
-    private static CurlCode SetNoBody(ref EasyOptions o, object? v) => Set(ref o, t => t with { NoBody = IsOn(v) });
+    /// <summary>
+    /// <c>CURLOPT_NOBODY</c>: on makes the request a <c>HEAD</c>, clearing <c>CURLOPT_UPLOAD</c>, as libcurl's one request
+    /// method replaces its <c>PUT</c> (CGR-122, BL-3651); off leaves an upload as it is.
+    /// </summary>
+    private static CurlCode SetNoBody(ref EasyOptions o, object? v) =>
+        Set(ref o, t => IsOn(v) ? t with { NoBody = true, Upload = false } : t with { NoBody = false });
 
     private static CurlCode SetUpload(ref EasyOptions o, object? v) => Set(ref o, t => t with { Upload = IsOn(v) });
 

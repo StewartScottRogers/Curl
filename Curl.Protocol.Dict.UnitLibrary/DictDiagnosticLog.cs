@@ -27,7 +27,7 @@ internal sealed class DictDiagnosticLog(IDiagnosticLog log)
     /// Logs, at <c>info</c>, the command line of the request sent, each byte read as
     /// Latin-1 so a byte that is not ASCII survives as one character.
     /// </summary>
-    /// <param name="request">The whole request, as <see cref="DictRequest.TryEncode" /> built it.</param>
+    /// <param name="request">The whole request, as <see cref="DictRequest.TryEncode(string, out byte[], out bool)" /> built it.</param>
     public void CommandSent(byte[] request)
     {
         if (log.IsEnabled(DiagnosticLogLevel.Info))

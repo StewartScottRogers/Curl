@@ -28,6 +28,20 @@ public static class WsFrameEncoder
     /// <summary>How many bytes a frame's mask has; a head written by <see cref="EncodeHead" /> ends with them.</summary>
     public const int MaskLength = 4;
 
+    /// <summary>The longest payload a control frame (close, ping or pong) may carry (RFC 6455 section 5.5).</summary>
+    public const int LongestControlPayloadLength = 125;
+
+    /// <summary>
+    /// Whether a frame of <paramref name="opcode" /> announcing <paramref name="payloadLength" /> bytes is a control
+    /// frame longer than <see cref="LongestControlPayloadLength" />, which curl 8.22.0's <c>curl_ws_send</c> refuses
+    /// with <c>CURLE_TOO_LARGE</c> before writing a byte (measured, CGR-123).
+    /// </summary>
+    /// <param name="opcode">What the frame carries.</param>
+    /// <param name="payloadLength">The whole payload's size.</param>
+    /// <returns>Whether the control frame's payload is too long.</returns>
+    public static bool IsControlPayloadTooLong(WsOpcode opcode, long payloadLength) =>
+        opcode is WsOpcode.Close or WsOpcode.Ping or WsOpcode.Pong && payloadLength > LongestControlPayloadLength;
+
     /// <summary>Writes a masked, unfragmented frame.</summary>
     /// <param name="opcode">What the frame carries.</param>
     /// <param name="payload">The payload, unmasked.</param>

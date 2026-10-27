@@ -9,7 +9,7 @@ namespace Curl.Protocol.Smtp;
 /// it sends when the cache closes it at exit, as curl 8.22.0 sends <c>EHLO</c>, both envelopes and
 /// one <c>QUIT</c> for <c>-T m smtp://h/ -T m smtp://h/</c> (BL-3181).
 /// </summary>
-/// <param name="connection">The pooled connection the session is held on.</param>
+/// <param name="connection">The lease of the pooled connection the session is first held on, which <see cref="ResumedOn" /> moves on to each later lease.</param>
 /// <param name="loginKey">The login the connection was made for (<see cref="LoginKeyOf" />).</param>
 /// <param name="timeProvider">Times the wait for <c>QUIT</c>'s reply.</param>
 /// <remarks>
@@ -53,6 +53,19 @@ internal sealed class SmtpKeptConnection(IConnection connection, string loginKey
     /// <param name="key">A transfer's <see cref="LoginKeyOf" />.</param>
     /// <returns><see langword="true" /> when the logins match.</returns>
     public bool Serves(string key) => key == loginKey;
+
+    /// <summary>
+    /// Moves the session onto the lease of the pooled connection a later transfer reuses it
+    /// through, so keeping it after that transfer marks that lease reusable, as curl keeps one
+    /// connection for every URL of the same login, not only the first two (CGR-102, BL-3631).
+    /// </summary>
+    /// <param name="lease">The connection the reusing transfer was handed.</param>
+    /// <returns>This session.</returns>
+    public SmtpKeptConnection ResumedOn(IConnection lease)
+    {
+        connection = lease;
+        return this;
+    }
 
     /// <summary>
     /// Hands the connection back to the run's connection cache, holding this session, so it

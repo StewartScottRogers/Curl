@@ -21,6 +21,8 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     private const int LinuxSolSocket = 1;
     private const int LinuxSoBindToDevice = 25;
 
+    private Action<nint>? socketCreated;
+
     /// <summary>
     /// Creates a dialer with curl's default socket options: <c>TCP_NODELAY</c> and
     /// <c>SO_KEEPALIVE</c> both on.
@@ -32,6 +34,33 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
 
     /// <summary>Gets the options set on every socket before it connects.</summary>
     public TcpSocketOptions SocketOptions { get; } = socketOptions ?? throw new ArgumentNullException(nameof(socketOptions));
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The dialer returned has this one's <see cref="SocketOptions" /> and hands
+    /// <paramref name="socketCreated" /> each socket's handle once its options are set and before it connects
+    /// (<see cref="PrepareToConnect" />), the Unix domain socket's included.
+    /// </remarks>
+    public ITcpDialer PublishingSocketsTo(Action<nint> socketCreated)
+    {
+        ArgumentNullException.ThrowIfNull(socketCreated);
+        return new TcpDialer(SocketOptions) { socketCreated = socketCreated };
+    }
+
+    /// <summary>
+    /// Sets <see cref="SocketOptions" /> on a TCP socket about to connect (<see cref="ApplySocketOptions" />), then
+    /// hands its handle to the hook <see cref="PublishingSocketsTo" /> gave, if any.
+    /// </summary>
+    /// <param name="socket">A TCP socket not yet connected.</param>
+    internal void PrepareToConnect(Socket socket)
+    {
+        ApplySocketOptions(socket);
+        PublishCreated(socket);
+    }
+
+    /// <summary>Hands <paramref name="socket" />'s handle to the hook <see cref="PublishingSocketsTo" /> gave, if any.</summary>
+    /// <param name="socket">A socket not yet connected.</param>
+    internal void PublishCreated(Socket socket) => socketCreated?.Invoke(socket.Handle);
 
     /// <inheritdoc />
     /// <remarks>
@@ -112,7 +141,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
-            ApplySocketOptions(socket);
+            PrepareToConnect(socket);
             await BindDeviceOrLocalEndAsync(
                 deviceName,
                 bindsAddressAfterDevice,
@@ -180,7 +209,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
-            ApplySocketOptions(socket);
+            PrepareToConnect(socket);
             if (bindTo is not null)
             {
                 BindLocalEnd(socket, bindTo, localPortCount, events);
@@ -262,6 +291,37 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     }
 
     /// <summary>
+    /// Adopts the operating system socket <paramref name="handle" /> an application supplied
+    /// (<see cref="TcpSocketOpenDecision.Supplied" />, libcurl's <c>CURLOPT_OPENSOCKETFUNCTION</c>) without
+    /// taking ownership, so closing the connection never closes the handle, and connects it to
+    /// <paramref name="endPoint" /> unless <paramref name="alreadyConnected" /> (ADR-0818).
+    /// </summary>
+    /// <param name="handle">The socket handle.</param>
+    /// <param name="alreadyConnected">Whether the socket is already connected.</param>
+    /// <param name="endPoint">The address and port the attempt connects to.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>The connection over the adopted socket.</returns>
+    /// <exception cref="SocketException">The handle is no socket, or the connect failed.</exception>
+    internal static async ValueTask<DialedTcpConnection> DialSuppliedSocketAsync(nint handle, bool alreadyConnected, IPEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        var socket = new Socket(new SafeSocketHandle(handle, ownsHandle: false));
+        try
+        {
+            if (!alreadyConnected)
+            {
+                await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+            }
+
+            return Connected(socket, endPoint);
+        }
+        catch (SocketException)
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Wraps the dialed <paramref name="socket" />: in a <see cref="NetworkStream" /> when it is connected, or
     /// in a <see cref="DeferredConnectSocketStream" /> when <c>connectx</c> left its connect to the first write
     /// (BL-1158), as <see cref="NetworkStream" /> refuses a socket that is not yet connected. Either stream owns
@@ -324,6 +384,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         try
         {
+            PublishCreated(socket);
             await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
         }
         catch

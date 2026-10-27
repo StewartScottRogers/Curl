@@ -372,7 +372,7 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreEqual((CurlMultiCode.Ok, 1500L), multi.GetTimeout());
     }
 
-    private static ManagedMultiTransfer NewMulti(TimeProvider time, IWaitSocketPoller? poller = null) =>
+    internal static ManagedMultiTransfer NewMulti(TimeProvider time, IWaitSocketPoller? poller = null) =>
         new(new ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance), time, poller ?? new ScriptedWaitSocketPoller(), () => ValueTask.CompletedTask, _ => ValueTask.CompletedTask, () => { });
 
     private static ControlledEasyTransfer WithTimeout(TimeSpan timeout) =>

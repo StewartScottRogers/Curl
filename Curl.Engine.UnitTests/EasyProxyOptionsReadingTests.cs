@@ -76,9 +76,9 @@ public sealed class EasyProxyOptionsReadingTests
     }
 
     [TestMethod]
-    public void TrySelect_ProxyUser_ReplacesTheProxysCredential()
+    public void TrySelect_ProxyUserForAProxyUrlWithoutUserInformation_GivesTheProxyThatCredential()
     {
-        EasyProxyOptions options = new() { Proxy = "http://a:b@proxy.example:3128" };
+        EasyProxyOptions options = new() { Proxy = "http://proxy.example:3128" };
         System.Net.NetworkCredential user = new("u", "p");
 
         TransferProxySelection.TrySelect(new ProxySelector(_ => null), options, false, user, Url, out ProxyEndpoint? proxy, out _);

@@ -55,25 +55,28 @@ internal sealed class CookieEngine
 
     private bool cookieFilesLoaded;
 
-    private CookieEngine(EasyHttpOptions http, CookieStore store, bool engineOn)
+    private readonly Encoding cookieStringEncoding;
+
+    private CookieEngine(EasyHttpOptions http, CookieStore store, bool engineOn, Encoding? cookieStringEncoding)
     {
         this.store = store;
         joinedCookieString = http.Cookie ?? string.Empty;
+        this.cookieStringEncoding = cookieStringEncoding ?? Encoding.UTF8;
         cookieFiles = http.CookieFiles;
         cookieJar = http.CookieJar;
         discardSessionCookies = http.CookieSession;
         cookieList = http.CookieList;
-        HandlerStore = HandlerStoreOf(engineOn, store, SentCookieStringsOf(joinedCookieString, http.HttpHeaders));
+        HandlerStore = HandlerStoreOf(engineOn, store, SentCookieStringsOf(WireTextOf(joinedCookieString, cookieStringEncoding), http.HttpHeaders));
     }
 
     /// <summary>
     /// Gets a value indicating whether the group's joined <c>-b name=value</c> strings
     /// (<see cref="EasyHttpOptions.Cookie" />) reach <see cref="LongestCookieLine" /> bytes in
-    /// UTF-8, so every transfer of the group fails with exit 100 before it connects, as curl
-    /// 8.21.0's <c>cookie_setopts</c> fails it - whether or not an <c>-H</c> value names
-    /// <c>Cookie</c> (measured 2026-10-03, BL-1391).
+    /// the encoding they are sent in (UTF-8 when none was named), so every transfer of the group
+    /// fails with exit 100 before it connects, as curl 8.21.0's <c>cookie_setopts</c> fails it -
+    /// whether or not an <c>-H</c> value names <c>Cookie</c> (measured 2026-10-03, BL-1391).
     /// </summary>
-    internal bool CookieLineTooLong => Encoding.UTF8.GetByteCount(joinedCookieString) >= LongestCookieLine;
+    internal bool CookieLineTooLong => cookieStringEncoding.GetByteCount(joinedCookieString) >= LongestCookieLine;
 
     /// <summary>
     /// Gets the store the HTTP handler reads and writes: the run's <see cref="CookieStore" />, with
@@ -114,12 +117,26 @@ internal sealed class CookieEngine
     /// </summary>
     /// <param name="http">The option group's HTTP options.</param>
     /// <param name="runCookies">The cookies stored and loaded by the run so far.</param>
+    /// <param name="cookieStringEncoding">
+    /// The encoding the <c>-b name=value</c> strings reach curl's <c>argv</c> in, whose bytes are sent as they
+    /// are, one character per byte (the platform's, <c>CredentialEncoding.ForPlatform</c>: UTF-8 on Linux, so
+    /// <c>-b c=中</c> sends <c>c=\xe4\xb8\xad</c>, CGR-065); <see langword="null" /> to send the strings'
+    /// characters as they are.
+    /// </param>
     /// <returns>
     /// The group's cookies, or <see langword="null" /> when the group gives neither <c>-b</c> nor <c>-c</c> and its
     /// <c>CURLOPT_COOKIELIST</c> adds no cookie.
     /// </returns>
-    internal static CookieEngine? FromHttpOptions(EasyHttpOptions http, CookieStore runCookies) =>
-        http.Cookie is not null || TurnsTheEngineOn(http) ? new CookieEngine(http, runCookies, TurnsTheEngineOn(http)) : null;
+    internal static CookieEngine? FromHttpOptions(EasyHttpOptions http, CookieStore runCookies, Encoding? cookieStringEncoding = null) =>
+        http.Cookie is not null || TurnsTheEngineOn(http) ? new CookieEngine(http, runCookies, TurnsTheEngineOn(http), cookieStringEncoding) : null;
+
+    /// <summary>
+    /// Gives <paramref name="text" /> as its bytes in <paramref name="encoding" />, one character per byte, as the
+    /// stored cookies (read from files and responses one character per byte) are; <paramref name="text" /> itself
+    /// when <paramref name="encoding" /> is <see langword="null" />.
+    /// </summary>
+    private static string WireTextOf(string text, Encoding? encoding) =>
+        encoding is null ? text : Encoding.Latin1.GetString(encoding.GetBytes(text));
 
     /// <summary>
     /// Creates the cookies a handle attached to a share handle that shares cookies applies its <c>CURLOPT_COOKIELIST</c>
@@ -130,7 +147,7 @@ internal sealed class CookieEngine
     /// <param name="sharedCookies">The share handle's cookies.</param>
     /// <returns>The cookies.</returns>
     internal static CookieEngine OverSharedCookies(EasyHttpOptions http, CookieStore sharedCookies) =>
-        new(http, sharedCookies, engineOn: true);
+        new(http, sharedCookies, engineOn: true, cookieStringEncoding: null);
 
     /// <summary>
     /// Applies the handle's <c>CURLOPT_COOKIELIST</c> items in the order set, as curl 8.22.0's <c>cookielist</c> in

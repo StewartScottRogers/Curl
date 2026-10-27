@@ -56,12 +56,23 @@ namespace Curl.Engine;
 /// </param>
 /// <param name="runsOnWindows">Whether the default location is looked for as curl's Windows build does.</param>
 /// <param name="diagnosticLog">Where a matching netrc entry is logged, by host and login only (BL-1151); <see langword="null" /> logs nothing.</param>
+/// <param name="credentialEncoding">
+/// The encoding the authenticators turn credentials into bytes with; <see langword="null" /> for
+/// <see cref="CredentialEncoding.ForPlatform" /> on this host, as the engine composes them. The
+/// URL's percent-decoded bytes and the netrc file's bytes are read back through it, so they reach
+/// the wire unchanged, as curl sends them: <c>http://%C3%A9:%E2%82%AC@host/</c> sends
+/// <c>Basic w6k64oKs</c> on Windows too (measured with curl 8.22.0 Schannel, CGR-052, ADR-0821).
+/// </param>
 internal sealed class TransferCredentialLookup(
     Func<string, byte[]?> readFile,
     Func<string, string?> readEnvironmentVariable,
     bool runsOnWindows,
-    IDiagnosticLog? diagnosticLog = null)
+    IDiagnosticLog? diagnosticLog = null,
+    Encoding? credentialEncoding = null)
 {
+    /// <summary>The encoding credentials are sent in, which the URL's and netrc file's bytes are read back through.</summary>
+    private readonly Encoding sentCredentialEncoding = credentialEncoding ?? CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
+
     /// <summary>The message curl 8.21.0 prints after <c>curl: (26) </c> when a required netrc file is missing.</summary>
     internal const string NoSuchFileMessage = ".netrc error: no such file";
 
@@ -135,7 +146,7 @@ internal sealed class TransferCredentialLookup(
         [NotNullWhen(false)] out TransferResult? failure,
         Action<string>? reportInfo)
     {
-        string? urlUser = DecodedUserInformation(url.User);
+        string? urlUser = DecodedUserInformation(url.User, sentCredentialEncoding);
         string? text = ReadNetrcText(authentication);
         NetrcLookupResult result = text is null ? NetrcLookupResult.NotFound : NetrcFile.Find(text, url.Host, urlUser, diagnosticLog);
         failure = FailureOf(authentication.Netrc, FailureMessageOf(text, result)) ?? NetrcControlCodeFailure(url, result);
@@ -144,7 +155,7 @@ internal sealed class TransferCredentialLookup(
             reportInfo?.Invoke(HostNotFoundLine(url.Host, authentication.NetrcFile));
         }
 
-        credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password));
+        credentials = CredentialsOf(result, urlUser, DecodedUserInformation(url.Password, sentCredentialEncoding));
         return failure is null;
     }
 
@@ -165,7 +176,7 @@ internal sealed class TransferCredentialLookup(
         CurlUrl url,
         [NotNullWhen(false)] out TransferResult? failure)
     {
-        failure = !UserOptionWins(authentication) && (HasRefusedControlCode(url, DecodedUserInformation(url.User)) || HasRefusedControlCode(url, DecodedUserInformation(url.Password)))
+        failure = !UserOptionWins(authentication) && (HasRefusedControlCode(url, DecodedUserInformation(url.User, Encoding.Latin1)) || HasRefusedControlCode(url, DecodedUserInformation(url.Password, Encoding.Latin1)))
             ? TransferResult.Failure(CurlExitCode.UrlMalformat, UrlCredentialsMessage)
             : null;
         return failure is null;
@@ -193,7 +204,7 @@ internal sealed class TransferCredentialLookup(
     /// <param name="url">The transfer's URL.</param>
     /// <returns><see langword="true" /> under <c>--netrc-optional</c> with a URL password.</returns>
     private static bool UrlPasswordWinsOverOptionalNetrc(EasyAuthenticationOptions authentication, CurlUrl url) =>
-        authentication.Netrc == NetrcUsage.Optional && DecodedUserInformation(url.Password) is not null;
+        authentication.Netrc == NetrcUsage.Optional && !string.IsNullOrEmpty(url.Password);
 
     /// <summary>
     /// Whether <c>-u</c> gives a user name, which wins over the URL's and the netrc file's credentials:
@@ -277,10 +288,10 @@ internal sealed class TransferCredentialLookup(
     /// The credentials, or <see langword="null" /> when the URL gives neither a user name nor a
     /// password, as <c>http://@host/</c> and <c>http://:@host/</c> send none.
     /// </returns>
-    private static NetworkCredential? CredentialsWrittenInUrl(CurlUrl url)
+    private NetworkCredential? CredentialsWrittenInUrl(CurlUrl url)
     {
-        string? user = DecodedUserInformation(url.User);
-        string? password = DecodedUserInformation(url.Password);
+        string? user = DecodedUserInformation(url.User, sentCredentialEncoding);
+        string? password = DecodedUserInformation(url.Password, sentCredentialEncoding);
         return user is null && password is null ? null : new NetworkCredential(user ?? string.Empty, password ?? string.Empty);
     }
 
@@ -341,10 +352,56 @@ internal sealed class TransferCredentialLookup(
     /// Percent-decodes a user name or password from the URL; an empty one counts as none, as
     /// curl's <c>http://@host/</c> sends no user.
     /// </summary>
+    /// <remarks>
+    /// The part is decoded to bytes, as curl's <c>Curl_urldecode</c> does: its text in
+    /// <paramref name="encoding" />, with each <c>%XX</c> replaced by the byte it names and a
+    /// <c>%</c> not followed by two hex digits kept. The bytes are then read back through
+    /// <paramref name="encoding" />, so the authenticator encoding the result with it sends them
+    /// unchanged (CGR-052).
+    /// </remarks>
     /// <param name="encoded">The part as written in the URL, or <see langword="null" />.</param>
+    /// <param name="encoding">The encoding the decoded part's bytes are sent in.</param>
     /// <returns>The decoded part, or <see langword="null" /> when it is absent or empty.</returns>
-    private static string? DecodedUserInformation(string? encoded) =>
-        string.IsNullOrEmpty(encoded) ? null : Uri.UnescapeDataString(encoded);
+    private static string? DecodedUserInformation(string? encoded, Encoding encoding)
+    {
+        if (string.IsNullOrEmpty(encoded))
+        {
+            return null;
+        }
+
+        byte[] bytes = encoding.GetBytes(encoded);
+        int length = 0;
+        for (int index = 0; index < bytes.Length; index++)
+        {
+            bytes[length++] = bytes[index] == (byte)'%' && TryReadEscapedByte(bytes, index + 1, out byte escaped)
+                ? StepOver(ref index, escaped)
+                : bytes[index];
+        }
+
+        return encoding.GetString(bytes, 0, length);
+    }
+
+    /// <summary>Reads the two hex digits at <paramref name="start" /> as one byte.</summary>
+    /// <param name="bytes">The encoded part's bytes.</param>
+    /// <param name="start">Where the two digits would be.</param>
+    /// <param name="value">The byte they name.</param>
+    /// <returns><see langword="false" /> when there are not two hex digits there.</returns>
+    private static bool TryReadEscapedByte(byte[] bytes, int start, out byte value)
+    {
+        value = 0;
+        return start + 2 <= bytes.Length
+            && byte.TryParse(bytes.AsSpan(start, 2), System.Globalization.NumberStyles.AllowHexSpecifier, null, out value);
+    }
+
+    /// <summary>Moves <paramref name="index" /> past an escape's two hex digits.</summary>
+    /// <param name="index">The escape's <c>%</c>; left on its last digit.</param>
+    /// <param name="value">The byte the escape names.</param>
+    /// <returns><paramref name="value" />.</returns>
+    private static byte StepOver(ref int index, byte value)
+    {
+        index += 2;
+        return value;
+    }
 
     /// <summary>
     /// Reads the first netrc file there is, as UTF-8 with any byte order mark kept as text, as
@@ -358,7 +415,7 @@ internal sealed class TransferCredentialLookup(
         {
             if (readFile(path) is { } contents)
             {
-                return Encoding.UTF8.GetString(contents);
+                return sentCredentialEncoding.GetString(contents);
             }
         }
 

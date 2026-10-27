@@ -191,7 +191,7 @@ public sealed class EasyHandleIsolationTests
 
         Assert.AreNotSame(engine.Shared.Connections, own.Connections);
         Assert.AreNotSame(engine.Shared.TlsSessions, own.TlsSessions);
-        Assert.AreSame(engine.Shared.DnsCache, own.DnsCache);
+        Assert.AreNotSame(engine.Shared.DnsCache, own.DnsCache);
         Assert.AreNotSame(engine.Shared.Cookies, own.Cookies);
         Assert.AreNotSame(engine.Shared.Hsts, own.Hsts);
         Assert.AreSame(engine.Shared, own.EngineWide);

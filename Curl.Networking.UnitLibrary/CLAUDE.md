@@ -96,7 +96,7 @@ certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per A
 build the platform usually runs, the Schannel build on Windows and the OpenSSL build
 elsewhere; its internal constructor names the build so tests pin both on any platform.
 The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`
-(`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts its certificates, the
+(`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts the certificates of its `<subject hash>.<n>` files, as OpenSSL's hashed directory lookup reads them (`OpenSslSubjectNameHash`, ADR-0836, CGR-111), the
 Schannel build ignores it and reports its one warning, unwrapped, in `SslStreamTlsProvider.Warnings`
 for the console to print wrapped at the terminal width (two lines at curl's default 79 columns). With `--cert` (`TlsClientOptions.ClientCertificate`, split into
 file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client
@@ -107,9 +107,10 @@ first reads the value as a store path (`CurrentUser\MY\<thumbprint>`, parsed by
 opens (`SystemClientCertificateStore`, through `X509Store`, in production; a fake in tests). A certificate that does not
 load is exit 58; in the OpenSSL build a key that does not load is exit 43, as curl reports
 it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
-ADR-0011: the Schannel build refuses `--ciphers` with exit 59 and ignores `--tls13-ciphers`;
+ADR-0011: the Schannel build reads `--ciphers` as ALG_IDs through `SchannelAlgorithmList` (ADR-0816: an entry naming none is exit 59, a list Schannel accepts none of exit 35, and a list stops the range at TLS 1.2) and ignores `--tls13-ciphers`;
 the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
-the hand-written OpenSSL-name table, and a list naming no known suite is exit 59. On
+the hand-written OpenSSL-name table in OpenSSL's `ALL` order, `--ciphers` expanded as an OpenSSL
+cipher string by `OpenSslCipherString` (ADR-0817), and a list left with no suite is exit 59. On
 Windows `CipherSuitesPolicy` cannot be constructed, so there the OpenSSL build (reached
 only from tests) reports exit 59 instead of throwing. The provider builds the policy through
 `ICipherSuitesPolicyFactory` (`CipherSuitesPolicyFactory.ForThisPlatform` in production, whose
@@ -118,12 +119,15 @@ only from tests) reports exit 59 instead of throwing. The provider builds the po
 the policy into `SslClientAuthenticationOptions` on Windows too (BL-268).
 Per ADR-0138 (BL-502) the handshake offers every TLS version from `TlsClientOptions.MinimumVersion`
 to `MaximumVersion` (`TlsVersion`; `--tlsv1.x`, `--tls-max`), as `TlsVersionRange` computes it,
-the one place here that names the obsolete TLS 1.0 and 1.1 members; a minimum above the ceiling
+the one place here that names the obsolete TLS 1.0 and 1.1 members; with neither set, or only a
+TLS 1.3 ceiling, it offers TLS 1.2 and 1.3, never the system default (ADR-0815, CGR-004); a minimum above the ceiling
 throws, since the parser refuses it. With a ceiling of TLS 1.0 or 1.1 the Schannel build reports
 any security status as `failed to receive handshake`, as curl's did in every measured case.
 Per ADR-0364 (BL-1152) the hand-built OpenSSL build refuses such a ceiling before any hello, as
 OpenSSL 3's security level does: the trust event, a `protocol_version` alert record
 (`ProtocolVersionAlertRecord`) and exit 35 with `TlsFailureMessages.OpenSslNoProtocolsAvailable`;
+per ADR-0827 (BL-3623) it raises a TLS 1.0 or 1.1 minimum under a later ceiling to TLS 1.2
+(`WithSecurityLevelMinimum`) unless `--ciphers` ends at `@SECLEVEL=0`;
 and below a TLS 1.3 ceiling the Schannel build's hello is in a record of the ceiling's version
 (`ClientHelloProfile.Tls12RecordVersionIsTheCeiling`), OpenSSL's in a TLS 1.0 one.
 The messages for its exit 35, exit 43, exit 58, exit 59, exit 60 and exit 77 live in
@@ -134,6 +138,10 @@ the console's to print. No type here constructs an `HttpClient`.
 first address's family in turn, the other family beside it once `happyEyeballsTimeout`
 (`--happy-eyeballs-timeout-ms`, 200 ms by default) has passed on its `TimeProvider` or the first
 family has failed on every address; the first connection wins and the rest are cancelled or closed.
+Per ADR-0818 (BL-3833) a target with a `SocketOpener` (`ITcpSocketOpener`) is raced through
+`SocketOpenerTcpDialer`, which asks it before each attempt to proceed, refuse (a `SocketException`, no
+socket) or use a supplied handle (adopted unowned by `TcpDialer.DialSuppliedSocketAsync`), and tells it
+`SocketClosed` when an opened attempt fails.
 
 `TcpConnector` fills `ConnectResult.Timings` and `LocalEndPoint` per ADR-0030: it takes
 `Started`, `NameResolved` and `Connected` from its `TimeProvider`, the local end point from
@@ -269,7 +277,9 @@ is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 6553
 an address literal `Dns` refuses with `ArgumentException` (the any-address, host `0`) as itself,
 so the dial fails with exit 7 as curl's does (BL-2084). It answers `localhost` and every name
 under `.localhost` itself, `::1` then `127.0.0.1`, without asking `Dns` (`TcpConnector.IsLocalhost`,
-test389, BL-2113). Every
+test389, BL-2113). Per ADR-0820 (BL-3575) on Windows it resolves an IPv4 address in shorthand
+(`Ipv4ShorthandAddress`: `127.1`, `0`, `2130706433`) to nothing, as the Schannel build does, and
+`LocalBindingAddressChooser` hands such an `--interface` host to the resolver. Every
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
 which cuts it to 255 characters as curl's 256-byte error buffer does (ADR-0072).
 
@@ -294,7 +304,8 @@ connection's own address.
 Every connection it returns is a `PooledConnection`; one marked with `MarkReusable` goes back
 to the pool on dispose, anything else closes. `ConnectionPoolKey` (with
 `ConnectionPoolProxyKey`) is the key: `PoolScheme`, host ignoring case, port, TLS choice,
-`IsForwardProxy` and tunnelling proxy with its credential by value; a target without `PoolScheme` is never pooled.
+`IsForwardProxy` and tunnelling proxy, or the forward proxy (`ConnectTarget.ForwardProxy`, so `--next`
+groups with different `-U` never share a plain proxy connection, CGR-083), with its credential by value; a target without `PoolScheme` is never pooled.
 The pool holds at most five idle connections in total, closing the oldest with curl's
 `Connection pool is full` and `shutting down connection #N` lines on the returning target's
 `Events`, and drops one idle longer than 118 seconds on its `TimeProvider`. It numbers
@@ -399,11 +410,14 @@ resolver and the DoH TLS options) and the DoH URL, and for each name POSTs the A
 query in parallel on two connections, A first, each request written byte for byte as curl 8.21.0
 writes it (no `User-Agent`; `Host` with the port only when it is not the default). The target
 carries `PoolScheme` `https`, so the handshake offers ALPN `http/1.1`. `DohResponseReader` reads the
-response as curl does: `Content-Type` ignored, a `Content-Length` or chunked body of at
-most 3000 bytes, anything else a failure; it hands on the status code, and a status outside 200-299
+response as curl does: `Content-Type` ignored, a `Content-Length`, chunked or close-delimited
+(CGR-160, BL-3689) body of at most 3000 bytes, anything else a failure; it hands on the status code, and a status outside 200-299
 fails the query undecoded with `[DoH] [DoH] [A] error: HTTP status N`, as curl 8.22.0's
 `doh_probe_done` does (BL-2972). It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
+A name `DnsQueryEncoder` refuses is reported, with nothing sent, as `DnsLookupFailure.DohBadLabel` or
+`DohNameTooLong` through `IDnsResolverWithFailureReason`, which `NameResolutionFailure` makes curl 8.22.0's
+exit 27 `Failed to encode DoH packet [1]` or `[13]` (CGR-158, BL-3687).
 Both answers fill one entry, as curl's `struct dohentry`: `DohQueryResult.AsOneEntry` cuts each,
 A first, to the 24 addresses the earlier ones left room for (measured, BL-1153). A query that
 failed writes curl 8.22.0's `[DoH] [DoH] [A] error ...` line on the trace in place of its completed

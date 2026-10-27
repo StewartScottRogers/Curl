@@ -30,6 +30,13 @@ internal sealed class ScpFileDownload(SshTransport transport)
     internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
 
     /// <summary>
+    /// Gets whether to stop after the file's header, curl's <c>-I</c> (CGR-030): curl's
+    /// transfer layer sets up no receive for a transfer that wants no body, so nothing is
+    /// copied or written and the channel is closed as after a download.
+    /// </summary>
+    internal bool NoBody { get; init; }
+
+    /// <summary>
     /// Downloads the file at <paramref name="urlPath" /> into <paramref name="output" />.
     /// </summary>
     /// <param name="urlPath">The URL's path, with its percent-escapes.</param>
@@ -65,7 +72,9 @@ internal sealed class ScpFileDownload(SshTransport transport)
         long size = await new ScpFileHeaderReader(channel).ReadFileSizeAsync(cancellationToken).ConfigureAwait(false);
         Trace.Rest();
         Trace.Write("DO phase is complete");
-        TransferResult result = await new Copy(channel, size, new DownloadSizeLimit(maxFileSize), output, progress).RunAsync(cancellationToken).ConfigureAwait(false);
+        TransferResult result = NoBody
+            ? TransferResult.Success(0)
+            : await new Copy(channel, size, new DownloadSizeLimit(maxFileSize), output, progress).RunAsync(cancellationToken).ConfigureAwait(false);
         Trace.Enter("SSH_SCP_DONE");
         Trace.Enter("SSH_SCP_CHANNEL_FREE");
         await CloseIgnoringFailureAsync(channel, cancellationToken).ConfigureAwait(false);
@@ -153,12 +162,16 @@ internal sealed class ScpFileDownload(SshTransport transport)
                 {
                     // Measured (BL-988): curl writes the channel's end on as an empty
                     // block, which --trace shows as 0 bytes of received data.
-                    await output.WriteAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
-                    return EndOfChannel();
+                    return await SshOutputWrite.TryWriteAsync(output, ReadOnlyMemory<byte>.Empty, received, cancellationToken).ConfigureAwait(false)
+                        ?? EndOfChannel();
                 }
 
                 int allowed = maxFileSize.AllowedOf(received, read);
-                await output.WriteAsync(buffer.AsMemory(0, allowed), cancellationToken).ConfigureAwait(false);
+                if (await SshOutputWrite.TryWriteAsync(output, buffer.AsMemory(0, allowed), received, cancellationToken).ConfigureAwait(false) is { } writeFailure)
+                {
+                    return writeFailure;
+                }
+
                 received += allowed;
                 progress.ReportDownloaded(received, expectedSize);
                 if (allowed < read)

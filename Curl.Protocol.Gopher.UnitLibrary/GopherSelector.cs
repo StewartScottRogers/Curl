@@ -16,9 +16,11 @@ namespace Curl.Protocol.Gopher;
 /// fewer gives an empty selector. The fragment is never sent.
 /// </para>
 /// <para>
-/// The path is read from <see cref="CurlUrl.OriginalString" />, as UTF-8 bytes, and its
+/// The path is read from <see cref="CurlUrl.OriginalString" />, as its command-line bytes
+/// (<see cref="GopherCommandLineText" />: the ANSI code page on Windows, UTF-8 elsewhere), and its
 /// dot segments are removed here, counting only literal dots, so the two characters
-/// removed are the two written after the authority.
+/// removed are the two written after the authority. Under <c>--path-as-is</c> the dot
+/// segments are kept, as curl keeps them (CGR-105).
 /// </para>
 /// </remarks>
 internal static class GopherSelector
@@ -37,13 +39,27 @@ internal static class GopherSelector
     /// Builds the selector for <paramref name="url" />, without its terminating CRLF.
     /// </summary>
     /// <param name="url">The transfer's URL.</param>
+    /// <param name="pathAsIs">Whether <c>--path-as-is</c> keeps the path's dot segments.</param>
     /// <returns>
     /// The decoded selector bytes, or <see langword="null" /> when it decodes to a NUL
     /// byte, which curl refuses with exit 3.
     /// </returns>
-    internal static byte[]? FromUrl(CurlUrl url)
+    internal static byte[]? FromUrl(CurlUrl url, bool pathAsIs) => FromUrl(url, GopherCommandLineText.Platform, pathAsIs);
+
+    /// <summary>
+    /// Builds the selector for <paramref name="url" />, without its terminating CRLF, reading
+    /// literal characters as <paramref name="commandLineText" />'s bytes.
+    /// </summary>
+    /// <param name="url">The transfer's URL.</param>
+    /// <param name="commandLineText">The encoding the platform's curl received the URL in.</param>
+    /// <param name="pathAsIs">Whether <c>--path-as-is</c> keeps the path's dot segments.</param>
+    /// <returns>
+    /// The decoded selector bytes, or <see langword="null" /> when it decodes to a NUL
+    /// byte, which curl refuses with exit 3.
+    /// </returns>
+    internal static byte[]? FromUrl(CurlUrl url, GopherCommandLineText commandLineText, bool pathAsIs = false)
     {
-        byte[] pathAndQuery = Encoding.UTF8.GetBytes(ReadPathAndQuery(url.OriginalString.Trim()));
+        byte[] pathAndQuery = commandLineText.GetBytes(ReadPathAndQuery(url.OriginalString.Trim(), pathAsIs));
         if (pathAndQuery.Length <= PrefixLength)
         {
             return [];
@@ -54,11 +70,13 @@ internal static class GopherSelector
 
     /// <summary>
     /// Reads the path and query from a URL as written, with the path's dot segments
-    /// removed and an empty path read as <c>/</c>, as curl's URL parser leaves them.
+    /// removed (unless <paramref name="pathAsIs" />) and an empty path read as <c>/</c>, as
+    /// curl's URL parser leaves them.
     /// </summary>
     /// <param name="written">The URL as written.</param>
+    /// <param name="pathAsIs">Whether to keep the path's dot segments, as <c>--path-as-is</c> does.</param>
     /// <returns>The path, followed by <c>?</c> and the query when there is one.</returns>
-    private static string ReadPathAndQuery(string written)
+    private static string ReadPathAndQuery(string written, bool pathAsIs)
     {
         int authorityStart = written.IndexOf(SchemeSeparator, StringComparison.Ordinal) + SchemeSeparator.Length;
         int pathStart = written.IndexOfAny(PathStarts, authorityStart);
@@ -73,7 +91,7 @@ internal static class GopherSelector
         string path = queryStart < 0 ? rest : rest[..queryStart];
         string query = queryStart < 0 ? string.Empty : rest[queryStart..];
 
-        return RemoveDotSegments(path) + query;
+        return (pathAsIs ? path : RemoveDotSegments(path)) + query;
     }
 
     /// <summary>

@@ -8,7 +8,8 @@ namespace Curl.Engine;
 /// A connection <see cref="SocketCallbackConnector" /> opened, carrying the opaque <see cref="CurlSocket" /> the
 /// socket callbacks saw for it. It reads, writes and answers as <paramref name="inner" /> does; disposing it
 /// closes <paramref name="inner" /> and then calls <c>CURLOPT_CLOSESOCKETFUNCTION</c> with the socket, once,
-/// as libcurl's <c>Curl_socket_close</c> calls it in place of <c>close()</c> (ADR-0610).
+/// as libcurl's <c>Curl_socket_close</c> calls it in place of <c>close()</c> (ADR-0610), or first, while it is
+/// open, when the socket is the engine's own operating system socket (CGR-129, ADR-0842).
 /// </summary>
 /// <param name="inner">The connection opened.</param>
 /// <param name="closer">Calls the close-socket callback once for the socket, shared with any connection <see cref="ClearTlsAsync" /> gives.</param>
@@ -25,6 +26,9 @@ internal sealed class SocketCallbackConnection(IConnection inner, CurlSocketClos
 
     /// <inheritdoc />
     public EndPoint? LocalEndPoint => inner.LocalEndPoint;
+
+    /// <inheritdoc />
+    public nint? SocketHandle => inner.SocketHandle;
 
     /// <inheritdoc />
     public IConnectionSession? Session => inner.Session;
@@ -62,10 +66,18 @@ internal sealed class SocketCallbackConnection(IConnection inner, CurlSocketClos
             ? new SocketCallbackConnection(plain, closer)
             : null;
 
-    /// <summary>Closes the inner connection, then calls the close-socket callback once.</summary>
+    /// <summary>
+    /// Closes the inner connection, then calls the close-socket callback once; the callback runs first when the
+    /// socket is the engine's own operating system socket, so it sees the socket open (CGR-129, ADR-0842).
+    /// </summary>
     /// <returns>A task that completes once both are done.</returns>
     public async ValueTask DisposeAsync()
     {
+        if (closer.IsTheConnectionsOwnSocket)
+        {
+            closer.Close();
+        }
+
         await inner.DisposeAsync().ConfigureAwait(false);
         closer.Close();
     }

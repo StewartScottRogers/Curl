@@ -57,7 +57,7 @@ internal static class WriteOutJson
         Dictionary<string, List<string>> valuesByName = new(StringComparer.Ordinal);
         foreach (KeyValuePair<string, string> header in headers)
         {
-            string name = header.Key.ToLowerInvariant();
+            string name = LowerAsciiLetters(header.Key);
             if (!valuesByName.TryGetValue(name, out List<string>? values))
             {
                 values = [];
@@ -70,6 +70,21 @@ internal static class WriteOutJson
 
         IEnumerable<string> formatted = members.Select(member => $"{Quote(member.Name)}:[{string.Join(',', member.Values)}]");
         return "{" + string.Join(",\n", formatted) + "\n}";
+    }
+
+    /// <summary>
+    /// Lowers only the ASCII letters of a header name, as curl's <c>Curl_strntolower</c>
+    /// does: a byte from 0x80, held as one Latin-1 character, stays as it is.
+    /// </summary>
+    private static string LowerAsciiLetters(string name)
+    {
+        return string.Create(name.Length, name, static (lowered, text) =>
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                lowered[index] = char.IsAsciiLetterUpper(text[index]) ? (char)(text[index] | 0x20) : text[index];
+            }
+        });
     }
 
     private static void AppendEscaped(StringBuilder quoted, char character)

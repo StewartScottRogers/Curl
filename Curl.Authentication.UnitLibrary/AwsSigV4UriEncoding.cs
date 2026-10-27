@@ -15,7 +15,8 @@ internal static class AwsSigV4UriEncoding
     internal const int MaxQueryComponents = 128;
 
     /// <summary>
-    /// Builds the canonical URI: the path as given for S3 (<c>s3</c>, <c>s3-express</c>,
+    /// Builds the canonical URI from the path as the request line carries it
+    /// (<see cref="PathAsSent" />): that path for S3 (<c>s3</c>, <c>s3-express</c>,
     /// <c>s3-outposts</c>), otherwise every byte but an unreserved one or <c>/</c>
     /// percent-encoded again; <c>/</c> when empty.
     /// </summary>
@@ -25,10 +26,47 @@ internal static class AwsSigV4UriEncoding
     /// <returns>The canonical URI.</returns>
     internal static string CanonicalPath(string path, string service, Encoding encoding)
     {
+        string sent = PathAsSent(path, encoding);
         string canonical = service is "s3" or "s3-express" or "s3-outposts"
-            ? path
-            : Escape(encoding.GetBytes(path), keepSlash: true);
+            ? sent
+            : Escape(Encoding.ASCII.GetBytes(sent), keepSlash: true);
         return canonical.Length == 0 ? "/" : canonical;
+    }
+
+    /// <summary>
+    /// Gives <paramref name="path" /> as the HTTP request line carries it: its bytes in
+    /// <paramref name="encoding" />, a lone <c>U+DC80</c> to <c>U+DCFF</c> standing for the
+    /// argument byte it escapes, with each byte above <c>~</c> as <c>%XX</c>. curl 8.21.0 on
+    /// Windows sends <c>http://h/ü</c> as <c>GET /%FC</c> and signs that path (measured, CGR-078,
+    /// BL-3607).
+    /// </summary>
+    private static string PathAsSent(string path, Encoding encoding)
+    {
+        StringBuilder sent = new(path.Length);
+        int runStart = 0;
+        for (int index = 0; index < path.Length; index++)
+        {
+            if (IsEscapedByte(path, index))
+            {
+                AppendAboveTildeEscaped(sent, encoding.GetBytes(path[runStart..index]));
+                AppendAboveTildeEscaped(sent, [(byte)(path[index] - 0xDC00)]);
+                runStart = index + 1;
+            }
+        }
+
+        AppendAboveTildeEscaped(sent, encoding.GetBytes(path[runStart..]));
+        return sent.ToString();
+    }
+
+    private static bool IsEscapedByte(string text, int index) =>
+        text[index] is >= '\uDC80' and <= '\uDCFF' && (index == 0 || !char.IsHighSurrogate(text[index - 1]));
+
+    private static void AppendAboveTildeEscaped(StringBuilder text, byte[] bytes)
+    {
+        foreach (byte value in bytes)
+        {
+            text.Append(value <= '~' ? ((char)value).ToString() : "%" + value.ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+        }
     }
 
     /// <summary>

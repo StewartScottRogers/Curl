@@ -1,5 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Curl.Protocol.Abstractions;
+using Microsoft.Win32.SafeHandles;
 
 namespace Curl.Core.FileSystem;
 
@@ -52,10 +55,38 @@ namespace Curl.Core.FileSystem;
 /// writes an overlapped write completed through the thread pool, which made a 50 MiB
 /// <c>-o</c> download take 1.8 times curl's wall time (BL-1675, AF-0048).
 /// </para>
+/// <para>
+/// Off Windows a read open of a path in <see cref="RawBytePath" />'s form, holding a byte
+/// that is not valid UTF-8, opens the file whose name is exactly those bytes, as curl's
+/// <c>open()</c> does: .NET's file APIs would encode the byte as EF BF BD, so the name goes to
+/// the runtime's own <c>open</c> shim instead and a <see cref="FileStream" /> wraps the
+/// descriptor (CGR-114, BL-3899, ADR-0839). Its failure is the status of the <c>errno</c>
+/// (<see cref="StatusForErrno(int)" />), so a name that does not exist is still
+/// <see cref="FileAccessStatus.NotFound" />. Every other path, and every path on Windows,
+/// opens as above.
+/// </para>
 /// </remarks>
-public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTimeSetter
+public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTimeSetter
 {
     private const int BufferSize = 4096;
+
+    /// <summary>The runtime's <c>O_RDONLY</c> (its PAL value, the same on Linux and macOS).</summary>
+    private const int ReadOnly = 0x0000;
+
+    /// <summary>The runtime's <c>O_CLOEXEC</c>.</summary>
+    private const int CloseOnExec = 0x0010;
+
+    /// <summary>The status of each <c>errno</c> a read <c>open</c> names specially; any other is an I/O error.</summary>
+    private static readonly Dictionary<int, FileAccessStatus> StatusesByErrno = new()
+    {
+        [1] = FileAccessStatus.AccessDenied,
+        [2] = FileAccessStatus.NotFound,
+        [13] = FileAccessStatus.AccessDenied,
+        [20] = FileAccessStatus.NotADirectory,
+        [21] = FileAccessStatus.IsDirectory,
+    };
+
+    private readonly Func<byte[], RawBytePathOpen>? openRawBytePathForRead;
 
     [UnsupportedOSPlatformGuard("windows")]
     private readonly bool setsUnixCreateMode;
@@ -68,13 +99,15 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// Initializes a new instance of the <see cref="PhysicalFileSystem" /> class that sets
     /// the create mode of a written file everywhere except Windows, reports the Unix
     /// epoch for an unreadable timestamp only on Windows, and reports a path whose parent
-    /// is a file as <see cref="FileAccessStatus.NotADirectory" /> everywhere except Windows.
+    /// is a file as <see cref="FileAccessStatus.NotADirectory" /> everywhere except Windows,
+    /// and opens a <see cref="RawBytePath" /> for reading under its raw bytes everywhere except Windows.
     /// </summary>
     public PhysicalFileSystem()
         : this(
             setsUnixCreateMode: !OperatingSystem.IsWindows(),
             reportsUnreadableTimestampAsEpoch: OperatingSystem.IsWindows(),
-            reportsFileInPathAsNotADirectory: !OperatingSystem.IsWindows())
+            reportsFileInPathAsNotADirectory: !OperatingSystem.IsWindows(),
+            openRawBytePathForRead: RawBytePathReadOpenerFor(OperatingSystem.IsWindows()))
     {
     }
 
@@ -99,14 +132,21 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     /// <see cref="DirectoryNotFoundException" />. <see langword="false" /> keeps
     /// <see cref="FileAccessStatus.NotFound" />, as Windows reports it.
     /// </param>
+    /// <param name="openRawBytePathForRead">
+    /// Opens a <see cref="RawBytePath" />'s NUL-terminated bytes for reading, as <c>open()</c>
+    /// does, for a read path holding a raw byte; <see langword="null" /> opens every path through
+    /// <see cref="FileStream" />, as Windows does.
+    /// </param>
     internal PhysicalFileSystem(
         bool setsUnixCreateMode,
         bool reportsUnreadableTimestampAsEpoch = false,
-        bool reportsFileInPathAsNotADirectory = false)
+        bool reportsFileInPathAsNotADirectory = false,
+        Func<byte[], RawBytePathOpen>? openRawBytePathForRead = null)
     {
         this.setsUnixCreateMode = setsUnixCreateMode;
         this.reportsUnreadableTimestampAsEpoch = reportsUnreadableTimestampAsEpoch;
         this.reportsFileInPathAsNotADirectory = reportsFileInPathAsNotADirectory;
+        this.openRawBytePathForRead = openRawBytePathForRead;
     }
 
     /// <inheritdoc />
@@ -116,6 +156,11 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
     public ValueTask<FileOpenResult> OpenForReadAsync(string path, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (openRawBytePathForRead is not null && RawBytePath.HoldsRawByte(path))
+        {
+            return ValueTask.FromResult(OpenUnderRawBytes(openRawBytePathForRead, path));
+        }
 
         // ReadWrite and Delete sharing: curl opens with a plain open(2), which locks
         // nothing, so a file another process is writing is still readable.
@@ -325,6 +370,91 @@ public sealed class PhysicalFileSystem : IFileSystem, IDirectoryLister, IFileTim
 
         return false;
     }
+
+    /// <summary>
+    /// The <see cref="FileAccessStatus" /> of a failed read <c>open</c>'s <c>errno</c>, whose
+    /// values these are on both Linux and macOS.
+    /// </summary>
+    /// <param name="errno">The error number.</param>
+    /// <returns>The status.</returns>
+    internal static FileAccessStatus StatusForErrno(int errno) => StatusesByErrno.GetValueOrDefault(errno, FileAccessStatus.IoError);
+
+    /// <summary>
+    /// The raw-byte read opener a platform uses: none on Windows, whose file APIs take UTF-16
+    /// names and never see a raw byte, and the runtime's <c>open</c> shim elsewhere.
+    /// </summary>
+    /// <param name="isWindows">Whether this is Windows.</param>
+    /// <returns>The opener, or <see langword="null" /> on Windows.</returns>
+    internal static Func<byte[], RawBytePathOpen>? RawBytePathReadOpenerFor(bool isWindows) =>
+        isWindows ? null : OpenUnderRawBytesForRead;
+
+    /// <summary>
+    /// Opens <paramref name="path" /> under its raw bytes with <paramref name="openRaw" />, and
+    /// reads the length and timestamp of the descriptor it gives, as <see cref="Open" /> does.
+    /// </summary>
+    /// <param name="openRaw">Opens NUL-terminated raw bytes for reading.</param>
+    /// <param name="path">A <see cref="RawBytePath" /> holding a raw byte.</param>
+    /// <returns>The opened handle, or the reason it could not be opened.</returns>
+    private FileOpenResult OpenUnderRawBytes(Func<byte[], RawBytePathOpen> openRaw, string path)
+    {
+        RawBytePathOpen open = openRaw([.. RawBytePath.ToBytes(path), 0]);
+        if (open.Handle is null)
+        {
+            return FileOpenResult.Failed(StatusForErrno(open.Errno));
+        }
+
+        FileStream stream;
+        try
+        {
+            stream = new FileStream(open.Handle, FileAccess.Read, BufferSize);
+        }
+        catch (Exception exception) when (FileOpenFailure.IsOpenFailure(exception))
+        {
+            open.Handle.Dispose();
+            return FileOpenResult.Failed(FileOpenFailure.StatusFor(exception, pathIsDirectory: false), exception);
+        }
+
+        return FileOpenResult.Opened(stream, LengthOf(stream), LastWriteTimeUtcOf(stream));
+    }
+
+    /// <summary>Opens the NUL-terminated name <paramref name="path" /> for reading with the runtime's <c>open</c>.</summary>
+    /// <param name="path">The name's raw bytes and a NUL.</param>
+    /// <returns>The descriptor, or the <c>errno</c> of the failed open.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0839: a thin adapter over an open only Linux and macOS take raw bytes in.")]
+    private static RawBytePathOpen OpenUnderRawBytesForRead(byte[] path)
+    {
+        nint descriptor;
+        int errno;
+        unsafe
+        {
+            fixed (byte* name = path)
+            {
+                descriptor = SystemNativeOpen(name, ReadOnly | CloseOnExec, 0);
+                errno = Marshal.GetLastSystemError();
+            }
+        }
+
+        return descriptor < 0
+            ? new RawBytePathOpen(null, errno)
+            : new RawBytePathOpen(new SafeFileHandle(descriptor, ownsHandle: true), 0);
+    }
+
+    /// <summary>
+    /// The runtime's non-variadic <c>open</c> shim, which every .NET build on Linux and macOS ships
+    /// and Native AOT links in; libc's own <c>open</c> is variadic, which a P/Invoke cannot call
+    /// correctly on Apple silicon. Its arguments are blittable, so no marshalling stub is generated;
+    /// the caller reads <c>errno</c> straight after, as a <c>SetLastError</c> stub would.
+    /// </summary>
+    [LibraryImport("libSystem.Native", EntryPoint = "SystemNative_Open")]
+    private static unsafe partial nint SystemNativeOpen(byte* path, int flags, int mode);
+
+    /// <summary>
+    /// What a raw-byte read <c>open</c> gave: the descriptor's handle, or <see langword="null" />
+    /// and the <c>errno</c> it failed with.
+    /// </summary>
+    /// <param name="Handle">The opened descriptor, owned by the receiver.</param>
+    /// <param name="Errno">The failed open's error number; zero when it opened.</param>
+    internal sealed record RawBytePathOpen(SafeFileHandle? Handle, int Errno);
 
     /// <summary>
     /// The length of an opened handle, or zero for one that cannot seek and so has none.

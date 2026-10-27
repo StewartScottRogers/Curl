@@ -19,6 +19,13 @@ public interface IMultiTransfer : IAsyncDisposable
     /// </summary>
     MultiOptions Options { get; set; }
 
+    /// <summary>
+    /// Gets whether the code asking runs inside one of this handle's transfers - in one of its callbacks -
+    /// where libcurl's <c>Curl_is_in_callback</c> check refuses <c>curl_multi_cleanup</c> with
+    /// <see cref="CurlMultiCode.RecursiveApiCall"/>. A handle whose transfers run no callbacks answers <see langword="false"/>.
+    /// </summary>
+    bool IsInTransferCallback => false;
+
     /// <summary><c>curl_multi_add_handle</c>: add a transfer, which starts on the next perform.</summary>
     /// <param name="transfer">The transfer to add.</param>
     /// <returns>The call's result; <see cref="CurlMultiCode.AddedAlready"/> when it is in a multi handle already.</returns>

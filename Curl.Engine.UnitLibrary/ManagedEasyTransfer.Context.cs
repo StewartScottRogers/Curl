@@ -23,6 +23,13 @@ namespace Curl.Engine;
 internal sealed partial class ManagedEasyTransfer
 {
     /// <summary>
+    /// The write-callback output the last context built wrote the body to, or <see langword="null" /> when it wrote
+    /// to the runner's <see cref="ToolOutputs" />, to no callback, or no context was built; its count is
+    /// <see cref="TransferInfo.SizeDelivered" /> (CGR-126).
+    /// </summary>
+    private CallbackWriteStream? lastWriteCallbackOutput;
+
+    /// <summary>
     /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a
     /// factory with no standard input over the engine's clock, the caches' HSTS store and <see cref="Host" />'s
     /// diagnostic log, and keeps it as <see cref="LastContext" />.
@@ -49,7 +56,8 @@ internal sealed partial class ManagedEasyTransfer
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
-        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
+        lastWriteCallbackOutput = outputs.Output as CallbackWriteStream;
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { ReadsTelnetStandardInputInTextMode = false, HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,
             options.Http,
@@ -222,8 +230,9 @@ internal sealed partial class ManagedEasyTransfer
     /// <summary>
     /// The proxy credentials <c>CURLOPT_PROXYUSERPWD</c>, <c>CURLOPT_PROXYUSERNAME</c> and <c>CURLOPT_PROXYPASSWORD</c>
     /// give, as the curl tool's <c>-U</c> gives them: <c>CURLOPT_PROXYUSERPWD</c> split at its first colon (no colon is
-    /// an empty password), the user name and password options each winning over their half of it. They replace the
-    /// proxy URL's own user information, as in libcurl (upstream test1588, BL-2660, ADR-0677).
+    /// an empty password), the user name and password options each winning over their half of it. They are used only
+    /// when the proxy URL has no user information of its own, as in libcurl (upstream test1588, BL-2660, ADR-0677,
+    /// CGR-079, ADR-0825).
     /// </summary>
     /// <param name="authentication">The handle's authentication options.</param>
     /// <returns>The credentials, or <see langword="null" /> when none of the three is set.</returns>

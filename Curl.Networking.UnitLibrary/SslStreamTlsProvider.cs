@@ -58,6 +58,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private readonly SslProtocols _offeredProtocols;
 
+    // The highest version offered: the options' ceiling, or TLS 1.2 for the Schannel build
+    // with --ciphers (ADR-0816), whose failure text names it.
+    private readonly TlsVersion _offeredMaximumVersion;
+
     private readonly TimeProvider _timeProvider;
 
     private readonly IClientCertificateStore _certificateStore;
@@ -137,7 +141,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         IClientCertificateStore certificateStore)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
-        _offeredProtocols = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
+        var offeredRange = SchannelAlgorithmList.WithLegacyCredentialRange(options, matchesSchannelBuild);
+        _offeredProtocols = TlsVersionRange.ToSslProtocols(offeredRange.MinimumVersion, offeredRange.MaximumVersion);
+        _offeredMaximumVersion = offeredRange.MaximumVersion;
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
         _matchesSchannelBuild = matchesSchannelBuild;
@@ -166,6 +172,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// line is without its line ending.
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
+
+    /// <summary>
+    /// Gets the record of which verification settings own each host's resumable sessions
+    /// (<see cref="SslStreamSessionPartitions" />, CGR-164). Defaults to the process's
+    /// <see cref="SslStreamSessionPartitions.Process" />; tests give each provider its own.
+    /// </summary>
+    internal SslStreamSessionPartitions SessionPartitions { get; init; } = SslStreamSessionPartitions.Process;
 
     /// <summary>
     /// Gets the factory that builds the OpenSSL build's <see cref="CipherSuitesPolicy" /> from
@@ -350,7 +363,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         if (cipherFailure is not null)
         {
             await plaintext.DisposeAsync().ConfigureAwait(false);
-            return ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure);
+            return cipherFailure;
         }
 
         var (clientCertificate, clientCertificateFailure) = LoadClientCertificate();
@@ -383,8 +396,9 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var judgedHandshake = Unnegotiated(offeredApplicationProtocols);
         var authenticationOptions = new SslClientAuthenticationOptions
         {
-            TargetHost = targetHost,
+            TargetHost = ServerNameIndication(targetHost),
             EnabledSslProtocols = _offeredProtocols,
+            AllowTlsResume = SessionPartitions.MayResume(targetHost, _options),
             CertificateChainPolicy = chainPolicy,
             LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
             CipherSuitesPolicy = cipherSuitesPolicy,
@@ -684,26 +698,40 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         : targetHost.StartsWith('[') && targetHost.EndsWith(']') ? targetHost[1..^1]
         : targetHost;
 
-    // ADR-0011: the Schannel build refuses --ciphers and ignores --tls13-ciphers; the
-    // OpenSSL build offers what they name. CipherSuitesPolicy cannot be constructed on
-    // Windows, where only the tests run the OpenSSL build, so there the factory builds none
-    // and the build cannot apply them.
-    private (CipherSuitesPolicy? Policy, string? FailureMessage) CreateCipherSuitesPolicy()
+    /// <summary>
+    /// Returns the name the handshake sends as SNI, as curl sends it (CGR-093, ADR-0825): the
+    /// target host lowercased, without the one trailing dot a fully qualified name may carry,
+    /// which RFC 6066 section 3 forbids in SNI. curl lowercases the URL host when it parses the
+    /// URL, so <c>https://LOCALHOST/</c> sends <c>localhost</c>; the Host header keeps its case.
+    /// </summary>
+    /// <param name="targetHost">The host the handshake connects to.</param>
+    /// <returns>The server name to send.</returns>
+    internal static string ServerNameIndication(string targetHost)
+    {
+        var lowercased = targetHost.ToLowerInvariant();
+        return lowercased.EndsWith('.') ? lowercased[..^1] : lowercased;
+    }
+
+    // ADR-0011, ADR-0816: the Schannel build reads --ciphers as ALG_IDs and ignores
+    // --tls13-ciphers; the OpenSSL build offers what they name. CipherSuitesPolicy cannot be
+    // constructed on Windows, where only the tests run the OpenSSL build, so there the
+    // factory builds none and the build cannot apply them.
+    private (CipherSuitesPolicy? Policy, ConnectResult? Failure) CreateCipherSuitesPolicy()
     {
         if (_matchesSchannelBuild)
         {
-            return (null, _options.Ciphers is null ? null : TlsFailureMessages.SchannelCipherListRefused);
+            return (null, SchannelAlgorithmList.Refusal(_options.Ciphers));
         }
 
         var (suites, failureMessage) = OpenSslCipherSuites.Select(_options.Ciphers, _options.Tls13Ciphers);
         if (suites is null)
         {
-            return (null, failureMessage);
+            return (null, failureMessage is null ? null : ConnectResult.Failed(CurlExitCode.SslCipher, failureMessage));
         }
 
         var policy = CipherSuitesPolicyFactory.Create(suites);
         return policy is null
-            ? (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers))
+            ? (null, ConnectResult.Failed(CurlExitCode.SslCipher, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers)))
             : (policy, null);
     }
 
@@ -720,7 +748,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate;
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
-        ? TlsFailureMessages.SchannelSslConnectError(failure, _options.MaximumVersion)
+        ? TlsFailureMessages.SchannelSslConnectError(failure, _offeredMaximumVersion)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
 
     // Cancellation is the one exception ITlsProvider lets escape; its stack trace is kept.

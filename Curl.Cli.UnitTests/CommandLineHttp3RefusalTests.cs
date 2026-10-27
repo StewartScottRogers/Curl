@@ -31,7 +31,7 @@ public sealed class CommandLineHttp3RefusalTests
     {
         Diagnostics.Arrange("is windows", isWindows);
 
-        CommandLineParseResult result = Parse([spelling, Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows));
+        CommandLineParseResult result = Parse([spelling, Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows));
 
         AssertRefused(result, $"curl: option {spelling}: {NotSupported}");
     }
@@ -39,7 +39,7 @@ public sealed class CommandLineHttp3RefusalTests
     [TestMethod]
     public void Parse_Http3OptionAfterAnotherVersionOnTheOpenSslBuild_IsRefusedAtTheHttp3Option()
     {
-        CommandLineParseResult result = Parse(["--http1.1", "--http3-only", Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false));
+        CommandLineParseResult result = Parse(["--http1.1", "--http3-only", Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows: false));
 
         AssertRefused(result, $"curl: option --http3-only: {NotSupported}");
     }
@@ -49,7 +49,7 @@ public sealed class CommandLineHttp3RefusalTests
     [DataRow("--no-http3-only")]
     public void Parse_NegatedHttp3OptionOnTheOpenSslBuild_IsRefusedAsNotReversible(string spelling)
     {
-        CommandLineParseResult result = Parse([spelling, Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false));
+        CommandLineParseResult result = Parse([spelling, Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows: false));
 
         AssertRefused(result, $"curl: option {spelling}: the given option cannot be reversed with a --no- prefix");
     }
@@ -59,7 +59,7 @@ public sealed class CommandLineHttp3RefusalTests
     {
         CommandLineParseResult result = Parse(
             ["-q", "--http3", Url],
-            parsed => CommandLineParser.Parse(parsed, _ => false, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false));
+            parsed => CommandLineParser.Parse(parsed, _ => false, new EmptyPasswordPrompt(), new RecordingDataFileReader(), new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false));
 
         AssertRefused(result, $"curl: option --http3: {NotSupported}");
     }
@@ -80,7 +80,7 @@ public sealed class CommandLineHttp3RefusalTests
     [TestMethod]
     public void Parse_WithoutAskingForAQuicBuild_DoesNotActAsOne()
     {
-        CommandLineParseResult result = Parse([Url], parsed => CommandLineParser.Parse(parsed, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), isWindows: false));
+        CommandLineParseResult result = Parse([Url], parsed => CommandLineParser.Parse(parsed, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), isWindows: false));
 
         Diagnostics.Assert("accepted", true, result.IsAccepted);
         Assert.IsTrue(result.IsAccepted);

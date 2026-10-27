@@ -104,18 +104,19 @@ internal sealed class ManagedEngineSharedState
     private readonly bool learnsHstsOverHttp;
 
     /// <summary>
-    /// Creates a state with the engine's clock, numbering, multi owners, performer and resolved names and caches of its own,
-    /// all empty: what a library easy handle (<c>curl_easy_init</c>, <c>curl_easy_duphandle</c>) or a multi handle runs over,
-    /// as upstream gives each its own connection pool, TLS sessions, cookies and HSTS (BL-3204). The resolved names stay
-    /// this state's, so a handle finds a name another handle's <c>CURLOPT_RESOLVE</c> added, as libcurl 8.22.0's do
-    /// (upstream test1512, ADR-0789). The engine keeps the new pool, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
+    /// Creates a state with the engine's clock, numbering, multi owners and performer and caches of its own, all empty:
+    /// what a library easy handle (<c>curl_easy_init</c>, <c>curl_easy_duphandle</c>) or a multi handle runs over, as upstream
+    /// gives each its own connection pool, TLS sessions, resolved names, cookies and HSTS (BL-3204). The resolved names are
+    /// the handle's own, as libcurl 8.22.0's <c>dnscache_get</c> takes the share's or the handle's multi's, so a new handle
+    /// looks a name up again and calls its <c>CURLOPT_RESOLVER_START_FUNCTION</c> (CGR-151, ADR-0851). The engine keeps the
+    /// new pool, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
     /// </summary>
     /// <returns>The new state.</returns>
     internal ManagedEngineSharedState WithOwnCaches()
     {
         ConnectionCache connections = new(TimeProvider);
         OwnConnectionCaches.Add(connections, connections);
-        return new(this, connections, new TlsSessionCache(TimeProvider), DnsCache, new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp));
+        return new(this, connections, new TlsSessionCache(TimeProvider), new DnsCache(), new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp));
     }
 
     /// <summary>
@@ -224,4 +225,20 @@ internal sealed class ManagedEngineSharedState
 
     /// <summary>Gets the performer that numbers the engine's transfers and connections and holds curl's easy error text.</summary>
     internal TransferPerformer Performer { get; }
+
+    /// <summary>
+    /// Gets what the transfer running over this state waits for on its socket while a multi handle drives it by
+    /// <c>curl_multi_socket_action</c>, which its dialer gates each dialed connection on
+    /// (<see cref="SocketActionGatedTcpDialer" />, ADR-0822); <see langword="null" /> outside socket-action mode.
+    /// </summary>
+    internal TransferSocketWait? SocketWait { get; private init; }
+
+    /// <summary>
+    /// Gives this state with <paramref name="wait" /> as its <see cref="SocketWait" />, or this state itself when
+    /// <paramref name="wait" /> is <see langword="null" />.
+    /// </summary>
+    /// <param name="wait">What the transfer waits for on its socket, or <see langword="null" />.</param>
+    /// <returns>The state the transfer runs over.</returns>
+    internal ManagedEngineSharedState WithSocketWait(TransferSocketWait? wait) =>
+        wait is null ? this : new(this, Connections, TlsSessions, DnsCache, Cookies, Hsts) { SocketWait = wait };
 }

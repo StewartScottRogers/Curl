@@ -158,10 +158,9 @@ against curl 8.21.0 (`/mingw64/bin/curl`, the Windows reference, ADR-0018) with
   to when BL-294 switches it to `CurlUrl.TryParse`.
 - **Unknown schemes parse.** `foo://h/` is a `CurlUrl`; curl ends it with exit 1, not 3,
   so refusing it stays the dispatcher's job.
-- **Backslashes.** When the text after the scheme's colon starts with `//`, every `\`
-  before the first `?` or `#` becomes `/`, for every scheme. After a single slash, or
-  with no scheme, they stay. This was measured on Windows only; whether the Linux build
-  does the same is not recorded.
+- **Backslashes.** A `file` URL's backslashes stay as typed, and are no separator for
+  dot segments (ADR-0822 replaced this bullet's earlier rule, that they became `/` after
+  `//`, when curl 8.21.0 and 8.18.0 were measured to keep them).
 - **Drive letters follow the platform.** `CurlUrl.TryParse` applies curl's Windows rules
   (`file:///C:/x` has the path `C:/x`) on Windows and rejects a `file` drive letter
   elsewhere, as `lib/urlapi.c` does outside Windows.

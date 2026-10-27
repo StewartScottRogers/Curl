@@ -119,9 +119,9 @@ internal static class HttpTransferMessages
     internal const string Http2FramingError = "Error in the HTTP2 framing layer";
 
     /// <summary>
-    /// The exit 55 message for a peer whose first bytes after the HTTP/2 preface are not a
+    /// The exit 16 message for a peer whose first bytes after the HTTP/2 preface are not a
     /// SETTINGS frame, such as an HTTP/1.1 server answering <c>--http2-prior-knowledge</c>
-    /// (measured on nghttp2-built curl 8.18.0, BL-3372 Notes).
+    /// (measured on nghttp2-built curl 8.18.0, BL-3650 Notes, ADR-0837).
     /// </summary>
     internal const string Http2SettingsExpected = "Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.";
 
@@ -141,6 +141,16 @@ internal static class HttpTransferMessages
     /// <returns>The message.</returns>
     internal static string Http2StreamNotClosedCleanly(int streamId, Curl.Http2.Http2ErrorCode errorCode) =>
         string.Create(CultureInfo.InvariantCulture, $"HTTP/2 stream {streamId} was not closed cleanly: {Http2ErrorName(errorCode)} (err {(uint)errorCode})");
+
+    /// <summary>
+    /// Formats the exit 92 message for an HTTP/2 stream the peer reset with NO_ERROR before the
+    /// final response head, with the two spaces curl 8.18.0 prints after <c>getting</c>
+    /// (measured, BL-3670 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2StreamClosedBeforeHead(int streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/2 stream {streamId} was closed cleanly, but before getting  all response header fields, treated as error");
 
     /// <summary>
     /// Formats the exit 16 message for an HTTP/2 connection ended by a protocol error:
@@ -350,6 +360,18 @@ internal static class HttpTransferMessages
     /// curl 8.21.0 says for upstream test223's broken deflate header (BL-1810).
     /// </summary>
     internal const string InvalidStoredBlockLengths = "Error while processing content unencoding: invalid stored block lengths";
+
+    /// <summary>
+    /// The exit 61 message for a gzip member whose CRC-32, or a zlib stream whose Adler-32,
+    /// does not match the bytes it decoded to: zlib's text (CGR-071, BL-3600).
+    /// </summary>
+    internal const string IncorrectDataCheck = "Error while processing content unencoding: incorrect data check";
+
+    /// <summary>
+    /// The exit 61 message for a gzip member whose CRC-32 matches but whose size does not:
+    /// zlib's text (CGR-071, BL-3600).
+    /// </summary>
+    internal const string IncorrectLengthCheck = "Error while processing content unencoding: incorrect length check";
 
     /// <summary>
     /// The exit 61 message for any other corrupt encoded body: measured for <c>br</c>, and

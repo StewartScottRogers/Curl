@@ -88,7 +88,7 @@ public sealed partial class SshProtocolHandlerTests
     [TestMethod]
     [DataRow("sftp", DisplayName = "sftp")]
     [DataRow("scp", DisplayName = "scp")]
-    public async Task ExecuteAsync_LocalOutputWriteFails_PassesTheOutputsIOExceptionOnRatherThanAConnectionFailure(string scheme)
+    public async Task ExecuteAsync_LocalOutputWriteFails_IsAWriteErrorRatherThanAConnectionFailure(string scheme)
     {
         InMemorySshServer server = Server();
         server.Files[ResetFile] = Hello;
@@ -102,13 +102,13 @@ public sealed partial class SshProtocolHandlerTests
         ArrangeTransfer(context);
         Diagnostics.Arrange("output failure", outputFailure.Message);
 
-        IOException thrown = await Assert.ThrowsExactlyAsync<IOException>(async () => await Handler(server).ExecuteAsync(context));
+        TransferResult result = await Handler(server).ExecuteAsync(context);
         await server.WhenSessionsEndAsync();
 
-        ActTransfer(null, context, server);
-        Diagnostics.Act("thrown", thrown.Message);
-        Diagnostics.Assert("thrown is the output's exception", true, ReferenceEquals(outputFailure, thrown));
-        Assert.AreSame(outputFailure, thrown);
+        ActTransfer(result, context, server);
+        Diagnostics.Assert("exit code (CGR-133: the output's failure is curl's write error)", CurlExitCode.WriteError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
+        Assert.StartsWith("Failure writing output to destination, passed ", result.ErrorMessage);
     }
 
     // A 100000-byte file, so a download reset after its first block has written part of it.

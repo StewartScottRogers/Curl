@@ -137,4 +137,17 @@ public interface ITcpDialer
     /// <param name="family">The address family about to be dialled.</param>
     /// <returns>The refusal, or <see langword="null" />; <see langword="null" /> unless a dialer says otherwise.</returns>
     SocketException? FailureToOpenSocket(AddressFamily family) => null;
+
+    /// <summary>
+    /// Gives a dialer that dials as this one does and hands <paramref name="socketCreated" /> the handle of each
+    /// socket it creates, before connecting it, so a transfer driven by <c>curl_multi_socket_action</c> can tell the
+    /// application its socket while the connect is still in progress, as libcurl does (BL-3890).
+    /// </summary>
+    /// <remarks>
+    /// This default is the dialer itself and hands nothing, for a dialer that creates no real socket.
+    /// <see cref="TcpDialer" /> hands each one.
+    /// </remarks>
+    /// <param name="socketCreated">Called with each socket's handle as the socket is created.</param>
+    /// <returns>The dialer to dial through.</returns>
+    ITcpDialer PublishingSocketsTo(Action<nint> socketCreated) => this;
 }

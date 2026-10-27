@@ -49,6 +49,7 @@ internal static class ConfigFileApplier
             return CommandLineRefusal.ConfigFileUnreadable(spelledOption, path, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
         }
 
+        contents = ConfigFileSyntax.TextModeContents(contents, options.ActsAsWindowsSchannelBuild);
         int readableLength = ConfigFileSyntax.ReadableLength(contents);
         options.OpenConfigFileCount++;
         CommandLineRefusal? refusal = ApplyLines(options, shownName, contents[..readableLength], spelledOption, pathExists, dataFileReader);
@@ -84,7 +85,7 @@ internal static class ConfigFileApplier
         {
             if (dataFileReader.TryReadFile(path, out byte[] contents))
             {
-                ApplyDefaultFileLines(options, path, contents, pathExists, dataFileReader);
+                ApplyDefaultFileLines(options, path, ConfigFileSyntax.TextModeContents(contents, options.ActsAsWindowsSchannelBuild), pathExists, dataFileReader);
                 return;
             }
         }

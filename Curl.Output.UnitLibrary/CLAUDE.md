@@ -14,7 +14,11 @@ sizes (`max5data`) and eight-column times (`time2str`). The figures come from `C
 `PeerCertificateText` prints one certificate for `%{certs}` as curl 8.21.0 does: it is a
 port of `Curl_extract_certinfo` in curl's `lib/vtls/x509asn1.c`, with `DerReader`,
 `X509CertificateFields` and `DerText` porting the lenient ASN.1 parser under it (ADR-0054).
-Keep it a port: change it only against that source or a measurement of real curl.
+Keep it a port: change it only against that source or a measurement of real curl. That is
+the Schannel build's layout; `PeerCertificateText.FormatFor` prints the OpenSSL build's
+instead for `TlsBackend.OpenSsl` (`OpenSslPeerCertificateText`, a port of `ossl_certchain`
+in `lib/vtls/openssl.c` and the OpenSSL printers it calls), and `TransferWriteOutVariables`
+picks the platform's (ADR-0825, CGR-091).
 
 `-w %time{format}` has one dialect per C runtime (`WriteOutTimeDialect`):
 `WindowsCRuntimeTimeFormat` (ADR-0038) and `GlibcTimeFormat`, a port of curl's `outtime`

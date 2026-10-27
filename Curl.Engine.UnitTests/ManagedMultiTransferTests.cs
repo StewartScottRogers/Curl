@@ -296,7 +296,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     /// <summary>A fake easy transfer whose perform finishes when the test says.</summary>
-    private sealed class ControlledEasyTransfer : IEasyTransfer
+    internal sealed class ControlledEasyTransfer : IEasyTransfer
     {
         private TaskCompletionSource<CurlCode> finish = new();
 

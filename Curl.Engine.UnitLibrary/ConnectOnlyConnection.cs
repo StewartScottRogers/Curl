@@ -47,9 +47,9 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
 
     /// <summary>
     /// Gets the socket number the numbering starts from; the first connection is given <c>FirstSocket + 1</c>, the
-    /// next <c>FirstSocket + 2</c> and so on. The managed engine's connections are not operating
-    /// system descriptors, so each opened connection is one number of the engine's own, above any descriptor a
-    /// process is likely to hold and apart from <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers.
+    /// next <c>FirstSocket + 2</c> and so on. Only a connection with no operating system socket (an in-memory one)
+    /// is numbered, each opened one with a number of the engine's own, above any descriptor a process is likely to
+    /// hold and apart from <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers.
     /// </summary>
     internal const long FirstSocket = 0x6000_0000;
 
@@ -69,14 +69,18 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// <summary>Gets the socket number of the connection open now while the options ask for connect-only, else <see cref="CurlSocket.Bad" />.</summary>
     internal CurlSocket LiveSocket => LiveConnection() is null ? CurlSocket.Bad : Socket;
 
-    /// <summary>Closes the connection open now, if any, and keeps <paramref name="opened" /> in its place under a new socket number.</summary>
+    /// <summary>
+    /// Closes the connection open now, if any, and keeps <paramref name="opened" /> in its place under its operating
+    /// system socket (<see cref="IConnection.SocketHandle" />), as libcurl's <c>CURLINFO_ACTIVESOCKET</c> answers its
+    /// own socket (CGR-129, ADR-0842), else under a new socket number.
+    /// </summary>
     /// <param name="opened">The connection the connect-only perform made.</param>
     /// <returns>A task that completes once the earlier connection is closed.</returns>
     internal async ValueTask OpenAsync(IConnection opened)
     {
         await CloseAsync().ConfigureAwait(false);
         connection = opened;
-        Socket = new CurlSocket((nint)Interlocked.Increment(ref nextSocket));
+        Socket = new CurlSocket(opened.SocketHandle ?? (nint)Interlocked.Increment(ref nextSocket));
     }
 
     /// <summary>

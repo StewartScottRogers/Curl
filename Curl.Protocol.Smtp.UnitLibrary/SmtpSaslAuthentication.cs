@@ -117,6 +117,21 @@ internal sealed class SmtpSaslAuthentication(SmtpControlChannel channel, ISaslAu
             .FirstOrDefault(option => option.StartsWith(AuthOption, StringComparison.OrdinalIgnoreCase))?[AuthOption.Length..];
 
     /// <summary>
+    /// Tells whether curl 8.22.0's <c>smtp_parse_url_options</c> accepts
+    /// <paramref name="loginOptions" />: every option is <c>AUTH=</c> (in any case) naming
+    /// <c>*</c> or a mechanism curl knows, in any case. Anything else (<c>AUTH=BOGUS</c>,
+    /// <c>AUTH=</c>, <c>FOO=BAR</c>) is exit 3 once connected, before a byte is sent
+    /// (measured, CGR-104).
+    /// </summary>
+    /// <param name="loginOptions">The login options, or <see langword="null" /> for none.</param>
+    /// <returns><see langword="true" /> when curl accepts them.</returns>
+    internal static bool AreLoginOptionsValid(string? loginOptions) =>
+        (loginOptions ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .All(option => option.StartsWith(AuthOption, StringComparison.OrdinalIgnoreCase)
+                && option[AuthOption.Length..] is var mechanism
+                && (mechanism == "*" || KnownMechanisms.Contains(mechanism)));
+
+    /// <summary>
     /// Collects the mechanisms every <c>AUTH</c> line of <paramref name="ehlo" /> offers.
     /// </summary>
     /// <returns>The mechanisms, empty for a bare <c>AUTH </c>; <see langword="null" /> without an <c>AUTH</c> line.</returns>

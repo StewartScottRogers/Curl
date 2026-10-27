@@ -31,7 +31,7 @@ internal static class OpenSslCertificateText
     };
 
     // OpenSSL's long names for the signature algorithms (OBJ_obj2txt); any other prints dotted.
-    private static readonly Dictionary<string, string> SignatureAlgorithmNames = new(StringComparer.Ordinal)
+    internal static readonly Dictionary<string, string> SignatureAlgorithmNames = new(StringComparer.Ordinal)
     {
         ["1.2.840.113549.1.1.4"] = "md5WithRSAEncryption",
         ["1.2.840.113549.1.1.5"] = "sha1WithRSAEncryption",
@@ -153,7 +153,7 @@ internal static class OpenSslCertificateText
 
     // ASN1_TIME_print: the month's abbreviation, the day padded to two with a space, the
     // time, the year and GMT.
-    private static string FormatTime(DateTime time)
+    internal static string FormatTime(DateTime time)
     {
         var utc = time.ToUniversalTime();
         return string.Create(CultureInfo.InvariantCulture, $"{utc:MMM} {utc.Day,2} {utc:HH:mm:ss} {utc.Year} GMT");

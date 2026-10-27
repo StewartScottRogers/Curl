@@ -35,7 +35,7 @@ public sealed class TcpConnectorShuffledResolverTests
             Ok(DnsTestReplies.Answer(queryAaaa, [IPAddress.IPv6Loopback])),
         ]);
         var resolver = ShufflingDnsResolver.Over(new DohDnsResolver(dohConnector, DohUrl), shuffleAddresses: true);
-        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider()) { AsksHttpsRecords = true };
 
         _ = await connector.ConnectAsync(new ConnectTarget("foo.example.com", OriginPort, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
 
@@ -60,7 +60,7 @@ public sealed class TcpConnectorShuffledResolverTests
         ]);
         var dialer = new FakeTcpDialer();
         var resolver = new ShufflingDnsResolver(new DohDnsResolver(dohConnector, DohUrl), _ => 0);
-        var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider());
+        var connector = new TcpConnector(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider()) { AsksHttpsRecords = true };
 
         _ = await connector.ConnectAsync(new ConnectTarget("foo.example.com", OriginPort, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
 

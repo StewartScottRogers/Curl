@@ -603,7 +603,7 @@ public sealed class TransferContextFactoryTests
         using MemoryStream standardInput = new();
         using MemoryStream output = new();
 
-        TransferContext context = new TransferContextFactory(standardInput)
+        TransferContext context = new TransferContextFactory(standardInput) { ReadsTelnetStandardInputInTextMode = false }
             .Create(EasyOptionsFromCommandLine.TransferSettingsOf(Parse("telnet://example.com/")), HttpOf("telnet://example.com/"), BehaviourOf("telnet://example.com/"), TransferOf("telnet://example.com/"), ProtocolOf("telnet://example.com/"), ProxyOf("telnet://example.com/"), AuthenticationOf("telnet://example.com/"), NetworkOf("telnet://example.com/"), CurlUrl.Parse("telnet://example.com/"), output, null, null, null);
         Diagnostics.Act("context URL", context.Url.OriginalString);
 

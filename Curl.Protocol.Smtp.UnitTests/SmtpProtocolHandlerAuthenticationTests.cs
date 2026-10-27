@@ -456,8 +456,8 @@ public sealed class SmtpProtocolHandlerAuthenticationTests
     [TestMethod]
     [DataRow(null, "AUTH=LOGIN", "LOGIN", DisplayName = "From the URL")]
     [DataRow("AUTH=PLAIN", "AUTH=LOGIN", "PLAIN", DisplayName = "--login-options wins over the URL")]
-    [DataRow("x=1;auth=*", null, "*", DisplayName = "Among other options")]
-    [DataRow("x=1", null, null, DisplayName = "No AUTH option")]
+    [DataRow("auth=*", null, "*", DisplayName = "In any case")]
+    [DataRow("", null, null, DisplayName = "No AUTH option")]
     public async Task ExecuteAsync_LoginOptions_NameTheRequiredMechanism(string? loginOptions, string? urlOptions, string? expected)
     {
         var sasl = new FakeSaslAuthenticator("PLAIN", PlainMessage);

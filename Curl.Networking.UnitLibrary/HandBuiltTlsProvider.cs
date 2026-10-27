@@ -124,7 +124,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     {
         _sessions = sessions;
         _echConfigs = echConfigs;
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _options = WithSecurityLevelMinimum(
+            SchannelAlgorithmList.WithLegacyCredentialRange(options ?? throw new ArgumentNullException(nameof(options)), matchesSchannelBuild),
+            matchesSchannelBuild);
         _ = TlsVersionRange.ToSslProtocols(options.MinimumVersion, options.MaximumVersion);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _certificateStore = certificateStore ?? throw new ArgumentNullException(nameof(certificateStore));
@@ -154,6 +156,27 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // OpenSSL 3's default security level allows no version below TLS 1.2, so the OpenSSL
     // build has nothing to offer under a lower ceiling (measured, BL-1152, ADR-0364).
     private bool RefusesItsVersionRange => !_matchesSchannelBuild && OffersOnlyVersionsBelowTls12;
+
+    // Under a TLS 1.2 or later ceiling, the same security level raises a --tlsv1.0 or
+    // --tlsv1.1 minimum to TLS 1.2 in the OpenSSL build, unless --ciphers ends at
+    // @SECLEVEL=0: a server speaking only TLS 1.1 then alerts protocol_version (measured
+    // against curl 8.18.0 OpenSSL 3.5.5, BL-3623, ADR-0364).
+    private static TlsClientOptions WithSecurityLevelMinimum(TlsClientOptions options, bool matchesSchannelBuild) =>
+        !matchesSchannelBuild && HasALegacyMinimumUnderAModernCeiling(options) && !LowersSecurityLevelToZero(options.Ciphers)
+            ? options with { MinimumVersion = TlsVersion.Tls12 }
+            : options;
+
+    private static bool HasALegacyMinimumUnderAModernCeiling(TlsClientOptions options) =>
+        options.MinimumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
+        && options.MaximumVersion is not (TlsVersion.Tls10 or TlsVersion.Tls11);
+
+    // OpenSSL applies a cipher string's @SECLEVEL=n commands in turn, so the last one counts.
+    private static bool LowersSecurityLevelToZero(string? ciphers)
+    {
+        const string command = "@SECLEVEL=";
+        var at = ciphers?.LastIndexOf(command, StringComparison.Ordinal) ?? -1;
+        return at >= 0 && ciphers!.AsSpan(at + command.Length).StartsWith("0", StringComparison.Ordinal);
+    }
 
     /// <inheritdoc />
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(
@@ -572,7 +595,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var (suites, cipherFailure) = SelectCipherSuites();
         if (cipherFailure is not null)
         {
-            return (null, ConnectResult.Failed(CurlExitCode.SslCipher, cipherFailure), null);
+            return (null, cipherFailure, null);
         }
 
         var (profile, listFailure) = CurvesAndSignatureAlgorithms.Apply(Profile, _options, _matchesSchannelBuild);
@@ -618,7 +641,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                     KeyLog = _options.KeyLogFile is { } keyLogFile ? new NssKeyLogFile(keyLogFile) : null,
                 },
                 clientCertificate,
-                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null, null);
+                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost, UntrustedStapleClock)), null, null);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
@@ -627,6 +650,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, ConnectResult.Failed(exitCode, message), null);
         }
     }
+
+    // Under -k the OpenSSL build trusts no OCSP responder, every build's --cert-status
+    // check being the OpenSSL build's (ADR-0191, ADR-0862).
+    private TimeProvider? UntrustedStapleClock =>
+        _options.Insecure && _options.RequireCertificateStatus ? _timeProvider : null;
 
     // The handshake's outcome, or what it threw: the transport's failures and cancellation.
     private async Task<(HandBuiltHandshake? Handshake, Exception? Thrown)> TryHandshakeAsync(
@@ -714,25 +742,25 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return tls12.Stream is { } tls12Stream ? HandBuiltHandshake.Completed(tls12Stream) : HandBuiltHandshake.Failed(tls12.Failure!);
     }
 
-    // ADR-0011 as SslStreamTlsProvider applies it: the Schannel build refuses --ciphers and
-    // ignores --tls13-ciphers; the OpenSSL build offers what they name that the client can
-    // run, and a list naming none of those is exit 59.
-    private (IReadOnlyList<ushort>? Suites, string? FailureMessage) SelectCipherSuites() =>
+    // ADR-0011 and ADR-0816 as SslStreamTlsProvider applies them: the Schannel build reads
+    // --ciphers as ALG_IDs and ignores --tls13-ciphers; the OpenSSL build offers what they
+    // name that the client can run, and a list naming none of those is exit 59.
+    private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) SelectCipherSuites() =>
         _matchesSchannelBuild
-            ? (null, _options.Ciphers is null ? null : TlsFailureMessages.SchannelCipherListRefused)
+            ? (null, SchannelAlgorithmList.Refusal(_options.Ciphers))
             : SelectOpenSslCipherSuites();
 
-    private (IReadOnlyList<ushort>? Suites, string? FailureMessage) SelectOpenSslCipherSuites()
+    private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) SelectOpenSslCipherSuites()
     {
         var (suites, failureMessage) = OpenSslCipherSuites.Select(_options.Ciphers, _options.Tls13Ciphers);
         if (suites is null)
         {
-            return (null, failureMessage);
+            return (null, failureMessage is null ? null : ConnectResult.Failed(CurlExitCode.SslCipher, failureMessage));
         }
 
         ushort[] offered = [.. suites.Select(suite => (ushort)suite).Where(CanOffer)];
         return offered.Length == 0
-            ? (null, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers))
+            ? (null, ConnectResult.Failed(CurlExitCode.SslCipher, OpenSslCipherSuites.Unapplied(_options.Ciphers, _options.Tls13Ciphers)))
             : (offered, null);
     }
 

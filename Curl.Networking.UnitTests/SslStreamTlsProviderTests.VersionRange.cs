@@ -15,7 +15,7 @@ namespace Curl.Networking;
 public sealed partial class SslStreamTlsProviderTests
 {
     [TestMethod]
-    [DataRow(TlsVersion.SystemDefault, TlsVersion.SystemDefault, SslProtocols.None)]
+    [DataRow(TlsVersion.SystemDefault, TlsVersion.SystemDefault, SslProtocols.Tls12 | SslProtocols.Tls13)]
     [DataRow(TlsVersion.Tls10, TlsVersion.Tls11, TlsVersionRange.Tls10 | TlsVersionRange.Tls11)]
     [DataRow(TlsVersion.SystemDefault, TlsVersion.Tls12, TlsVersionRange.Tls10 | TlsVersionRange.Tls11 | SslProtocols.Tls12)]
     [DataRow(TlsVersion.Tls12, TlsVersion.SystemDefault, SslProtocols.Tls12 | SslProtocols.Tls13)]

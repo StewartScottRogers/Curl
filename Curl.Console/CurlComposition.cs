@@ -152,6 +152,10 @@ internal static class CurlComposition
     /// <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540). Tests and the conformance
     /// harness turn it on to reach the hand-built HTTP/3 (BL-2260, BL-2332).
     /// </param>
+    /// <param name="parsesAsEchBuild">
+    /// Whether the runner reads the command line as a curl built with ECH does, accepting <c>--ech</c>; off by default, as
+    /// every reference build refuses it (ADR-0822). Tests and the conformance harness turn it on to reach the hand-built ECH.
+    /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -166,7 +170,8 @@ internal static class CurlComposition
         bool? parsesAsWindowsBuild = null,
         bool writesProgressMeter = false,
         IWriteOutFileOpener? writeOutFileOpener = null,
-        bool parsesAsQuicBuild = false)
+        bool parsesAsQuicBuild = false,
+        bool parsesAsEchBuild = false)
     {
         LateBoundDiagnosticLog runLog = new();
         return new(
@@ -185,6 +190,7 @@ internal static class CurlComposition
             lateBoundDiagnosticLog: runLog,
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
+            parsesAsEchBuild: parsesAsEchBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
     }
 
@@ -248,6 +254,10 @@ internal static class CurlComposition
     /// Whether the runner reads the command line as a curl built with a QUIC library does, accepting <c>--http3</c> and
     /// <c>--http3-only</c>; off by default, as every reference build refuses them (ADR-0540). Tests and the conformance
     /// harness turn it on to reach the hand-built HTTP/3 (BL-2260, BL-2332).
+    /// </param>
+    /// <param name="parsesAsEchBuild">
+    /// Whether the runner reads the command line as a curl built with ECH does, accepting <c>--ech</c>; off by default, as
+    /// every reference build refuses it (ADR-0822). Tests and the conformance harness turn it on to reach the hand-built ECH.
     /// </param>
     /// <param name="extendedAttributeWriter">
     /// Sets the <c>--xattr</c> attributes; <see langword="null" /> for a run that sets none. The conformance harness
@@ -315,7 +325,8 @@ internal static class CurlComposition
         ISecurityContextFactory? securityContexts = null,
         EngineFeatureMask featureMask = EngineFeatureMask.None,
         bool standardOutputIsTerminal = false,
-        Func<int, byte[]>? digestRandomBytes = null)
+        Func<int, byte[]>? digestRandomBytes = null,
+        bool parsesAsEchBuild = false)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
@@ -344,6 +355,7 @@ internal static class CurlComposition
             altSvcUsesOverHttp: UsesAltSvcOverHttp(honoursAltSvcHttpVariable, environment),
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
+            parsesAsEchBuild: parsesAsEchBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
             extendedAttributeWriter: extendedAttributeWriter,
             debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment));
@@ -379,7 +391,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -488,6 +500,17 @@ internal static class CurlComposition
         runsOnWindows ? WriteOutTimeDialect.WindowsCRuntime : WriteOutTimeDialect.Glibc;
 
     /// <summary>
+    /// The encoding the <c>-b name=value</c> strings reach curl's <c>argv</c> in, whose bytes go out as they are: the
+    /// ANSI code page on Windows (<c>CredentialEncoding.ForPlatform</c>), and off Windows UTF-8 that gives each
+    /// <see cref="InvalidUtf8ByteEscape" /> surrogate back as its byte, so <c>-b $'a=\xff'</c> sends <c>a=\xff</c>
+    /// as curl 8.18.0 does on Linux (CGR-016) and <c>-b c=中</c> still sends its UTF-8 bytes (CGR-065).
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
+    /// <returns>The encoding for <see cref="CookieEngine.FromHttpOptions(EasyHttpOptions, CookieStore, Encoding?)" />.</returns>
+    internal static Encoding CookieStringEncodingFor(bool runsOnWindows) =>
+        runsOnWindows ? CredentialEncoding.ForPlatform(true) : InvalidUtf8ByteEscape.Encoding;
+
+    /// <summary>
     /// Wraps a dispatch factory so every <c>-:</c> / <c>--next</c> option group of one run gets its own
     /// <see cref="CookieEngine" /> over the one <see cref="CookieStore" /> the run shares, as curl 8.21.0
     /// shares its cookie list between groups (measured 2026-09-28, BL-509 Notes).
@@ -498,7 +521,8 @@ internal static class CurlComposition
         Func<CommandLineOptions, CookieEngine?, TransferDispatch> createTransferDispatch)
     {
         CookieStore runCookies = new();
-        return options => createTransferDispatch(options, CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options), runCookies));
+        Encoding cookieStringEncoding = CookieStringEncodingFor(OperatingSystem.IsWindows());
+        return options => createTransferDispatch(options, CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options), runCookies, cookieStringEncoding));
     }
 
     /// <summary>

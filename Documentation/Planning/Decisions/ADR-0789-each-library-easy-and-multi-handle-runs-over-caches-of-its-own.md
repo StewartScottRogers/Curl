@@ -21,7 +21,7 @@ reused the first one's connection.
 
 - `ManagedEngineSharedState.WithOwnCaches()` makes a state over the engine's clock, numbering, multi
   owners, performer and DNS cache with an empty connection pool, TLS session cache, cookie store and HSTS cache of
-  its own. The resolved names stay shared: upstream test1512 gives only the first of two easy handles a
+  its own. The resolved names stayed shared until ADR-0851 gave each handle its own (CGR-151): upstream test1512 gives only the first of two easy handles a
   `CURLOPT_RESOLVE` entry and libcurl 8.22.0 still reaches the second's host through it, so libcurl's easy handles
   see each other's resolved names (`CURLOPT_DNS_USE_GLOBAL_CACHE` itself stays ignored, as upstream ignores it). `CreateEasy`, `Duplicate` and `CreateMulti` each
   take one; the engine's own state stays as `EngineWide`, and `MultiCaches` keeps each multi handle's.

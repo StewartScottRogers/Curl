@@ -25,16 +25,41 @@ public sealed partial class DohDnsResolver
     internal static string HttpsQueryName(string host, int port) =>
         port == 443 ? host : $"_{port}._https.{host}";
 
-    // The request line and header block of the POST curl sends for one query.
+    // The request line and header block of the POST curl sends for one query: through a forwarding
+    // proxy the target is absolute and Proxy-Connection follows Accept (measured, CGR-037).
     private byte[] BuildRequestHead(byte[] query)
     {
         var host = _dohUrl.IsDefaultPort ? _dohUrl.Host : $"{_dohUrl.Host}:{_dohUrl.Port}";
-        var head = $"POST {_dohUrl.PathAndQuery} HTTP/1.1\r\n"
+        var forwarded = ForwardsThroughProxy;
+        var target = forwarded ? $"{_dohUrl.Scheme}://{host}{_dohUrl.PathAndQuery}" : _dohUrl.PathAndQuery;
+        var head = $"POST {target} HTTP/1.1\r\n"
             + $"Host: {host}\r\n"
+            + BasicAuthorizationLine(_dohUrl.UserInfo)
             + "Accept: */*\r\n"
+            + (forwarded ? "Proxy-Connection: Keep-Alive\r\n" : string.Empty)
             + "Content-Type: application/dns-message\r\n"
             + $"Content-Length: {query.Length}\r\n"
             + "\r\n";
         return Encoding.Latin1.GetBytes(head);
+    }
+
+    /// <summary>
+    /// The <c>Authorization: Basic</c> line curl sends after Host when the DoH URL names a user or a
+    /// password: the percent-decoded <c>user:password</c> in base64 (<c>u@</c> sends <c>u:</c>), and
+    /// nothing when both are empty (measured, CGR-156, ADR-0853).
+    /// </summary>
+    /// <param name="userInfo">The DoH URL's user information, still percent-encoded.</param>
+    /// <returns>The header line with its CRLF, or the empty string.</returns>
+    internal static string BasicAuthorizationLine(string userInfo)
+    {
+        var separator = userInfo.IndexOf(':', StringComparison.Ordinal);
+        var user = Uri.UnescapeDataString(separator < 0 ? userInfo : userInfo[..separator]);
+        var password = separator < 0 ? string.Empty : Uri.UnescapeDataString(userInfo[(separator + 1)..]);
+        if (user.Length + password.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return $"Authorization: Basic {Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{password}"))}\r\n";
     }
 }

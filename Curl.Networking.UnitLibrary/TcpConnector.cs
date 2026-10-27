@@ -177,6 +177,11 @@ public sealed partial class TcpConnector(
         ? new LocalBindingTcpDialer(tcpDialer, addressChooser, events)
         : tcpDialer;
 
+    // The race's dialer: BindingDialer's, asking the target's socket opener before each attempt when it has one (ADR-0818).
+    private ITcpDialer AttemptDialer(ConnectTarget target) => target.SocketOpener is { } opener
+        ? new SocketOpenerTcpDialer(BindingDialer(target.Events), opener)
+        : BindingDialer(target.Events);
+
     // Chooses the local address TCP dials and QUIC's UDP sockets bind; null when localBinding is.
     private LocalBindingAddressChooser? LocalAddressChooser() => localBinding is null
         ? null
@@ -223,6 +228,15 @@ public sealed partial class TcpConnector(
     /// address entry (BL-2977). The <c>Added H:P:A to DNS cache</c> line keeps the entry as written.
     /// </summary>
     public bool ShufflesResolveEntryAddresses { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a direct connect's <c>https://</c> origin is resolved through
+    /// <see cref="IHttpsOriginDnsResolver.ResolveHttpsOriginAsync" />, asking its HTTPS record first,
+    /// as curl 8.22.0's HTTPSRR build does (ADR-0727). The default is the platform build's: off on
+    /// Windows, where the Schannel build has no <c>HTTPSRR</c> and sends only the A and AAAA DoH
+    /// queries, on elsewhere (ADR-0856, CGR-157).
+    /// </summary>
+    public bool AsksHttpsRecords { get; init; } = !OperatingSystem.IsWindows();
 
     // Gives a random index below its argument for ShufflesResolveEntryAddresses; tests pin it.
     internal Func<int, int> ResolveEntryShuffleRandomBelow { get; init; } = DnsAddressShuffle.CryptographicRandomBelow;
@@ -1244,7 +1258,7 @@ public sealed partial class TcpConnector(
 
     // The resolver that asks a direct connect's https:// origin for its HTTPS record, or null.
     private IHttpsOriginDnsResolver? HttpsOriginResolverFor(ConnectTarget target) =>
-        KindOfResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target)
+        AsksHttpsRecords && KindOfResolver is IHttpsOriginDnsResolver httpsOriginResolver && target.Proxy is null && IsHttpsOrigin(target)
             ? httpsOriginResolver
             : null;
 
@@ -1284,10 +1298,15 @@ public sealed partial class TcpConnector(
         return dialable;
     }
 
-    // curl 8.21.0 answers localhost and every name under .localhost itself, with ::1 and 127.0.0.1.
-    internal static bool IsLocalhost(string host) =>
-        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
-        || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+    // curl 8.21.0 answers localhost and every name under .localhost itself, with ::1 and 127.0.0.1,
+    // each also with one trailing dot: with --doh-url, http://localhost.:21802/ sends no DoH query
+    // and dials ::1 (CGR-159).
+    internal static bool IsLocalhost(string host)
+    {
+        var name = host.EndsWith('.') ? host[..^1] : host;
+        return string.Equals(name, "localhost", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Reports curl 8.21.0's <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
@@ -1708,7 +1727,9 @@ public sealed partial class TcpConnector(
             // The proxy connection is disposed whether the handshake failed or could not be sent or read.
             await connection.DisposeAsync().ConfigureAwait(false);
             exception?.Throw();
-            return failure!;
+
+            ReportSocks4Failure(target.Events, socks, failure!);
+            return failure;
         }
 
         // curl 8.21.0 names the destination as given, not the address SOCKS4 or SOCKS5 sent for it,
@@ -1796,7 +1817,7 @@ public sealed partial class TcpConnector(
 
             if (!onThisConnection)
             {
-                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure).ConfigureAwait(false);
+                return await CloseUnopenedTunnelAsync(connection, reply, exception, answer, tunnel.AuthenticatorEvents.FirstSspiFailure, tunnel.Target.Events).ConfigureAwait(false);
             }
 
             proxyAuthorization = answer;
@@ -1829,11 +1850,12 @@ public sealed partial class TcpConnector(
         HttpProxyTunnelReply reply,
         ExceptionDispatchInfo? exception,
         string? redialAuthorization,
-        string? firstSspiFailure)
+        string? firstSspiFailure,
+        ITransferEvents events)
     {
         await connection.DisposeAsync().ConfigureAwait(false);
         exception?.Throw();
-        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure), null) : (null, redialAuthorization);
+        return redialAuthorization is null ? (TunnelFailure(reply, firstSspiFailure, events), null) : (null, redialAuthorization);
     }
 
     /// <summary>
@@ -2049,10 +2071,34 @@ public sealed partial class TcpConnector(
                 lastSocketError: opened.LastSocketError)
             : opened;
 
-    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure) =>
-        reply.FailureMessage is { } failureMessage
-            ? ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage)
-            : ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? $"CONNECT tunnel failed, response {reply.StatusCode}", null, 0, reply.StatusCode);
+    /// <summary>
+    /// Gives the failure of a CONNECT the proxy refused: the reply's own failure, or exit 7
+    /// <c>CONNECT tunnel failed, response N</c>, which curl 8.22.0's <c>failf</c> also writes as a
+    /// <c>-v</c> line (measured, BL-3617).
+    /// </summary>
+    /// <summary>
+    /// Writes a failed SOCKS4 or SOCKS4a handshake's message as a <c>-v</c> line, as curl 8.22.0's
+    /// <c>failf</c> does (measured, BL-3617); SOCKS5's failures already wrote theirs.
+    /// </summary>
+    private static void ReportSocks4Failure(ITransferEvents events, ProxyEndpoint socks, ConnectResult failure)
+    {
+        if (socks.Kind is ProxyKind.Socks4 or ProxyKind.Socks4a)
+        {
+            events.ReportInfo(failure.ErrorMessage!);
+        }
+    }
+
+    private static ConnectResult TunnelFailure(HttpProxyTunnelReply reply, string? firstSspiFailure, ITransferEvents events)
+    {
+        if (reply.FailureMessage is { } failureMessage)
+        {
+            return ConnectResult.Failed(reply.FailureExitCode, firstSspiFailure ?? failureMessage);
+        }
+
+        var refused = $"CONNECT tunnel failed, response {reply.StatusCode}";
+        events.ReportInfo(refused);
+        return ConnectResult.Failed(CurlExitCode.CouldntConnect, firstSspiFailure ?? refused, null, 0, reply.StatusCode);
+    }
 
     private async ValueTask<ConnectResult> SecureWhenAskedAsync(
         DialedSocket dialed,
@@ -2405,7 +2451,7 @@ public sealed partial class TcpConnector(
             return (null, SocketError.ConnectionRefused, null);
         }
 
-        var race = new AddressFamilyRace(BindingDialer(target.Events), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
+        var race = new AddressFamilyRace(AttemptDialer(target), timeProvider, HappyEyeballsTimeout, target.Events, new NetworkDiagnosticLog(target.DiagnosticLog), trace);
         var (dialed, remoteEndPoint, lastError, lastBindFailure) = await race.DialAsync(addresses, port, cancellationToken).ConfigureAwait(false);
         return dialed is null
             ? (null, lastError, lastBindFailure)

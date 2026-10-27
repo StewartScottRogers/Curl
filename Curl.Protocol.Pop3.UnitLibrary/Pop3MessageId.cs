@@ -31,9 +31,20 @@ internal static class Pop3MessageId
     /// The decoded text, each byte as one Latin-1 character, or <see langword="null" /> when a
     /// decoded byte is below 0x20.
     /// </returns>
-    public static string? Decode(string text)
+    public static string? Decode(string text) => Decode(Encoding.UTF8.GetBytes(text));
+
+    /// <summary>
+    /// Percent-decodes <paramref name="encoded" />, text already turned into its bytes, as
+    /// <see cref="Decode(string)" /> does; a <c>-X</c> command comes here as its command-line
+    /// bytes (<see cref="Pop3CommandLineText" />).
+    /// </summary>
+    /// <param name="encoded">The bytes to decode.</param>
+    /// <returns>
+    /// The decoded text, each byte as one Latin-1 character, or <see langword="null" /> when a
+    /// decoded byte is below 0x20.
+    /// </returns>
+    public static string? Decode(byte[] encoded)
     {
-        byte[] encoded = Encoding.UTF8.GetBytes(text);
         var decoded = new List<byte>(encoded.Length);
         for (int index = 0; index < encoded.Length; index++)
         {

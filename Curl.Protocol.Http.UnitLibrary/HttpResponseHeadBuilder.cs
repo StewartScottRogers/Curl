@@ -50,9 +50,14 @@ internal sealed class HttpResponseHeadBuilder
     /// headers but keeping its bytes.
     /// </summary>
     /// <param name="statusLine">The status line.</param>
-    /// <exception cref="HttpTransferException">The heads grew past <see cref="MaximumHeadSize" /> (exit 56).</exception>
+    /// <exception cref="HttpTransferException">
+    /// The status line holds a NUL byte (exit 8, <c>Nul byte in header</c>), which curl 8.22.0
+    /// refuses before writing it, as it refuses one in a header line (CGR-116, BL-3645); or the
+    /// heads grew past <see cref="MaximumHeadSize" /> (exit 56).
+    /// </exception>
     internal void StartHead(HttpLine statusLine)
     {
+        RefuseNulByte(statusLine);
         headers.Clear();
         Append(statusLine.Content, statusLine.Terminator);
     }
@@ -65,8 +70,7 @@ internal sealed class HttpResponseHeadBuilder
     /// </summary>
     /// <param name="line">A non-empty line after the status line.</param>
     /// <exception cref="HttpTransferException">
-    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon once any
-    /// leading blanks of a line with no header to fold into are dropped (exit 8,
+    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon (exit 8,
     /// <c>Header without colon</c>); or is a
     /// second <c>Location</c> header that differs from the first (exit 8,
     /// <c>Multiple Location headers</c>); or the heads grew past <see cref="MaximumHeadSize" />
@@ -74,11 +78,7 @@ internal sealed class HttpResponseHeadBuilder
     /// </exception>
     internal void AddLine(HttpLine line)
     {
-        if (line.Content.Contains('\0', StringComparison.Ordinal))
-        {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
-        }
-
+        RefuseNulByte(line);
         if (FoldsIntoPendingHeader(line))
         {
             Fold(line);
@@ -86,7 +86,7 @@ internal sealed class HttpResponseHeadBuilder
         }
 
         CommitPendingHeader();
-        string content = line.Content.TrimStart([' ', '\t']);
+        string content = line.Content;
         if (!content.Contains(':', StringComparison.Ordinal))
         {
             throw HeaderWithoutColon();
@@ -110,10 +110,20 @@ internal sealed class HttpResponseHeadBuilder
     }
 
     /// <summary>
-    /// Ends the current head where the peer closed, keeping the headers already received.
+    /// Ends the current head where the peer closed, keeping the headers already received and
+    /// the unfinished line the peer sent last when it is a lone carriage return, which curl
+    /// 8.22.0 writes with the head (measured, BL-3556 Notes).
     /// </summary>
+    /// <param name="unfinishedLine">The bytes after the last whole line.</param>
     /// <exception cref="HttpTransferException">The heads grew past <see cref="MaximumHeadSize" /> (exit 56).</exception>
-    internal void EndHeadAtClose() => CommitPendingHeader();
+    internal void EndHeadAtClose(ReadOnlySpan<byte> unfinishedLine)
+    {
+        CommitPendingHeader();
+        if (unfinishedLine is [(byte)'\r'])
+        {
+            Append(string.Empty, "\r");
+        }
+    }
 
     /// <summary>
     /// Builds the final head.
@@ -140,8 +150,9 @@ internal sealed class HttpResponseHeadBuilder
     /// <summary>
     /// Determines whether a header line folds into the header before it: it is a continuation
     /// line and a header of the current head is pending. A continuation line with no header
-    /// before it is a header of its own, its leading blanks dropped, as curl 8.21.0's
-    /// <c>Curl_headers_push</c> takes it rather than failing (measured, upstream test1473, BL-1805).
+    /// before it is a header of its own, as curl 8.21.0's <c>Curl_headers_push</c> takes it
+    /// rather than failing (measured, upstream test1473, BL-1805): its name loses the leading
+    /// blanks, but the line is written as received (CGR-118, BL-3647).
     /// </summary>
     /// <param name="line">A non-empty line after the status line.</param>
     /// <returns><see langword="true" /> when the line folds into the pending header.</returns>
@@ -202,7 +213,7 @@ internal sealed class HttpResponseHeadBuilder
     private HttpResponseHeader ToHeader(string header)
     {
         int colon = header.IndexOf(':', StringComparison.Ordinal);
-        return new HttpResponseHeader(header[..colon], header[(colon + 1)..].Trim(' ', '\t')) { LineStart = headText.Length };
+        return new HttpResponseHeader(header[..colon].TrimStart(' ', '\t'), header[(colon + 1)..].Trim(' ', '\t')) { LineStart = headText.Length };
     }
 
     private void Append(string content, string terminator)
@@ -211,6 +222,14 @@ internal sealed class HttpResponseHeadBuilder
         if (headText.Length > MaximumHeadSize)
         {
             throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.HeadTooLarge(headText.Length));
+        }
+    }
+
+    private static void RefuseNulByte(HttpLine line)
+    {
+        if (line.Content.Contains('\0', StringComparison.Ordinal))
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
         }
     }
 

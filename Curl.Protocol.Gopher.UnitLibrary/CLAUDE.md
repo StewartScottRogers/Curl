@@ -5,7 +5,8 @@ Phase 4.
 Gopher document retrieval: `GopherProtocolHandler` sends the URL's selector followed by
 CRLF and writes the server's reply to the output unaltered until the server closes the
 connection, as curl 8.21.0 does. `GopherSelector` builds the selector: the path and
-query as written (dot segments removed, still percent-encoded) less their first two
+query as written (dot segments removed unless `ITransferContext.PathAsIs`, BL-3634;
+still percent-encoded) less their first two
 characters, then percent-decoded. A selector that decodes to NUL, or (as in curl 8.22.0,
 BL-2185) to CR or LF, is exit 3 after connecting, with nothing sent; the CR or LF case
 reports `Bad gopher selector, CR or LF not allowed`.

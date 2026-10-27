@@ -104,7 +104,7 @@ public sealed partial class ManagedEasyTransferTests
         easy.Options = new EasyOptions
         {
             Network = new EasyNetworkOptions { Url = "http://h/x" },
-            Proxy = new EasyProxyOptions { Proxy = "http://u:p@proxy:3128" },
+            Proxy = new EasyProxyOptions { Proxy = "http://proxy:3128" },
             Authentication = new EasyAuthenticationOptions { ProxyUserPassword = "silly:person", ProxyAuthentication = HttpAuthenticationMethods.Digest },
         };
 

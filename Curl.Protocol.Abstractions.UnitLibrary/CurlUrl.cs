@@ -1,4 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Text;
 
 namespace Curl.Protocol.Abstractions;
 
@@ -122,6 +124,15 @@ public sealed record CurlUrl
     /// before a drive letter on Windows, so <c>file:///C:/x</c> has the path <c>C:/x</c>.
     /// </summary>
     public string AbsolutePath { get; }
+
+    /// <summary>
+    /// Gets <see cref="AbsolutePath" /> as an HTTP request line carries it: each of its bytes
+    /// above <c>~</c> as <c>%XX</c>, the bytes being <see cref="UrlByteText.ToBytes" />'s, so a
+    /// character is its UTF-8 and an argument byte that was not valid UTF-8 (a lone
+    /// <c>U+DC80</c> to <c>U+DCFF</c>) is itself: <c>/%FF</c>, as curl 8.18.0 sends
+    /// <c>http://h/</c> and the byte <c>0xFF</c> on Linux (CGR-016, BL-3851, ADR-0823).
+    /// </summary>
+    public string RequestPath => PercentEncodedAboveTilde(AbsolutePath);
 
     /// <summary>
     /// Gets the text after the <c>?</c>, which may be empty, or <see langword="null" />
@@ -353,5 +364,23 @@ public sealed record CurlUrl
         url = CurlUrlParser.Parse(text, pathAsIs, driveLetters, disallowUser, out rejection, refuseUnconvertibleName: true);
 
         return url is not null;
+    }
+
+    private static string PercentEncodedAboveTilde(string text)
+    {
+        StringBuilder encoded = new(text.Length);
+        foreach (byte value in UrlByteText.ToBytes(text))
+        {
+            if (value <= '~')
+            {
+                encoded.Append((char)value);
+            }
+            else
+            {
+                encoded.Append('%').Append(value.ToString("X2", CultureInfo.InvariantCulture));
+            }
+        }
+
+        return encoded.ToString();
     }
 }

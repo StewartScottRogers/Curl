@@ -422,8 +422,9 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         catch (Http2ProtocolException error) when (!wasSettingsReceived && error.ErrorCode == Http2ErrorCode.FrameSizeError)
         {
             // An HTTP/1.1 reply's first bytes read as a huge frame length; nghttp2 checks the
-            // frame type first and curl gives exit 55 whichever bytes or reset arrive (BL-3372).
-            HttpTransferException notHttp2 = new(CurlExitCode.SendError, HttpTransferMessages.Http2SettingsExpected);
+            // frame type first and curl gives exit 16 (upstream test1801, BL-3650). Only a
+            // server that closes straight after its reply makes curl's exit 16 or 55 by race.
+            HttpTransferException notHttp2 = new(CurlExitCode.Http2, HttpTransferMessages.Http2SettingsExpected);
             connectionFailure = ExceptionDispatchInfo.Capture(notHttp2);
             throw notHttp2;
         }
@@ -437,6 +438,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             LogPeerConnectionFrames(wasSettingsReceived, wasGoAwayReceived);
         }
 
+        await RejectUnlessSettingsCameFirstAsync(wasSettingsReceived, cancellationToken).ConfigureAwait(false);
         if (frame is null)
         {
             return;
@@ -449,6 +451,33 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         }
 
         Route(frame);
+    }
+
+    /// <summary>
+    /// Fails the connection when the server's first frame was not its SETTINGS - HEADERS, DATA,
+    /// PING or even a SETTINGS acknowledgement - as nghttp2's preface check does (RFC 9113 3.4,
+    /// CGR-139): curl 8.18.0 sends GOAWAY PROTOCOL_ERROR with the debug data <c>SETTINGS expected</c>
+    /// and exits 16. A peer that closed before any frame is left to the read that sees the close.
+    /// </summary>
+    private async ValueTask RejectUnlessSettingsCameFirstAsync(bool wasSettingsReceived, CancellationToken cancellationToken)
+    {
+        if (wasSettingsReceived || Frames.IsPeerSettingsReceived || Frames.IsClosedByPeer)
+        {
+            return;
+        }
+
+        HttpTransferException notHttp2 = new(CurlExitCode.Http2, HttpTransferMessages.Http2SettingsExpected);
+        connectionFailure = ExceptionDispatchInfo.Capture(notHttp2);
+        try
+        {
+            await Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, "SETTINGS expected"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // The transport is already gone; the missing SETTINGS is still what the transfer reports.
+        }
+
+        throw notHttp2;
     }
 
     /// <summary>

@@ -165,8 +165,11 @@ public sealed class SystemDnsResolverTests
         // (Schannel) resolves it to itself and fails the connect, which TcpConnector reports
         // as CouldntConnect: curl http://0 -> exit 7, curl: (7) Failed to connect to
         // 0.0.0.0:80 after 0 ms: Could not connect to server (measured 2026-10-11; test1293).
+        // The URL parser writes host 0 as 0.0.0.0; the shorthand "0" itself reaches the lookup
+        // only where IPv4 shorthand is not refused, the OpenSSL build (ADR-0820).
         var resolver = new SystemDnsResolver(
-            (_, _) => Task.FromException<IPAddress[]>(new ArgumentException("IPv4 address 0.0.0.0 and IPv6 address ::0 are unspecified addresses that cannot be used as a target address.", "hostNameOrAddress")));
+            (_, _) => Task.FromException<IPAddress[]>(new ArgumentException("IPv4 address 0.0.0.0 and IPv6 address ::0 are unspecified addresses that cannot be used as a target address.", "hostNameOrAddress")),
+            refusesIpv4Shorthand: false);
 
         Diagnostics.Arrange("host, lookup failure", $"{host}, ArgumentException");
 

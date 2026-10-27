@@ -181,6 +181,13 @@ internal static class FtpTransferMessages
     internal const string ServerFailedToConnectToDataPort = "FTP: The server failed to connect to data port";
 
     /// <summary>
+    /// The exit 10 message curl 8.22.0's <c>ftp_done</c> sets when that reply ends a download
+    /// whose size was known, as its partial-file check runs before the error text is chosen
+    /// (measured with <c>SIZE</c> answered and with it refused, CGR-099).
+    /// </summary>
+    internal static string ReceivedOnlyPartialFile(long bytes) => Format($"Received only partial file: {bytes} bytes");
+
+    /// <summary>
     /// The exit 64 message for an <c>AUTH</c> refused under <c>--ssl-reqd</c> or
     /// <c>--ftp-ssl-control</c>, or a <c>PROT P</c> refused under <c>--ssl-reqd</c> (BL-437).
     /// </summary>
@@ -489,6 +496,14 @@ internal static class FtpTransferMessages
     /// <param name="connectionNumber">The control connection's number.</param>
     /// <returns>The line, such as <c>shutting down connection #0</c>.</returns>
     internal static string ShuttingDownConnection(long connectionNumber) => Format($"shutting down connection #{connectionNumber}");
+
+    /// <summary>
+    /// The <c>-v</c> line after a refused login, whose control connection curl 8.22.0 closes
+    /// with no <c>QUIT</c> (measured, BL-3617).
+    /// </summary>
+    /// <param name="connectionNumber">The control connection's number.</param>
+    /// <returns>The line, such as <c>closing connection #0</c>.</returns>
+    internal static string ClosingConnection(long connectionNumber) => Format($"closing connection #{connectionNumber}");
 
     private static string Format(FormattableString message) => message.ToString(CultureInfo.InvariantCulture);
 }

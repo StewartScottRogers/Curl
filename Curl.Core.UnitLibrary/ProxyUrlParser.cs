@@ -303,6 +303,13 @@ public static class ProxyUrlParser
         }
 
         host = Uri.UnescapeDataString(host);
+        if (IPAddress.TryParse(host, out IPAddress? address) && address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            // curl reads the host as a URL's, so IPv4 shorthand becomes a dotted quad: -x
+            // http://127.1:8080 dials 127.0.0.1, which the Windows resolver needs (BL-3575, ADR-0820).
+            host = address.ToString();
+        }
+
         return host.AsSpan().ContainsAny(ForbiddenHostCharacters) ? BadHostnameReason : null;
     }
 

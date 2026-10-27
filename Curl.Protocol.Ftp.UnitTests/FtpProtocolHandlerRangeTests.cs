@@ -434,7 +434,7 @@ public sealed class FtpProtocolHandlerRangeTests
         string expectedSent = "USER anonymous\r\nPASS ftp@example.com\r\nPWD\r\nCWD dir\r\nEPSV\r\nTYPE A\r\nLIST\r\nQUIT\r\n";
         diagnostics.DiffSent(expectedSent, run.Sent);
         Assert.AreEqual(expectedSent, run.Sent);
-        Assert.AreEqual("a\r\nb\r\n", run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of("a\r\nb\r\n"), run.OutputText);
     }
 
     [TestMethod]

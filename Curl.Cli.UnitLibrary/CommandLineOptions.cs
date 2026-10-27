@@ -94,6 +94,13 @@ public sealed class CommandLineOptions
     internal bool ApplyingValueLedByVariableBytes { get => globals.ApplyingValueLedByVariableBytes; set => globals.ApplyingValueLedByVariableBytes = value; }
 
     /// <summary>
+    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value in
+    /// which at least one variable reference was replaced: <see cref="VariableExpansion"/> builds it from
+    /// UTF-8 bytes, so <see cref="CommandLineTextBytes"/> sends it as UTF-8 (BL-3844).
+    /// </summary>
+    internal bool ApplyingExpandedValue { get => globals.ApplyingExpandedValue; set => globals.ApplyingExpandedValue = value; }
+
+    /// <summary>
     /// The encoding the request side sends header text in, when it is not the UTF-8 a config file is
     /// written in: the ANSI code page on Windows (<see cref="ConfigFileWireText"/>); otherwise <see langword="null"/>.
     /// </summary>
@@ -104,7 +111,7 @@ public sealed class CommandLineOptions
     /// config file read as UTF-8 is read and <see cref="ConfigFileWireTextEncoding"/> is set, re-spelled so it goes out as
     /// the file's own bytes (<see cref="ConfigFileWireText.Respell"/>); otherwise unchanged.
     /// </summary>
-    /// <param name="value">A header, user-agent or referer value.</param>
+    /// <param name="value">A header, user-agent, referer or <c>-o</c> value.</param>
     /// <returns>The value to store.</returns>
     internal string AsWireText(string value) =>
         ReadingUtf8ConfigFile && ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(value, wireEncoding) : value;
@@ -290,6 +297,27 @@ public sealed class CommandLineOptions
     /// <see cref="CommandLineParser"/> for it to reach the HTTP/3 stack.
     /// </summary>
     public bool ActsAsQuicBuild { get => globals.ActsAsQuicBuild; internal set => globals.ActsAsQuicBuild = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when the command line is read as a curl built with ECH reads it (<c>--enable-ech</c>
+    /// with a TLS library that has ECH): <c>--ech</c> is accepted and runs over Curl's hand-built TLS 1.3 client
+    /// (ADR-0327). <see langword="false"/> as every reference build reads it - Schannel on Windows, OpenSSL without
+    /// ECH on Linux and macOS - which refuses <c>--ech</c> with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutEch"/>,
+    /// ADR-0822). The executable never sets it; tests and the conformance harness ask
+    /// <see cref="CommandLineParser"/> for it to reach the ECH code.
+    /// </summary>
+    public bool ActsAsEchBuild { get => globals.ActsAsEchBuild; internal set => globals.ActsAsEchBuild = value; }
+
+    /// <summary>
+    /// <see langword="true"/> when the command line is read as a curl built with c-ares reads it: <c>--dns-servers</c>,
+    /// <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c> are accepted and run over Curl's
+    /// hand-built DNS resolver. <see langword="false"/> as every reference build reads it - Schannel on Windows,
+    /// OpenSSL with the threaded resolver on Linux and macOS - which refuses all four with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutCAres"/>,
+    /// ADR-0841). The executable never sets it; tests ask <see cref="CommandLineParser"/> for it to reach the resolver.
+    /// </summary>
+    public bool ActsAsCAresBuild { get => globals.ActsAsCAresBuild; internal set => globals.ActsAsCAresBuild = value; }
 
     /// <summary>
     /// Reads an environment variable for <c>--variable %name</c>; <see langword="null"/> when it is not set.
@@ -2307,13 +2335,15 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is
-    /// opened or created.
+    /// opened or created. A value from a UTF-8 config file on Windows is re-spelled by
+    /// <see cref="AsWireText"/>, so the name is the file's bytes read in the ANSI code page, as the
+    /// curl 8.22.0 mingw build opens it (<c>output = "café.bin"</c> creates <c>cafÃ©.bin</c>, BL-3900).
     /// </summary>
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
     internal void AddOutputFile(string outputFile)
     {
         UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
-        output.FileName = outputFile;
+        output.FileName = AsWireText(outputFile);
         output.HasOutputOption = true;
     }
 
@@ -2370,11 +2400,28 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
-    /// Appends the UTF-8 bytes of <paramref name="data"/> to <see cref="PostData"/>, after a single
-    /// <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.21.0 does.
+    /// The bytes <paramref name="text"/>, a <c>-d</c>-family, <c>--json</c>, <c>--data-urlencode</c> or
+    /// <c>--url-query</c> value, goes out as, as curl 8.22.0 sends it (CGR-015, BL-3844): a command-line
+    /// argument, or a line of a config file read in <see cref="ConfigFileWireTextEncoding"/>, in that
+    /// encoding when it is set, since curl's Windows build gets its arguments in the ANSI code page and
+    /// sends their bytes unchanged; a line of a config file read as UTF-8, an <c>--expand-</c> value
+    /// (<see cref="ApplyingExpandedValue"/>, whose variables hold UTF-8) and every value off Windows in UTF-8,
+    /// with each byte of an argument that was not valid UTF-8 sent back unchanged (<see cref="InvalidUtf8ByteEscape"/>,
+    /// CGR-016, BL-3849), so <c>-d $'\xff'</c> posts FF as curl 8.18.0 does on Linux.
+    /// </summary>
+    /// <param name="text">The value as parsed.</param>
+    /// <returns>The value's bytes.</returns>
+    internal byte[] CommandLineTextBytes(string text) =>
+        ReadingUtf8ConfigFile || ApplyingExpandedValue || ConfigFileWireTextEncoding is null
+            ? InvalidUtf8ByteEscape.Encoding.GetBytes(text)
+            : ConfigFileWireTextEncoding.GetBytes(text);
+
+    /// <summary>
+    /// Appends the bytes of <paramref name="data"/> (<see cref="CommandLineTextBytes"/>) to <see cref="PostData"/>,
+    /// after a single <c>&amp;</c> when <see cref="PostData"/> already holds at least one byte, as curl 8.22.0 does.
     /// </summary>
     /// <param name="data">A <c>-d</c> / <c>--data</c> value, possibly empty.</param>
-    internal void AppendPostData(string data) => AppendPostData(Encoding.UTF8.GetBytes(data));
+    internal void AppendPostData(string data) => AppendPostData(CommandLineTextBytes(data));
 
     /// <summary>
     /// Appends <paramref name="data"/> to <see cref="PostData"/>, after a single <c>&amp;</c> when

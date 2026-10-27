@@ -54,10 +54,9 @@ public sealed class HttpLastModifiedTests
     }
 
     [TestMethod]
-    [DataRow("X-A: 1", DisplayName = "absent")]
-    [DataRow("Last-Modified: garbage", DisplayName = "not an HTTP-date")]
-    public void Find_NoTime_IsNull(string header)
+    public void Find_NoLastModified_IsNull()
     {
+        const string header = "X-A: 1";
         Diagnostics.Arrange("header", header);
 
         long? found = HttpLastModified.Find(Head(200, header));

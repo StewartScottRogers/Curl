@@ -111,7 +111,8 @@ public sealed class CurlCommandRunnerEchModeTests
                     standardError,
                     new MemoryStream(),
                     runsOnWindows: false,
-                    outputPaths: fileSystem)
+                    outputPaths: fileSystem,
+                    parsesAsEchBuild: true)
                 .RunAsync(arguments);
         }
 

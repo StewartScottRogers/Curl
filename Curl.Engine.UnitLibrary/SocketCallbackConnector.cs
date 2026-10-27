@@ -11,22 +11,29 @@ namespace Curl.Engine;
 /// <c>CURLOPT_CLOSESOCKETFUNCTION</c> around each TCP and QUIC connection <paramref name="inner" /> opens (ADR-0610). The
 /// managed engine's sockets live inside <c>Curl.Networking</c> and are never handed out, so a socket the callbacks
 /// see is an opaque <see cref="CurlSocket" /> over the <see cref="IConnection" />: the open-socket callback's, or
-/// the engine's next <see cref="CurlSocketHandles" /> number without one. Once <paramref name="inner" /> has
-/// connected, the open-socket callback is asked for the connection's peer address, and its
-/// <see cref="CurlSocket.Bad" /> closes it and fails the connect with <see cref="CurlExitCode.CouldntConnect" />;
-/// the socket-option callback then gets the socket, and its <see cref="SocketOptionResult.Error" /> closes it (the
-/// close-socket callback called) and fails with <see cref="CurlExitCode.AbortedByCallback" />, each with curl
-/// 8.22.0's <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms: &lt;text&gt;</c>;
-/// <see cref="SocketOptionResult.AlreadyConnected" /> carries on as <see cref="SocketOptionResult.Ok" /> does, the
-/// connection being made already. Closing the connection calls the close-socket callback once. A QUIC connection's
-/// UDP socket goes through the same steps, the open-socket callback seeing <c>SOCK_DGRAM</c> and <c>IPPROTO_UDP</c>
-/// (BL-2474).
+/// the engine's next <see cref="CurlSocketHandles" /> number without one. A TCP connect asks the callbacks before each
+/// attempt dials, through the <see cref="AttemptSocketOpener" /> it puts on the target (CGR-036, ADR-0818): the
+/// open-socket callback's <see cref="CurlSocket.Bad" /> opens no connection and fails the connect with
+/// <see cref="CurlExitCode.CouldntConnect" />, the socket it returns is the one connected (as it is, under the
+/// socket-option callback's <see cref="SocketOptionResult.AlreadyConnected" />), and the socket-option callback's
+/// <see cref="SocketOptionResult.Error" /> calls the close-socket callback and fails with
+/// <see cref="CurlExitCode.AbortedByCallback" />, each with curl 8.22.0's
+/// <c>Failed to connect to &lt;host&gt;:&lt;port&gt; after &lt;n&gt; ms: &lt;text&gt;</c>; a failed attempt's
+/// socket goes to the close-socket callback. A connector that never asks the opener gets the same steps once it has
+/// connected, for the connection's peer, a refusal closing the connection. Closing the connection calls the
+/// close-socket callback once. A QUIC connection's UDP socket goes through the after-connect steps, the open-socket
+/// callback seeing <c>SOCK_DGRAM</c> and <c>IPPROTO_UDP</c> (BL-2474).
 /// </summary>
 /// <param name="inner">Opens the connections.</param>
 /// <param name="callbacks">The handle's socket callbacks.</param>
 /// <param name="handles">Numbers the sockets the open-socket callback did not make.</param>
 /// <param name="timeProvider">Measures the milliseconds a refused connect reports.</param>
-internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOptions callbacks, CurlSocketHandles handles, TimeProvider timeProvider) : IConnector
+/// <param name="suppliesSockets">
+/// Whether the open-socket callback's socket is an operating system socket handed to the dialer; <see langword="false" />
+/// when the engine dials through an <see cref="EngineDialing" /> (the conformance harness's in-memory servers), whose
+/// libtests return socket numbers no operating system made, so the dialer opens its own.
+/// </param>
+internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOptions callbacks, CurlSocketHandles handles, TimeProvider timeProvider, bool suppliesSockets = true) : IConnector
 {
     /// <summary><c>curl_easy_strerror(CURLE_COULDNT_CONNECT)</c>, the end of an open-socket refusal's message.</summary>
     internal const string CouldntConnectText = "Could not connect to server";
@@ -57,22 +64,70 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
     internal static IConnector Over(IConnector connector, EasyCallbackOptions callbacks, ManagedEngineSharedState shared) =>
         callbacks is { OpenSocket: null, SocketOption: null, CloseSocket: null }
             ? connector
-            : new SocketCallbackConnector(connector, callbacks, shared.SocketHandles, shared.TimeProvider);
+            : new SocketCallbackConnector(connector, callbacks, shared.SocketHandles, shared.TimeProvider, suppliesSockets: shared.Dialing is null);
 
-    /// <summary>Connects through the inner connector, then runs the open-socket and socket-option callbacks.</summary>
+    /// <summary>
+    /// Connects through the inner connector with an <see cref="AttemptSocketOpener" /> on the target, so the
+    /// open-socket and socket-option callbacks run before each TCP attempt dials, as curl 8.22.0's
+    /// <c>cf_socket_open</c> calls them (CGR-036, ADR-0818): a refusal opens no connection, a socket the open-socket
+    /// callback returns is the one connected (used as it is under <see cref="SocketOptionResult.AlreadyConnected" />),
+    /// and a failed attempt's socket goes to the close-socket callback. A connector that never asks the opener (a Unix
+    /// socket, a test fake) gets the callbacks once it has connected, for the connection's peer.
+    /// </summary>
     /// <param name="target">Where to connect.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
     /// <returns>The connection wrapped as a <see cref="SocketCallbackConnection" />, or the failure.</returns>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
         long started = timeProvider.GetTimestamp();
-        ConnectResult connect = await inner.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        AttemptSocketOpener opener = new(callbacks, handles, suppliesSockets);
+        ConnectResult connect = await inner.ConnectAsync(target with { SocketOpener = opener }, cancellationToken).ConfigureAwait(false);
+        return opener.WasAsked
+            ? Opened(target, started, connect, opener)
+            : await OpenedAfterConnectAsync(target, started, connect).ConfigureAwait(false);
+    }
+
+    // The result of a connect whose attempts the opener saw: the connection over the winning attempt's socket, or the
+    // failure, curl's open-socket or socket-option refusal when one refused an attempt. A connection whose attempt the
+    // opener no longer holds gets a socket number no callback saw, so closing it calls none.
+    private ConnectResult Opened(ConnectTarget target, long started, ConnectResult connect, AttemptSocketOpener opener)
+    {
+        CurlSocketCloser? closer = opener.TakeOpened();
+        if (connect.Connection is { } connection)
+        {
+            return Rewrapped(connect, new SocketCallbackConnection(connection, CloserOf(connection, closer)));
+        }
+
+        closer?.Close();
+        if (opener.Refusal == CurlExitCode.Ok)
+        {
+            return connect;
+        }
+
+        SocketOpening refused = Refused(target, started, opener.Refusal, opener.Refusal == CurlExitCode.AbortedByCallback ? AbortedByCallbackText : CouldntConnectText);
+        return ConnectResult.Failed(refused.ExitCode, refused.ErrorMessage);
+    }
+
+    // The winning attempt's closer, now under the connection's operating system socket when the dialer opened its
+    // own (CGR-129), or a closer calling nothing when the opener no longer holds the attempt.
+    private CurlSocketCloser CloserOf(IConnection connection, CurlSocketCloser? attempt) =>
+        (attempt, callbacks.OpenSocket, connection.SocketHandle) switch
+        {
+            (null, _, _) => new CurlSocketCloser(handles.Next(), close: null),
+            ({ IsTheConnectionsOwnSocket: true }, _, _) => attempt,
+            (_, null, { } handle) => new CurlSocketCloser(new CurlSocket(handle), callbacks.CloseSocket, isTheConnectionsOwnSocket: true),
+            _ => attempt,
+        };
+
+    // Runs the callbacks for a connection the inner connector made without asking the opener.
+    private async ValueTask<ConnectResult> OpenedAfterConnectAsync(ConnectTarget target, long started, ConnectResult connect)
+    {
         if (connect.Connection is not { } connection)
         {
             return connect;
         }
 
-        SocketOpening opening = await OpenSocketAsync(target, started, connection, AddressOf(connection.RemoteEndPoint)).ConfigureAwait(false);
+        SocketOpening opening = await OpenSocketAsync(target, started, connection, AddressOf(connection.RemoteEndPoint), connection.SocketHandle).ConfigureAwait(false);
         return opening.Closer is { } closer
             ? Rewrapped(connect, new SocketCallbackConnection(connection, closer))
             : ConnectResult.Failed(opening.ExitCode, opening.ErrorMessage);
@@ -96,7 +151,7 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
             return connect;
         }
 
-        SocketOpening opening = await OpenSocketAsync(target, started, connection, DatagramAddressOf(connection.RemoteEndPoint)).ConfigureAwait(false);
+        SocketOpening opening = await OpenSocketAsync(target, started, connection, DatagramAddressOf(connection.RemoteEndPoint), socketHandle: null).ConfigureAwait(false);
         return opening.Closer is { } closer
             ? MultiplexedConnectResult.Connected(new SocketCallbackMultiplexedConnection(connection, closer), connect.Timings)
             : MultiplexedConnectResult.Failed(opening.ExitCode, opening.ErrorMessage);
@@ -164,19 +219,18 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
         _ => (int)family,
     };
 
-    // Runs the open-socket and socket-option callbacks for a connection inner has just made, closing it on a refusal.
-    private async ValueTask<SocketOpening> OpenSocketAsync(ConnectTarget target, long started, IAsyncDisposable connection, CurlSocketAddress address)
+    // Runs the open-socket and socket-option callbacks for a connection inner has just made, closing it on a refusal;
+    // without an open-socket callback the socket is the connection's own operating system socket when it has one.
+    private async ValueTask<SocketOpening> OpenSocketAsync(ConnectTarget target, long started, IAsyncDisposable connection, CurlSocketAddress address, nint? socketHandle)
     {
-        CurlSocket socket = callbacks.OpenSocket is { } open
-            ? open(CurlSocketType.IpConnection, address)
-            : handles.Next();
+        (CurlSocket socket, bool ownSocket) = SocketFor(address, socketHandle);
         if (socket == CurlSocket.Bad)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
             return Refused(target, started, CurlExitCode.CouldntConnect, CouldntConnectText);
         }
 
-        CurlSocketCloser closer = new(socket, callbacks.CloseSocket);
+        CurlSocketCloser closer = new(socket, callbacks.CloseSocket, ownSocket);
         if (callbacks.SocketOption?.Invoke(socket, CurlSocketType.IpConnection) == SocketOptionResult.Error)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
@@ -186,6 +240,16 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
 
         return new SocketOpening(closer, CurlExitCode.Ok, string.Empty);
     }
+
+    // The open-socket callback's socket, else the connection's own operating system socket (marked as the engine's),
+    // else the engine's next number.
+    private (CurlSocket Socket, bool IsTheConnectionsOwnSocket) SocketFor(CurlSocketAddress address, nint? socketHandle) =>
+        (callbacks.OpenSocket, socketHandle) switch
+        {
+            ({ } open, _) => (open(CurlSocketType.IpConnection, address), false),
+            (null, { } handle) => (new CurlSocket(handle), true),
+            _ => (handles.Next(), false),
+        };
 
     private SocketOpening Refused(ConnectTarget target, long started, CurlExitCode code, string text)
     {
@@ -208,6 +272,119 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
             connect.MappedPort,
             connect.ConnectReplyHeadersStored,
             connect.ProxyConnectHeaderBytes);
+
+    /// <summary>
+    /// The <see cref="ITcpSocketOpener" /> one <see cref="ConnectAsync" /> puts on its target: for each TCP attempt it
+    /// calls the open-socket callback (or numbers the socket without one) and the socket-option callback, and keeps
+    /// the attempt's <see cref="CurlSocketCloser" /> until the attempt fails or the connect takes it.
+    /// </summary>
+    /// <param name="callbacks">The handle's socket callbacks.</param>
+    /// <param name="handles">Numbers the sockets the open-socket callback did not make.</param>
+    /// <param name="suppliesSockets">Whether the open-socket callback's socket is handed to the dialer.</param>
+    internal sealed class AttemptSocketOpener(EasyCallbackOptions callbacks, CurlSocketHandles handles, bool suppliesSockets) : ITcpSocketOpener
+    {
+        private readonly Lock gate = new();
+        private readonly List<KeyValuePair<IPEndPoint, CurlSocketCloser>> opened = [];
+        private volatile bool asked;
+        private volatile int refusal;
+
+        /// <summary>Gets a value indicating whether the connector asked about any attempt.</summary>
+        internal bool WasAsked => asked;
+
+        /// <summary>Gets the exit code of the last attempt a callback refused, <see cref="CurlExitCode.Ok" /> for none.</summary>
+        internal CurlExitCode Refusal => (CurlExitCode)refusal;
+
+        public TcpSocketOpenDecision Open(IPEndPoint remoteEndPoint)
+        {
+            asked = true;
+            (CurlSocket socket, Socket? engineSocket) = SocketFor(remoteEndPoint);
+            if (socket == CurlSocket.Bad)
+            {
+                refusal = (int)CurlExitCode.CouldntConnect;
+                return TcpSocketOpenDecision.Refuse;
+            }
+
+            CurlSocketCloser closer = new(socket, callbacks.CloseSocket, isTheConnectionsOwnSocket: engineSocket is not null, engineSocket);
+            SocketOptionResult? option = callbacks.SocketOption?.Invoke(socket, CurlSocketType.IpConnection);
+            if (option == SocketOptionResult.Error)
+            {
+                closer.Close();
+                refusal = (int)CurlExitCode.AbortedByCallback;
+                return TcpSocketOpenDecision.Refuse;
+            }
+
+            lock (gate)
+            {
+                opened.Add(new(remoteEndPoint, closer));
+            }
+
+            return DecisionFor(socket, option, engineSocket);
+        }
+
+        // The open-socket callback's socket for the attempt; else, for a socket-option callback over a dialer that
+        // adopts sockets, an operating system socket the engine opens now, before the connect, as curl 8.22.0's
+        // cf_socket_open does (CGR-145); else the engine's next number.
+        private (CurlSocket Socket, Socket? EngineSocket) SocketFor(IPEndPoint remoteEndPoint)
+        {
+            if (callbacks.OpenSocket is { } open)
+            {
+                return (open(CurlSocketType.IpConnection, AddressOf(remoteEndPoint)), null);
+            }
+
+            if (callbacks.SocketOption is null || !suppliesSockets)
+            {
+                return (handles.Next(), null);
+            }
+
+            Socket engineSocket = new(remoteEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            return (new CurlSocket(engineSocket.Handle), engineSocket);
+        }
+
+        // The dialer's own socket without a socket the callbacks saw (or one it cannot adopt), else that socket,
+        // used as it is under CURL_SOCKOPT_ALREADY_CONNECTED, connected or not.
+        private TcpSocketOpenDecision DecisionFor(CurlSocket socket, SocketOptionResult? option, Socket? engineSocket) =>
+            (callbacks.OpenSocket is null && engineSocket is null) || !suppliesSockets
+                ? TcpSocketOpenDecision.Proceed
+                : TcpSocketOpenDecision.Supplied(socket.Handle, option == SocketOptionResult.AlreadyConnected);
+
+        public void SocketClosed(IPEndPoint remoteEndPoint)
+        {
+            CurlSocketCloser? closer = null;
+            lock (gate)
+            {
+                int index = opened.FindIndex(attempt => attempt.Key.Equals(remoteEndPoint));
+                if (index >= 0)
+                {
+                    closer = opened[index].Value;
+                    opened.RemoveAt(index);
+                }
+            }
+
+            closer?.Close();
+        }
+
+        /// <summary>
+        /// Takes the socket of the attempt still open, the connection's, closing any other one left; <see langword="null" />
+        /// when none is.
+        /// </summary>
+        /// <returns>The open attempt's closer, or <see langword="null" />.</returns>
+        internal CurlSocketCloser? TakeOpened()
+        {
+            CurlSocketCloser[] left;
+            lock (gate)
+            {
+                left = [.. opened.Select(attempt => attempt.Value)];
+                opened.Clear();
+            }
+
+            foreach (CurlSocketCloser abandoned in left.SkipLast(1))
+            {
+                abandoned.Close();
+            }
+
+            return left.LastOrDefault();
+        }
+    }
 
     /// <summary>What the callbacks made of a new connection: its socket's closer, or the failure that refused it.</summary>
     /// <param name="Closer">Closes the socket the callbacks saw, or <see langword="null" /> when they refused it.</param>

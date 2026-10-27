@@ -74,7 +74,8 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         long started = context.TimeProvider.GetTimestamp();
-        TransferResult result = await TransferAsync(context).ConfigureAwait(false);
+        using var connectPhase = new Pop3ConnectPhaseLimit(context, started);
+        TransferResult result = await TransferAsync(context, connectPhase).ConfigureAwait(false);
         Pop3DiagnosticLogLines.TransferEnded(context.DiagnosticLog, result, context.TimeProvider, started);
         return result;
     }
@@ -88,7 +89,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
     /// <summary>
     /// Refuses credentials holding a control byte, then connects and transfers.
     /// </summary>
-    private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, Pop3ConnectPhaseLimit connectPhase)
     {
         if (HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password))
         {
@@ -96,14 +97,14 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, Pop3SessionMessages.CredentialsHaveControlCode);
         }
 
-        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+        return await ConnectAndTransferAsync(context, connectPhase).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Connects, or reuses a kept connection for the same login, runs the session on it and
     /// writes the lines <c>-v</c> ends the transfer with.
     /// </summary>
-    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context, Pop3ConnectPhaseLimit connectPhase)
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
@@ -127,10 +128,10 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            Pop3KeptConnection? reused = connected.IsReused ? connection.Session as Pop3KeptConnection : null;
+            Pop3KeptConnection? reused = connected.IsReused ? (connection.Session as Pop3KeptConnection)?.ResumedOn(connection) : null;
             Pop3KeptConnection kept = reused ?? new Pop3KeptConnection(connection, loginKey, context.TimeProvider);
             var session = new Pop3Session(
-                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened, kept, reused is not null);
+                new Pop3ControlChannel(connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput), tlsProvider, context, implicitTls, saslAuthenticator, connectEvents.Opened, kept, reused is not null, connectPhase);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {

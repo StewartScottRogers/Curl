@@ -36,6 +36,10 @@ internal sealed class Http2ProxyTunnelConnection : IConnection
     /// <inheritdoc />
     public EndPoint? LocalEndPoint => _proxyConnection.LocalEndPoint;
 
+    /// <inheritdoc />
+    /// <remarks>The socket to the proxy, as libcurl gives through a tunnel.</remarks>
+    public nint? SocketHandle => _proxyConnection.SocketHandle;
+
     /// <summary>
     /// Gets the CONNECT request's header fields: <c>:method</c> and <c>:authority</c> only, no
     /// <c>:scheme</c> or <c>:path</c> (RFC 9113 section 8.5), then <c>proxy-authorization</c>

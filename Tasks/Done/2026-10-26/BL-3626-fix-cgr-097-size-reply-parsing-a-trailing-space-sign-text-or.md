@@ -1,0 +1,89 @@
+---
+id: BL-3626
+title: Fix CGR-097: SIZE reply parsing: a trailing space, sign, text or non-digit suffix makes PORT ignore the size
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/FtpProtocolHandlerTests.cs, Curl.Protocol.Ftp.UnitTests/Cgr097Tests.cs]
+requirement: none
+created: 2026-10-26
+completed: 2026-10-26
+---
+# BL-3626 — Fix CGR-097: SIZE reply parsing: a trailing space, sign, text or non-digit suffix makes PORT ignore the size
+
+## Goal
+
+Curl behaves as curl 8.22.0 does for every repro in third-party gap report issue CGR-097 (severity Medium): same exit code, stdout bytes, stderr text, files written and bytes on the wire.
+
+## Context
+
+From the third-party functional review `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (2026-10-25, Curl master at b0d27d68 against curl 8.22.0 Schannel on Windows and curl 8.18.0 OpenSSL on Linux). Its section 1 explains the method, the normalisations and the names `REF`, `PORT`, `SCR` and `EV`. The `SCR` evidence folder was a temporary scratchpad and may be gone; every issue states the server behaviour it needs, so rebuild the repro with `Record-CurlExchange.ps1` or a C# file-based server (no Python, CLAUDE.md). Line numbers are at b0d27d68 and may have moved. Measure real curl before pinning output text.
+
+The issue as the report gives it:
+
+#### CGR-097: SIZE reply parsing: a trailing space, sign, text or non-digit suffix makes PORT ignore the size
+
+- **Severity:** Medium
+- **Area:** ftp-file-tftp
+- **Platform(s):** Both (Windows and Linux)
+- **Confidence:** Confirmed
+- **Related existing finding (GF/AF):** none
+- **Source findings:** `ftp-file-tftp FTP-4`
+
+**Reproduction**
+
+- *Setup (ftp-file-tftp):* EV = `SCR\evidence\ftp-file-tftp`. Scripted FTP/TFTP stub: `EV\stub\win3\stub.exe` (Linux `EV/stub/linux/stub`, source `EV\stub\Program.cs`) with fixture root `EV\fixture\root` (file.txt is 18 bytes). Differential harness `EV\dt.sh NAME 'script' curl-args`, where `@U@` = `ftp://127.0.0.1:$CPORT`, script lines are `CMD=reply` or `OPT key=value` separated by `;;`, and `STUBEXTRA=EV\tls.pfx` enables FTPS. Verifier: `EV\v1.sh`, `EV\v2.sh` (Windows), `EV\vl.sh` (Linux).
+- Script `SIZE=213 18 ` (trailing space): `curl -sS -I ftp://127.0.0.1:20960/file.txt`.
+- Script `SIZE=213 -5` or `SIZE=213 size 5`: `curl -sSv ftp://127.0.0.1:20960/file.txt` (the file is 18 bytes).
+
+Cases: `v_size_trail_I`, `v_size_neg`, `v_size_text` (Windows); `v_size_neg` (Linux).
+
+Commands (run each with REF and with PORT):
+
+```sh
+SIZE=213 18 
+curl -sS -I ftp://127.0.0.1:20960/file.txt
+SIZE=213 -5
+SIZE=213 size 5
+curl -sSv ftp://127.0.0.1:20960/file.txt
+```
+
+**Expected (real curl)**
+
+- Uses the trailing digit run. `-I` prints `Content-Length: 18`. With `-5` or `size 5` it reports `Getting file with size: 5` and writes only `line1`, exit 0.
+
+**Actual (Curl)**
+
+- The size is treated as unknown. `-I` omits the `Content-Length` line. Downloads report `Getting file with size: -1` and write all 18 bytes.
+
+**Suspected location in source**
+
+- `Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs:1996-1999` `SizeOf` (`long.TryParse` with `AllowLeadingWhite` only).
+
+**Acceptance criterion:** For every repro command above, PORT's exit code, stdout bytes, stderr text, files written and bytes on the wire equal REF's on Windows and REF-LINUX's on Linux (Expected); repro variants that already matched still match.
+
+
+## Acceptance criteria
+
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+
+## Notes
+
+- 2026-10-26 (lane 8): Cause: `FtpSession.SizeOf` parsed the text after the code with `long.TryParse` (leading white only). Now `TrailingSizeOf` reads it as curl 8.22.0's `ftp_state_size_resp` does: from the line's last character, step back over the digits just before it, then read the digits from there (`curlx_str_number`). So `213 -5` and `213 size 5` are 5, `213 18 ` is 18, `213 7x` is 7, and `213 7  ` (two characters after the digits), `213 many`, `213 ` and an overflow are unknown (-1). This matches real curl (measured below) and needs no ADR, since it only follows curl.
+- Measured with `Record-CurlExchange.ps1 -Ftp -Port 20960 -FtpData "line1`nline2`nline3`n" -FtpReply 'SIZE=<reply>'`, first with real curl 8.22.0 (Schannel, ucrt64) and then with `-Curl Curl.Console\bin\Debug\net10.0\curl.exe`:
+  - `SIZE=213 18 `, `curl -sS -I ftp://127.0.0.1:20960/file.txt`: REF exit 0, stdout `Last-Modified: Sun, 27 Sep 2026 12:34:56 GMT` / `Content-Length: 18` / `Accept-ranges: bytes`, stderr empty. PORT: identical stdout, exit and request bytes.
+  - `SIZE=213 -5` and `SIZE=213 size 5`, `curl -sSv ftp://127.0.0.1:20960/file.txt`: REF exit 0, `* Getting file with size: 5`, stdout `line1`. PORT: same exit, stdout and request bytes; stderr equal apart from the reference debug build's own lines (`!!! WARNING !!!`, `sendrecv_dl`, `{ [0 bytes data]`) and the data port.
+  - Extra variants: `SIZE=213 7x` gives size 7 (`line1\nl`), and `SIZE=213 7  ` size -1 (all 18 bytes) in both; they match too.
+- Before the fix, `Cgr097Tests` failed on the sign, text and suffix rows; after it they pass. `FtpProtocolHandlerTests.ExecuteAsync_SizeUnknown_DownloadsWhateverArrives` pinned `213 -5` as an unknown size, which was the defect, so that row is now `213 7  `, a reply curl was measured to treat as unknown. That file was added to `touches` (no other task in Doing on origin/work/dark-factory names it).
+- Linux: the parsing is the same in curl 8.18.0 (the report lists `v_size_neg` on Linux as well), and the test uses no path, OS error text or certificate, so it is platform-neutral. The fast tests pass on Windows.
+- Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary: 0 failing members, after splitting out `LeadingCountOf` so complexity stays under the limit.
+- Put the focused unit test (ADR-0482) in Cgr097Tests.cs, which 	ouches names.
+## Log
+
+- 2026-10-26: Created from CGR-097 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. SIZE replies are now parsed from their trailing digits as curl 8.22.0 does; all repros match

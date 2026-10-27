@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net;
 using Curl.Http2;
 using Curl.Protocol.Abstractions;
@@ -20,7 +21,10 @@ namespace Curl.Protocol.Http;
 /// or a response with no valid <c>:status</c> or with DATA before its head, which this client
 /// resets with PROTOCOL_ERROR, is exit 92; a protocol error or an undecodable header block is
 /// exit 16 and a GOAWAY with an error exit 56; a connection the peer closes before the final
-/// head is exit 16, and part way through the body exit 18. Failed reads and writes of the
+/// head is exit 16, and part way through the body exit 18. A response whose length does not add
+/// up (RFC 9113 section 8.1.1: DATA past or short of its <c>content-length</c>, a body on HEAD, 204
+/// or 304, a 1xx head ending the stream, an invalid or second <c>content-length</c>) makes this
+/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847). Failed reads and writes of the
 /// connection itself pass through as <see cref="IOException" />.
 /// </remarks>
 /// <param name="session">The connection's HTTP/2 session.</param>
@@ -54,6 +58,16 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     private bool isResponseEnded;
 
     private bool isFinalHeadReceived;
+
+    private bool isHeadRequest;
+
+    /// <summary>The body length the final head promises (RFC 9113 section 8.1.1), or <see langword="null" /> when it promises none.</summary>
+    private long? promisedBodyLength;
+
+    private long bodyBytesReceived;
+
+    /// <summary>The failure of a response this client shut the connection down for, thrown once the bytes before it are read.</summary>
+    private HttpTransferException? malformedResponseFailure;
 
     /// <inheritdoc />
     public bool IsSecure => session.Connection.IsSecure;
@@ -201,10 +215,12 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// whose response is read from it (<see cref="Http2Session.StartUpgradedStreamAsync" />).
     /// Nothing may be written to it afterwards.
     /// </summary>
+    /// <param name="isHead">Whether the upgraded request is a HEAD, whose response has no body (BL-3667).</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the preface is written.</returns>
-    public async ValueTask StartUpgradedAsync(CancellationToken cancellationToken)
+    public async ValueTask StartUpgradedAsync(bool isHead, CancellationToken cancellationToken)
     {
+        isHeadRequest = isHead;
         streamId = await session.StartUpgradedStreamAsync(this, cancellationToken).ConfigureAwait(false);
         isRequestEnded = true;
         isReceiveWindowGrown = true;
@@ -256,6 +272,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         try
         {
             List<HeaderField> fields = Http2RequestHeaders.Of(head.Span, scheme);
+            isHeadRequest = fields.Contains(new HeaderField(":method", "HEAD"));
             streamId = await session.StartStreamAsync(this, fields, isRequestEnded, cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException)
@@ -323,6 +340,11 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private async ValueTask ReceiveFrameAsync(CancellationToken cancellationToken)
     {
+        if (malformedResponseFailure is not null)
+        {
+            throw malformedResponseFailure;
+        }
+
         await GrowReceiveWindowOnceAsync(cancellationToken).ConfigureAwait(false);
         if (!inbox.TryDequeue(out ReceivedFrame? next))
         {
@@ -341,10 +363,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (next.Reset is { } reset)
         {
-            throw FailureOf(reset)!;
+            EndOnCleanReset(reset);
         }
-
-        if (next.Frame!.Type == Http2FrameType.Headers)
+        else if (next.Frame!.Type == Http2FrameType.Headers)
         {
             await ReceiveHeadersAsync(next.Frame, next.Fields!, cancellationToken).ConfigureAwait(false);
         }
@@ -360,6 +381,10 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         {
             await session.ReceiveAsync(this, cancellationToken).ConfigureAwait(false);
         }
+        catch (Http2StreamResetException reset)
+        {
+            EndOnCleanReset(reset);
+        }
         catch (Exception exception) when (FailureOf(exception) is { } failure)
         {
             throw failure;
@@ -367,17 +392,66 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
+    /// Ends the response at a RST_STREAM NO_ERROR that came after the final head, which curl
+    /// with nghttp2 takes as the body's end (CGR-141, measured, BL-3670 Notes); throws the
+    /// transfer failure for any other reset.
+    /// </summary>
+    private void EndOnCleanReset(Http2StreamResetException reset)
+    {
+        if (reset.ErrorCode != Http2ErrorCode.NoError || !isFinalHeadReceived)
+        {
+            throw FailureOf(reset)!;
+        }
+
+        isResponseEnded = true;
+    }
+
+    /// <summary>
+    /// Gives the exit 92 message for a reset: NO_ERROR, which reaches here only before the final
+    /// head, says the stream closed cleanly too early; any other code says it did not close cleanly.
+    /// </summary>
+    private static string ResetMessageOf(Http2StreamResetException reset) => reset.ErrorCode == Http2ErrorCode.NoError
+        ? HttpTransferMessages.Http2StreamClosedBeforeHead(reset.StreamId)
+        : HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode);
+
+    /// <summary>
     /// Gives the transfer failure curl reports for a failure of the stream or its connection,
     /// or <see langword="null" /> for one that passes through, such as an <see cref="IOException" />.
+    /// A reset with HTTP_1_1_REQUIRED is marked <see cref="HttpTransferException.RequiresHttp11" />,
+    /// which the handler sends again over HTTP/1.1 on a new connection (CGR-032); any reset is
+    /// marked <see cref="HttpTransferException.LeavesConnectionIntact" />, since it ends only the
+    /// stream and the next transfer goes on the same connection (CGR-140).
     /// </summary>
-    private HttpTransferException? FailureOf(Exception exception) => exception switch
+    private HttpTransferException? FailureOf(Exception exception) => IsRefusal(exception) ? Refused() : exception switch
     {
-        Http2StreamResetException reset => new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode)),
+        Http2StreamResetException reset => new(CurlExitCode.Http2Stream, ResetMessageOf(reset))
+        {
+            RequiresHttp11 = reset.ErrorCode == Http2ErrorCode.Http11Required,
+            LeavesConnectionIntact = true,
+        },
         Http2ProtocolException error => new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode)),
         Http2GoAwayException => new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed),
         EndOfStreamException => Closed(),
         _ => null,
     };
+
+    /// <summary>
+    /// Tells whether the server refused this stream: reset it with REFUSED_STREAM, or sent a
+    /// GOAWAY whose last stream ID is below it, which nghttp2 closes the stream for with
+    /// REFUSED_STREAM too.
+    /// </summary>
+    private bool IsRefusal(Exception exception) =>
+        exception is Http2StreamResetException { ErrorCode: Http2ErrorCode.RefusedStream }
+        || (exception is Http2GoAwayException goAway && goAway.GoAway.LastStreamId < streamId);
+
+    /// <summary>
+    /// Gives the failure for a stream the server refused (<see cref="IsRefusal" />): exit 56 marked
+    /// <see cref="HttpTransferException.IsStreamRefused" />, which the handler sends again on a
+    /// new connection as curl 8.18.0 with nghttp2 does, with no <c>-v</c> line of its own
+    /// (measured, BL-3560 Notes).
+    /// </summary>
+    private static HttpTransferException Refused() =>
+        new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed) { IsStreamRefused = true };
 
     private void ThrowIfClosed()
     {
@@ -404,11 +478,59 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         else
         {
             int statusCode = Http2ResponseHead.StatusOf(fields) ?? throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
-            received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
-            isFinalHeadReceived = statusCode >= 200;
+            if (!await IsHeadTakenAsync(statusCode, fields, frame.IsEndStream, cancellationToken).ConfigureAwait(false))
+            {
+                return;
+            }
         }
 
-        isResponseEnded = frame.IsEndStream;
+        await EndResponseAsync(frame.IsEndStream, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Takes a response head as nghttp2 checks it (measured, BL-3667 Notes): a <c>content-length</c>
+    /// that is not a number, or a second one, is an invalid header field, and a 1xx head that
+    /// ends the stream is a protocol error. Either way curl has written the lines before the
+    /// failure but not the empty line, and nghttp2 shuts the connection down.
+    /// </summary>
+    /// <returns><see langword="true" /> for a head taken, <see langword="false" /> for one the connection was shut down for.</returns>
+    private async ValueTask<bool> IsHeadTakenAsync(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream, CancellationToken cancellationToken)
+    {
+        if (MalformedHeadOf(statusCode, fields, isEndStream) is { } malformed)
+        {
+            received.Enqueue(malformed.Written);
+            await ShutDownMalformedAsync(malformed.Message, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
+        received.Enqueue(Http2ResponseHead.Format(session.VersionName, statusCode, fields));
+        isFinalHeadReceived = statusCode >= 200;
+        promisedBodyLength = PromisedBodyLengthOf(statusCode, fields);
+        return true;
+    }
+
+    /// <summary>
+    /// Gives the body length a head promises: none for a response to HEAD, a 204 or a 304, as
+    /// nghttp2 counts it, else its <c>content-length</c>, or <see langword="null" /> when it has none.
+    /// </summary>
+    private long? PromisedBodyLengthOf(int statusCode, IReadOnlyList<HeaderField> fields) =>
+        isHeadRequest || statusCode is 204 or 304 ? 0 : ContentLengthOf(fields);
+
+    /// <summary>
+    /// Gives what curl writes of a head nghttp2 rejects and the message it fails with, or
+    /// <see langword="null" /> for a head it takes (<see cref="IsHeadTakenAsync" />).
+    /// </summary>
+    private (byte[] Written, string Message)? MalformedHeadOf(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream)
+    {
+        int invalidIndex = IndexOfInvalidContentLength(fields);
+        if (invalidIndex >= 0)
+        {
+            return (HeadWithoutEmptyLine(statusCode, fields.Take(invalidIndex).ToList()), InvalidHeaderFieldReceived(streamId, fields[invalidIndex]));
+        }
+
+        return statusCode < 200 && isEndStream
+            ? (HeadWithoutEmptyLine(statusCode, fields), HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError))
+            : null;
     }
 
     private async ValueTask ReceiveDataAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
@@ -418,9 +540,83 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        bodyBytesReceived += frame.Content.Length;
+        if (bodyBytesReceived > promisedBodyLength)
+        {
+            await ShutDownMalformedAsync(HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         received.Enqueue(frame.Content);
-        isResponseEnded = frame.IsEndStream;
+        await EndResponseAsync(frame.IsEndStream, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Ends the response when its last frame came, unless its body is shorter than its
+    /// <c>content-length</c>, which nghttp2 shuts the connection down for (RFC 9113 section 8.1.1).
+    /// </summary>
+    private async ValueTask EndResponseAsync(bool isEndStream, CancellationToken cancellationToken)
+    {
+        if (isEndStream && isFinalHeadReceived && bodyBytesReceived != (promisedBodyLength ?? bodyBytesReceived))
+        {
+            await ShutDownMalformedAsync(HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.ProtocolError), cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        isResponseEnded = isEndStream;
+    }
+
+    /// <summary>
+    /// Shuts the connection down for a malformed response as nghttp2 does: GOAWAY with
+    /// PROTOCOL_ERROR, last stream 0 and no debug data (measured, BL-3667 Notes). The exit 16
+    /// failure with <paramref name="message" /> is thrown by the stream's next read, after the
+    /// bytes curl wrote before it.
+    /// </summary>
+    private async ValueTask ShutDownMalformedAsync(string message, CancellationToken cancellationToken)
+    {
+        malformedResponseFailure = new HttpTransferException(CurlExitCode.Http2, message);
+        await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Finds the first <c>content-length</c> nghttp2 rejects: one that is not a decimal number
+    /// that fits a 64-bit length, or any after the first; -1 when there is none.
+    /// </summary>
+    private static int IndexOfInvalidContentLength(IReadOnlyList<HeaderField> fields)
+    {
+        bool isSeen = false;
+        for (int index = 0; index < fields.Count; index++)
+        {
+            if (fields[index].Name != "content-length")
+            {
+                continue;
+            }
+
+            if (isSeen || ParseContentLength(fields[index].Value) is null)
+            {
+                return index;
+            }
+
+            isSeen = true;
+        }
+
+        return -1;
+    }
+
+    /// <summary>Gives the head's <c>content-length</c>, already checked by <see cref="IndexOfInvalidContentLength" />, or <see langword="null" /> when it has none.</summary>
+    private static long? ContentLengthOf(IReadOnlyList<HeaderField> fields) =>
+        fields.Where(field => field.Name == "content-length").Select(field => ParseContentLength(field.Value)).FirstOrDefault();
+
+    private static long? ParseContentLength(string value) =>
+        long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long length) ? length : null;
+
+    /// <summary>Gives the status line and header lines curl writes for a head it fails part way through: no empty line.</summary>
+    private byte[] HeadWithoutEmptyLine(int statusCode, IReadOnlyList<HeaderField> fields) =>
+        Http2ResponseHead.Format(session.VersionName, statusCode, fields)[..^2];
+
+    /// <summary>The exit 16 message curl gives for a header field nghttp2 rejects (measured, BL-3667 Notes).</summary>
+    private static string InvalidHeaderFieldReceived(int streamId, HeaderField field) =>
+        string.Create(CultureInfo.InvariantCulture, $"Invalid HTTP header field was received: frame type: 1, stream: {streamId}, name: [{field.Name}], value: [{field.Value}]");
 
     /// <summary>
     /// Resets the stream with PROTOCOL_ERROR for a malformed response - a head with no valid

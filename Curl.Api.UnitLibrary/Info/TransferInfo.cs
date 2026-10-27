@@ -321,6 +321,12 @@ public sealed record TransferInfo
     public long SizeDownload { get; init; }
 
     /// <summary>
+    /// <c>CURLINFO_SIZE_DELIVERED</c>: the bytes passed to the write callback - the body after content
+    /// decoding, with the header lines too under <c>CURLOPT_HEADER</c> (CGR-126). Default 0.
+    /// </summary>
+    public long SizeDelivered { get; init; }
+
+    /// <summary>
     /// <c>CURLINFO_SPEED_UPLOAD</c> (and <c>_T</c>): the average upload speed in bytes per
     /// second. Default 0.
     /// </summary>

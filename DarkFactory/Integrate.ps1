@@ -130,6 +130,7 @@ function Resolve-RebaseConflictUnlocked {
 }
 
 function Update-BoardBeforePush {
+    # Returns '' when the board is settled, or why it is not: the caller must not push then (BL-3834).
     param([string]$Id)
     # The board housekeeping every push of this lane's commits needs, run under the integrate lock.
     # Lanes number the tasks they file from their own copy of the board, so two
@@ -141,6 +142,14 @@ function Update-BoardBeforePush {
         Invoke-Git @('commit', '-q', '-m', "chore(tasks): renumber task IDs another lane took first`n`n$($dedupe -join "`n")") | Out-Null
         foreach ($line in $dedupe) { Write-Trace $Id 'renum' $line 'DarkYellow' }
     }
+    # ADRs get the same treatment: one this lane added under a number the branch already uses
+    # takes the next free number, with its citations (BL-3834). A failure stops the push.
+    try {
+        foreach ($line in @(Invoke-AdrRenumber -Repo $Root -Base "origin/$Branch")) { Write-Trace $Id 'renum' $line 'DarkYellow' }
+    } catch {
+        Write-Trace $Id 'renum' "ADR renumbering failed: $_" 'Red'
+        return "its ADR numbers could not be checked against the branch (ADR renumbering failed: $_)"
+    }
     # Keep Done short enough for Stewart to read at a glance. Only the lane holding
     # this lock archives, on top of every other lane's work, so two lanes never
     # move the same finished tasks into different folders.
@@ -150,6 +159,7 @@ function Update-BoardBeforePush {
         Invoke-Git @('commit', '-q', '-m', "chore(tasks): archive Done once it grew past the short list`n`n$archived") | Out-Null
         Write-Trace $Id 'archive' $archived
     }
+    return ''
 }
 
 function Test-IncomingIsBoardOnly {
@@ -176,7 +186,7 @@ function Invoke-PushRetryWithoutVerify {
         $after = "$(git -C $Root rev-parse "origin/$Branch" 2>$null)".Trim()
         if (-not $before -or -not (Test-IncomingIsBoardOnly $before $after)) { return 'verify' }
         Write-Trace $Id 'push' 'refused after another push that changes only task files; pushing again without a new verify' 'DarkYellow'
-        Update-BoardBeforePush -Id $Id
+        if (Update-BoardBeforePush -Id $Id) { return 'verify' }
         if (Invoke-Git @('push', '-q', 'origin', "HEAD:$Branch")) { return 'pushed' }
     }
     return 'verify'
@@ -218,7 +228,8 @@ function Invoke-Integrate {
                 if ($rebase -eq 'fetch failed') { Start-Sleep -Seconds 10; continue }
                 if ($rebase -eq 'rebase failed') { return 'rebase failed' }
                 if ($rebase -eq 'conflict') { $attempt--; $conflict = $true; break }
-                Update-BoardBeforePush -Id $Id
+                $boardWhy = Update-BoardBeforePush -Id $Id
+                if ($boardWhy) { return $boardWhy }
                 if ($State -eq 'Done') {
                     Set-HeartbeatStep @('verify', 'build and fast tests on the shared branch')
                     $red = Test-Green -Id $Id -Base "origin/$Branch"

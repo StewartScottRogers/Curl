@@ -55,7 +55,7 @@ public sealed class FtpProtocolHandlerSizeDownloadTests
 
         FtpRun run = await FtpRun.ExecuteAsync(RootUrl, Login + Passive + Opened, listing, c => new TransferContext { Url = c.Url, Output = c.Output, ListOnly = listOnly });
 
-        Assert.AreEqual(listing, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(listing), run.OutputText);
         AssertSizes(diagnostics, run, listing.Length, 0);
     }
 

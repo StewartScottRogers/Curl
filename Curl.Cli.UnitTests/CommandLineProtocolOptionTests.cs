@@ -31,7 +31,8 @@ public sealed class CommandLineProtocolOptionTests
     }
 
     [TestMethod]
-    public void Parse_DataWithNonAsciiText_RecordsUtf8Bytes()
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_DataWithNonAsciiTextOffWindows_RecordsUtf8Bytes()
     {
         CommandLineParseResult result = Parse(["-d", "é", "http://example.com/"]);
 

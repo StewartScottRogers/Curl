@@ -51,6 +51,9 @@ internal sealed class TcpIoTraceConnection(IConnection inner, ITransferEvents ev
     public EndPoint? LocalEndPoint => inner.LocalEndPoint;
 
     /// <inheritdoc />
+    public nint? SocketHandle => inner.SocketHandle;
+
+    /// <inheritdoc />
     public IConnectionSession? Session => inner.Session;
 
     /// <inheritdoc />

@@ -120,13 +120,14 @@ public sealed partial class TcpConnectorTests
         // answering 00 5b: exit 97 with curl's own [SOCKS] message (BL-1191 Notes).
         var events = await TraceThroughSocksAsync(ProxyKind.Socks4, "127.0.0.1", Socks4Refused);
 
-        Diagnostics.Assert("SOCKS lines", 3, SocksLines(events).Length);
+        Diagnostics.Assert("SOCKS lines", 4, SocksLines(events).Length);
         CollectionAssert.AreEqual(
             new[]
             {
                 "[SOCKS] SOCKS4 connecting to 127.0.0.1:8080",
                 "[SOCKS] SOCKS4 connect to IPv4 127.0.0.1 (locally resolved)",
                 "[SOCKS] adjust pollset in (4)",
+                "[SOCKS] cannot complete SOCKS4 connection to 127.0.0.1:80. (91), request rejected or failed.",
             },
             SocksLines(events));
     }

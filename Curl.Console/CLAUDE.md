@@ -88,7 +88,7 @@ gateway or not: `curl: Failed to extract a filename from the URL to use for stor
 `curl: (1) Unsupported protocol` (neither under `-s` alone), `%{xfer_id}` and `%{conn_id}`
 `-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
-`%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
+`%{url_effective}` shows while `%{url}` keeps the URL as typed - unless `-G` or `--url-query` appends a query, when `%{url}` and `%{url.*}` read the URL with it, normalised as `%{url_effective}` is, still without a guessed scheme (CGR-089, BL-3618). Measured on curl 8.21.0
 (BL-240 Notes). `%{url_effective}` prints the URL `Curl.Engine`'s `UrlEffective` rebuilds: the scheme in
 lower case, the user info and host name as typed, an IP address and the port as curl 8.22.0
 holds them (`0x7f.1:09` prints `127.0.0.1:9`, an empty port is dropped), and the path as curl
@@ -532,6 +532,15 @@ to a pipe whose reader has gone as a success. A console is still opened the .NET
 redirected standard output becomes an unbuffered `FileStream` over the process's own
 handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
 `ClosedStandardOutputStream` whose writes throw.
+
+Standard error is wrapped in `WriteFailureIgnoringStream`, which ignores an
+`IOException` from any write, flush or close, as curl ignores a failed `fputs` to `stderr`: with
+`2>/dev/full` (ENOSPC) the exit code stays the transfer's (ADR-0815, CGR-008, BL-3537). So are a
+`--stderr` file, a `--trace` or `--trace-ascii` file and each `%output{file}` target (through
+`WriteFailureIgnoringWriteOutFileOpener`), and a `-D` file's close: on `/dev/full` the first three
+leave the exit code alone, and `-D` ends with its `Failed writing headers` line and the handler's
+exit 23 rather than the close's exception; a `-c` jar whose close fails is a jar not written
+(ADR-0818, CGR-026, BL-3830).
 
 Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
 `-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;

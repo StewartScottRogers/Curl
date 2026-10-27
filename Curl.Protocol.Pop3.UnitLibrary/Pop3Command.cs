@@ -70,10 +70,22 @@ internal sealed record Pop3Command(string Line, bool WritesBody)
     /// The command, or <see langword="null" /> when the message id or the <c>-X</c> command
     /// decodes to a control character, which curl refuses with exit 3.
     /// </returns>
-    public static Pop3Command? Choose(ITransferContext context)
+    public static Pop3Command? Choose(ITransferContext context) => Choose(context, Pop3CommandLineText.Platform);
+
+    /// <summary>
+    /// Chooses the command for <paramref name="context" />'s URL, <c>-X</c> and <c>-l</c>, sending
+    /// <c>-X</c>'s command as <paramref name="commandLineText" />'s bytes.
+    /// </summary>
+    /// <param name="context">The transfer whose URL, mail options and list-only flag decide.</param>
+    /// <param name="commandLineText">The encoding the platform's curl received <c>-X</c> in.</param>
+    /// <returns>
+    /// The command, or <see langword="null" /> when the message id or the <c>-X</c> command
+    /// decodes to a control character, which curl refuses with exit 3.
+    /// </returns>
+    public static Pop3Command? Choose(ITransferContext context, Pop3CommandLineText commandLineText)
     {
         if (Pop3MessageId.Read(context.Url) is not { } messageId
-            || Pop3MessageId.Decode(context.Mail?.CustomCommand ?? string.Empty) is not { } custom)
+            || Pop3MessageId.Decode(commandLineText.GetBytes(context.Mail?.CustomCommand ?? string.Empty)) is not { } custom)
         {
             return null;
         }

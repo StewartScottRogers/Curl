@@ -33,7 +33,7 @@ namespace Curl.Networking;
 /// composition root passes a real sink only for that option.
 /// </para>
 /// </remarks>
-public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLookup
+public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolverWithFailureReason, IEchConfigListLookup
 {
     private readonly IConnector _connector;
     private readonly Uri _dohUrl;
@@ -113,28 +113,67 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfig
     /// </summary>
     public ITransferEvents SubTransferEvents { get; init; } = NoTransferEvents.Instance;
 
+    /// <summary>
+    /// Gets the proxy the DoH requests go through, as curl 8.22.0's DoH sub-transfers take the
+    /// proxy environment variables (CGR-037, ADR-0818): an <c>http://</c> DoH URL through an HTTP or
+    /// HTTPS proxy is POSTed to the proxy in absolute form with <c>Proxy-Connection: Keep-Alive</c>;
+    /// an <c>https://</c> one, or any through a SOCKS proxy, is tunnelled. <see langword="null" />,
+    /// the default, connects to the DoH server directly.
+    /// </summary>
+    public ProxyEndpoint? Proxy { get; init; }
+
+    // Whether each POST goes to an HTTP or HTTPS proxy in absolute form rather than through a tunnel.
+    private bool ForwardsThroughProxy =>
+        Proxy is { Kind: ProxyKind.Http or ProxyKind.Http10 or ProxyKind.Https } && !_dohServer.UseTls;
+
+    // Where each DoH connection is opened: the DoH server, the proxy it is forwarded to, or the
+    // DoH server through a tunnel.
+    private ConnectTarget DohConnectTarget => Proxy switch
+    {
+        null => _dohServer,
+        { } proxy when ForwardsThroughProxy =>
+            new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true, PoolScheme = _dohServer.PoolScheme },
+        { } proxy => _dohServer with { Proxy = proxy },
+    };
+
     /// <inheritdoc />
-    public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+        (await ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)).Addresses;
+
+    /// <summary>
+    /// Resolves <paramref name="host" /> as <see cref="ResolveAsync" /> does, reporting a name that cannot be put in
+    /// a query as <see cref="DnsLookupFailure.DohBadLabel" /> or <see cref="DnsLookupFailure.DohNameTooLong" />,
+    /// before anything is sent, so the transfer fails with curl 8.22.0's exit 27 <c>Failed to encode DoH packet [N]</c>
+    /// rather than exit 6 (CGR-158).
+    /// </summary>
+    /// <param name="host">The host name or literal address to resolve.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>The addresses, or why there are none.</returns>
+    public async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
 
         if (IPAddress.TryParse(host.Trim('[', ']'), out var literal))
         {
-            return [literal];
+            return new DnsResolution([literal], DnsLookupFailure.None);
         }
 
         if (TcpConnector.IsLocalhost(host))
         {
-            return [IPAddress.IPv6Loopback, IPAddress.Loopback];
+            return new DnsResolution([IPAddress.IPv6Loopback, IPAddress.Loopback], DnsLookupFailure.None);
         }
 
         var queryA = DnsQueryEncoder.Encode(host, DnsRecordType.A);
         if (queryA.Failure != DnsMessageFailure.None)
         {
-            return [];
+            return new DnsResolution([], EncodingFailureOf(queryA.Failure));
         }
 
         var results = DohQueryResult.AsOneEntry(await RunAddressQueriesAsync(AddressQueries(host, queryA.Bytes), cancellationToken).ConfigureAwait(false));
-        return ResolvedAddresses(results);
+        return new DnsResolution(ResolvedAddresses(results), DnsLookupFailure.None);
     }
+
+    // The lookup failure for a query DnsQueryEncoder refused: a bad label or a name too long.
+    private static DnsLookupFailure EncodingFailureOf(DnsMessageFailure failure) =>
+        failure == DnsMessageFailure.NameTooLong ? DnsLookupFailure.DohNameTooLong : DnsLookupFailure.DohBadLabel;
 }

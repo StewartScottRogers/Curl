@@ -261,6 +261,19 @@ public sealed class DeferredConnectSocketStreamTests
     }
 
     [TestMethod]
+    public async Task WriteAsync_SocketNeverConnected_ThrowsAnIOExceptionOverTheSocketException()
+    {
+        await using var stream = new DeferredConnectSocketStream(new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+        Diagnostics.Arrange("socket", "unconnected TCP (CGR-145)");
+
+        var exception = await Assert.ThrowsExactlyAsync<IOException>(async () => await stream.WriteAsync("GET"u8.ToArray().AsMemory()));
+
+        Diagnostics.Act("inner exception type", exception.InnerException?.GetType().Name);
+        Assert.IsInstanceOfType<SocketException>(exception.InnerException);
+        StringAssert.StartsWith(exception.Message, "Unable to write data to the transport connection: ");
+    }
+
+    [TestMethod]
     public void Dispose_DisposesTheSocket()
     {
         var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

@@ -183,6 +183,7 @@ internal sealed partial class ManagedEasyTransfer
         }
 
         await ConnectOnly.OpenAsync(opened).ConfigureAwait(false);
-        return Finish(CurlCode.Ok, string.Empty, Info);
+        TransferInfo connected = WithConnectionEndPoints(Info, opened.RemoteEndPoint as System.Net.IPEndPoint, opened.LocalEndPoint as System.Net.IPEndPoint ?? connect.LocalEndPoint);
+        return Finish(CurlCode.Ok, string.Empty, TransferInfoFromReport.WithScheme(connected, url.Scheme));
     }
 }

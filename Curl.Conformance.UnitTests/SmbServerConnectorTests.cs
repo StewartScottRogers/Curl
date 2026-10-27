@@ -1,12 +1,13 @@
 using System.Buffers.Binary;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Protocol.Smb;
 
 namespace Curl.Conformance;
 
 /// <summary>
 /// Pins <see cref="SmbServerConnector"/> and its <see cref="SmbServerConnection"/>, driven by Curl's own SMB client
-/// (<c>Curl.Protocol.Smb.UnitLibrary</c>, through the composed curl) and by hand-made messages for what curl never sends.
+/// (<c>Curl.Protocol.Smb.UnitLibrary</c>'s handler) and by hand-made messages for what curl never sends.
 /// </summary>
 [TestClass]
 public sealed class SmbServerConnectorTests
@@ -16,18 +17,18 @@ public sealed class SmbServerConnectorTests
     private const string Url = "smb://127.0.0.1:9020/TESTS/1451";
 
     [TestMethod]
-    public async Task Download_ByCurl_GetsTheReplyData()
+    public async Task Download_BySmbHandler_GetsTheReplyData()
     {
-        (int exitCode, string output, string error) = await RunCurlAsync(Hello, "-u", "curltest:curltest", Url);
+        (int exitCode, string output, string error) = await RunSmbAsync(Hello, null, Url);
 
         Assert.AreEqual(0, exitCode, error);
         Assert.AreEqual("Basic SMB test complete\n", output);
     }
 
     [TestMethod]
-    public async Task TwoDownloads_ByCurl_GetTheReplyDataTwice()
+    public async Task TwoDownloads_BySmbHandler_GetTheReplyDataTwice()
     {
-        (int exitCode, string output, string error) = await RunCurlAsync(Hello, "-u", "curltest:curltest", Url, Url);
+        (int exitCode, string output, string error) = await RunSmbAsync(Hello, null, Url, Url);
 
         Assert.AreEqual(0, exitCode, error);
         Assert.AreEqual("Basic SMB test complete\nBasic SMB test complete\n", output);
@@ -36,7 +37,7 @@ public sealed class SmbServerConnectorTests
     [TestMethod]
     public async Task Download_CaseWithoutReplyData_GetsAnEmptyFile()
     {
-        (int exitCode, string output, string error) = await RunCurlAsync("<reply>\n</reply>\n", "-u", "curltest:curltest", Url);
+        (int exitCode, string output, string error) = await RunSmbAsync("<reply>\n</reply>\n", null, Url);
 
         Assert.AreEqual(0, exitCode, error);
         Assert.AreEqual(string.Empty, output);
@@ -45,26 +46,19 @@ public sealed class SmbServerConnectorTests
     [TestMethod]
     public async Task Download_FromAnotherShare_IsRefusedAsRemoteFileNotFound()
     {
-        (int exitCode, _, _) = await RunCurlAsync(Hello, "-u", "curltest:curltest", "smb://127.0.0.1:9020/OTHER/1451");
+        (int exitCode, _, _) = await RunSmbAsync(Hello, null, "smb://127.0.0.1:9020/OTHER/1451");
 
         Assert.AreEqual(78, exitCode);
     }
 
     [TestMethod]
-    public async Task Upload_ByCurl_IsRefusedAsNotImplemented()
+    public async Task Upload_BySmbHandler_IsRefusedAsNotImplemented()
     {
-        string source = Path.Combine(Path.GetTempPath(), $"smb-upload-{Guid.NewGuid():N}");
-        await File.WriteAllTextAsync(source, "upload");
-        try
-        {
-            (int exitCode, _, _) = await RunCurlAsync(Hello, "-u", "curltest:curltest", "-T", source, Url);
+        using MemoryStream source = new("upload"u8.ToArray());
 
-            Assert.AreEqual(25, exitCode);
-        }
-        finally
-        {
-            File.Delete(source);
-        }
+        (int exitCode, _, _) = await RunSmbAsync(Hello, source, Url);
+
+        Assert.AreEqual(25, exitCode);
     }
 
     [TestMethod]
@@ -177,15 +171,19 @@ public sealed class SmbServerConnectorTests
         return [.. received];
     }
 
-    private static async Task<(int ExitCode, string Output, string Error)> RunCurlAsync(string sections, params string[] arguments)
+    // Runs each URL through Curl's SMB handler as user curltest, as curl -u curltest:curltest did before
+    // curl 8.22.0's reference builds turned smb off (ADR-0835), stopping at the first failure.
+    private static async Task<(int ExitCode, string Output, string Error)> RunSmbAsync(string sections, Stream? upload, params string[] urls)
     {
-        SmbServerConnector smb = new(ParsedTestCase.From(sections), new RecordingConnector());
-        using MemoryStream standardOutput = new();
-        using MemoryStream standardError = new();
-        using MemoryStream standardInput = new();
-        int exitCode = await UpstreamConformanceTests.RunCurlAsync(
-            new UpstreamCurlInvocation(arguments, standardOutput, standardError, standardInput, smb, new UnreachableDatagramConnector()));
-        return (exitCode, Encoding.Latin1.GetString(standardOutput.ToArray()), Encoding.Latin1.GetString(standardError.ToArray()));
+        SmbProtocolHandler handler = new(new SmbServerConnector(ParsedTestCase.From(sections), new RecordingConnector()));
+        using MemoryStream output = new();
+        TransferResult result = TransferResult.Success(0);
+        foreach (string url in urls.TakeWhile(_ => result.ExitCode == CurlExitCode.Ok))
+        {
+            result = await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = output, Upload = upload, Credentials = new("curltest", "curltest") });
+        }
+
+        return ((int)result.ExitCode, Encoding.Latin1.GetString(output.ToArray()), result.ErrorMessage ?? string.Empty);
     }
 
     // Refuses every connection and remembers where the last one was to go.

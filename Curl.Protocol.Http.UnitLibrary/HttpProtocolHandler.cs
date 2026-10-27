@@ -220,6 +220,11 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     internal const int MaximumStreamRefusedRetries = 5;
 
+    /// <summary>
+    /// The protocols a request downgraded to HTTP/1.1 offers through ALPN (CGR-032).
+    /// </summary>
+    private static readonly IReadOnlyList<string> Http11ApplicationProtocols = ["http/1.1"];
+
     private static readonly string[] Schemes = ["http", "https"];
 
     private readonly IConnector connector = connector ?? throw new ArgumentNullException(nameof(connector));
@@ -330,7 +335,7 @@ public sealed class HttpProtocolHandler(
         new(
             framing.Method,
             context.Url,
-            options.RequestTarget ?? HttpUrlText.RequestTarget(context.Url),
+            options.RequestTarget ?? HttpUrlText.OriginTarget(context.Url, options.CommandLineTextEncoding),
             context.Credentials,
             options.BearerToken,
             AllowedSchemesOf(options),
@@ -625,12 +630,12 @@ public sealed class HttpProtocolHandler(
     {
         ConnectTarget urlTarget = TargetOf(plan.Context.Url);
         ConnectTarget target = plan.ForwardProxy is { } proxy
-            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true }
+            ? new ConnectTarget(proxy.Host, proxy.Port, proxy.Kind == ProxyKind.Https) { IsForwardProxy = true, ForwardProxy = proxy }
             : urlTarget with
             {
                 Proxy = plan.Options.ForwardProxy,
                 AltSvcRoute = plan.Options.AltSvcRoute,
-                ApplicationProtocols = AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
+                ApplicationProtocols = plan.DowngradedToHttp11 ? Http11ApplicationProtocols : AltSvcApplicationProtocols.Of(plan.Options.AltSvcRoute),
             };
         return target with { PoolScheme = urlTarget.UseTls ? "https" : "http", Events = plan.Context.Events };
     }
@@ -1249,9 +1254,16 @@ public sealed class HttpProtocolHandler(
         outcome switch
         {
             { ReportsLeftIntact: true } => LeftIntactLine(target, connect),
-            { DiedBeforeResponse: false, Result.ExitCode: not CurlExitCode.Ok } => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
+            { DiedBeforeResponse: false } when ClosesTheConnection(outcome.Result.ExitCode) => HttpConnectionInfoLines.Closing(connect.ConnectionNumber),
             _ => HttpConnectionInfoLines.ShuttingDown(connect.ConnectionNumber),
         };
+
+    /// <summary>
+    /// Tells whether a failure that came once a response began ends with <c>closing connection
+    /// #N</c>: every one but an empty reply, whose connection curl 8.22.0 shuts down (measured, BL-3617).
+    /// </summary>
+    private static bool ClosesTheConnection(CurlExitCode exitCode) =>
+        exitCode is not (CurlExitCode.Ok or CurlExitCode.GotNothing);
 
     /// <summary>
     /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
@@ -1287,7 +1299,6 @@ public sealed class HttpProtocolHandler(
     {
         ITransferContext context = plan.Context;
         HttpRequestOptions options = plan.Options;
-        HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = plan.Deadline.Token;
 
         // curl 8.21.0 says which version it uses before it builds the request, so the cookie
@@ -1295,6 +1306,8 @@ public sealed class HttpProtocolHandler(
         ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
+        plan = PlanForConnection(plan, connection);
+        HttpRequestFraming framing = plan.Framing;
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = ResponseConnectionOf(plan, requestStream, timedConnection);
@@ -1364,7 +1377,7 @@ public sealed class HttpProtocolHandler(
         ReportTransferDone(requestStream, connect);
         TransferResult result = Succeeded(delivery, actedOn!, exchange.Report(body));
         LogExchanged(exchangeLog, context.TimeProvider, exchange.RequestReady, actedOn!, body);
-        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection)))
+        return new HttpAttemptOutcome(result, retry, KeepsAlive(plan, actedOn, upload, headReader, delivery, StreamSessionAfter(streams, connection), body.FoundExcess))
         {
             LeftIntactAfterServerClosed = LeftIntactAfterServerClosed(plan, actedOn, upload, headReader, delivery),
             UpgradedSession = UpgradedSessionOf(connection),
@@ -1385,13 +1398,41 @@ public sealed class HttpProtocolHandler(
         bool reusedConnection,
         HttpTransferException failure)
     {
+        ReportReturnedError(plan.Context.Events, failure);
         headReader.ReportHeldLines();
         ReportReceiveFailure(plan.Context.Events, failure);
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
         { Report = WithHeadBeforeFailure(exchange.Report(body), failure) };
-        return FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
+        HttpAttemptOutcome outcome = FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
+        ReportEmptyReply(plan.Context.Events, failure, outcome);
+        return outcome;
+    }
+
+    /// <summary>
+    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c> as a <c>-v</c> line, as
+    /// curl 8.22.0's <c>failf</c> does, before the head's held empty line (measured, BL-3617).
+    /// </summary>
+    private static void ReportReturnedError(ITransferEvents events, HttpTransferException failure)
+    {
+        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        {
+            events.ReportInfo(failure.Message);
+        }
+    }
+
+    /// <summary>
+    /// Echoes <c>Empty reply from server</c> as a <c>-v</c> line, as curl 8.22.0's <c>failf</c>
+    /// does, when the transfer ends with it rather than sending the request again on a new
+    /// connection (measured, BL-3617).
+    /// </summary>
+    private static void ReportEmptyReply(ITransferEvents events, HttpTransferException failure, HttpAttemptOutcome outcome)
+    {
+        if (failure.Message == HttpTransferMessages.EmptyReply && outcome.Retry is null)
+        {
+            events.ReportInfo(failure.Message);
+        }
     }
 
     /// <summary>
@@ -1570,6 +1611,7 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = IsThroughHttpProxy(options),
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            AsksH2cUpgrade = connection is HttpH2cUpgradeConnection,
             DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
     }
@@ -1752,6 +1794,15 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static bool UpgradesToH2c(HttpRequestPlan plan, IConnection transport) =>
         plan.Options.Version == HttpVersionPreference.Http2 && !transport.IsSecure;
+
+    /// <summary>
+    /// Gives the plan the exchange sends on <paramref name="connection" />: over an h2c upgrade
+    /// (<see cref="HttpH2cUpgradeConnection" />) the request without curl's own
+    /// <c>Expect: 100-continue</c> (<see cref="HttpRequestFraming.ForH2cUpgrade" />), and
+    /// otherwise the plan unchanged.
+    /// </summary>
+    private static HttpRequestPlan PlanForConnection(HttpRequestPlan plan, IConnection connection) =>
+        connection is HttpH2cUpgradeConnection ? plan.ForH2cUpgrade() : plan;
 
     /// <summary>
     /// Tells whether the exchange's connection has switched to HTTP/2 after an h2c upgrade's <c>101</c>.
@@ -1955,7 +2006,9 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportNoEndOfMessageIndicator(HttpRequestPlan plan, HttpResponseHead head, HttpResponseHeadReader headReader)
     {
+        // curl 8.22.0 writes no such line for a final 101's body (measured, BL-3599 Notes).
         if (headReader.EndedAtEmptyLine
+            && head.StatusLine.StatusCode != 101
             && HttpConnectionPersistence.LacksEndOfMessageIndicator(head, plan.Context.NoBody, plan.Options.IgnoreContentLength))
         {
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.NoEndOfMessageIndicator);
@@ -2047,7 +2100,7 @@ public sealed class HttpProtocolHandler(
         HttpRequestOptions options = plan.Options;
         if (HttpResponseBodyReader.HasBody(head, plan.Context.NoBody))
         {
-            return HttpResponseBodyFraming.Of(head.Headers, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
+            return HttpResponseBodyFraming.Of(HttpResponseBodyReader.FramingHeadersOf(head), options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength;
         }
 
         return options.IgnoreContentLength || HttpTransferEncoding.ListsChunked(head.Headers) ? null : HttpContentLength.Find(head.Headers);
@@ -2056,12 +2109,13 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Reports a read a socket error failed as the <c>-v</c> line curl 8.21.0's <c>failf</c> prints
     /// for it, such as <c>Recv failure: Connection was reset</c>, before the connection's end is
-    /// reported (measured, BL-449 Notes), and an HTTP/3 stream the server refused as the line curl 8.21.0's
-    /// <c>cf-ngtcp2.c</c> prints for it (ADR-0187), then the failure's own <see cref="HttpTransferException.InfoLines" />. Any other failure is left to the transfer's result.
+    /// reported (measured, BL-449 Notes), then the failure's own <see cref="HttpTransferException.InfoLines" />,
+    /// such as the line curl 8.21.0's <c>cf-ngtcp2.c</c> prints for an HTTP/3 stream the server refused
+    /// (ADR-0187). Any other failure is left to the transfer's result.
     /// </summary>
     private static void ReportReceiveFailure(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.IsStreamRefused || failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
+        if (failure.Message.StartsWith(HttpTransferMessages.ReceiveFailurePrefix, StringComparison.Ordinal))
         {
             events.ReportInfo(failure.Message);
         }
@@ -2073,7 +2127,7 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Builds the outcome of an exchange whose HTTP/3 stream the server refused, as curl
+    /// Builds the outcome of an exchange whose HTTP/3 or HTTP/2 stream the server refused, as curl
     /// 8.21.0's <c>Curl_retry_request</c> does (ADR-0187): when no byte of the response had
     /// arrived, the request is sent again on a new connection up to
     /// <see cref="MaximumStreamRefusedRetries" /> times, and the refusal after that fails with
@@ -2141,11 +2195,25 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Builds the outcome of an exchange whose HTTP/2 stream the server reset with
+    /// <c>HTTP_1_1_REQUIRED</c>, as curl 8.18.0's <c>multi_runsingle</c> does for
+    /// <c>Curl_h2_http_1_1_error</c> (CGR-032, ADR-0819): <c>-v</c> says <c>Downgrades to HTTP/1.1</c>,
+    /// the HTTP/2 connection is closed and the request is sent again, once, over HTTP/1.1 on a
+    /// new connection, its body rewound as for a refused stream.
+    /// </summary>
+    private static HttpAttemptOutcome Http11RequiredOutcome(HttpRequestPlan plan, HttpRequestBodyWriter upload, TransferResult failed)
+    {
+        plan.Context.Events.ReportInfo(HttpConnectionInfoLines.DowngradesToHttp11);
+        return new HttpAttemptOutcome(failed, plan.AfterHttp11Required(RewindUploadFailure(plan.Framing.Body, upload)), KeepsAlive: false);
+    }
+
+    /// <summary>
     /// Builds the outcome of an exchange that failed with <paramref name="failure" />: as
-    /// <see cref="StreamRefusedOutcome" /> says when the server refused its HTTP/3 stream; sent
+    /// <see cref="StreamRefusedOutcome" /> says when the server refused its stream; sent
     /// again once on a fresh connection when a connection that already carried a request died
     /// before the response
-    /// (<see cref="DiedBeforeResponse" />); and final otherwise.
+    /// (<see cref="DiedBeforeResponse" />); and final otherwise, keeping the connection alive
+    /// when only the request's HTTP/2 stream was reset (CGR-140).
     /// </summary>
     private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, bool reusedConnection, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {
@@ -2154,9 +2222,14 @@ public sealed class HttpProtocolHandler(
             return StreamRefusedOutcome(plan, upload, failed, headReader.HasReceived);
         }
 
+        if (failure.RequiresHttp11 && !plan.DowngradedToHttp11)
+        {
+            return Http11RequiredOutcome(plan, upload, failed);
+        }
+
         return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
             ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
-            : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+            : new HttpAttemptOutcome(failed, null, KeepsAlive: failure.LeavesConnectionIntact);
     }
 
     /// <summary>
@@ -2173,10 +2246,10 @@ public sealed class HttpProtocolHandler(
     /// carries another request once the exchange ran whole unless the peer sent GOAWAY or
     /// closed it (<see cref="IHttpStreamSession.AcceptsNewStreams" />).
     /// </remarks>
-    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams) =>
+    private static bool KeepsAlive(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery, IHttpStreamSession? streams, bool foundExcess) =>
         DeliveredWhole(head, upload, headReader, delivery)
             && (streams?.AcceptsNewStreams
-                ?? HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options)));
+                ?? (!foundExcess && HttpConnectionPersistence.KeepsAlive(head, plan.Context.NoBody || !headReader.EndedAtEmptyLine, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding, IsThroughHttpProxy(plan.Options))));
 
     /// <summary>
     /// Decides whether the connection is reported left intact although the server closed it
@@ -2297,7 +2370,7 @@ public sealed class HttpProtocolHandler(
         }
 
         HttpRequestOptions options = plan.Options;
-        if (HttpResponseBodyFraming.Of(head.Headers, options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
+        if (HttpResponseBodyFraming.Of(HttpResponseBodyReader.FramingHeadersOf(head), options.PassesTransferCoding, options.IgnoreContentLength, options.TransferEncoding).ContentLength is > 0 and { } remaining)
         {
             string message = HttpTransferMessages.TransferClosedWithBytesRemaining(remaining);
             plan.Context.Events.ReportInfo(message);
@@ -2462,7 +2535,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static TransferResult Succeeded(HttpBodyDelivery delivery, HttpResponseHead head, TransferReport report)
     {
-        long? lastModified = HttpLastModified.Find(head);
+        long? lastModified = HttpLastModified.FindFileTime(head);
         return delivery == HttpBodyDelivery.TimeConditionUnmet
             ? TransferResult.TimeConditionNotMet() with { SourceLastWriteUnixSeconds = lastModified, Report = report with { ResponseCode = 304 } }
             : TransferResult.Success(report.DownloadSize) with { SourceLastWriteUnixSeconds = lastModified, Report = report };
@@ -3451,6 +3524,13 @@ public sealed class HttpProtocolHandler(
         public int StreamRefusedRetries { get; private set; }
 
         /// <summary>
+        /// Gets a value indicating whether the request is sent over HTTP/1.1 because the server
+        /// reset its HTTP/2 stream with <c>HTTP_1_1_REQUIRED</c> (CGR-032): its TLS handshake
+        /// offers only <c>http/1.1</c> through ALPN and it is never downgraded again.
+        /// </summary>
+        public bool DowngradedToHttp11 { get; private set; }
+
+        /// <summary>
         /// Gets the message this resend's <c>-T</c> upload failed to rewind with - <c>seek callback
         /// returned error 2</c> for one that cannot seek back to where the refused request began
         /// reading it, as stdin cannot, or an <see cref="IUploadRewinder" />'s own - so the resend fails
@@ -3631,10 +3711,33 @@ public sealed class HttpProtocolHandler(
         public HttpRequestPlan ForHttp2OrHttp3() => With(Framing.ForHttp2OrHttp3(), Authorization);
 
         /// <summary>
+        /// Makes the same request framed for an h2c upgrade (<see cref="HttpRequestFraming.ForH2cUpgrade" />).
+        /// </summary>
+        /// <returns>The upgrade request's plan.</returns>
+        public HttpRequestPlan ForH2cUpgrade() => With(Framing.ForH2cUpgrade(), Authorization);
+
+        /// <summary>
         /// Makes the same request, marked as sent again on a fresh connection.
         /// </summary>
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed, AuthorizationAnswersChallenge);
+
+        /// <summary>
+        /// Makes the same request, sent again over HTTP/1.1 on a new connection because the server
+        /// reset its HTTP/2 stream with <c>HTTP_1_1_REQUIRED</c> (<see cref="DowngradedToHttp11" />).
+        /// </summary>
+        /// <param name="uploadRewindFailure">
+        /// The message its <c>-T</c> upload failed to rewind with, so the resend fails before it
+        /// connects (<see cref="UploadRewindFailure" />); <see langword="null" /> when it was rewound.
+        /// </param>
+        /// <returns>The resent request's plan.</returns>
+        public HttpRequestPlan AfterHttp11Required(string? uploadRewindFailure)
+        {
+            HttpRequestPlan retry = With(Framing, Authorization);
+            retry.Options = Options with { Version = HttpVersionPreference.Http11 };
+            retry.DowngradedToHttp11 = true;
+            return retry.FailingUploadRewind(uploadRewindFailure);
+        }
 
         /// <summary>
         /// Makes the same request, sent again on a new connection because the server refused its
@@ -3763,6 +3866,7 @@ public sealed class HttpProtocolHandler(
                 AuthorizationInfoLines = authorizationInfoLines ?? AuthorizationInfoLines,
                 AuthorizationFailure = authorizationFailure ?? AuthorizationFailure,
                 StreamRefusedRetries = StreamRefusedRetries,
+                DowngradedToHttp11 = DowngradedToHttp11,
                 HoldsDigestNonce = HoldsDigestNonce,
                 AuthSchemesOffered = AuthSchemesOffered,
                 ProxyAuthSchemesOffered = ProxyAuthSchemesOffered,

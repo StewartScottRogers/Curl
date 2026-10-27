@@ -678,9 +678,9 @@ public sealed partial class HandBuiltTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateInTheOpenSslBuild_Succeeds()
     {
-        WriteFile("server.pem", s_serverCertificate.ExportCertificatePem());
+        WriteFile($"{OpenSslSubjectNameHash.Of(s_serverCertificate.SubjectName)}.0", s_serverCertificate.ExportCertificatePem());
         Diagnostics.Arrange("build", "OpenSSL");
-        Diagnostics.Arrange("CA certificate directory", "a temporary directory holding server.pem");
+        Diagnostics.Arrange("CA certificate directory", "a temporary directory holding the server certificate under its subject hash name");
         Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls12);
         ArrangeCertificate("server certificate", s_serverCertificate);
 

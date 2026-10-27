@@ -372,7 +372,7 @@ public sealed class SocketCallbackConnectorTests
     [TestMethod]
     public async Task Connection_EveryMember_AnswersAsTheInnerConnection()
     {
-        FakeConnection inner = new() { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 1), LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 2) };
+        FakeConnection inner = new() { RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 1), LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 2), SocketHandle = 4242 };
         SocketCallbackConnection connection = new(inner, new CurlSocketCloser(new CurlSocket(3), null));
         byte[] buffer = new byte[4];
 
@@ -385,6 +385,7 @@ public sealed class SocketCallbackConnectorTests
         Assert.IsTrue(connection.IsSecure);
         Assert.AreSame(inner.RemoteEndPoint, connection.RemoteEndPoint);
         Assert.AreSame(inner.LocalEndPoint, connection.LocalEndPoint);
+        Assert.AreEqual((nint)4242, connection.SocketHandle);
         Assert.IsNull(connection.Session);
         Assert.IsFalse(connection.TryHoldSession(null!));
         Assert.IsTrue(connection.IsSharedWithAnotherTransfer);
@@ -455,6 +456,8 @@ public sealed class SocketCallbackConnectorTests
         public EndPoint? RemoteEndPoint { get; init; }
 
         public EndPoint? LocalEndPoint { get; init; }
+
+        public nint? SocketHandle { get; init; }
 
         public bool IsSharedWithAnotherTransfer => true;
 

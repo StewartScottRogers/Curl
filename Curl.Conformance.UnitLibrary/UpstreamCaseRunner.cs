@@ -466,7 +466,9 @@ public sealed class UpstreamCaseRunner(
         // A CONNECT through the http-proxy to a mail port or the FTP control or passive port reaches that stand-in
         // (test1319 to 1321, BL-2011; test714 and test715, BL-2035); one to %HTTPSPORT reaches the HTTPS stand-in, whose TLS handshake travels inside the tunnel (BL-2225).
         server.TunnelServerForPort = port => TunnelledPorts.Contains(port) ? pop3 : null;
-        UpstreamCurlInvocation invocation = new(arguments, standardOutput, standardError, standardInput, servers, fronts.WrapDatagram(dns, standIns), perlScript is null ? EnvironmentVariables(testCase) : ScriptEnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
+        // Stderr is written through a synchronized wrapper: a libtest program's threads write their verbose lines to it
+        // at once, and concurrent writes to a bare MemoryStream corrupt it (test3207's 16 threads, BL-3909).
+        UpstreamCurlInvocation invocation = new(arguments, standardOutput, Stream.Synchronized(standardError), standardInput, servers, fronts.WrapDatagram(dns, standIns), perlScript is null ? EnvironmentVariables(testCase) : ScriptEnvironmentVariables(testCase)) { ConnectionListener = ftp.ActiveModeListener };
         (int exitCode, string? failure) = await RunCurlAsync(perlScript is null ? ProgramRun(libTest, unitProgram, testNumber, invocation) : () => perlScript(invocation), server).ConfigureAwait(false);
         if (failure is not null)
         {

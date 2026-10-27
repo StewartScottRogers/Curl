@@ -32,7 +32,7 @@ internal static class HttpProxyTunnel
     /// </returns>
     public static byte[] BuildConnectRequest(string host, int port, ProxyEndpoint proxy, HttpProxyTunnelOptions options, string? proxyAuthorization)
     {
-        var authority = FormatAuthority(host, port);
+        var authority = FormatAuthority(WithoutZoneId(host), port);
         var version = proxy.Kind == ProxyKind.Http10 ? "HTTP/1.0" : "HTTP/1.1";
         HttpProxyTunnelHeader[] proxyHeaders = [.. options.ProxyHeaders.Select(value => HttpProxyTunnelHeader.Parse(RequestText(value, options)))];
         var request = new StringBuilder()
@@ -218,7 +218,7 @@ internal static class HttpProxyTunnel
             return ParseReply(header, forConnectUdp);
         }
 
-        if (lineStart == 0 && !StartsWithHttpVersion(header))
+        if (IsHeaderLineWithoutColon(header, lineStart))
         {
             return HttpProxyTunnelReply.Failed(InvalidResponseHeader) with { FailureExitCode = CurlExitCode.BadFunctionArgument };
         }
@@ -228,8 +228,10 @@ internal static class HttpProxyTunnel
     }
 
     /// <summary>
-    /// The message curl 8.21.0 fails a reply with, exit 43, once its first line has ended and
-    /// does not start with <c>HTTP/</c> (measured, upstream test750, BL-1857).
+    /// The message curl 8.22.0 fails a reply with, exit 43, once a line after the first has ended
+    /// that is neither a folded continuation (starting with a space or tab) nor holds a colon
+    /// (measured, upstream test750, BL-1857, CGR-081/BL-3610). A first line that is not
+    /// <c>HTTP/1.x</c> is no failure of its own: it leaves the status 0, exit 7.
     /// </summary>
     internal const string InvalidResponseHeader = "Invalid response header";
 
@@ -248,8 +250,10 @@ internal static class HttpProxyTunnel
             Head = header[..lineStart].ToArray(),
         };
 
-    private static bool StartsWithHttpVersion(List<byte> header) =>
-        System.Runtime.InteropServices.CollectionsMarshal.AsSpan(header).StartsWith("HTTP/"u8);
+    // The line from lineStart to the LF just read follows the status line, does not start with
+    // a space or tab, and holds no colon: curl's header list refuses it.
+    private static bool IsHeaderLineWithoutColon(List<byte> header, int lineStart) =>
+        lineStart > 0 && header[lineStart] is not ((byte)' ' or (byte)'\t') && header.IndexOf((byte)':', lineStart) < 0;
 
     // The line from lineStart to the LF just read holds nothing but that LF, or a CR and it.
     private static bool IsEmptyLine(List<byte> header, int lineStart) =>
@@ -432,17 +436,38 @@ internal static class HttpProxyTunnel
             ? $"[{host}]:{port}"
             : $"{host}:{port}";
 
+    /// <summary>
+    /// Removes an IPv6 zone id (<c>%eth0</c>) from <paramref name="host" />, bracketed or not:
+    /// curl 8.22.0 sends <c>CONNECT [fe80::1]:8080</c> and <c>Host: [fe80::1]:8080</c> for
+    /// <c>http://[fe80::1%25eth0]:8080/</c> (measured, CGR-085).
+    /// </summary>
+    /// <param name="host">The tunnel's host, such as <c>fe80::1%eth0</c> or <c>[fe80::1%eth0]</c>.</param>
+    /// <returns><paramref name="host" /> without its zone id, or unchanged when it has none.</returns>
+    internal static string WithoutZoneId(string host)
+    {
+        var zoneStart = host.IndexOf('%', StringComparison.Ordinal);
+        if (zoneStart < 0 || !host.Contains(':', StringComparison.Ordinal))
+        {
+            return host;
+        }
+
+        return host.EndsWith(']') ? $"{host[..zoneStart]}]" : host[..zoneStart];
+    }
+
     private static int ParseStatusCode(List<byte> header)
     {
         // "HTTP/1.1 407 Proxy Authentication Required": the version, a space, exactly three
         // digits, then a space or the end of the line; anything else is status 0 (measured).
+        // Only HTTP/1.0 and HTTP/1.1 count: HTTP/2, HTTP/2.0 and HTTP/1.2 are status 0 (CGR-080).
         var firstLine = Encoding.Latin1.GetString([.. header[..header.IndexOf((byte)'\n')]]).TrimEnd('\r');
         var parts = firstLine.Split(' ', 3);
         return parts.Length >= 2
-            && parts[0].StartsWith("HTTP/", StringComparison.Ordinal)
+            && IsHttp10OrHttp11(parts[0])
             && parts[1].Length == 3
             && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var statusCode)
                 ? statusCode
                 : 0;
     }
+
+    private static bool IsHttp10OrHttp11(string version) => version is "HTTP/1.0" or "HTTP/1.1";
 }

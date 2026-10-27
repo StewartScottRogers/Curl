@@ -71,6 +71,7 @@ internal sealed class ImapSession(
     bool implicitTls,
     ConnectionOpenedEvent? opened,
     ImapKeptConnection kept,
+    ImapConnectPhaseLimit connectPhase,
     bool resumesKept = false) : IAsyncDisposable
 {
     private const string CapabilityCommand = "CAPABILITY";
@@ -329,8 +330,7 @@ internal sealed class ImapSession(
 
     /// <summary>Opens the session and logs in, and does nothing more.</summary>
     private async ValueTask<TransferResult> OpenOnlyAsync(ImapLoginOptions loginOptions) =>
-        await OpenAsync().ConfigureAwait(false)
-        ?? await LoginAsync(loginOptions).ConfigureAwait(false)
+        await OpenAndLogInAsync(loginOptions).ConfigureAwait(false)
         ?? TransferResult.Success(0);
 
     /// <summary>
@@ -345,7 +345,29 @@ internal sealed class ImapSession(
             return null;
         }
 
-        return await OpenAsync().ConfigureAwait(false) ?? await LoginAsync(loginOptions).ConfigureAwait(false);
+        return await OpenAndLogInAsync(loginOptions).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Opens and logs in with every send and read on the connect phase's token, so a server
+    /// that never greets or never answers ends the transfer at <c>--connect-timeout</c> with
+    /// exit 28, as curl 8.22.0 does (BL-3532).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenAndLogInAsync(ImapLoginOptions loginOptions)
+    {
+        channel.CancellationToken = connectPhase.Token;
+        try
+        {
+            return await OpenAsync().ConfigureAwait(false) ?? await LoginAsync(loginOptions).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (connectPhase.HasPassed)
+        {
+            return connectPhase.Failure();
+        }
+        finally
+        {
+            channel.CancellationToken = context.CancellationToken;
+        }
     }
 
     private async ValueTask<TransferResult?> OpenAsync()
@@ -444,7 +466,7 @@ internal sealed class ImapSession(
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
         ConnectResult secured = await tlsProvider
-            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
+            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, channel.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
@@ -572,7 +594,7 @@ internal sealed class ImapSession(
     private bool TryDecodeCustomCommand(out string? customCommand)
     {
         string? typed = context.Mail?.CustomCommand;
-        customCommand = typed is null ? null : ImapUrlPath.Decode(typed);
+        customCommand = typed is null ? null : ImapUrlPath.Decode(ImapCommandLineText.Platform.ToWire(typed));
         return typed is null || customCommand is not null;
     }
 

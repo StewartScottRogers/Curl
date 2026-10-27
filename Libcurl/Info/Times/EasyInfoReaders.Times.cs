@@ -107,8 +107,8 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadSizeDownloadT(TransferInfo info, EasyOptions options) => info.SizeDownload;
 
-    /// <summary>The body bytes delivered to the write callback: the engine counts those as the downloaded size.</summary>
-    private static object? ReadSizeDelivered(TransferInfo info, EasyOptions options) => info.SizeDownload;
+    /// <summary>The bytes passed to the write callback, after content decoding and with the header lines under <c>CURLOPT_HEADER</c> (CGR-126).</summary>
+    private static object? ReadSizeDelivered(TransferInfo info, EasyOptions options) => info.SizeDelivered;
 
     private static object? ReadSpeedUpload(TransferInfo info, EasyOptions options) => (double)info.SpeedUpload;
 

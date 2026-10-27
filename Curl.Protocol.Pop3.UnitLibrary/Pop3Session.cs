@@ -52,7 +52,8 @@ internal sealed class Pop3Session(
     ISaslAuthenticator? saslAuthenticator = null,
     ConnectionOpenedEvent? opened = null,
     Pop3KeptConnection? kept = null,
-    bool resumesKept = false) : IAsyncDisposable
+    bool resumesKept = false,
+    Pop3ConnectPhaseLimit? connectPhase = null) : IAsyncDisposable
 {
     private bool secure = implicitTls;
 
@@ -233,7 +234,7 @@ internal sealed class Pop3Session(
     private async ValueTask<TransferResult?> UpgradeAsync()
     {
         ConnectResult secured = await tlsProvider
-            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, context.CancellationToken)
+            .AuthenticateAsClientAsync(channel.Connection, context.Url.IdnHost, context.Events, channel.CancellationToken)
             .ConfigureAwait(false);
         if (secured.Connection is not { } connection)
         {
@@ -347,7 +348,31 @@ internal sealed class Pop3Session(
             return null;
         }
 
-        return await OpenAsync(loginOptions).ConfigureAwait(false);
+        return connectPhase is null
+            ? await OpenAsync(loginOptions).ConfigureAwait(false)
+            : await OpenWithinConnectPhaseAsync(loginOptions, connectPhase).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Opens and logs in with every send and read on <paramref name="limit" />'s token, so a
+    /// server that never greets or never answers ends the transfer at <c>--connect-timeout</c>
+    /// with exit 28, as curl 8.22.0 does (BL-3532).
+    /// </summary>
+    private async ValueTask<TransferResult?> OpenWithinConnectPhaseAsync(Pop3LoginOptions loginOptions, Pop3ConnectPhaseLimit limit)
+    {
+        channel.CancellationToken = limit.Token;
+        try
+        {
+            return await OpenAsync(loginOptions).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (limit.HasPassed)
+        {
+            return limit.Failure();
+        }
+        finally
+        {
+            channel.CancellationToken = context.CancellationToken;
+        }
     }
 
     /// <summary>

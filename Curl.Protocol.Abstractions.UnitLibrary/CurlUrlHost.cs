@@ -23,9 +23,7 @@ internal static class CurlUrlHost
     /// A dot and the characters IDNA (UTS #46, transitional) maps to nothing; see
     /// <see cref="IsMappedToNothingOrDot" />.
     /// </summary>
-    private const string CharactersMappedToNothingOrDot =
-        ".­͏᠋᠌᠍᠎᠏​‌‍⁠"
-        + "︀︁︂︃︄︅︆︇︈︉︊︋︌︍︎️﻿";
+    private const string CharactersMappedToNothingOrDot = "." + CurlUrlHostNameMapping.CharactersMappedToNothing;
 
     /// <summary>The longest zone id curl keeps; a longer one is rejected.</summary>
     private const int MaximumZoneIdLength = 15;
@@ -166,7 +164,9 @@ internal static class CurlUrlHost
         CharactersMappedToNothingOrDot.Contains(character);
 
     /// <summary>
-    /// Converts a host name that is not ASCII to punycode, or returns <see langword="null" />
+    /// Maps a host name that is not ASCII as UTS #46 does (<see cref="CurlUrlHostNameMapping" />,
+    /// so <c>BÜCHER</c> is <c>xn--bcher-kva</c> and <c>Ａb</c> is <c>ab</c>) and converts it to
+    /// punycode, or returns <see langword="null" />
     /// when <see cref="IdnMapping" /> cannot convert it: bytes that are not UTF-8
     /// (<c>invalid-utf8-%e2%90.local</c>, upstream test 1034) or a label longer than 63
     /// characters once converted (test 1035). curl 8.22.0 in a UTF-8 locale fails a transfer
@@ -174,9 +174,10 @@ internal static class CurlUrlHost
     /// </summary>
     private static string? ToPunycode(string name)
     {
+        string mapped = CurlUrlHostNameMapping.Map(name);
         try
         {
-            return Idn.GetAscii(name);
+            return Ascii.IsValid(mapped) ? mapped : Idn.GetAscii(mapped);
         }
         catch (ArgumentException)
         {
@@ -188,7 +189,9 @@ internal static class CurlUrlHost
     /// Checks and normalises a bracketed IPv6 address as curl's <c>ipv6_parse</c> does:
     /// only hexadecimal digits, colons and dots, then optionally <c>%</c> (a decoded <c>%25</c>)
     /// and a zone id of 1 to 15 characters, and the address printed back in its shortest
-    /// form. A zone id longer than 15 characters is a bad host name to curl; every other
+    /// form when that is no longer than the address as written (zone id aside), so
+    /// <c>[::FFFF:7f00:0001]</c> is <c>[::ffff:127.0.0.1]</c> but <c>[::ffff:7f00:1]</c> stays
+    /// as written (CGR-058). A zone id longer than 15 characters is a bad host name to curl; every other
     /// fault is a bad IPv6 address.
     /// </summary>
     /// <returns>Why curl rejects the address, or <see cref="CurlUrlRejection.None" />.</returns>
@@ -206,7 +209,8 @@ internal static class CurlUrlHost
             return CurlUrlRejection.BadIPv6;
         }
 
-        string text = address.ToString();
+        string shortest = address.ToString();
+        string text = shortest.Length <= inner.Length ? shortest : inner;
         normalized = $"[{text}]";
         idnHost = zoneId is null ? text : $"{text}%{zoneId}";
 

@@ -70,11 +70,13 @@ public sealed class CurlCommandRunnerCredentialControlCodeTests
 
         Diagnostics.Assert("exit code", 0, exitCode);
         NetworkCredential? credentials = Assert.ContainsSingle(handler.Contexts).Credentials;
-        Diagnostics.Assert("user name", Escape(user), Escape(credentials?.UserName));
+        // The decoded bytes are held so the platform's credential encoding gives them back (CGR-052).
+        Encoding sent = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
+        Diagnostics.Assert("user name", Escape(user), Escape(credentials is null ? null : Encoding.UTF8.GetString(sent.GetBytes(credentials.UserName))));
         Diagnostics.Assert("password", "p", credentials?.Password ?? "<null>");
         Assert.AreEqual(0, exitCode);
         Assert.IsNotNull(credentials);
-        Assert.AreEqual(user, credentials.UserName);
+        CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(user), sent.GetBytes(credentials.UserName));
         Assert.AreEqual("p", credentials.Password);
     }
 

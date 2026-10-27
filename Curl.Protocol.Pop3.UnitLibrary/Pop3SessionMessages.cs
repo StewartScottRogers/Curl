@@ -130,4 +130,13 @@ internal static class Pop3SessionMessages
     /// <returns><see langword="true" /> when the message is written.</returns>
     internal static bool IsWrittenByVerbose(string message) =>
         message is not (WeirdServerReply or UrlMalformed or LoginDenied or ResponseLineTooLarge or SendFailed);
+
+    /// <summary>
+    /// <c>--connect-timeout</c> passed before the session was open (exit 28), curl 8.22.0's text,
+    /// <paramref name="milliseconds" /> counted from the start of the request (BL-3532).
+    /// </summary>
+    /// <param name="milliseconds">The time since the request started.</param>
+    /// <returns>The message.</returns>
+    internal static string OperationTimedOut(long milliseconds) =>
+        string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received");
 }

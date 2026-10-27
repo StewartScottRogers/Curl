@@ -64,7 +64,7 @@ internal static class OpenSslDistinguishedNameText
     };
 
     // OpenSSL's short names for the attribute types a certificate name carries.
-    private static readonly Dictionary<string, string> ShortNames = new(StringComparer.Ordinal)
+    internal static readonly Dictionary<string, string> ShortNames = new(StringComparer.Ordinal)
     {
         ["2.5.4.3"] = "CN",
         ["2.5.4.4"] = "SN",
@@ -102,6 +102,23 @@ internal static class OpenSslDistinguishedNameText
     /// <returns>The text, or <see langword="null"/> when OpenSSL could not print it.</returns>
     internal static string? Format(X500DistinguishedName name)
     {
+        return Format(name, OpenSslNameStyle.CurlVerbose);
+    }
+
+    /// <summary>
+    /// Prints a name as <c>X509_NAME_print_ex</c> with <c>XN_FLAG_ONELINE</c>, as the OpenSSL
+    /// build prints it for <c>%{certs}</c>: <c>, </c> between relative names, <c> = </c> after
+    /// the short name, and every byte above 0x7F as <c>\XX</c> (CGR-091).
+    /// </summary>
+    /// <param name="name">The name.</param>
+    /// <returns>The text, or <see langword="null"/> when OpenSSL could not print it.</returns>
+    internal static string? FormatOneLine(X500DistinguishedName name)
+    {
+        return Format(name, OpenSslNameStyle.OneLine);
+    }
+
+    private static string? Format(X500DistinguishedName name, OpenSslNameStyle style)
+    {
         var output = new List<byte>();
         try
         {
@@ -109,8 +126,8 @@ internal static class OpenSslDistinguishedNameText
             var separator = string.Empty;
             while (names.HasData)
             {
-                AppendRelativeName(output, names.ReadSetOf(skipSortOrderValidation: true), separator);
-                separator = "; ";
+                AppendRelativeName(output, names.ReadSetOf(skipSortOrderValidation: true), separator, style);
+                separator = style.RelativeNameSeparator;
             }
         }
         catch (AsnContentException)
@@ -125,7 +142,7 @@ internal static class OpenSslDistinguishedNameText
         return Encoding.UTF8.GetString(output.ToArray());
     }
 
-    private static void AppendRelativeName(List<byte> output, AsnReader attributes, string separator)
+    private static void AppendRelativeName(List<byte> output, AsnReader attributes, string separator, OpenSslNameStyle style)
     {
         while (attributes.HasData)
         {
@@ -133,14 +150,14 @@ internal static class OpenSslDistinguishedNameText
             var type = attribute.ReadObjectIdentifier();
             Append(output, separator);
             Append(output, ShortNames.GetValueOrDefault(type, type));
-            output.Add((byte)'=');
-            AppendValue(output, attribute.ReadEncodedValue());
+            Append(output, style.EqualsSign);
+            AppendValue(output, attribute.ReadEncodedValue(), style.EscapesAboveAscii);
             separator = " + ";
         }
     }
 
     // do_print_ex: a string type is printed character by character, anything else dumped.
-    private static void AppendValue(List<byte> output, ReadOnlyMemory<byte> encoded)
+    private static void AppendValue(List<byte> output, ReadOnlyMemory<byte> encoded, bool escapesAboveAscii)
     {
         var tag = new AsnReader(encoded, AsnEncodingRules.BER).PeekTag();
         if (tag.TagClass != TagClass.Universal || tag.IsConstructed || !CharacterWidths.TryGetValue(tag.TagValue, out var width))
@@ -150,11 +167,11 @@ internal static class OpenSslDistinguishedNameText
             return;
         }
 
-        AppendString(output, new AsnReader(encoded, AsnEncodingRules.BER).PeekContentBytes().ToArray(), width);
+        AppendString(output, new AsnReader(encoded, AsnEncodingRules.BER).PeekContentBytes().ToArray(), width, escapesAboveAscii);
     }
 
     // do_buf, run once to learn whether the value needs quotes and once to print it.
-    private static void AppendString(List<byte> output, byte[] content, int width)
+    private static void AppendString(List<byte> output, byte[] content, int width, bool escapesAboveAscii)
     {
         var characters = ReadCharacters(content, width);
         var value = new List<byte>();
@@ -162,7 +179,7 @@ internal static class OpenSslDistinguishedNameText
         for (var index = 0; index < characters.Length; index++)
         {
             var position = index == characters.Length - 1 ? LastCharacter : index == 0 ? FirstCharacter : 0;
-            quoted |= AppendCharacter(value, characters[index], width == 0, position);
+            quoted |= AppendCharacter(value, characters[index], width == 0, position, escapesAboveAscii);
         }
 
         if (quoted)
@@ -202,11 +219,11 @@ internal static class OpenSslDistinguishedNameText
     }
 
     // do_esc_char for one character; returns whether the value must be quoted.
-    private static bool AppendCharacter(List<byte> value, int character, bool isUtf8Byte, int position)
+    private static bool AppendCharacter(List<byte> value, int character, bool isUtf8Byte, int position, bool escapesAboveAscii)
     {
         if ((uint)character > 0x7F)
         {
-            AppendAboveAscii(value, character, isUtf8Byte);
+            AppendAboveAscii(value, character, isUtf8Byte, escapesAboveAscii);
             return false;
         }
 
@@ -237,19 +254,43 @@ internal static class OpenSslDistinguishedNameText
     // A UTF-8 byte goes out as it is; any other character as its UTF-8 bytes, which are all
     // above 0x7F and so never escaped. A surrogate or a value past U+10FFFF, which UTF8_putc
     // refuses, prints nothing.
-    private static void AppendAboveAscii(List<byte> value, int character, bool isUtf8Byte)
+    // Under ASN1_STRFLGS_ESC_MSB each of those bytes is escaped as \XX instead.
+    private static void AppendAboveAscii(List<byte> value, int character, bool isUtf8Byte, bool escapesAboveAscii)
     {
+        Span<byte> bytes = stackalloc byte[4];
+        var length = 0;
         if (isUtf8Byte)
         {
-            value.Add((byte)character);
-            return;
+            bytes[0] = (byte)character;
+            length = 1;
+        }
+        else if (Rune.TryCreate(character, out var rune))
+        {
+            length = rune.EncodeToUtf8(bytes);
         }
 
-        if (Rune.TryCreate(character, out var rune))
+        foreach (var octet in bytes[..length])
         {
-            Span<byte> bytes = stackalloc byte[4];
-            value.AddRange(bytes[..rune.EncodeToUtf8(bytes)]);
+            if (escapesAboveAscii)
+            {
+                Append(value, $"\\{octet:X2}");
+            }
+            else
+            {
+                value.Add(octet);
+            }
         }
+    }
+
+    // How a curl build asks X509_NAME_print_ex to print a name: the relative-name separator,
+    // the text between a short name and its value, and whether bytes above 0x7F are escaped.
+    private sealed record OpenSslNameStyle(string RelativeNameSeparator, string EqualsSign, bool EscapesAboveAscii)
+    {
+        // curl's x509_name_oneline for -v.
+        internal static OpenSslNameStyle CurlVerbose { get; } = new("; ", "=", false);
+
+        // XN_FLAG_ONELINE for %{certs}.
+        internal static OpenSslNameStyle OneLine { get; } = new(", ", " = ", true);
     }
 
     private static void Append(List<byte> output, string text)

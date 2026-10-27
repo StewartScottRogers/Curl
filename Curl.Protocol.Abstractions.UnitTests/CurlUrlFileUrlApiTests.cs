@@ -81,12 +81,12 @@ public sealed class CurlUrlFileUrlApiTests
     }
 
     [TestMethod]
-    public void TryParse_DrivePathWithBackslashesAfterTwoSlashes_TurnsThemIntoSlashesAsTheTool()
+    public void TryParse_DrivePathWithBackslashesAfterTwoSlashes_KeepsThemAsTheTool()
     {
         bool parsed = CurlUrl.TryParse("file:///C:\\programs\\foo", pathAsIs: false, driveLetters: true, out CurlUrl? url, out _);
 
         Assert.IsTrue(parsed);
-        Assert.AreEqual("C:/programs/foo", url!.AbsolutePath);
+        Assert.AreEqual("C:\\programs\\foo", url!.AbsolutePath);
     }
 
     [TestMethod]

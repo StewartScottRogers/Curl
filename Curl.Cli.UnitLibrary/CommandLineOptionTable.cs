@@ -162,10 +162,10 @@ public static partial class CommandLineOptionTable
         CommandLineOption.Value("connect-to", null, AcceptingEmpty((options, entry) => options.AddConnectToEntry(entry))),
         CommandLineOption.Text("interface", null, (options, name) => options.Interface = InterfaceBinding.Parse(name)),
         CommandLineOption.Value("local-port", null, SetLocalPorts),
-        CommandLineOption.Text("dns-servers", null, (options, servers) => options.DnsServers = servers),
-        CommandLineOption.Text("dns-interface", null, (options, name) => options.DnsInterface = name),
-        CommandLineOption.Text("dns-ipv4-addr", null, (options, address) => options.DnsIPv4Address = address),
-        CommandLineOption.Text("dns-ipv6-addr", null, (options, address) => options.DnsIPv6Address = address),
+        CommandLineOption.Text("dns-servers", null, (options, servers) => options.DnsServers = servers).RefusedWithoutCAres(),
+        CommandLineOption.Text("dns-interface", null, (options, name) => options.DnsInterface = name).RefusedWithoutCAres(),
+        CommandLineOption.Text("dns-ipv4-addr", null, (options, address) => options.DnsIPv4Address = address).RefusedWithoutCAres(),
+        CommandLineOption.Text("dns-ipv6-addr", null, (options, address) => options.DnsIPv6Address = address).RefusedWithoutCAres(),
         CommandLineOption.Value("doh-url", null, AcceptingEmpty((options, url) => options.DohUrl = url.Length == 0 ? null : url)),
         CommandLineOption.NegatableFlag("doh-insecure", null, (options, on) => options.DohInsecure = on),
         CommandLineOption.NegatableFlag("doh-cert-status", null, (options, on) => options.DohCertificateStatus = on),
@@ -264,7 +264,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.Text("curves", null, (options, curves) => options.Curves = curves),
         CommandLineOption.Text("sigalgs", null, (options, algorithms) => options.SignatureAlgorithms = algorithms),
         CommandLineOption.NegatableFlag("tls-earlydata", null, (options, on) => options.TlsEarlyData = on),
-        CommandLineOption.Value("ech", null, SetEch),
+        CommandLineOption.Value("ech", null, SetEch).RefusedWithoutEch(),
         CommandLineOption.FileName("ssl-sessions", null, (options, file) => options.SslSessionsFile = file).RefusedBySchannelBuild(),
         CommandLineOption.Text("engine", null, SetEngine),
         CommandLineOption.Flag("dump-ca-embed", null, options => options.CaEmbedDumpRequested = true),
@@ -290,12 +290,12 @@ public static partial class CommandLineOptionTable
         CommandLineOption.NegatableFlag("remote-time", 'R', (options, on) => options.RemoteTime = on),
         CommandLineOption.NegatableFlag("xattr", null, (options, on) => options.ExtendedAttributes = on),
         CommandLineOption.Value("time-cond", 'z', SetTimeCondition),
-        CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = method),
+        CommandLineOption.Text("request", 'X', (options, method) => options.RequestMethod = AsRawWireText(options, method)),
         CommandLineOption.Value("header", 'H', AddHeaders),
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
-        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie))),
+        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') && options.ReadingConfigFile ? AsRawWireText(options, cookie) : cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
         CommandLineOption.NegatableFlag("follow", null, SetFollow),
@@ -799,7 +799,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, out byte[] contents);
         if (refusal is null)
         {
             options.AppendPostData(RemoveLineBreaksAndNuls(contents));
@@ -814,30 +814,32 @@ public static partial class CommandLineOptionTable
     /// (standard input for <c>@-</c>) unchanged, as curl 8.21.0 does.
     /// </summary>
     private static CommandLineRefusal? AppendBinaryPostData(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
-        AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, options.AppendPostData);
+        AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, false, options.AppendPostData);
 
     /// <summary>
     /// Appends a <c>--json</c> value to the body with no separator and marks the request as JSON:
-    /// the value's own text, or, when it starts with <c>@</c>, the bytes of the file it names
-    /// (standard input for <c>@-</c>) unchanged, as curl 8.21.0 does.
+    /// the value's own text, or, when it starts with <c>@</c>, the bytes of the file it names unchanged,
+    /// as curl 8.21.0 does, or of standard input for <c>@-</c>, read in Windows text mode on Windows
+    /// (<see cref="WindowsTextModeInput"/>).
     /// </summary>
     private static CommandLineRefusal? AppendJsonData(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
-        AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, options.AppendJsonData);
+        AppendTextOrFileBytes(options, value, spelledOption, dataFileReader, true, options.AppendJsonData);
 
     /// <summary>
-    /// Hands <paramref name="append"/> the UTF-8 bytes of <paramref name="value"/>, or, when it starts
-    /// with <c>@</c>, the unchanged bytes of the file it names. A file that cannot be read is refused
-    /// with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
+    /// Hands <paramref name="append"/> the bytes of <paramref name="value"/> (<see cref="CommandLineOptions.CommandLineTextBytes"/>),
+    /// or, when it starts with <c>@</c>, the unchanged bytes of the file it names, standard input for <c>@-</c> read in
+    /// Windows text mode when <paramref name="readsStandardInputAsText"/> (<see cref="WindowsTextModeInput"/>). A file
+    /// that cannot be read is refused with <see cref="CommandLineRefusal.DataFileUnreadable"/> and nothing is appended.
     /// </summary>
-    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, Action<byte[]> append)
+    private static CommandLineRefusal? AppendTextOrFileBytes(CommandLineOptions options, string value, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, Action<byte[]> append)
     {
         if (!value.StartsWith('@'))
         {
-            append(Encoding.UTF8.GetBytes(value));
+            append(options.CommandLineTextBytes(value));
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, out byte[] contents);
         if (refusal is null)
         {
             append(contents);
@@ -870,7 +872,25 @@ public static partial class CommandLineOptionTable
             ? CommandLineRefusal.BlankArgument(spelledOption)
             : value[0] == '@'
                 ? AddUrlsFromFile(options, value[1..], spelledOption, dataFileReader)
-                : options.AddUrl(value, spelledOption);
+                : options.AddUrl(WithUserInformationAsWireText(options, value), spelledOption);
+
+    /// <summary>
+    /// <paramref name="url"/> with the user information before its host re-spelled by
+    /// <see cref="CommandLineOptions.AsWireText"/>, so a user name or password written raw in a UTF-8
+    /// <c>-K</c> file goes out as the file's own bytes, as curl 8.22.0's Windows build sends them
+    /// (CGR-052, ADR-0821); the host, path and the rest are left as they are.
+    /// </summary>
+    /// <param name="options">The options, which say whether a UTF-8 config file is being read.</param>
+    /// <param name="url">The <c>--url</c> value.</param>
+    /// <returns>The URL to add.</returns>
+    private static string WithUserInformationAsWireText(CommandLineOptions options, string url)
+    {
+        int schemeEnd = url.IndexOf("://", StringComparison.Ordinal);
+        int authorityStart = schemeEnd < 0 ? 0 : schemeEnd + 3;
+        int authorityLength = url.AsSpan(authorityStart).IndexOfAny('/', '?', '#') is var end and >= 0 ? end : url.Length - authorityStart;
+        int at = url.AsSpan(authorityStart, authorityLength).LastIndexOf('@');
+        return at < 0 ? url : url[..authorityStart] + options.AsWireText(url.Substring(authorityStart, at)) + url[(authorityStart + at)..];
+    }
 
     /// <summary>
     /// Adds every URL in the file a <c>--url @file</c> value names, or standard input for <c>@-</c>, one
@@ -969,18 +989,18 @@ public static partial class CommandLineOptionTable
 
         if (split < 0)
         {
-            encoded = UrlEncodedContent.Escape(Encoding.UTF8.GetBytes(value));
+            encoded = UrlEncodedContent.Escape(options.CommandLineTextBytes(value));
             return null;
         }
 
         string name = value[..split];
         if (value[split] == '=')
         {
-            encoded = NameAndEscapedContent(name, Encoding.UTF8.GetBytes(value[(split + 1)..]));
+            encoded = NameAndEscapedContent(name, options.CommandLineTextBytes(value[(split + 1)..]));
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, false, out byte[] contents);
         encoded = contents.Length == 0 ? string.Empty : NameAndEscapedContent(name, contents);
         return refusal;
     }
@@ -1005,6 +1025,39 @@ public static partial class CommandLineOptionTable
     /// a <c>-H</c> value, warning with <see cref="CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader(string)"/>
     /// instead, as curl 8.21.0 does.
     /// </summary>
+    /// <summary>
+    /// <paramref name="value"/> as the request side must hold a <c>-b</c> cookie string or <c>-X</c> method
+    /// to send it as curl 8.22.0 does: while a config file is read, re-spelled one character per byte of
+    /// the file's own bytes, since the request side writes those values one character per byte
+    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise with each
+    /// byte of an argument that was not valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>) given as that
+    /// byte's one character, so <c>-b $'a=\xff'</c> sends the byte FF as curl 8.18.0 does on Linux
+    /// (CGR-016, BL-3850), and every other character unchanged. A command-line <c>-b</c> string is not passed here:
+    /// it keeps the escape, which the console's cookie string encoding gives back as its byte (BL-3545).
+    /// </summary>
+    private static string AsRawWireText(CommandLineOptions options, string value) =>
+        options.ReadingConfigFile
+            ? Encoding.Latin1.GetString((options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : Encoding.UTF8).GetBytes(value))
+            : WithEscapedBytesAsCharacters(value);
+
+    /// <summary>
+    /// <paramref name="value"/> with each lone surrogate U+DC80 to U+DCFF, an argument byte that was not
+    /// valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>), replaced by the character U+0080 to U+00FF
+    /// whose Latin-1 byte it stands for; a surrogate that ends a valid pair is kept.
+    /// </summary>
+    private static string WithEscapedBytesAsCharacters(string value) =>
+        string.Create(value.Length, value, static (characters, text) =>
+        {
+            for (int index = 0; index < text.Length; index++)
+            {
+                characters[index] = IsEscapedByte(text, index) ? (char)(text[index] - 0xDC00) : text[index];
+            }
+        });
+
+    /// <summary>Whether the character at <paramref name="index"/> is a lone surrogate U+DC80 to U+DCFF.</summary>
+    private static bool IsEscapedByte(string text, int index) =>
+        text[index] is >= '\uDC80' and <= '\uDCFF' && (index == 0 || !char.IsHighSurrogate(text[index - 1]));
+
     private static CommandLineRefusal? AddProxyHeaders(CommandLineOptions options, string value, string spelledOption, Func<string, bool> pathExists, IDataFileReader dataFileReader) =>
         AddHeaderValue(options, value, spelledOption, dataFileReader, CommandLineWarning.ProxyHeaderDoesNotLookLikeAHeader, options.AddProxyHeader);
 
@@ -1032,10 +1085,10 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, out byte[] contents);
         if (refusal is null)
         {
-            foreach (string line in Encoding.UTF8.GetString(contents).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+            foreach (string line in HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
             {
                 addHeader(line);
             }
@@ -1047,12 +1100,14 @@ public static partial class CommandLineOptionTable
     /// <summary>
     /// Reads the file an <c>@file</c> value names, or standard input when <paramref name="file"/> is
     /// <c>-</c>, and refuses a file that cannot be read with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// Standard input is read as curl's Windows build reads it in text mode when <paramref name="readsStandardInputAsText"/>
+    /// and the build is Windows (<see cref="WindowsTextModeInput"/>), and unchanged otherwise.
     /// </summary>
-    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, out byte[] contents)
+    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, out byte[] contents)
     {
         if (file == "-")
         {
-            contents = dataFileReader.ReadStandardInput();
+            contents = WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), readsStandardInputAsText && options.ActsAsWindowsSchannelBuild);
             return null;
         }
 
@@ -1073,12 +1128,12 @@ public static partial class CommandLineOptionTable
     {
         if (!value.StartsWith('@'))
         {
-            options.WriteOut = value;
+            options.WriteOut = options.AsWireText(value);
             return null;
         }
 
         string file = value[1..];
-        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, true, out byte[] contents);
         if (refusal is not null)
         {
             return refusal;
@@ -1091,7 +1146,8 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        options.WriteOut = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
+        string template = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
+        options.WriteOut = options.ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(template, wireEncoding) : template;
         return null;
     }
 
@@ -1671,7 +1727,9 @@ public static partial class CommandLineOptionTable
     /// Records a <c>-z</c>/<c>--time-cond</c> value as curl 8.21.0's tool reads it: a leading <c>-</c>
     /// asks for the resource only when it is not newer than the date
     /// (<see cref="TimeConditionKind.IfUnmodifiedSince"/>); a leading <c>+</c>, a leading <c>=</c> or
-    /// none asks for it only when it is newer (<see cref="TimeConditionKind.IfModifiedSince"/>). The
+    /// none asks for it only when it is newer (<see cref="TimeConditionKind.IfModifiedSince"/>), and a
+    /// leading <c>=</c> is curl's <c>CURL_TIMECOND_LASTMOD</c>, sent as a <c>Last-Modified</c> header
+    /// (<see cref="TimeCondition.SentAsLastModified"/>, CGR-073). The
     /// rest is read by <see cref="CurlDateParser"/>; when it is not a date it is taken as a file name,
     /// and that file's modification time, read through <paramref name="dataFileReader"/>, is the date.
     /// A value that is neither, empty included, is never refused: it clears any earlier condition and
@@ -1685,7 +1743,7 @@ public static partial class CommandLineOptionTable
         string date = value.StartsWith('-') || value.StartsWith('+') || value.StartsWith('=') ? value[1..] : value;
         if (TryReadTimeConditionDate(date, dataFileReader, out long unixSeconds, out string? failureReason))
         {
-            options.TimeCondition = TimeCondition.FromUnixSeconds(unixSeconds, kind);
+            options.TimeCondition = TimeCondition.FromUnixSeconds(unixSeconds, kind) with { SentAsLastModified = value.StartsWith('=') };
             return null;
         }
 

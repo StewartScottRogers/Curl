@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
@@ -89,6 +90,48 @@ internal sealed partial class ManagedEasyTransfer
         : -1;
 
     /// <summary>
+    /// <c>CURLINFO_CONTENT_LENGTH_UPLOAD</c> once an <c>http</c> or <c>https</c> request has been sent, as libcurl 8.22.0
+    /// sets it from the last request's body (CGR-127): 0 for a request with no body (a plain <c>GET</c>,
+    /// <c>CURLOPT_NOBODY</c>, <c>CURLOPT_HTTPGET</c>, or a post a followed redirect turned into a <c>GET</c>), -1 for a
+    /// body sent chunked under a <c>Transfer-Encoding: chunked</c> header, else <see cref="ContentLengthUploadOf(EasyOptions)" />.
+    /// An upload, a form body, another scheme or a transfer that sent no request keeps that answer.
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <param name="report">The transfer's report, or <see langword="null" />.</param>
+    /// <param name="requestUrl">The URL the transfer requested.</param>
+    /// <returns>The size, or -1.</returns>
+    internal static long ContentLengthUploadOf(EasyOptions options, TransferReport? report, string requestUrl) =>
+        SentAnHttpRequest(report, requestUrl) && HasNoUploadOrForm(options)
+            ? HttpRequestBodyLengthOf(options, report)
+            : ContentLengthUploadOf(options);
+
+    private static bool SentAnHttpRequest([NotNullWhen(true)] TransferReport? report, string requestUrl) =>
+        report is { RequestSize: > 0 } && IsHttpUrl(requestUrl);
+
+    private static bool IsHttpUrl(string url) =>
+        url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasNoUploadOrForm(EasyOptions options) =>
+        !options.Transfer.Upload && options.Http.MimePost is null && options.Http.HttpPost is null;
+
+    private static long HttpRequestBodyLengthOf(EasyOptions options, TransferReport report)
+    {
+        long declared = ContentLengthUploadOf(options);
+        return SendsNoBody(options, declared) || RedirectDroppedTheBody(report) ? 0
+            : options.Http.HttpHeaders.Any(IsChunkedTransferEncoding) ? -1
+            : declared;
+    }
+
+    private static bool SendsNoBody(EasyOptions options, long declared) =>
+        (declared < 0 && !options.Http.Post) || options.Transfer.NoBody || (options.Http.HttpGet && !options.Http.Post);
+
+    private static bool RedirectDroppedTheBody(TransferReport report) =>
+        report.RedirectCount > 0 && report.Method is "GET" or "HEAD";
+
+    private static bool IsChunkedTransferEncoding(string header) =>
+        header.StartsWith("Transfer-Encoding:", StringComparison.OrdinalIgnoreCase) && header.Contains("chunked", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Records a performed transfer's outcome: the result's code, message and <see cref="Info" />, or
     /// <see cref="CurlCode.AbortedByCallback" /> with <paramref name="abortedText" /> when the progress or read
     /// callback aborted it. <see cref="TransferInfo.CookieList" /> is the cookie engine's list either way.
@@ -116,7 +159,9 @@ internal sealed partial class ManagedEasyTransfer
             return Finish(
                 CurlCode.AbortedByCallback,
                 abortedText,
-                new TransferInfo { EffectiveUrl = transferUrl, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
+                TransferInfoFromReport.WithSchemeOf(
+                    Info with { EffectiveUrl = transferUrl, EffectiveMethod = EffectiveMethodOf(options), TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList },
+                    transferUrl));
         }
 
         CurlCode code = result.ExitCode.ToCurlCode();
@@ -173,8 +218,9 @@ internal sealed partial class ManagedEasyTransfer
             TransferId = transferId,
             ConnectionId = connectionId,
             CookieList = cookieList,
-            ContentLengthUpload = ContentLengthUploadOf(options),
+            ContentLengthUpload = ContentLengthUploadOf(options, result.Report, requestUrl),
         };
+        info = info with { SizeDelivered = lastWriteCallbackOutput?.BytesDelivered ?? info.SizeDownload };
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
         info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl), HttpVersion = HttpVersionOf(info.HttpVersion, result, headers.HttpVersion) };
         return toolState is null
@@ -198,7 +244,9 @@ internal sealed partial class ManagedEasyTransfer
     /// connection the report does not (BL-3316): a <c>tftp</c> transfer (its socket is the connection), a transfer under
     /// <c>CURLOPT_FRESH_CONNECT</c> or <c>CURLOPT_FORBID_REUSE</c> that succeeded (libcurl always opens a new connection
     /// for it; this engine does not yet, see BL-3316 Notes), and one a watchdog cut off after the response head came, as the
-    /// low-speed timeout does, and one that timed out with no report, whose attempted connection libcurl counts (BL-3302).
+    /// low-speed timeout does, one that timed out with no report, whose attempted connection libcurl counts (BL-3302),
+    /// and one whose proxy refused the tunnel - a <c>CONNECT</c> answered with a status, or a SOCKS handshake that
+    /// failed with a <c>CURLPX_*</c> code - whose connection to the proxy libcurl counts (CGR-084, BL-3613).
     /// </summary>
     /// <param name="info">The info with the report's count.</param>
     /// <param name="result">The transfer's result.</param>
@@ -212,8 +260,14 @@ internal sealed partial class ManagedEasyTransfer
             return info.NumConnects;
         }
 
-        return ForcesNewConnection(options.Network, result) || CutOffAfterHead(info, result) || TimedOutWithNoReport(result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        return ForcesNewConnection(options.Network, result) || CountsAFailedConnection(info, result) || requestUrl.StartsWith("tftp:", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
     }
+
+    private static bool CountsAFailedConnection(TransferInfo info, TransferResult result) =>
+        CutOffAfterHead(info, result) || TimedOutWithNoReport(result) || ProxyRefusedTheTunnel(info);
+
+    private static bool ProxyRefusedTheTunnel(TransferInfo info) =>
+        info.HttpConnectCode > 0 || info.ProxyError > 0;
 
     private static bool ForcesNewConnection(EasyNetworkOptions network, TransferResult result) =>
         (network.FreshConnect || network.ForbidReuse) && result.ExitCode == CurlExitCode.Ok;
@@ -338,6 +392,59 @@ internal sealed partial class ManagedEasyTransfer
             TotalTime = sinceStart,
         };
     }
+
+    /// <summary>
+    /// The method a perform that ended with no report answers as <c>CURLINFO_EFFECTIVE_METHOD</c>, from the options as
+    /// curl 8.22.0's <c>getinfo_char</c> reads it: <c>CURLOPT_CUSTOMREQUEST</c>, else <c>HEAD</c> under
+    /// <c>CURLOPT_NOBODY</c>, <c>PUT</c> under <c>CURLOPT_UPLOAD</c>, <c>POST</c> for a post (<see cref="PostsOf" />)
+    /// and <c>GET</c> otherwise (CGR-128).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The method.</returns>
+    internal static string EffectiveMethodOf(EasyOptions options) =>
+        options.Transfer.CustomRequest
+        ?? (options.Transfer.NoBody ? "HEAD"
+            : options.Transfer.Upload ? "PUT"
+            : PostsOf(options.Http) ? "POST"
+            : "GET");
+
+    /// <summary>
+    /// Whether the options post: <c>CURLOPT_POST</c>, or post fields or a MIME or form body not overridden by
+    /// <c>CURLOPT_HTTPGET</c> (<see cref="WithoutPostFieldsUnderHttpGet" />).
+    /// </summary>
+    /// <param name="http">The handle's HTTP options.</param>
+    /// <returns><see langword="true" /> for a post.</returns>
+    private static bool PostsOf(Api.Options.Http.EasyHttpOptions http) =>
+        http.Post || (!http.HttpGet && (http.PostFields is not null || http.MimePost is not null || http.HttpPost is not null));
+
+    /// <summary>
+    /// <paramref name="info" /> with the end points of the connection a perform opened as <c>CURLINFO_PRIMARY_IP</c>,
+    /// <c>PRIMARY_PORT</c>, <c>LOCAL_IP</c> and <c>LOCAL_PORT</c> (empty and 0 for one not known), and that connection
+    /// counted in <c>CURLINFO_NUM_CONNECTS</c> (CGR-128).
+    /// </summary>
+    /// <param name="info">The info so far.</param>
+    /// <param name="remote">The peer's end point, or <see langword="null" />.</param>
+    /// <param name="local">The local end point, or <see langword="null" />.</param>
+    /// <returns>The info with the connection.</returns>
+    private static TransferInfo WithConnectionEndPoints(TransferInfo info, System.Net.IPEndPoint? remote, System.Net.IPEndPoint? local) =>
+        info with
+        {
+            PrimaryIp = AddressOf(remote),
+            PrimaryPort = PortOf(remote),
+            LocalIp = AddressOf(local),
+            LocalPort = PortOf(local),
+            NumConnects = info.NumConnects + 1,
+        };
+
+    /// <summary>The address of <paramref name="endPoint" />, or empty for none.</summary>
+    /// <param name="endPoint">The end point, or <see langword="null" />.</param>
+    /// <returns>The address text.</returns>
+    private static string AddressOf(System.Net.IPEndPoint? endPoint) => endPoint?.Address.ToString() ?? string.Empty;
+
+    /// <summary>The port of <paramref name="endPoint" />, or 0 for none.</summary>
+    /// <param name="endPoint">The end point, or <see langword="null" />.</param>
+    /// <returns>The port.</returns>
+    private static long PortOf(System.Net.IPEndPoint? endPoint) => endPoint?.Port ?? 0;
 
     private CurlCode Finish(CurlCode code, string errorText, TransferInfo info)
     {

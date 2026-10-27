@@ -143,7 +143,7 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
     private static async ValueTask<TransferResult> ExchangeAsync(IConnection connection, ITransferContext context, GopherDiagnosticLog log)
     {
-        if (GopherSelector.FromUrl(context.Url) is not { } selector)
+        if (GopherSelector.FromUrl(context.Url, context.PathAsIs) is not { } selector)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, GopherTransferMessages.SelectorMalformed);
         }

@@ -451,7 +451,7 @@
     {"name":"libcurl-gen","command":"--libcurl lc.c -s -d x=y -H 'X: 1' {U}/echo"},
     {"name":"curves","command":"-sS --curves nope https://127.0.0.1:18080/","timeoutSeconds":15},
     {"name":"mail-rcpt-allowfails","command":"-sS --mail-rcpt-allowfails smtp://127.0.0.1:9"},
-    {"name":"ech","command":"-sS --ech true {U}/echo","limitations":["NoEch"]},
+    {"name":"ech","command":"-sS --ech true {U}/echo"},
     {"name":"ssl-no-revoke","command":"-sS --ssl-no-revoke {U}/echo"},
     {"name":"login-options","command":"-sS --login-options 'AUTH=*' imap://127.0.0.1:9/"}
   ]

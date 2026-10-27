@@ -137,6 +137,7 @@ public sealed partial class HttpProtocolHandlerTests
         [
             .. Encoding.Latin1.GetBytes(SwitchingProtocolsHead),
             .. RecordedUpgradeFrames(
+                Http2FrameFactory.CreateSettings([]),
                 Http2FrameFactory.CreateHeaders(1, server.Encode([new(":status", "401"), new("www-authenticate", "Basic realm=\"x\"")]), isEndStream: false, isEndHeaders: true),
                 Http2FrameFactory.CreateData(1, "no\n"u8.ToArray(), isEndStream: true),
                 Http2FrameFactory.CreateHeaders(3, server.Encode([new(":status", "200"), new("content-length", "2")]), isEndStream: false, isEndHeaders: true),

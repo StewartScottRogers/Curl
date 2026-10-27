@@ -87,7 +87,8 @@ public sealed class ImapProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         long started = context.TimeProvider.GetTimestamp();
-        TransferResult result = await TransferAsync(context).ConfigureAwait(false);
+        using var connectPhase = new ImapConnectPhaseLimit(context, started);
+        TransferResult result = await TransferAsync(context, connectPhase).ConfigureAwait(false);
         ImapDiagnosticLogLines.TransferEnded(context.DiagnosticLog, result, context.TimeProvider, started);
         return result;
     }
@@ -117,9 +118,10 @@ public sealed class ImapProtocolHandler : IProtocolHandler
         ArgumentNullException.ThrowIfNull(context);
 
         long started = context.TimeProvider.GetTimestamp();
+        using var connectPhase = new ImapConnectPhaseLimit(context, started);
         ImapConnectOutcome outcome = HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password)
             ? new ImapConnectOutcome(TransferResult.Failure(CurlExitCode.BadFunctionArgument, ImapSessionMessages.CredentialsHaveControlCode), null)
-            : await ConnectAndOpenAsync(context).ConfigureAwait(false);
+            : await ConnectAndOpenAsync(context, connectPhase).ConfigureAwait(false);
         if (outcome.Connection is null)
         {
             ImapDiagnosticLogLines.TransferEnded(context.DiagnosticLog, outcome.Result, context.TimeProvider, started);
@@ -132,7 +134,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     /// Connects and runs the session's connect phase, handing the connection back on success
     /// and closing it otherwise.
     /// </summary>
-    private async ValueTask<ImapConnectOutcome> ConnectAndOpenAsync(ITransferContext context)
+    private async ValueTask<ImapConnectOutcome> ConnectAndOpenAsync(ITransferContext context, ImapConnectPhaseLimit connectPhase)
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
@@ -150,7 +152,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
                 new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused }, null);
         }
 
-        return await OpenOnlyAsync(context, connection, target, connected.ConnectionNumber, connectEvents.Opened).ConfigureAwait(false);
+        return await OpenOnlyAsync(context, connectPhase, connection, target, connected.ConnectionNumber, connectEvents.Opened).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -158,12 +160,12 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     /// back on success and closing it otherwise.
     /// </summary>
     private async ValueTask<ImapConnectOutcome> OpenOnlyAsync(
-        ITransferContext context, IConnection connection, ConnectTarget target, long connectionNumber, ConnectionOpenedEvent? opened)
+        ITransferContext context, ImapConnectPhaseLimit connectPhase, IConnection connection, ConnectTarget target, long connectionNumber, ConnectionOpenedEvent? opened)
     {
         var kept = new ImapKeptConnection(connection, ImapKeptConnection.LoginKeyOf(context), TagLetterOf(connectionNumber), context.TimeProvider);
         var channel = new ImapControlChannel(
             connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput, kept.TagLetter, kept.CommandsSent);
-        var session = new ImapSession(channel, tlsProvider, saslAuthenticator, context, target.UseTls, opened, kept);
+        var session = new ImapSession(channel, tlsProvider, saslAuthenticator, context, target.UseTls, opened, kept, connectPhase);
         var lease = new ImapConnectOnlyLease(connection, session);
         await using (lease.ConfigureAwait(false))
         {
@@ -187,7 +189,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
     /// <summary>
     /// Connects, runs the session and writes the lines <c>-v</c> ends the transfer with.
     /// </summary>
-    private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, ImapConnectPhaseLimit connectPhase)
     {
         if (HasControlByte(context.Credentials?.UserName) || HasControlByte(context.Credentials?.Password))
         {
@@ -195,14 +197,14 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             return TransferResult.Failure(CurlExitCode.BadFunctionArgument, ImapSessionMessages.CredentialsHaveControlCode);
         }
 
-        return await ConnectAndTransferAsync(context).ConfigureAwait(false);
+        return await ConnectAndTransferAsync(context, connectPhase).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Connects, or reuses a kept connection for the same login, runs the session on it and
     /// writes the lines <c>-v</c> ends the transfer with.
     /// </summary>
-    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context)
+    private async ValueTask<TransferResult> ConnectAndTransferAsync(ITransferContext context, ImapConnectPhaseLimit connectPhase)
     {
         CurlUrl url = context.Url;
         bool implicitTls = url.Scheme == ImplicitTlsScheme;
@@ -230,7 +232,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             ImapKeptConnection kept = reused ?? new ImapKeptConnection(connection, loginKey, TagLetterOf(connected.ConnectionNumber), context.TimeProvider);
             var channel = new ImapControlChannel(
                 connection, context.Events, context.CancellationToken, context.DiagnosticLog, context.DumpHeaderOutput, kept.TagLetter, kept.CommandsSent);
-            var session = new ImapSession(channel, tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened, kept, reused is not null);
+            var session = new ImapSession(channel, tlsProvider, saslAuthenticator, context, implicitTls, connectEvents.Opened, kept, connectPhase, reused is not null);
             TransferResult result;
             await using (session.ConfigureAwait(false))
             {

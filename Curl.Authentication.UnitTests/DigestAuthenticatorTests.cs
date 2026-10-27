@@ -498,7 +498,7 @@ public sealed class DigestAuthenticatorTests
     }
 
     [TestMethod]
-    public void RepeatAuthorization_SspiBuildUserHash_CountsOnInTheSspiForm()
+    public void RepeatAuthorization_SspiBuildUserHash_CountsOnWithoutUserHash()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         DigestAuthenticator authenticator = new(Encoding.UTF8, () => "c", matchesSspiBuild: true);
@@ -512,9 +512,10 @@ public sealed class DigestAuthenticatorTests
         diagnostics.Act("first", first);
         diagnostics.Act("second", second);
         diagnostics.Assert("second counted on", true, second.Contains(",nc=00000002,", StringComparison.Ordinal));
-        diagnostics.Assert("second ends", true, second.EndsWith(",qop=\"auth\",userhash=true", StringComparison.Ordinal));
+        diagnostics.Assert("second ends", true, second.EndsWith(",qop=\"auth\"", StringComparison.Ordinal));
         StringAssert.Contains(second, ",nc=00000002,", StringComparison.Ordinal);
-        StringAssert.EndsWith(second, ",qop=\"auth\",userhash=true", StringComparison.Ordinal);
+        StringAssert.StartsWith(second, "Digest username=\"u\",", StringComparison.Ordinal);
+        StringAssert.EndsWith(second, ",qop=\"auth\"", StringComparison.Ordinal);
     }
 
     /// <summary>

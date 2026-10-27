@@ -5,13 +5,14 @@ public static class AltSvcAlpnToken
 {
     /// <summary>
     /// Reads an ALPN token as libcurl's <c>Curl_alpn2alpnid</c> does: exactly <c>h1</c>,
-    /// <c>h2</c> or <c>h3</c>; <c>H2</c> or any other token is unknown.
+    /// <c>h2</c> or <c>h3</c>, or <c>http/1.1</c> for <c>h1</c>; <c>H2</c>, <c>HTTP/1.1</c>
+    /// or any other token is unknown.
     /// </summary>
     /// <param name="token">The token.</param>
     /// <returns>The version, or <see langword="null" /> when the token is unknown.</returns>
     public static AltSvcAlpn? Parse(ReadOnlySpan<char> token) => token switch
     {
-        "h1" => AltSvcAlpn.H1,
+        "h1" or "http/1.1" => AltSvcAlpn.H1,
         "h2" => AltSvcAlpn.H2,
         "h3" => AltSvcAlpn.H3,
         _ => null,

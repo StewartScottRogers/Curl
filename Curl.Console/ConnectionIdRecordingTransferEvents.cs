@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -13,6 +14,10 @@ namespace Curl.Console;
 /// (measured, BL-754 Notes; BL-1052). A reused connection no transfer here saw open, such as one a
 /// group without <c>-w</c> opened, takes the pool's number for it, which is curl's connection number,
 /// the <c>N</c> of <c>Connection #N</c> (ADR-0109).
+/// Once the transfer leaves its connection for another request, a followed redirect's hop or a fresh
+/// connect after a reused connection died, the line after <c>Issue another request to this URL</c>
+/// takes the next <c>%{conn_id}</c>, as curl 8.22.0 printed <c>2</c> for three hops on closed
+/// connections and marked the second hop's lines <c>[0-1]</c> (measured, BL-3619 Notes; CGR-090).
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
 /// <param name="state">The running transfer whose <see cref="Curl.Engine.EngineTransferState.ConnectionId" /> is kept.</param>
@@ -49,7 +54,14 @@ internal sealed class ConnectionIdRecordingTransferEvents(
     public void ReportTlsEarlyData(long bytes) => inner.ReportTlsEarlyData(bytes);
 
     /// <inheritdoc />
-    public void ReportInfo(string text) => inner.ReportInfo(text);
+    public void ReportInfo(string text)
+    {
+        inner.ReportInfo(text);
+        if (text.StartsWith(RedirectFollower.IssueAnotherRequestMessagePrefix, StringComparison.Ordinal))
+        {
+            state.ConnectionId = null;
+        }
+    }
 
     /// <inheritdoc />
     public void ReportTlsHandshake(TlsHandshakeEvent handshake) => inner.ReportTlsHandshake(handshake);

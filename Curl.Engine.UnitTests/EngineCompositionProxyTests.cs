@@ -104,10 +104,17 @@ public sealed class EngineCompositionProxyTests
         Diagnostics.ArrangeCommandLine(arguments);
         HttpProxyTunnelOptions options =
             EngineComposition.CreateProxyTunnelOptions(
-                EasyOptionsFromCommandLine.HttpOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!),
-                EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!), EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!),
+                EasyOptionsFromCommandLine.HttpOf(CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, isWindows: false).Options!),
+                EasyOptionsFromCommandLine.ProxyOf(CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, isWindows: false).Options!), EasyOptionsFromCommandLine.AuthenticationOf(CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, DiskDataFileReader.ForProcess, isWindows: false).Options!),
                 new SystemSecurityContextFactory());
         Diagnostics.Act("proxy auth schemes, HTTP/2 tunnel", $"{options.ProxyAuthSchemes}, {options.ProxyHttp2}");
         return options;
     }
+}
+
+/// <summary>Answers every password prompt with an empty password, so a test that parses a <c>-u</c> user without a password never waits on the process console.</summary>
+internal sealed class EmptyPasswordPrompt : IPasswordPrompt
+{
+    /// <inheritdoc/>
+    public string ReadPassword(string prompt) => string.Empty;
 }

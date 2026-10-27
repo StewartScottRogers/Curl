@@ -11,9 +11,11 @@ namespace Curl.Protocol.Http;
 /// </summary>
 /// <remarks>
 /// curl 8.21.0 sends the body when <c>100 Continue</c> arrives or when the wait runs out
-/// with nothing received, and leaves it unsent when a final status arrives first (BL-175
-/// Notes). The read the wait started keeps running after the wait runs out, so a status of
-/// 300 or above that arrives while the body is sent is seen in time to stop sending it
+/// with nothing received, and leaves it unsent when any other reply arrives first (BL-175
+/// Notes), except a final 2xx: curl 8.22.0 still waits the time out after one, reports
+/// <see cref="HttpConnectionInfoLines.DoneWaitingForContinue" /> and sends the body (measured,
+/// CGR-067, BL-3596 Notes). The read the wait started keeps running after the wait runs out,
+/// so a status of 300 or above that arrives while the body is sent is seen in time to stop sending it
 /// (<see cref="SendUnlessStoppedAsync" />, BL-319 and BL-395 Notes); the next read waits
 /// for it. Disposing this does nothing: the connection it wraps belongs to the handler.
 /// </remarks>
@@ -56,9 +58,9 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// <param name="timeProvider">The clock <see cref="ContinueWait" /> runs on.</param>
     /// <param name="cancellationToken">Cancels the wait.</param>
     /// <returns>
-    /// <see langword="true" /> when the wait ran out or the first status line received is
-    /// informational; <see langword="false" /> when any other reply, or the end of the
-    /// connection, came first.
+    /// <see langword="true" /> when the wait ran out, after nothing or after a final 2xx, or
+    /// the first status line received is informational; <see langword="false" /> when any
+    /// other reply, or the end of the connection, came first.
     /// </returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
     internal async ValueTask<bool> WaitForContinueAsync(TimeProvider timeProvider, CancellationToken cancellationToken)
@@ -66,7 +68,7 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
         statusLineRead = ReadStatusLineAsync(cancellationToken);
         using CancellationTokenSource waitEnded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task wait = Task.Delay(ContinueWait > LongestTimedWait ? Timeout.InfiniteTimeSpan : ContinueWait, timeProvider, waitEnded.Token);
-        Task first = await Task.WhenAny(statusLineRead, wait).ConfigureAwait(false);
+        Task first = await WhenWaitEndsAsync(statusLineRead, wait).ConfigureAwait(false);
         await waitEnded.CancelAsync().ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         WaitRanOut = first == wait;
@@ -74,8 +76,22 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     }
 
     /// <summary>
+    /// Waits for the first status line or the end of <paramref name="wait" />, whichever comes
+    /// first, and on past a final 2xx to the end of <paramref name="wait" />: curl 8.22.0 still
+    /// waits the time out after one and then sends the body (measured, CGR-067, BL-3596 Notes).
+    /// </summary>
+    /// <returns><paramref name="wait" /> when the wait ended it; otherwise <paramref name="read" />.</returns>
+    private async Task<Task> WhenWaitEndsAsync(Task<bool> read, Task wait)
+    {
+        Task first = await Task.WhenAny(read, wait).ConfigureAwait(false);
+        return first != wait && read.IsCompletedSuccessfully && firstStatusCode is >= 200 and < 300
+            ? await Task.WhenAny(wait).ConfigureAwait(false)
+            : first;
+    }
+
+    /// <summary>
     /// Gets a value indicating whether <see cref="WaitForContinueAsync" /> ran out of time
-    /// before any status line arrived, after which curl 8.21.0 reports
+    /// before any status line arrived, or after a final 2xx did, after which curl 8.21.0 reports
     /// <see cref="HttpConnectionInfoLines.DoneWaitingForContinue" /> (measured, BL-449 Notes).
     /// </summary>
     internal bool WaitRanOut { get; private set; }

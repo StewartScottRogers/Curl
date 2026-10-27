@@ -27,6 +27,7 @@ public sealed class EasyInfoReadersTimesTests
         EarlyDataSent = 512,
         SizeUpload = 1_000,
         SizeDownload = 2_000,
+        SizeDelivered = 2_500,
         SpeedUpload = 3_000,
         SpeedDownload = 4_000,
         ContentLengthDownload = 5_000,
@@ -91,9 +92,9 @@ public sealed class EasyInfoReadersTimesTests
     }
 
     [TestMethod]
-    public void GetInfo_SizeDelivered_IsTheBodyBytesDownloadedAsALong()
+    public void GetInfo_SizeDelivered_IsTheBytesDeliveredAsALong()
     {
-        Assert.AreEqual(2_000L, Read(Reported, CurlInfo.SizeDelivered));
+        Assert.AreEqual(2_500L, Read(Reported, CurlInfo.SizeDelivered));
     }
 
     [TestMethod]

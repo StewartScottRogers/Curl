@@ -22,7 +22,7 @@ public sealed partial class CurlMulti : IAsyncDisposable
     private readonly IMultiTransfer transfer;
     // Maps the engine's transfer back to the CurlEasy added, by reference, for messages and callbacks.
     private readonly Dictionary<IEasyTransfer, CurlEasy> handles = new(ReferenceEqualityComparer.Instance);
-    // 0 until DisposeAsync runs; exchanged atomically so cleanup happens once.
+    // 0 until CleanupAsync runs; the handle is for one thread at a time, so cleanup happens once.
     private int cleanedUp;
 
     /// <summary>Wraps the engine's multi <paramref name="transfer"/>.</summary>
@@ -39,6 +39,8 @@ public sealed partial class CurlMulti : IAsyncDisposable
     /// <param name="easy">The easy handle to add.</param>
     /// <returns>
     /// <see cref="CurlMultiCode.BadEasyHandle"/> for a <see langword="null"/> or cleaned-up handle,
+    /// <see cref="CurlMultiCode.RecursiveApiCall"/> from inside one of the handle's transfer callbacks, even
+    /// for a handle it holds already, as libcurl 8.22.0 answers (CGR-146),
     /// <see cref="CurlMultiCode.AddedAlready"/> for one this handle holds already, else the engine's answer
     /// (<see cref="CurlMultiCode.AddedAlready"/> too when another multi handle holds it).
     /// </returns>
@@ -49,6 +51,11 @@ public sealed partial class CurlMulti : IAsyncDisposable
         if (easy is null || easy.IsCleanedUp)
         {
             return CurlMultiCode.BadEasyHandle;
+        }
+
+        if (live.IsInTransferCallback)
+        {
+            return CurlMultiCode.RecursiveApiCall;
         }
 
         var easyTransfer = easy.Transfer;
@@ -114,19 +121,32 @@ public sealed partial class CurlMulti : IAsyncDisposable
 
     /// <summary>
     /// <c>curl_multi_cleanup</c>: disposes the engine's multi transfer, which leaves every easy handle
-    /// it held free to be added again. A second cleanup does nothing.
+    /// it held free to be added again. Called from inside one of the handle's transfer callbacks it does
+    /// nothing and answers <see cref="CurlMultiCode.RecursiveApiCall"/>, as libcurl 8.22.0 does; a second
+    /// cleanup does nothing and answers <see cref="CurlMultiCode.BadHandle"/>.
     /// </summary>
-    /// <returns>A task that completes once the multi transfer is disposed.</returns>
-    public async ValueTask DisposeAsync()
+    /// <returns><see cref="CurlMultiCode.Ok"/> once the multi transfer is disposed, else why it was not.</returns>
+    public async ValueTask<CurlMultiCode> CleanupAsync()
     {
-        if (Interlocked.Exchange(ref cleanedUp, 1) != 0)
+        if (IsCleanedUp)
         {
-            return;
+            return CurlMultiCode.BadHandle;
         }
 
+        if (transfer.IsInTransferCallback)
+        {
+            return CurlMultiCode.RecursiveApiCall;
+        }
+
+        Volatile.Write(ref cleanedUp, 1);
         handles.Clear();
         await transfer.DisposeAsync().ConfigureAwait(false);
+        return CurlMultiCode.Ok;
     }
+
+    /// <summary><c>curl_multi_cleanup</c>, its answer dropped: see <see cref="CleanupAsync"/>.</summary>
+    /// <returns>A task that completes once the cleanup has run.</returns>
+    public async ValueTask DisposeAsync() => await CleanupAsync().ConfigureAwait(false);
 
     /// <summary>The engine transfer, for a member that must not run after cleanup.</summary>
     /// <returns>The engine's multi transfer.</returns>

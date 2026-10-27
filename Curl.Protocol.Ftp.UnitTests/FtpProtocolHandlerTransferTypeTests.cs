@@ -48,7 +48,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
 
         diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
-        Assert.AreEqual(File, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(File), run.OutputText);
         diagnostics.Assert("result", TransferResult.Success(7), run.Result);
         Assert.AreEqual(TransferResult.Success(7), run.Result);
     }
@@ -66,7 +66,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
 
         diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
-        Assert.AreEqual(File, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(File), run.OutputText);
     }
 
     [TestMethod]
@@ -99,7 +99,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
 
         diagnostics.DiffSent(InDirectorySent + "EPSV\r\nTYPE A\r\nNLST\r\nQUIT\r\n", run.Sent);
         Assert.AreEqual(InDirectorySent + "EPSV\r\nTYPE A\r\nNLST\r\nQUIT\r\n", run.Sent);
-        Assert.AreEqual(File, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(File), run.OutputText);
     }
 
     [TestMethod]
@@ -170,7 +170,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
 
         diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
-        Assert.AreEqual(File, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(File), run.OutputText);
     }
 
     [TestMethod]
@@ -203,7 +203,7 @@ public sealed class FtpProtocolHandlerTransferTypeTests
 
         diagnostics.DiffSent(AsciiDownloadSent, run.Sent);
         Assert.AreEqual(AsciiDownloadSent, run.Sent);
-        Assert.AreEqual(File, run.OutputText);
+        Assert.AreEqual(FtpAsciiOutput.Of(File), run.OutputText);
     }
 
     [TestMethod]

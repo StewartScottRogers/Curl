@@ -28,7 +28,7 @@ namespace Curl.Protocol.Http;
 /// <c>http://host[:port]/path?query</c>, with no fragment and no user information but an
 /// <c>ftp</c> URL's (<see cref="FtpUserInformation" />). The <c>-H</c> values follow in
 /// command-line order, then, through a forward proxy only, the <c>--proxy-header</c> values under the
-/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A body of unknown length gets
+/// same rules; of curl's own headers they override only <c>Proxy-Connection</c> (BL-296 Notes) and <c>Proxy-Authorization</c>, which a <c>--proxy-header</c> value naming it leaves out where an <c>-H</c> one does not (measured, BL-3611 Notes). A custom <c>Host</c> is the exception: it takes the <c>Host</c> slot. A body of unknown length gets
 /// <c>Transfer-Encoding: chunked</c> just after <c>Proxy-Connection</c>, ahead of the <c>Cookie</c> and the
 /// <c>-H</c> values, as curl 8.21.0 places it (upstream test60). A request with a body ends with
 /// <c>Content-Length</c> when its length is known, <c>Content-Type</c> and
@@ -138,7 +138,7 @@ internal static class HttpRequestHeadFormatter
         AppendRequestLine(head, framing.Method, url, forwardProxy ? credentials ?? NoCredentials : null, options);
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
-        AppendAlways(head, "Proxy-Authorization", proxyAuthorization);
+        AppendUnlessOverridden(head, proxyHeaders, "Proxy-Authorization", proxyAuthorization);
         AppendAuthorization(head, customHeaders, authorization, options.HttpSignature is not null);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
@@ -194,10 +194,41 @@ internal static class HttpRequestHeadFormatter
     /// Gives command-line <paramref name="text" /> as its bytes in
     /// <see cref="HttpRequestOptions.CommandLineTextEncoding" />, one character per byte, so the
     /// head's closing <see cref="Encoding.Latin1" /> step puts those bytes on the wire unchanged.
+    /// A lone surrogate from U+DC80 to U+DCFF stands for the byte U+DC00 below it, which a header
+    /// file held but UTF-8 could not read, and is given as that byte (CGR-020, BL-3549).
     /// </summary>
     [return: NotNullIfNotNull(nameof(text))]
     private static string? HeadText(string? text, HttpRequestOptions options) =>
-        text is null ? null : Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
+        text is null ? null : WireText(text, options.CommandLineTextEncoding);
+
+    /// <summary>
+    /// Gives <paramref name="text" /> as its bytes in <paramref name="encoding" />, one character
+    /// per byte, with each escaped byte (<see cref="EscapedByteOf" />) given as itself.
+    /// </summary>
+    internal static string WireText(string text, Encoding encoding)
+    {
+        StringBuilder wire = new(text.Length);
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (EscapedByteOf(text, index) is { } escaped)
+            {
+                wire.Append(Encoding.Latin1.GetString(encoding.GetBytes(text[runStart..index]))).Append(escaped);
+                runStart = index + 1;
+            }
+        }
+
+        return wire.Append(Encoding.Latin1.GetString(encoding.GetBytes(text[runStart..]))).ToString();
+    }
+
+    /// <summary>
+    /// The byte the character at <paramref name="index" /> stands for when it is a lone surrogate
+    /// from U+DC80 to U+DCFF, one character per byte; otherwise <see langword="null" />.
+    /// </summary>
+    private static char? EscapedByteOf(string text, int index) =>
+        text[index] is >= '\uDC80' and <= '\uDCFF' && (index == 0 || !char.IsHighSurrogate(text[index - 1]))
+            ? (char)(text[index] - 0xDC00)
+            : null;
 
     /// <summary>
     /// Gives <paramref name="framing" />, or the framing <see cref="HttpRequestFraming.Of" />
@@ -207,28 +238,34 @@ internal static class HttpRequestHeadFormatter
         framing ?? HttpRequestFraming.Of(options, customHeaders, noBody);
 
     /// <summary>
-    /// Appends the request line: the method, the target (<see cref="TargetOf" />) and the
-    /// version.
+    /// Appends the request line: the method as its bytes in
+    /// <see cref="HttpRequestOptions.CommandLineTextEncoding" /> (<see cref="HeadText" />), as
+    /// curl copies <c>-X</c> from its <c>argv</c> (CGR-065), the target (<see cref="TargetOf" />)
+    /// and the version.
     /// </summary>
     private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options) =>
-        head.Append(method).Append(' ').Append(TargetOf(url, proxiedCredentials, options)).Append(VersionOf(options)).Append("\r\n");
+        head.Append(HeadText(method, options)).Append(' ').Append(TargetOf(url, proxiedCredentials, options)).Append(VersionOf(options)).Append("\r\n");
 
     /// <summary>
     /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
-    /// verbatim when given, its UTF-8 bytes one character each as
-    /// <see cref="HttpUrlText.RequestTarget" /> writes a query; otherwise the absolute form
+    /// verbatim when given, its bytes in <see cref="HttpRequestOptions.CommandLineTextEncoding" />
+    /// one character each (<see cref="WireText" />); otherwise the absolute form
     /// for a forward proxy (<paramref name="proxiedCredentials" /> not <see langword="null" />)
-    /// and the path and query for the origin. curl 8.21.0 was measured (BL-186 Notes) sending
-    /// <c>--request-target</c> in place of both forms.
+    /// and the path and query for the origin, both from the URL's bytes in that encoding
+    /// (<see cref="HttpUrlText.RequestTarget(CurlUrl, Encoding)" />, CGR-015). curl 8.21.0 was
+    /// measured (BL-186 Notes) sending <c>--request-target</c> in place of both forms, and 8.22.0
+    /// on Windows sending <c>--request-target /é</c> as <c>/</c> and the cp1252 byte <c>0xE9</c> (BL-3840).
     /// </summary>
     private static string TargetOf(CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options)
     {
         if (options.RequestTarget is { } target)
         {
-            return Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(target));
+            return WireText(target, options.CommandLineTextEncoding);
         }
 
-        return proxiedCredentials is null ? HttpUrlText.RequestTarget(url) : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType);
+        return proxiedCredentials is null
+            ? HttpUrlText.OriginTarget(url, options.CommandLineTextEncoding)
+            : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType, options.CommandLineTextEncoding);
     }
 
     /// <summary>
@@ -320,11 +357,22 @@ internal static class HttpRequestHeadFormatter
     /// Formats the absolute-form request target a forward proxy is sent: the scheme, the host
     /// and port as the <c>Host</c> line has them, then the path and query; for an <c>ftp</c> URL
     /// the user and password come before the host (<see cref="FtpUserInformation" />), and the path ends in
-    /// <see cref="FtpTypeOf" />.
+    /// <see cref="FtpTypeOf" />. An IPv6 host keeps its zone id as <c>%25</c> and the id before the
+    /// closing bracket, as curl 8.22.0 sends <c>GET http://[fe80::1%25eth0]:8080/x</c> while its
+    /// <c>Host</c> line is <c>[fe80::1]:8080</c> (measured, CGR-056, BL-3585).
     /// </summary>
-    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType) =>
-        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{HttpUrlText.WireHostAndPort(url)}"
-        + HttpUrlText.RequestTarget(url).Insert(HttpUrlText.Path(url).Length, FtpTypeOf(url, proxyTransferType));
+    private static string AbsoluteForm(CurlUrl url, NetworkCredential credentials, char? proxyTransferType, Encoding encoding) =>
+        $"{url.Scheme}://{FtpUserInformation(url, credentials)}{ZonedHostAndPort(url)}"
+        + HttpUrlText.RequestTarget(url, encoding).Insert(HttpUrlText.Path(url, encoding).Length, FtpTypeOf(url, proxyTransferType));
+
+    /// <summary>
+    /// Gives <see cref="HttpUrlText.WireHostAndPort" /> with the URL's IPv6 zone id, when it has
+    /// one, put before the closing bracket as <c>%25</c> and the id.
+    /// </summary>
+    private static string ZonedHostAndPort(CurlUrl url) =>
+        url.ZoneId is { } zoneId
+            ? HttpUrlText.WireHostAndPort(url).Replace("]", $"%25{zoneId}]", StringComparison.Ordinal)
+            : HttpUrlText.WireHostAndPort(url);
 
     /// <summary>
     /// Gives <c>;type=</c> and <paramref name="proxyTransferType" /> for an <c>ftp</c> URL whose path does not
@@ -403,7 +451,7 @@ internal static class HttpRequestHeadFormatter
 
     /// <summary>
     /// Appends a line whatever the <c>-H</c> values name, as curl 8.21.0 sends its cookie
-    /// engine's <c>Cookie</c> and its <c>Proxy-Authorization</c> beside custom ones (BL-182 and
+    /// engine's <c>Cookie</c> beside custom ones (BL-182 and
     /// BL-183 Notes).
     /// </summary>
     private static void AppendLines(StringBuilder head, string? lines)

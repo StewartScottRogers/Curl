@@ -47,6 +47,9 @@ public sealed class PooledConnection : IConnection
     public EndPoint? LocalEndPoint => _underlying.Connection.LocalEndPoint;
 
     /// <inheritdoc />
+    public nint? SocketHandle => _underlying.Connection.SocketHandle;
+
+    /// <inheritdoc />
     /// <remarks>
     /// A read into a non-empty buffer that returns zero records that the server closed the
     /// connection, so the pool reports it dead rather than reusing it (ADR-0112); so does a

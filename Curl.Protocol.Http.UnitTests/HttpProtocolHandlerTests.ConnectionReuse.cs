@@ -379,7 +379,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
         Diagnostics.Assert("connect targets", 2, connector.Targets.Count);
         Assert.AreEqual(2, connector.Targets.Count);
-        string[] expectedInfo = [RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, RequestSent, "closing connection #1"];
+        string[] expectedInfo = [RequestSent, DiedRetrying, "shutting down connection #0", IssueAnother, RequestSent, "Empty reply from server", "shutting down connection #1"];
         WriteExpectedLines("info lines", expectedInfo, events.Info);
         CollectionAssert.AreEqual(
             expectedInfo,
@@ -399,7 +399,7 @@ public sealed partial class HttpProtocolHandlerTests
         WriteEvents("info lines", events.Info);
         Diagnostics.Assert("exit code", CurlExitCode.GotNothing, result.ExitCode);
         Assert.AreEqual(CurlExitCode.GotNothing, result.ExitCode);
-        string[] expectedInfo = [UsingHttp1, RequestSent, "closing connection #0"];
+        string[] expectedInfo = [UsingHttp1, RequestSent, "Empty reply from server", "shutting down connection #0"];
         WriteExpectedLines("info lines", expectedInfo, events.Info);
         CollectionAssert.AreEqual(expectedInfo, events.Info);
     }

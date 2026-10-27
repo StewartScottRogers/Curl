@@ -48,6 +48,8 @@ internal sealed class HandBuiltTlsConnection(
 
     public EndPoint? LocalEndPoint => plaintext.LocalEndPoint;
 
+    public nint? SocketHandle => plaintext.SocketHandle;
+
     public bool HasPeerClosed => plaintext.HasPeerClosed;
 
     /// <exception cref="MissingCloseNotifyException">The connection ended without <c>close_notify</c>.</exception>

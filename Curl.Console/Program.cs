@@ -15,7 +15,7 @@ internal static class Program
         ArgumentNullException.ThrowIfNull(args);
 
         using Stream standardOutput = StandardOutputOpener.Open();
-        using Stream standardError = System.Console.OpenStandardError();
+        using Stream standardError = new WriteFailureIgnoringStream(System.Console.OpenStandardError());
         using Stream standardInput = System.Console.OpenStandardInput();
         bool standardOutputIsTerminal = !System.Console.IsOutputRedirected;
         using StandardOutputVirtualTerminal virtualTerminal = StandardOutputVirtualTerminal.ForWindowsConsole();
@@ -25,7 +25,7 @@ internal static class Program
         return await UnhandledExceptionGuard.RunAsync(
                 () => CurlComposition
                     .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal, terminalRendersStyles)
-                    .RunAsync(args),
+                    .RunAsync(AnsiCodePageArguments.ForPlatform(RawCommandLineArguments.ForCurrentPlatform(args), OperatingSystem.IsWindows())),
                 standardOutput,
                 standardError)
             .ConfigureAwait(false);

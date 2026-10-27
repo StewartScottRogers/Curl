@@ -14,8 +14,8 @@ namespace Curl.Engine;
 /// </summary>
 /// <remarks>
 /// <see cref="ProxySelector" /> picks the proxy (ADR-0024); <c>-U</c>/<c>--proxy-user</c> then
-/// replaces its credential, as curl 8.21.0 lets <c>-U</c> win over the proxy URL's user
-/// information. The chosen proxy reaches both <see cref="ITransferContext.Proxy" />, which a
+/// gives it a credential when the proxy URL has no user information, as curl 8.22.0 lets the
+/// proxy URL's user and password win over <c>-U</c> (CGR-079, ADR-0825). The chosen proxy reaches both <see cref="ITransferContext.Proxy" />, which a
 /// handler connecting over TCP hands to the connector's tunnel (ADR-0056), and
 /// <see cref="Curl.Protocol.Abstractions.HttpRequestOptions.ForwardProxy" />, where the HTTP
 /// handler forwards a plain <c>http</c> request itself and hands every other route to the
@@ -206,7 +206,10 @@ internal static class TransferProxySelection
     private static ProxyEndpoint? WithHttp10Kind(ProxyEndpoint? proxy, EasyProxyOptions options) =>
         proxy is { Kind: ProxyKind.Http } && options.ProxyType == ProxyType.Http10 ? proxy with { Kind = ProxyKind.Http10 } : proxy;
 
-    /// <summary>Replaces the proxy's credential with the <c>-U</c> one, when both are present.</summary>
+    /// <summary>
+    /// Gives the proxy the <c>-U</c> credential when its URL carries no user information of its own,
+    /// as curl's <c>parse_proxy</c> lets the URL's user and password win (CGR-079, BL-3608, ADR-0825).
+    /// </summary>
     private static ProxyEndpoint? WithProxyUser(ProxyEndpoint? proxy, NetworkCredential? proxyUser) =>
-        proxy is not null && proxyUser is not null ? proxy with { Credential = proxyUser } : proxy;
+        proxy is { Credential: null } && proxyUser is not null ? proxy with { Credential = proxyUser } : proxy;
 }

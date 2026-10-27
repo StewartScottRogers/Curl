@@ -49,6 +49,10 @@ internal sealed class CommandLineGlobalState
 
     public bool ActsAsQuicBuild { get; set; }
 
+    public bool ActsAsEchBuild { get; set; }
+
+    public bool ActsAsCAresBuild { get; set; }
+
     public Func<string, string?> ReadEnvironmentVariable { get; set; } = Environment.GetEnvironmentVariable;
 
     public bool Silent { get; set; }
@@ -116,6 +120,8 @@ internal sealed class CommandLineGlobalState
     public bool ReadingConfigFileAsWireText { get; set; }
 
     public bool ApplyingValueLedByVariableBytes { get; set; }
+
+    public bool ApplyingExpandedValue { get; set; }
 
     public System.Text.Encoding? ConfigFileWireTextEncoding { get; set; }
 }

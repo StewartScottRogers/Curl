@@ -147,6 +147,7 @@ internal static class HttpDownloadConditions
     /// <returns><see langword="true" /> when the body is to be delivered.</returns>
     internal static bool IsMet(TimeCondition condition, long? documentTime) =>
         documentTime is not { } time
+        || time == 0
         || (condition.Kind == TimeConditionKind.IfUnmodifiedSince ? time < condition.ValueUnixSeconds : time > condition.ValueUnixSeconds);
 
     /// <summary>

@@ -33,7 +33,11 @@ public sealed record AwsSigV4Request
     /// </summary>
     public required string HostHeaderValue { get; init; }
 
-    /// <summary>Gets the URL's path as curl's URL parser leaves it, e.g. <c>/bucket/key%20a</c>.</summary>
+    /// <summary>
+    /// Gets the URL's path as curl's URL parser leaves it, e.g. <c>/bucket/key%20a</c>; a
+    /// character above <c>~</c> is signed as the request line sends it, each of its bytes in the
+    /// signer's argument encoding as <c>%XX</c> (CGR-078).
+    /// </summary>
     public required string Path { get; init; }
 
     /// <summary>Gets the URL's query without the <c>?</c>; <see langword="null" /> when there is none.</summary>

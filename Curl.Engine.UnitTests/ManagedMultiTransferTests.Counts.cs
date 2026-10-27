@@ -55,11 +55,11 @@ public sealed partial class ManagedMultiTransferTests
         CurlWaitSocket[] sockets = new CurlWaitSocket[4];
 
         CurlMultiCode beforePerform = multi.GetWaitSockets(sockets, out int countBeforePerform);
-        await multi.PerformAsync(CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         CurlMultiCode running = multi.GetWaitSockets(sockets, out int countRunning);
         CurlWaitSocket[] runningSockets = [.. sockets];
         first.Finish(CurlCode.Ok);
-        await multi.PerformAsync(CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         CurlWaitSocket[] afterFirst = new CurlWaitSocket[3];
         multi.GetWaitSockets(afterFirst, out int countAfterFirst);
 
@@ -94,7 +94,7 @@ public sealed partial class ManagedMultiTransferTests
         multi.GetWaitSockets(first, out _);
         multi.GetWaitSockets(second, out _);
         multi.Options = new MultiOptions { Socket = (_, socket, _, _) => { told.Add(socket); return 0; } };
-        await multi.PerformAsync(CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         CurlSocket expected = new(ManagedMultiTransfer.FirstTransferSocket);
         Assert.AreEqual(expected, first[0].Socket);
@@ -277,7 +277,7 @@ public sealed partial class ManagedMultiTransferTests
         };
         multi.EnableNotification(CurlMultiNotification.EasyDone);
         multi.Add(transfer);
-        await multi.PerformAsync(CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         await multi.PerformAsync(CancellationToken.None);
 

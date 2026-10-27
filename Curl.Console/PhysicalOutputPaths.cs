@@ -29,6 +29,13 @@ internal sealed class PhysicalOutputPaths(Func<string, bool>? isRegularFile, CRu
             return true;
         }
 
+        if (ParentIsRegularFile(path))
+        {
+            errorNumber = CRuntimeErrorNumbers.NotADirectory;
+
+            return false;
+        }
+
         try
         {
             Directory.CreateDirectory(path);
@@ -45,6 +52,19 @@ internal sealed class PhysicalOutputPaths(Func<string, bool>? isRegularFile, CRu
 
     /// <inheritdoc />
     public bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
+
+    /// <summary>
+    /// Tells whether the directory <paramref name="path" /> would be created in is a regular file,
+    /// where <c>mkdir</c> fails with <c>ENOTDIR</c> (<c>ENOENT</c> on Windows; both give curl's
+    /// <c>Error creating directory</c>). .NET on Windows reports that file as
+    /// <c>ERROR_ALREADY_EXISTS</c> instead, an <c>EEXIST</c> curl would ignore (CGR-048, BL-3577).
+    /// </summary>
+    /// <param name="path">The directory to create.</param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="path" />'s parent is a file; a path with no
+    /// parent gives <see langword="null" /> or an empty string, which <see cref="File.Exists(string)" /> rejects.
+    /// </returns>
+    private static bool ParentIsRegularFile(string path) => File.Exists(Path.GetDirectoryName(path));
 
     /// <inheritdoc />
     public OutputFileRemoval RemoveFile(string path)

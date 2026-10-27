@@ -41,6 +41,10 @@ public sealed partial class TcpConnectorTests
         var port = ClosedLoopbackPort();
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new TcpDialer(), new FakeTlsProvider(), TimeProvider.System);
 
+        // One untimed connect first, so the timed one measures the refusal, not the first use's
+        // JIT and socket start-up on a busy runner (633 ms on macOS CI, BL-3845).
+        await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", port, UseTls: false));
+
         var stopwatch = Stopwatch.StartNew();
         var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", port, UseTls: false));
         stopwatch.Stop();

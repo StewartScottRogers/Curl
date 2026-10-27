@@ -15,7 +15,7 @@ namespace Curl.Core;
 /// The gateway is <c>--ipfs-gateway</c> when given, a URL with no scheme getting the one
 /// <see cref="UrlSchemeGuesser" /> guesses (curl's <c>CURLU_GUESS_SCHEME</c>); else the
 /// <c>IPFS_GATEWAY</c> environment variable, even empty; else the first line of <c>$IPFS_PATH/gateway</c>, or of <c>$HOME/.ipfs/gateway</c> when
-/// <c>IPFS_PATH</c> is not set. A gateway from the environment or the file must name its
+/// <c>IPFS_PATH</c> is not set or empty. A gateway from the environment or the file must name its
 /// scheme. <c>HOME</c> is the only home curl reads, on Windows too: <c>USERPROFILE</c> is
 /// ignored. No gateway, or a file whose first line (up to <c>\r</c> or <c>\n</c>) is empty,
 /// is <see cref="IpfsGatewayFailure.GatewayDetectionFailed" />.
@@ -244,7 +244,8 @@ public sealed class IpfsGatewayRewriter(
 
     private string? ReadGatewayFile()
     {
-        string? folder = readEnvironmentVariable(IpfsPathVariableName) ?? HomeIpfsFolder();
+        string? ipfsPath = readEnvironmentVariable(IpfsPathVariableName);
+        string? folder = string.IsNullOrEmpty(ipfsPath) ? HomeIpfsFolder() : ipfsPath;
         string? text = folder is null ? null : readFileText(folder.TrimEnd('/') + "/gateway");
         string firstLine = text is null ? string.Empty : text[..IndexOfLineEnd(text)];
 

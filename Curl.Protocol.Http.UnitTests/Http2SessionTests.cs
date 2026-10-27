@@ -52,7 +52,7 @@ public sealed class Http2SessionTests
         Http2StreamConnection stream = (Http2StreamConnection)session.CreateStream("http", 0, ignoresBody: false);
         Diagnostics.Arrange("upgraded stream", "stream 1 opened by the h2c upgrade, settings not yet acknowledged");
 
-        await stream.StartUpgradedAsync(CancellationToken.None);
+        await stream.StartUpgradedAsync(isHead: false, CancellationToken.None);
 
         string written = Convert.ToHexString(connection.Written);
         const string StreamOneWindowUpdate = "000004080000000001009F0001";
@@ -212,14 +212,16 @@ public sealed class Http2SessionTests
     public async Task ReceiveAsync_WhenTheReceiverAlreadyHasAFrame_ReadsNoOther()
     {
         HpackEncoder server = new();
-        byte[] scripted = [.. Http2FrameCodec.Serialize(Headers(server, 1, isEndStream: true)), .. Http2FrameCodec.Serialize(Headers(server, 3, isEndStream: true))];
-        Diagnostics.Arrange("server frames", "HEADERS 1 end, HEADERS 3 end, with no SETTINGS");
+        byte[] scripted = [.. Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])), .. Http2FrameCodec.Serialize(Headers(server, 1, isEndStream: true)), .. Http2FrameCodec.Serialize(Headers(server, 3, isEndStream: true))];
+        Diagnostics.Arrange("server frames", "SETTINGS, HEADERS 1 end, HEADERS 3 end");
         Diagnostics.Bytes("scripted server bytes", scripted);
         ScriptedConnection connection = new(scripted, 65536);
         Http2Session session = new(connection);
         Http2StreamConnection first = await StartAsync(session, "/1");
         Http2StreamConnection second = await StartAsync(session, "/2");
 
+        // The first read takes the SETTINGS, the second HEADERS 1; the third finds stream 1 already holding a frame.
+        await session.ReceiveAsync(first, CancellationToken.None);
         await session.ReceiveAsync(first, CancellationToken.None);
         await session.ReceiveAsync(first, CancellationToken.None);
 
@@ -237,10 +239,12 @@ public sealed class Http2SessionTests
         Http2Session session = new(connection);
         Http2StreamConnection first = await StartAsync(session, "/1");
         Http2StreamConnection second = await StartAsync(session, "/2");
+        connection.Push(Http2FrameCodec.Serialize(Http2FrameFactory.CreateSettings([])));
+        await session.ReceiveAsync(first, CancellationToken.None);
         Task firstWait = session.ReceiveAsync(first, CancellationToken.None).AsTask();
         Task secondWait = session.ReceiveAsync(second, CancellationToken.None).AsTask();
         byte[] pushed = Http2FrameCodec.Serialize(Headers(server, 1, isEndStream: true));
-        Diagnostics.Arrange("frame pushed while both streams wait", "HEADERS 1 end");
+        Diagnostics.Arrange("frame pushed while both streams wait, after the server's SETTINGS was read", "HEADERS 1 end");
         Diagnostics.Bytes("pushed bytes", pushed);
 
         connection.Push(pushed);
@@ -248,10 +252,11 @@ public sealed class Http2SessionTests
 
         Diagnostics.Act("received by stream 1 and stream 3", string.Join(", ", first.HasReceived, second.HasReceived));
         Diagnostics.Act("connection reads", connection.ReadCount);
-        Diagnostics.Assert("connection reads", 1, connection.ReadCount);
+        // One read for the SETTINGS, one for the HEADERS: the stream that lost the race reads nothing.
+        Diagnostics.Assert("connection reads", 2, connection.ReadCount);
         Assert.IsTrue(first.HasReceived);
         Assert.IsFalse(second.HasReceived);
-        Assert.AreEqual(1, connection.ReadCount);
+        Assert.AreEqual(2, connection.ReadCount);
     }
 
     [TestMethod]
@@ -307,8 +312,8 @@ public sealed class Http2SessionTests
     {
         byte[] scripted = Frames(
             [new Http2Setting(Http2SettingIdentifier.MaxConcurrentStreams, 1)],
-            Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.RefusedStream));
-        Diagnostics.Arrange("server frames", "SETTINGS MAX_CONCURRENT_STREAMS 1, RST_STREAM 1 REFUSED_STREAM");
+            Http2FrameFactory.CreateRstStream(1, Http2ErrorCode.Cancel));
+        Diagnostics.Arrange("server frames", "SETTINGS MAX_CONCURRENT_STREAMS 1, RST_STREAM 1 CANCEL");
         Diagnostics.Bytes("scripted server bytes", scripted);
         ScriptedConnection connection = new(scripted, 65536);
         Http2Session session = new(connection);

@@ -19,9 +19,18 @@ internal static class ScpRemotePath
     /// </summary>
     /// <param name="urlPath">The URL's path, as parsed, with its percent-escapes.</param>
     /// <returns>The path's bytes.</returns>
+    /// <exception cref="SshTransferException">
+    /// The path holds <c>%00</c> (exit 3, <c>URL using bad/illegal format or missing URL</c>),
+    /// as curl 8.22.0 answers before it opens the channel (CGR-134, BL-3663).
+    /// </exception>
     internal static byte[] Resolve(string urlPath)
     {
         byte[] path = SftpRemotePath.Decode(urlPath);
+        if (Array.IndexOf(path, (byte)0) >= 0)
+        {
+            throw SshTransferException.UrlPathHoldsZeroByte();
+        }
+
         return path.Length > HomePrefix.Length && path.AsSpan().StartsWith(HomePrefix) ? path[HomePrefix.Length..] : path;
     }
 }

@@ -37,6 +37,9 @@ internal sealed class UrlGlobParser(string url)
     /// <summary>curl's <c>MAX_IP6LEN</c>: a bracketed IPv6 literal is shorter than this.</summary>
     private const int MaxIPv6LiteralLength = 128;
 
+    /// <summary>The most characters curl 8.22.0's URL parser takes as an IPv6 zone id.</summary>
+    private const int MaxZoneLength = 15;
+
     private const long MaxCharacterStep = 256;
 
     private const int MaxCharacterSpan = 'z' - 'a';
@@ -47,8 +50,14 @@ internal sealed class UrlGlobParser(string url)
     /// </summary>
     private const int MaxPieceCount = 256;
 
-    private static readonly System.Buffers.SearchValues<char> ZoneCharacters = System.Buffers.SearchValues.Create(
-        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-._~");
+    /// <summary>
+    /// The characters curl 8.22.0's URL parser refuses in a zone id: space and control
+    /// characters, and the <c>/</c>, <c>?</c>, <c>#</c> and <c>@</c> that end or split an authority.
+    /// </summary>
+    private static readonly System.Buffers.SearchValues<char> ZoneRejectedCharacters = System.Buffers.SearchValues.Create(
+        "\0\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\t\n\u000B\f\r\u000E\u000F"
+        + "\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001A\u001B\u001C\u001D\u001E\u001F"
+        + " \u007F/?#@");
 
     private readonly List<UrlGlobPiece> pieces = [];
 
@@ -203,7 +212,7 @@ internal sealed class UrlGlobParser(string url)
     /// <summary>
     /// Gets whether the text between brackets is an IPv6 address as curl's URL parser takes
     /// one: hexadecimal digits, colons and dots, then optionally <c>%</c> or <c>%25</c> and a
-    /// zone of letters, digits, <c>-</c>, <c>.</c>, <c>_</c> or <c>~</c>.
+    /// zone id.
     /// </summary>
     private static bool IsIPv6Literal(ReadOnlySpan<char> bracketed)
     {
@@ -219,11 +228,27 @@ internal sealed class UrlGlobParser(string url)
             && parsed.AddressFamily == AddressFamily.InterNetworkV6;
     }
 
+    /// <summary>
+    /// Gets whether the text after an IPv6 literal's <c>%</c> is a zone id curl 8.22.0 takes:
+    /// a leading <c>25</c> is the encoded percent sign and is skipped; any other two hexadecimal
+    /// digits there are a percent-encoding it refuses; the rest is 1 to 15 characters with none of
+    /// <see cref="ZoneRejectedCharacters" /> (CGR-057, ADR-0822).
+    /// </summary>
     private static bool IsZone(ReadOnlySpan<char> zone)
     {
-        ReadOnlySpan<char> name = zone.StartsWith("25") ? zone[2..] : zone;
-        return !name.IsEmpty && !name.ContainsAnyExcept(ZoneCharacters);
+        if (zone.StartsWith("25"))
+        {
+            return IsZoneName(zone[2..]);
+        }
+
+        return !StartsWithTwoHexDigits(zone) && IsZoneName(zone);
     }
+
+    private static bool StartsWithTwoHexDigits(ReadOnlySpan<char> text) =>
+        text.Length >= 2 && char.IsAsciiHexDigit(text[0]) && char.IsAsciiHexDigit(text[1]);
+
+    private static bool IsZoneName(ReadOnlySpan<char> name) =>
+        name.Length is > 0 and <= MaxZoneLength && !name.ContainsAny(ZoneRejectedCharacters);
 
     /// <summary>Reads a <c>{a,b}</c> set; the index is just past its <c>{</c>.</summary>
     private UrlGlobError? ReadSet()

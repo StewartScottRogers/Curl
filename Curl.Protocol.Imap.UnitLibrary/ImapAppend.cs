@@ -10,6 +10,9 @@ namespace Curl.Protocol.Imap;
 /// </summary>
 /// <remarks>
 /// <list type="bullet">
+/// <item><c>--crlf</c> is exit 25 <c>Cannot APPEND with CRLF conversion making size unknown</c>,
+/// checked before anything else (CGR-106, measured on curl 8.22.0: it wins over a missing
+/// mailbox and over <c>-T -</c>); it sends no <c>APPEND</c>.</item>
 /// <item>No mailbox in the URL is exit 3 <c>Cannot APPEND without a mailbox.</c>, and an
 /// upload whose size cannot be known first (it cannot seek, as with <c>-T -</c>) exit 25
 /// <c>Cannot APPEND with unknown input file size</c>; neither sends <c>APPEND</c>.</item>
@@ -49,6 +52,11 @@ internal sealed class ImapAppend(ImapControlChannel channel, ITransferContext co
     /// <exception cref="ImapResponseMissingException">The server closed before a response was complete.</exception>
     public async ValueTask<TransferResult> AppendAsync(string? mailbox, Stream upload)
     {
+        if (context.ConvertLineEndings)
+        {
+            return TransferResult.Failure(CurlExitCode.UploadFailed, ImapSessionMessages.AppendWithCrlfConversion);
+        }
+
         if (mailbox is null)
         {
             return TransferResult.Failure(CurlExitCode.UrlMalformat, ImapSessionMessages.AppendWithoutMailbox);

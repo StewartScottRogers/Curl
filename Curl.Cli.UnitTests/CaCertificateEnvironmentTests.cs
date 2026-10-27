@@ -126,7 +126,7 @@ public sealed class CaCertificateEnvironmentTests
     {
         Diagnostics.ArrangeArguments(arguments);
 
-        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), new DefaultConfigFileSearch(_ => null, false, null, null), isWindows, environment);
+        CommandLineParseResult result = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), new RecordingDataFileReader(), new DefaultConfigFileSearch(_ => null, false, null, null), isWindows, environment);
         Diagnostics.ActParse(result);
         return result;
     }

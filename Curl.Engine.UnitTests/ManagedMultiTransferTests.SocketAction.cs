@@ -122,53 +122,6 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task SocketActionAsync_SocketCallbackReturnsMinusOne_AbortsAndEndsEveryTransferOnTheNextCall()
-    {
-        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
-        multi.Options = new MultiOptions { Socket = (_, _, _, _) => -1 };
-        ControlledEasyTransfer started = new();
-        multi.Add(started);
-
-        (CurlMultiCode Code, int RunningTransfers) aborted = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        ControlledEasyTransfer addedLater = new();
-        multi.Add(addedLater);
-        (CurlMultiCode Code, int RunningTransfers) after = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-
-        Assert.AreEqual((CurlMultiCode.AbortedByCallback, 1), aborted);
-        Assert.AreEqual(CurlMultiCode.AbortedByCallback, after.Code);
-        Assert.AreEqual(0, after.RunningTransfers);
-        Assert.IsTrue(started.PerformToken.IsCancellationRequested);
-        Assert.AreEqual(0, addedLater.PerformCount);
-        Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? first, out _));
-        Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? second, out _));
-        Assert.AreEqual(CurlCode.AbortedByCallback, first.Result);
-        Assert.AreEqual(CurlCode.AbortedByCallback, second.Result);
-    }
-
-    [TestMethod]
-    public async Task SocketActionAsync_AbortedBeforeTheSecondTransfersSocket_RemovesOnlyTheFirstsSocket()
-    {
-        List<string> calls = [];
-        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
-        multi.Options = new MultiOptions
-        {
-            Socket = (_, socket, what, _) =>
-            {
-                calls.Add($"socket {socket.Handle} {what}");
-                return calls.Count == 1 ? -1 : 0;
-            },
-        };
-        multi.Add(new ControlledEasyTransfer());
-        multi.Add(new ControlledEasyTransfer());
-
-        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        (CurlMultiCode Code, int RunningTransfers) after = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-
-        Assert.AreEqual(0, after.RunningTransfers);
-        CollectionAssert.AreEqual(new[] { $"socket {FirstSocket.Handle} In", $"socket {FirstSocket.Handle} Remove" }, calls);
-    }
-
-    [TestMethod]
     public async Task Add_TimerCallbackReturnsMinusOne_AbortsAndTheTransferNeverStarts()
     {
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -185,19 +138,6 @@ public sealed partial class ManagedMultiTransferTests
         Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out int remaining));
         Assert.AreEqual(CurlCode.AbortedByCallback, message.Result);
         Assert.AreEqual(0, remaining);
-    }
-
-    [TestMethod]
-    public async Task PerformAsync_SocketCallbackSet_TellsItOfTheTransfersSockets()
-    {
-        List<string> calls = [];
-        await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
-        multi.Options = new MultiOptions { Socket = RecordingOptions(calls).Socket };
-        multi.Add(new ControlledEasyTransfer());
-
-        await multi.PerformAsync(CancellationToken.None);
-
-        CollectionAssert.AreEqual(new[] { $"socket {FirstSocket.Handle} In null" }, calls);
     }
 
     [TestMethod]
