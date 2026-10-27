@@ -31,10 +31,30 @@ namespace Curl.Cli;
 /// It is probably a mistake. Consider double quotes.</c> and keeps the quote. An empty unquoted
 /// parameter is no parameter.</item>
 /// </list>
-/// The 10 MiB line limit is <see cref="ReadableLength"/>.
+/// The 10 MiB line limit is <see cref="ReadableLength"/>, and the Windows build's Ctrl-Z end of file
+/// is <see cref="TextModeContents"/>.
 /// </remarks>
 internal static class ConfigFileSyntax
 {
+    /// <summary>The Ctrl-Z byte a Windows text-mode read takes as the end of the file.</summary>
+    private const byte TextModeEndOfFile = 0x1A;
+
+    /// <summary>
+    /// The bytes of a config file curl reads: on Windows, where curl 8.22.0 reads a <c>-K</c> file,
+    /// <c>-K -</c> and <c>.curlrc</c> in text mode, those before the first Ctrl-Z (0x1A), which ends the
+    /// read; elsewhere all of them, a Ctrl-Z being content. Measured with the local curl 8.22.0 on
+    /// 2026-10-26 (CGR-113, BL-3642): <c>write-out = "A"</c> CR LF Ctrl-Z <c> bogus = 1</c> writes
+    /// <c>A</c> with nothing on stderr, and <c>write-out = "A</c> Ctrl-Z <c>Z"</c> writes <c>A</c>.
+    /// </summary>
+    /// <param name="contents">The file's bytes.</param>
+    /// <param name="readsInWindowsTextMode">Whether the file is read as curl's Windows build reads it.</param>
+    /// <returns><paramref name="contents"/>, or its bytes before the first Ctrl-Z.</returns>
+    internal static byte[] TextModeContents(byte[] contents, bool readsInWindowsTextMode)
+    {
+        int endOfFile = readsInWindowsTextMode ?Array.IndexOf(contents, TextModeEndOfFile) : -1;
+        return endOfFile < 0 ? contents : contents[..endOfFile];
+    }
+
     /// <summary>
     /// The shortest line, counting its LF, curl 8.21.0 cannot read: its line buffer holds 10 MiB
     /// (10485760 bytes) with the line's terminating NUL. Measured with the local curl 8.21.0 on
