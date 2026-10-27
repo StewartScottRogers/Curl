@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/Cgr111Tests.cs]
+touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitLibrary/OpenSslSubjectNameHash.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/Cgr111Tests.cs, Curl.Networking.UnitTests/SslStreamTlsProviderTests.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3640 — Fix CGR-111: --capath / SSL_CERT_DIR trust every certificate file in the directory; OpenSSL REF only uses subject-hash-named (c_rehash) files
 
@@ -66,17 +66,30 @@ SSL_CERT_DIR=/nope:plain ...
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr111Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Plan and decision (ADR-0835, decided by Claude under Stewart's delegation): the OpenSSL build now reads `--capath` / `SSL_CERT_DIR` as OpenSSL's `by_dir.c` does. The value is split at `Path.PathSeparator` (`:` off Windows), empty entries skipped. Only files named `<8 lowercase hex>.<digits>` are opened, `<hash>.0` upward until a number is missing, and only certificates whose subject hashes to `<hash>` are trusted. The hash is `X509_NAME_hash`, computed by hand in the new `OpenSslSubjectNameHash` (canonical UTF8String encoding, SHA-1, the first four bytes read little-endian).
+- Measured: Git's `openssl x509 -noout -subject_hash` gives `4042bcee` for `/C=US/O=Internet Security Research Group/CN=ISRG Root X1` and `ce275665` for `/CN=localhost`. `Cgr111Tests` pins both, plus the case and whitespace canonicalisation.
+- Repro results. REF is the report's REF-LINUX (curl 8.18.0 OpenSSL): this Windows lane has only the Schannel curl, which ignores `--capath`, so the Linux run could not be repeated here.
+  - `--capath plain` (cert as `server-ca.crt`): REF exit 60 `SSL certificate OpenSSL verify result: self-signed certificate (18)`, nothing on stdout. PORT: no anchors are read (`ReadTrustAnchors_CapathWhoseCertificateFileIsNotHashNamed_TrustsNothing`), so it is exit 60 with the same message (`SslStreamTlsProviderTests`' empty-directory and unreadable-file cases pin that message for an empty `--capath`).
+  - `SSL_CERT_DIR=plain`: same as above. `CaCertificateEnvironment` passes `SSL_CERT_DIR` as `CaCertificateDirectory`.
+  - `SSL_CERT_DIR=/nope:plain`: REF exit 60. PORT exit 60 (`..._SslCertDirListWithAMissingDirectoryThenAPlainOne_TrustsNothing`).
+  - The variant that already matched, `--capath hashdir` (after `openssl rehash`): REF exit 0, PORT exit 0 (`..._CapathWhoseCertificateFileIsHashNamed_TrustsIt`, and the `SslStreamTlsProviderTests` / `HandBuiltTlsProviderTests` handshakes with the certificate under its hash name). `/nope:hashdir` is now trusted as OpenSSL trusts it.
+  - Bytes on the wire are unchanged: only the trust decision after the server's certificate differs.
+- Before the fix, `Cgr111Tests`' plain-directory and `/nope:plain` tests fail, because every file was trusted. After the fix they pass.
+- `touches` widened: the new `OpenSslSubjectNameHash.cs`, the project's `CLAUDE.md` (its `--capath` sentence), and `SslStreamTlsProviderTests.cs` / `HandBuiltTlsProviderTests.cs`, whose `--capath` handshakes wrote `server.pem` and now write the hash name. No other task in Doing on origin/work/dark-factory names a Networking file.
+- Platform-neutral: tests use temporary directories, `Path.PathSeparator` and ECDSA certificates made in the test, with no OS-specific text.
+- Fast tests: all 46 assemblies passed (Networking 3645 passed, 31 skipped). Measure-CodeQuality for Curl.Networking.UnitLibrary showed 100% lines. One member, `OpenSslSubjectNameHash.WriteCanonicalAttribute`, had its non-universal tag branch uncovered (complexity 4, CRAP 4). `Of_ContextTaggedValueWithAStringTagNumber_IsHashedAsEncoded` was added for it; Measure-CodeQuality was not run again afterwards.
 
 ## Log
 
 - 2026-10-26: Created from CGR-111 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. --capath and SSL_CERT_DIR in the OpenSSL build trust only openssl-rehash-named files, as OpenSSL's hashed directory lookup does (CGR-111)
