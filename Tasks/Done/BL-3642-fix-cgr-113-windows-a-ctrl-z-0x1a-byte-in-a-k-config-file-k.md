@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/ConfigFileSyntax.cs, Curl.Cli.UnitTests/Cgr113Tests.cs]
+touches: [Curl.Cli.UnitLibrary/ConfigFileSyntax.cs, Curl.Cli.UnitLibrary/ConfigFileApplier.cs, Curl.Cli.UnitTests/Cgr113Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3642 — Fix CGR-113: Windows: a Ctrl-Z (0x1A) byte in a -K config file, -K - or .curlrc ends the file for curl; PORT parses past it (unknown option, exit 2)
 
@@ -83,17 +83,28 @@ E\verify\v2_misc.ps1
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr113Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 9): Pipeline `feature` run as a direct change: the fix is one function and two call sites, so no architect stage was needed. Fix: `ConfigFileSyntax.TextModeContents` cuts a config file's bytes at the first 0x1A when the parse acts as the Windows build (`ActsAsWindowsSchannelBuild`); `ConfigFileApplier` applies it to `-K` files, `-K -` and `.curlrc` before the 10 MiB line check. Elsewhere 0x1A stays content (the report's Linux REF 8.18 treats it so). No ADR: this only matches the platform's curl as measured, so there was no design choice to record.
+- Touches widened to `Curl.Cli.UnitLibrary/ConfigFileApplier.cs`, which reads the files and calls the syntax. No task in Doing on origin/work/dark-factory names it.
+- Measured with Record-CurlExchange.ps1 on Windows. REF = Git for Windows curl 8.22.0, PORT = Curl.Console published from this tree. URL `file:///<temp>/body.txt`; the temp path has a space, so both exit 3. That is the same for both and has nothing to do with this issue:
+  - `-s -o NUL -K c.cfg <url>`, c.cfg = `write-out = "A"` CRLF 0x1A ` bogus = 1` CRLF `write-out = "B"` CRLF: REF exit 3, stdout `A`, stderr empty; PORT the same. Before the fix PORT refused with an unknown option and exited 2 (the report's Actual).
+  - `-K mid.cfg`, mid.cfg = `write-out = "A` 0x1A `Z"` LF: REF exit 3, stdout `A`, stderr empty; PORT the same.
+  - `type c.cfg | curl -s -o NUL -K - <url>`: REF and PORT both print `AA` and exit 0.
+  - ENV-06 over HTTP: `-s -K h.cfg http://127.0.0.1:21642/echo`, h.cfg = `header = "X-A: 1"` CRLF 0x1A ` header = "X-C: 3"` CRLF. Both exit 0 with empty stderr, and both requests carry `X-A: 1` and no `X-C`, byte for byte the same.
+  - z1 (url line before 0x1A) and z2 (`.curlrc` with `X-Before` before 0x1A) are pinned in Cgr113Tests through the parser: one URL, no header, and no warning for `.curlrc`.
+- Cgr113Tests: with the cut disabled, 5 of its 6 tests failed; with the fix, all pass. The off-Windows test pins 0x1A as content.
+- Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary: 0 failing members. Build clean and the fast tests green on Windows. The tests feed the parser bytes in memory and use no OS path, so they are platform-neutral, which covers CI on Linux and macOS.
 
 ## Log
 
 - 2026-10-26: Created from CGR-113 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A Ctrl-Z (0x1A) byte ends a -K file, -K - or .curlrc on Windows as in curl 8.22.0; elsewhere it stays content
