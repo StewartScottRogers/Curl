@@ -88,7 +88,7 @@ gateway or not: `curl: Failed to extract a filename from the URL to use for stor
 `curl: (1) Unsupported protocol` (neither under `-s` alone), `%{xfer_id}` and `%{conn_id}`
 `-1`, exit 1, and the run ends (BL-372 Notes). A URL still without a
 scheme gets the one `UrlSchemeGuesser` guesses (`http`, or `ftp` for `ftp.` and so on), which
-`%{url_effective}` shows while `%{url}` keeps the URL as typed. Measured on curl 8.21.0
+`%{url_effective}` shows while `%{url}` keeps the URL as typed - unless `-G` or `--url-query` appends a query, when `%{url}` and `%{url.*}` read the URL with it, normalised as `%{url_effective}` is, still without a guessed scheme (CGR-089, BL-3618). Measured on curl 8.21.0
 (BL-240 Notes). `%{url_effective}` prints the URL `Curl.Engine`'s `UrlEffective` rebuilds: the scheme in
 lower case, the user info and host name as typed, an IP address and the port as curl 8.22.0
 holds them (`0x7f.1:09` prints `127.0.0.1:9`, an empty port is dropped), and the path as curl

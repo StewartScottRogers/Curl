@@ -2845,12 +2845,37 @@ internal sealed class CurlCommandRunner(
         Api.Info.TransferInfo info = Running.EasyWriteOutInfo is { } easyInfo && easyInfo.Describes(result)
             ? easyInfo.Info
             : ReportWriteOutInfo(options, transfer, transferUrl, result, connectionId);
-        return new(debugWriteOut.Apply(info), result, givenUrl, transfer.UrlNumber)
+        return new(debugWriteOut.Apply(info), result, WriteOutGivenUrl(options, givenUrl, transferUrl), transfer.UrlNumber)
         {
             OutputFileName = Running.OutputFileName,
             RetryCount = Running.RetryCount,
             LibraryVersion = debugWriteOut.LibraryVersionOr(TransferWriteOutVariables.FormatLibraryVersion(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS())),
         };
+    }
+
+    /// <summary>
+    /// The URL <c>%{url}</c> and <c>%{url.&lt;part&gt;}</c> read: <paramref name="givenUrl" /> as typed, unless
+    /// <c>-G</c> or <c>--url-query</c> appends a query, which curl's tool does by rebuilding the URL with its URL API
+    /// and storing the result in place of the typed one. That URL is normalised as <c>%{url_effective}</c> is, keeps
+    /// no scheme the user did not type (curl 8.21.0 Schannel: <c>-G -d a=b 127.0.0.1:1/p</c> prints
+    /// <c>127.0.0.1:1/p?a=b</c>), and stays as typed, without the query, when curl rejects it (CGR-089, BL-3618).
+    /// </summary>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="givenUrl">The URL as it was given.</param>
+    /// <param name="transferUrl">The URL transferred, with its guessed scheme.</param>
+    /// <returns>The URL <c>%{url}</c> prints.</returns>
+    private static string WriteOutGivenUrl(CommandLineOptions options, string givenUrl, string transferUrl)
+    {
+        string queriedUrl = QueryUrl.Append(transferUrl, options);
+        if (queriedUrl == transferUrl || !CurlUrl.TryParse(queriedUrl, pathAsIs: false, out _))
+        {
+            return givenUrl;
+        }
+
+        string url = UrlEffective.Normalize(queriedUrl, pathAsIs: false);
+        return UrlSchemeGuesser.AddScheme(givenUrl, options.DefaultProtocol) == givenUrl
+            ? url
+            : url[(url.IndexOf("://", StringComparison.Ordinal) + "://".Length)..];
     }
 
     /// <summary>
