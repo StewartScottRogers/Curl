@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr165Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3694 — Fix CGR-165: Explicit FTPS (AUTH TLS) never reuses the control connection for the next URL, while a CCC-cleared plaintext connection is reused where c...
 
@@ -61,17 +61,26 @@ curl -sS -k --ssl-reqd --ftp-ssl-ccc ftp://localhost:<p>/file.txt ftp://localhos
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr165Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Pipeline `feature`, done directly in one library: the cause was one condition in `FtpSession.TryKeepControlConnection`, so a full architect/implementer round would have cost more than the fix. Cause: the session kept only the pooled connection it was given, so an `AUTH`-wrapped TLS connection was never kept, while `CCC`'s `ClearTlsAsync` hands back that same pooled connection, so a cleared one was. Fix: `FtpKeptConnection.SecuredControl` holds the TLS connection (the reusing session switches to it and the closing `QUIT` goes on it), and a `controlCleared` flag stops a CCC-cleared connection from being kept. Decision recorded in ADR-0857.
+- Measured on Windows with `Record-CurlExchange.ps1 -Ftp -FtpData hello`, REF = curl 8.22.0 Schannel, PORT = this branch's Debug `curl.exe`:
+  - `curl -sS -k --ssl-reqd ftp://localhost:21946/a.txt ftp://localhost:21946/b.txt`: REF and PORT both exit 0, stdout `hellohello`, stderr empty. Transcripts are equal apart from the EPSV port: one connection with `AUTH SSL`, USER, PASS, `PBSZ 0`, `PROT P`, PWD, EPSV, `TYPE I`, `SIZE a.txt`, `RETR a.txt`, EPSV, `SIZE b.txt`, `RETR b.txt`, QUIT. Before the fix PORT sent QUIT after `RETR a.txt` and logged in again.
+  - Control: `curl -sS -k ftps://localhost:21947/a.txt ftps://localhost:21947/b.txt` (with `-Tls`): REF and PORT both exit 0, stdout `hellohello`, transcripts equal. It still matches.
+  - `curl -sS -k --ssl-reqd --ftp-ssl-ccc ftp://localhost:21948/file.txt ftp://localhost:21948/file2.txt`: REF and PORT both exit 28, with stderr `curl: (81) Failed to clear the command channel (CCC)` then `curl: (28) server response timeout`. Both send the same commands, AUTH SSL through CCC. It still matches.
+  - Linux REF (curl 8.18.0 OpenSSL in WSL, `-Curl wsl.exe -ListenAddress 172.26.96.1`) with `--ftp-ssl-ccc`: after CCC it sends PWD, EPSV, `TYPE I`, `SIZE file.txt` and `RETR file.txt` in plain text, then nothing more on that connection; it tries a new connection for `file2.txt`, which the one-session recorder never answers (exit 28 under `--connect-timeout 5`). PORT cannot run on Linux from this lane. The CCC behaviour is pinned by `Cgr165Tests.ExecuteAsync_ControlConnectionCccCleared_IsNotKeptAndEndsWithQuit`: PORT now ends the cleared connection with QUIT and connects anew. curl sends that QUIT when its cache closes the connection at exit. The bytes on each connection are the same; only their order across the two connections differs (ADR-0857).
+- `Cgr165Tests` (2 tests): both fail with the production change reverse-applied and pass with it. Build clean. Fast tests: 44,556 in all, none failed. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 0 failing members.
+- CI on Linux and macOS: the change is platform-neutral (in-memory fakes, no paths, OS error text or certificates), so that criterion is met with the fast tests green here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-165 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Explicit FTPS keeps its AUTH-secured control connection for the next URL, and a CCC-cleared one is never reused, as curl does
