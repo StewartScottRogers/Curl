@@ -76,7 +76,7 @@ curl -sS --doh-url http://127.0.0.1:21800/dns-query http://<64 x 'a'>.test:21802
   - `... http://foo..test:21802/x`: REF and PORT exit 27 `[1]`, empty stdout.
   - Extra variant, a 310-byte name of 50-byte labels: REF and PORT exit 27 `[13]`.
   - Already matching: `http://ok.test:21802/x` with the DoH server unreachable: REF and PORT exit 6 `Could not resolve host: ok.test`.
-  - Not in the issue's repro: the same names on `https://` origins. REF exits 27; PORT still exits 6, because `TcpConnector`'s HTTPS-origin lookup carries no failure reason and `TcpConnector.cs` is held by BL-3686. Filed as BL-3913 (depends on BL-3686).
+  - Not in the issue's repro: the same names on `https://` origins. REF exits 27; PORT still exits 6, because `TcpConnector`'s HTTPS-origin lookup carries no failure reason and `TcpConnector.cs` is held by BL-3686. Filed as BL-3915 (depends on BL-3686).
 - Linux/macOS: the change and the test are platform-neutral (no paths, OS text or certificates); the gap report gives the same exit 27 on Linux.
 - Unit test `Cgr158Tests` (5 cases): `ResolveWithFailureReasonAsync` did not exist and `Describe` returned exit 6 before the fix; all pass after.
 - `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members. `dotnet build` clean; fast tests 44238 passed, 0 failed across 46 test projects.

@@ -1,5 +1,5 @@
 ---
-id: BL-3913
+id: BL-3915
 title: DoH: an https:// origin whose host cannot be DNS-encoded exits 6 instead of 27 Failed to encode DoH packet
 priority: Normal
 assignee: Claude

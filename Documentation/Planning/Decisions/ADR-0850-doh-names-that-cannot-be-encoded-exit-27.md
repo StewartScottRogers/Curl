@@ -22,9 +22,9 @@ as `DnsLookupFailure.DohBadLabel` or `DnsLookupFailure.DohNameTooLong`. `NameRes
 exit 27 (`CurlExitCode.OutOfMemory`, as curl reuses `CURLE_OUT_OF_MEMORY`) with curl's message, in place of
 the `Could not resolve` one. The failure travels the existing failure-reason path, so `TcpConnector`,
 `UdpDatagramConnector` and the wrapping resolvers need no new code. A direct connect's `https://` origin asks
-the resolver through `IHttpsOriginDnsResolver`, which carries no reason; BL-3913 carries it there.
+the resolver through `IHttpsOriginDnsResolver`, which carries no reason; BL-3915 carries it there.
 
 ## Consequences
 
-- `http://` origins under `--doh-url` match curl for these names; `https://` ones still exit 6 until BL-3913.
+- `http://` origins under `--doh-url` match curl for these names; `https://` ones still exit 6 until BL-3915.
 - No new exception type: a resolver failure stays a `DnsResolution`.
