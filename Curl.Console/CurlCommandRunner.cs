@@ -456,6 +456,9 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private Stream? standardErrorFile;
 
+    /// <summary>The encoding of a refused command line's lines on standard error when they echo command-line text: the system ANSI code page on Windows, in which that text was read (ADR-0840, BL-3893), and UTF-8 elsewhere.</summary>
+    private readonly Encoding commandLineEchoEncoding = CredentialEncoding.ForPlatform(runsOnWindows);
+
     /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input and sends command-line header text in the platform's encoding (ADR-0067).</summary>
     private readonly TransferContextFactory transferContextFactory = new(standardInput, timeProvider, CredentialEncoding.ForPlatform(runsOnWindows));
 
@@ -972,7 +975,7 @@ internal sealed class CurlCommandRunner(
 
         // curl 8.21.0 refuses a later -:/--next group only once the groups before it have run
         // (test686: "htdhdhdtp://localhost --next" exits 2).
-        await WriteErrorLinesAsync(refusalAfterGroups.StandardErrorLines).ConfigureAwait(false);
+        await WriteRefusalLinesAsync(refusalAfterGroups).ConfigureAwait(false);
         return (int)refusalAfterGroups.ExitCode;
     }
 
@@ -5087,15 +5090,33 @@ internal sealed class CurlCommandRunner(
         runsOnWindows && options.UseAscii ? new TextModeUntilBinaryStream(output, () => standardOutputSwitchedToBinary) : output;
 
     /// <summary>
-    /// Writes each of <paramref name="lines" /> to standard error, in order.
+    /// Writes each of <paramref name="lines" /> to standard error as UTF-8, in order.
     /// </summary>
     /// <param name="lines">The lines, without terminators.</param>
     /// <returns>A task that completes when every line is flushed.</returns>
-    private async Task WriteErrorLinesAsync(IReadOnlyList<string> lines)
+    private Task WriteErrorLinesAsync(IReadOnlyList<string> lines) => WriteErrorLinesAsync(lines, Encoding.UTF8);
+
+    /// <summary>
+    /// Writes a refused command line's lines to standard error: in <see cref="commandLineEchoEncoding" />
+    /// when they echo command-line text, as UTF-8 when they echo a config file's
+    /// (<see cref="CommandLineRefusal.EchoesConfigFileText" />, ADR-0840).
+    /// </summary>
+    /// <param name="refusal">The refusal.</param>
+    /// <returns>A task that completes when every line is flushed.</returns>
+    private Task WriteRefusalLinesAsync(CommandLineRefusal refusal) =>
+        WriteErrorLinesAsync(refusal.StandardErrorLines, refusal.EchoesConfigFileText ? Encoding.UTF8 : commandLineEchoEncoding);
+
+    /// <summary>
+    /// Writes each of <paramref name="lines" /> to standard error in <paramref name="encoding" />, in order.
+    /// </summary>
+    /// <param name="lines">The lines, without terminators.</param>
+    /// <param name="encoding">The encoding of the bytes written.</param>
+    /// <returns>A task that completes when every line is flushed.</returns>
+    private async Task WriteErrorLinesAsync(IReadOnlyList<string> lines, Encoding encoding)
     {
         foreach (string line in lines)
         {
-            await WriteErrorLineAsync(line).ConfigureAwait(false);
+            await WriteErrorLineAsync(line, encoding).ConfigureAwait(false);
         }
     }
 
@@ -5198,12 +5219,12 @@ internal sealed class CurlCommandRunner(
         {
             await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
             await WriteTlsSessionLinesAsync(optionsRead, LoadTlsSessionFileLines).ConfigureAwait(false);
-            await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
+            await WriteRefusalLinesAsync(refusal).ConfigureAwait(false);
             await WriteTlsSessionLinesAsync(optionsRead, (sessions, options) => TlsSessionFileLines.Save(sessions, options, runsOnWindows)).ConfigureAwait(false);
         }
         else
         {
-            await WriteErrorLinesAsync(refusal.StandardErrorLines).ConfigureAwait(false);
+            await WriteRefusalLinesAsync(refusal).ConfigureAwait(false);
             await WriteDefaultConfigFileNoteAsync(notedDefaultConfigFile).ConfigureAwait(false);
         }
     }
@@ -5232,14 +5253,23 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="line">The line, without a terminator.</param>
     /// <returns>A task that completes when the line is flushed.</returns>
-    private Task WriteErrorLineAsync(string line)
+    private Task WriteErrorLineAsync(string line) => WriteErrorLineAsync(line, Encoding.UTF8);
+
+    /// <summary>
+    /// Writes <paramref name="line" /> to standard error in <paramref name="encoding" />, wrapped as
+    /// <see cref="WriteErrorLineAsync(string)" /> wraps it.
+    /// </summary>
+    /// <param name="line">The line, without a terminator.</param>
+    /// <param name="encoding">The encoding of the bytes written.</param>
+    /// <returns>A task that completes when the line is flushed.</returns>
+    private Task WriteErrorLineAsync(string line, Encoding encoding)
     {
         if (IsWarningLine(line))
         {
             diagnosticLog.Write(DiagnosticLogLevel.Warning, DiagnosticLogComponents.Runner, line);
         }
 
-        return WriteErrorPiecesAsync(WarningLineWrapper.WrapLine(line, terminalColumns));
+        return WriteErrorPiecesAsync(WarningLineWrapper.WrapLine(line, terminalColumns), encoding);
     }
 
     /// <summary>
@@ -5259,7 +5289,16 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     /// <param name="pieces">The lines, already wrapped, without terminators.</param>
     /// <returns>A task that completes when the lines are flushed.</returns>
-    private async Task WriteErrorPiecesAsync(IReadOnlyList<string> pieces)
+    private Task WriteErrorPiecesAsync(IReadOnlyList<string> pieces) => WriteErrorPiecesAsync(pieces, Encoding.UTF8);
+
+    /// <summary>
+    /// Writes <paramref name="pieces" /> to standard error in <paramref name="encoding" />, each followed by
+    /// <see cref="Environment.NewLine" />, in one write.
+    /// </summary>
+    /// <param name="pieces">The lines, already wrapped, without terminators.</param>
+    /// <param name="encoding">The encoding of the bytes written.</param>
+    /// <returns>A task that completes when the lines are flushed.</returns>
+    private async Task WriteErrorPiecesAsync(IReadOnlyList<string> pieces, Encoding encoding)
     {
         StringBuilder text = new();
         foreach (string piece in pieces)
@@ -5267,7 +5306,7 @@ internal sealed class CurlCommandRunner(
             text.Append(piece).Append(Environment.NewLine);
         }
 
-        byte[] bytes = Encoding.UTF8.GetBytes(text.ToString());
+        byte[] bytes = encoding.GetBytes(text.ToString());
         await standardError.WriteAsync(bytes).ConfigureAwait(false);
         await standardError.FlushAsync().ConfigureAwait(false);
     }
