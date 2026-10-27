@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Engine.UnitTests/Cgr163Tests.cs]
+touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Engine.UnitTests/Cgr163Tests.cs, Curl.Engine.UnitTests/Cgr155Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3692 — Fix CGR-163: A plain http:// --doh-url is used; release curl allows only https for DoH
 
@@ -60,17 +60,25 @@ curl -sS --doh-url http://127.0.0.1:21800/dns-query http://foo.test:21802/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr163Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Measured 2026-10-26. REF is curl 8.21.0's Windows release build (`C:\Windows\System32\curl.exe`, Schannel); the lane's mingw curl 8.22.0 is a Debug build, which allows http DoH, so it cannot serve as REF here (the report's REF-LINUX was a release build). No server needed: release curl never connects.
+  - `curl -sS --doh-url http://127.0.0.1:21800/dns-query http://foo.test:21802/x`: REF exit 6, stdout empty, stderr `curl: (6) Could not resolve host: foo.test`, no file, nothing on the wire. PORT (after the fix): identical. Before the fix PORT sent the DoH POSTs over plain HTTP.
+  - Scheme-less `--doh-url 127.0.0.1:21800/dns-query`: REF and PORT the same as above (release curl guesses http, then refuses it).
+  - Under `-v` PORT writes `* Could not resolve host: foo.test` twice where REF writes it once. `--doh-url bogus` already did this before the fix, so it is a separate gap, filed as BL-3914.
+- Decision (ADR-0854): `EngineComposition.CreateDnsResolver`, the resolver behind the shipped curl and every library handle, takes `allowsPlainHttpDohUrl` (off by default). Off, any DoH URL that is not https (`IsHttpsDohUrl`) gets the `UnusableDohUrlResolver`, the same resolver `--doh-url bogus` gets. The harness's dialing paths keep allowing http, standing in for the debug build that upstream cases 2100, 2101 and 2117 run on. `Cgr155Tests` passes `allowsPlainHttpDohUrl: true` for its plain-HTTP DoH server. Touched outside `touches`: `Curl.Engine.UnitTests/Cgr155Tests.cs`, a one-argument change. No task in Doing on origin/work/dark-factory names that file.
+- `Cgr163Tests`: with the guard disabled, 3 of its 10 cases failed (the http, HTTP and scheme-less URLs reached the DoH server). With the guard in place all pass. The full fast run passed, 0 failed (Curl.Engine.UnitTests 2667 passed). Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
+- CI on Linux and macOS: the change is platform-neutral (no paths, OS error text or certificates), and the fast tests are green here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-163 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A plain http or scheme-less --doh-url resolves nothing (exit 6) and never reaches the server, as release curl
