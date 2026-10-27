@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitTests/Cgr158Tests.cs]
+touches: [Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitTests/Cgr158Tests.cs, Curl.Networking.UnitLibrary/DnsLookupFailure.cs, Curl.Networking.UnitLibrary/NameResolutionFailure.cs, Curl.Networking.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3687 — Fix CGR-158: Host names that cannot be DNS-encoded exit 6 instead of 27 "Failed to encode DoH packet"
 
@@ -60,17 +60,29 @@ curl -sS --doh-url http://127.0.0.1:21800/dns-query http://<64 x 'a'>.test:21802
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr158Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Touches widened (no other Doing task on origin/work/dark-factory named them): `DnsLookupFailure.cs` (two new values), `NameResolutionFailure.cs` (their exit 27 message) and the project's `CLAUDE.md` (the DoH paragraph). Decision recorded in ADR-0850.
+- Fix: `DohDnsResolver` implements `IDnsResolverWithFailureReason`; a name `DnsQueryEncoder` refuses is `DnsLookupFailure.DohBadLabel` / `DohNameTooLong`, which `NameResolutionFailure` makes exit 27 `Failed to encode DoH packet [1]` / `[13]`. Nothing is sent (no connection opened).
+- Measured 2026-10-26, nothing listening on 21800 (curl fails before connecting, so no server is needed and no bytes go on the wire either way); REF = curl 8.22.0 Schannel (ucrt64), PORT = `dotnet run --project Curl.Console`:
+  - `curl -sS --doh-url http://127.0.0.1:21800/dns-query http://<64 x a>.test:21802/x`: REF exit 27 `curl: (27) Failed to encode DoH packet [1]`, empty stdout; PORT the same (was exit 6 `Could not resolve host`).
+  - `... http://foo..test:21802/x`: REF and PORT exit 27 `[1]`, empty stdout.
+  - Extra variant, a 310-byte name of 50-byte labels: REF and PORT exit 27 `[13]`.
+  - Already matching: `http://ok.test:21802/x` with the DoH server unreachable: REF and PORT exit 6 `Could not resolve host: ok.test`.
+  - Not in the issue's repro: the same names on `https://` origins. REF exits 27; PORT still exits 6, because `TcpConnector`'s HTTPS-origin lookup carries no failure reason and `TcpConnector.cs` is held by BL-3686. Filed as BL-3913 (depends on BL-3686).
+- Linux/macOS: the change and the test are platform-neutral (no paths, OS text or certificates); the gap report gives the same exit 27 on Linux.
+- Unit test `Cgr158Tests` (5 cases): `ResolveWithFailureReasonAsync` did not exist and `Describe` returned exit 6 before the fix; all pass after.
+- `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members. `dotnet build` clean; fast tests 44238 passed, 0 failed across 46 test projects.
 
 ## Log
 
 - 2026-10-26: Created from CGR-158 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. DoH names with an empty or over-63-byte label, or too long, exit 27 Failed to encode DoH packet [1]/[13] with nothing sent, as curl 8.22.0
