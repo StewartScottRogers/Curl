@@ -10,8 +10,8 @@ namespace Curl.Console;
 /// CGR-114 (BL-3900, ADR-0846): curl 8.22.0's mingw build on a Windows-1252 host writes <c>-o 日本語.bin</c>
 /// as <c>___.bin</c>, refuses <c>-T 日本.txt</c> with <c>curl: cannot open '??.txt'</c> and exit 26, and
 /// creates <c>cafÃ©.bin</c> for a UTF-8 config file's <c>output = "café.bin"</c>. The arguments are read
-/// through an injected Windows-1252 as <c>Program</c> reads them through the host's code page, so the tests
-/// pass on every host.
+/// through an injected Windows-1252 as <c>Program</c> reads them through the host's code page, and the command
+/// line is parsed as the Windows build parses it, so the tests pass on every host.
 /// </summary>
 [TestClass]
 public sealed class Cgr114FileNameTests
@@ -69,6 +69,7 @@ public sealed class Cgr114FileNameTests
                 new MemoryStream(),
                 runsOnWindows: true,
                 configFileReader: configFiles,
-                defaultConfigFileSearch: new DefaultConfigFileSearch(_ => null, isWindows: true, executableDirectory: null, accountHomeDirectory: null))
+                defaultConfigFileSearch: new DefaultConfigFileSearch(_ => null, isWindows: true, executableDirectory: null, accountHomeDirectory: null),
+                parsesAsWindowsBuild: true)
             .RunAsync(arguments);
 }
