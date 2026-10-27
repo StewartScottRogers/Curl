@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr098Tests.cs]
+touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr098Tests.cs, Record-CurlExchange.ps1]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3627 — Fix CGR-098: The size in the 150 reply (N bytes) is ignored when SIZE fails
 
@@ -63,17 +63,28 @@ curl -sS ftp://127.0.0.1:20960/file.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr098Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 5): Cause: `FtpSession.RetrieveAsync` never read the `150` text. Now `ReadOpeningSizeHint` takes the count as curl 8.22.0's `ftp_state_get_resp` does, for a `125` or `150` when `SIZE` gave no size above 0, and not for a listing, an ASCII transfer or `--ignore-content-length`: find the first ` bytes`, step back over digits to a `(` (any other character: no size), read the digits (none or overflow: 1, as curl's failed `curlx_str_number` leaves it), and limit it to a `-r` range. That count then drives the same end-of-transfer checks a `SIZE` count does. No ADR: it only follows curl.
+- Record-CurlExchange.ps1 could not change RETR's `150` text while still serving the data, so it gained a `RETROPEN` override for it (added to `touches`; no task in Doing on origin/work/dark-factory names that script).
+- Measured with `Record-CurlExchange.ps1 -Ftp -Port 20960 -FtpData "line1`nline2`nline3`n" -FtpReply 'SIZE=500 no','RETROPEN=150 Opening BINARY mode data connection for file.txt (<n> bytes).' -CurlArgs '-sS','ftp://127.0.0.1:20960/file.txt'`, with real curl 8.22.0 (Schannel) and then with `-Curl Curl.Console\bin\Debug\net10.0\curl.exe`:
+  - `(5 bytes)`: REF exit 0, stdout `line1`, stderr empty, requests USER, PASS, PWD, EPSV, TYPE I, SIZE, RETR, QUIT. PORT: exitcode.txt, stdout.bin, stderr.txt and request.bin byte-identical.
+  - `(30 bytes)`: REF exit 18, stdout all 18 bytes, stderr `curl: (18) transfer closed with 12 bytes remaining to read`, requests end at RETR (no QUIT). PORT: all four files byte-identical.
+- Variants that already matched still match: `Cgr098Tests` pins a known `SIZE` (count ignored), an ASCII transfer (count ignored) and a `150` with no count (all bytes); the full fast suite passes.
+- `Cgr098Tests` failed on 4 rows with the call removed and passes with it (ADR-0482).
+- Linux: curl 8.18.0 does the same (the report lists `v_r150` on Linux); the tests use no path, OS error text or certificate, so they are platform-neutral. Fast tests pass on Windows.
+- Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary: 0 failing members, after moving the condition into `TakesOpeningSizeHint` (the first cut had complexity 14).
+
 ## Log
 
 - 2026-10-26: Created from CGR-098 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Curl takes the (N bytes) count of a 150 reply when SIZE fails, as curl 8.22.0 does; both repros byte-identical

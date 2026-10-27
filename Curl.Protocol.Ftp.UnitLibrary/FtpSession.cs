@@ -2137,6 +2137,7 @@ internal sealed class FtpSession(
         FtpReply opened = await ExchangeTransferCommandAsync(command).ConfigureAwait(false);
         if (opened.Code is 125 or 150)
         {
+            ReadOpeningSizeHint(opened, listing);
             log.TransferStarted(command);
             context.Events.ReportInfo(FtpTransferMessages.MaxDownload(window.MaxDownload));
             if (!listing)
@@ -2281,6 +2282,48 @@ internal sealed class FtpSession(
     /// <summary>The bytes of a read of <paramref name="read" /> bytes that lie within the window.</summary>
     private int CountWithinWindow(int read) =>
         window.MaxDownload is { } max ? (int)Math.Min(read, max - bytesTransferred) : read;
+
+    /// <summary>
+    /// Takes the size a <c>150</c> or <c>125</c> reply announces, such as
+    /// <c>150 Opening BINARY mode data connection for file.txt (5 bytes).</c>, as the bytes to
+    /// expect when <c>SIZE</c> gave none, as curl 8.22.0's <c>ftp_state_get_resp</c> does
+    /// (CGR-098): not for a listing, an ASCII transfer or <c>--ignore-content-length</c>, and
+    /// limited to a <c>-r</c> range's length.
+    /// </summary>
+    private void ReadOpeningSizeHint(FtpReply opened, bool listing)
+    {
+        if (TakesOpeningSizeHint(listing) && SizeHintOf(opened.LastLine) is { } hinted)
+        {
+            expectedSize = LimitToWindow(hinted);
+        }
+    }
+
+    private bool TakesOpeningSizeHint(bool listing) =>
+        !listing && !typeCode.UseAscii && !ignoresContentLength && fileSize is not > 0;
+
+    /// <summary>
+    /// Reads the count before the first <c> bytes</c> in <paramref name="line" /> as curl does:
+    /// stepping back from it over digits to a <c>(</c>, so <c>(5 bytes)</c> is 5 and
+    /// <c>file 5 bytes</c> or <c>(5x bytes)</c> is no size; a <c>(</c> with no digits, or a
+    /// count that overflows, is 1, as curl's failed <c>curlx_str_number</c> leaves it.
+    /// </summary>
+    /// <param name="line">The reply's last line.</param>
+    /// <returns>The count, or <see langword="null" /> when the line announces none.</returns>
+    private static long? SizeHintOf(string line)
+    {
+        int at = line.IndexOf(" bytes", StringComparison.Ordinal) - 1;
+        while (at > 1 && line[at] != '(')
+        {
+            if (!char.IsAsciiDigit(line[at]))
+            {
+                return null;
+            }
+
+            at--;
+        }
+
+        return at < 0 ? null : LeadingCountOf(line.AsSpan(at + 1)) ?? 1;
+    }
 
     /// <summary>
     /// Ends a download that had a byte limit: exit 18 with no <c>QUIT</c> when the data
