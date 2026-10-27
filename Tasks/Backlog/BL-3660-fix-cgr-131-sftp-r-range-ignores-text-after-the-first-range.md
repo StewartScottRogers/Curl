@@ -4,8 +4,8 @@ title: Fix CGR-131: sftp -r/--range ignores text after the first range, and hand
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Core.UnitLibrary/ByteRangeParser.cs, Curl.Core.UnitTests/Cgr131Tests.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs, Curl.Protocol.Ssh.UnitTests/Cgr131Tests.cs]
+depends-on: [BL-3570]
+touches: [Curl.Core.UnitLibrary/ByteRangeParser.cs, Curl.Core.UnitTests/Cgr131Tests.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDownloadPart.cs, Curl.Protocol.Ssh.UnitTests/Cgr131Tests.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr131Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -83,8 +83,13 @@ curl -sS AUTH -r "<R>" -w "<%{size_download}>" U/digits.txt
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr131Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 9, no code edited): two causes, both found.
+  1. `0 - 9` and `0x10-0x20` (whole file in REF) are curl 8.22.0's tool, not libcurl: its `-r` parser appends a dash ("A specified range MUST include at least one dash (-). Appending one for you") whenever `curlx_str_number` reads a leading number that fits and the next character is not `-`, so both become `0-`. `CommandLineOptionTable.SetRange` only does it when the value starts with a digit and has no dash anywhere. Measured with real curl 8.22.0 (Schannel) over `file://` on a 292-byte `seq 1 100` file: `0 - 9`, `0x10-0x20`, `0 -9` -> dash warning, exit 0, 292 bytes; `5`, `5 ` -> dash warning, 287 bytes; `0-9x` -> invalid-character warning, 10 bytes; `1-2-3`, `0-1,5-6` -> no warning, 2 bytes; `99999999999999999999 - 3` -> invalid-character warning (overflow keeps the text verbatim), exit 33; `-5 x` -> invalid-character warning, 5 bytes. Fix: in `SetRange`, append the dash when the leading digits parse as a `long` and are not followed by `-`; otherwise keep the text (with the invalid-character warning when due). Pin it in `Curl.Cli.UnitTests/Cgr131Tests.cs`.
+  2. `0-1,5-6`, `0-9x`, `0-1,3`, `1-2-3`, `0-0,0-0` (exit 33 in REF): `SftpDownloadPart.Asked` uses the `ByteRangeParser` range (which, rightly for file:// and FTP, ignores trailing text) before the raw text. Fix: when `rangeText` is not null, read it with `WithinText` (Curl_ssh_range) and use the parsed range only when there is no text. `ByteRangeParser` needs no change. Pin it in `Curl.Protocol.Ssh.UnitTests/Cgr131Tests.cs` against `SftpDownloadPart.Choose`.
+- 2026-10-26: Added `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs` and `Curl.Cli.UnitTests/Cgr131Tests.cs` to touches for cause 1; BL-3570 (Doing on work/dark-factory) holds `CommandLineOptionTable.cs`, so it is in depends-on and the task goes back to Backlog until that is Done.
 
 ## Log
 
 - 2026-10-26: Created from CGR-131 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Needs Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, which BL-3570 holds; waits on BL-3570
