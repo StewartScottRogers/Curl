@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ssh.UnitLibrary/Scp/ScpRemotePath.cs, Curl.Protocol.Ssh.UnitTests/Cgr134Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3663 — Fix CGR-134: an scp:// URL containing an encoded NUL (%00) is not rejected, and PORT sends the NUL inside the remote exec command
 
@@ -62,17 +62,23 @@ curl -sS AUTH "UC/a%00b"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr134Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Fix (2026-10-26): `ScpRemotePath.Resolve` now refuses a decoded path holding a zero byte with `SshTransferException.UrlPathHoldsZeroByte()` (exit 3), as `SftpRemotePath.ResolveUrlPath` already did. Both SCP callers resolve the path before they open the channel, so no channel and no `exec` request are sent. No ADR: it follows ADR-0277's SFTP decision for SCP.
+- Timing measured: real curl 8.22.0 against a closed port (`curl -k -sS "scp://127.0.0.1:1/a%00b"`, and the same with sftp://) exits 7, not 3. So curl connects before it checks the path, and the report's "before any login" is not literal. curl rejects in `SSH_SCP_TRANS_INIT` (`Curl_getworkingpath`), after login and before libssh2 opens the scp channel. Curl now matches that.
+- Repro, run 2026-10-26 against the review's sshd, still on 127.0.0.1:21523, with the report's AUTH (`-k -u stewart_rogers: --key E\keys\c_rsa_pem --pubkey E\keys\c_rsa_pem.pub`). REF = `/ucrt64/bin/curl` 8.22.0 Schannel; PORT = `Curl.Console\bin\Debug\net10.0\curl.exe` at this commit. `curl -sS AUTH "UC/a%00b"`, the same with sftp://, `-T E\upf\small.txt "UC/a%00b"` and `-T E\upf\small.txt scp://127.0.0.1:21523/~/up21501/a%00b`: REF and PORT each print `curl: (3) URL using bad/illegal format or missing URL`, exit 3, with empty stdout and no file written. The sftp:// variant, which already matched, still matches.
+- Linux: the change is platform-neutral byte handling and the tests have no path or OS text, so REF-LINUX's identical exit 3 is met by the same code. CI on Linux and macOS is left to the shift's CI watch.
+- Focused tests: `Curl.Protocol.Ssh.UnitTests/Cgr134Tests.cs`. `Resolve_PathHoldsZeroByte_ThrowsUrlMalformat` cannot pass without the check, because the old `Resolve` returned the bytes. `ExecuteAsync_ScpPathHoldsZeroByte_IsExit3WithNoChannelOpened` covers download and upload. The fast tests are all green. Measure-CodeQuality for Curl.Protocol.Ssh.UnitLibrary reports 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-134 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. scp:// paths holding %00 exit 3 before any channel opens, as curl 8.22.0 does
