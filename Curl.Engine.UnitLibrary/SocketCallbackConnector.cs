@@ -95,7 +95,7 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
         CurlSocketCloser? closer = opener.TakeOpened();
         if (connect.Connection is { } connection)
         {
-            return Rewrapped(connect, new SocketCallbackConnection(connection, closer ?? new CurlSocketCloser(handles.Next(), close: null)));
+            return Rewrapped(connect, new SocketCallbackConnection(connection, CloserOf(connection, closer)));
         }
 
         closer?.Close();
@@ -108,6 +108,16 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
         return ConnectResult.Failed(refused.ExitCode, refused.ErrorMessage);
     }
 
+    // The winning attempt's closer, now under the connection's operating system socket when the dialer opened its
+    // own (CGR-129), or a closer calling nothing when the opener no longer holds the attempt.
+    private CurlSocketCloser CloserOf(IConnection connection, CurlSocketCloser? attempt) =>
+        (attempt, callbacks.OpenSocket, connection.SocketHandle) switch
+        {
+            (null, _, _) => new CurlSocketCloser(handles.Next(), close: null),
+            (_, null, { } handle) => new CurlSocketCloser(new CurlSocket(handle), callbacks.CloseSocket, isTheConnectionsOwnSocket: true),
+            _ => attempt,
+        };
+
     // Runs the callbacks for a connection the inner connector made without asking the opener.
     private async ValueTask<ConnectResult> OpenedAfterConnectAsync(ConnectTarget target, long started, ConnectResult connect)
     {
@@ -116,7 +126,7 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
             return connect;
         }
 
-        SocketOpening opening = await OpenSocketAsync(target, started, connection, AddressOf(connection.RemoteEndPoint)).ConfigureAwait(false);
+        SocketOpening opening = await OpenSocketAsync(target, started, connection, AddressOf(connection.RemoteEndPoint), connection.SocketHandle).ConfigureAwait(false);
         return opening.Closer is { } closer
             ? Rewrapped(connect, new SocketCallbackConnection(connection, closer))
             : ConnectResult.Failed(opening.ExitCode, opening.ErrorMessage);
@@ -140,7 +150,7 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
             return connect;
         }
 
-        SocketOpening opening = await OpenSocketAsync(target, started, connection, DatagramAddressOf(connection.RemoteEndPoint)).ConfigureAwait(false);
+        SocketOpening opening = await OpenSocketAsync(target, started, connection, DatagramAddressOf(connection.RemoteEndPoint), socketHandle: null).ConfigureAwait(false);
         return opening.Closer is { } closer
             ? MultiplexedConnectResult.Connected(new SocketCallbackMultiplexedConnection(connection, closer), connect.Timings)
             : MultiplexedConnectResult.Failed(opening.ExitCode, opening.ErrorMessage);
@@ -208,19 +218,18 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
         _ => (int)family,
     };
 
-    // Runs the open-socket and socket-option callbacks for a connection inner has just made, closing it on a refusal.
-    private async ValueTask<SocketOpening> OpenSocketAsync(ConnectTarget target, long started, IAsyncDisposable connection, CurlSocketAddress address)
+    // Runs the open-socket and socket-option callbacks for a connection inner has just made, closing it on a refusal;
+    // without an open-socket callback the socket is the connection's own operating system socket when it has one.
+    private async ValueTask<SocketOpening> OpenSocketAsync(ConnectTarget target, long started, IAsyncDisposable connection, CurlSocketAddress address, nint? socketHandle)
     {
-        CurlSocket socket = callbacks.OpenSocket is { } open
-            ? open(CurlSocketType.IpConnection, address)
-            : handles.Next();
+        (CurlSocket socket, bool ownSocket) = SocketFor(address, socketHandle);
         if (socket == CurlSocket.Bad)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
             return Refused(target, started, CurlExitCode.CouldntConnect, CouldntConnectText);
         }
 
-        CurlSocketCloser closer = new(socket, callbacks.CloseSocket);
+        CurlSocketCloser closer = new(socket, callbacks.CloseSocket, ownSocket);
         if (callbacks.SocketOption?.Invoke(socket, CurlSocketType.IpConnection) == SocketOptionResult.Error)
         {
             await connection.DisposeAsync().ConfigureAwait(false);
@@ -230,6 +239,16 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
 
         return new SocketOpening(closer, CurlExitCode.Ok, string.Empty);
     }
+
+    // The open-socket callback's socket, else the connection's own operating system socket (marked as the engine's),
+    // else the engine's next number.
+    private (CurlSocket Socket, bool IsTheConnectionsOwnSocket) SocketFor(CurlSocketAddress address, nint? socketHandle) =>
+        (callbacks.OpenSocket, socketHandle) switch
+        {
+            ({ } open, _) => (open(CurlSocketType.IpConnection, address), false),
+            (null, { } handle) => (new CurlSocket(handle), true),
+            _ => (handles.Next(), false),
+        };
 
     private SocketOpening Refused(ConnectTarget target, long started, CurlExitCode code, string text)
     {
