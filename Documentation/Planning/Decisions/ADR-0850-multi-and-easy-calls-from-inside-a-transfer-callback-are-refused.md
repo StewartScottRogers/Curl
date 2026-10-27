@@ -1,4 +1,4 @@
-# ADR-0846 — Multi and easy calls from inside a transfer callback are refused
+# ADR-0850 — Multi and easy calls from inside a transfer callback are refused
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
