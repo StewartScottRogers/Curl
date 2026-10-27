@@ -8,7 +8,7 @@ depends-on: [BL-3617]
 touches: [Curl.Console.UnitTests/Cgr109Tests.cs, Curl.Console/ParallelTransferMulti.cs, Curl.Console/ParallelTransferQueue.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelHostQueue.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3638 — Fix CGR-109: -Z without --parallel-immediate: the second same-host transfer does not wait for the first connection
 
@@ -59,10 +59,10 @@ curl -sS -Z -m 2 -w '[%{num_connects}]' $H/stall $H/ok
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -72,6 +72,11 @@ curl -sS -Z -m 2 -w '[%{num_connects}]' $H/stall $H/ok
 - Cause found: `ParallelHostQueue` already holds the second `http://` transfer until the host's first ends (BL-520), but its `-m` clock does not run while it waits: `CurlCommandRunner.TransferOnceHostIsFreeAsync` starts the `MaxTimeWatchdog` only once `WaitForHostAsync` returns, so after the first times out the waiter connects (second connection) and gets the body.
 - Plan for the next claim: in `TransferOnceHostIsFreeAsync`, when `options.MaxTime` is positive, wait for the host under a `CancellationTokenSource(maxTime, timeProvider)` linked with the abort token; when that timer (not the abort) ends the wait, return `TransferResult.Failure(CurlExitCode.OperationTimedOut, "Operation timed out after N milliseconds with 0 bytes received")` (N from `timeProvider.GetElapsedTime` since the wait began) with `(transfer.Url, AddScheme(...))` as the abort path does; `WaitForTurnAsync`'s registration already withdraws the waiter. Its `-w` then reads `num_connects` 0 from a report-less result. Focused test in `Curl.Console.UnitTests/Cgr109Tests.cs` through the runner with a manual `TimeProvider`: two same-host `http://` URLs, `-Z -m 2`, a first connection that never answers, expect one connection, `[1][0]`, two `(28)` lines, exit 28; the `--parallel-immediate` variant still opens two connections. Decision: the attempt that starts after a wait keeps a full `-m` (curl counts it from the add); left as is, as the issue does not exercise it.
 - Requeued: the fix needs `Curl.Console/CurlCommandRunner.cs`, held in `touches` by BL-3617 (Doing). Added it, and `Curl.Console/ParallelHostQueue.cs`, to `touches`, and BL-3617 to `depends-on`. No code was edited.
+- 2026-10-26 (lane 8): Fixed in `CurlCommandRunner.WaitForHostWithinMaxTimeAsync` (ADR-0848). On the Debug build, a timer counted only from the start of the wait lost the race: the first transfer's synchronous setup runs before the scheduler reaches the second, so the second's wait began tens of ms later, and the first's `Leave` freed it before its timer fired (still two connections). So the `-m` counts from `ParallelTransferQueue.BatchAddedTimestamp`, taken when the run starts its first transfer and when a slot comes free after a `--parallel-max` wait. A waiter the host frees after that `-m` has passed leaves the host and times out instead of connecting. The wait's own timer still runs a whole `-m` from the start of the wait, so the first transfer ends first and the output order is curl's `[1][0]`.
+- Curl after the fix, with the same `Record-CurlExchange.ps1` command as above (`-Curl` the Debug `curl.exe`), run twice: stdout `[1][0]`, exit 28, stderr `curl: (28) Operation timed out after 2012 milliseconds with 0 bytes received` and `curl: (28) Operation timed out after 2245 milliseconds with 0 bytes received`, one connection (`GET /stall` only). This matches real curl except for the milliseconds, which the report's section 1 normalises. Before the fix: `[1][1]`, with `GET /stall` and `GET /ok` on two connections.
+- `--parallel-immediate` variant, Curl after the fix: both transfers connect at once (`[1][1]`, two `(28)` lines, exit 28). That is the same as before, and the report says real curl gives the same output. It is unchanged because `--parallel-immediate` never waits for the host.
+- `Cgr109Tests` (4 tests) uses a test clock whose timers fire only when the test advances it. The main test (`RunAsync_SecondSameHostTransferWaitsPastMaxTime_TimesOutWithoutConnecting`) failed with the fix bypassed (`/ok` started) and passes with it. Fast tests: 46 test projects passed, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members.
+- Platform: the tests use no paths, OS error text or certificates, and each waits for the event it needs (transfer started, timers armed) before it moves the clock, so they are platform-neutral.
 
 ## Log
 
@@ -79,3 +84,4 @@ curl -sS -Z -m 2 -w '[%{num_connects}]' $H/stall $H/ok
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-3617 (Doing); depends-on BL-3617
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Under -Z a transfer waiting for its host's first connection runs its -m and times out with exit 28 without connecting, as curl does (CGR-109)
