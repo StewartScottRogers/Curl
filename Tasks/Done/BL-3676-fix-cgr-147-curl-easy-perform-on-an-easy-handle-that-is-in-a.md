@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitTests/Cgr147Tests.cs, Libcurl.UnitTests/Cgr147Tests.cs, Libcurl/Easy/CurlEasy.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitTests/Cgr147Tests.cs, Libcurl.UnitTests/Cgr147Tests.cs, Libcurl/Easy/CurlEasy.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.Cleanup.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3676 — Fix CGR-147: curl_easy_perform on an easy handle that is in a multi handle runs a second transfer instead of failing with CURLE_FAILED_INIT
 
@@ -59,17 +59,22 @@ probe.exe C_04 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr147Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
-
+- Measured REF with a P/Invoke probe against libcurl 8.22.0 (Git for Windows `ucrt64/bin/libcurl-4.dll`) and a recording loopback server answering `200 hello`: `e` driven to done in `m`, left attached, then `curl_easy_perform(e)` gives `easy_perform-while-in-multi rc=2 error=[easy handle already used in multi handle]` and the server log `conn,GET / HTTP/1.1` (one request). PORT before the fix: rc=0 and a second `GET /` (the report's Actual; `Libcurl.UnitTests/Cgr147Tests.cs` failed with rc Ok). PORT after the fix, the same probe over `CurlGlobal.Init().MultiInit()/EasyInit()`: `rc=2 error=[easy handle already used in multi handle]`, log `conn,GET / HTTP/1.1` - equal to REF. No stdout, files or other CURLINFO are involved. Linux (curl 8.18.0) also answers 2 per the report; the fix is platform-neutral.
+- Fix (ADR-0857): `ManagedEasyTransfer.PerformAsync` takes the multi handle's `MultiCallbacks` marshal as it starts; a perform of a handle in `MultiOwners` without one is the application's call and answers `FailedInit` with curl's error text. `CurlEasy.cs` needed no change: it already fills the error buffer from `ErrorText`. The ADR-0850 recursive-call check still comes first, so the CGR-146 variants still match (Cgr146Tests pass).
+- Added `Curl.Engine.UnitTests/ManagedEasyTransferTests.Cleanup.cs` to touches (no task in Doing on origin/work/dark-factory names it): its `DisposeAsync_HandleInAMultiHandle_...` test performed a handle directly while it was in a multi handle, the call now refused; it drives the multi handle instead.
+- Focused tests: `Curl.Engine.UnitTests/Cgr147Tests.cs` (refused, error text, one request; removed handle performs again) and `Libcurl.UnitTests/Cgr147Tests.cs`; the refusal tests failed with the fix reverted and pass with it. Build clean, fast tests green; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
+- Pipeline `feature` run directly: a one-check fix in one method, no design beyond the ADR.
 ## Log
 
 - 2026-10-26: Created from CGR-147 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. curl_easy_perform of a handle still in a multi handle answers CURLE_FAILED_INIT with curl's error text and sends nothing, as libcurl 8.22.0
