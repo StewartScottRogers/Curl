@@ -94,6 +94,9 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.DohSslVerifypeer] = new(SetDohVerifyPeer);
         setters[CurlOption.DohSslVerifyhost] = new(SetDohVerifyHost);
         setters[CurlOption.DohSslVerifystatus] = new(SetDohVerifyStatus);
+        setters[CurlOption.SslEnableNpn] = new(IgnoreDeprecated);
+        setters[CurlOption.Egdsocket] = new(IgnoreDeprecated);
+        setters[CurlOption.RandomFile] = new(IgnoreDeprecated);
     }
 
     /// <summary>
@@ -174,6 +177,12 @@ internal static class EasyTlsOptionSetters
     private static CurlCode SetDohVerifyHost(ref EasyOptions o, object? v) => Tls(ref o, t => t with { DohVerifyHost = IsVerifyHostOn(v) });
 
     private static CurlCode SetDohVerifyStatus(ref EasyOptions o, object? v) => Tls(ref o, t => t with { DohVerifyStatus = IsOn(v) });
+
+    /// <summary>
+    /// <c>CURLOPT_SSL_ENABLE_NPN</c>, <c>CURLOPT_EGDSOCKET</c> and <c>CURLOPT_RANDOM_FILE</c>: deprecated, and ignored
+    /// with <see cref="CurlCode.Ok"/> for every value, as libcurl 8.22.0's <c>setopt.c</c> does (CGR-125).
+    /// </summary>
+    private static CurlCode IgnoreDeprecated(ref EasyOptions o, object? v) => CurlCode.Ok;
 
     /// <summary>Replaces the TLS options with what <paramref name="change"/> returns for them; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Tls(ref EasyOptions options, Func<EasyTlsOptions, EasyTlsOptions> change)
