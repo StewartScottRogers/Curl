@@ -2,7 +2,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Parses a command line as a curl built with c-ares reads it (<see cref="CommandLineOptions.ActsAsCAresBuild"/>,
-/// ADR-0837), otherwise as the Linux and macOS OpenSSL build reads it, on every platform, so tests of
+/// ADR-0841), otherwise as the Linux and macOS OpenSSL build reads it, on every platform, so tests of
 /// <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c>, which every
 /// reference build refuses, still reach what they set.
 /// </summary>

@@ -1,4 +1,4 @@
-# ADR-0837 — `--dns-servers`, `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr` are refused on every platform unless the parse reads as a c-ares build
+# ADR-0841 — `--dns-servers`, `--dns-interface`, `--dns-ipv4-addr` and `--dns-ipv6-addr` are refused on every platform unless the parse reads as a c-ares build
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

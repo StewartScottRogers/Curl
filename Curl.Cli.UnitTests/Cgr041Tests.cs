@@ -5,7 +5,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c> as every
-/// reference build answers them (third-party gap report issue CGR-041, ADR-0837): curl's Schannel build, measured
+/// reference build answers them (third-party gap report issue CGR-041, ADR-0841): curl's Schannel build, measured
 /// with 8.21.0 on 2026-10-26 (BL-3570), and curl 8.22.0 Schannel and 8.18.0 OpenSSL, as the report measured them,
 /// have no c-ares and refuse each with exit 2 and <c>curl: option --dns-servers: the installed libcurl version does
 /// not support this</c>, whatever its value, so Curl refuses them on every platform unless the parse reads as a

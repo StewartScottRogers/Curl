@@ -315,7 +315,7 @@ public sealed class CommandLineOptions
     /// hand-built DNS resolver. <see langword="false"/> as every reference build reads it - Schannel on Windows,
     /// OpenSSL with the threaded resolver on Linux and macOS - which refuses all four with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutCAres"/>,
-    /// ADR-0837). The executable never sets it; tests ask <see cref="CommandLineParser"/> for it to reach the resolver.
+    /// ADR-0841). The executable never sets it; tests ask <see cref="CommandLineParser"/> for it to reach the resolver.
     /// </summary>
     public bool ActsAsCAresBuild { get => globals.ActsAsCAresBuild; internal set => globals.ActsAsCAresBuild = value; }
 

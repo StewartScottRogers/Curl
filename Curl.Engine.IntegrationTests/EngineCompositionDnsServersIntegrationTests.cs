@@ -70,7 +70,7 @@ public sealed class EngineCompositionDnsServersIntegrationTests
     private CommandLineOptions Parse(params string[] arguments)
     {
         Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://bl694.example/")));
-        // As a build with c-ares reads it, so the four DNS options are accepted (ADR-0837).
+        // As a build with c-ares reads it, so the four DNS options are accepted (ADR-0841).
         CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://bl694.example/"], _ => true, new NoPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;

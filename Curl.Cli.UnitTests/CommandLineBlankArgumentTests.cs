@@ -28,7 +28,7 @@ public sealed class CommandLineBlankArgumentTests
     ];
 
     // Refused as not supported, blank or not, by every reference build, none of which has c-ares, as Cgr041Tests
-    // pins (ADR-0837); a c-ares build refuses an empty one as blank, as CommandLineDnsOptionTests pins.
+    // pins (ADR-0841); a c-ares build refuses an empty one as blank, as CommandLineDnsOptionTests pins.
     private static readonly string[] RefusedWithoutCAres =
     [
         "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "dns-servers",

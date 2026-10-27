@@ -10,7 +10,7 @@ namespace Curl.Cli;
 /// resolves a host name (exit 43 there). Measured on 2026-09-28 with Alpine edge's curl 8.22.0 built with
 /// c-ares 1.34.8 through <c>Record-CurlExchange.ps1 -NoServer</c> against <c>http://127.0.0.1:1/</c>;
 /// every case is in BL-643's Notes. Every case parses as that c-ares build (<see cref="CAresBuildParser"/>): every
-/// reference build refuses all four, as <see cref="Cgr041Tests"/> pins (ADR-0837).
+/// reference build refuses all four, as <see cref="Cgr041Tests"/> pins (ADR-0841).
 /// </summary>
 [TestClass]
 public sealed class CommandLineDnsOptionTests

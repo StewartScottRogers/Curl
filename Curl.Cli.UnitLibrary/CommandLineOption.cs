@@ -92,7 +92,7 @@ public sealed class CommandLineOption
     /// <summary>
     /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutCAres"/>: every reference build -
     /// Schannel on Windows, OpenSSL with the threaded resolver on Linux and macOS - refuses the option with exit 2,
-    /// and so does Curl unless the parse reads as a c-ares build (<see cref="CommandLineOptions.ActsAsCAresBuild"/>, ADR-0837).
+    /// and so does Curl unless the parse reads as a c-ares build (<see cref="CommandLineOptions.ActsAsCAresBuild"/>, ADR-0841).
     /// </summary>
     public bool RefusedByBuildsWithoutCAres { get; }
 
@@ -204,7 +204,7 @@ public sealed class CommandLineOption
     /// <c>curl: option --dns-servers: the installed libcurl version does not support this</c> and exit 2 whatever
     /// the value, blank or missing (measured with curl 8.21.0 Schannel, 2026-10-26, BL-3570), as do curl 8.22.0
     /// Schannel and 8.18.0 OpenSSL - so <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and
-    /// <c>--dns-ipv6-addr</c> are refused on every platform (CGR-041, ADR-0837).
+    /// <c>--dns-ipv6-addr</c> are refused on every platform (CGR-041, ADR-0841).
     /// </summary>
     /// <returns>The row, refused on every reference build.</returns>
     public CommandLineOption RefusedWithoutCAres()

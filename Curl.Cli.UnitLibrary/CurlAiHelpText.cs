@@ -28,7 +28,7 @@ public static class CurlAiHelpText
     private const string NoEchRefusalLine =
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) are built without ECH.";
 
-    /// <summary>The line an option's section carries when every reference build refuses it for want of c-ares (ADR-0837).</summary>
+    /// <summary>The line an option's section carries when every reference build refuses it for want of c-ares (ADR-0841).</summary>
     private const string NoCAresRefusalLine =
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) are built without c-ares.";
 

@@ -194,7 +194,7 @@ public static class CommandLineParser
     /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null"/> when it is not set.</param>
     /// <param name="actsAsQuicBuild">Whether to read the arguments as a curl built with a QUIC library does.</param>
     /// <param name="actsAsEchBuild">Whether to read the arguments as a curl built with ECH does, accepting <c>--ech</c> rather than refusing it as every reference build does (ADR-0822).</param>
-    /// <param name="actsAsCAresBuild">Whether to read the arguments as a curl built with c-ares does, accepting <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c> rather than refusing them as every reference build does (ADR-0837).</param>
+    /// <param name="actsAsCAresBuild">Whether to read the arguments as a curl built with c-ares does, accepting <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c> rather than refusing them as every reference build does (ADR-0841).</param>
     /// <returns>As the overload without <paramref name="actsAsQuicBuild"/> returns.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
     public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild = false, bool actsAsCAresBuild = false)
