@@ -80,7 +80,7 @@ probe.exe sweep
 - Touches widened to `EasyProtocolOptionSetters.cs`, `EasySmtpOptions.cs` and its test file
   `Curl.Api.UnitTests/Options/Protocols/EasySmtpOptionsTests.cs` (which counts the record's properties); no task in
   Doing on origin/work/dark-factory named them.
-- Follow-up: BL-3904 sends the stored flags in a Libcurl IMAP `APPEND` (the engine's `TransferSettingsOf` still passes
+- Follow-up: BL-3905 sends the stored flags in a Libcurl IMAP `APPEND` (the engine's `TransferSettingsOf` still passes
   `UploadFlags: []`); the issue checked only the setopt level.
 - Gates: `dotnet build` clean; fast tests all green (Libcurl.UnitTests 1438 passed, Curl.Api.UnitTests 901 passed);
   `Measure-CodeQuality.ps1 -Library Libcurl,Curl.Api.UnitLibrary`: 0 failing members. The change has no paths or

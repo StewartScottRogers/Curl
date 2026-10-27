@@ -1,5 +1,5 @@
 ---
-id: BL-3904
+id: BL-3905
 title: Send CURLOPT_UPLOAD_FLAGS as the IMAP APPEND flag list in Libcurl transfers
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3904 — Send CURLOPT_UPLOAD_FLAGS as the IMAP APPEND flag list in Libcurl transfers
+# BL-3905 — Send CURLOPT_UPLOAD_FLAGS as the IMAP APPEND flag list in Libcurl transfers
 
 ## Goal
 
