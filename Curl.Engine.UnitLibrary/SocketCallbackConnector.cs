@@ -114,6 +114,7 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
         (attempt, callbacks.OpenSocket, connection.SocketHandle) switch
         {
             (null, _, _) => new CurlSocketCloser(handles.Next(), close: null),
+            ({ IsTheConnectionsOwnSocket: true }, _, _) => attempt,
             (_, null, { } handle) => new CurlSocketCloser(new CurlSocket(handle), callbacks.CloseSocket, isTheConnectionsOwnSocket: true),
             _ => attempt,
         };
@@ -296,14 +297,14 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
         public TcpSocketOpenDecision Open(IPEndPoint remoteEndPoint)
         {
             asked = true;
-            CurlSocket socket = SocketFor(remoteEndPoint);
+            (CurlSocket socket, Socket? engineSocket) = SocketFor(remoteEndPoint);
             if (socket == CurlSocket.Bad)
             {
                 refusal = (int)CurlExitCode.CouldntConnect;
                 return TcpSocketOpenDecision.Refuse;
             }
 
-            CurlSocketCloser closer = new(socket, callbacks.CloseSocket);
+            CurlSocketCloser closer = new(socket, callbacks.CloseSocket, isTheConnectionsOwnSocket: engineSocket is not null, engineSocket);
             SocketOptionResult? option = callbacks.SocketOption?.Invoke(socket, CurlSocketType.IpConnection);
             if (option == SocketOptionResult.Error)
             {
@@ -317,18 +318,32 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
                 opened.Add(new(remoteEndPoint, closer));
             }
 
-            return DecisionFor(socket, option);
+            return DecisionFor(socket, option, engineSocket);
         }
 
-        // The open-socket callback's socket for the attempt, else the engine's next number.
-        private CurlSocket SocketFor(IPEndPoint remoteEndPoint) =>
-            callbacks.OpenSocket is { } open
-                ? open(CurlSocketType.IpConnection, AddressOf(remoteEndPoint))
-                : handles.Next();
+        // The open-socket callback's socket for the attempt; else, for a socket-option callback over a dialer that
+        // adopts sockets, an operating system socket the engine opens now, before the connect, as curl 8.22.0's
+        // cf_socket_open does (CGR-145); else the engine's next number.
+        private (CurlSocket Socket, Socket? EngineSocket) SocketFor(IPEndPoint remoteEndPoint)
+        {
+            if (callbacks.OpenSocket is { } open)
+            {
+                return (open(CurlSocketType.IpConnection, AddressOf(remoteEndPoint)), null);
+            }
 
-        // The dialer's own socket without an open-socket callback (or one it cannot adopt), else the callback's.
-        private TcpSocketOpenDecision DecisionFor(CurlSocket socket, SocketOptionResult? option) =>
-            callbacks.OpenSocket is null || !suppliesSockets
+            if (callbacks.SocketOption is null || !suppliesSockets)
+            {
+                return (handles.Next(), null);
+            }
+
+            Socket engineSocket = new(remoteEndPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+            return (new CurlSocket(engineSocket.Handle), engineSocket);
+        }
+
+        // The dialer's own socket without a socket the callbacks saw (or one it cannot adopt), else that socket,
+        // used as it is under CURL_SOCKOPT_ALREADY_CONNECTED, connected or not.
+        private TcpSocketOpenDecision DecisionFor(CurlSocket socket, SocketOptionResult? option, Socket? engineSocket) =>
+            (callbacks.OpenSocket is null && engineSocket is null) || !suppliesSockets
                 ? TcpSocketOpenDecision.Proceed
                 : TcpSocketOpenDecision.Supplied(socket.Handle, option == SocketOptionResult.AlreadyConnected);
 

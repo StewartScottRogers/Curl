@@ -141,7 +141,8 @@ public sealed class Cgr036Tests
         Assert.AreEqual(CurlExitCode.AbortedByCallback, result.ExitCode);
         StringAssert.EndsWith(result.ErrorMessage, " ms: " + SocketCallbackConnector.AbortedByCallbackText);
         Assert.IsFalse(listener.Poll(100_000, SelectMode.SelectRead), "the listener has a connection waiting");
-        CollectionAssert.AreEqual(new[] { "sockopt 1", "close 1" }, calls);
+        Assert.HasCount(2, calls);
+        Assert.AreEqual(calls[0].Replace("sockopt", "close", StringComparison.Ordinal), calls[1]);
     }
 
     [TestMethod]

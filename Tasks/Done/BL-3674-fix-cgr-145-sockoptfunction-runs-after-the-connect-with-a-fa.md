@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/CurlSocketHandles.cs, Curl.Engine.UnitLibrary/SocketCallbackConnector.cs, Curl.Engine.UnitTests/Cgr145Tests.cs]
+touches: [Curl.Engine.UnitLibrary/CurlSocketHandles.cs, Curl.Engine.UnitLibrary/SocketCallbackConnector.cs, Curl.Engine.UnitTests/Cgr145Tests.cs, Curl.Engine.UnitLibrary/CurlSocketCloser.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitTests/Cgr036Tests.cs, Curl.Networking.UnitLibrary/DeferredConnectSocketStream.cs, Curl.Networking.UnitTests/DeferredConnectSocketStreamTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3674 — Fix CGR-145: SOCKOPTFUNCTION runs after the connect with a fake socket handle; CURL_SOCKOPT_ERROR still connects, and CURL_SOCKOPT_ALREADY_CONNECTED i...
 
@@ -59,17 +59,27 @@ probe.exe C_43 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr145Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Plan and decision (ADR-0845): without an open-socket callback, a set socket-option callback over a dialer that adopts sockets gets a TCP socket `AttemptSocketOpener` opens itself (with `TCP_NODELAY`) before the dial; it goes to the dialer as `Supplied`, unconnected under `AlreadyConnected`, and its `CurlSocketCloser` owns and closes it after the close-socket callback. Only the socket-option callback triggers it, so a close-socket-only handle keeps the dialer's own socket and options (ADR-0842).
+- Touches widened, since no task in Doing on origin/work/dark-factory names these files: `CurlSocketCloser.cs` (it owns the engine socket), `Cgr036Tests.cs` (one test pinned the fake handle `1` for the error case), `Curl.Engine.UnitLibrary/CLAUDE.md` (the socket callbacks paragraph), and `Curl.Networking.UnitLibrary/DeferredConnectSocketStream.cs` plus its tests. That stream let a raw `SocketException` out of `WriteAsync` on the unconnected socket, which escaped the perform, so it now wraps it in an `IOException` as `NetworkStream` does, and the HTTP handler answers exit 55.
+- Repro: a C# file-based probe outside the repository (`dotnet run probe.cs -- REF|PORT`), with a loopback server answering `200 hello`, CONNECTTIMEOUT_MS 2000, and SOCKOPTFUNCTION checking `SO_TYPE` on its handle and returning OK, then ERROR, then ALREADY_CONNECTED. REF is Git for Windows' `libcurl-4.dll` 8.22.0 Schannel; PORT is `ManagedCurlEngine`.
+  - REF: `Ok: rc=0 real=True reqs=1 serverconns=1`; `Error: rc=42 real=True reqs=0 serverconns=0`; `AlreadyConnected: rc=55 real=True reqs=0 serverconns=0`.
+  - PORT before the fix: `real=False` on every case, and AlreadyConnected connected (rc=0, reqs=1). The report's `Error: serverconns=1` was already fixed by CGR-036.
+  - PORT after the fix: the same three lines as REF. A library handle writes no stderr and no files here.
+- ADR-0482 test: `Cgr145Tests` (Curl.Engine.UnitTests). With the production change reverted, 3 of its 4 tests failed; with it, all pass. `DeferredConnectSocketStreamTests.WriteAsync_SocketNeverConnected_ThrowsAnIOExceptionOverTheSocketException` covers the stream.
+- The Ok case already matched curl and still does.
+- Verified: `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Curl.Networking.UnitLibrary` reports 0 failing members; `dotnet build` is clean; the fast tests pass (Curl.Engine.UnitTests 2610, Curl.Networking.UnitTests 3644). Linux 8.18 also gives rc=55 (the report). The new tests use only loopback and unconnected sockets with no platform-specific text, so they are platform-neutral.
 
 ## Log
 
 - 2026-10-26: Created from CGR-145 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Without an open-socket callback, SOCKOPTFUNCTION gets a real socket opened before the connect; ERROR connects nothing (42) and ALREADY_CONNECTED leaves it unconnected (55), as libcurl 8.22.0
