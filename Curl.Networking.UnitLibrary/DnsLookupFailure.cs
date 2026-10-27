@@ -51,4 +51,18 @@ public enum DnsLookupFailure
     /// reports as exit 42 (<c>CURLE_ABORTED_BY_CALLBACK</c>) under the plain <c>Could not resolve host</c> message.
     /// </summary>
     AbortedByCallback,
+
+    /// <summary>
+    /// The DoH resolver could not put the name in a query because a label is empty or over 63 bytes
+    /// (<c>DOH_DNS_BAD_LABEL</c>), which curl 8.22.0 reports as exit 27 <c>Failed to encode DoH packet [1]</c>
+    /// and sends nothing (CGR-158).
+    /// </summary>
+    DohBadLabel,
+
+    /// <summary>
+    /// The DoH resolver could not put the name in a query because the query would be over 272 bytes
+    /// (<c>DOH_DNS_NAME_TOO_LONG</c>), which curl 8.22.0 reports as exit 27 <c>Failed to encode DoH packet [13]</c>
+    /// and sends nothing (CGR-158).
+    /// </summary>
+    DohNameTooLong,
 }

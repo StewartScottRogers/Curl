@@ -33,7 +33,7 @@ namespace Curl.Networking;
 /// composition root passes a real sink only for that option.
 /// </para>
 /// </remarks>
-public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfigListLookup
+public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolverWithFailureReason, IEchConfigListLookup
 {
     private readonly IConnector _connector;
     private readonly Uri _dohUrl;
@@ -137,27 +137,43 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IEchConfig
     };
 
     /// <inheritdoc />
-    public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>
+        (await ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)).Addresses;
+
+    /// <summary>
+    /// Resolves <paramref name="host" /> as <see cref="ResolveAsync" /> does, reporting a name that cannot be put in
+    /// a query as <see cref="DnsLookupFailure.DohBadLabel" /> or <see cref="DnsLookupFailure.DohNameTooLong" />,
+    /// before anything is sent, so the transfer fails with curl 8.22.0's exit 27 <c>Failed to encode DoH packet [N]</c>
+    /// rather than exit 6 (CGR-158).
+    /// </summary>
+    /// <param name="host">The host name or literal address to resolve.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>The addresses, or why there are none.</returns>
+    public async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
 
         if (IPAddress.TryParse(host.Trim('[', ']'), out var literal))
         {
-            return [literal];
+            return new DnsResolution([literal], DnsLookupFailure.None);
         }
 
         if (TcpConnector.IsLocalhost(host))
         {
-            return [IPAddress.IPv6Loopback, IPAddress.Loopback];
+            return new DnsResolution([IPAddress.IPv6Loopback, IPAddress.Loopback], DnsLookupFailure.None);
         }
 
         var queryA = DnsQueryEncoder.Encode(host, DnsRecordType.A);
         if (queryA.Failure != DnsMessageFailure.None)
         {
-            return [];
+            return new DnsResolution([], EncodingFailureOf(queryA.Failure));
         }
 
         var results = DohQueryResult.AsOneEntry(await RunAddressQueriesAsync(AddressQueries(host, queryA.Bytes), cancellationToken).ConfigureAwait(false));
-        return ResolvedAddresses(results);
+        return new DnsResolution(ResolvedAddresses(results), DnsLookupFailure.None);
     }
+
+    // The lookup failure for a query DnsQueryEncoder refused: a bad label or a name too long.
+    private static DnsLookupFailure EncodingFailureOf(DnsMessageFailure failure) =>
+        failure == DnsMessageFailure.NameTooLong ? DnsLookupFailure.DohNameTooLong : DnsLookupFailure.DohBadLabel;
 }

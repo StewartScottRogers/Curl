@@ -415,6 +415,9 @@ response as curl does: `Content-Type` ignored, a `Content-Length`, chunked or cl
 fails the query undecoded with `[DoH] [DoH] [A] error: HTTP status N`, as curl 8.22.0's
 `doh_probe_done` does (BL-2972). It returns the AAAA answer's addresses, then the A
 answer's; a query that fails yields none, and none from both makes `TcpConnector` fail with exit 6.
+A name `DnsQueryEncoder` refuses is reported, with nothing sent, as `DnsLookupFailure.DohBadLabel` or
+`DohNameTooLong` through `IDnsResolverWithFailureReason`, which `NameResolutionFailure` makes curl 8.22.0's
+exit 27 `Failed to encode DoH packet [1]` or `[13]` (CGR-158, BL-3687).
 Both answers fill one entry, as curl's `struct dohentry`: `DohQueryResult.AsOneEntry` cuts each,
 A first, to the 24 addresses the earlier ones left room for (measured, BL-1153). A query that
 failed writes curl 8.22.0's `[DoH] [DoH] [A] error ...` line on the trace in place of its completed

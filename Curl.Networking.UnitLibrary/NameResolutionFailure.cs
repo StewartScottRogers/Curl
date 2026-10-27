@@ -20,13 +20,18 @@ internal static class NameResolutionFailure
     /// <param name="port">The port it was resolved for.</param>
     /// <param name="failure">Why, as the resolver reported it; <see cref="DnsLookupFailure.None" /> when it did not say.</param>
     /// <returns>The exit code and the message, cut to 255 characters as curl's error buffer cuts it.</returns>
-    public static (CurlExitCode ExitCode, string Message) Describe(CurlExitCode notResolved, string subject, string host, int port, DnsLookupFailure failure)
-    {
-        if (failure == DnsLookupFailure.BadConfiguration)
+    public static (CurlExitCode ExitCode, string Message) Describe(CurlExitCode notResolved, string subject, string host, int port, DnsLookupFailure failure) =>
+        failure switch
         {
-            return (CurlExitCode.BadFunctionArgument, CurlErrorBuffer.Truncate($"Error 43 resolving {host}:{port}"));
-        }
+            DnsLookupFailure.BadConfiguration => (CurlExitCode.BadFunctionArgument, CurlErrorBuffer.Truncate($"Error 43 resolving {host}:{port}")),
+            DnsLookupFailure.DohBadLabel => (CurlExitCode.OutOfMemory, "Failed to encode DoH packet [1]"),
+            DnsLookupFailure.DohNameTooLong => (CurlExitCode.OutOfMemory, "Failed to encode DoH packet [13]"),
+            _ => DescribeNotResolved(notResolved, subject, host, failure),
+        };
 
+    // curl's "Could not resolve" message, with the c-ares reason in brackets when there is one.
+    private static (CurlExitCode ExitCode, string Message) DescribeNotResolved(CurlExitCode notResolved, string subject, string host, DnsLookupFailure failure)
+    {
         var reason = DnsLookupFailureText.Describe(failure);
         var suffix = reason.Length == 0 ? string.Empty : $" ({reason})";
         var exitCode = failure == DnsLookupFailure.AbortedByCallback ? CurlExitCode.AbortedByCallback : notResolved;
