@@ -1859,7 +1859,14 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer)
     {
-        await run.WaitForFreeSlotAsync().ConfigureAwait(false);
+        Task slotFree = run.WaitForFreeSlotAsync();
+        bool beginsABatch = !slotFree.IsCompleted || !run.Queue.HasStartedAny;
+        await slotFree.ConfigureAwait(false);
+        if (beginsABatch)
+        {
+            run.Queue.BatchAddedTimestamp = timeProvider.GetTimestamp();
+        }
+
         if (run.HasEnded)
         {
             return true;
@@ -1950,7 +1957,11 @@ internal sealed class CurlCommandRunner(
         CancellationToken abortToken)
     {
         string url = UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol);
-        await run.Hosts.WaitForHostAsync(url, options.HttpVersion == RequestedHttpVersion.Http2PriorKnowledge, abortToken).ConfigureAwait(false);
+        if (await WaitForHostWithinMaxTimeAsync(run, options, url, abortToken).ConfigureAwait(false) is { } timedOut)
+        {
+            return (timedOut, transfer.Url, url);
+        }
+
         Running.ParallelProgress?.MarkLive(bindsInterface: options.Interface is not null);
         bool connectionStayedOpen = false;
         try
@@ -1963,6 +1974,69 @@ internal sealed class CurlCommandRunner(
         {
             run.Hosts.Leave(url, connectionStayedOpen);
         }
+    }
+
+    /// <summary>
+    /// Waits for the host of a <c>-Z</c> transfer (<see cref="ParallelHostQueue.WaitForHostAsync(string, bool, CancellationToken)" />)
+    /// with its positive <c>-m</c> running, as curl 8.22.0's runs from the moment the transfer is added: a
+    /// transfer still waiting for the host's first connection when <c>-m</c> passes ends with exit 28 and
+    /// <c>Operation timed out after N milliseconds with 0 bytes received</c>, having opened no connection
+    /// (CGR-109, BL-3638). The wait's own timer runs a whole <c>-m</c> from when the wait began, after the
+    /// host's first transfer started its <c>-m</c>, so that one ends first, as in curl; a transfer the host
+    /// frees once <c>-m</c> has passed since its batch was added (<see cref="ParallelTransferQueue.BatchAddedTimestamp" />)
+    /// leaves the host and times out instead of connecting.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="url">The transfer's URL, with its scheme.</param>
+    /// <param name="abortToken">Ends the wait when <c>--fail-early</c> aborts the run.</param>
+    /// <returns>The timed-out result, or <see langword="null" /> once the transfer may start.</returns>
+    private async Task<TransferResult?> WaitForHostWithinMaxTimeAsync(
+        ParallelRun run,
+        CommandLineOptions options,
+        string url,
+        CancellationToken abortToken)
+    {
+        bool speaksHttp2FromTheStart = options.HttpVersion == RequestedHttpVersion.Http2PriorKnowledge;
+        if (options.MaxTime is not { } maxTime || maxTime <= TimeSpan.Zero)
+        {
+            await run.Hosts.WaitForHostAsync(url, speaksHttp2FromTheStart, abortToken).ConfigureAwait(false);
+            return null;
+        }
+
+        // Read before the first await: the transfer was added in the batch the queue last began.
+        long added = run.Queue.BatchAddedTimestamp;
+        using CancellationTokenSource maxTimePassed = new(EasyOptionsFromCommandLine.AtMostLongestTimerWait(maxTime), timeProvider);
+        using CancellationTokenSource waitEnds = CancellationTokenSource.CreateLinkedTokenSource(abortToken, maxTimePassed.Token);
+        try
+        {
+            await run.Hosts.WaitForHostAsync(url, speaksHttp2FromTheStart, waitEnds.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!abortToken.IsCancellationRequested)
+        {
+            return WaitForHostTimedOut(added);
+        }
+
+        if (timeProvider.GetElapsedTime(added) < maxTime)
+        {
+            return null;
+        }
+
+        run.Hosts.Leave(url);
+        return WaitForHostTimedOut(added);
+    }
+
+    /// <summary>
+    /// The exit 28 result of a <c>-Z</c> transfer whose <c>-m</c> passed while it waited for its host.
+    /// </summary>
+    /// <param name="added">The timestamp at which the transfer was added.</param>
+    /// <returns>curl 8.22.0's <c>Operation timed out after N milliseconds with 0 bytes received</c>.</returns>
+    private TransferResult WaitForHostTimedOut(long added)
+    {
+        long milliseconds = (long)timeProvider.GetElapsedTime(added).TotalMilliseconds;
+        return TransferResult.Failure(
+            CurlExitCode.OperationTimedOut,
+            string.Create(CultureInfo.InvariantCulture, $"Operation timed out after {milliseconds} milliseconds with 0 bytes received"));
     }
 
     /// <summary>

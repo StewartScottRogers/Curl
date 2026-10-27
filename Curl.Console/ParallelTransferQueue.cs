@@ -32,6 +32,14 @@ internal sealed class ParallelTransferQueue(int maxRunning)
     /// </summary>
     internal Action BeforeEachWait { get; set; } = static () => { };
 
+    /// <summary>
+    /// Gets or sets the timestamp at which the run last began adding transfers: when it started its first,
+    /// or when a slot came free after a wait. curl adds every transfer of such a batch at once and runs each
+    /// one's <c>-m</c> from there, so a transfer that waits for its host counts its <c>-m</c> from this
+    /// moment rather than from when its wait began (CGR-109, BL-3638).
+    /// </summary>
+    internal long BatchAddedTimestamp { get; set; }
+
     /// <summary>Waits until fewer than the maximum transfers are running.</summary>
     /// <returns>A task that completes when a transfer may start.</returns>
     internal async Task WaitForFreeSlotAsync()
