@@ -1,4 +1,4 @@
-# ADR-0836 — HTTP/2 against a peer that answers in HTTP/1.1 exits 16
+# ADR-0837 — HTTP/2 against a peer that answers in HTTP/1.1 exits 16
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
