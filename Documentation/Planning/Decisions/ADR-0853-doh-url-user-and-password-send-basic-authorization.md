@@ -1,4 +1,4 @@
-# ADR-0849: A user name or password in the `--doh-url` sends `Authorization: Basic` on each DoH POST
+# ADR-0853: A user name or password in the `--doh-url` sends `Authorization: Basic` on each DoH POST
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

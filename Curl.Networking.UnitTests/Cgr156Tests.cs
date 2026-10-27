@@ -5,7 +5,7 @@ using Curl.Networking.Fakes;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-156 (BL-3685, ADR-0849): a user name or password in the <c>--doh-url</c> sends
+/// CGR-156 (BL-3685, ADR-0853): a user name or password in the <c>--doh-url</c> sends
 /// <c>Authorization: Basic</c> on every DoH POST, right after Host, as curl 8.21.0 did when
 /// measured with <c>Record-CurlExchange.ps1</c>.
 /// </summary>

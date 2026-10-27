@@ -46,7 +46,7 @@ public sealed partial class DohDnsResolver
     /// <summary>
     /// The <c>Authorization: Basic</c> line curl sends after Host when the DoH URL names a user or a
     /// password: the percent-decoded <c>user:password</c> in base64 (<c>u@</c> sends <c>u:</c>), and
-    /// nothing when both are empty (measured, CGR-156, ADR-0849).
+    /// nothing when both are empty (measured, CGR-156, ADR-0853).
     /// </summary>
     /// <param name="userInfo">The DoH URL's user information, still percent-encoded.</param>
     /// <returns>The header line with its CRLF, or the empty string.</returns>
