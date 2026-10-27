@@ -18,7 +18,7 @@ A libcurl handle that sets `CURLOPT_SOCKOPTFUNCTION` without `CURLOPT_OPENSOCKET
 
 ## Context
 
-Left over from BL-3658 (CGR-129, LMC-15, ADR-0840 point 4). `SocketCallbackConnector.AttemptSocketOpener.Open` runs before `TcpDialer` creates its socket, so without an open-socket callback the socket-option callback gets a `CurlSocketHandles` number. Fix: let the dialer create the socket first and pass its handle to `ITcpSocketOpener` (for example an `Open(remoteEndPoint, nint? dialerSocket)` overload, default delegating to the old one), and have the opener hand it to the socket-option callback and keep it for the close-socket callback (which BL-3658 already gives the real handle after connect). Measure real libcurl first.
+Left over from BL-3658 (CGR-129, LMC-15, ADR-0842 point 4). `SocketCallbackConnector.AttemptSocketOpener.Open` runs before `TcpDialer` creates its socket, so without an open-socket callback the socket-option callback gets a `CurlSocketHandles` number. Fix: let the dialer create the socket first and pass its handle to `ITcpSocketOpener` (for example an `Open(remoteEndPoint, nint? dialerSocket)` overload, default delegating to the old one), and have the opener hand it to the socket-option callback and keep it for the close-socket callback (which BL-3658 already gives the real handle after connect). Measure real libcurl first.
 
 ## Acceptance criteria
 

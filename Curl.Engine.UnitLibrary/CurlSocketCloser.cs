@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// <param name="close">The close-socket callback, or <see langword="null" /> when none is set.</param>
 /// <param name="isTheConnectionsOwnSocket">
 /// Whether <paramref name="socket" /> is the operating system socket the engine opened for the connection, which the
-/// callback must see before the connection closes it (CGR-129, ADR-0840).
+/// callback must see before the connection closes it (CGR-129, ADR-0842).
 /// </param>
 internal sealed class CurlSocketCloser(CurlSocket socket, CloseSocketCallback? close, bool isTheConnectionsOwnSocket = false)
 {

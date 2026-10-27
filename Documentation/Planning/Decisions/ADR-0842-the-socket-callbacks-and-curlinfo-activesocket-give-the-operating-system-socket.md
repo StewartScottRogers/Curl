@@ -1,4 +1,4 @@
-# ADR-0840 — CURLINFO_ACTIVESOCKET and the close-socket callback give the operating system socket
+# ADR-0842 — CURLINFO_ACTIVESOCKET and the close-socket callback give the operating system socket
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

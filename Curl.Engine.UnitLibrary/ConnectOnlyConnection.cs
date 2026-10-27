@@ -72,7 +72,7 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// <summary>
     /// Closes the connection open now, if any, and keeps <paramref name="opened" /> in its place under its operating
     /// system socket (<see cref="IConnection.SocketHandle" />), as libcurl's <c>CURLINFO_ACTIVESOCKET</c> answers its
-    /// own socket (CGR-129, ADR-0840), else under a new socket number.
+    /// own socket (CGR-129, ADR-0842), else under a new socket number.
     /// </summary>
     /// <param name="opened">The connection the connect-only perform made.</param>
     /// <returns>A task that completes once the earlier connection is closed.</returns>
