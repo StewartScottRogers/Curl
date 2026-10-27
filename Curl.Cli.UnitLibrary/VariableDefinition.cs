@@ -111,7 +111,8 @@ internal static class VariableDefinition
     {
         if (file == StandardInputName)
         {
-            return Set(options, name, range.Cut(dataFileReader.ReadStandardInput()));
+            // curl's Windows build reads it in text mode (WindowsTextModeInput, CGR-112).
+            return Set(options, name, range.Cut(WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), options.ActsAsWindowsSchannelBuild)));
         }
 
         return dataFileReader.TryReadFile(file, out byte[] contents)
