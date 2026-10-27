@@ -641,7 +641,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                     KeyLog = _options.KeyLogFile is { } keyLogFile ? new NssKeyLogFile(keyLogFile) : null,
                 },
                 clientCertificate,
-                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost)), null, null);
+                new HandBuiltCertificateVerifier(_verification, chainPolicy, anchorsBesideSystemStore, revocationLists, targetHost, UntrustedStapleClock)), null, null);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or CryptographicException)
         {
@@ -650,6 +650,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return (null, ConnectResult.Failed(exitCode, message), null);
         }
     }
+
+    // Under -k the OpenSSL build trusts no OCSP responder, every build's --cert-status
+    // check being the OpenSSL build's (ADR-0191, ADR-0859).
+    private TimeProvider? UntrustedStapleClock =>
+        _options.Insecure && _options.RequireCertificateStatus ? _timeProvider : null;
 
     // The handshake's outcome, or what it threw: the transport's failures and cancellation.
     private async Task<(HandBuiltHandshake? Handshake, Exception? Thrown)> TryHandshakeAsync(

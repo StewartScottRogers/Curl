@@ -21,12 +21,19 @@ namespace Curl.Networking;
 /// <param name="anchorsBesideSystemStore">The <c>--capath</c> roots trusted beside the system store.</param>
 /// <param name="revocationLists">The <c>--crlfile</c> lists, or <see langword="null" /> when none are checked.</param>
 /// <param name="targetHost">The host the certificate is checked against, IPv6 brackets and all.</param>
+/// <param name="untrustedStapleClock">
+/// Under <c>-k</c> with <c>--cert-status</c>, the clock the stapled OCSP response is read at;
+/// <see langword="null" /> otherwise. curl's OpenSSL build loads no trust store under <c>-k</c>,
+/// so <c>OCSP_basic_verify</c> trusts no responder and every staple that reads as a successful
+/// response is refused with exit 91 <c>OCSP response verification failed</c> (ADR-0859, CGR-167).
+/// </param>
 internal sealed class HandBuiltCertificateVerifier(
     ServerCertificateVerification verification,
     X509ChainPolicy? chainPolicy,
     X509Certificate2Collection anchorsBesideSystemStore,
     CertificateRevocationListFile? revocationLists,
-    string targetHost) : IServerCertificateVerifier
+    string targetHost,
+    TimeProvider? untrustedStapleClock = null) : IServerCertificateVerifier
 {
     // What SslStream asks of a server certificate's chain: the server authentication usage.
     private static readonly Oid ServerAuthentication = new("1.3.6.1.5.5.7.3.1");
@@ -101,8 +108,23 @@ internal sealed class HandBuiltCertificateVerifier(
         var (observed, failure) = verification.Judge(
             errors, sent.Count == 0 ? null : chain, targetHost, anchorsBesideSystemStore, revocationLists, PeerCertificates, Presented!.OcspResponse);
         Observed = observed;
-        return failure is { } rejected ? ServerCertificateVerdict.Rejected(rejected) : ServerCertificateVerdict.Accepted;
+        return failure is { } rejected
+            ? ServerCertificateVerdict.Rejected(rejected)
+            : RefusesUntrustedStaple()
+            ? ServerCertificateVerdict.Rejected(
+                (CurlExitCode.SslInvalidCertStatus, CertificateStatusFailureMessages.For(new OcspStapleOutcome(OcspStapleStatus.SignatureInvalid))),
+                TlsAlertDescription.BadCertificateStatusResponse)
+            : ServerCertificateVerdict.Accepted;
     }
+
+    // curl's verifystatus() refuses a missing, unreadable or unsuccessful response before
+    // OCSP_basic_verify, which trusts no responder without a trust store, so only those
+    // outcomes keep their own message under -k (measured with curl 8.18.0 on OpenSSL 3.5.5).
+    private bool RefusesUntrustedStaple() =>
+        untrustedStapleClock is not null
+        && Presented!.Certificates.Count > 0
+        && OcspStapleVerifier.Verify(Presented.OcspResponse, Presented.Certificates, untrustedStapleClock.GetUtcNow()).Status
+            is not (OcspStapleStatus.NoResponse or OcspStapleStatus.Malformed or OcspStapleStatus.Unsuccessful);
 
     // The chain SslStream builds: the policy ServerCertificateVerification read (--cacert, or the
     // Schannel build's system store revocation check), or the system store for server
