@@ -174,6 +174,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     public IReadOnlyList<string> Warnings { get; }
 
     /// <summary>
+    /// Gets the record of which verification settings own each host's resumable sessions
+    /// (<see cref="SslStreamSessionPartitions" />, CGR-164). Defaults to the process's
+    /// <see cref="SslStreamSessionPartitions.Process" />; tests give each provider its own.
+    /// </summary>
+    internal SslStreamSessionPartitions SessionPartitions { get; init; } = SslStreamSessionPartitions.Process;
+
+    /// <summary>
     /// Gets the factory that builds the OpenSSL build's <see cref="CipherSuitesPolicy" /> from
     /// the suites <c>--ciphers</c> and <c>--tls13-ciphers</c> select, returning
     /// <see langword="null" /> where the platform cannot apply them. Defaults to
@@ -391,6 +398,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         {
             TargetHost = ServerNameIndication(targetHost),
             EnabledSslProtocols = _offeredProtocols,
+            AllowTlsResume = SessionPartitions.MayResume(targetHost, _options),
             CertificateChainPolicy = chainPolicy,
             LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
             CipherSuitesPolicy = cipherSuitesPolicy,
