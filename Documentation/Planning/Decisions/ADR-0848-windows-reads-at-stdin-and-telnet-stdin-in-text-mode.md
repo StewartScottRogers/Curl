@@ -1,4 +1,4 @@
-# ADR-0844: On Windows, `@-` text consumers and telnet's standard input are read in text mode
+# ADR-0848: On Windows, `@-` text consumers and telnet's standard input are read in text mode
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
