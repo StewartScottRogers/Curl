@@ -856,11 +856,15 @@ public sealed class CurlCommandRunnerTests
     public async Task RunAsync_TelnetUrl_ReceivesStandardInputAsUpload()
     {
         RecordingProtocolHandler telnet = RecordingProtocolHandler.WritingPath("telnet");
+        standardInput.Write("a\r\nb"u8);
+        standardInput.Position = 0;
 
         await RunAsync(["telnet://h/"], telnet);
 
-        Diagnostics.Assert("upload is standard input", true, ReferenceEquals(standardInput, telnet.Contexts.Single().Upload));
-        Assert.AreSame(standardInput, telnet.Contexts.Single().Upload);
+        // On Windows curl reads it in text mode, CR LF as LF (CGR-112).
+        using MemoryStream uploaded = new();
+        await telnet.Contexts.Single().Upload!.CopyToAsync(uploaded);
+        Assert.AreEqual(OperatingSystem.IsWindows() ? "a\nb" : "a\r\nb", Encoding.Latin1.GetString(uploaded.ToArray()));
     }
 
     [TestMethod]

@@ -24,7 +24,7 @@ namespace Curl.Engine;
 /// carrying every option a handler reads.
 /// </summary>
 /// <param name="standardInput">
-/// The raw standard input stream, given to a <c>telnet</c> transfer as its
+/// The raw standard input stream, given to a <c>telnet</c> transfer (through <see cref="WindowsTextModeReadStream" /> on Windows) as its
 /// <see cref="ITransferContext.Upload" />, because curl's telnet "sends what it reads on
 /// stdin" (ADR-0006). Every other scheme's upload is <see langword="null" />.
 /// </param>
@@ -47,6 +47,16 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
 
     /// <summary>The TFTP options at libcurl's defaults, whose block size <see cref="BlockSizeOf" /> compares with.</summary>
     private static readonly EasyTftpOptions DefaultTftpOptions = new();
+
+    /// <summary>
+    /// Gets whether a <c>telnet</c> transfer without <c>-T</c> reads standard input in the C runtime's
+    /// text mode (<see cref="WindowsTextModeReadStream" />), as curl's Windows build does (CGR-112): on
+    /// Windows by default, settable so tests can pin either platform.
+    /// </summary>
+    internal bool ReadsTelnetStandardInputInTextMode { get; init; } = OperatingSystem.IsWindows();
+
+    /// <summary>Standard input as a <c>telnet</c> transfer reads it, built on its first use (<see cref="UploadOf" />).</summary>
+    private Stream? telnetStandardInput;
 
     /// <summary>Every context's clock: the one given, or <see cref="TimeProvider.System" />.</summary>
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
@@ -381,13 +391,17 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
 
     /// <summary>
     /// Gets what the transfer uploads: the <c>-T</c> <paramref name="upload" /> when given, standard
-    /// input for a <c>telnet</c> URL without one, and nothing for any other.
+    /// input for a <c>telnet</c> URL without one (in text mode under <see cref="ReadsTelnetStandardInputInTextMode" />),
+    /// and nothing for any other.
     /// </summary>
     /// <param name="url">The URL to transfer.</param>
     /// <param name="upload">The <c>-T</c> source, or <see langword="null" /> without <c>-T</c>.</param>
     /// <returns>The context's <see cref="TransferContext.Upload" />.</returns>
     private Stream? UploadOf(CurlUrl url, Stream? upload) =>
-        upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? standardInput : null);
+        upload ?? (string.Equals(url.Scheme, TelnetScheme, StringComparison.Ordinal) ? TelnetStandardInput() : null);
+
+    private Stream TelnetStandardInput() =>
+        telnetStandardInput ??= ReadsTelnetStandardInputInTextMode ? new WindowsTextModeReadStream(standardInput) : standardInput;
 
     /// <summary>
     /// Gets the <c>-m</c> watchdog's start, which every limit of the attempt counts from, or

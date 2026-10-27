@@ -57,7 +57,7 @@ internal sealed partial class ManagedEasyTransfer
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
         lastWriteCallbackOutput = outputs.Output as CallbackWriteStream;
-        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
+        TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { ReadsTelnetStandardInputInTextMode = false, HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,
             options.Http,

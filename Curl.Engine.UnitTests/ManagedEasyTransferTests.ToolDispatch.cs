@@ -39,7 +39,7 @@ public sealed partial class ManagedEasyTransferTests
         using MemoryStream standardInput = new([1, 2, 3]);
         await using ManagedEasyTransfer easy = EasyOver(RecordingProtocolHandler.WritingPath("telnet"));
         easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "telnet://h/" } };
-        easy.ToolDispatch = DispatchOver(runners, new TransferContextFactory(standardInput, TimeProvider.System));
+        easy.ToolDispatch = DispatchOver(runners, new TransferContextFactory(standardInput, TimeProvider.System) { ReadsTelnetStandardInputInTextMode = false });
 
         await easy.PerformAsync(CancellationToken.None);
 

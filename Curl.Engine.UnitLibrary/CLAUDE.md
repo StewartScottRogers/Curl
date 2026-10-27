@@ -542,3 +542,7 @@ Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransf
 ## CURLINFO_CONTENT_LENGTH_UPLOAD after an HTTP request (BL-3656)
 
 Once an `http` or `https` request has been sent and the transfer is neither an upload nor a form post, `TransferInfo.ContentLengthUpload` is the last request's body size (`ManagedEasyTransfer.ContentLengthUploadOf(EasyOptions, TransferReport?, string)`): 0 with no body (no post, `CURLOPT_NOBODY`, `CURLOPT_HTTPGET`, or a redirect followed with `GET` or `HEAD`), -1 under a `Transfer-Encoding: chunked` header, else the post's size, as libcurl 8.22.0 sets it from each request's reader (CGR-127, ADR-0843). Its tests are `Cgr127Tests`.
+
+## Telnet standard input in Windows text mode (BL-3641)
+
+`TransferContextFactory` gives a `telnet` transfer without `-T` its standard input through a `WindowsTextModeReadStream` while `ReadsTelnetStandardInputInTextMode` is set (by default on Windows), so a Ctrl-Z ends it and CR LF goes as LF, as curl 8.22.0's Windows build reads `stdin` in text mode; a `-T` source is sent unchanged, and the library handle's factory, whose standard input is `Stream.Null`, turns it off (CGR-112, ADR-0844). Its tests are `Cgr112Tests`.
