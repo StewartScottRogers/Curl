@@ -25,6 +25,13 @@ internal sealed partial class ManagedEasyTransfer
     /// <inheritdoc />
     public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken)
     {
+        // A perform of this handle already running means the call comes from one of its callbacks, which
+        // curl 8.22.0's Curl_is_in_callback check refuses (CGR-146).
+        if (ConnectOnly.PerformRunning)
+        {
+            return CurlCode.RecursiveApiCall;
+        }
+
         ConnectOnly.PerformRunning = true;
         try
         {

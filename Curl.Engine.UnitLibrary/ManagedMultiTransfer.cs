@@ -146,7 +146,8 @@ internal sealed class ManagedMultiTransfer(
     /// of the engine already, <see cref="CurlMultiCode.BadEasyHandle" /> for <see langword="null" /> and
     /// <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed. As libcurl does, it gives the
     /// timer callback 0 (act at once), and answers <see cref="CurlMultiCode.AbortedByCallback" /> when that
-    /// returns -1.
+    /// returns -1. Called from inside one of its own transfers' callbacks (<see cref="IsInTransferCallback" />)
+    /// it adds nothing and answers <see cref="CurlMultiCode.RecursiveApiCall" />, as libcurl does (CGR-146).
     /// </returns>
     public CurlMultiCode Add(IEasyTransfer transfer)
     {
@@ -160,11 +161,19 @@ internal sealed class ManagedMultiTransfer(
             return CurlMultiCode.BadEasyHandle;
         }
 
-        if (!owners.TryAdd(transfer, this))
+        // Before the added-already check: curl 8.22.0 refuses a handle already in the multi handle with 8 here too.
+        if (IsInTransferCallback)
         {
-            return CurlMultiCode.AddedAlready;
+            return CurlMultiCode.RecursiveApiCall;
         }
 
+        return owners.TryAdd(transfer, this) ? AddEntry(transfer) : CurlMultiCode.AddedAlready;
+    }
+
+    // Adds a transfer this handle now owns; also the engine's own add of an HTTP/2 pushed transfer, which
+    // runs inside a transfer and so skips the recursive-call check.
+    private CurlMultiCode AddEntry(IEasyTransfer transfer)
+    {
         entries.Add(new MultiEntry(transfer));
         transfersAdded++;
         return UpdateTimer(timerFired: false);
@@ -179,7 +188,8 @@ internal sealed class ManagedMultiTransfer(
     /// <returns>
     /// <see cref="CurlMultiCode.Ok" />, also for a transfer in no multi handle;
     /// <see cref="CurlMultiCode.BadEasyHandle" /> for <see langword="null" /> or one in another multi handle,
-    /// and <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed.
+    /// and <see cref="CurlMultiCode.BadHandle" /> once this handle is disposed; called from inside one of its
+    /// own transfers' callbacks it removes nothing and answers <see cref="CurlMultiCode.RecursiveApiCall" /> (CGR-146).
     /// </returns>
     public CurlMultiCode Remove(IEasyTransfer transfer)
     {
@@ -201,6 +211,11 @@ internal sealed class ManagedMultiTransfer(
         if (owner != this)
         {
             return CurlMultiCode.BadEasyHandle;
+        }
+
+        if (IsInTransferCallback)
+        {
+            return CurlMultiCode.RecursiveApiCall;
         }
 
         RemoveEntry(entries.Find(candidate => candidate.Transfer == transfer)!);
@@ -272,10 +287,13 @@ internal sealed class ManagedMultiTransfer(
     /// <summary><c>curl_multi_info_read</c>: takes the oldest queued message.</summary>
     /// <param name="message">The message, or <see langword="null" /> when none waits.</param>
     /// <param name="remainingMessages">The messages still queued after this one.</param>
-    /// <returns><see langword="true" /> when a message was taken.</returns>
+    /// <returns>
+    /// <see langword="true" /> when a message was taken; <see langword="false" /> from inside one of the handle's
+    /// own transfers' callbacks, where libcurl's call answers no message (CGR-146).
+    /// </returns>
     public bool TryReadInfo([NotNullWhen(true)] out CurlMultiMessage? message, out int remainingMessages)
     {
-        if (messages.Count == 0)
+        if (messages.Count == 0 || IsInTransferCallback)
         {
             message = null;
             remainingMessages = 0;
@@ -383,12 +401,18 @@ internal sealed class ManagedMultiTransfer(
             return (CurlMultiCode.BadHandle, -1);
         }
 
+        return IsInTransferCallback ? (CurlMultiCode.RecursiveApiCall, -1) : (CurlMultiCode.Ok, TimeoutMilliseconds());
+    }
+
+    // GetTimeout's milliseconds for a live handle.
+    private long TimeoutMilliseconds()
+    {
         if (entries.Exists(HasWorkForPerform) || callbackQueue.HasQueued)
         {
-            return (CurlMultiCode.Ok, 0);
+            return 0;
         }
 
-        return (CurlMultiCode.Ok, entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds >= 0).DefaultIfEmpty(-1).Min());
+        return entries.Select(RemainingMilliseconds).Where(milliseconds => milliseconds >= 0).DefaultIfEmpty(-1).Min();
     }
 
     /// <summary>
@@ -520,7 +544,8 @@ internal sealed class ManagedMultiTransfer(
         }
 
         // The timer's answer to the add is the handle's to report on its next call, not the push's.
-        Add(pushed);
+        owners[pushed] = this;
+        AddEntry(pushed);
         return CurlPushResult.Ok;
     }
 
@@ -687,6 +712,11 @@ internal sealed class ManagedMultiTransfer(
             return ValueTask.FromResult((CurlMultiCode.BadHandle, 0));
         }
 
+        if (IsInTransferCallback)
+        {
+            return ValueTask.FromResult((CurlMultiCode.RecursiveApiCall, 0));
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         int previousThread = callbackQueue.EnterPerform();
         try
@@ -848,7 +878,7 @@ internal sealed class ManagedMultiTransfer(
 
     private long TimerMilliseconds()
     {
-        long handleTimeout = GetTimeout().TimeoutMilliseconds;
+        long handleTimeout = TimeoutMilliseconds();
         if (!entries.Exists(entry => !entry.Done))
         {
             return handleTimeout;
@@ -899,6 +929,11 @@ internal sealed class ManagedMultiTransfer(
         if (disposed)
         {
             return (CurlMultiCode.BadHandle, 0);
+        }
+
+        if (IsInTransferCallback)
+        {
+            return (CurlMultiCode.RecursiveApiCall, 0);
         }
 
         if (timeout < TimeSpan.Zero)

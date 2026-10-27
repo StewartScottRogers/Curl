@@ -39,6 +39,8 @@ public sealed partial class CurlMulti : IAsyncDisposable
     /// <param name="easy">The easy handle to add.</param>
     /// <returns>
     /// <see cref="CurlMultiCode.BadEasyHandle"/> for a <see langword="null"/> or cleaned-up handle,
+    /// <see cref="CurlMultiCode.RecursiveApiCall"/> from inside one of the handle's transfer callbacks, even
+    /// for a handle it holds already, as libcurl 8.22.0 answers (CGR-146),
     /// <see cref="CurlMultiCode.AddedAlready"/> for one this handle holds already, else the engine's answer
     /// (<see cref="CurlMultiCode.AddedAlready"/> too when another multi handle holds it).
     /// </returns>
@@ -49,6 +51,11 @@ public sealed partial class CurlMulti : IAsyncDisposable
         if (easy is null || easy.IsCleanedUp)
         {
             return CurlMultiCode.BadEasyHandle;
+        }
+
+        if (live.IsInTransferCallback)
+        {
+            return CurlMultiCode.RecursiveApiCall;
         }
 
         var easyTransfer = easy.Transfer;
