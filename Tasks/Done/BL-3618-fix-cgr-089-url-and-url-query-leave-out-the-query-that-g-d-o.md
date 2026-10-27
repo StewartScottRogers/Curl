@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests/Cgr089Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/Cgr089Tests.cs]
+touches: [Curl.Console/CLAUDE.md, Curl.Console.UnitTests/Cgr089Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/Cgr089Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3618 — Fix CGR-089: %{url} and %{url.query} leave out the query that -G -d or --url-query appended
 
@@ -79,17 +79,31 @@ curl -sS --url-query a=b "http://127.0.0.1:20200/x" -w "%{url}"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr089Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 8): Fixed in `Curl.Console/CurlCommandRunner.cs` (`WriteOutGivenUrl`): when `-G`/`--url-query` appends a query, `%{url}` and `%{url.*}` read the URL with it, normalised by `UrlEffective` as `%{url_effective}` is. `TransferWriteOutVariables` needed no change (it parses whatever URL it is handed, schemeless included), so the Output files in `touches` stay untouched. Added `Curl.Console/CLAUDE.md` to `touches` to correct its "`%{url}` keeps the URL as typed" sentence; no task in Doing on origin/work/dark-factory names it.
+- Measured on curl 8.21.0 Schannel (`C:\Windows\System32\curl.exe`, the platform's curl), port 1 closed (`-s -o NUL -w '%{url}|%{url.query}|%{url_effective}\n'`):
+  - `-G -d a=b http://127.0.0.1:1/p` -> `http://127.0.0.1:1/p?a=b|a=b|http://127.0.0.1:1/p?a=b`
+  - `--url-query x=1 'http://127.0.0.1:1/p?y=2'` -> `http://127.0.0.1:1/p?y=2&x=1|y=2&x=1|...`
+  - `-G -d 'a=%2f' 'HTTP://127.0.0.1:1/a/../p#frag'` -> `http://127.0.0.1:1/p?a=%2F#frag|a=%2F|...` (normalised, fragment kept)
+  - `-G -d a=b 127.0.0.1:1/p` -> `127.0.0.1:1/p?a=b|a=b|http://127.0.0.1:1/p?a=b` (no guessed scheme in `%{url}`; curl 8.18.0 mingw prints it with `http://`, 8.21.0 Schannel without; matched the platform's curl)
+  - `-G -d a=b 'http://a b/p'` (rejected) -> `http://a b/p||` (as typed, no query)
+  - without `-G`, `'HTTP://127.0.0.1:1/a/../p'` -> `HTTP://127.0.0.1:1/a/../p|` (as typed, unchanged)
+  Every case is pinned in `Curl.Console.UnitTests/Cgr089Tests.cs`; 5 of its 7 cases failed with the fix removed and all 7 pass with it.
+- The issue's four repro commands through `Record-CurlExchange.ps1` against a 200 `ok` responder on port 18961, ref = curl 8.21.0 Schannel vs Curl: exit code 0 for both; stdout identical (`http://127.0.0.1:18961/p?a=b|a=b`, `http://127.0.0.1:18961/p?y=2&x=1|y=2&x=1`, `okhttp://127.0.0.1:18961/x?a=b` twice); stderr empty for both; no files written; request bytes identical except `User-Agent: curl/8.21.0` vs `curl/8.22.0`, the version Curl reports (the report's normalisation). Variants that already matched (`%{url_effective}`, `urle.*`, the request line) still match.
+- No ADR: no design choice beyond matching the platform's curl as measured.
+- `dotnet build` clean; fast tests green (0 failed). `Measure-CodeQuality.ps1 -Library Curl.Console`: 100% line, 100% branch, 0 failing members, worst CRAP 10.
+- CI on Linux and macOS: the tests use fake handlers and no paths, OS text or certificates, so they are platform-neutral.
 
 ## Log
 
 - 2026-10-26: Created from CGR-089 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. %{url} and %{url.query} include the query -G -d or --url-query appended, as curl does
