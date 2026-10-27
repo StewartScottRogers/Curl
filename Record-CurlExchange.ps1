@@ -166,7 +166,8 @@
     Overrides for the FTP reply table, each 'VERB=reply' with the same backslash escapes
     as Response, e.g. 'PASS=430 Access denied'. The reply is sent as given with CRLF
     appended. VERB is a command name in capitals, GREETING for the greeting, or RETRDONE
-    for the reply sent after RETR's or LIST's data, or STORDONE for the reply sent after
+    for the reply sent after RETR's or LIST's data, RETROPEN for the 150 sent before it
+    (still opening the data connection, e.g. 'RETROPEN=150 Opening (5 bytes)', BL-3627), or STORDONE for the reply sent after
     STOR's or APPE's data. An overridden EPSV, PASV, RETR, LIST, NLST, STOR or APPE sends
     only the reply: no data connection is offered. The reply CLOSE closes the control
     connection instead of answering, e.g. 'PWD=CLOSE', and the reply STALL sends nothing and
@@ -1133,7 +1134,8 @@ $serveFtpSession = {
                     'EPSV' { Send-Reply -Stream $stream -Reply "229 Entering Extended Passive Mode (|||$dataPort|)" }
                     'PASV' { Send-Reply -Stream $stream -Reply "227 Entering Passive Mode ($($ListenAddress.ToString().Replace('.', ',')),$([Math]::Floor($dataPort / 256)),$($dataPort % 256))" }
                     { $_ -eq 'RETR' -or $_ -eq 'LIST' -or $_ -eq 'NLST' } {
-                        Send-Reply -Stream $stream -Reply '150 Opening BINARY mode data connection'
+                        $opening = if ($Overrides.ContainsKey('RETROPEN')) { Get-Override -Verb 'RETROPEN' } else { '150 Opening BINARY mode data connection' }
+                        Send-Reply -Stream $stream -Reply $opening
                         $dataClient, $dataStream = Open-DataConnection -Verb $verb -ActiveEndPoint $activeEndPoint -Protect $protectData
                         try {
                             $start = [int] [Math]::Max(0, [Math]::Min($restOffset, $DataBytes.Length))
