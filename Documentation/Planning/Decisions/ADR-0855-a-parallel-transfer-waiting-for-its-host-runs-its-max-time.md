@@ -1,4 +1,4 @@
-# ADR-0848 — A parallel transfer waiting for its host runs its max time
+# ADR-0855 — A parallel transfer waiting for its host runs its max time
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
