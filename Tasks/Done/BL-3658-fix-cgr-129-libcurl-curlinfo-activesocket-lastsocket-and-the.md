@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/CurlSocketHandles.cs, Curl.Engine.UnitLibrary/SocketCallbackConnector.cs, Curl.Engine.UnitTests/Cgr129Tests.cs, Libcurl.UnitTests/Cgr129Tests.cs, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs]
+touches: [Curl.Engine.UnitLibrary/CurlSocketHandles.cs, Curl.Engine.UnitLibrary/SocketCallbackConnector.cs, Curl.Engine.UnitLibrary/ConnectOnlyConnection.cs, Curl.Engine.UnitLibrary/CurlSocketCloser.cs, Curl.Engine.UnitLibrary/SocketCallbackConnection.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitTests/Cgr129Tests.cs, Libcurl.UnitTests/Cgr129Tests.cs, Libcurl/Info/Longs/EasyInfoReaders.Longs.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3658 — Fix CGR-129: libcurl: CURLINFO_ACTIVESOCKET/LASTSOCKET and the CLOSESOCKETFUNCTION argument are synthetic ids (0x6000000N), not OS sockets
 
@@ -71,17 +71,23 @@ probe.exe C_48 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr129Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Touches widened (2026-10-26) to `ConnectOnlyConnection.cs` (where the connect-only socket number is made; `EasyInfoReaders.Longs.cs` only reads `TransferInfo`), `CurlSocketCloser.cs` and `SocketCallbackConnection.cs` (the close-socket callback must run before the engine closes its socket) and the engine's `CLAUDE.md` (its text described the old numbers). No task in Doing on `origin/work/dark-factory` names any of them. `Libcurl` needed no change.
+- Fix (ADR-0840): since ADR-0820 `IConnection.SocketHandle` gives the real socket through every wrapper. `ConnectOnlyConnection.OpenAsync` keeps the connection under it (so `CURLINFO_ACTIVESOCKET`/`LASTSOCKET` are the OS socket); without an open-socket callback `SocketCallbackConnector` gives the close-socket callback the connection's `SocketHandle` and `SocketCallbackConnection.DisposeAsync` calls the callback before closing the connection, so the callback sees it open (`getsockopt(SO_TYPE)` works). In-memory connections (ratchet, fakes) keep engine numbers.
+- Repro: the report's `SCR` probe folder is gone, so REF's answers are the report's measurement (libcurl 8.22.0 Schannel and 8.18.0 OpenSSL: `ACTIVESOCKET` a real Winsock socket / fd, C_48 close counts 0/0/1, 1/2/2, 1/2/2 with `real=[True...]`). PORT was rerun at this commit through the engine over a real loopback connection: `Cgr129Tests.ConnectAsync_OnlyCloseSocketOverARealConnection_CallsItWithTheOpenOperatingSystemSocket` (only CLOSESOCKETFUNCTION set) gets the connection's own handle, once, and `SO_TYPE` on it reads `SOCK_STREAM` (real=True); `OpenAsync_ConnectionWithAnOperatingSystemSocket_GivesThatSocket` makes `ActiveSocket`/`LastSocket` that handle. Before the fix 4 of the 5 `Cgr129Tests` failed (synthetic 0x6000000N / 1), after it all pass. Close counts are unchanged (the existing `SocketCallbackConnectorTests` and `ManagedEasyTransferTests.Sockets.cs` still pass), and `curl_easy_send`/`recv`, which already matched, are untouched code.
+- Left over: `CURLOPT_SOCKOPTFUNCTION` without an open-socket callback still gets the engine number, as it runs before the dialer creates its socket; filed as BL-3904 (not part of the C_48 repro, which sets only the close-socket callback).
+- Gates: `dotnet build` clean; fast tests all green (46 test assemblies, 0 failed); `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 100% line and branch, 0 failing members (the first run flagged `OpenSocketAsync` at complexity 12; its socket choice moved to `SocketFor`). The change is platform-neutral (handles via `SocketHandle`, `SafeSocketHandle` with `ownsHandle: false` in the test), meeting the Linux/macOS side.
 ## Log
 
 - 2026-10-26: Created from CGR-129 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. CURLINFO_ACTIVESOCKET/LASTSOCKET and the close-socket callback get the connection's OS socket, open, as libcurl does
