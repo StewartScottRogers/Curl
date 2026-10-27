@@ -215,7 +215,8 @@ public sealed class FtpProtocolHandlerActiveModeTests
     [DataRow("127.0.0.1:4x-5y", "127.0.0.1", 4, 5)]
     [DataRow("[::1]:40000", "::1", 40000, 40000)]
     [DataRow("[::1]", "::1", 0, 0)]
-    [DataRow("::1", "::1", 0, 0)]
+    [DataRow("0::1", "::1", 0, 0)]
+    [DataRow("::1", "127.0.0.1", 0, 0)]
     public async Task ExecuteAsync_PortValue_BindsTheAddressAndPortRangeItNames(string value, string address, int low, int high)
     {
         var diagnostics = TestDiagnostics.For(TestContext);

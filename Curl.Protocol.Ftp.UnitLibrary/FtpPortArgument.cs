@@ -7,7 +7,8 @@ namespace Curl.Protocol.Ftp;
 /// optional <c>:port</c> or <c>:low-high</c> port range (ADR-0102).
 /// </summary>
 /// <param name="Address">
-/// The address part: <c>-</c> or empty for the control connection's own address, an IPv4
+/// The address part: <c>-</c> or empty (also for a value that starts with a colon, such as
+/// <c>::1</c>) for the control connection's own address, an IPv4
 /// literal, or an IPv6 literal (written in brackets when a port follows); anything else is
 /// a host or interface name, which the handler resolves as a host name (ADR-0108).
 /// </param>
@@ -44,9 +45,11 @@ internal readonly record struct FtpPortArgument(string Address, int LowPort, int
     }
 
     /// <summary>
-    /// Splits the address from what follows it: the text inside brackets, a whole value
-    /// with two or more colons (a bare IPv6 literal, with no port), or the text before the
-    /// one colon.
+    /// Splits the address from what follows it: the text inside brackets, no address for a
+    /// value that starts with a colon (so <c>::1</c> is the control connection's address and
+    /// <c>:1</c> after the first colon its port, as curl 8.21.0 was measured to send
+    /// <c>EPRT |1|127.0.0.1|...|</c> for <c>-P ::1</c>, CGR-100), a whole value with two or
+    /// more colons (a bare IPv6 literal, with no port), or the text before the one colon.
     /// </summary>
     private static (string Address, string Remainder) SplitAddress(string value)
     {
@@ -57,6 +60,11 @@ internal readonly record struct FtpPortArgument(string Address, int LowPort, int
         }
 
         int colon = value.IndexOf(':', StringComparison.Ordinal);
+        if (colon == 0)
+        {
+            return (string.Empty, value);
+        }
+
         return colon < 0 || value.IndexOf(':', colon + 1) >= 0 ? (value, string.Empty) : (value[..colon], value[colon..]);
     }
 
