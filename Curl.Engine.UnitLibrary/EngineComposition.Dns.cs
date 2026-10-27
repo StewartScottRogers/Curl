@@ -33,7 +33,7 @@ internal static partial class EngineComposition
     {
         if (network.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider), AddressFamilyOf(network), dohTrace, easyErrorText, traces);
+            return CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider, resolveOverrides: ResolveOverrides.Parse(network.Resolve)), AddressFamilyOf(network), dohTrace, easyErrorText, traces);
         }
 
         DnsServerResolverOptions resolverOptions = new(
@@ -156,8 +156,11 @@ internal static partial class EngineComposition
     /// of its own over the <see cref="SystemDnsResolver" /> (the DoH server's own name is resolved as any
     /// host is), <paramref name="tcpDialer" />, and a TLS provider routed as
     /// <see cref="CreateTlsProvider" /> routes the options <see cref="TlsClientOptionsMapping.DohOf" />
-    /// maps. No <c>--resolve</c>, <c>--connect-to</c>, <c>-x</c> or <c>-4</c>/<c>-6</c> applies to it; the proxy
-    /// environment variables do, through <see cref="DohProxyOf" /> (CGR-037).
+    /// maps. The <c>--resolve</c> entries answer for the DoH server's name, as curl 8.22.0's DoH
+    /// probes look it up in the DNS cache those entries were added to (CGR-155, ADR-0848); they are
+    /// loaded into the connector's cache when it is made, so no DoH sub-transfer writes their
+    /// <c>Added ... to DNS cache</c> lines. No <c>--connect-to</c>, <c>-x</c> or <c>-4</c>/<c>-6</c>
+    /// applies to it; the proxy environment variables do, through <see cref="DohProxyOf" /> (CGR-037).
     /// Under <see cref="TracesDns" /> it writes the DNS filter's lines for each DoH sub-transfer too,
     /// as curl 8.21.0 does (BL-1180).
     /// </summary>
@@ -166,17 +169,23 @@ internal static partial class EngineComposition
     /// <param name="tcpDialer">Opens each plaintext connection.</param>
     /// <param name="timeProvider">The clock the connector and its TLS provider time on.</param>
     /// <param name="hostResolver">Resolves the DoH server's own name; <see langword="null" /> for the <see cref="SystemDnsResolver" />. The conformance harness passes its in-memory resolver (BL-2919).</param>
+    /// <param name="resolveOverrides">The option group's <c>--resolve</c> entries; <see langword="null" /> for none.</param>
     /// <returns>The connector.</returns>
-    internal static TcpConnector CreateDohConnector(EngineTraceComponents traces, EasyTlsOptions tls, ITcpDialer tcpDialer, TimeProvider timeProvider, IDnsResolver? hostResolver = null) =>
-        new(
+    internal static TcpConnector CreateDohConnector(EngineTraceComponents traces, EasyTlsOptions tls, ITcpDialer tcpDialer, TimeProvider timeProvider, IDnsResolver? hostResolver = null, ResolveOverrides? resolveOverrides = null)
+    {
+        TcpConnector connector = new(
             hostResolver ?? new SystemDnsResolver(),
             tcpDialer,
             CreateTlsProvider(TlsClientOptionsMapping.DohOf(tls), timeProvider),
             timeProvider,
-            DohProxyTunnelOptions)
+            DohProxyTunnelOptions,
+            resolveOverrides)
         {
             TracesDnsFilter = TracesDns(traces),
         };
+        connector.LoadResolveEntries(NoTransferEvents.Instance);
+        return connector;
+    }
 
     /// <summary>
     /// The CONNECT a DoH sub-transfer sends through a proxy from the environment: no
@@ -199,7 +208,7 @@ internal static partial class EngineComposition
     /// <returns>The resolver.</returns>
     private static IDnsResolver DialingResolverOf(EngineDialing dialing, EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents traces) =>
         network.DohUrl is { } dohUrl
-            ? CreateDohResolver(dohUrl, CreateDohConnector(traces, tls, dialing.TcpDialer, timeProvider, dialing.DnsResolver), AddressFamilyOf(network), dohTrace, easyErrorText, traces)
+            ? CreateDohResolver(dohUrl, CreateDohConnector(traces, tls, dialing.TcpDialer, timeProvider, dialing.DnsResolver, ResolveOverrides.Parse(network.Resolve)), AddressFamilyOf(network), dohTrace, easyErrorText, traces)
             : dialing.DnsResolver;
 
     /// <summary>The variable curl's debug build reads the DNS server to ask from (<c>override-dns</c>).</summary>
