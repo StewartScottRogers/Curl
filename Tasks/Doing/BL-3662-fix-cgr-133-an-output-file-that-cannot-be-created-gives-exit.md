@@ -76,3 +76,4 @@ curl -sS AUTH -o nodir21500/x.txt -w "[%{exitcode}]\n" U/hello.txt
 ## Log
 
 - 2026-10-26: Created from CGR-133 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
