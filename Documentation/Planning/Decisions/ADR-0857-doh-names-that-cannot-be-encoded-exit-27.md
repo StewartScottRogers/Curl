@@ -1,4 +1,4 @@
-# ADR-0850: A DoH name that cannot be put in a query exits 27 "Failed to encode DoH packet"
+# ADR-0857: A DoH name that cannot be put in a query exits 27 "Failed to encode DoH packet"
 
 - Status: Accepted
 - Date: 2026-10-26
