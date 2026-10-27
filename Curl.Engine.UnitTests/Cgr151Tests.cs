@@ -12,7 +12,7 @@ namespace Curl.Engine;
 /// <summary>
 /// CGR-151: each library easy handle looks names up in a DNS cache of its own, as libcurl 8.22.0's
 /// <c>dnscache_get</c> takes the share's or the handle's own multi's, so a new handle's
-/// <c>CURLOPT_RESOLVER_START_FUNCTION</c> is called again and its abort answers <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0847).
+/// <c>CURLOPT_RESOLVER_START_FUNCTION</c> is called again and its abort answers <c>CURLE_ABORTED_BY_CALLBACK</c> (ADR-0851).
 /// </summary>
 [TestClass]
 public sealed class Cgr151Tests

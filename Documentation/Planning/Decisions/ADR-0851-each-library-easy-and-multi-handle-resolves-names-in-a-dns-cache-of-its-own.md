@@ -1,4 +1,4 @@
-# ADR-0847 — Each library easy and multi handle resolves names in a DNS cache of its own
+# ADR-0851 — Each library easy and multi handle resolves names in a DNS cache of its own
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
