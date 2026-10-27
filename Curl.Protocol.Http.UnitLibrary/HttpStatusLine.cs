@@ -53,8 +53,9 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
     /// <exception cref="HttpTransferException">
     /// The line does not begin <c>HTTP/</c> (exit 1, <c>Received HTTP/0.9 when not
     /// allowed</c>), names an unsupported version (exit 1), or carries a status code below
-    /// 100 (exit 1, <c>Unsupported response code in HTTP response</c>), or carries a status
-    /// code of four or more digits (exit 8, <c>Invalid status line</c>).
+    /// 100 (exit 1, <c>Unsupported response code in HTTP response</c>, the line parsed as its
+    /// <see cref="HttpTransferException.StatusLineBeforeFailure" />). Digits after the first three
+    /// are not part of the code.
     /// </exception>
     internal static HttpStatusLine Parse(string line)
     {
@@ -86,15 +87,17 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
 
     /// <summary>
     /// Tells whether a status line received over HTTP/1.x names HTTP/2 or HTTP/3 in the shape
-    /// curl's OpenSSL build parses, <c>HTTP/2 </c> or <c>HTTP/3 </c> and a three-digit code,
-    /// rather than taking it as an assumed <c>HTTP/1.0 200</c> (measured, BL-2715 Notes).
+    /// curl's OpenSSL build parses, <c>HTTP/2 </c> or <c>HTTP/3 </c>, a three-digit code and a
+    /// blank, rather than taking it as an assumed <c>HTTP/1.0 200</c> (measured, BL-2715 Notes);
+    /// <c>HTTP/2 200</c> with nothing after the code is taken as that (measured, BL-3646 Notes).
     /// </summary>
     /// <param name="line">The line, without its terminator.</param>
     /// <returns><see langword="true" /> when it does.</returns>
     internal static bool NamesHttp2OrHttp3(string line) =>
-        line.Length >= 10
+        line.Length > 10
         && (line.StartsWith("HTTP/2 ", StringComparison.Ordinal) || line.StartsWith("HTTP/3 ", StringComparison.Ordinal))
-        && IsThreeDigits(line.AsSpan(7, 3));
+        && IsThreeDigits(line.AsSpan(7, 3))
+        && HttpLine.IsBlank(line[10]);
 
     /// <summary>
     /// Gives the failure curl's OpenSSL build reports for a status line over HTTP/1.x that
@@ -218,20 +221,13 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
             throw Unsupported(HttpTransferMessages.UnsupportedHttp1Subversion);
         }
 
+        // Only the first three digits are the code: curl 8.22.0 reads "2000" as 200 and "1000" as 100 (measured, BL-3646 Notes).
         int statusCode = int.Parse(line.AsSpan(CodeOffset, 3), System.Globalization.CultureInfo.InvariantCulture);
-        if (statusCode < 100)
-        {
-            throw Unsupported(HttpTransferMessages.UnsupportedResponseCode);
-        }
-
-        // Checked after the code below 100, as curl's test 1432 (a 100-digit code starting 012) exits 1.
-        if (line.Length > ReasonOffset && char.IsAsciiDigit(line[ReasonOffset]))
-        {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.InvalidStatusLine);
-        }
-
         Version version = line[7] == '0' ? HttpVersion.Version10 : HttpVersion.Version11;
-        return new HttpStatusLine(version, statusCode, line[ReasonOffset..].TrimStart(' ', '\t'));
+        HttpStatusLine statusLine = new(version, statusCode, line[ReasonOffset..].TrimStart(' ', '\t'));
+        return statusCode < 100
+            ? throw new HttpTransferException(CurlExitCode.UnsupportedProtocol, HttpTransferMessages.UnsupportedResponseCode) { StatusLineBeforeFailure = statusLine }
+            : statusLine;
     }
 
     private static bool HasHttp1Shape(string line) =>

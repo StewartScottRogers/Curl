@@ -246,6 +246,8 @@ internal sealed class HttpResponseHeadReader
 
     private int informationalHeaderCount;
 
+    private HttpTransferException? deferredCodeRefusal;
+
     /// <summary>
     /// Reports the lines <see cref="ReadAsync" /> still holds, once: the whole headers of a
     /// final head a failure cut off, each after <see cref="HeaderReceived" /> is told of it, then
@@ -311,6 +313,7 @@ internal sealed class HttpResponseHeadReader
                 return HeadBeforeRefusalOrThrow(statusLine, failure);
             }
 
+            ThrowDeferredCodeRefusal();
             if (!IsInterim(statusLine))
             {
                 EndedAtEmptyLine = !closed;
@@ -529,6 +532,45 @@ internal sealed class HttpResponseHeadReader
     }
 
     /// <summary>
+    /// Parses a status line as <see cref="ParseStatusLine" /> does, except that a status code
+    /// below 100 is not refused yet but held in <see cref="deferredCodeRefusal" />: curl 8.22.0
+    /// reads and writes the whole head first, then fails with exit 1 and that code as
+    /// <c>%{http_code}</c> (measured, BL-3646 Notes). An empty line refused as HTTP/0.9 carries
+    /// its bytes, which curl 8.22.0 writes to <c>-i</c>'s output before failing (measured,
+    /// BL-3646 Notes).
+    /// </summary>
+    private HttpStatusLine ParseStatusLineOrDeferCodeRefusal(byte[] bytes, string line)
+    {
+        try
+        {
+            return ParseStatusLine(line);
+        }
+        catch (HttpTransferException refusal) when (refusal.StatusLineBeforeFailure is { } statusLine)
+        {
+            deferredCodeRefusal = refusal;
+            return statusLine;
+        }
+        catch (HttpTransferException refusal) when (bytes is [(byte)'\n'] or [(byte)'\r', (byte)'\n'])
+        {
+            refusal.HeadBytesBeforeFailure = bytes;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Throws the refusal <see cref="ParseStatusLineOrDeferCodeRefusal" /> held once its head is
+    /// read, carrying the heads read so far; does nothing when none is held.
+    /// </summary>
+    private void ThrowDeferredCodeRefusal()
+    {
+        if (deferredCodeRefusal is { } refusal)
+        {
+            refusal.HeadBytesBeforeFailure = builder.HeadBytesSoFar();
+            throw refusal;
+        }
+    }
+
+    /// <summary>
     /// Decides whether a head is an interim one another head follows: a 1xx, except a
     /// <c>101</c> on HTTP/1.x that no h2c upgrade asked for, which curl 8.22.0 takes as final
     /// (<see cref="AsksH2cUpgrade" />).
@@ -540,7 +582,7 @@ internal sealed class HttpResponseHeadReader
     {
         byte[] bytes = await lines.ReadLineAsync(true, cancellationToken).ConfigureAwait(false) ?? throw EmptyReply();
         HttpLine line = HttpLine.SplitKeepingCarriageReturns(bytes);
-        HttpStatusLine statusLine = ParseStatusLine(line.Content);
+        HttpStatusLine statusLine = ParseStatusLineOrDeferCodeRefusal(bytes, line.Content);
         line.RefuseCarriageReturn();
         SwitchedProtocols |= statusLine.StatusCode == 101;
         builder.StartHead(line);

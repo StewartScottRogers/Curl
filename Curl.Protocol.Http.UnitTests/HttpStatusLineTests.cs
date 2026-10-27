@@ -40,7 +40,8 @@ public sealed class HttpStatusLineTests
 
     [TestMethod]
     [DataRow("HTTP/2 101 OK", true, DisplayName = "HTTP/2 101")]
-    [DataRow("HTTP/3 100", true, DisplayName = "HTTP/3 100")]
+    [DataRow("HTTP/3 100 Continue", true, DisplayName = "HTTP/3 100")]
+    [DataRow("HTTP/3 100", false, DisplayName = "Nothing after the code (measured: assumed 200, BL-3646)")]
     [DataRow("HTTP/2 200 OK", true, DisplayName = "HTTP/2 200")]
     [DataRow("HTTP/2 99 OK", false, DisplayName = "Two-digit code (measured: assumed 200)")]
     [DataRow("HTTP/2 abc", false, DisplayName = "Code not digits (measured: assumed 200)")]
