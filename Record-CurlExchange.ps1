@@ -520,6 +520,15 @@
     resend over HTTP/1.1, which gets the first Response). Default -1, no reset.
     Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2ResetCode 13 -Port 18080 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nh1 hello\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-reset-13
 
+.PARAMETER Http2Answer
+    With -Http2Origin, how every HTTP/2 request is answered instead of a plain :status plus
+    content-length 0 (BL-3912): `push` sends a PUSH_PROMISE (END_HEADERS, promised stream 2,
+    a GET / request header block) on the request's stream before the HEADERS `:status: 200`;
+    `status:<value>` answers with that exact string as `:status` (`status:2x0`,
+    `status:20`, `status:200 ` with a trailing space); `nostatus` answers with a HEADERS
+    block holding only content-length 0. Default empty, the ordinary answer.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Answer push -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-push
+
 .PARAMETER Http2NoSettings
     With -Http2 or -Http2Origin, never send the server's SETTINGS frame: the first frame curl
     gets is the answer's HEADERS (BL-3668, CGR-139: curl answers GOAWAY "SETTINGS expected"
@@ -711,6 +720,7 @@ param(
     [ValidateRange(100, 999)] [int] $ProxyStatus = 200,
     [ValidateSet('h2', 'http/1.1')] [string] $ProxyAlpn = 'h2',
     [int] $Http2ResetCode = -1,
+    [ValidatePattern('^(|push|nostatus|status:.*)$')] [string] $Http2Answer = '',
     [switch] $Http2NoSettings,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
@@ -740,6 +750,7 @@ if ($UdpSink -and $Port -eq 0) { throw '-UdpSink binds UDP on -Port, so -Port is
 if ($Tftp -and ($Ftp -or $Smtp -or $Imap -or $Pop3 -or $Script -or $Tls -or $NoServer -or $UnixSocket -or $UdpSink)) { throw '-Tftp serves one TFTP transfer on UDP -Port, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -Tls, -NoServer, -UnixSocket or -UdpSink.' }
 if (@($DnsSilentPort | Where-Object { $DnsPort -notcontains $_ }).Count -gt 0) { throw '-DnsSilentPort names a port -DnsPort does not; give each silent port in -DnsPort too.' }
 if ($Http2Origin) { $Http2 = [switch] $true }
+if ($Http2Answer -and -not $Http2Origin) { throw '-Http2Answer answers an HTTP/2 origin, so it needs -Http2Origin.' }
 if ($Http2Origin -eq 'alpn' -and -not $Tls) { throw '-Http2Origin alpn is an HTTPS origin that picks h2 or http/1.1 by ALPN, so it needs -Tls.' }
 if ($Http2Origin -and $Http2Origin -ne 'alpn' -and $Tls) { throw '-Http2Origin h2c-upgrade, h2c-upgrade-ignored and prior-knowledge are plain TCP, so they cannot be combined with -Tls.' }
 if ($Http2 -and -not $Tls -and -not $Http2Origin) { throw '-Http2 is an HTTPS proxy that picks h2 by ALPN, so it needs -Tls.' }
@@ -2232,6 +2243,7 @@ public sealed class RecorderHttp2Proxy
 
     private readonly int _resetCode;
     public bool OmitSettings { get; set; }
+    public string Answer { get; set; } = "";
 
     public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode)
     {
@@ -2516,6 +2528,7 @@ public sealed class RecorderHttp2Proxy
             Note("< RST_STREAM stream " + streamId + " error " + _resetCode);
             return;
         }
+        if (Answer.Length > 0 && !connect) { AnswerScenario(stream, streamId); return; }
         var block = new List<byte> { 0x08 };
         AppendLiteral(block, _status.ToString());
         bool refused = _status / 100 != 2 || !connect;
@@ -2531,6 +2544,31 @@ public sealed class RecorderHttp2Proxy
         Note("< HEADERS stream " + streamId + " flags 0x" + flags.ToString("x2"));
         Note("<   :status: " + _status);
         if (refused) { Note("<   content-length: 0"); }
+    }
+
+    // BL-3912: push, status:<value> and nostatus answers; each ends the stream with content-length 0.
+    private void AnswerScenario(Stream stream, int streamId)
+    {
+        if (Answer == "push")
+        {
+            var promise = new List<byte> { 0, 0, 0, 2, 0x82, 0x86, 0x84 };
+            WriteFrame(stream, 5, 0x04, streamId, promise.ToArray());
+            Note("< PUSH_PROMISE stream " + streamId + " flags 0x04 promised stream 2");
+        }
+        var block = new List<byte>();
+        string status = Answer.StartsWith("status:") ? Answer.Substring(7) : Answer == "push" ? "200" : null;
+        if (status != null)
+        {
+            block.Add(0x08);
+            AppendLiteral(block, status);
+        }
+        block.Add(0x0f);
+        block.Add(0x0d);
+        AppendLiteral(block, "0");
+        WriteFrame(stream, 1, 0x05, streamId, block.ToArray());
+        Note("< HEADERS stream " + streamId + " flags 0x05");
+        Note(status != null ? "<   :status: " + status : "<   (no :status)");
+        Note("<   content-length: 0");
     }
 
     private static void AppendLiteral(List<byte> block, string value)
@@ -2659,6 +2697,7 @@ public sealed class RecorderHttp2Proxy
     $server = $null
     $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode)
     $http2Proxy.OmitSettings = [bool]$Http2NoSettings
+    $http2Proxy.Answer = $Http2Answer
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
