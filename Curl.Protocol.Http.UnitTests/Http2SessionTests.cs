@@ -52,7 +52,7 @@ public sealed class Http2SessionTests
         Http2StreamConnection stream = (Http2StreamConnection)session.CreateStream("http", 0, ignoresBody: false);
         Diagnostics.Arrange("upgraded stream", "stream 1 opened by the h2c upgrade, settings not yet acknowledged");
 
-        await stream.StartUpgradedAsync(CancellationToken.None);
+        await stream.StartUpgradedAsync(isHead: false, CancellationToken.None);
 
         string written = Convert.ToHexString(connection.Written);
         const string StreamOneWindowUpdate = "000004080000000001009F0001";
