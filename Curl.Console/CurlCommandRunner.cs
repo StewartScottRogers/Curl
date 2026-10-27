@@ -3683,6 +3683,7 @@ internal sealed class CurlCommandRunner(
             bool toStandardOutput = !transfer.DiscardsBody;
             StartTransferProgress(options, options.ResumeFrom, toStandardOutput);
             TerminalBinaryOutputRefusingStream? terminalGuard = TerminalBinaryOutputGuardOf(options);
+            AttemptUploadRewinder rewinder = new(upload, formBody);
             TransferAttemptPieces attempt = new(
                 url,
                 transferOptions,
@@ -3690,7 +3691,11 @@ internal sealed class CurlCommandRunner(
                     RateLimited(options, toStandardOutput ? FlushedEachWriteUnderNoBuffer(options, InTextModeUnderUseAscii(options, GuardedStandardOutput(terminalGuard))) : Stream.Null),
                     headerOutput,
                     BodyHeaderStyles: toStandardOutput ? HeaderStylesFor(options, url) : null),
-                _ => AttemptInputsOf(options, range, options.ResumeFrom, formBody, upload, proxy));
+                _ =>
+                {
+                    rewinder.Rewind();
+                    return AttemptInputsOf(options, range, options.ResumeFrom, formBody, upload, proxy);
+                });
             TransferResult result = toStandardOutput
                 ? await TransferToStandardOutputAsync(follower, options, attempt, terminalGuard).ConfigureAwait(false)
                 : await FollowRetryingAsync(follower, options, attempt, options.ResumeFrom, null).ConfigureAwait(false);
@@ -4505,6 +4510,7 @@ internal sealed class CurlCommandRunner(
             }
 
             EasyTransferOptions transferOptions = TransferOptionsOf(options, upload);
+            AttemptUploadRewinder rewinder = new(upload, formBody);
             TransferResult fileResult = await FollowRetryingAsync(
                     follower,
                     options,
@@ -4512,7 +4518,11 @@ internal sealed class CurlCommandRunner(
                         url,
                         transferOptions,
                         () => new EngineToolTransferOutputs(RateLimited(options, FlushedEachWriteUnderNoBuffer(options, output)), headerOutput, watchHeaderOutput),
-                        attemptResumeFrom => AttemptInputsOf(options, range, attemptResumeFrom, formBody, upload, proxy)),
+                        attemptResumeFrom =>
+                        {
+                            rewinder.Rewind();
+                            return AttemptInputsOf(options, range, attemptResumeFrom, formBody, upload, proxy);
+                        }),
                     resumeFrom,
                     output)
                 .ConfigureAwait(false);
