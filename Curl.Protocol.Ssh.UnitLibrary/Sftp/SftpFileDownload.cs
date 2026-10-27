@@ -224,7 +224,11 @@ internal sealed class SftpFileDownload(SshTransport transport)
 
                 data = data[..(int)Math.Min(data.Length, (size ?? long.MaxValue) - received)];
                 int allowed = maxFileSize.AllowedOf(received, data.Length);
-                await output.WriteAsync(data[..allowed], cancellationToken).ConfigureAwait(false);
+                if (await SshOutputWrite.TryWriteAsync(output, data[..allowed], received, cancellationToken).ConfigureAwait(false) is { } writeFailure)
+                {
+                    return writeFailure;
+                }
+
                 received += allowed;
                 progress.ReportDownloaded(received, size);
                 if (allowed < data.Length)

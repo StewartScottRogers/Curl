@@ -85,7 +85,10 @@ their libssh2 codes are ADR-0122's, ADR-0206's and ADR-0212's, measured from the
 reference builds. A failed read or write of the connection, such as a reset, reaches
 the steps as an `SshConnectionLostException`, so `SshConnectionFailure.Is` tells it
 apart from the local output's `IOException`; each step reports it as libssh2 does
-(ADR-0283 for the handshake, ADR-0289 after it).
+(ADR-0283 for the handshake, ADR-0289 after it). A download's write to the local output goes
+through `SshOutputWrite`, which turns that output's `IOException` (an `-o` file that cannot be
+created) into exit 23, `Failure writing output to destination, passed N returned M`, so the
+session still closes and sends `DISCONNECT` and the curl tool still prints `-w` (CGR-133, BL-3662).
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnection`
 so the tests in the matching `.UnitTests` project can drive this code from a

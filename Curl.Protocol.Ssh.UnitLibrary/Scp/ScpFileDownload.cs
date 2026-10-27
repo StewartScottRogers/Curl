@@ -162,12 +162,16 @@ internal sealed class ScpFileDownload(SshTransport transport)
                 {
                     // Measured (BL-988): curl writes the channel's end on as an empty
                     // block, which --trace shows as 0 bytes of received data.
-                    await output.WriteAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
-                    return EndOfChannel();
+                    return await SshOutputWrite.TryWriteAsync(output, ReadOnlyMemory<byte>.Empty, received, cancellationToken).ConfigureAwait(false)
+                        ?? EndOfChannel();
                 }
 
                 int allowed = maxFileSize.AllowedOf(received, read);
-                await output.WriteAsync(buffer.AsMemory(0, allowed), cancellationToken).ConfigureAwait(false);
+                if (await SshOutputWrite.TryWriteAsync(output, buffer.AsMemory(0, allowed), received, cancellationToken).ConfigureAwait(false) is { } writeFailure)
+                {
+                    return writeFailure;
+                }
+
                 received += allowed;
                 progress.ReportDownloaded(received, expectedSize);
                 if (allowed < read)
