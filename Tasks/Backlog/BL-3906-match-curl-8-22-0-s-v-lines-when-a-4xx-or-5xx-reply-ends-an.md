@@ -1,5 +1,5 @@
 ---
-id: BL-3901
+id: BL-3906
 title: Match curl 8.22.0's -v lines when a 4xx or 5xx reply ends an active-mode accept wait
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3901 — Match curl 8.22.0's -v lines when a 4xx or 5xx reply ends an active-mode accept wait
+# BL-3906 — Match curl 8.22.0's -v lines when a 4xx or 5xx reply ends an active-mode accept wait
 
 ## Goal
 

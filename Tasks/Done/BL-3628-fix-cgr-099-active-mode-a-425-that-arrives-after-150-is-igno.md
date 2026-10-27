@@ -78,7 +78,7 @@ EV\v2.sh
 - Unit tests: `Cgr099Tests` (3 tests). With FtpSession.cs's change reverse-applied, both refusal tests fail (exit 12 at the 5 s accept timeout) and the positive-reply test passes; with it, all 3 pass.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 0 failing members. Fast tests: 46 projects passed, 0 failed (Ftp: 1299 passed, 7 skipped).
 - Touches widened to FtpControlChannel.cs, FtpTransferMessages.cs, FtpProtocolHandlerActiveModeTests.cs and Record-CurlExchange.ps1: the fix needs a control read that survives the accept, the new message, the existing test pinned the unmeasured message, and the repro needed a delayed reply; no other task in Doing names them.
-- Follow-up: BL-3901 for the `-v` lines of this path, which still print curl 8.21.0's words.
+- Follow-up: BL-3906 for the `-v` lines of this path, which still print curl 8.21.0's words.
 
 ## Log
 
