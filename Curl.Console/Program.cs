@@ -25,7 +25,7 @@ internal static class Program
         return await UnhandledExceptionGuard.RunAsync(
                 () => CurlComposition
                     .CreateRunner(standardOutput, standardError, standardInput, standardOutputIsTerminal, terminalRendersStyles)
-                    .RunAsync(RawCommandLineArguments.ForCurrentPlatform(args)),
+                    .RunAsync(AnsiCodePageArguments.ForPlatform(RawCommandLineArguments.ForCurrentPlatform(args), OperatingSystem.IsWindows())),
                 standardOutput,
                 standardError)
             .ConfigureAwait(false);
