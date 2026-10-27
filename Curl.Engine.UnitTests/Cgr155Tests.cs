@@ -23,7 +23,7 @@ public sealed class Cgr155Tests
         ScriptedConnector dohServer = new([Forbidden, Forbidden]);
         CommandLineOptions options = Parse("--resolve", "dohsrv.test:21800:192.0.2.7", "--doh-url", "http://dohsrv.test:21800/dns-query");
         IDnsResolver resolver = EngineComposition.CreateDnsResolver(
-            EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), TimeProvider.System, new ScriptedTcpDialer(dohServer));
+            EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), TimeProvider.System, new ScriptedTcpDialer(dohServer), allowsPlainHttpDohUrl: true);
 
         await resolver.ResolveAsync("foo.test", CancellationToken.None);
 

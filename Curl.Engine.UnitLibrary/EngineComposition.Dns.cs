@@ -28,12 +28,18 @@ internal static partial class EngineComposition
     /// </param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DoH connector's DNS filter lines; <see langword="null" /> for none.</param>
+    /// <param name="allowsPlainHttpDohUrl">
+    /// Whether a DoH URL that is not <c>https</c> is used, as curl's debug build allows; <see langword="false" />, as curl
+    /// 8.22.0's release build, makes such a URL an <see cref="UnusableDohUrlResolver" /> (CGR-163, ADR-0854).
+    /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null)
+    internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, bool allowsPlainHttpDohUrl = false)
     {
         if (network.DohUrl is { } dohUrl)
         {
-            return CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider, resolveOverrides: ResolveOverrides.Parse(network.Resolve)), AddressFamilyOf(network), dohTrace, easyErrorText, traces);
+            return !allowsPlainHttpDohUrl && !IsHttpsDohUrl(dohUrl)
+                ? new UnusableDohUrlResolver()
+                : CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider, resolveOverrides: ResolveOverrides.Parse(network.Resolve)), AddressFamilyOf(network), dohTrace, easyErrorText, traces);
         }
 
         DnsServerResolverOptions resolverOptions = new(
@@ -150,6 +156,16 @@ internal static partial class EngineComposition
             ? url
             : null;
     }
+
+    /// <summary>
+    /// Whether <see cref="DohUrlOf" /> makes an <c>https</c> URL of a <c>--doh-url</c> value, the only DoH URL curl
+    /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> or
+    /// scheme-less one fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0854).
+    /// </summary>
+    /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
+    /// <returns><see langword="true" /> for an <c>https</c> DoH URL.</returns>
+    internal static bool IsHttpsDohUrl(string dohUrl) =>
+        DohUrlOf(dohUrl)?.Scheme == Uri.UriSchemeHttps;
 
     /// <summary>
     /// Creates the connector the DoH queries are sent through (ADR-0152): a <see cref="TcpConnector" />
