@@ -175,6 +175,7 @@ internal sealed partial class ManagedEasyTransfer
             CookieList = cookieList,
             ContentLengthUpload = ContentLengthUploadOf(options),
         };
+        info = info with { SizeDelivered = lastWriteCallbackOutput?.BytesDelivered ?? info.SizeDownload };
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
         info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl), HttpVersion = HttpVersionOf(info.HttpVersion, result, headers.HttpVersion) };
         return toolState is null

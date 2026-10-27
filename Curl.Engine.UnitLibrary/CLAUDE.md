@@ -534,3 +534,7 @@ Before each perform it starts, `ManagedMultiTransfer` gives a `ManagedEasyTransf
 ## smb and smbs disabled (BL-3887)
 
 `CreateProtocolHandlers` serves `smb` and `smbs` with a `DisabledProtocolHandler`, which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, as curl 8.22.0's reference builds, which have no SMB, do (ADR-0835). `Curl.Protocol.Smb.UnitLibrary` stays as the client a build with SMB would use. Its tests are `DisabledProtocolHandlerTests`.
+
+## CURLINFO_SIZE_DELIVERED (BL-3655)
+
+`CallbackWriteStream.BytesDelivered` counts the bytes the write callback took, and a perform from the options puts that count of the body output its last context wrote to on `TransferInfo.SizeDelivered` (`lastWriteCallbackOutput`): the body after content decoding, with the header lines under `CURLOPT_HEADER`, as libcurl 8.22.0 counts what it passes the write callback (CGR-126). With no write callback, or under the runner's `ToolOutputs`, it is `SizeDownload`. Its tests are `Cgr126Tests`.

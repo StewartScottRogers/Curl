@@ -27,6 +27,9 @@ internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callbac
     /// <summary>libcurl's <c>CURLE_WRITE_ERROR</c> text for a pause the transfer cannot honour.</summary>
     internal const string PauseNotSupportedText = "Write callback asked for PAUSE when not supported";
 
+    /// <summary>The bytes the callback has taken so far: what <c>CURLINFO_SIZE_DELIVERED</c> answers for a write callback (CGR-126).</summary>
+    internal long BytesDelivered { get; private set; }
+
     /// <summary>Creates the stream over a write callback.</summary>
     /// <param name="callback">The <c>CURLOPT_WRITEFUNCTION</c>.</param>
     /// <param name="pauseGate">The handle's pause state, or <see langword="null" /> when the transfer cannot pause.</param>
@@ -85,6 +88,7 @@ internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callbac
         }
 
         CheckTook(buffer.Length, returned);
+        BytesDelivered += buffer.Length;
     }
 
     /// <inheritdoc />
@@ -103,6 +107,7 @@ internal sealed class CallbackWriteStream(Func<ReadOnlySpan<byte>, long> callbac
         }
 
         CheckTook(buffer.Length, returned);
+        BytesDelivered += buffer.Length;
     }
 
     /// <inheritdoc />

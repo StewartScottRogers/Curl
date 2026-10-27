@@ -23,6 +23,13 @@ namespace Curl.Engine;
 internal sealed partial class ManagedEasyTransfer
 {
     /// <summary>
+    /// The write-callback output the last context built wrote the body to, or <see langword="null" /> when it wrote
+    /// to the runner's <see cref="ToolOutputs" />, to no callback, or no context was built; its count is
+    /// <see cref="TransferInfo.SizeDelivered" /> (CGR-126).
+    /// </summary>
+    private CallbackWriteStream? lastWriteCallbackOutput;
+
+    /// <summary>
     /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a
     /// factory with no standard input over the engine's clock, the caches' HSTS store and <see cref="Host" />'s
     /// diagnostic log, and keeps it as <see cref="LastContext" />.
@@ -49,6 +56,7 @@ internal sealed partial class ManagedEasyTransfer
         CancellationToken cancellationToken)
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
+        lastWriteCallbackOutput = outputs.Output as CallbackWriteStream;
         TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,

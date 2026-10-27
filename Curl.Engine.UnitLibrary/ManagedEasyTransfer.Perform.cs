@@ -207,6 +207,7 @@ internal sealed partial class ManagedEasyTransfer
         EasyOptions options = MarshalledOf(UrlPortOverride.Apply(UrlHandleOverride.Apply(WithoutPostFieldsUnderHttpGet(ToolSettings is null ? WithoutDefaultUserAgent(Options) : Options))));
         LastResult = null;
         LastContext = null;
+        lastWriteCallbackOutput = null;
         StartSocketWait(options);
         if (options.Network.Url is not { } urlText)
         {
