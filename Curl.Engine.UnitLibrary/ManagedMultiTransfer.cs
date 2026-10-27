@@ -230,11 +230,12 @@ internal sealed class ManagedMultiTransfer(
     /// <param name="cancellationToken">Stops the call before it starts anything.</param>
     /// <returns>
     /// <see cref="CurlMultiCode.Ok" /> and the transfers not yet finished, or
-    /// <see cref="CurlMultiCode.BadHandle" /> and 0 once this handle is disposed. It tells the socket and
-    /// timer callbacks what changed as <see cref="SocketActionAsync" /> does.
+    /// <see cref="CurlMultiCode.BadHandle" /> and 0 once this handle is disposed. It tells the timer
+    /// callback what changed as <see cref="SocketActionAsync" /> does, but never the socket callback, as
+    /// curl 8.22.0's perform does not (CGR-148).
     /// </returns>
     public ValueTask<(CurlMultiCode Code, int RunningTransfers)> PerformAsync(CancellationToken cancellationToken) =>
-        MoveTransfersOnAsync(timerFired: false, cancellationToken);
+        MoveTransfersOnAsync(socketAction: false, timerFired: false, cancellationToken);
 
     /// <summary>
     /// <c>curl_multi_socket_action</c>: moves every transfer on as <see cref="PerformAsync" /> does - the
@@ -243,8 +244,10 @@ internal sealed class ManagedMultiTransfer(
     /// <see cref="CurlPoll.In" />) or finished (<see cref="CurlPoll.Remove" />, with the value
     /// <see cref="Assign" /> gave), and <see cref="MultiOptions.Timer" /> of the next timeout when it changed,
     /// or always after <see cref="CurlMultiSockets.Timeout" />, whose timer is spent. Once either callback
-    /// returns -1, every unfinished transfer ends with <see cref="CurlCode.AbortedByCallback" /> on the
-    /// next call, as libcurl's dead multi handle does.
+    /// returns -1 the handle is dead, as libcurl's: every later socket action answers
+    /// <see cref="CurlMultiCode.Ok" /> and the unfinished transfers without moving any on or calling either
+    /// callback, and the next <see cref="PerformAsync" /> ends every unfinished transfer with
+    /// <see cref="CurlCode.AbortedByCallback" /> (CGR-148).
     /// </summary>
     /// <param name="socket">The socket with the event, or <see cref="CurlMultiSockets.Timeout" /> for the timer.</param>
     /// <param name="events">The events on the socket; not read.</param>
@@ -255,7 +258,7 @@ internal sealed class ManagedMultiTransfer(
     /// <see cref="CurlMultiCode.BadHandle" /> and 0 once this handle is disposed.
     /// </returns>
     public ValueTask<(CurlMultiCode Code, int RunningTransfers)> SocketActionAsync(CurlSocket socket, CurlSocketSelect events, CancellationToken cancellationToken) =>
-        MoveTransfersOnAsync(socket == CurlMultiSockets.Timeout, cancellationToken);
+        MoveTransfersOnAsync(socketAction: true, socket == CurlMultiSockets.Timeout, cancellationToken);
 
     /// <summary>
     /// <c>curl_multi_assign</c>: the value the socket callback receives with <paramref name="socket" />
@@ -494,7 +497,7 @@ internal sealed class ManagedMultiTransfer(
     /// <paramref name="notification" /> to <see cref="MultiOptions.Notify" />: <see cref="CurlMultiNotification.InfoRead" />
     /// when a message is queued with none queued before it, then <see cref="CurlMultiNotification.EasyDone" />
     /// for each transfer whose message is queued, each with that transfer, once the call has moved every
-    /// transfer on and before it tells the socket and timer callbacks.
+    /// transfer on and before it tells the socket callback (on a socket action) and the timer callback.
     /// </summary>
     /// <param name="notification">The notification to switch on; any number from 0 to 31 is kept.</param>
     /// <returns>
@@ -705,7 +708,7 @@ internal sealed class ManagedMultiTransfer(
         owners.TryRemove(entry.Transfer, out _);
     }
 
-    private ValueTask<(CurlMultiCode Code, int RunningTransfers)> MoveTransfersOnAsync(bool timerFired, CancellationToken cancellationToken)
+    private ValueTask<(CurlMultiCode Code, int RunningTransfers)> MoveTransfersOnAsync(bool socketAction, bool timerFired, CancellationToken cancellationToken)
     {
         if (disposed)
         {
@@ -718,6 +721,11 @@ internal sealed class ManagedMultiTransfer(
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(socketAction && abortedByCallback ? (CurlMultiCode.Ok, UnfinishedCount()) : MoveOnAndTellCallbacks(socketAction, timerFired));
+    }
+
+    private (CurlMultiCode Code, int RunningTransfers) MoveOnAndTellCallbacks(bool socketAction, bool timerFired)
+    {
         int previousThread = callbackQueue.EnterPerform();
         try
         {
@@ -730,8 +738,24 @@ internal sealed class ManagedMultiTransfer(
         }
 
         SendNotifications();
-        CurlMultiCode code = UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
-        return ValueTask.FromResult((code, entries.Count(entry => !entry.Done)));
+        CurlMultiCode code = TellCallbacks(socketAction, timerFired);
+        return (code, UnfinishedCount());
+    }
+
+    private int UnfinishedCount() => entries.Count(entry => !entry.Done);
+
+    /// <summary>
+    /// Tells the socket callback (on a socket action only) and the timer callback what changed; a handle a
+    /// callback killed in an earlier call tells neither again, as curl 8.22.0's dead multi handle (CGR-148).
+    /// </summary>
+    private CurlMultiCode TellCallbacks(bool socketAction, bool timerFired)
+    {
+        if (abortedByCallback)
+        {
+            return CurlMultiCode.Ok;
+        }
+
+        return !socketAction || UpdateSockets() ? UpdateTimer(timerFired) : CurlMultiCode.AbortedByCallback;
     }
 
     /// <summary>

@@ -75,10 +75,10 @@ public sealed partial class ManagedMultiTransferTests
         multi.Add(first);
         multi.Add(second);
 
-        await multi.PerformAsync(CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         int toldWhileHeld = told.Count;
         first.Finish(CurlCode.Ok);
-        await multi.PerformAsync(CancellationToken.None);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         Assert.AreEqual(1, toldWhileHeld);
         CollectionAssert.AreEqual(new IEasyTransfer[] { first, first, second }, told);
