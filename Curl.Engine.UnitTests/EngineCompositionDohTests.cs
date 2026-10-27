@@ -302,8 +302,9 @@ public sealed class EngineCompositionDohTests
 
         Diagnostics.Assert("DoH-only insecure", true, dohOnly.Insecure);
         Assert.IsTrue(dohOnly.Insecure);
-        Diagnostics.Assert("DoH-only requires certificate status", true, dohOnly.RequireCertificateStatus);
-        Assert.IsTrue(dohOnly.RequireCertificateStatus);
+        // The Schannel build ignores --doh-cert-status (CGR-154).
+        Diagnostics.Assert("DoH-only requires certificate status", !OperatingSystem.IsWindows(), dohOnly.RequireCertificateStatus);
+        Assert.AreEqual(!OperatingSystem.IsWindows(), dohOnly.RequireCertificateStatus);
         Diagnostics.Assert("transferOnly", new TlsClientOptions(), transferOnly);
         Assert.AreEqual(new TlsClientOptions(), transferOnly);
     }

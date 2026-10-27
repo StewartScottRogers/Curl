@@ -168,7 +168,8 @@ internal static class TlsClientOptionsMapping
     /// <param name="tls">The option group's TLS options.</param>
     /// <returns>
     /// <see cref="EasyTlsOptions.DohVerifyPeer" /> negated as <see cref="TlsClientOptions.Insecure" />,
-    /// <see cref="EasyTlsOptions.DohVerifyStatus" /> as <see cref="TlsClientOptions.RequireCertificateStatus" />,
+    /// <see cref="EasyTlsOptions.DohVerifyStatus" /> as <see cref="TlsClientOptions.RequireCertificateStatus" /> outside the
+    /// Schannel build, which ignores <c>--doh-cert-status</c> as it does <c>--cert-status</c> (measured, CGR-154, ADR-0795),
     /// and the origin's CA file and directory, revocation list, <see cref="SslOptions.NoRevoke" />,
     /// <see cref="SslOptions.RevokeBestEffort" /> and <see cref="SslOptions.AutoClientCert" />, and
     /// <see cref="EasyTlsOptions.EllipticCurves" />, verbatim; every other setting is its default, so ALPN
@@ -184,7 +185,7 @@ internal static class TlsClientOptionsMapping
             SkipRevocationCheck: origin.SslOptions.HasFlag(SslOptions.NoRevoke),
             RevocationCheckBestEffort: origin.SslOptions.HasFlag(SslOptions.RevokeBestEffort),
             Curves: tls.EllipticCurves,
-            RequireCertificateStatus: tls.DohVerifyStatus,
+            RequireCertificateStatus: RequiresCertificateStatus(tls.DohVerifyStatus, OperatingSystem.IsWindows()),
             AutoClientCertificate: origin.SslOptions.HasFlag(SslOptions.AutoClientCert),
             CertificateRevocationListFile: origin.RevocationListFile,
             KeyLogFile: KeyLogFile(null),
