@@ -234,7 +234,7 @@ public sealed partial class TcpConnector(
     /// <see cref="IHttpsOriginDnsResolver.ResolveHttpsOriginAsync" />, asking its HTTPS record first,
     /// as curl 8.22.0's HTTPSRR build does (ADR-0727). The default is the platform build's: off on
     /// Windows, where the Schannel build has no <c>HTTPSRR</c> and sends only the A and AAAA DoH
-    /// queries, on elsewhere (ADR-0849, CGR-157).
+    /// queries, on elsewhere (ADR-0856, CGR-157).
     /// </summary>
     public bool AsksHttpsRecords { get; init; } = !OperatingSystem.IsWindows();
 

@@ -1,4 +1,4 @@
-# ADR-0849: On Windows `--doh-url` sends no HTTPS-RR query, as the Schannel build has no HTTPSRR
+# ADR-0856: On Windows `--doh-url` sends no HTTPS-RR query, as the Schannel build has no HTTPSRR
 
 - Status: Accepted
 - Date: 2026-10-26
