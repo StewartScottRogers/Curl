@@ -1,4 +1,4 @@
-# ADR-0850: A close-delimited DoH response is read to the close
+# ADR-0854: A close-delimited DoH response is read to the close
 
 - Status: Accepted
 - Date: 2026-10-26
