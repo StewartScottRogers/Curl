@@ -1,5 +1,5 @@
 ---
-id: BL-3904
+id: BL-3908
 title: Stabilise ConnectAsync_ClosedPort_CallsOpenWithTheAddressThenCloseOnceAndFailsWithCouldntConnect under a full Engine test run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3904 — Stabilise ConnectAsync_ClosedPort_CallsOpenWithTheAddressThenCloseOnceAndFailsWithCouldntConnect under a full Engine test run
+# BL-3908 — Stabilise ConnectAsync_ClosedPort_CallsOpenWithTheAddressThenCloseOnceAndFailsWithCouldntConnect under a full Engine test run
 
 ## Goal
 
