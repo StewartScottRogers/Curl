@@ -175,7 +175,9 @@
     answered in the order given, one per command, the last repeating for the rest, e.g.
     'CWD=550 No such directory' 'CWD=250 OK' (BL-436). In a reply, {DATAPORT} stands for
     the data listener's port and {DATAPORT_HI} and {DATAPORT_LO} for its two PASV numbers,
-    e.g. 'PASV=227 Entering Passive Mode (127,0,0,2,{DATAPORT_HI},{DATAPORT_LO})'.
+    e.g. 'PASV=227 Entering Passive Mode (127,0,0,2,{DATAPORT_HI},{DATAPORT_LO})'. A line
+    {PAUSE} between reply lines sends the lines before it, waits a second and sends the
+    rest, e.g. 'RETR=150 Opening\r\n{PAUSE}\r\n425 Cannot open data connection' (CGR-099).
 
 .PARAMETER FtpData
     The file served by RETR, and the listing served by LIST, in -Ftp mode, with the
@@ -1043,10 +1045,18 @@ $serveFtpSession = {
     function Send-Reply {
         param($Stream, [string] $Reply)
         $Reply = $Reply.Replace('{DATAPORT_HI}', [string] [Math]::Floor($dataPort / 256)).Replace('{DATAPORT_LO}', [string] ($dataPort % 256)).Replace('{DATAPORT}', [string] $dataPort)
-        $bytes = $latin1.GetBytes($Reply + "`r`n")
-        $Stream.Write($bytes, 0, $bytes.Length)
-        $Stream.Flush()
-        foreach ($line in ($Reply -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+        # A {PAUSE} line sends the lines before it, waits a second, then sends the rest (CGR-099).
+        $parts = $Reply -split [regex]::Escape("`r`n{PAUSE}`r`n")
+        for ($index = 0; $index -lt $parts.Length; $index++) {
+            if ($index -gt 0) {
+                [System.Threading.Thread]::Sleep(1000)
+                [void] $Transcript.Append("= paused 1000 ms`r`n")
+            }
+            $bytes = $latin1.GetBytes($parts[$index] + "`r`n")
+            $Stream.Write($bytes, 0, $bytes.Length)
+            $Stream.Flush()
+            foreach ($line in ($parts[$index] -split "`r`n")) { [void] $Transcript.Append("< $line`r`n") }
+        }
     }
 
     try {
