@@ -1,4 +1,4 @@
-# ADR-0857: An AUTH-secured FTP control connection is kept in TLS for the next URL; a CCC-cleared one is not kept
+# ADR-0861: An AUTH-secured FTP control connection is kept in TLS for the next URL; a CCC-cleared one is not kept
 
 - Status: Accepted
 - Date: 2026-10-26
