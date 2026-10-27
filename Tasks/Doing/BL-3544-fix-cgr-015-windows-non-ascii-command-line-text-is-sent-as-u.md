@@ -230,3 +230,4 @@ curl -s -o NUL -w "[é]" http://127.0.0.1:21370/x
 - 2026-10-26: Created from CGR-015 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Split by library: waits on BL-3843, BL-3844, BL-3840, BL-3841 and BL-3842
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
