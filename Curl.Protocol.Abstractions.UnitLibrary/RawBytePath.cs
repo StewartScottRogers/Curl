@@ -6,7 +6,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// The text form of a file path that may hold bytes that are not valid UTF-8, so a path curl hands
 /// to <c>open()</c> unchanged can reach <see cref="IFileSystem" /> as a <see cref="string" />
-/// (CGR-114, BL-3899, ADR-0836). <see cref="FromBytes" /> reads the bytes as UTF-8 but keeps each
+/// (CGR-114, BL-3899, ADR-0839). <see cref="FromBytes" /> reads the bytes as UTF-8 but keeps each
 /// byte <c>b</c> outside a valid sequence as the lone surrogate U+DC00 + <c>b</c> (U+DC80 to
 /// U+DCFF), and <see cref="ToBytes" /> gives each such surrogate back its byte, so the round trip
 /// keeps every byte. A path of valid UTF-8 holds no such surrogate and is the plain text it always was.

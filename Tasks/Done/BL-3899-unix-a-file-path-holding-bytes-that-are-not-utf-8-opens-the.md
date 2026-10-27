@@ -30,7 +30,7 @@ This task provides the hook only: a way for `Curl.Protocol.File.UnitLibrary` (wh
 
 ## Notes
 
-- Plan: `RawBytePath` (Abstractions) keeps each non-UTF-8 byte as U+DC00 + byte, the scheme of `Curl.Cli`'s `InvalidUtf8ByteEscape` (written again because the file protocol references only Abstractions); `PhysicalFileSystem.OpenForReadAsync` off Windows opens a path holding one with `SystemNative_Open` on the raw bytes and wraps the descriptor in a `FileStream`, as `Curl.Console`'s `RawByteFileName` does for `-o`. Decision recorded in ADR-0836.
+- Plan: `RawBytePath` (Abstractions) keeps each non-UTF-8 byte as U+DC00 + byte, the scheme of `Curl.Cli`'s `InvalidUtf8ByteEscape` (written again because the file protocol references only Abstractions); `PhysicalFileSystem.OpenForReadAsync` off Windows opens a path holding one with `SystemNative_Open` on the raw bytes and wraps the descriptor in a `FileStream`, as `Curl.Console`'s `RawByteFileName` does for `-o`. Decision recorded in ADR-0839.
 - Default taken: only the read open takes raw bytes (the criterion names reading); a raw-byte write open or directory listing waits for a case that needs it. errno is mapped as `RawByteFileName` maps it (ENOENT NotFound, EACCES/EPERM AccessDenied, ENOTDIR, EISDIR, else IoError).
 - Tests: the routing, errno mapping and FileStream wrapping are covered on every platform through an injected opener (`PhysicalFileSystemRawByteNameTests`); the open of a real raw-byte file and a missing raw-byte name are Unix-only (`OSCondition`), so they were skipped on this Windows lane and only CI runs them. That and the platform-neutral fast tests meet the Linux/macOS side.
 - Measure-CodeQuality: Curl.Core.UnitLibrary and Curl.Protocol.Abstractions.UnitLibrary at 100% line and 100% branch, 0 failing (the first run failed the public constructor's platform ternary, now in `RawBytePathReadOpenerFor`). dotnet build is clean; the fast tests pass (43961 passed).
@@ -39,4 +39,4 @@ This task provides the hook only: a way for `Curl.Protocol.File.UnitLibrary` (wh
 
 - 2026-10-26: Created.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: fb155554 f361d830 002d20a6 779790c0.
-- 2026-10-26: Doing -> Done. PhysicalFileSystem opens a RawBytePath read path under its raw bytes on Linux and macOS (ADR-0836)
+- 2026-10-26: Doing -> Done. PhysicalFileSystem opens a RawBytePath read path under its raw bytes on Linux and macOS (ADR-0839)

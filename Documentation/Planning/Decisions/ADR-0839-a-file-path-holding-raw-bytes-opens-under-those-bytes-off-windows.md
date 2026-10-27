@@ -1,4 +1,4 @@
-# ADR-0836 — A file path holding bytes that are not UTF-8 opens under those bytes off Windows
+# ADR-0839 — A file path holding bytes that are not UTF-8 opens under those bytes off Windows
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

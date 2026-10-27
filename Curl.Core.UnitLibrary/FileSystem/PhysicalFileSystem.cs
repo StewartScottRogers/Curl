@@ -60,7 +60,7 @@ namespace Curl.Core.FileSystem;
 /// that is not valid UTF-8, opens the file whose name is exactly those bytes, as curl's
 /// <c>open()</c> does: .NET's file APIs would encode the byte as EF BF BD, so the name goes to
 /// the runtime's own <c>open</c> shim instead and a <see cref="FileStream" /> wraps the
-/// descriptor (CGR-114, BL-3899, ADR-0836). Its failure is the status of the <c>errno</c>
+/// descriptor (CGR-114, BL-3899, ADR-0839). Its failure is the status of the <c>errno</c>
 /// (<see cref="StatusForErrno(int)" />), so a name that does not exist is still
 /// <see cref="FileAccessStatus.NotFound" />. Every other path, and every path on Windows,
 /// opens as above.
@@ -420,7 +420,7 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
     /// <summary>Opens the NUL-terminated name <paramref name="path" /> for reading with the runtime's <c>open</c>.</summary>
     /// <param name="path">The name's raw bytes and a NUL.</param>
     /// <returns>The descriptor, or the <c>errno</c> of the failed open.</returns>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0836: a thin adapter over an open only Linux and macOS take raw bytes in.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0839: a thin adapter over an open only Linux and macOS take raw bytes in.")]
     private static RawBytePathOpen OpenUnderRawBytesForRead(byte[] path)
     {
         nint descriptor;
