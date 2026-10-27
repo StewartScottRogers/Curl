@@ -92,3 +92,4 @@ curl -sS --url-query a=b "http://127.0.0.1:20200/x" -w "%{url}"
 ## Log
 
 - 2026-10-26: Created from CGR-089 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
