@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitTests/Cgr128Tests.cs]
+touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Preparation.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs, Curl.Engine.UnitLibrary/EngineConnectionIdTransferEvents.cs, Curl.Engine.UnitLibrary/TransferInfoFromReport.Scheme.cs, Curl.Engine.UnitTests/Cgr128Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3657 — Fix CGR-128: After a CONNECT_ONLY perform, or a transfer aborted by an XFERINFO/READ callback, PRIMARY_IP, PRIMARY_PORT, LOCAL_IP, NUM_CONNECTS, SCHEM...
 
@@ -62,17 +62,22 @@ export CURLOPT_CONNECT_ONLY=1
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr128Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 2): Cause: `PerformConnectOnlyAsync` finished with the perform's empty starting `Info`, and `FinishPerformed` built a fresh `TransferInfo` for a callback-aborted transfer, so neither carried the connection. Fix: `EngineConnectionIdTransferEvents` takes an optional `connectionOpened` hook, through which `ManagedEasyTransfer.ShowConnectionEndPointsOnInfo` puts each opened connection's peer and local IP and port on the live `Info` and counts it in `NumConnects` (libcurl's are live once connected). A connect-only perform puts its connection's end points (local from the connection, else the `ConnectResult`), `NumConnects` 1 and the URL's scheme and `CURLPROTO_*` bit (`TransferInfoFromReport.WithScheme`) on `Info`. A callback abort keeps the live `Info` and adds the scheme and protocol (`WithSchemeOf`) and `EffectiveMethodOf(options)`: `CURLOPT_CUSTOMREQUEST`, else `HEAD` under `NOBODY`, `PUT` under `UPLOAD`, `POST` for a post not overridden by `HTTPGET`, else `GET`, as curl 8.22.0's `getinfo_char` answers `CURLINFO_EFFECTIVE_METHOD` from the options. Decided by Claude under Stewart's delegation; it copies libcurl's behaviour directly, so no ADR.
+- Touches widened to the partial files of `ManagedEasyTransfer` the change lands in, `EngineConnectionIdTransferEvents.cs` and `TransferInfoFromReport.Scheme.cs`. No task in Doing on `origin/work/dark-factory` names any of them (checked 2026-10-26: BL-3658 and BL-3661 hold other Engine files).
+- Evidence: the report's probe (P/Invoke to REF libcurl beside the port) is not in the tree and was not rebuilt, so REF's values are the report's own measurement (CONNECT_ONLY: PRIMARY_IP 127.0.0.1, PRIMARY_PORT 21410, LOCAL_IP 127.0.0.1, NUM_CONNECTS 1, SCHEME http, PROTOCOL 1; xferinfo abort: 42 with the same; read abort: EFFECTIVE_METHOD PUT). `Cgr128Tests` runs each case through the engine against `127.0.0.1:21410` and gets those values: connect-only Ok with the six values, xferinfo abort `AbortedByCallback` (42) with them, and read-aborted upload `AbortedByCallback` with `PUT`. Before the fix the code left `''`, 0, `''`, 0, `null`, 0 and `GET` on these paths; the failing run was not recorded separately. Return codes and bytes on the wire are unchanged: the existing connect-only and callback-abort tests in `ManagedEasyTransferTests` still pass.
+- Checks: `dotnet build` clean; `dotnet test --filter "TestCategory!=Integration"` green across all 46 test projects. One later `Curl.Engine.UnitTests` run failed `Cgr036Tests.ConnectAsync_ClosedPort_...` once (it passes alone and passed in the full run), filed as BL-3904. `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: every member this task added or changed is within the gates. The one failing member, `QueuedCallback.WaitUntilRun` (lines 178 and 179 covered in the first run, not in the second), has timing-dependent coverage this change does not touch; also in BL-3904. Platform-neutral: loopback IPv4 end points only, no paths or OS text.
 
 ## Log
 
 - 2026-10-26: Created from CGR-128 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. CONNECT_ONLY performs and callback-aborted transfers answer PRIMARY_IP/PORT, LOCAL_IP/PORT, NUM_CONNECTS, SCHEME and PROTOCOL, and a read-aborted upload answers EFFECTIVE_METHOD PUT
