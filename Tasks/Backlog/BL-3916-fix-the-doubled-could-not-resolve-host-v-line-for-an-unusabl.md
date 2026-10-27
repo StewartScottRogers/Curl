@@ -1,5 +1,5 @@
 ---
-id: BL-3914
+id: BL-3916
 title: Fix the doubled 'Could not resolve host' -v line for an unusable --doh-url
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3914 — Fix the doubled 'Could not resolve host' -v line for an unusable --doh-url
+# BL-3916 — Fix the doubled 'Could not resolve host' -v line for an unusable --doh-url
 
 ## Goal
 
