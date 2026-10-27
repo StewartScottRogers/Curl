@@ -87,3 +87,4 @@ curl -sS AUTH -r "<R>" -w "<%{size_download}>" U/digits.txt
 ## Log
 
 - 2026-10-26: Created from CGR-131 of the third-party gap report.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
