@@ -69,13 +69,27 @@ internal sealed class DeferredConnectSocketStream(Socket socket) : Stream
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
         WriteAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Sends every byte of <paramref name="buffer" />; a send the socket refuses, as one never connected under
+    /// <c>CURL_SOCKOPT_ALREADY_CONNECTED</c> is (CGR-145), throws an <see cref="IOException" /> over the
+    /// <see cref="SocketException" />, as <see cref="NetworkStream" /> does, so the handler fails as a send error.
+    /// </summary>
+    /// <param name="buffer">The bytes to send.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes once every byte is sent.</returns>
     public override async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         var remaining = buffer;
-        while (!remaining.IsEmpty)
+        try
         {
-            remaining = remaining[await _socket.SendAsync(remaining, SocketFlags.None, cancellationToken).ConfigureAwait(false)..];
+            while (!remaining.IsEmpty)
+            {
+                remaining = remaining[await _socket.SendAsync(remaining, SocketFlags.None, cancellationToken).ConfigureAwait(false)..];
+            }
+        }
+        catch (SocketException exception)
+        {
+            throw new IOException($"Unable to write data to the transport connection: {exception.Message}", exception);
         }
     }
 
