@@ -641,7 +641,7 @@ internal sealed class TransferContextFactory(Stream standardInput, TimeProvider?
     /// Whether a transfer's header lines go to its body output: under <c>CURLOPT_HEADER</c>, or under
     /// <c>CURLOPT_NOBODY</c> for an <c>ftp</c> or <c>ftps</c> URL; never for a WebSocket URL (<see cref="HeaderOutputOf" />),
     /// nor for an <c>sftp</c> or <c>scp</c> URL, whose quote command output (<c>pwd</c>, <c>statvfs</c>) curl 8.22.0
-    /// writes only to <c>-D</c> under <c>-i</c> and <c>-I</c> (CGR-132, BL-3661, ADR-0841).
+    /// writes only to <c>-D</c> under <c>-i</c> and <c>-I</c> (CGR-132, BL-3661, ADR-0844).
     /// </summary>
     /// <param name="behaviour">The behaviour options, whose <see cref="EasyBehaviourOptions.IncludeHeader" /> is <c>CURLOPT_HEADER</c>.</param>
     /// <param name="transfer">The transfer's options, whose <see cref="EasyTransferOptions.NoBody" /> is <c>CURLOPT_NOBODY</c>.</param>

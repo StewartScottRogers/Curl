@@ -1,4 +1,4 @@
-# ADR-0841: sftp and scp header lines never go to the body output
+# ADR-0844: sftp and scp header lines never go to the body output
 
 - Status: Accepted
 - Date: 2026-10-26

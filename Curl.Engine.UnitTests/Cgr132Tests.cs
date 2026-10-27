@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// CGR-132 (BL-3661, ADR-0841): curl 8.22.0 writes an <c>sftp</c> or <c>scp</c> transfer's quote command output
+/// CGR-132 (BL-3661, ADR-0844): curl 8.22.0 writes an <c>sftp</c> or <c>scp</c> transfer's quote command output
 /// (<c>pwd</c>'s <c>257</c> line, <c>statvfs</c>'s lines) only to <c>-D</c>, never to the body output, under
 /// <c>-i</c> and <c>-I</c> alike (measured 2026-10-26 against OpenSSH 10.2p1, BL-3661 Notes).
 /// </summary>
