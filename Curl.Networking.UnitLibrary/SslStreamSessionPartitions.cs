@@ -3,7 +3,7 @@ namespace Curl.Networking;
 /// <summary>
 /// Decides whether an <c>SslStream</c> handshake may resume a TLS session, so a run resumes a
 /// session only between connections to one host whose verification settings match, as curl
-/// keys its session cache on them (CGR-164, ADR-0859).
+/// keys its session cache on them (CGR-164, ADR-0860).
 /// </summary>
 /// <remarks>
 /// <c>SslStream</c> keeps sessions in a process-wide cache keyed on the target host and the

@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// CGR-164 of the third-party gap report (BL-3693): curl resumes a TLS session only between
 /// transfers whose verification settings match, so <c>-k</c> then <c>--cacert</c>, the reverse,
 /// or an added <c>--pinnedpubkey</c> makes a new session, and the same options twice resume one
-/// (ADR-0859).
+/// (ADR-0860).
 /// </summary>
 [TestClass]
 public sealed class Cgr164Tests

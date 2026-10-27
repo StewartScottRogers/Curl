@@ -1,4 +1,4 @@
-# ADR-0859 — TLS sessions resume only between matching verification settings
+# ADR-0860 — TLS sessions resume only between matching verification settings
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
