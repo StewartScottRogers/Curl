@@ -7,9 +7,10 @@ namespace Curl.Networking;
 public sealed partial class DohDnsResolverTraceTests
 {
     [TestMethod]
-    public async Task ResolveAsync_ACloseDelimitedBody_ReportsTheReceiveFailureForEachQuery()
+    public async Task ResolveAsync_ABodyCutShort_ReportsTheReceiveFailureForEachQuery()
     {
-        var lines = await TraceAsync([.. Response("HTTP/1.1 200 OK\r\n\r\n"), .. Convert.FromHexString(MeasuredAAnswer)]);
+        // A close-delimited body is read to the close (CGR-160, BL-3689); one cut short of its Content-Length is not.
+        var lines = await TraceAsync([.. Response("HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n"), .. Convert.FromHexString(MeasuredAAnswer)]);
 
         AssertLines(
             ["[DoH] [DoH] [AAAA] error: Failure when receiving data from the peer", "[DoH] [DoH] [A] error: Failure when receiving data from the peer"],
@@ -59,7 +60,7 @@ public sealed partial class DohDnsResolverTraceTests
     {
         var connector = new FakeConnector();
         connector.BytesToRead.Add(Ok(Convert.FromHexString(MeasuredAAnswer)));
-        connector.BytesToRead.Add(Response("HTTP/1.1 200 OK\r\n\r\n"));
+        connector.BytesToRead.Add(Response("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\n"));
 
         var (lines, addresses) = await ResolveAsync(connector, System.Net.Sockets.AddressFamily.Unspecified);
 

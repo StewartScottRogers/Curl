@@ -9,8 +9,9 @@ namespace Curl.Networking;
 /// <summary>
 /// Pins <see cref="DohResponseReader" /> to how curl 8.21.0 took a DoH server's response
 /// (measured with <c>Record-CurlExchange.ps1 -Tls</c> on 2026-09-28, BL-641): status and
-/// <c>Content-Type</c> ignored, <c>Content-Length</c> and chunked bodies read, and a body
-/// delimited by the close, cut short or too large read as a failure.
+/// <c>Content-Type</c> ignored, <c>Content-Length</c> and chunked bodies read, and a body cut
+/// short or too large read as a failure; <see cref="Cgr160Tests" /> pins a body delimited by the
+/// close, which curl 8.22.0 reads to the end (BL-3689).
 /// </summary>
 [TestClass]
 public sealed class DohResponseReaderTests
@@ -133,7 +134,6 @@ public sealed class DohResponseReaderTests
     }
 
     [TestMethod]
-    [DataRow("close-delimited", "HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\n\r\nABCDEFG")]
     [DataRow("cut short", "HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\nABCDEFG")]
     [DataRow("over curl's buffer", "HTTP/1.1 200 OK\r\nContent-Length: 3001\r\n\r\nABCDEFG")]
     [DataRow("Content-Length not a number", "HTTP/1.1 200 OK\r\nContent-Length: seven\r\n\r\nABCDEFG")]
@@ -154,7 +154,6 @@ public sealed class DohResponseReaderTests
     [DataRow("closed in the trailer", "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nA\r\n0\r\nX-Trailer: 1\r\n")]
     public async Task ReadBodyAsync_WithAResponseCurlFailsToReceive_ReturnsNull(string reason, string response)
     {
-        // A close-delimited body was "DoH request Failure when receiving data from the peer" (measured).
         Diagnostics.Arrange("reason", reason);
         var body = await ReadAsync(Encoding.Latin1.GetBytes(response));
 

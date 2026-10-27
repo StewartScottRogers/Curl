@@ -11,9 +11,9 @@ namespace Curl.Networking;
 /// <c>text/plain</c> answer is decoded all the same, and hands the status code on through
 /// <see cref="ReadResponseAsync" />, outside 200-299 of which the resolver fails the query as
 /// curl 8.22.0 does (BL-2979, BL-2972); the body is
-/// framed by <c>Content-Length</c> or chunked transfer coding; and a body framed by neither (and
-/// so delimited by the close), cut short, or longer than curl's 3000-byte DoH buffer is a
-/// receive failure.
+/// framed by <c>Content-Length</c>, by chunked transfer coding or, framed by neither, by the close,
+/// which curl reads to the end (measured, BL-3689); and a body cut short or longer than curl's
+/// 3000-byte DoH buffer is a receive failure.
 /// </summary>
 internal static class DohResponseReader
 {
@@ -112,9 +112,25 @@ internal static class DohResponseReader
     }
 
     // A body framed by neither Content-Length nor chunked coding ends at the close, which curl
-    // reports as a receive failure (measured).
+    // 8.22.0 reads to the end for HTTP/1.0 and HTTP/1.1 alike (measured, BL-3689).
     private static async ValueTask<byte[]?> ReadContentLengthBodyAsync(ConnectionByteReader reader, long? contentLength, CancellationToken cancellationToken) =>
-        contentLength is { } length ? await ReadExactlyAsync(reader, length, cancellationToken).ConfigureAwait(false) : null;
+        contentLength is { } length
+            ? await ReadExactlyAsync(reader, length, cancellationToken).ConfigureAwait(false)
+            : await ReadToCloseAsync(reader, cancellationToken).ConfigureAwait(false);
+
+    // The bytes up to the peer's close; null once they run past curl's buffer.
+    private static async ValueTask<byte[]?> ReadToCloseAsync(ConnectionByteReader reader, CancellationToken cancellationToken)
+    {
+        var body = new List<byte>();
+        var next = await reader.ReadByteAsync(cancellationToken).ConfigureAwait(false);
+        while (next >= 0 && body.Count < MaximumBodyLength)
+        {
+            body.Add((byte)next);
+            next = await reader.ReadByteAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return next < 0 ? [.. body] : null;
+    }
 
     private static async ValueTask<byte[]?> ReadChunkedBodyAsync(ConnectionByteReader reader, CancellationToken cancellationToken)
     {
