@@ -652,7 +652,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     // Under -k the OpenSSL build trusts no OCSP responder, every build's --cert-status
-    // check being the OpenSSL build's (ADR-0191, ADR-0859).
+    // check being the OpenSSL build's (ADR-0191, ADR-0862).
     private TimeProvider? UntrustedStapleClock =>
         _options.Insecure && _options.RequireCertificateStatus ? _timeProvider : null;
 

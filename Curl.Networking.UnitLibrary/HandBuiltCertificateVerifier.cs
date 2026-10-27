@@ -25,7 +25,7 @@ namespace Curl.Networking;
 /// Under <c>-k</c> with <c>--cert-status</c>, the clock the stapled OCSP response is read at;
 /// <see langword="null" /> otherwise. curl's OpenSSL build loads no trust store under <c>-k</c>,
 /// so <c>OCSP_basic_verify</c> trusts no responder and every staple that reads as a successful
-/// response is refused with exit 91 <c>OCSP response verification failed</c> (ADR-0859, CGR-167).
+/// response is refused with exit 91 <c>OCSP response verification failed</c> (ADR-0862, CGR-167).
 /// </param>
 internal sealed class HandBuiltCertificateVerifier(
     ServerCertificateVerification verification,

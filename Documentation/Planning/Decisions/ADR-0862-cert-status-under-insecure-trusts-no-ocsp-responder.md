@@ -1,4 +1,4 @@
-# ADR-0859: `--cert-status` under `-k` trusts no OCSP responder
+# ADR-0862: `--cert-status` under `-k` trusts no OCSP responder
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

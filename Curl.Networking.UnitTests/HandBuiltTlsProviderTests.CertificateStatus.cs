@@ -221,7 +221,7 @@ public sealed partial class HandBuiltTlsProviderTests
     }
 
     // Under -k the OpenSSL build trusts no OCSP responder, so even a good staple is exit 91
-    // (CGR-167, ADR-0859).
+    // (CGR-167, ADR-0862).
     [TestMethod]
     [DataRow(SchannelBuild)]
     [DataRow(OpenSslBuild)]

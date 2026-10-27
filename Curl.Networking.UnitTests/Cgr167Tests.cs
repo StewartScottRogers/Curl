@@ -5,7 +5,7 @@ using Curl.Tls;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-167 (BL-3696, ADR-0859): under <c>-k</c> curl's OpenSSL build loads no trust store, so
+/// CGR-167 (BL-3696, ADR-0862): under <c>-k</c> curl's OpenSSL build loads no trust store, so
 /// <c>--cert-status</c>'s <c>OCSP_basic_verify</c> trusts no responder and every stapled
 /// response that reads as successful, good, revoked, for another certificate or with its issuer
 /// missing, is exit 91 <c>OCSP response verification failed</c>; a missing, unreadable or
