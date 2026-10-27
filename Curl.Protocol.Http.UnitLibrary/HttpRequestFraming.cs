@@ -190,6 +190,18 @@ internal sealed class HttpRequestFraming
         new(Method, Body, KnownLength, isChunked: false, addsExpect: false, awaitsContinue: false, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe);
 
     /// <summary>
+    /// Makes the same framing for an HTTP/1.1 request that asks to upgrade to h2c: with no
+    /// <c>Expect: 100-continue</c> of curl's own and no wait for <c>100 Continue</c>, the body
+    /// following the head at once, as curl 8.18.0 sends a 2 MiB <c>--data-binary</c> body and a
+    /// chunked <c>-T -</c> upload with <c>--http2</c> over cleartext (measured, BL-3672 Notes;
+    /// CGR-143). The body keeps its framing, chunked or not, and an <c>-H</c>
+    /// <c>Expect: 100-continue</c> still waits.
+    /// </summary>
+    /// <returns>The framing of the h2c upgrade request.</returns>
+    internal HttpRequestFraming ForH2cUpgrade() =>
+        new(Method, Body, KnownLength, IsChunked, addsExpect: false, awaitsContinue: AwaitsContinue && !AddsExpect, RefusesUnknownLength, Upload, ContentRange, IsAuthProbe, ChunksForUnknownLength);
+
+    /// <summary>
     /// Decides the framing for a request with <paramref name="options" />.
     /// </summary>
     /// <param name="options">The HTTP options.</param>

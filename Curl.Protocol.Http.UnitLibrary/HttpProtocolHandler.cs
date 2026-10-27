@@ -1299,7 +1299,6 @@ public sealed class HttpProtocolHandler(
     {
         ITransferContext context = plan.Context;
         HttpRequestOptions options = plan.Options;
-        HttpRequestFraming framing = plan.Framing;
         CancellationToken cancellationToken = plan.Deadline.Token;
 
         // curl 8.21.0 says which version it uses before it builds the request, so the cookie
@@ -1307,6 +1306,8 @@ public sealed class HttpProtocolHandler(
         ReportProtocolChosen(context.Events, newConnection, streams);
         IHttpStreamConnection? requestStream = CreateRequestStream(plan, streams);
         IConnection connection = ExchangeConnectionOf(plan, requestStream, transport);
+        plan = PlanForConnection(plan, connection);
+        HttpRequestFraming framing = plan.Framing;
         byte[] request = FormatRequestHead(plan, streams, connection is HttpH2cUpgradeConnection, options.EarlierResponseWasHttp10 || Http1VersionSeen.DowngradesToHttp10(transport));
         HttpFirstByteTimingConnection timedConnection = new(connection, context.TimeProvider);
         IConnection responseConnection = ResponseConnectionOf(plan, requestStream, timedConnection);
@@ -1793,6 +1794,15 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static bool UpgradesToH2c(HttpRequestPlan plan, IConnection transport) =>
         plan.Options.Version == HttpVersionPreference.Http2 && !transport.IsSecure;
+
+    /// <summary>
+    /// Gives the plan the exchange sends on <paramref name="connection" />: over an h2c upgrade
+    /// (<see cref="HttpH2cUpgradeConnection" />) the request without curl's own
+    /// <c>Expect: 100-continue</c> (<see cref="HttpRequestFraming.ForH2cUpgrade" />), and
+    /// otherwise the plan unchanged.
+    /// </summary>
+    private static HttpRequestPlan PlanForConnection(HttpRequestPlan plan, IConnection connection) =>
+        connection is HttpH2cUpgradeConnection ? plan.ForH2cUpgrade() : plan;
 
     /// <summary>
     /// Tells whether the exchange's connection has switched to HTTP/2 after an h2c upgrade's <c>101</c>.
@@ -3698,6 +3708,12 @@ public sealed class HttpProtocolHandler(
         /// </summary>
         /// <returns>The HTTP/2 or HTTP/3 request's plan.</returns>
         public HttpRequestPlan ForHttp2OrHttp3() => With(Framing.ForHttp2OrHttp3(), Authorization);
+
+        /// <summary>
+        /// Makes the same request framed for an h2c upgrade (<see cref="HttpRequestFraming.ForH2cUpgrade" />).
+        /// </summary>
+        /// <returns>The upgrade request's plan.</returns>
+        public HttpRequestPlan ForH2cUpgrade() => With(Framing.ForH2cUpgrade(), Authorization);
 
         /// <summary>
         /// Makes the same request, marked as sent again on a fresh connection.
