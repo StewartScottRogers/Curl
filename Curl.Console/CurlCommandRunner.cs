@@ -456,7 +456,7 @@ internal sealed class CurlCommandRunner(
     /// </summary>
     private Stream? standardErrorFile;
 
-    /// <summary>The encoding of a refused command line's lines on standard error when they echo command-line text: the system ANSI code page on Windows, in which that text was read (ADR-0840, BL-3893), and UTF-8 elsewhere.</summary>
+    /// <summary>The encoding of standard error lines that echo command-line text (a refused command line, a <c>-T</c> or <c>-o</c> file that cannot be opened): the system ANSI code page on Windows, in which that text was read (ADR-0840, BL-3893, BL-3544), and UTF-8 elsewhere.</summary>
     private readonly Encoding commandLineEchoEncoding = CredentialEncoding.ForPlatform(runsOnWindows);
 
     /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input and sends command-line header text in the platform's encoding (ADR-0067).</summary>
@@ -3503,7 +3503,7 @@ internal sealed class CurlCommandRunner(
         FileOpenResult opened = await fileSystem.OpenForReadAsync(uploadFile, CancellationToken.None).ConfigureAwait(false);
         if (opened.Content is not { } upload)
         {
-            await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine])
+            await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
                 .ConfigureAwait(false);
             return CannotOpenUploadFileResult();
         }
@@ -4573,7 +4573,7 @@ internal sealed class CurlCommandRunner(
     {
         if (ShowsErrors(options))
         {
-            await WriteErrorLineAsync($"curl: cannot open '{outputFile}'").ConfigureAwait(false);
+            await WriteErrorLineAsync($"curl: cannot open '{outputFile}'", commandLineEchoEncoding).ConfigureAwait(false);
         }
 
         return CannotOpenForResumeFailure;
