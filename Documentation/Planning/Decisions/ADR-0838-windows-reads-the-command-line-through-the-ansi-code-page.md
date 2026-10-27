@@ -1,4 +1,4 @@
-# ADR-0836: On Windows the command line is read through the ANSI code page with best fit
+# ADR-0838: On Windows the command line is read through the ANSI code page with best fit
 
 - Status: Accepted
 - Date: 2026-10-26

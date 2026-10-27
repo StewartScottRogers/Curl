@@ -4,7 +4,7 @@ using Curl.Authentication;
 namespace Curl.Console;
 
 /// <summary>
-/// CGR-015 part 1a (BL-3892, ADR-0836): on Windows the reference curl reads its <c>argv</c> through the
+/// CGR-015 part 1a (BL-3892, ADR-0838): on Windows the reference curl reads its <c>argv</c> through the
 /// system ANSI code page with best fit. The code page is passed in (Windows-1252, as on the measuring
 /// machine) so these pass on every host.
 /// </summary>

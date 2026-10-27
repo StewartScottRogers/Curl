@@ -5,7 +5,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Reads the command line as the reference curl on Windows reads its ANSI <c>argv</c> (CGR-015,
-/// BL-3892, ADR-0836): each argument is converted to the system ANSI code page with Windows best fit
+/// BL-3892, ADR-0838): each argument is converted to the system ANSI code page with Windows best fit
 /// and back, so a character the code page lacks becomes its best-fit stand-in (the full-width digit
 /// U+FF10 becomes <c>0</c>) or <c>?</c> (<c>中</c>), while one it has (<c>é</c>, <c>“</c>) is kept.
 /// Off Windows the arguments pass through unchanged.
