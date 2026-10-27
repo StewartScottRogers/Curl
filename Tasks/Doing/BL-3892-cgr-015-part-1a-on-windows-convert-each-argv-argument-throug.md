@@ -37,3 +37,4 @@ Split from BL-3843, which was over its cost cap. Continues the stashed work of B
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: a15a88ba c458aac4 1e0b33a1 f4912012 326de9ca.
