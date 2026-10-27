@@ -111,7 +111,7 @@ public sealed class CommandLineOptions
     /// config file read as UTF-8 is read and <see cref="ConfigFileWireTextEncoding"/> is set, re-spelled so it goes out as
     /// the file's own bytes (<see cref="ConfigFileWireText.Respell"/>); otherwise unchanged.
     /// </summary>
-    /// <param name="value">A header, user-agent or referer value.</param>
+    /// <param name="value">A header, user-agent, referer or <c>-o</c> value.</param>
     /// <returns>The value to store.</returns>
     internal string AsWireText(string value) =>
         ReadingUtf8ConfigFile && ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(value, wireEncoding) : value;
@@ -2335,13 +2335,15 @@ public sealed class CommandLineOptions
 
     /// <summary>
     /// Pairs <paramref name="outputFile"/> with the next URL in <see cref="UrlOutputs"/>; nothing is
-    /// opened or created.
+    /// opened or created. A value from a UTF-8 config file on Windows is re-spelled by
+    /// <see cref="AsWireText"/>, so the name is the file's bytes read in the ANSI code page, as the
+    /// curl 8.22.0 mingw build opens it (<c>output = "café.bin"</c> creates <c>cafÃ©.bin</c>, BL-3900).
     /// </summary>
     /// <param name="outputFile">A <c>-o</c> / <c>--output</c> value.</param>
     internal void AddOutputFile(string outputFile)
     {
         UrlOutput output = urlOutputs.Find(output => !output.HasOutputOption) ?? AddUrlOutput();
-        output.FileName = outputFile;
+        output.FileName = AsWireText(outputFile);
         output.HasOutputOption = true;
     }
 
