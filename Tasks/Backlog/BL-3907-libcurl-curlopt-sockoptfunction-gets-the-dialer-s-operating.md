@@ -1,5 +1,5 @@
 ---
-id: BL-3904
+id: BL-3907
 title: libcurl: CURLOPT_SOCKOPTFUNCTION gets the dialer's operating system socket when no open-socket callback is set
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3904 — libcurl: CURLOPT_SOCKOPTFUNCTION gets the dialer's operating system socket when no open-socket callback is set
+# BL-3907 — libcurl: CURLOPT_SOCKOPTFUNCTION gets the dialer's operating system socket when no open-socket callback is set
 
 ## Goal
 
