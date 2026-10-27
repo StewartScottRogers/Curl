@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpResponseHeadBuilder.cs, Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs, Curl.Protocol.Http.UnitTests/Cgr116Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3645 — Fix CGR-116: A NUL byte in the HTTP status line is accepted (output written, exit 0); curl fails with exit 8 Nul byte in header
 
@@ -77,17 +77,29 @@ curl -s -S http://127.0.0.1:20400/st_reason_nul
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr116Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
-
+- Fix: `HttpResponseHeadBuilder.StartHead` now refuses a status line holding a NUL byte with exit 8 `Nul byte in header` (the check `AddLine` already made, shared as `RefuseNulByte`), before the line is written or reported; as in curl's `http_rw_hd`, the status line is parsed first, so a non-HTTP first line still takes the HTTP/0.9 path. No ADR: the behaviour is curl's, measured, with no design choice to record.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1` (port 21645), real curl 8.22.0 (mingw, Schannel) and then Curl's `curl.exe` against the same canned responses; exit code, stdout.bin, stderr.txt and request.bin compared by hash, all equal:
+  - `-s -i` on `HTTP/1.1 200 OK\0\r\nContent-Length: 6\r\n\r\n-foo-\n`: REF exit 8, stdout empty, stderr empty. PORT the same (was exit 0, 45 bytes on stdout).
+  - `-s -S` on the same: REF exit 8, `curl: (8) Nul byte in header`, stdout empty. PORT the same.
+  - `-s -i` on the test262 shape (LF line ends, NUL in status line, Date and ETag): REF exit 8, stdout empty. PORT the same (was exit 8 with 17 bytes on stdout).
+  - `-s -S` on `HTTP/1.1 200 O\0K` (st_reason_nul): REF exit 8, `curl: (8) Nul byte in header`. PORT the same (was exit 0, `ok`).
+  - `-s -S -i` on `HTTP/1.1 200\0` (st_code_nul): REF exit 8, `curl: (8) Nul byte in header`, stdout empty. PORT the same.
+  - `-s -S -f` on `HTTP/1.1 404 Not\0` (st_reason_nul_end): REF exit 8, `curl: (8) Nul byte in header`. PORT the same (was exit 22).
+- No variant matched before the fix; the existing header-line NUL test (`ExecuteAsync_NulByteInAHeaderLine_FailsWithWeirdServerReplyBeforeReportingIt`) still passes.
+- Focused test `Cgr116Tests.cs` (`ExecuteAsync_NulByteInTheStatusLine_FailsWithWeirdServerReplyBeforeReportingIt`, five rows): all five failed before the fix and pass after.
+- `dotnet build` clean; fast tests 43940 passed of 44235 (the rest skipped), 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members.
+- Linux: the check is byte-level with no platform-dependent text; REF-LINUX 8.18.0 gives the same exit 8 per the report; kept platform-neutral, CI runs it on Linux and macOS.
 ## Log
 
 - 2026-10-26: Created from CGR-116 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A NUL byte in the HTTP status line fails with exit 8 Nul byte in header and nothing written, as curl 8.22.0 does
