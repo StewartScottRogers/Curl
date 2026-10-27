@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpResponseHeadBuilder.cs, Curl.Protocol.Http.UnitTests/Cgr118Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3647 — Fix CGR-118: A header line that starts with white space and has no previous header to fold into loses its leading blanks in -i/-D output
 
@@ -72,17 +72,21 @@ curl -s -S -i http://127.0.0.1:20400/fold_first
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr118Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Measured 2026-10-26 with `Record-CurlExchange.ps1` (reference curl 8.22.0 mingw Schannel, then `-Curl` set to Curl's built `curl.exe`), command `curl -s -S -i -D <file> http://127.0.0.1:<port>/x` against five canned replies: UC-3 ` Date: Tue, 09 Nov 2010 14:49:00 GMT` and `\tX-A: one` (then `Server: x`, `Content-Length: 6`, body `-foo-\n`); HR-13 `  X-Fold: a`, ` X-Fold: a` + `  b`, `\tX: a` (then `Content-Length: 2`, body `ok`). Real curl: exit 0, stderr empty, stdout and the -D file hold the line as received (` Date: ...`, `\tX-A: one`, `  X-Fold: a`, ` X-Fold: a b`, `\tX: a`). Curl before the fix dropped the leading blanks; after it, exit code, stdout bytes, -D file bytes and stderr equal real curl's for all five, and the request bytes are equal once the port in `Host:` is normalised.
+- Fix: `HttpResponseHeadBuilder.AddLine` no longer trims the line it keeps for the head bytes; `ToHeader` trims the leading blanks from the header name only, so `Headers` (names for -w, cookies, Location) are unchanged and the existing `ReadAsync_FirstHeaderStartsWithBlanks_TakesItWithoutTheBlanks` still holds. The colon check is unaffected (a blank-led line with no colon still fails with `Header without colon`). No ADR: no design choice, only matching measured curl.
+- Unit tests `Cgr118Tests` (5 cases, chunk sizes 1, 7, 65536) failed with the old `TrimStart` and pass with the fix. Fast tests: all green (0 failed). `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary`: 0 failing members. CI on Linux/macOS: the change and tests are platform-neutral (in-memory bytes only).
 
 ## Log
 
 - 2026-10-26: Created from CGR-118 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A header line that starts with white space and has no header to fold into is written to -i/-D with its leading blanks, as curl 8.22.0 writes it
