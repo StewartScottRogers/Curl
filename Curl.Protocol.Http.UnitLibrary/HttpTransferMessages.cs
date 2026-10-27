@@ -119,9 +119,9 @@ internal static class HttpTransferMessages
     internal const string Http2FramingError = "Error in the HTTP2 framing layer";
 
     /// <summary>
-    /// The exit 55 message for a peer whose first bytes after the HTTP/2 preface are not a
+    /// The exit 16 message for a peer whose first bytes after the HTTP/2 preface are not a
     /// SETTINGS frame, such as an HTTP/1.1 server answering <c>--http2-prior-knowledge</c>
-    /// (measured on nghttp2-built curl 8.18.0, BL-3372 Notes).
+    /// (measured on nghttp2-built curl 8.18.0, BL-3650 Notes, ADR-0836).
     /// </summary>
     internal const string Http2SettingsExpected = "Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.";
 

@@ -227,7 +227,7 @@ public sealed partial class HttpProtocolHandlerTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public async Task ExecuteAsync_Http2PriorKnowledgeAgainstHttp11Server_FailsWithExit55WhetherOrNotItResets(bool resetsAfterReply)
+    public async Task ExecuteAsync_Http2PriorKnowledgeAgainstHttp11Server_FailsWithExit16WhetherOrNotItResets(bool resetsAfterReply)
     {
         byte[] reply = Encoding.Latin1.GetBytes("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         ScriptedConnection connection = resetsAfterReply
@@ -241,8 +241,8 @@ public sealed partial class HttpProtocolHandlerTests
             .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
 
         WriteResult(result);
-        Diagnostics.Assert("exit code", CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
+        Diagnostics.Assert("exit code", CurlExitCode.Http2, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
         Diagnostics.Assert("error message", HttpTransferMessages.Http2SettingsExpected, result.ErrorMessage);
         Assert.AreEqual("Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.", result.ErrorMessage);
     }
