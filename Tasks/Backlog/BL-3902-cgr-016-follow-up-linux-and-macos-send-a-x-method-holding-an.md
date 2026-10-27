@@ -1,5 +1,5 @@
 ---
-id: BL-3894
+id: BL-3902
 title: CGR-016 follow-up: Linux and macOS send a -X method holding an invalid UTF-8 byte as that byte
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3894 — CGR-016 follow-up: Linux and macOS send a -X method holding an invalid UTF-8 byte as that byte
+# BL-3902 — CGR-016 follow-up: Linux and macOS send a -X method holding an invalid UTF-8 byte as that byte
 
 ## Goal
 

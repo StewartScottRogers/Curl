@@ -1,5 +1,5 @@
 ---
-id: BL-3895
+id: BL-3903
 title: CGR-016 follow-up: Linux and macOS send a config file's cookie string bytes once, not UTF-8-encoded twice
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3895 — CGR-016 follow-up: Linux and macOS send a config file's cookie string bytes once, not UTF-8-encoded twice
+# BL-3903 — CGR-016 follow-up: Linux and macOS send a config file's cookie string bytes once, not UTF-8-encoded twice
 
 ## Goal
 
