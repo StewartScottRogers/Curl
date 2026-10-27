@@ -1,6 +1,6 @@
 namespace Curl.Conformance;
 
-/// <summary>The features on Curl's <c>curl -V</c> <c>Features:</c> line that every platform has, plus <c>ECH</c> (ADR-0520).</summary>
+/// <summary>The features on Curl's <c>curl -V</c> <c>Features:</c> line that every platform has, plus <c>ECH</c> (ADR-0520); <c>HTTPSRR</c> is Linux and macOS only (ADR-0849).</summary>
 internal static class UpstreamCurlVersionLineFeatures
 {
     public static readonly string[] Names =
@@ -12,7 +12,6 @@ internal static class UpstreamCurlVersionLineFeatures
         "GSS-API",
         "HSTS",
         "HTTPS-proxy",
-        "HTTPSRR",
         "IDN",
         "IPv6",
         "Kerberos",

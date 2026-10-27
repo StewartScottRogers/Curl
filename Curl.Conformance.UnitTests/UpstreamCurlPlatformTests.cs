@@ -10,7 +10,7 @@ public sealed partial class UpstreamCurlPlatformTests
     [
         "dict", "file", "ftp", "gopher", "gophers", "http", "https", "imap", "ipfs", "mqtt", "mqtts", "pop3", "scp", "sftp", "smtp", "telnet", "tftp", "ws", "wss",
         "alt-svc", "AsynchDNS", "brotli", "ECH", "GSS-API", "HSTS", "HTTPS-proxy",
-        "HTTPSRR", "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
+        "IDN", "IPv6", "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL",
         "UnixSockets", "zstd",
         "crypto", "cookies", "proxy", "Mime", "manual", "DoH", "digest", "aws", "netrc", "verbose-strings",
         "large-time", "large-size", "sha512-256", "SSLpinning",
@@ -46,7 +46,7 @@ public sealed partial class UpstreamCurlPlatformTests
 
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        bool featuresMatch = platform.Features.IsSupersetOf([.. CommonFeatures, "OpenSSL", "SSLS-EXPORT", "xattr"]);
+        bool featuresMatch = platform.Features.IsSupersetOf([.. CommonFeatures, "OpenSSL", "SSLS-EXPORT", "xattr", "HTTPSRR"]);
         diagnostics.Act("feature count", platform.Features.Count);
         diagnostics.Act("null device", platform.NullDevice);
         diagnostics.Assert("features include common + OpenSSL + xattr", true, featuresMatch);

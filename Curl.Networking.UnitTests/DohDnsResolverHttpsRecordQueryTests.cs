@@ -118,7 +118,7 @@ public sealed class DohDnsResolverHttpsRecordQueryTests
     public async Task ConnectAsync_ToADirectHttpsOrigin_AsksTheResolverForTheHttpsOriginWithItsPort()
     {
         var resolver = new RecordingHttpsOriginResolver();
-        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider());
+        var connector = new TcpConnector(resolver, new FakeTcpDialer(), new FakeTlsProvider(), new ManualTimeProvider()) { AsksHttpsRecords = true };
         Diagnostics.Arrange("target", $"https://foo.example.com:{OriginPort}/");
 
         _ = await connector.ConnectAsync(new ConnectTarget("foo.example.com", OriginPort, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
