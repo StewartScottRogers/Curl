@@ -5,7 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-111 (BL-3640, ADR-0835): the OpenSSL build reads a <c>--capath</c> or <c>SSL_CERT_DIR</c>
+/// CGR-111 (BL-3640, ADR-0836): the OpenSSL build reads a <c>--capath</c> or <c>SSL_CERT_DIR</c>
 /// directory as OpenSSL's hashed directory lookup does, trusting only the certificates in files
 /// named <c>&lt;subject hash&gt;.&lt;n&gt;</c> (as <c>openssl rehash</c> names them), so a
 /// certificate copied in under any other name is not trusted (exit 60 with

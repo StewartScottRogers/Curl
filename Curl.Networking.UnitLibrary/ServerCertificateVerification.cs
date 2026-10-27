@@ -554,7 +554,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         return certificates;
     }
 
-    // OpenSSL's hashed directory lookup (by_dir.c, ADR-0835) opens only files named
+    // OpenSSL's hashed directory lookup (by_dir.c, ADR-0836) opens only files named
     // <subject hash>.<n>, as c_rehash and openssl rehash name them; any other file adds nothing
     // (CGR-111).
     private static IEnumerable<string> SubjectHashesNamedIn(string directory) =>

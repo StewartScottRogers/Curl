@@ -96,7 +96,7 @@ certificate that is only out of date is exit 35 with `SEC_E_CERT_EXPIRED`. Per A
 build the platform usually runs, the Schannel build on Windows and the OpenSSL build
 elsewhere; its internal constructor names the build so tests pin both on any platform.
 The builds differ in message text, in which `--cacert` files are exit 77, and in `--capath`
-(`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts the certificates of its `<subject hash>.<n>` files, as OpenSSL's hashed directory lookup reads them (`OpenSslSubjectNameHash`, ADR-0835, CGR-111), the
+(`TlsClientOptions.CaCertificateDirectory`): the OpenSSL build trusts the certificates of its `<subject hash>.<n>` files, as OpenSSL's hashed directory lookup reads them (`OpenSslSubjectNameHash`, ADR-0836, CGR-111), the
 Schannel build ignores it and reports its one warning, unwrapped, in `SslStreamTlsProvider.Warnings`
 for the console to print wrapped at the terminal width (two lines at curl's default 79 columns). With `--cert` (`TlsClientOptions.ClientCertificate`, split into
 file and passphrase by `ClientCertificateArgument` as curl splits it) it presents a client

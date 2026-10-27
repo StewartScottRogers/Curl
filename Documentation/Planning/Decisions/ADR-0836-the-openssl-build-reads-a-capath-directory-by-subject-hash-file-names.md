@@ -1,4 +1,4 @@
-# ADR-0835: The OpenSSL build reads a --capath directory by subject hash file names
+# ADR-0836: The OpenSSL build reads a --capath directory by subject hash file names
 
 - Status: Accepted
 - Date: 2026-10-26

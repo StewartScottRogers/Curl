@@ -11,7 +11,7 @@ namespace Curl.Networking;
 /// OpenSSL's subject name hash (<c>X509_NAME_hash</c>, <c>openssl x509 -hash</c>): the first four
 /// bytes of the SHA-1 of the name's canonical encoding, read little-endian, as eight lowercase hex
 /// digits. It names the files of a hashed CA directory (<c>--capath</c>, <c>SSL_CERT_DIR</c>) that
-/// the OpenSSL build reads (ADR-0835, CGR-111).
+/// the OpenSSL build reads (ADR-0836, CGR-111).
 /// </summary>
 internal static class OpenSslSubjectNameHash
 {
