@@ -2,9 +2,10 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Pins CGR-016 part 2 (BL-3850): curl 8.18.0 on Linux sends <c>-H $'X-A: \xff'</c>, <c>-b $'a=\xff'</c>
-/// and <c>-X $'G\xffT'</c> with the byte FF unchanged. A <c>-b</c> cookie string and a <c>-X</c> method go
-/// out one character per byte, so the parse gives each <see cref="InvalidUtf8ByteEscape"/> surrogate as
-/// its byte's character; a <c>-H</c> value keeps the surrogate, which the request head gives as its byte.
+/// and <c>-X $'G\xffT'</c> with the byte FF unchanged. A <c>-X</c> method goes out one character per byte, so
+/// the parse gives each <see cref="InvalidUtf8ByteEscape"/> surrogate as its byte's character; a <c>-H</c>
+/// value keeps the surrogate, which the request head gives as its byte, and so does a <c>-b</c> cookie
+/// string, which the console's cookie string encoding gives as its byte (BL-3545).
 /// </summary>
 [TestClass]
 public sealed class Cgr016HeaderCookieTests
@@ -14,11 +15,11 @@ public sealed class Cgr016HeaderCookieTests
     private static readonly string EscapedFF = InvalidUtf8ByteEscape.Decode([0xFF]);
 
     [TestMethod]
-    public void Parse_CookieOfInvalidByte_SendsTheByte()
+    public void Parse_CookieOfInvalidByte_KeepsTheEscapeForTheCookieStringEncoding()
     {
         CommandLineOptions options = Parse(["-b", "a=" + EscapedFF, Url]);
 
-        Assert.AreEqual("a=ÿ", options.Cookies[0].Value);
+        Assert.AreEqual("a=\uDCFF", options.Cookies[0].Value);
     }
 
     [TestMethod]
@@ -58,11 +59,11 @@ public sealed class Cgr016HeaderCookieTests
     }
 
     [TestMethod]
-    public void Parse_CookieStartingWithInvalidByte_SendsTheByte()
+    public void Parse_CookieStartingWithInvalidByte_KeepsTheEscape()
     {
         CommandLineOptions options = Parse(["-b", EscapedFF + "=1", Url]);
 
-        Assert.AreEqual("ÿ=1", options.Cookies[0].Value);
+        Assert.AreEqual("\uDCFF=1", options.Cookies[0].Value);
     }
 
     private static CommandLineOptions Parse(string[] arguments)

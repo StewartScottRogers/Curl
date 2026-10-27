@@ -500,6 +500,17 @@ internal static class CurlComposition
         runsOnWindows ? WriteOutTimeDialect.WindowsCRuntime : WriteOutTimeDialect.Glibc;
 
     /// <summary>
+    /// The encoding the <c>-b name=value</c> strings reach curl's <c>argv</c> in, whose bytes go out as they are: the
+    /// ANSI code page on Windows (<c>CredentialEncoding.ForPlatform</c>), and off Windows UTF-8 that gives each
+    /// <see cref="InvalidUtf8ByteEscape" /> surrogate back as its byte, so <c>-b $'a=\xff'</c> sends <c>a=\xff</c>
+    /// as curl 8.18.0 does on Linux (CGR-016) and <c>-b c=中</c> still sends its UTF-8 bytes (CGR-065).
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
+    /// <returns>The encoding for <see cref="CookieEngine.FromHttpOptions(EasyHttpOptions, CookieStore, Encoding?)" />.</returns>
+    internal static Encoding CookieStringEncodingFor(bool runsOnWindows) =>
+        runsOnWindows ? CredentialEncoding.ForPlatform(true) : InvalidUtf8ByteEscape.Encoding;
+
+    /// <summary>
     /// Wraps a dispatch factory so every <c>-:</c> / <c>--next</c> option group of one run gets its own
     /// <see cref="CookieEngine" /> over the one <see cref="CookieStore" /> the run shares, as curl 8.21.0
     /// shares its cookie list between groups (measured 2026-09-28, BL-509 Notes).
@@ -510,7 +521,7 @@ internal static class CurlComposition
         Func<CommandLineOptions, CookieEngine?, TransferDispatch> createTransferDispatch)
     {
         CookieStore runCookies = new();
-        Encoding cookieStringEncoding = CredentialEncoding.ForPlatform(OperatingSystem.IsWindows());
+        Encoding cookieStringEncoding = CookieStringEncodingFor(OperatingSystem.IsWindows());
         return options => createTransferDispatch(options, CookieEngine.FromHttpOptions(EasyOptionsFromCommandLine.HttpOf(options), runCookies, cookieStringEncoding));
     }
 

@@ -295,7 +295,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
-        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') ? AsRawWireText(options, cookie) : cookie))),
+        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') && options.ReadingConfigFile ? AsRawWireText(options, cookie) : cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
         CommandLineOption.NegatableFlag("follow", null, SetFollow),
@@ -1030,7 +1030,8 @@ public static partial class CommandLineOptionTable
     /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise with each
     /// byte of an argument that was not valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>) given as that
     /// byte's one character, so <c>-b $'a=\xff'</c> sends the byte FF as curl 8.18.0 does on Linux
-    /// (CGR-016, BL-3850), and every other character unchanged.
+    /// (CGR-016, BL-3850), and every other character unchanged. A command-line <c>-b</c> string is not passed here:
+    /// it keeps the escape, which the console's cookie string encoding gives back as its byte (BL-3545).
     /// </summary>
     private static string AsRawWireText(CommandLineOptions options, string value) =>
         options.ReadingConfigFile
