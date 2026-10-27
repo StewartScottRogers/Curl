@@ -1,4 +1,4 @@
-# ADR-0857: `curl_easy_perform` of a handle in a multi handle answers `CURLE_FAILED_INIT`
+# ADR-0858: `curl_easy_perform` of a handle in a multi handle answers `CURLE_FAILED_INIT`
 
 - **Status:** Accepted
 - **Date:** 2026-10-26
