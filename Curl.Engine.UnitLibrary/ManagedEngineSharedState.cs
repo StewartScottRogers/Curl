@@ -104,18 +104,19 @@ internal sealed class ManagedEngineSharedState
     private readonly bool learnsHstsOverHttp;
 
     /// <summary>
-    /// Creates a state with the engine's clock, numbering, multi owners, performer and resolved names and caches of its own,
-    /// all empty: what a library easy handle (<c>curl_easy_init</c>, <c>curl_easy_duphandle</c>) or a multi handle runs over,
-    /// as upstream gives each its own connection pool, TLS sessions, cookies and HSTS (BL-3204). The resolved names stay
-    /// this state's, so a handle finds a name another handle's <c>CURLOPT_RESOLVE</c> added, as libcurl 8.22.0's do
-    /// (upstream test1512, ADR-0789). The engine keeps the new pool, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
+    /// Creates a state with the engine's clock, numbering, multi owners and performer and caches of its own, all empty:
+    /// what a library easy handle (<c>curl_easy_init</c>, <c>curl_easy_duphandle</c>) or a multi handle runs over, as upstream
+    /// gives each its own connection pool, TLS sessions, resolved names, cookies and HSTS (BL-3204). The resolved names are
+    /// the handle's own, as libcurl 8.22.0's <c>dnscache_get</c> takes the share's or the handle's multi's, so a new handle
+    /// looks a name up again and calls its <c>CURLOPT_RESOLVER_START_FUNCTION</c> (CGR-151, ADR-0847). The engine keeps the
+    /// new pool, which its <c>DisposeAsync</c> closes (<see cref="OwnConnectionCaches" />).
     /// </summary>
     /// <returns>The new state.</returns>
     internal ManagedEngineSharedState WithOwnCaches()
     {
         ConnectionCache connections = new(TimeProvider);
         OwnConnectionCaches.Add(connections, connections);
-        return new(this, connections, new TlsSessionCache(TimeProvider), DnsCache, new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp));
+        return new(this, connections, new TlsSessionCache(TimeProvider), new DnsCache(), new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp));
     }
 
     /// <summary>
