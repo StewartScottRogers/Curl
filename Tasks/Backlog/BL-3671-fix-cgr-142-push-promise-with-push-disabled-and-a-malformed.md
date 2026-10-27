@@ -4,8 +4,8 @@ title: Fix CGR-142: PUSH_PROMISE (with push disabled) and a malformed or missing
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Http2.UnitLibrary/Http2Connection.cs, Curl.Http2.UnitTests/Cgr142Tests.cs, Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitTests/Cgr142Tests.cs]
+depends-on: [BL-3667, BL-3910]
+touches: [Curl.Http2.UnitLibrary/Http2Connection.cs, Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs, Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Curl.Http2.UnitTests/Cgr142Tests.cs, Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitTests/Cgr142Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -74,7 +74,12 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr142Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 9, first pass before any edit): all three exit codes are chosen in `Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs`. Its `FailureOf` maps `Http2ProtocolException` (thrown by `Http2Connection.ReceivePushPromise` when push is disabled) to exit 16 "nghttp2 shuts down connection", and `ResetMalformedAsync` (reached from `Http2ResponseHead.StatusOf` returning null) sends RST_STREAM and gives exit 92 "not closed cleanly". The fix: a push-disabled PUSH_PROMISE gives exit 92 with the "[HTTP2] [1] received invalid frame: FRAME[PUSH_PROMISE, len=N, hend=1], error -505: Protocol error" text; a :status that is present but not three digits gives exit 16 "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [:status], value: [2x0]"; a missing :status sends GOAWAY PROTOCOL_ERROR and gives exit 8 "nghttp2 shuts down connection with error 1: PROTOCOL_ERROR". `StatusOf` must then tell "missing" from "invalid". New message text goes in `HttpTransferMessages.cs`. Added `Http2StreamConnection.cs` and `HttpTransferMessages.cs` to touches for that.
+- `Http2StreamConnection.cs` is held by BL-3667 (in Doing on work/dark-factory), so `depends-on` names BL-3667.
+- Measuring real curl needs an HTTP/2 server that sends PUSH_PROMISE, a bad :status, or no :status. `Record-CurlExchange.ps1 -Http2Origin` cannot yet do that, and the local curl 8.22.0 is a Schannel build with no nghttp2. Filed BL-3910 to extend the script and record curl.se's nghttp2 build of 8.22.0 (see BL-658 Notes); this task depends on it and pins text from its Notes.
+
 ## Log
 
 - 2026-10-26: Created from CGR-142 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits for BL-3667 (holds Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs) and BL-3910 (Record-CurlExchange HTTP/2 push and :status scenarios to measure curl)
