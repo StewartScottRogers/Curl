@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/DohDnsResolver.RequestEncoding.cs, Curl.Networking.UnitTests/Cgr156Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3685 — Fix CGR-156: User name and password in the --doh-url are not sent (no Authorization: Basic on DoH requests)
 
@@ -60,17 +60,21 @@ curl -sS --doh-url http://u:p@127.0.0.1:21800/dns-query http://foo.test:21802/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr156Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 7): measured with `Record-CurlExchange.ps1 -Port 21800 -Connections 2 -Response 'HTTP/1.1 500 x...'` and `-sS --doh-url http://u%41:p%3a@127.0.0.1:21800/dns-query http://foo.test:21802/x` (a 500 DoH reply; the plain-HTTP repro, since the request bytes are the point). REF (curl 8.21.0 Schannel): exit 6, stdout empty, stderr `curl: (6) Could not resolve host: foo.test`, both POSTs `Host: 127.0.0.1:21800` then `Authorization: Basic dUE6cDo=` then `Accept`/`Content-Type`/`Content-Length`. PORT before the fix: no Authorization line. PORT after: the same exit, stdout, stderr, no files, and each POST byte for byte the same (the recorder read A and AAAA in the other order, which is which parallel connection arrived first, not a request difference). Further REF rows: `u@` -> `Basic dTo=`, `:p@` -> `Basic OnA=`, `:@` -> none. Decision in ADR-0849 (0845-0848 were taken).
+- Fix: `DohDnsResolver.BasicAuthorizationLine` in `DohDnsResolver.RequestEncoding.cs`; `Cgr156Tests` pins the resolver's POSTs and each measured row (the resolver test fails without the fix: no Authorization line). A URL without user information sends no line, as before (`DohDnsResolverTests.ResolveAsync_ThePostsCurlSent_AreWrittenByteForByte` still passes).
+- Build clean, fast tests green on Windows; the change is pure string code, platform-neutral, so CI on Linux and macOS is covered by that. `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-156 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. A user name or password in --doh-url sends Authorization: Basic on each DoH POST, as curl does
