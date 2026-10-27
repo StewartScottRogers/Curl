@@ -1,4 +1,4 @@
-# ADR-0853 — `curl_multi_perform` never calls the socket callback, and a multi handle a callback killed calls no callback again
+# ADR-0863 — `curl_multi_perform` never calls the socket callback, and a multi handle a callback killed calls no callback again
 
 - Status: Accepted
 - Date: 2026-10-26
