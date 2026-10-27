@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/CertificateStatusFailureMessages.cs, Curl.Networking.UnitLibrary/CertificateStatusText.cs, Curl.Networking.UnitTests/Cgr167Tests.cs]
+touches: [Curl.Networking.UnitLibrary/CertificateStatusFailureMessages.cs, Curl.Networking.UnitLibrary/CertificateStatusText.cs, Curl.Networking.UnitTests/Cgr167Tests.cs, Curl.Networking.UnitLibrary/HandBuiltCertificateVerifier.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.CertificateStatus.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3696 — Fix CGR-167: Linux: --cert-status with -k reports the OCSP outcome, and accepts a good staple, where curl fails with "OCSP response verification failed"
 
@@ -60,17 +60,29 @@ curl -sS -k --cert-status https://localhost:<p>/index.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr167Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Touches widened (no task in Doing on origin/work/dark-factory names these files): the fix lives in `HandBuiltCertificateVerifier.cs` (refuses the staple) and `HandBuiltTlsProvider.cs` (hands it the clock under `-k` with `--cert-status`); `HandBuiltTlsProviderTests.CertificateStatus.cs` ran its good, revoked and unknown staples under `-k`, which now fail as curl does, so those cases trust the test CA through `--cacert` (with `--ssl-no-revoke`) and a new case pins `-k` with a good staple at exit 91. The two listed message files needed no change.
+- Decision (ADR-0859): under `-k` curl loads no trust store, so `OCSP_basic_verify` trusts no responder. Every staple outcome except no response, malformed or unsuccessful becomes exit 91 `OCSP response verification failed`, decided in the verifier before `Curl.Tls`' status check (so no `SSL certificate status:` `-v` line, as curl stops before it). A refused certificate or pin keeps its own failure (sensible default; that combination was not measured).
+- Measured in WSL (Ubuntu, curl 8.18.0 OpenSSL 3.5.5; no 8.22.0 OpenSSL build to hand) against `openssl s_server -accept <p> -cert <leaf> -key srv.key -cert_chain rca.crt -WWW -status_file <staple>` with a hand-made PKI (root `rca`, leaves serial 0B good and 0C revoked keyCompromise, staples from `openssl ocsp -index`); command `curl -sS <opts> --cert-status https://localhost:<p>/index.txt`. REF and PORT (Curl published linux-x64, run in WSL) after the fix:
+  - good staple: `-k` 91 `OCSP response verification failed` both; `--cacert rca.crt` 0 `hello rev` both; `-k --cacert` 91 verification failed both. Before the fix PORT `-k` gave exit 0 `hello rev`.
+  - revoked staple: `-k` 91 verification failed both; `--cacert` 91 `SSL certificate revocation reason: keyCompromise (1)` both; `-k --cacert` 91 verification failed both.
+  - staple of another certificate: `-k` 91 verification failed both; `--cacert` 91 `Could not find certificate ID in OCSP response` both; `-k --cacert` 91 verification failed both.
+  - server sends no issuer: `-k` 91 verification failed both; `--cacert` REF 91 `Error computing OCSP ID`, PORT 91 `Error finding issuer certificate`, outside CGR-167 and filed as BL-3916.
+  - stdout empty on every failure for both; nothing written; no HTTP request reaches the wire on a failure, since the TLS handshake fails before it.
+- On Windows Curl ignores `--cert-status` as curl 8.22.0 Schannel does (ADR-0795), so the change reaches only the OpenSSL build. The tests run both builds' providers in-memory with no platform-specific paths or text, so they are platform-neutral; CI on Linux and macOS is left to the shift's watch.
+- Focused tests: `Cgr167Tests` (7 verifier cases) and `HandBuiltTlsProviderTests.AuthenticateAsClientAsync_WithCertStatusUnderInsecureAndAGoodStapledResponse_FailsWithExit91VerificationFailed`; before the fix the verifier accepted every staple and the provider connected (exit 0). Full fast run green; `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary`: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-167 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Linux --cert-status under -k fails every readable staple with exit 91 OCSP response verification failed, as curl
