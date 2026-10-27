@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3849, BL-3850, BL-3851, BL-3852, BL-3853]
-touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitTests/Cgr016Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr016Tests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitTests/Cgr016Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr016Tests.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3545 — Fix CGR-016: Linux: invalid UTF-8 bytes in arguments are replaced with U+FFFD before use
 
@@ -59,10 +59,10 @@ curl -s -d $'\xff' URL
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -71,9 +71,25 @@ curl -s -d $'\xff' URL
 
 - Split for size (2026-10-26, lane 8, before any code): the fix needs Linux and macOS to read argv as raw bytes and then five separate byte paths changed (request body, headers and cookies, URL, `-w` output, `-o` file names, the last needing a libc `open` P/Invoke since .NET cannot name a file with an invalid UTF-8 byte). Filed BL-3849 (raw argv with a lossless surrogate-escape decoding, plus `-d` and `--data-urlencode`), BL-3850 (`-H`, `-b`), BL-3851 (URL), BL-3852 (`-w`) and BL-3853 (`-o`); BL-3850 to BL-3853 depend on BL-3849. Once they are Done this task only re-measures every repro against curl 8.18.0 in WSL, records both results here, and adds the `Cgr016Tests.cs` checks its touches name.
 
+- Re-measured 2026-10-26 (lane 6) in WSL Ubuntu: REF is curl 8.18.0 (OpenSSL), PORT a linux-x64 build of this commit (`dotnet publish Curl.Console -c Release -r linux-x64 --self-contained -p:PublishAot=false`). Each command ran from an empty directory against `nc -N -l 127.0.0.1 <port>` replying `200`, `Content-Length: 5`, `hello`; the script compared exit code, stdout, stderr, the files written and the request bytes (Host and User-Agent lines normalised, as section 1 of the report does). Ubuntu's Rust `timeout` refuses invalid UTF-8 arguments, so the binaries ran unwrapped. Results, REF and PORT identical on every one, exit 0, stderr empty:
+  - `curl -s -d $'\xff' URL`: `Content-Length: 1`, body FF; stdout `hello`.
+  - `-H $'X-A: \xff'`: `X-A: ` FF.
+  - `$'http://127.0.0.1:<port>/\xff'`: `GET /%FF HTTP/1.1`.
+  - `-o $'\xff.txt'`: file name `ff 2e 74 78 74`, contents `hello`, stdout empty.
+  - `-o /dev/null -w $'\xfe'`: stdout the one byte FE.
+  - `--data-urlencode $'\xff'`: `Content-Length: 3`, body `%FF`.
+  - `-b $'a=\xff'`: `Cookie: a=` FF. Before this run PORT sent `a=` C3 BF: BL-3850 turned the escape U+DCFF into U+00FF in the parse, and the console's cookie engine then encoded the string as UTF-8 (CGR-065's platform encoding), so the byte was encoded twice.
+  - Variants that already matched still match: `-d $'\xc3\xa9' -H $'X-B: \xc3\xa9'` (C3 A9 in both), and `-b $'a=\xff' -b $'c=\xc3\xa9'` gives `Cookie: a=` FF `; c=` C3 A9 in both.
+- Fix: a command-line `-b` string now keeps the escape (`CommandLineOptionTable`, only a config-file value still goes through `AsRawWireText`), and `CurlComposition.CookieStringEncodingFor` gives the cookie engine `InvalidUtf8ByteEscape.Encoding` off Windows (identical to UTF-8 for valid text, the escape back to its byte) and the ANSI code page on Windows as before. Decision (sensible default, no new ADR): this applies ADR-0821's escape to the cookie string encoding and decides nothing new. Windows argv is never escaped, so Windows is unchanged.
+- Tests: `Curl.Console.UnitTests/Cgr016Tests.cs` pins the encoding (FF back as FF, valid text as UTF-8, Windows the ANSI code page; it does not compile before the change), and `Cgr016HeaderCookieTests`' two invalid-byte cookie tests now expect the escape kept (they fail against the old parse). `Curl.Cli.UnitTests/Cgr016Tests.cs` covers the `-X` escape branches the cookie tests used to reach. Tests are platform-neutral (strings and byte arrays only).
+- Added to touches: `Curl.Cli.UnitLibrary/CommandLineOptionTable.cs` and `Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs` (the `-b` parse lives there); no task in Doing on origin/work/dark-factory names them.
+- Found outside this issue's repros, filed: BL-3894 (`-X $'G\xffT'` sends `G` C3 BF `T`, curl sends `G` FF `T`) and BL-3895 (a config file's `cookie = "c=é"` sends C3 83 C2 A9 on Linux, curl C3 A9; it was like that before this run).
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary,Curl.Console` flagged one branch of `IsEscapedByte` (only the cookie tests reached it); after `Cgr016Tests` covered it, `-Library Curl.Cli.UnitLibrary` reports 100% line, 100% branch, 0 failing members; Curl.Console 100/100, 0 failing. `dotnet build` clean; fast tests 46 test projects passed, 0 failed (Curl.Cli.UnitTests 4376, Curl.Console.UnitTests 2934 before the two `-X` tests were added). CI on Linux and macOS: the change and tests are platform-neutral.
+
 ## Log
 
 - 2026-10-26: Created from CGR-016 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Split for size: waits on BL-3849, BL-3850, BL-3851, BL-3852 and BL-3853 (raw argv bytes on Linux and macOS, then body, headers and cookies, URL, -w and -o paths)
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Every CGR-016 repro (-d, -H, URL, -o, -w, --data-urlencode, -b) sends and writes the raw bytes curl 8.18.0 does on Linux
