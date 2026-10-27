@@ -1,5 +1,5 @@
 ---
-id: BL-3913
+id: BL-3914
 title: Decide and match the Linux build's HTTPS-RR DoH query and HTTPSRR feature (CGR-157 Linux half)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3913 — Decide and match the Linux build's HTTPS-RR DoH query and HTTPSRR feature (CGR-157 Linux half)
+# BL-3914 — Decide and match the Linux build's HTTPS-RR DoH query and HTTPSRR feature (CGR-157 Linux half)
 
 ## Goal
 
