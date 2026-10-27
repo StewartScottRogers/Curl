@@ -1,4 +1,4 @@
-# ADR-0843 — HTTP/2 responses whose length does not add up shut the connection down
+# ADR-0847 — HTTP/2 responses whose length does not add up shut the connection down
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

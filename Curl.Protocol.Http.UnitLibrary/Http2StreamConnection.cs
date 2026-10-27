@@ -24,7 +24,7 @@ namespace Curl.Protocol.Http;
 /// head is exit 16, and part way through the body exit 18. A response whose length does not add
 /// up (RFC 9113 section 8.1.1: DATA past or short of its <c>content-length</c>, a body on HEAD, 204
 /// or 304, a 1xx head ending the stream, an invalid or second <c>content-length</c>) makes this
-/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0843). Failed reads and writes of the
+/// client send GOAWAY PROTOCOL_ERROR, and is exit 16 (ADR-0847). Failed reads and writes of the
 /// connection itself pass through as <see cref="IOException" />.
 /// </remarks>
 /// <param name="session">The connection's HTTP/2 session.</param>
