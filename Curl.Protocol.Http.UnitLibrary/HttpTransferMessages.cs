@@ -143,6 +143,16 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"HTTP/2 stream {streamId} was not closed cleanly: {Http2ErrorName(errorCode)} (err {(uint)errorCode})");
 
     /// <summary>
+    /// Formats the exit 92 message for an HTTP/2 stream the peer reset with NO_ERROR before the
+    /// final response head, with the two spaces curl 8.18.0 prints after <c>getting</c>
+    /// (measured, BL-3670 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2StreamClosedBeforeHead(int streamId) =>
+        string.Create(CultureInfo.InvariantCulture, $"HTTP/2 stream {streamId} was closed cleanly, but before getting  all response header fields, treated as error");
+
+    /// <summary>
     /// Formats the exit 16 message for an HTTP/2 connection ended by a protocol error:
     /// <c>nghttp2 shuts down connection with error 1: PROTOCOL_ERROR</c> (measured, BL-658 Notes).
     /// </summary>

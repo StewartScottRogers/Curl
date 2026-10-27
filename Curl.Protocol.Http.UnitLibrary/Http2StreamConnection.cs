@@ -363,10 +363,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     {
         if (next.Reset is { } reset)
         {
-            throw FailureOf(reset)!;
+            EndOnCleanReset(reset);
         }
-
-        if (next.Frame!.Type == Http2FrameType.Headers)
+        else if (next.Frame!.Type == Http2FrameType.Headers)
         {
             await ReceiveHeadersAsync(next.Frame, next.Fields!, cancellationToken).ConfigureAwait(false);
         }
@@ -382,11 +381,38 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         {
             await session.ReceiveAsync(this, cancellationToken).ConfigureAwait(false);
         }
+        catch (Http2StreamResetException reset)
+        {
+            EndOnCleanReset(reset);
+        }
         catch (Exception exception) when (FailureOf(exception) is { } failure)
         {
             throw failure;
         }
     }
+
+    /// <summary>
+    /// Ends the response at a RST_STREAM NO_ERROR that came after the final head, which curl
+    /// with nghttp2 takes as the body's end (CGR-141, measured, BL-3670 Notes); throws the
+    /// transfer failure for any other reset.
+    /// </summary>
+    private void EndOnCleanReset(Http2StreamResetException reset)
+    {
+        if (reset.ErrorCode != Http2ErrorCode.NoError || !isFinalHeadReceived)
+        {
+            throw FailureOf(reset)!;
+        }
+
+        isResponseEnded = true;
+    }
+
+    /// <summary>
+    /// Gives the exit 92 message for a reset: NO_ERROR, which reaches here only before the final
+    /// head, says the stream closed cleanly too early; any other code says it did not close cleanly.
+    /// </summary>
+    private static string ResetMessageOf(Http2StreamResetException reset) => reset.ErrorCode == Http2ErrorCode.NoError
+        ? HttpTransferMessages.Http2StreamClosedBeforeHead(reset.StreamId)
+        : HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode);
 
     /// <summary>
     /// Gives the transfer failure curl reports for a failure of the stream or its connection,
@@ -398,7 +424,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private HttpTransferException? FailureOf(Exception exception) => IsRefusal(exception) ? Refused() : exception switch
     {
-        Http2StreamResetException reset => new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode))
+        Http2StreamResetException reset => new(CurlExitCode.Http2Stream, ResetMessageOf(reset))
         {
             RequiresHttp11 = reset.ErrorCode == Http2ErrorCode.Http11Required,
             LeavesConnectionIntact = true,
