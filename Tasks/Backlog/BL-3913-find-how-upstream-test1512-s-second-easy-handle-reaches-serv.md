@@ -1,5 +1,5 @@
 ---
-id: BL-3910
+id: BL-3913
 title: Find how upstream test1512's second easy handle reaches server.example.curl under libcurl 8.22.0's per-handle DNS cache
 priority: Normal
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3910 — Find how upstream test1512's second easy handle reaches server.example.curl under libcurl 8.22.0's per-handle DNS cache
+# BL-3913 — Find how upstream test1512's second easy handle reaches server.example.curl under libcurl 8.22.0's per-handle DNS cache
 
 ## Goal
 

@@ -29,10 +29,10 @@ gives each easy handle a multi of its own (`data->multi_easy`, `lib/easy.c`).
 - Upstream test1512 comes off `PassingUpstreamCases.txt`: in the harness its second handle no longer
   finds the first handle's `CURLOPT_RESOLVE` entry. The measured libcurl behaviour and libcurl's own
   source win over a case whose pass in upstream's suite this lane could not explain without
-  building `lib1512` against real libcurl; BL-3910 checks that.
+  building `lib1512` against real libcurl; BL-3913 checks that.
 
 ## Consequences
 
 - A new handle's resolver-start callback runs for every name it has not looked up itself, and
   `CURLMOPT_NETWORK_CHANGED`'s `ClearDns` empties only that multi handle's names.
-- test1512 shows `Inconclusive` until BL-3910 says how upstream's run of it reaches the second host.
+- test1512 shows `Inconclusive` until BL-3913 says how upstream's run of it reaches the second host.
