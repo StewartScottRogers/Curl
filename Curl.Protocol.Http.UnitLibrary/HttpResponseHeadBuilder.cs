@@ -70,8 +70,7 @@ internal sealed class HttpResponseHeadBuilder
     /// </summary>
     /// <param name="line">A non-empty line after the status line.</param>
     /// <exception cref="HttpTransferException">
-    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon once any
-    /// leading blanks of a line with no header to fold into are dropped (exit 8,
+    /// The line holds a NUL byte (exit 8, <c>Nul byte in header</c>); or has no colon (exit 8,
     /// <c>Header without colon</c>); or is a
     /// second <c>Location</c> header that differs from the first (exit 8,
     /// <c>Multiple Location headers</c>); or the heads grew past <see cref="MaximumHeadSize" />
@@ -87,7 +86,7 @@ internal sealed class HttpResponseHeadBuilder
         }
 
         CommitPendingHeader();
-        string content = line.Content.TrimStart([' ', '\t']);
+        string content = line.Content;
         if (!content.Contains(':', StringComparison.Ordinal))
         {
             throw HeaderWithoutColon();
@@ -151,8 +150,9 @@ internal sealed class HttpResponseHeadBuilder
     /// <summary>
     /// Determines whether a header line folds into the header before it: it is a continuation
     /// line and a header of the current head is pending. A continuation line with no header
-    /// before it is a header of its own, its leading blanks dropped, as curl 8.21.0's
-    /// <c>Curl_headers_push</c> takes it rather than failing (measured, upstream test1473, BL-1805).
+    /// before it is a header of its own, as curl 8.21.0's <c>Curl_headers_push</c> takes it
+    /// rather than failing (measured, upstream test1473, BL-1805): its name loses the leading
+    /// blanks, but the line is written as received (CGR-118, BL-3647).
     /// </summary>
     /// <param name="line">A non-empty line after the status line.</param>
     /// <returns><see langword="true" /> when the line folds into the pending header.</returns>
@@ -213,7 +213,7 @@ internal sealed class HttpResponseHeadBuilder
     private HttpResponseHeader ToHeader(string header)
     {
         int colon = header.IndexOf(':', StringComparison.Ordinal);
-        return new HttpResponseHeader(header[..colon], header[(colon + 1)..].Trim(' ', '\t')) { LineStart = headText.Length };
+        return new HttpResponseHeader(header[..colon].TrimStart(' ', '\t'), header[(colon + 1)..].Trim(' ', '\t')) { LineStart = headText.Length };
     }
 
     private void Append(string content, string terminator)
