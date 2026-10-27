@@ -22,9 +22,13 @@ namespace Curl.Cli;
 /// <c>curl: unrecognized protocol '&lt;name&gt;'</c>, then <c>is badly used here</c> and the try-help line, and
 /// exit 2 sending nothing, for <c>--proto-redir</c> too; <c>++http</c> repeats <c>+http</c>, <c>+</c> and
 /// <c>=,http</c> repeat <c>''</c>, and a long name is cut to 31 characters; <c>-s</c> drops the first line and
-/// <c>-sS</c> keeps it; <c>HTTP</c> is taken. curl 8.21.0 only warned and went on (BL-522). <c>smb</c> and
-/// <c>smbs</c> are known all the same, as the Linux (OpenSSL) build knows them, since Curl serves both
-/// (BL-598, BL-1099).
+/// <c>-sS</c> keeps it; <c>HTTP</c> is taken. curl 8.21.0 only warned and went on (BL-522).
+/// </para>
+/// <para>
+/// <c>smb</c> and <c>smbs</c> are unrecognized here on every platform, as neither reference build of curl
+/// 8.22.0 has SMB: measured on Windows on 2026-10-26, <c>--proto =smb -sS smb://127.0.0.1:20002/share/x</c>
+/// exits 2 with <c>curl: unrecognized protocol 'smb'</c> and sends nothing (CGR-043, BL-3888, ADR-0835).
+/// <see cref="KnownScheme"/>, which <c>--proto-default</c> reads, still knows them.
 /// </para>
 /// </remarks>
 internal static class CommandLineProtocolSet
@@ -46,6 +50,13 @@ internal static class CommandLineProtocolSet
         "wss");
 
     /// <summary>
+    /// The schemes <c>--proto</c> and <c>--proto-redir</c> know: <see cref="KnownSchemes"/> less <c>smb</c> and
+    /// <c>smbs</c>, which curl 8.22.0 refuses there as unrecognized (BL-3888).
+    /// </summary>
+    private static FrozenSet<string> ProtoSchemes { get; } =
+        KnownSchemes.Except(["smb", "smbs"], StringComparer.OrdinalIgnoreCase).ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Reads a <c>--proto</c> or <c>--proto-redir</c> value into the schemes it allows, stopping at the first
     /// name curl does not know.
     /// </summary>
@@ -59,7 +70,7 @@ internal static class CommandLineProtocolSet
     /// </returns>
     internal static FrozenSet<string>? Read(string value, out string? unrecognizedName)
     {
-        HashSet<string> allowed = new(KnownSchemes, StringComparer.Ordinal);
+        HashSet<string> allowed = new(ProtoSchemes, StringComparer.Ordinal);
         unrecognizedName = null;
         foreach (string item in value.Split(','))
         {
@@ -95,8 +106,7 @@ internal static class CommandLineProtocolSet
             return null;
         }
 
-        string? scheme = KnownScheme(name);
-        if (scheme is null)
+        if (!ProtoSchemes.TryGetValue(name, out string? scheme))
         {
             return name[..Math.Min(name.Length, LongestRepeatedName)];
         }
@@ -145,7 +155,7 @@ internal static class CommandLineProtocolSet
         }
         else
         {
-            allowed.UnionWith(KnownSchemes);
+            allowed.UnionWith(ProtoSchemes);
         }
     }
 }

@@ -29,8 +29,9 @@ Curl connected and failed with exit 7 for all three.
    which fails every transfer with exit 1 and `Protocol "<scheme>" is disabled` before connecting, also
    as the `-v` info line. The curl tool, `Curl.Api` and `Libcurl` all compose their handlers there, so
    all three refuse alike, as libcurl built without SMB does (BL-3887).
-2. `CommandLineProtocolSet.KnownSchemes` drops `smb` and `smbs`, so `--proto` and `--proto-redir` refuse
-   them as unrecognized and `--proto-default` as unsupported (BL-3888, BL-3889).
+2. `CommandLineProtocolSet` reads `--proto` and `--proto-redir` against `KnownSchemes` less `smb` and
+   `smbs`, so both refuse them as unrecognized and `all` leaves them out (BL-3888); `--proto-default`
+   is to refuse them as unsupported (BL-3889).
 3. `Curl.Protocol.Smb.UnitLibrary` stays, with its tests, as the SMBv1 client a build with SMB would
    use; the conformance harness's smbserver stand-in still serves it, driven by that handler.
    Upstream's smb cases (1451, 1850) leave the ratchet: the harness no longer reports the `smb`

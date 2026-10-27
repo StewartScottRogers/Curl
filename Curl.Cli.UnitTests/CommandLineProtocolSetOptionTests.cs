@@ -17,8 +17,7 @@ public sealed class CommandLineProtocolSetOptionTests
     private static readonly string[] EveryKnownScheme =
     [
         "dict", "file", "ftp", "ftps", "gopher", "gophers", "http", "https", "imap", "imaps", "ldap", "ldaps",
-        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smb", "smbs", "smtp", "smtps", "telnet", "tftp", "ws",
-        "wss",
+        "mqtt", "mqtts", "pop3", "pop3s", "rtsp", "scp", "sftp", "smtp", "smtps", "telnet", "tftp", "ws", "wss",
     ];
 
     public TestContext TestContext { get; set; } = null!;
@@ -70,38 +69,6 @@ public sealed class CommandLineProtocolSetOptionTests
         Assert.IsTrue(result.IsAccepted);
         AssertSchemes(["https"], result.Options.AllowedRedirectProtocols);
         Assert.IsNull(result.Options.AllowedProtocols);
-    }
-
-    [TestMethod]
-    public void Parse_ProtoRemovingFtp_StillAllowsSmbAndSmbs()
-    {
-        // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): curl -sS --proto -ftp
-        // smb://127.0.0.1:1/s/f -> exit 7, a connect failure, so smb stays allowed.
-        CommandLineParseResult result = Parse(["--proto", "-ftp", Url]);
-
-        Assert.IsTrue(result.IsAccepted);
-        IReadOnlySet<string>? allowed = CommandLineParseDiagnostics.Peek(result.Options.AllowedProtocols);
-        Diagnostics.Assert("smb allowed", true, allowed?.Contains("smb"));
-        Diagnostics.Assert("smbs allowed", true, allowed?.Contains("smbs"));
-        Diagnostics.Assert("ftp allowed", false, allowed?.Contains("ftp"));
-        Assert.IsTrue(result.Options.AllowedProtocols!.Contains("smb"));
-        Assert.IsTrue(result.Options.AllowedProtocols.Contains("smbs"));
-        Assert.IsFalse(result.Options.AllowedProtocols.Contains("ftp"));
-    }
-
-    [TestMethod]
-    [DataRow("smb")]
-    [DataRow("smbs")]
-    [DataRow("=SMB")]
-    public void Parse_ProtoNamingSmb_TakesItWithoutAWarning(string value)
-    {
-        // Linux curl 8.18.0 (OpenSSL), measured 2026-10-01 (BL-1099 Notes): --proto smb,bogus warns
-        // only about 'bogus'.
-        CommandLineParseResult result = Parse(["--proto", value, Url]);
-
-        AssertWarnings([], result);
-        Assert.IsTrue(result.IsAccepted);
-        Assert.IsEmpty(result.WarningLines);
     }
 
     [TestMethod]
