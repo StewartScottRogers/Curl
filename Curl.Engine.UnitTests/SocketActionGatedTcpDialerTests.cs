@@ -42,7 +42,9 @@ public sealed class SocketActionGatedTcpDialerTests
         await dialer.Started.Task.WaitAsync(LongestWait);
         CurlPoll waitingDuringDial = wait.Waiting;
         DateTimeOffset? deadlineDuringDial = wait.EarliestDeadline;
+        Task dialWaitEnded = UntilAsync(wait, () => wait.Waiting == CurlPoll.None);
         dialer.Release.SetResult();
+        await dialWaitEnded;
         await UntilAsync(wait, () => wait.Waiting != CurlPoll.None);
         CurlPoll firstWait = wait.Waiting;
         int writtenBeforeSignal = server.Written.Length;
