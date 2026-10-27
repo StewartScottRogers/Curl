@@ -1298,10 +1298,15 @@ public sealed partial class TcpConnector(
         return dialable;
     }
 
-    // curl 8.21.0 answers localhost and every name under .localhost itself, with ::1 and 127.0.0.1.
-    internal static bool IsLocalhost(string host) =>
-        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
-        || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+    // curl 8.21.0 answers localhost and every name under .localhost itself, with ::1 and 127.0.0.1,
+    // each also with one trailing dot: with --doh-url, http://localhost.:21802/ sends no DoH query
+    // and dials ::1 (CGR-159).
+    internal static bool IsLocalhost(string host)
+    {
+        var name = host.EndsWith('.') ? host[..^1] : host;
+        return string.Equals(name, "localhost", StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Reports curl 8.21.0's <c>Host &lt;name&gt;:&lt;port&gt; was resolved.</c>,
