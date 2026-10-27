@@ -9,7 +9,8 @@ namespace Curl.Cli;
 /// blank, and a malformed one is accepted, because a c-ares build of curl checks the value only when it
 /// resolves a host name (exit 43 there). Measured on 2026-09-28 with Alpine edge's curl 8.22.0 built with
 /// c-ares 1.34.8 through <c>Record-CurlExchange.ps1 -NoServer</c> against <c>http://127.0.0.1:1/</c>;
-/// every case is in BL-643's Notes.
+/// every case is in BL-643's Notes. Every case parses as that c-ares build (<see cref="CAresBuildParser"/>): every
+/// reference build refuses all four, as <see cref="Cgr041Tests"/> pins (ADR-0837).
 /// </summary>
 [TestClass]
 public sealed class CommandLineDnsOptionTests
@@ -178,7 +179,7 @@ public sealed class CommandLineDnsOptionTests
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.ArrangeArguments(arguments);
-        CommandLineParseResult result = CommandLineParser.Parse(arguments);
+        CommandLineParseResult result = CAresBuildParser.Parse(arguments);
         diagnostics.ActParse(result);
         return result;
     }

@@ -393,8 +393,8 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     {
         string[] parsedArguments = ["-s", .. arguments.Split('|')];
         Diagnostics.ArrangeArguments(parsedArguments);
-        // As a build with a QUIC library and ECH reads it, so --http3 and --ech reach the generator (ADR-0540, ADR-0822).
-        return CommandLineParser.Parse(parsedArguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: true, actsAsEchBuild: true).Options!;
+        // As a build with a QUIC library, ECH and c-ares reads it, so --http3, --ech and the DNS options reach the generator (ADR-0540, ADR-0822, ADR-0837).
+        return CommandLineParser.Parse(parsedArguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: true, actsAsEchBuild: true, actsAsCAresBuild: true).Options!;
     }
 
     /// <summary>Generates the libcurl source for <paramref name="arguments"/>, whose last element is the URL, and writes it.</summary>

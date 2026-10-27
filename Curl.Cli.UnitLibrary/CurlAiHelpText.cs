@@ -28,6 +28,10 @@ public static class CurlAiHelpText
     private const string NoEchRefusalLine =
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) are built without ECH.";
 
+    /// <summary>The line an option's section carries when every reference build refuses it for want of c-ares (ADR-0837).</summary>
+    private const string NoCAresRefusalLine =
+        "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) are built without c-ares.";
+
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own diagnostic-log
     /// options. <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
@@ -193,13 +197,27 @@ public static class CurlAiHelpText
         lines.Add($"- Repeat: {RepeatMeaning(longName)}");
         lines.AddRange(OtherSpellingAndEnvironmentLines(longName));
         lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && !row.RefusedWhenTurnedOn) ? [] : ["- Not supported by this build yet: curl refuses it with exit 2."]);
-        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByWindowsSchannelBuild) ? [SchannelBuildRefusalLine] : []);
-        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByEveryReferenceBuild) ? [NoQuicRefusalLine] : []);
-        lines.AddRange(CommandLineOptionTable.Rows.Any(row => row.LongName == RowName(longName) && row.RefusedByBuildsWithoutEch) ? [NoEchRefusalLine] : []);
+        lines.AddRange(ReferenceBuildRefusalLines(longName));
         lines.AddRange([string.Empty, CurlManualMarkdown.Escape(entry.Description) + "."]);
         lines.AddRange(CurlManualMarkdown.TryGetOptionMarkdown(longName, out IReadOnlyList<string> manual) ? [string.Empty, .. manual] : []);
         return lines;
     }
+
+    /// <summary>The lines saying which reference builds refuse the option for want of a feature, when any do.</summary>
+    private static IEnumerable<string> ReferenceBuildRefusalLines(string longName)
+    {
+        CommandLineOption[] rows = [.. CommandLineOptionTable.Rows.Where(row => row.LongName == RowName(longName))];
+        return ReferenceBuildRefusals.Where(refusal => rows.Any(refusal.Refuses)).Select(refusal => refusal.Line);
+    }
+
+    /// <summary>Each way a reference build refuses an option for want of a feature, with the line its section then carries, in the order the lines are written.</summary>
+    private static readonly (Func<CommandLineOption, bool> Refuses, string Line)[] ReferenceBuildRefusals =
+    [
+        (row => row.RefusedByWindowsSchannelBuild, SchannelBuildRefusalLine),
+        (row => row.RefusedByEveryReferenceBuild, NoQuicRefusalLine),
+        (row => row.RefusedByBuildsWithoutEch, NoEchRefusalLine),
+        (row => row.RefusedByBuildsWithoutCAres, NoCAresRefusalLine),
+    ];
 
     /// <summary>The lines naming the option's other spelling and the environment variables it stands in for, when it has them.</summary>
     private static IEnumerable<string> OtherSpellingAndEnvironmentLines(string longName)

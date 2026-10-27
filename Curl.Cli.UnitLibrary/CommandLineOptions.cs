@@ -310,6 +310,16 @@ public sealed class CommandLineOptions
     public bool ActsAsEchBuild { get => globals.ActsAsEchBuild; internal set => globals.ActsAsEchBuild = value; }
 
     /// <summary>
+    /// <see langword="true"/> when the command line is read as a curl built with c-ares reads it: <c>--dns-servers</c>,
+    /// <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c> are accepted and run over Curl's
+    /// hand-built DNS resolver. <see langword="false"/> as every reference build reads it - Schannel on Windows,
+    /// OpenSSL with the threaded resolver on Linux and macOS - which refuses all four with
+    /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutCAres"/>,
+    /// ADR-0837). The executable never sets it; tests ask <see cref="CommandLineParser"/> for it to reach the resolver.
+    /// </summary>
+    public bool ActsAsCAresBuild { get => globals.ActsAsCAresBuild; internal set => globals.ActsAsCAresBuild = value; }
+
+    /// <summary>
     /// Reads an environment variable for <c>--variable %name</c>; <see langword="null"/> when it is not set.
     /// This process's environment unless <see cref="CommandLineParser"/> is given the run's own reader (BL-1943).
     /// </summary>

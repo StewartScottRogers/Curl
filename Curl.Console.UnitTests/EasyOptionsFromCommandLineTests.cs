@@ -149,8 +149,8 @@ public sealed partial class EasyOptionsFromCommandLineTests
 
     private static CommandLineOptions Parse(params string[] arguments)
     {
-        // As a build with a QUIC library and ECH reads it, so --http3 and --ech are accepted (ADR-0540, ADR-0822).
-        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url], _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: true, actsAsEchBuild: true);
+        // As a build with a QUIC library, ECH and c-ares reads it, so --http3, --ech and the DNS options are accepted (ADR-0540, ADR-0822, ADR-0837).
+        CommandLineParseResult result = CommandLineParser.Parse([.. arguments, Url], _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: true, actsAsEchBuild: true, actsAsCAresBuild: true);
         Assert.IsTrue(result.IsAccepted, string.Join(' ', arguments));
         return result.Options;
     }

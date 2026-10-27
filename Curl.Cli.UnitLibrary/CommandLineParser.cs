@@ -194,19 +194,20 @@ public static class CommandLineParser
     /// <param name="readEnvironmentVariable">Reads an environment variable; <see langword="null"/> when it is not set.</param>
     /// <param name="actsAsQuicBuild">Whether to read the arguments as a curl built with a QUIC library does.</param>
     /// <param name="actsAsEchBuild">Whether to read the arguments as a curl built with ECH does, accepting <c>--ech</c> rather than refusing it as every reference build does (ADR-0822).</param>
+    /// <param name="actsAsCAresBuild">Whether to read the arguments as a curl built with c-ares does, accepting <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and <c>--dns-ipv6-addr</c> rather than refusing them as every reference build does (ADR-0837).</param>
     /// <returns>As the overload without <paramref name="actsAsQuicBuild"/> returns.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild = false)
+    public static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, DefaultConfigFileSearch defaultConfigFileSearch, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild = false, bool actsAsCAresBuild = false)
     {
         ArgumentNullException.ThrowIfNull(defaultConfigFileSearch);
 
-        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild);
+        return Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileSearch.CandidatePaths(), isWindows, readEnvironmentVariable, actsAsQuicBuild, actsAsEchBuild, actsAsCAresBuild);
     }
 
     private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows) =>
-        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false, actsAsEchBuild: false);
+        Parse(arguments, pathExists, passwordPrompt, dataFileReader, defaultConfigFileCandidates, isWindows, ProcessEnvironmentVariable, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: false);
 
-    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild)
+    private static CommandLineParseResult Parse(IReadOnlyList<string> arguments, Func<string, bool> pathExists, IPasswordPrompt passwordPrompt, IDataFileReader dataFileReader, IReadOnlyList<string> defaultConfigFileCandidates, bool isWindows, Func<string, string?> readEnvironmentVariable, bool actsAsQuicBuild, bool actsAsEchBuild, bool actsAsCAresBuild)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(pathExists);
@@ -214,7 +215,7 @@ public static class CommandLineParser
         ArgumentNullException.ThrowIfNull(dataFileReader);
         ArgumentNullException.ThrowIfNull(readEnvironmentVariable);
 
-        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ActsAsQuicBuild = actsAsQuicBuild, ActsAsEchBuild = actsAsEchBuild, ReadEnvironmentVariable = readEnvironmentVariable };
+        CommandLineOptions options = new() { ReadsArgumentsAsUtf8 = !isWindows, ActsAsWindowsSchannelBuild = isWindows, ActsAsQuicBuild = actsAsQuicBuild, ActsAsEchBuild = actsAsEchBuild, ActsAsCAresBuild = actsAsCAresBuild, ReadEnvironmentVariable = readEnvironmentVariable };
         if (isWindows)
         {
             options.ConfigFileWireTextEncoding = ConfigFileWireText.WindowsAnsiCodePage(() => System.Text.CodePagesEncodingProvider.Instance.GetEncoding(0));

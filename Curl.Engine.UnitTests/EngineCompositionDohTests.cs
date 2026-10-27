@@ -412,7 +412,8 @@ public sealed class EngineCompositionDohTests
     private CommandLineOptions Parse(params string[] arguments)
     {
         Diagnostics.Arrange("arguments", string.Join(' ', arguments.Append("http://example.test:48712/")));
-        CommandLineParseResult parsed = OpenSslBuildParser.Parse([.. arguments, "http://example.test:48712/"], _ => true);
+        // As the OpenSSL build with c-ares reads it, so --dns-servers is accepted beside --doh-url (ADR-0837).
+        CommandLineParseResult parsed = CommandLineParser.Parse([.. arguments, "http://example.test:48712/"], _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: false, actsAsEchBuild: false, actsAsCAresBuild: true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
     }

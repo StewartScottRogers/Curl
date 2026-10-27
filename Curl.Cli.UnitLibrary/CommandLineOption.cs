@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// </summary>
 public sealed class CommandLineOption
 {
-    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedByEveryReferenceBuild = false, bool refusedWithoutEch = false)
+    private CommandLineOption(string longName, char? shortName, bool takesValue, CommandLineOptionApplier apply, CommandLineOptionApplier? negate = null, bool takesSubject = false, bool endsBundle = false, bool shortNameTurnsOff = false, bool warnsAboutLeadingUnicode = true, bool refusedByWindowsSchannelBuild = false, bool refusedWhenTurnedOn = false, bool refusedByEveryReferenceBuild = false, bool refusedWithoutEch = false, bool refusedWithoutCAres = false)
     {
         RefusedWhenTurnedOn = refusedWhenTurnedOn;
         LongName = longName;
@@ -21,6 +21,7 @@ public sealed class CommandLineOption
         RefusedByWindowsSchannelBuild = refusedByWindowsSchannelBuild;
         RefusedByEveryReferenceBuild = refusedByEveryReferenceBuild;
         RefusedByBuildsWithoutEch = refusedWithoutEch;
+        RefusedByBuildsWithoutCAres = refusedWithoutCAres;
     }
 
     /// <summary>
@@ -87,6 +88,13 @@ public sealed class CommandLineOption
     /// does Curl unless the parse reads as an ECH build (<see cref="CommandLineOptions.ActsAsEchBuild"/>, ADR-0822).
     /// </summary>
     public bool RefusedByBuildsWithoutEch { get; }
+
+    /// <summary>
+    /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutCAres"/>: every reference build -
+    /// Schannel on Windows, OpenSSL with the threaded resolver on Linux and macOS - refuses the option with exit 2,
+    /// and so does Curl unless the parse reads as a c-ares build (<see cref="CommandLineOptions.ActsAsCAresBuild"/>, ADR-0837).
+    /// </summary>
+    public bool RefusedByBuildsWithoutCAres { get; }
 
     /// <summary>
     /// <see langword="true"/> for a row built with <see cref="UnsupportedFlagTurnedOffQuietly"/>: turning the
@@ -187,6 +195,31 @@ public sealed class CommandLineOption
             ShortNameTurnsOff,
             warnsAboutLeadingUnicode: false,
             refusedWithoutEch: true);
+    }
+
+    /// <summary>
+    /// Returns this value row refused with <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> unless
+    /// the parse reads as a curl built with c-ares (<see cref="CommandLineOptions.ActsAsCAresBuild"/>), and otherwise
+    /// applied as before. No reference build resolves with c-ares - curl's Schannel build answers
+    /// <c>curl: option --dns-servers: the installed libcurl version does not support this</c> and exit 2 whatever
+    /// the value, blank or missing (measured with curl 8.21.0 Schannel, 2026-10-26, BL-3570), as do curl 8.22.0
+    /// Schannel and 8.18.0 OpenSSL - so <c>--dns-servers</c>, <c>--dns-interface</c>, <c>--dns-ipv4-addr</c> and
+    /// <c>--dns-ipv6-addr</c> are refused on every platform (CGR-041, ADR-0837).
+    /// </summary>
+    /// <returns>The row, refused on every reference build.</returns>
+    public CommandLineOption RefusedWithoutCAres()
+    {
+        return new CommandLineOption(
+            LongName,
+            ShortName,
+            TakesValue,
+            Refusing(options => !options.ActsAsCAresBuild, Apply),
+            negate: null,
+            TakesSubject,
+            EndsBundle,
+            ShortNameTurnsOff,
+            warnsAboutLeadingUnicode: false,
+            refusedWithoutCAres: true);
     }
 
     /// <summary>

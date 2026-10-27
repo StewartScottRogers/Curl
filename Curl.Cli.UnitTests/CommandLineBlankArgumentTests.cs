@@ -27,10 +27,9 @@ public sealed class CommandLineBlankArgumentTests
         "socks5", "socks5-hostname", "tls13-ciphers", "trace", "trace-ascii", "unix-socket", "url",
     ];
 
-    // The local Schannel curl 8.22.0 has no c-ares, so it refuses these as not supported whatever the
-    // value. Curl acts as a build that has it (BL-643), and such a build reads each with
-    // getstr(..., DENY_BLANK), refusing an empty one as blank, so that is what is pinned here.
-    private static readonly string[] RefusedAsBlankByCAresBuild =
+    // Refused as not supported, blank or not, by every reference build, none of which has c-ares, as Cgr041Tests
+    // pins (ADR-0837); a c-ares build refuses an empty one as blank, as CommandLineDnsOptionTests pins.
+    private static readonly string[] RefusedWithoutCAres =
     [
         "dns-interface", "dns-ipv4-addr", "dns-ipv6-addr", "dns-servers",
     ];
@@ -72,7 +71,7 @@ public sealed class CommandLineBlankArgumentTests
 
     public TestContext TestContext { get; set; } = null!;
 
-    public static IEnumerable<object[]> RefusedAsBlankOptions => RefusedAsBlank.Concat(RefusedAsBlankByCAresBuild).Select(name => new object[] { name });
+    public static IEnumerable<object[]> RefusedAsBlankOptions => RefusedAsBlank.Select(name => new object[] { name });
 
     public static IEnumerable<object[]> AcceptedWhenBlankOptions => AcceptedWhenBlank.Select(name => new object[] { name });
 
@@ -146,7 +145,7 @@ public sealed class CommandLineBlankArgumentTests
     [TestMethod]
     public void Lists_EveryArgumentTakingRowInTheTable_IsMeasured()
     {
-        string[] measured = [.. RefusedAsBlank, .. RefusedAsBlankByCAresBuild, .. AcceptedWhenBlank, .. RefusedForAnotherReason, .. CurlOnly, SslSessions, Ech];
+        string[] measured = [.. RefusedAsBlank, .. RefusedWithoutCAres, .. AcceptedWhenBlank, .. RefusedForAnotherReason, .. CurlOnly, SslSessions, Ech];
         string[] unmeasured = CommandLineOptionTable.Rows
             .Where(row => row.TakesValue && !measured.Contains(row.LongName))
             .Select(row => row.LongName)
