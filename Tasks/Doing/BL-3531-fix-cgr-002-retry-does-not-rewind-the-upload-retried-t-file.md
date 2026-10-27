@@ -99,3 +99,4 @@ curl -sS --retry 2 --retry-delay 1 -F f=value http://127.0.0.1:20500/p
 - 2026-10-26: Created from CGR-002 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3825: Record-CurlExchange.ps1 hangs on a --retry exchange, so real curl cannot be measured; rewind fix for -T started, -F still exits 26
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
