@@ -520,6 +520,12 @@
     resend over HTTP/1.1, which gets the first Response). Default -1, no reset.
     Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2ResetCode 13 -Port 18080 -Response 'HTTP/1.1 200 OK\r\nContent-Length: 9\r\n\r\nh1 hello\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-reset-13
 
+.PARAMETER Http2NoSettings
+    With -Http2 or -Http2Origin, never send the server's SETTINGS frame: the first frame curl
+    gets is the answer's HEADERS (BL-3668, CGR-139: curl answers GOAWAY "SETTINGS expected"
+    and exits 16). A GOAWAY's debug data is noted after its error code.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2NoSettings -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-no-settings
+
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
     to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
@@ -705,6 +711,7 @@ param(
     [ValidateRange(100, 999)] [int] $ProxyStatus = 200,
     [ValidateSet('h2', 'http/1.1')] [string] $ProxyAlpn = 'h2',
     [int] $Http2ResetCode = -1,
+    [switch] $Http2NoSettings,
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -2224,6 +2231,7 @@ public sealed class RecorderHttp2Proxy
     private Thread _thread;
 
     private readonly int _resetCode;
+    public bool OmitSettings { get; set; }
 
     public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode)
     {
@@ -2401,8 +2409,15 @@ public sealed class RecorderHttp2Proxy
         Buffer.BlockCopy(already, 0, preface, 0, already.Length);
         Buffer.BlockCopy(more, 0, preface, already.Length, more.Length);
         Note("> PREFACE " + Escape(preface, 0, preface.Length));
-        WriteFrame(stream, 4, 0, 0, new byte[0]);
-        Note("< SETTINGS");
+        if (OmitSettings)
+        {
+            Note("= no SETTINGS sent");
+        }
+        else
+        {
+            WriteFrame(stream, 4, 0, 0, new byte[0]);
+            Note("< SETTINGS");
+        }
         var headerBlock = new MemoryStream();
         var tunnel = new MemoryStream();
         int tunnelStream = 0;
@@ -2483,7 +2498,7 @@ public sealed class RecorderHttp2Proxy
                     if ((flags & 0x1) == 0) { WriteFrame(stream, 6, 1, 0, payload); Note("< PING ACK"); }
                     break;
                 case 7:
-                    Note("> GOAWAY last stream " + (((payload[0] & 0x7f) << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]) + " error " + ((payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]));
+                    Note("> GOAWAY last stream " + (((payload[0] & 0x7f) << 24) | (payload[1] << 16) | (payload[2] << 8) | payload[3]) + " error " + ((payload[4] << 24) | (payload[5] << 16) | (payload[6] << 8) | payload[7]) + (length > 8 ? " debug " + Escape(payload, 8, length - 8) : ""));
                     return;
                 case 8: Note("> WINDOW_UPDATE" + frame + " increment " + ((payload[0] & 0x7f) << 24 | (payload[1] << 16) | (payload[2] << 8) | payload[3])); break;
                 default: Note("> frame type " + type + frame + " " + length + " bytes"); break;
@@ -2643,6 +2658,7 @@ public sealed class RecorderHttp2Proxy
     $server.Dispose()
     $server = $null
     $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode)
+    $http2Proxy.OmitSettings = [bool]$Http2NoSettings
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
