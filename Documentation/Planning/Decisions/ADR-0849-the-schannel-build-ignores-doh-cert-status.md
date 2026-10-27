@@ -1,4 +1,4 @@
-# ADR-0847: The Schannel build ignores --doh-cert-status, as it ignores --cert-status
+# ADR-0849: The Schannel build ignores --doh-cert-status, as it ignores --cert-status
 
 - Status: Accepted
 - Date: 2026-10-26
