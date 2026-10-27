@@ -4,8 +4,8 @@ title: Fix CGR-136: transfer-encoding: chunked in an HTTP/2 response makes PORT 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitTests/Cgr136Tests.cs]
+depends-on: [BL-3667]
+touches: [Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs, Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Record-CurlExchange.ps1, Curl.Protocol.Http.UnitTests/Cgr136Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -69,7 +69,15 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr136Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 9): Measured REF-LINUX (WSL curl 8.18.0, nghttp2 1.68) with `Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2HeaderField <fields> -ListenAddress 172.26.96.1 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl wsl.exe -CurlArgs '-d','Ubuntu','--','curl','-sS','--http2-prior-knowledge','-i','http://172.26.96.1:18665/x'`. `-Http2HeaderField` is new in this run (more literal fields after `:status`; it is in the stash). Results:
+  - fields `transfer-encoding: chunked` (then content-length: 0, END_STREAM): exit 16; stderr `curl: (16) Invalid HTTP header field was received: frame type: 1, stream: 1, name: [transfer-encoding], value: [chunked]`; stdout `HTTP/2 200 \r\n` (no blank line).
+  - fields `server: x`, `transfer-encoding: chunked`, `content-type: text/plain`: same exit and stderr; stdout `HTTP/2 200 \r\nserver: x\r\n` - curl writes the status line and every field before the bad one, then stops (no blank line, nothing after).
+  - Wire after the client's two stream-1 WINDOW_UPDATEs and SETTINGS ACK: `GOAWAY last stream 0 error 1` (PROTOCOL_ERROR, 8-byte payload, no debug data), no RST_STREAM.
+- Plan for the next claim: `Http2ResponseHead` gains a finder for nghttp2's connection-specific response fields (connection, keep-alive, proxy-connection, transfer-encoding, upgrade, and te with a value other than `trailers`) and a head prefix writer (status line plus the lines before the bad field, no empty line). `Http2StreamConnection.ReceiveHeadersAsync` (head branch) enqueues that prefix, sends `session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, ...)` (last stream 0, as measured) and keeps an exit 16 failure (message in `HttpTransferMessages`) that `ReceiveFrameAsync` throws once `received` is drained, so the head bytes reach `-i` output first. Then check that the HTTP/1 head reader writes the partial head to stdout as curl does.
+- Requeued behind BL-3667 (holds `Http2StreamConnection.cs`, which the fix must change). `Http2Session.cs` (BL-3668) is not needed: GOAWAY goes out through `session.Frames`. Touches widened to Http2StreamConnection.cs, HttpTransferMessages.cs (the new message) and Record-CurlExchange.ps1 (the new parameter).
+
 ## Log
 
 - 2026-10-26: Created from CGR-136 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Waits on BL-3667, which holds Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs that the fix must change; REF measured and plan in Notes
