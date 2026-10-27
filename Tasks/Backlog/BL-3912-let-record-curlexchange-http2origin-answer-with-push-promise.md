@@ -1,5 +1,5 @@
 ---
-id: BL-3910
+id: BL-3912
 title: Let Record-CurlExchange -Http2Origin answer with PUSH_PROMISE, a chosen :status value or no :status
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3910 — Let Record-CurlExchange -Http2Origin answer with PUSH_PROMISE, a chosen :status value or no :status
+# BL-3912 — Let Record-CurlExchange -Http2Origin answer with PUSH_PROMISE, a chosen :status value or no :status
 
 ## Goal
 
