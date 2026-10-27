@@ -36,3 +36,4 @@ Curl today writes `日本語.bin`, uploads `日本.txt`, and creates `café.bin`
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-26: Backlog -> Doing. Criteria at claim: d02b924d bd4de3db b3264596 779790c0.
