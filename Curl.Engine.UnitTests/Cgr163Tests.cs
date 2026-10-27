@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// CGR-163 (ADR-0854): curl 8.22.0's release build uses only an <c>https</c> DoH URL; an <c>http</c> or
+/// CGR-163 (ADR-0859): curl 8.22.0's release build uses only an <c>https</c> DoH URL; an <c>http</c> or
 /// scheme-less <c>--doh-url</c> fails every name with exit 6 and <c>Could not resolve host</c> without
 /// contacting the DoH server (measured with curl 8.21.0's release build on Windows). The debug build's
 /// allowance stays behind <c>allowsPlainHttpDohUrl</c> for the conformance harness.

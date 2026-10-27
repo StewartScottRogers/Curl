@@ -30,7 +30,7 @@ internal static partial class EngineComposition
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DoH connector's DNS filter lines; <see langword="null" /> for none.</param>
     /// <param name="allowsPlainHttpDohUrl">
     /// Whether a DoH URL that is not <c>https</c> is used, as curl's debug build allows; <see langword="false" />, as curl
-    /// 8.22.0's release build, makes such a URL an <see cref="UnusableDohUrlResolver" /> (CGR-163, ADR-0854).
+    /// 8.22.0's release build, makes such a URL an <see cref="UnusableDohUrlResolver" /> (CGR-163, ADR-0859).
     /// </param>
     /// <returns>The resolver.</returns>
     internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, bool allowsPlainHttpDohUrl = false)
@@ -160,7 +160,7 @@ internal static partial class EngineComposition
     /// <summary>
     /// Whether <see cref="DohUrlOf" /> makes an <c>https</c> URL of a <c>--doh-url</c> value, the only DoH URL curl
     /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> or
-    /// scheme-less one fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0854).
+    /// scheme-less one fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0859).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns><see langword="true" /> for an <c>https</c> DoH URL.</returns>

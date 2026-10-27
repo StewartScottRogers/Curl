@@ -1,4 +1,4 @@
-# ADR-0854: The release build uses only an https DoH URL
+# ADR-0859: The release build uses only an https DoH URL
 
 - Status: Accepted
 - Date: 2026-10-26
