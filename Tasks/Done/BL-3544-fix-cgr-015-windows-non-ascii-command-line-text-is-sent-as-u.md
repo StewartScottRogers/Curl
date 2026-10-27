@@ -8,7 +8,7 @@ depends-on: [BL-3892, BL-3893, BL-3844, BL-3840, BL-3841, BL-3842]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr015Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr015Tests.cs, Curl.Output.UnitLibrary/WriteOutTemplateRenderer.cs, Curl.Output.UnitTests/Cgr015Tests.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Protocol.Http.UnitLibrary/HttpUrlText.cs, Curl.Protocol.Http.UnitTests/Cgr015Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3544 — Fix CGR-015: Windows: non-ASCII command-line text is sent as UTF-8 for bodies, URLs, --data-urlencode, --url-query, -w and several non-HTTP protocols,...
 
@@ -213,10 +213,10 @@ curl -s -o NUL -w "[é]" http://127.0.0.1:21370/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -224,6 +224,13 @@ curl -s -o NUL -w "[é]" http://127.0.0.1:21370/x
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
 - 2026-10-26 (lane 9, first pass, no code changed): split by library because the fix spans Curl.Console, Curl.Cli, Curl.Protocol.Http, Curl.Output and the gopher, dict, POP3 and MQTT libraries, too much for one run. Decision, decided by Claude under Stewart's delegation: on Windows match the designated ANSI-argv reference (Git for Windows ucrt64 curl 8.22.0, the one `Record-CurlExchange.ps1` runs), i.e. command-line text goes out in the system ANSI code page with best fit; off Windows UTF-8 is unchanged. Reason: the lane rules name that build as the oracle, and the existing header, credential, SMTP and IMAP paths already use the ANSI code page, so this makes Curl consistent with itself. BL-3843 writes the ADR. Filed BL-3843 (argv best fit, stderr echo, ADR), BL-3844 (-d family, --data-urlencode, --url-query, --variable; also MQTT payloads), BL-3840 (HTTP URL path, query, --request-target), BL-3841 (-w) and BL-3842 (gopher, dict, POP3, MQTT topic). Once they are Done this task runs every repro against real curl and ticks the criteria.
+- 2026-10-26 (lane 8, verification after BL-3892, BL-3893, BL-3840, BL-3841, BL-3842 and BL-3844): ran every repro through the reference ucrt64 curl 8.22.0 and this build (`Curl.Console`, Debug) with `Record-CurlExchange.ps1` on 127.0.0.1:20200, system ANSI code page 1252, a fresh working directory per run, comparing exit code, stdout.bin, stderr.txt, request.bin and the files left in the working directory. The script is a throwaway runner outside the repository; MQTT runs used `-Script` (read, send CONNACK `\x20\x02\x00\x00`, read, close).
+  - Identical (exit code; all five files byte for byte): `-s -d é` (exit 0, body E9), `-s http://…/é` and `-sS http://…/café` (target `/caf%E9`), `-s -o NUL -w é`, `-s -o NUL -w 'café ü €\n'` (stdout `63 61 66 E9 20 FC 20 80 0D 0A` in both), `-s --data-urlencode é` and `x=é` (`%E9`), `-s -d 中` (best fit `?`), `-s -o 中.txt` (both leave `中.txt`), `--sílent` (exit 2), `-sS http://中文.localhost:20200/` (exit 3), `-sS http://127.0.0.1:2020０/a` (full-width zero, exit 0), `--url-query q=é`, `--json '"é"'`, `--data-raw é`, `--data-binary é`, `--request-target /é`, `-d x=é`, `-H "X-U: é"`, `-A é`, `-e é`, `-b c=é`, `-X Gé`, `-u é:p`, `-o é.txt`, `gopher://…/0/é`, `dict://…/d:é`, and `pop3 -u u:p -X "XFOO é"` / `"XFOO €"` (exit 8 both).
+  - Identical after the normalisation section 1 allows: `-F a=é` (only the random multipart boundary differs; the part body is E9 in both), and every MQTT case, `-d`, `--data-binary`, `--data-raw`, `--data-urlencode héllo`, `-d €` and topic `/té` (only the 8 random client ID characters differ; payload `68 E9 6C 6C 6F`, `68 25 45 39 6C 6C 6F`, `80`, topic `74 E9` in both).
+  - Fixed here: `-sS -T ü.txt` (from the finder's c-cases): both exit 26 (curl's Windows build cannot open a file named in ANSI bytes, and neither can Curl), but Curl wrote `curl: cannot open '` C3 BC `.txt'` where curl writes FC. `CurlCommandRunner` now writes that line, and the `-o` resume one beside it, in `commandLineEchoEncoding` (the ANSI code page on Windows, ADR-0840); after the fix the case is identical. Edge left as it is: a `-T` value read from a UTF-8 config file is now echoed in ANSI too, where curl would echo the file's bytes; the runner does not know which source a value came from, and the command line is the common case.
+  - Still different, left to BL-3848 (Backlog, owns `--variable`): `--variable v=é --expand-data '{{v}}'` posts C3 A9 where curl posts E9. The issue lists `--variable` only in ENV-07's parenthesis, not as a repro command, and BL-3844 filed BL-3848 for exactly this, so this task does not wait on it.
+- Focused test (ADR-0482): `Curl.Console.UnitTests/Cgr015Tests.cs`; with the upload line's encoding put back to UTF-8 the Windows test failed (1 failed, 1 passed), with the fix both pass. They compare against `CredentialEncoding.ForPlatform` with `runsOnWindows` injected, so they pass on Linux and macOS.
+- `dotnet build` clean (0 warnings), `dotnet test --filter "TestCategory!=Integration"` green; `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members. The change is platform-neutral, so CI on Linux and macOS is covered by the injected-platform tests.
 
 ## Log
 
@@ -231,3 +238,4 @@ curl -s -o NUL -w "[é]" http://127.0.0.1:21370/x
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Split by library: waits on BL-3843, BL-3844, BL-3840, BL-3841 and BL-3842
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Every CGR-015 repro matches reference curl 8.22.0 on Windows; -T echoes its file name in the ANSI code page; --variable is left to BL-3848
