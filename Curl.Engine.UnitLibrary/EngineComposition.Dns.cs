@@ -157,7 +157,7 @@ internal static partial class EngineComposition
     /// host is), <paramref name="tcpDialer" />, and a TLS provider routed as
     /// <see cref="CreateTlsProvider" /> routes the options <see cref="TlsClientOptionsMapping.DohOf" />
     /// maps. The <c>--resolve</c> entries answer for the DoH server's name, as curl 8.22.0's DoH
-    /// probes look it up in the DNS cache those entries were added to (CGR-155, ADR-0848); they are
+    /// probes look it up in the DNS cache those entries were added to (CGR-155, ADR-0852); they are
     /// loaded into the connector's cache when it is made, so no DoH sub-transfer writes their
     /// <c>Added ... to DNS cache</c> lines. No <c>--connect-to</c>, <c>-x</c> or <c>-4</c>/<c>-6</c>
     /// applies to it; the proxy environment variables do, through <see cref="DohProxyOf" /> (CGR-037).

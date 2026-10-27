@@ -1,4 +1,4 @@
-# ADR-0848 — --resolve entries answer for the DoH server's own name
+# ADR-0852 — --resolve entries answer for the DoH server's own name
 
 - **Status:** Accepted
 - **Date:** 2026-10-26

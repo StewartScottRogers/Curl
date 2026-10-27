@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// CGR-155 (ADR-0848): a <c>--resolve</c> entry for the DoH server's host and port answers for it,
+/// CGR-155 (ADR-0852): a <c>--resolve</c> entry for the DoH server's host and port answers for it,
 /// as curl 8.22.0's DoH probes find the name in the DNS cache those entries were added to (measured
 /// with <c>Record-CurlExchange.ps1 -DohPort</c>: both queries reached the server named
 /// <c>dohsrv.test</c>), and loading them writes no <c>Added ... to DNS cache</c> line of its own.
