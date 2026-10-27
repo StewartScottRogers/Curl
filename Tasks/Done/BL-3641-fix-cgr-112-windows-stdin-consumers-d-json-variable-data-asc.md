@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitTests/Cgr112Tests.cs, Curl.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Protocol.Telnet.UnitTests/Cgr112Tests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitLibrary/VariableDefinition.cs, Curl.Cli.UnitLibrary/WindowsTextModeInput.cs, Curl.Cli.UnitTests/Cgr112Tests.cs, Curl.Protocol.Telnet.UnitLibrary/TelnetProtocolHandler.cs, Curl.Protocol.Telnet.UnitTests/Cgr112Tests.cs, Curl.Engine.UnitLibrary/TransferContextFactory.cs, Curl.Engine.UnitLibrary/WindowsTextModeReadStream.cs, Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/Cgr112Tests.cs, Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolDispatch.cs, Curl.Engine.UnitTests/TransferContextFactoryTests.cs, Curl.Console.UnitTests/CurlCommandRunnerTests.cs, Curl.Engine.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3641 — Fix CGR-112: Windows: @- stdin consumers (-d, --json, --variable, --data-ascii, -H, -w) and telnet stdin are read in binary; REF reads them in text mo...
 
@@ -113,17 +113,30 @@ curl -s -S telnet://127.0.0.1:21373
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr112Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-26 (lane 7): Measured real curl 8.22.0 (Git for Windows ucrt64, the reference `Record-CurlExchange.ps1` picks) and Curl (`Curl.Console\bin\Debug\net10.0\curl.exe`) with one PowerShell driver over `Record-CurlExchange.ps1` (`-StandardInput`, echo-less HTTP 200 server; telnet against the same listener). Before the fix Curl sent the raw bytes (as the report says). After it, each case gives the same exit code (0), stdout, stderr and request bytes (body and the headers before it; only the port differs) as curl:
+  - `-s --json @-` with `{\r\n"a":1\r\n}` -> `{\n"a":1\n}`, Content-Length 9.
+  - `-s -d @-` and `-s --data-ascii @-` with `ab\x1Acd\r\nef` -> `ab`.
+  - `-s --variable v@- --expand-data {{v}}` with `ab\x1Acd\r\nef` -> `ab`; with `a\r\nb\rc` -> `a\nb\rc` (a lone CR stays).
+  - `-s -H @-` with `X-A: 1\r\nX-B: 2\x1A\r\nX-C: 3` -> X-A and X-B only.
+  - `-s -o NUL -w @-` with `ab\x1acd\r\nef\n` -> stdout `ab`; `-s --json @-` with the same -> `ab` (Content-Length 2).
+  - Already matching, still matching: `--data-binary @-` (every byte) and `--data-urlencode @-` (`ab%1Acd%0D%0Aef`, binary in curl too).
+  - `-s -S telnet://` with `a\r\nb\r\n\x1a\r\nc\n` -> wire `a\nb\n`; with `GET /x HTTP/1.0\r\n\r\n` -> `GET /x HTTP/1.0\n\n`; `-T - telnet://` sends every byte in both.
+- Decision (ADR-0844): text mode is applied to standard input only, in `Curl.Cli` (`WindowsTextModeInput`, through `ReadAtFile`'s `readsStandardInputAsText` and `VariableDefinition`) and, for telnet, in `Curl.Engine`'s `TransferContextFactory` (a `WindowsTextModeReadStream` over standard input when there is no `-T`, on by default on Windows). The handler cannot tell `-T -` from default standard input, so the fix landed in the factory, not `TelnetProtocolHandler.cs`; `Curl.Telnet` files were left unchanged. `CurlCommandRunner.cs` (held by BL-3900) was avoided by taking the platform default inside the factory.
+- Touches widened: `VariableDefinition.cs` (`--variable @-` reads stdin there), the new `WindowsTextModeInput.cs`, the Engine factory, stream and `ManagedEasyTransfer.Context.cs` (library handle has `Stream.Null`, setting off), and three existing tests that pinned the raw stream by reference (`ManagedEasyTransferTests.ToolDispatch.cs`, `TransferContextFactoryTests.cs`, `CurlCommandRunnerTests.cs`). No other task in Doing on `origin/work/dark-factory` named any of them.
+- Unit tests: `Curl.Cli.UnitTests/Cgr112Tests.cs` (11) and `Curl.Engine.UnitTests/Cgr112Tests.cs` (10); the Windows ones fail before the fix (stdin raw). Platform-neutral: the Cli tests pass `isWindows` explicitly and the Engine tests set `ReadsTelnetStandardInputInTextMode`; the Console test expects text mode only when `OperatingSystem.IsWindows()`. CI on Linux and macOS is covered by that and the fast tests green here.
+- `Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary,Curl.Engine.UnitLibrary`: Engine 100/100, no failing member; Cli's `WindowsTextModeInput.Contents` was complexity 12, split, and the rerun on Cli is 100/100 with no failing member. `dotnet build` clean; `dotnet test --filter "TestCategory!=Integration"` passed (46 test projects).
 
 ## Log
 
 - 2026-10-26: Created from CGR-112 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. On Windows, -d/--data-ascii/--json/--variable/-H/-w @- and telnet's stdin without -T are read in text mode (Ctrl-Z ends, CR LF to LF), matching curl 8.22.0
