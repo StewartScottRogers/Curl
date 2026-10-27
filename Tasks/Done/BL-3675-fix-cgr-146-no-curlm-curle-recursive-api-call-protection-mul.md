@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Perform.cs, Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr146Tests.cs, Libcurl.UnitTests/Cgr146Tests.cs, Libcurl/Multi/Core/CurlMulti.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3675 — Fix CGR-146: No CURLM/CURLE_RECURSIVE_API_CALL protection: multi and easy API calls made inside callbacks succeed in PORT and run nested transfers
 
@@ -63,17 +63,24 @@ probe.exe C_90,C_91 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr146Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Plan: refuse every multi call made while `ManagedMultiTransfer.IsInTransferCallback` holds (the AsyncLocal mark CGR-033 put on code inside the handle's transfers), and a perform of an easy handle while its own perform runs; ADR-0846 records it. Production changes: `ManagedMultiTransfer.cs` (Add, Remove, perform/socket action, wait/poll, timeout, info_read), `ManagedEasyTransfer.Perform.cs` (self-perform answers 93), `Libcurl/Multi/Core/CurlMulti.cs` (`AddHandle` asks the engine before its own added-already check).
+- REF measured with a throwaway C# file-based P/Invoke probe (outside the repository) against Git for Windows' `ucrt64/bin/libcurl-4.dll`, libcurl 8.22.0 Schannel, with a recording loopback server answering `200 hello`. C_90 (e1 in multi m; e1's first write callback calls): `perform 8`, `add(e2) 8`, `add(e1, already in m) 8`, `remove(e1) 8`, `easy_perform(e3) 0`, `wait 8`, `poll 8`, `socket_action(TIMEOUT) 8`, `timeout 8`, `info_read NULL`, `wakeup 0`; messages `e1:0`; server `[GET /one] | [GET /three]`. C_91: `easy_perform self 93`, `easy_perform e2 0`, outer 0; server `[GET /one] | [GET /two]`.
+- PORT, the same sequences driven through the engine (`Curl.Engine.UnitTests/Cgr146Tests.cs`, a recording handler standing in for the server) and through Libcurl's `CurlMulti` (`Libcurl.UnitTests/Cgr146Tests.cs`): before the fix every call answered 0 and took effect (both engine tests failed); after it every answer, the one message `e1:0` and the paths `/one`, `/three` (C_90) and `/one`, `/two` (C_91) equal REF's. The add of a handle the multi holds already answers 8 in a callback, measured above, so the in-callback check comes before the added-already check in both the engine and Libcurl.
+- Decision (default taken): the self-perform answers 93 on every platform, matching curl 8.22.0, the release Curl targets; the report's Linux 2 comes from curl 8.18.0, an older release that checks `data->multi` first. The behaviour does not depend on the platform otherwise (no paths, sockets or OS text), so CI on Linux and macOS is covered by the platform-neutral tests that are green here.
+- Repro variants that already matched (the unrelated `curl_easy_perform` answering 0, `curl_multi_wakeup` answering 0) still match: asserted in the engine test.
+- Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary,Libcurl: both 100% line and branch, 0 failing members. Build clean; fast tests green (46 test assemblies, 0 failed).
 
 ## Log
 
 - 2026-10-26: Created from CGR-146 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. Multi and easy calls from inside a transfer callback answer CURLM/CURLE_RECURSIVE_API_CALL as libcurl 8.22.0
