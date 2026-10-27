@@ -242,7 +242,8 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     /// <summary>
     /// Starts a frame as <c>ws_enc_write_head</c> does: <see cref="CurlCode.SendError" /> for a negative length or while
     /// the frame before has payload left, <see cref="CurlCode.BadFunctionArgument" /> for bits naming no frame
-    /// (<c>CURLWS_OFFSET</c> aside), else the head written and the frame's mask and length kept for its parts.
+    /// (<c>CURLWS_OFFSET</c> aside), <see cref="CurlCode.TooLarge" /> for a control frame over 125 bytes (CGR-123),
+    /// else the head written and the frame's mask and length kept for its parts.
     /// </summary>
     /// <param name="flags">The frame's bits.</param>
     /// <param name="frameLength">The frame's whole payload size.</param>
@@ -251,14 +252,10 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
     private CurlCode StartFrame(CurlWebSocketFlags flags, long frameLength, out byte[] head)
     {
         head = [];
-        if (frameLength < 0 || sendFrameLeft > 0)
+        CurlCode refusal = FrameRefusalOf(flags, frameLength, out WsOpcode opcode, out bool isFinal);
+        if (refusal != CurlCode.Ok)
         {
-            return CurlCode.SendError;
-        }
-
-        if (!WebSocketFrameFlags.TryFrameOf(flags & ~CurlWebSocketFlags.Offset, continuesSentMessage, out WsOpcode opcode, out bool isFinal))
-        {
-            return CurlCode.BadFunctionArgument;
+            return refusal;
         }
 
         head = WsFrameEncoder.EncodeHead(opcode, isFinal, frameLength, randomSource);
@@ -267,6 +264,34 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
         sendFrameOffset = 0;
         continuesSentMessage = opcode is WsOpcode.Close or WsOpcode.Ping or WsOpcode.Pong ? continuesSentMessage : !isFinal;
         return CurlCode.Ok;
+    }
+
+    /// <summary>
+    /// Checks a frame about to start as <c>ws_enc_write_head</c> does: <see cref="CurlCode.SendError" /> for a negative
+    /// length or while the frame before has payload left, <see cref="CurlCode.BadFunctionArgument" /> for bits naming
+    /// no frame, <see cref="CurlCode.TooLarge" /> for a control frame over 125 bytes (CGR-123), else
+    /// <see cref="CurlCode.Ok" /> with the frame's opcode and FIN bit.
+    /// </summary>
+    /// <param name="flags">The frame's bits.</param>
+    /// <param name="frameLength">The frame's whole payload size.</param>
+    /// <param name="opcode">The frame's opcode when the bits name one.</param>
+    /// <param name="isFinal">Whether the frame ends its message.</param>
+    /// <returns>Why the frame cannot start, or <see cref="CurlCode.Ok" />.</returns>
+    private CurlCode FrameRefusalOf(CurlWebSocketFlags flags, long frameLength, out WsOpcode opcode, out bool isFinal)
+    {
+        opcode = default;
+        isFinal = false;
+        if (frameLength < 0 || sendFrameLeft > 0)
+        {
+            return CurlCode.SendError;
+        }
+
+        if (!WebSocketFrameFlags.TryFrameOf(flags & ~CurlWebSocketFlags.Offset, continuesSentMessage, out opcode, out isFinal))
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
+        return WsFrameEncoder.IsControlPayloadTooLong(opcode, frameLength) ? CurlCode.TooLarge : CurlCode.Ok;
     }
 
     /// <summary>
