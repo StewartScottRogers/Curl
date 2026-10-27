@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 using System.Text;
 using Curl.Http2;
@@ -13,6 +14,9 @@ namespace Curl.Protocol.Http;
 /// </summary>
 internal static class Http2ResponseHead
 {
+    private static readonly SearchValues<char> TokenCharacters =
+        SearchValues.Create("!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+
     /// <summary>
     /// Finds the <c>:status</c> of a response header block: three digits from 100 to 999, or
     /// <see langword="null" /> when it has none or another value, which makes the response
@@ -51,10 +55,18 @@ internal static class Http2ResponseHead
 
     /// <summary>
     /// Joins a line for each header that is not a pseudo-header, leaving out any field whose
-    /// value holds a CR, LF or NUL: nghttp2 treats such a field as malformed (RFC 9113 section
-    /// 8.2.1) and curl ignores it without a message, so a server cannot inject header lines
-    /// (CGR-011).
+    /// value holds a CR, LF or NUL, or whose name is empty or holds a character that is not a
+    /// token character (a space or a colon, say): nghttp2 treats such a field as malformed (RFC
+    /// 9113 section 8.2.1) and curl ignores it without a message, so a server cannot inject
+    /// header lines (CGR-011, CGR-137).
     /// </summary>
     private static string HeaderLines(IReadOnlyList<HeaderField> fields) =>
-        string.Concat(fields.Where(field => !field.Name.StartsWith(':') && !field.Value.AsSpan().ContainsAny("\r\n\0")).Select(field => $"{field.Name}: {field.Value}\r\n"));
+        string.Concat(fields.Where(field => !field.Name.StartsWith(':') && IsTokenName(field.Name) && !field.Value.AsSpan().ContainsAny("\r\n\0")).Select(field => $"{field.Name}: {field.Value}\r\n"));
+
+    /// <summary>
+    /// Tells whether <paramref name="name" /> is a field name nghttp2 hands on: one or more
+    /// token characters (RFC 9110 section 5.6.2).
+    /// </summary>
+    private static bool IsTokenName(string name) =>
+        name.Length > 0 && !name.AsSpan().ContainsAnyExcept(TokenCharacters);
 }

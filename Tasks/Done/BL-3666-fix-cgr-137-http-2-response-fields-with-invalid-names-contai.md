@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitTests/Cgr137Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3666 — Fix CGR-137: HTTP/2 response fields with invalid names (containing a space or a colon, or empty) are printed and counted by PORT; REF drops them witho...
 
@@ -61,17 +61,26 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '[%{size_header} %{n
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr137Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Plan (small fix, done directly): `Http2ResponseHead.HeaderLines` now also leaves out a regular field whose name is empty or holds a non-token character (RFC 9110 tchar), as nghttp2's `nghttp2_check_header_name` makes curl ignore such a field without a message (`NGHTTP2_ERR_IGN_HTTP_HEADER`). Uppercase letters stay accepted here: nghttp2 treats them as a stream error, not an ignored field, which is outside CGR-137 and was not measured.
+- Repro (rebuilt without Python): a throwaway C# file-based h2c server outside the repo answers HEADERS `:status 200`, `content-length: 5`, the bad field (`x bad: v`, `x:y: v`, empty name `: v`, or control `x-ok: v`), `x-good: 1`, then DATA `hello`. Command: `curl -sS --http2-prior-knowledge -i http://HOST:P/x -w '[%{size_header} %{num_headers}]'`. REF = WSL curl 8.18.0 (OpenSSL, nghttp2 1.68.0); PORT = Curl.Console on Windows.
+  - REF, all three bad names: exit 0, stderr empty, stdout `HTTP/2 200 \r\ncontent-length: 5\r\nx-good: 1\r\n\r\nhello[45 2]`.
+  - PORT before: exit 0, the bad field printed (`x bad: v` / `x:y: v` / `: v`), `[55 3]`, `[53 3]`, `[50 3]`.
+  - PORT after: exit 0, stderr empty, stdout identical to REF, `[45 2]` for all three. Request bytes on the wire are unchanged by the fix (response-side only). No files written in either.
+  - Control `x-ok` (already matched): REF and PORT both print it, `[54 3]`; still matches.
+- Focused test `Curl.Protocol.Http.UnitTests/Cgr137Tests.cs`: the invalid-name rows fail against the old code (which emitted every non-pseudo field, as the PORT-before run shows) and pass now.
+- `dotnet build` clean; fast tests green (Curl.Protocol.Http.UnitTests 2440 passed, 0 failed across the solution). Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: 0 failing members. The change is platform-neutral (pure string formatting), which covers the PORT-LINUX side of the criterion.
 
 ## Log
 
 - 2026-10-26: Created from CGR-137 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. HTTP/2 response fields with an empty or non-token name are dropped silently, as curl's nghttp2 build does
