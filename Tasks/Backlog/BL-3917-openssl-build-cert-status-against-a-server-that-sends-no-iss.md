@@ -1,5 +1,5 @@
 ---
-id: BL-3916
+id: BL-3917
 title: OpenSSL build: --cert-status against a server that sends no issuer reports 'Error computing OCSP ID' as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-26
 completed:
 ---
-# BL-3916 — OpenSSL build: --cert-status against a server that sends no issuer reports 'Error computing OCSP ID' as curl does
+# BL-3917 — OpenSSL build: --cert-status against a server that sends no issuer reports 'Error computing OCSP ID' as curl does
 
 ## Goal
 
