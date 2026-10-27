@@ -4,8 +4,8 @@ title: Fix CGR-135: HTTP/2 response fields are not validated: upper-case names, 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitTests/Cgr135Tests.cs]
+depends-on: [BL-3667, BL-3668]
+touches: [Curl.Protocol.Http.UnitLibrary/Http2ResponseHead.cs, Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs, Curl.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Record-CurlExchange.ps1, Curl.Protocol.Http.UnitTests/Cgr135Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -92,7 +92,22 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr135Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 3, first claim): touches widened. The fix cannot stay in Http2ResponseHead.cs: the stream must enqueue a partial head, then fail the connection with GOAWAY PROTOCOL_ERROR, which lands in Http2StreamConnection.cs (held by BL-3667) and needs a locked GOAWAY send in Http2Session.cs (held by BL-3668); HttpTransferMessages.cs gets the new message; Record-CurlExchange.ps1 gained -Http2Frames to measure (no other task names either). Requeued until BL-3667 and BL-3668 are Done. The -Http2Frames extension is left uncommitted in the stash.
+- Recorder extension (Record-CurlExchange.ps1, stashed): `-Http2Frames 'H :status: 200|X-Upper: v','D! hello h2\n'`: with -Http2Origin, answers with these frames: 'H' HEADERS / 'D' DATA, '!' = END_STREAM; HEADERS fields '|'-separated, each sent as a literal with a new name exactly as written. REF runs through `wsl.exe -e curl` with `-ListenAddress 172.26.96.1` (the WSL gateway; 127.0.0.1 gives exit 7). Driver used: a pwsh loop over the scenarios with `-Http2Origin prior-knowledge -Response 'HTTP/1.1 200 OK\r\n\r\n' -CurlArgs '-sS','--http2-prior-knowledge','-i',<url>,'-w','\n[%{http_version} %{response_code} %{num_connects} %{size_download} %{size_header} %{num_headers}]\n'`.
+- REF-LINUX (curl 8.18.0, nghttp2 1.68) measured, every failing case also sends `GOAWAY last stream 0 error 1` (PROTOCOL_ERROR); passing cases GOAWAY error 0. Message form: `curl: (16) Invalid HTTP header field was received: frame type: 1, stream: 1, name: [<name>], value: [<value>]`. stdout = what was received before the bad field (status line and earlier valid lines, no blank line after them), then the -w line:
+  - upper (`:status 200|X-Upper: v`): 16, name [X-Upper] value [v]; stdout `HTTP/2 200 \r\n` + `\n[2 200 1 0 13 0]\n`.
+  - connhdr (`connection: close`), keepalivehdr (`keep-alive: timeout=5`), upgradehdr (`upgrade: h2c`), proxyconn (`proxy-connection: keep-alive`), resptegzip (`te: gzip`), unkpseudo (`:foo: bar`), dupstatus (second `:status: 200`): each 16 naming that field; stdout `HTTP/2 200 \r\n` + `[2 200 1 0 13 0]`.
+  - cltwo (`content-length: 9` twice): 16 naming the second; stdout `HTTP/2 200 \r\ncontent-length: 9\r\n` + `[2 200 1 0 32 1]`.
+  - pseudoafter (`x-a: 1|:status: 200`): exit 8 (!), message names [:status] value [200]; stdout only `\n[0 000 1 0 0 0]\n`.
+  - status101 (`:status: 101`, then a 200 head): 16 naming [:status] [101]; stdout only `[0 000 1 0 0 0]`.
+  - trpseudo (head, DATA `hello h2\n`, trailer `H! :status: 200`): 16 naming [:status] [200]; stdout full head `HTTP/2 200 \r\n\r\nhello h2\n` + `[2 200 1 10 15 0]`. uppertrailer (trailer `X-T: 1`): same, naming [X-T] [1].
+  - twoheaders (two `:status: 200` blocks, the second without END_STREAM, then DATA): 16 naming [:status] [200]; stdout `HTTP/2 200 \r\n\r\n` + `[2 200 1 0 15 0]` (field check comes before the END_STREAM check).
+  - trnoes (head, DATA `hello h2`, `H x-t: 1` without END_STREAM, `D! more`): `curl: (16) nghttp2 shuts down connection with error 1: PROTOCOL_ERROR`; stdout `HTTP/2 200 \r\n\r\nhello h2` + `[2 200 1 8 15 0]`.
+  - Controls that pass (exit 0): `te: trailers`; a good head with `x-a: 1` and trailer `x-t: 1` (trailer printed after the body, `hello h2\nx-t: 1\r\n`).
+- Plan for the next claim (nghttp2 1.68 `nghttp2_http_on_header` rules): add `Http2ResponseHead.InvalidFieldIndex(fields, isTrailer)` giving the first invalid field or -1: a pseudo-header is invalid in trailers, after a regular field, when it is not `:status`, a second `:status`, or `:status 101`; a regular name with an upper-case letter is invalid; `connection`, `keep-alive`, `proxy-connection`, `transfer-encoding`, `upgrade` invalid; `te` invalid unless `trailers` (case-insensitive); a second `content-length` or a non-digit one invalid; a regular field whose value holds CR/LF/NUL stays silently ignored first (CGR-011), as does a name with other non-token characters. Keep a bad `:status` value (not 101) on its measured exit 92 path. In `Http2StreamConnection.ReceiveHeadersAsync`: check fields first; on an invalid one, for a head whose first field is `:status`, enqueue the status line plus the valid lines before it with no blank line, store the failure as pending and throw it once `received` is drained (ReadAsync), so -i prints the partial head; send GOAWAY PROTOCOL_ERROR (last stream 0) via a new locked `Http2Session` method that also records connectionFailure; exit 8 (WeirdServerReply) when the head's first field is a regular one, else 16. Then a trailer HEADERS (after the final head) without END_STREAM fails with exit 16 `Http2ShutsDownConnection(ProtocolError)` and GOAWAY 1, its fields not written. Leave HTTP/3 alone (Http3StreamConnection also uses Format/StatusOf). Focused tests in Cgr135Tests.cs: InvalidFieldIndex cases plus one Http2StreamConnection replay (upper case -> exit 16 message, partial head).
+
 ## Log
 
 - 2026-10-26: Created from CGR-135 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs (held by BL-3667) and Http2Session.cs (held by BL-3668); REF measured and plan recorded in Notes
