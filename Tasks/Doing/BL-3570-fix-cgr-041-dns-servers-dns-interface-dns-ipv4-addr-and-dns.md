@@ -88,3 +88,4 @@ curl -sS --dns-ipv4-addr 127.0.0.1 http://127.0.0.1:20600/x
 - 2026-10-26: Created from CGR-041 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Needs Curl.Cli.UnitLibrary/CommandLineOptions.cs, held by BL-3545 (Doing); plan recorded under Notes
+- 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
