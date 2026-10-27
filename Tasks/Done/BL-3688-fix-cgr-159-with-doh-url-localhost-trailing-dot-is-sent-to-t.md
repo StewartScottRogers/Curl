@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/Cgr159Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-26
 ---
 # BL-3688 — Fix CGR-159: With --doh-url, "localhost." (trailing dot) is sent to the DoH server instead of resolving to loopback
 
@@ -60,17 +60,25 @@ curl -sS --doh-url http://127.0.0.1:21800/dns-query http://localhost.:21802/x -w
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr159Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Fix: `TcpConnector.IsLocalhost` now drops one trailing dot before it matches, so `localhost.` and `<name>.localhost.` get `::1`, `127.0.0.1` without a DoH query. The system resolver, the HTTPS query and `--interface` share that check, so they now treat these names the same way. curl's own localhost check also accepts the trailing-dot forms. No ADR, because this only matches curl.
+- Pipeline `feature` run as a direct change: the fix was one line, so no architect stage was needed (sensible default).
+- Measured with `Record-CurlExchange.ps1 -Port 21802 -ListenAddress ::1` and no DoH responder, because real curl sends no query. REF = curl 8.22.0 Schannel (`C:\Program Files\Git\ucrt64\bin\curl.exe`), PORT = `dotnet run --project Curl.Console --no-build --`:
+  - `curl -sS --doh-url http://127.0.0.1:21800/dns-query http://localhost.:21802/x -w "%{remote_ip} %{num_connects}\n"`: REF exit 0, stdout `::1 1`, stderr empty, request `GET /x HTTP/1.1`, `Host: localhost.:21802`, `User-Agent: curl/8.22.0`, `Accept: */*`. PORT identical: the stdout, stderr, exit code and request.bin hashes are equal. No files written by either. Before the fix PORT queried DoH and exited 6.
+  - Variant without `--doh-url` (already matched): REF and PORT are still identical in all four files.
+- Cgr159Tests: with the fix reverted, 5 of 8 cases failed; with it, all pass. dotnet build clean (0 warnings); fast tests all passed. Measure-CodeQuality -Library Curl.Networking.UnitLibrary: 0 failing members.
+- Linux/macOS: the change and its tests are platform-neutral (no path, OS text or certificate) and the fast tests pass here. Linux REF was not measured; the report gives the same Expected for both platforms.
 
 ## Log
 
 - 2026-10-26: Created from CGR-159 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Done. With --doh-url, localhost. resolves to loopback without a DoH query, as curl 8.22.0 does
