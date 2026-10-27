@@ -116,7 +116,9 @@ internal sealed partial class ManagedEasyTransfer
             return Finish(
                 CurlCode.AbortedByCallback,
                 abortedText,
-                new TransferInfo { EffectiveUrl = transferUrl, TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList });
+                TransferInfoFromReport.WithSchemeOf(
+                    Info with { EffectiveUrl = transferUrl, EffectiveMethod = EffectiveMethodOf(options), TransferId = transferId, ConnectionId = connectionId, CookieList = cookieList },
+                    transferUrl));
         }
 
         CurlCode code = result.ExitCode.ToCurlCode();
@@ -347,6 +349,59 @@ internal sealed partial class ManagedEasyTransfer
             TotalTime = sinceStart,
         };
     }
+
+    /// <summary>
+    /// The method a perform that ended with no report answers as <c>CURLINFO_EFFECTIVE_METHOD</c>, from the options as
+    /// curl 8.22.0's <c>getinfo_char</c> reads it: <c>CURLOPT_CUSTOMREQUEST</c>, else <c>HEAD</c> under
+    /// <c>CURLOPT_NOBODY</c>, <c>PUT</c> under <c>CURLOPT_UPLOAD</c>, <c>POST</c> for a post (<see cref="PostsOf" />)
+    /// and <c>GET</c> otherwise (CGR-128).
+    /// </summary>
+    /// <param name="options">The handle's options.</param>
+    /// <returns>The method.</returns>
+    internal static string EffectiveMethodOf(EasyOptions options) =>
+        options.Transfer.CustomRequest
+        ?? (options.Transfer.NoBody ? "HEAD"
+            : options.Transfer.Upload ? "PUT"
+            : PostsOf(options.Http) ? "POST"
+            : "GET");
+
+    /// <summary>
+    /// Whether the options post: <c>CURLOPT_POST</c>, or post fields or a MIME or form body not overridden by
+    /// <c>CURLOPT_HTTPGET</c> (<see cref="WithoutPostFieldsUnderHttpGet" />).
+    /// </summary>
+    /// <param name="http">The handle's HTTP options.</param>
+    /// <returns><see langword="true" /> for a post.</returns>
+    private static bool PostsOf(Api.Options.Http.EasyHttpOptions http) =>
+        http.Post || (!http.HttpGet && (http.PostFields is not null || http.MimePost is not null || http.HttpPost is not null));
+
+    /// <summary>
+    /// <paramref name="info" /> with the end points of the connection a perform opened as <c>CURLINFO_PRIMARY_IP</c>,
+    /// <c>PRIMARY_PORT</c>, <c>LOCAL_IP</c> and <c>LOCAL_PORT</c> (empty and 0 for one not known), and that connection
+    /// counted in <c>CURLINFO_NUM_CONNECTS</c> (CGR-128).
+    /// </summary>
+    /// <param name="info">The info so far.</param>
+    /// <param name="remote">The peer's end point, or <see langword="null" />.</param>
+    /// <param name="local">The local end point, or <see langword="null" />.</param>
+    /// <returns>The info with the connection.</returns>
+    private static TransferInfo WithConnectionEndPoints(TransferInfo info, System.Net.IPEndPoint? remote, System.Net.IPEndPoint? local) =>
+        info with
+        {
+            PrimaryIp = AddressOf(remote),
+            PrimaryPort = PortOf(remote),
+            LocalIp = AddressOf(local),
+            LocalPort = PortOf(local),
+            NumConnects = info.NumConnects + 1,
+        };
+
+    /// <summary>The address of <paramref name="endPoint" />, or empty for none.</summary>
+    /// <param name="endPoint">The end point, or <see langword="null" />.</param>
+    /// <returns>The address text.</returns>
+    private static string AddressOf(System.Net.IPEndPoint? endPoint) => endPoint?.Address.ToString() ?? string.Empty;
+
+    /// <summary>The port of <paramref name="endPoint" />, or 0 for none.</summary>
+    /// <param name="endPoint">The end point, or <see langword="null" />.</param>
+    /// <returns>The port.</returns>
+    private static long PortOf(System.Net.IPEndPoint? endPoint) => endPoint?.Port ?? 0;
 
     private CurlCode Finish(CurlCode code, string errorText, TransferInfo info)
     {

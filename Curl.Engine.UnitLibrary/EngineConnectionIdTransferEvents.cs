@@ -20,18 +20,24 @@ namespace Curl.Engine;
 /// <param name="connectionIds">The engine's <c>%{conn_id}</c> of each connection, by the pool's number for it.</param>
 /// <param name="takeConnectionId">Gives the transfer its <c>%{conn_id}</c>, taking the next one when it has none.</param>
 /// <param name="connectionIdTaken">Told the transfer's <c>%{conn_id}</c> each time it opens or reuses a connection.</param>
+/// <param name="connectionOpened">
+/// Told each connection the transfer opens, other than a second (data) connection, before <paramref name="connectionIdTaken" />;
+/// <see langword="null" /> for none.
+/// </param>
 internal sealed class EngineConnectionIdTransferEvents(
     ITransferEvents inner,
     EngineTransferState state,
     ConcurrentDictionary<long, long> connectionIds,
     Func<long> takeConnectionId,
-    Action<long> connectionIdTaken) : ITransferEvents
+    Action<long> connectionIdTaken,
+    Action<ConnectionOpenedEvent>? connectionOpened = null) : ITransferEvents
 {
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened)
     {
         if (!opened.IsSecondConnection)
         {
+            connectionOpened?.Invoke(opened);
             long connectionId = takeConnectionId();
             connectionIds[opened.ConnectionNumber] = connectionId;
             connectionIdTaken(connectionId);

@@ -67,6 +67,29 @@ internal static partial class TransferInfoFromReport
 
     private static bool RedirectRefused(TransferResult result) =>
         result.ExitCode == CurlExitCode.UnsupportedProtocol && result.ErrorMessage?.EndsWith("(in redirect)", StringComparison.Ordinal) == true;
+    /// <summary>
+    /// <paramref name="info" /> with <paramref name="scheme" /> as <c>CURLINFO_SCHEME</c> (lower cased) and its <c>CURLPROTO_*</c>
+    /// bit as <c>CURLINFO_PROTOCOL</c>, for a perform that ends with no report, such as a connect-only one (CGR-128).
+    /// </summary>
+    /// <param name="info">The info.</param>
+    /// <param name="scheme">The transfer's scheme.</param>
+    /// <returns>The info with the scheme and protocol.</returns>
+    internal static TransferInfo WithScheme(TransferInfo info, string scheme)
+    {
+        string lowered = scheme.ToLowerInvariant();
+        return info with { Scheme = lowered, Protocol = CurlProtoBitsByScheme.GetValueOrDefault(lowered) };
+    }
+
+    /// <summary>
+    /// <paramref name="info" /> with the scheme of <paramref name="url" /> (<see cref="WithScheme" />), unchanged when it
+    /// does not parse.
+    /// </summary>
+    /// <param name="info">The info.</param>
+    /// <param name="url">The transfer's URL.</param>
+    /// <returns>The info with the scheme and protocol.</returns>
+    internal static TransferInfo WithSchemeOf(TransferInfo info, string url) =>
+        SchemeOf(url) is { } scheme ? WithScheme(info, scheme) : info;
+
     private static string? SchemeOf(string effectiveUrl) =>
         CurlUrl.TryParse(effectiveUrl, pathAsIs: false, out CurlUrl? url) ? url.Scheme : null;
 

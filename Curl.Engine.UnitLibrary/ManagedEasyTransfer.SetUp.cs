@@ -278,7 +278,29 @@ internal sealed partial class ManagedEasyTransfer
             state,
             shared.ConnectionIdsByPoolNumber,
             () => state.ConnectionId ??= shared.Performer.TakeConnectionId(),
-            ShowConnectionOnInfo);
+            ShowConnectionOnInfo,
+            ShowConnectionEndPointsOnInfo);
+
+    /// <summary>
+    /// Puts the end points of a connection the running perform opened on <see cref="Info" /> at once and counts it in
+    /// <see cref="TransferInfo.NumConnects" />, as libcurl fills <c>CURLINFO_PRIMARY_IP</c>, <c>CURLINFO_LOCAL_IP</c> and
+    /// their ports once it connects, so a transfer a callback aborts still answers them (CGR-128, BL-3657).
+    /// </summary>
+    /// <param name="opened">The connection opened.</param>
+    private void ShowConnectionEndPointsOnInfo(ConnectionOpenedEvent opened) => Info = WithOpenedConnection(Info, opened);
+
+    /// <summary>
+    /// <paramref name="info" /> with <paramref name="opened" />'s end points (<see cref="WithConnectionEndPoints" />), its
+    /// <see cref="ConnectionOpenedEvent.UnixSocketRemoteIp" /> as the primary IP when it went over a Unix socket.
+    /// </summary>
+    /// <param name="info">The info so far.</param>
+    /// <param name="opened">The connection opened.</param>
+    /// <returns>The info with the connection.</returns>
+    internal static TransferInfo WithOpenedConnection(TransferInfo info, ConnectionOpenedEvent opened)
+    {
+        TransferInfo connected = WithConnectionEndPoints(info, opened.RemoteEndPoint, opened.LocalEndPoint);
+        return opened.UnixSocketRemoteIp is { } unixSocketIp ? connected with { PrimaryIp = unixSocketIp } : connected;
+    }
 
     /// <summary>
     /// Puts the connection the running perform took on <see cref="Info" /> at once (BL-2364) and notes when it was
