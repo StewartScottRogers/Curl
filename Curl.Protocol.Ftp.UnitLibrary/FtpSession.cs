@@ -234,6 +234,9 @@ internal sealed class FtpSession(
     /// <summary>The control connection <c>AUTH</c> upgraded to TLS, which the session owns.</summary>
     private IConnection? securedControl;
 
+    /// <summary>Whether <c>CCC</c> cleared TLS from the control connection, which is then never kept (CGR-165).</summary>
+    private bool controlCleared;
+
     /// <summary>Whether an accepted <c>PROT P</c> makes every data connection TLS.</summary>
     private bool protectData;
 
@@ -465,6 +468,11 @@ internal sealed class FtpSession(
         reused!.QuitsOnShutDown = false;
         entryPath = reused.EntryPath;
         protectData = reused.ProtectsData;
+        if (reused.SecuredControl is { } secured)
+        {
+            control.SwitchTo(secured);
+        }
+
         control.ReadFirst(reused.UnreadBytes);
         control.CancellationToken = context.CancellationToken;
         return null;
@@ -744,6 +752,7 @@ internal sealed class FtpSession(
         }
 
         control.SwitchTo(plaintext);
+        controlCleared = true;
         log.ControlCleared();
         return null;
     }
@@ -2689,18 +2698,23 @@ internal sealed class FtpSession(
     /// <summary>
     /// Hands the control connection back to the run's connection cache for the next URL, with
     /// what it knows of the connection, instead of sending <c>QUIT</c>, as curl 8.21.0 keeps a
-    /// control connection its <c>ftp_done</c> leaves valid (BL-1981). Only a pooled connection
-    /// the session still talks on, not one <c>AUTH</c> or <c>CCC</c> replaced, can be kept.
+    /// control connection its <c>ftp_done</c> leaves valid (BL-1981). A connection <c>AUTH</c>
+    /// secured is kept in TLS, which the next URL talks on; one <c>CCC</c> cleared is not, as
+    /// curl 8.22.0 never reuses it for a transfer that asked for TLS (CGR-165, BL-3694).
     /// </summary>
     /// <returns><see langword="true" /> when the connection was kept.</returns>
     private bool TryKeepControlConnection()
     {
         FtpKeptConnection kept = reused ?? new FtpKeptConnection(originalControl, FtpKeptConnection.LoginKeyOf(context), context.TimeProvider);
-        if (!ReferenceEquals(control.Connection, originalControl) || !originalControl.TryHoldSession(kept))
+        if (controlCleared || !originalControl.TryHoldSession(kept))
         {
             return false;
         }
 
+        kept.SecuredControl = ReferenceEquals(control.Connection, originalControl) ? null : control.Connection;
+
+        // The kept session owns AUTH's secured connection now, so disposing the session leaves it open.
+        securedControl = null;
         kept.Remember(entryPath, protectData, transferType, rememberedPath, control.UnreadBytes);
         kept.EpsvRefused = epsvRefused;
         kept.EprtRefused = eprtRefused;

@@ -72,6 +72,17 @@ internal sealed class FtpKeptConnection(IConnection connection, string loginKey,
     public static string LoginKeyOf(ITransferContext context) =>
         string.Join('\0', context.Credentials?.UserName, context.Credentials?.Password, context.FtpAccount, context.FtpAlternativeToUser, FtpTlsRequirements.Of(context), context.FtpCommandChannelClearing);
 
+    /// <summary>
+    /// Gets or sets the connection <c>AUTH</c> secured over the pooled one, which a reused
+    /// transfer and the closing <c>QUIT</c> talk on, as curl 8.22.0 keeps an explicit FTPS
+    /// control connection in TLS for the next URL (CGR-165, BL-3694); <see langword="null" />
+    /// when the session talks on the pooled connection itself.
+    /// </summary>
+    public IConnection? SecuredControl { get; set; }
+
+    /// <summary>Gets the connection the session talks on: the secured one, or else the pooled one.</summary>
+    private IConnection TalksOn => SecuredControl ?? connection;
+
     /// <summary>Tells whether the connection was made for the login <paramref name="key" /> names.</summary>
     /// <param name="key">A transfer's <see cref="LoginKeyOf" />.</param>
     /// <returns><see langword="true" /> when the logins match.</returns>
@@ -110,8 +121,8 @@ internal sealed class FtpKeptConnection(IConnection connection, string loginKey,
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, limit.Token);
         try
         {
-            await connection.WriteAsync(QuitCommand, linked.Token).ConfigureAwait(false);
-            await connection.FlushAsync(linked.Token).ConfigureAwait(false);
+            await TalksOn.WriteAsync(QuitCommand, linked.Token).ConfigureAwait(false);
+            await TalksOn.FlushAsync(linked.Token).ConfigureAwait(false);
             await ReadReplyLineAsync(linked.Token).ConfigureAwait(false);
         }
         catch (IOException)
@@ -130,7 +141,7 @@ internal sealed class FtpKeptConnection(IConnection connection, string loginKey,
         int read;
         do
         {
-            read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            read = await TalksOn.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
         while (read > 0 && Array.IndexOf(buffer, (byte)'\n', 0, read) < 0);
     }
