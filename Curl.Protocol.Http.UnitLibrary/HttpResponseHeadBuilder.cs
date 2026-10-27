@@ -50,9 +50,14 @@ internal sealed class HttpResponseHeadBuilder
     /// headers but keeping its bytes.
     /// </summary>
     /// <param name="statusLine">The status line.</param>
-    /// <exception cref="HttpTransferException">The heads grew past <see cref="MaximumHeadSize" /> (exit 56).</exception>
+    /// <exception cref="HttpTransferException">
+    /// The status line holds a NUL byte (exit 8, <c>Nul byte in header</c>), which curl 8.22.0
+    /// refuses before writing it, as it refuses one in a header line (CGR-116, BL-3645); or the
+    /// heads grew past <see cref="MaximumHeadSize" /> (exit 56).
+    /// </exception>
     internal void StartHead(HttpLine statusLine)
     {
+        RefuseNulByte(statusLine);
         headers.Clear();
         Append(statusLine.Content, statusLine.Terminator);
     }
@@ -74,11 +79,7 @@ internal sealed class HttpResponseHeadBuilder
     /// </exception>
     internal void AddLine(HttpLine line)
     {
-        if (line.Content.Contains('\0', StringComparison.Ordinal))
-        {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
-        }
-
+        RefuseNulByte(line);
         if (FoldsIntoPendingHeader(line))
         {
             Fold(line);
@@ -221,6 +222,14 @@ internal sealed class HttpResponseHeadBuilder
         if (headText.Length > MaximumHeadSize)
         {
             throw new HttpTransferException(CurlExitCode.RecvError, HttpTransferMessages.HeadTooLarge(headText.Length));
+        }
+    }
+
+    private static void RefuseNulByte(HttpLine line)
+    {
+        if (line.Content.Contains('\0', StringComparison.Ordinal))
+        {
+            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
         }
     }
 
