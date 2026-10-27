@@ -800,7 +800,7 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateInTheOpenSslBuild_Succeeds()
     {
-        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+        var caDirectory = WriteCaDirectory((ServerCertificateHashName(0), s_serverCertificate.ExportCertificatePem()));
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
@@ -815,9 +815,9 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateAmongUnusableFilesInTheOpenSslBuild_Succeeds()
     {
         var caDirectory = WriteCaDirectory(
-            ("corrupt.pem", CorruptCertificatePem),
-            ("undecodable.pem", UndecodableCertificatePem),
-            ("server.pem", s_serverCertificate.ExportCertificatePem()));
+            (ServerCertificateHashName(0), CorruptCertificatePem),
+            (ServerCertificateHashName(1), UndecodableCertificatePem),
+            (ServerCertificateHashName(2), s_serverCertificate.ExportCertificatePem()));
         Directory.CreateDirectory(Path.Combine(caDirectory, "subdirectory"));
 
         var result = await HandshakeAsync(
@@ -831,9 +831,9 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryWhoseOnlyFileCannotBeReadInTheOpenSslBuild_AddsNothing()
     {
-        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+        var caDirectory = WriteCaDirectory((ServerCertificateHashName(0), s_serverCertificate.ExportCertificatePem()));
         await using var lockedFile = new FileStream(
-            Path.Combine(caDirectory, "server.pem"), FileMode.Open, FileAccess.Read, FileShare.None);
+            Path.Combine(caDirectory, ServerCertificateHashName(0)), FileMode.Open, FileAccess.Read, FileShare.None);
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, OpenSslBuild);
@@ -886,7 +886,7 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryAndAnUnrelatedCaCertificateFileInTheOpenSslBuild_TrustsBoth()
     {
         var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
-        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+        var caDirectory = WriteCaDirectory((ServerCertificateHashName(0), s_serverCertificate.ExportCertificatePem()));
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile, CaCertificateDirectory: caDirectory),
@@ -937,7 +937,7 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateInTheSchannelBuild_IgnoresTheDirectory()
     {
-        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+        var caDirectory = WriteCaDirectory((ServerCertificateHashName(0), s_serverCertificate.ExportCertificatePem()));
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), CertificateHost, SslProtocols.None, SchannelBuild);
@@ -952,7 +952,7 @@ public sealed partial class SslStreamTlsProviderTests
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryHoldingTheServerCertificateButAnotherHostNameInTheOpenSslBuild_ReportsNoAlternativeNameMatches()
     {
-        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+        var caDirectory = WriteCaDirectory((ServerCertificateHashName(0), s_serverCertificate.ExportCertificatePem()));
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateDirectory: caDirectory), "wrong.example", SslProtocols.None, OpenSslBuild);
@@ -969,7 +969,7 @@ public sealed partial class SslStreamTlsProviderTests
     public async Task AuthenticateAsClientAsync_WithCaCertificateDirectoryAndAnUnrelatedCaCertificateFileInTheSchannelBuild_TrustsTheFileAlone()
     {
         var caFile = WriteCaFile("unrelated.pem", CreateUnrelatedAuthorityPem());
-        var caDirectory = WriteCaDirectory(("server.pem", s_serverCertificate.ExportCertificatePem()));
+        var caDirectory = WriteCaDirectory((ServerCertificateHashName(0), s_serverCertificate.ExportCertificatePem()));
 
         var result = await HandshakeAsync(
             new TlsClientOptions(CaCertificateFile: caFile, CaCertificateDirectory: caDirectory),
@@ -1033,6 +1033,10 @@ public sealed partial class SslStreamTlsProviderTests
         File.WriteAllText(path, content);
         return path;
     }
+
+    // A --capath file is read only under its subject hash name, as openssl rehash names it (CGR-111).
+    private static string ServerCertificateHashName(int number) =>
+        $"{OpenSslSubjectNameHash.Of(s_serverCertificate.SubjectName)}.{number}";
 
     private string WriteCaDirectory(params (string FileName, string Content)[] files)
     {

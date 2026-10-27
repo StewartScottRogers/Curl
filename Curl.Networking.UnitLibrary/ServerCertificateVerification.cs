@@ -537,18 +537,49 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private X509Certificate2Collection ReadCaCertificateDirectory()
     {
         var certificates = new X509Certificate2Collection();
-        var directory = options.CaCertificateDirectory;
-        if (matchesSchannelBuild || directory is null)
+        var directories = options.CaCertificateDirectory;
+        if (matchesSchannelBuild || directories is null)
         {
             return certificates;
         }
 
-        foreach (var file in ListFilesOrNothing(directory))
+        foreach (var directory in directories.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            ImportParsableCertificates(certificates, ReadTextOrNothing(file));
+            foreach (var subjectHash in SubjectHashesNamedIn(directory))
+            {
+                ImportHashedCertificates(certificates, directory, subjectHash);
+            }
         }
 
         return certificates;
+    }
+
+    // OpenSSL's hashed directory lookup (by_dir.c, ADR-0835) opens only files named
+    // <subject hash>.<n>, as c_rehash and openssl rehash name them; any other file adds nothing
+    // (CGR-111).
+    private static IEnumerable<string> SubjectHashesNamedIn(string directory) =>
+        ListFilesOrNothing(directory)
+            .Select(Path.GetFileName)
+            .Where(IsHashedCertificateFileName)
+            .Select(name => name![..8])
+            .Distinct(StringComparer.Ordinal);
+
+    private static bool IsHashedCertificateFileName(string? name) =>
+        name is { Length: > 9 }
+        && name[8] == '.'
+        && name.AsSpan(0, 8).ContainsAnyExcept("0123456789abcdef") is false
+        && name.AsSpan(9).ContainsAnyExceptInRange('0', '9') is false;
+
+    // OpenSSL reads <hash>.0, <hash>.1 and on until a number is missing, and finds in them only
+    // the certificates whose subject has that hash.
+    private static void ImportHashedCertificates(X509Certificate2Collection certificates, string directory, string subjectHash)
+    {
+        for (var number = 0; File.Exists(Path.Combine(directory, $"{subjectHash}.{number}")); number++)
+        {
+            var inFile = new X509Certificate2Collection();
+            ImportParsableCertificates(inFile, ReadTextOrNothing(Path.Combine(directory, $"{subjectHash}.{number}")));
+            certificates.AddRange(inFile.Where(certificate => OpenSslSubjectNameHash.Of(certificate.SubjectName) == subjectHash).ToArray());
+        }
     }
 
     // A --capath that is empty, malformed, missing, not a directory or cannot be listed adds
