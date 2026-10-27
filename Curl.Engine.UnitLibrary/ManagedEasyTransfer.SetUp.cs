@@ -9,6 +9,7 @@ using Curl.Api.EngineContracts.WebSocket;
 using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Api.Options.Authentication;
+using Curl.Api.Options.Behaviour;
 using Curl.Api.Options.Proxy;
 using Curl.Core;
 using Curl.Core.Hsts;
@@ -224,9 +225,11 @@ internal sealed partial class ManagedEasyTransfer
     /// <summary>
     /// The running transfer, the events it reports to and what records its verify codes: the runner's
     /// <paramref name="toolEvents" /> and their state as they are, whose recorders number <c>%{conn_id}</c> and keep the
-    /// verify codes, so the handler sees the runner's own events and nothing records here (BL-2394); or a new state and
-    /// the handle's own events (<see cref="EventsOf" />) kept by <see cref="TlsVerifyResultRecordingTransferEvents" />
-    /// for <c>CURLINFO_SSL_VERIFYRESULT</c> without them (ADR-0561).
+    /// verify codes, so the handler sees the runner's own events and nothing records here (BL-2394), except that under
+    /// <c>-Y</c>/<c>-y</c> they pass through <see cref="AbortedHeadRecordingTransferEvents" /> alone, so a low-speed abort
+    /// keeps its response code, HTTP version and sizes for <c>-w</c> as curl does (BL-3673); or a new state and the
+    /// handle's own events (<see cref="EventsOf" />) kept by <see cref="TlsVerifyResultRecordingTransferEvents" /> for
+    /// <c>CURLINFO_SSL_VERIFYRESULT</c> without them (ADR-0561).
     /// </summary>
     /// <param name="toolEvents">The runner's events and state, or <see langword="null" /> for a handle's own.</param>
     /// <param name="options">The handle's options.</param>
@@ -235,7 +238,8 @@ internal sealed partial class ManagedEasyTransfer
     {
         if (toolEvents is not null)
         {
-            return (toolEvents.State, toolEvents.Events, null, null, null);
+            AbortedHeadRecordingTransferEvents? toolAbortedHead = WatchesLowSpeed(options.Transfer) ? new(toolEvents.Events) : null;
+            return (toolEvents.State, toolAbortedHead ?? toolEvents.Events, null, null, toolAbortedHead);
         }
 
         EngineTransferState state = new();
@@ -244,6 +248,12 @@ internal sealed partial class ManagedEasyTransfer
         TlsVerifyResultRecordingTransferEvents recorder = new(negotiateFailure);
         return (state, recorder, recorder, negotiateFailure, abortedHead);
     }
+
+    /// <summary>Tells whether <c>-Y</c> or <c>-y</c> is set, so a <c>-Y</c>/<c>-y</c> watchdog may end the transfer.</summary>
+    /// <param name="transfer">The transfer's options.</param>
+    /// <returns><see langword="true" /> when the low-speed limit or time is above zero.</returns>
+    private static bool WatchesLowSpeed(EasyTransferOptions transfer) =>
+        transfer.LowSpeedLimit > 0 || transfer.LowSpeedTime > TimeSpan.Zero;
 
     /// <summary>
     /// The token the context stops on: the runner's abort token as it is when the runner gave <paramref name="toolProgress" />
