@@ -69,6 +69,7 @@ internal static class EasyProtocolOptionSetters
         setters[CurlOption.MailRcpt] = new(SetMailRecipients);
         setters[CurlOption.MailAuth] = new(SetMailAuth);
         setters[CurlOption.MailRcptAllowfails] = new(SetMailRecipientAllowFails);
+        setters[CurlOption.UploadFlags] = new(SetUploadFlags);
         setters[CurlOption.TftpBlksize] = new(SetTftpBlockSize);
         setters[CurlOption.TftpNoOptions] = new(SetTftpNoOptions);
         setters[CurlOption.Telnetoptions] = new(SetTelnetOptions);
@@ -157,6 +158,9 @@ internal static class EasyProtocolOptionSetters
     private static CurlCode SetMailAuth(ref EasyOptions o, object? v) => Smtp(ref o, m => m with { MailAuth = (string?)v });
 
     private static CurlCode SetMailRecipientAllowFails(ref EasyOptions o, object? v) => Smtp(ref o, m => m with { MailRecipientAllowFails = IsOn(v) });
+
+    // setopt.c stores CURLOPT_UPLOAD_FLAGS as (unsigned char)arg and accepts every value.
+    private static CurlCode SetUploadFlags(ref EasyOptions o, object? v) => Smtp(ref o, m => m with { UploadFlags = unchecked((byte)NumberOf(v)) });
 
     /// <summary><c>CURLOPT_TFTP_BLKSIZE</c>: below 8 becomes 512 and above 65464 becomes 65464, as libcurl does.</summary>
     private static CurlCode SetTftpBlockSize(ref EasyOptions o, object? v)
