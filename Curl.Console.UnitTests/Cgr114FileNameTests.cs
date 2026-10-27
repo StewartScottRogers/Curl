@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Console;
 
 /// <summary>
-/// CGR-114 (BL-3900, ADR-0843): curl 8.22.0's mingw build on a Windows-1252 host writes <c>-o 日本語.bin</c>
+/// CGR-114 (BL-3900, ADR-0846): curl 8.22.0's mingw build on a Windows-1252 host writes <c>-o 日本語.bin</c>
 /// as <c>___.bin</c>, refuses <c>-T 日本.txt</c> with <c>curl: cannot open '??.txt'</c> and exit 26, and
 /// creates <c>cafÃ©.bin</c> for a UTF-8 config file's <c>output = "café.bin"</c>. The arguments are read
 /// through an injected Windows-1252 as <c>Program</c> reads them through the host's code page, so the tests

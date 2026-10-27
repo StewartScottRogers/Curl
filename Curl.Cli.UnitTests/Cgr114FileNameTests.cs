@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Cli;
 
 /// <summary>
-/// CGR-114 (BL-3900, ADR-0843): curl 8.22.0's mingw build opens a UTF-8 config file's <c>output</c>
+/// CGR-114 (BL-3900, ADR-0846): curl 8.22.0's mingw build opens a UTF-8 config file's <c>output</c>
 /// value as the file's bytes read in the ANSI code page, so on Windows the parser re-spells it there,
 /// while an <c>-o</c> argument stays as the command line gave it and other platforms read UTF-8.
 /// </summary>

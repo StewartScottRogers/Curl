@@ -1,4 +1,4 @@
-# ADR-0843: On Windows, -o, -T and config-file output names take the mingw curl's ANSI bytes
+# ADR-0846: On Windows, -o, -T and config-file output names take the mingw curl's ANSI bytes
 
 - Status: Accepted
 - Date: 2026-10-26
