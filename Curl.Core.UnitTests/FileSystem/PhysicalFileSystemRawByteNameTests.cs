@@ -9,8 +9,10 @@ namespace Curl.Core.FileSystem;
 /// <summary>
 /// Drives <see cref="PhysicalFileSystem" />'s read open of a <see cref="RawBytePath" /> holding a
 /// byte that is not valid UTF-8 (CGR-114, BL-3899): with an injected raw opener on every platform,
-/// and on Linux and macOS against a temporary file whose name is those raw bytes, as curl's
-/// <c>open()</c> takes them.
+/// on Linux against a temporary file whose name is those raw bytes, as curl's <c>open()</c> takes
+/// them, and on Linux and macOS against such a name that does not exist. macOS's file systems
+/// refuse to create a name that is not valid UTF-8 (<c>EILSEQ</c>), so no such file can exist
+/// there for a test to open (BL-3904).
 /// </summary>
 [TestClass]
 public sealed partial class PhysicalFileSystemRawByteNameTests
@@ -149,7 +151,7 @@ public sealed partial class PhysicalFileSystemRawByteNameTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    [OSCondition(OperatingSystems.Linux)]
     public async Task OpenForReadAsync_FileNamedByRawBytesOnUnix_OpensThoseBytes()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
