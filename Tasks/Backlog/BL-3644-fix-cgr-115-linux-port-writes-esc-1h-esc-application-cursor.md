@@ -4,8 +4,8 @@ title: Fix CGR-115: Linux: PORT writes ESC[?1h ESC= (application cursor/keypad m
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Console.UnitTests/Cgr115Tests.cs, Curl.Console/TerminalColumns.cs]
+depends-on: [BL-3892]
+touches: [Curl.Console.UnitTests/Cgr115Tests.cs, Curl.Console/TerminalColumns.cs, Curl.Console/NativeTerminalWindowSize.cs, Curl.Console/StandardOutputOpener.cs, Curl.Console/Program.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -96,7 +96,13 @@ EV\verify\linux\vrun.sh
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr115Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-26 (lane 3, first claim, no code edited): the cause is wider than `TerminalColumns.cs`. On Unix .NET's `ConsolePal.EnsureConsoleInitialized` (which writes terminfo `keypad_xmit`, `ESC[?1h ESC=`, to stdout's terminal, or stdin's when stdout is redirected) runs from `Console.WindowWidth` AND from every write through a `UnixConsoleStream`: `ConsolePal.WriteFromConsoleStream` calls it. That was checked by decoding the IL of the linux-x64 10.0.14 `System.Console.dll` from the NuGet cache with a System.Reflection.Metadata file app. Curl writes through such streams in two places: `Program.cs`'s `System.Console.OpenStandardError()` and `StandardOutputOpener`'s console branch (stdout on a terminal). So the fix needs three parts:
+  1. `TerminalColumns`: off Windows, read the width as curl's `get_terminal_columns` does, `ioctl(STDIN_FILENO, TIOCGWINSZ)`, through the runtime's own shim. The linux-x64 System.Console metadata gives its signature as `int SystemNative_GetWindowSize(IntPtr fd, WinSize*)`, where WinSize is 4 x ushort (Row, Col, XPixel, YPixel); it returns 0 on success. Use `[LibraryImport("libSystem.Native", EntryPoint = "SystemNative_GetWindowSize")]` in a new `NativeTerminalWindowSize.cs`, `[ExcludeFromCodeCoverage]` as `NativeRegularFileTest` is (ADR-0083). Don't P/Invoke libc `ioctl`: it is variadic, which breaks on macOS arm64. Keep `Console.WindowWidth` (stderr, minus one) on Windows only, behind a testable `runsOnWindows` choice so both branches are covered on Windows.
+  2. `StandardOutputOpener`: off Windows, open stdout on a terminal as the same unbuffered `FileStream` over fd 1 as the redirected branch, not `Console.OpenStandardOutput()`.
+  3. `Program.cs`: off Windows, open stderr as an unbuffered `FileStream` over fd 2 (still inside `WriteFailureIgnoringStream`), not `Console.OpenStandardError()`. `OpenStandardInput` is fine: reads do not initialise the console.
+  Requeued behind BL-3892, which holds `Curl.Console/Program.cs` (in Doing on origin/work/dark-factory). Touches widened to the three files above for that reason. Write an ADR for the decision. The unit test goes in `Cgr115Tests.cs`: the width read picks the stdin-terminal reader off Windows and never calls the window-width reader, and the opener picks the handle stream for a terminal stdout off Windows.
 ## Log
 
 - 2026-10-26: Created from CGR-115 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-26: Doing -> Backlog. Needs Curl.Console/Program.cs, held by BL-3892 (Doing); fix plan recorded in Notes
