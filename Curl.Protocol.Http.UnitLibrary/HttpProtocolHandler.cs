@@ -2212,7 +2212,8 @@ public sealed class HttpProtocolHandler(
     /// <see cref="StreamRefusedOutcome" /> says when the server refused its stream; sent
     /// again once on a fresh connection when a connection that already carried a request died
     /// before the response
-    /// (<see cref="DiedBeforeResponse" />); and final otherwise.
+    /// (<see cref="DiedBeforeResponse" />); and final otherwise, keeping the connection alive
+    /// when only the request's HTTP/2 stream was reset (CGR-140).
     /// </summary>
     private static HttpAttemptOutcome FailedOutcome(HttpRequestPlan plan, bool reusedConnection, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpTransferException failure, TransferResult failed)
     {
@@ -2228,7 +2229,7 @@ public sealed class HttpProtocolHandler(
 
         return DiedBeforeResponse(plan, reusedConnection, headReader, failure)
             ? new HttpAttemptOutcome(failed, plan.OnFreshConnection(), KeepsAlive: false) { DiedBeforeResponse = true }
-            : new HttpAttemptOutcome(failed, null, KeepsAlive: false);
+            : new HttpAttemptOutcome(failed, null, KeepsAlive: failure.LeavesConnectionIntact);
     }
 
     /// <summary>

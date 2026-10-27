@@ -392,13 +392,16 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// Gives the transfer failure curl reports for a failure of the stream or its connection,
     /// or <see langword="null" /> for one that passes through, such as an <see cref="IOException" />.
     /// A reset with HTTP_1_1_REQUIRED is marked <see cref="HttpTransferException.RequiresHttp11" />,
-    /// which the handler sends again over HTTP/1.1 on a new connection (CGR-032).
+    /// which the handler sends again over HTTP/1.1 on a new connection (CGR-032); any reset is
+    /// marked <see cref="HttpTransferException.LeavesConnectionIntact" />, since it ends only the
+    /// stream and the next transfer goes on the same connection (CGR-140).
     /// </summary>
     private HttpTransferException? FailureOf(Exception exception) => IsRefusal(exception) ? Refused() : exception switch
     {
         Http2StreamResetException reset => new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(reset.StreamId, reset.ErrorCode))
         {
             RequiresHttp11 = reset.ErrorCode == Http2ErrorCode.Http11Required,
+            LeavesConnectionIntact = true,
         },
         Http2ProtocolException error => new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode)),
         Http2GoAwayException => new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed),

@@ -35,6 +35,13 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal bool RequiresHttp11 { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the failure ended only the request's HTTP/2 stream - the
+    /// server reset it - so its connection stays open for the next transfer, as curl 8.18.0 with
+    /// nghttp2 leaves a multiplexed connection intact after one stream fails (CGR-140).
+    /// </summary>
+    internal bool LeavesConnectionIntact { get; init; }
+
+    /// <summary>
     /// Gets the <c>-v</c> lines the handler reports for the failure, in order, once the head
     /// lines it holds are reported; none by default. Too many response headers reports its
     /// message, and among a chunked body's trailers also
