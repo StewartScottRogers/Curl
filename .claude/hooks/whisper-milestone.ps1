@@ -50,6 +50,7 @@ $ErrorActionPreference = 'Stop'
 # nothing here speaks - not the hook's phrases, not the Backlog depth, not the factory's
 # "CI failure filed". One file outside the repository, so every lane and session obeys it
 # at once. Delete it to turn the whispers back on.
+if ($PSVersionTable.PSEdition -eq 'Core' -and -not $IsWindows) { exit 0 }
 if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'Curl\audio-off')) { exit 0 }
 
 function Invoke-Whisper([string[]] $Phrases, [int] $PauseSeconds = 0) {
