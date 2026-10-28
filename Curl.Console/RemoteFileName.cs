@@ -28,9 +28,14 @@ internal static class RemoteFileName
     /// Takes the file name from a URL's path.
     /// </summary>
     /// <param name="absolutePath">The URL's path, as <see cref="Protocol.Abstractions.CurlUrl.AbsolutePath" /> gives it.</param>
+    /// <remarks>
+    /// A backslash also ends a name, though not a dot segment: <c>/a\b.txt</c> writes
+    /// <c>b.txt</c> and <c>/x/a\</c> writes <c>a</c>, on Windows and Linux alike (curl 8.21.0
+    /// measured 2026-10-28, CGR-064, BL-3593).
+    /// </remarks>
     /// <returns>
-    /// The last segment that is not empty of the path with its dot segments resolved, or
-    /// <see langword="null" /> when no such segment is left.
+    /// The last part that is not empty of the path with its dot segments resolved, split at
+    /// <c>/</c> and <c>\</c>, or <see langword="null" /> when no such part is left.
     /// </returns>
     internal static string? FromUrlPath(string absolutePath)
     {
@@ -40,7 +45,9 @@ internal static class RemoteFileName
             KeepOrDropSegment(segments, segment);
         }
 
-        return segments.LastOrDefault(segment => segment.Length != 0);
+        return segments
+            .SelectMany(segment => segment.Split('\\'))
+            .LastOrDefault(part => part.Length != 0);
     }
 
     /// <summary>

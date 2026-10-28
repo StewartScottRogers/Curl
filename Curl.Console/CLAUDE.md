@@ -136,7 +136,8 @@ way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
 segment, still percent-encoded, after the `.` and `..` segments `--path-as-is` leaves are
-resolved, `%2e` counted as a dot, as curl's `dedotdotify` does (CGR-063, BL-3592); none gives `curl_response` and curl's
+resolved, `%2e` counted as a dot, as curl's `dedotdotify` does (CGR-063, BL-3592), and then
+the part after its last backslash, so `/a\b.txt` names `b.txt` (CGR-064, BL-3593); none gives `curl_response` and curl's
 `Warning: No remote filename` line unless `-s`). On Windows a remote name also goes through
 `WindowsOutputFileNameSanitizer.SanitizeRemoteName` (`:` becomes `_`, DOS device names are
 renamed). `--output-dir` is put in front of either with `/`, as typed. `--create-dirs` makes
