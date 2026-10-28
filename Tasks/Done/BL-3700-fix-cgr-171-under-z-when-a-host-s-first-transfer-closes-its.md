@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests/Cgr171Tests.cs, Curl.Console/ParallelHostQueue.cs]
+touches: [Curl.Console.UnitTests/Cgr171Tests.cs, Curl.Console/ParallelHostQueue.cs, Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitLibrary/ConnectionCache.cs, Curl.Networking.UnitLibrary/CLAUDE.md, Curl.Networking.UnitTests/Cgr171Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3700 — Fix CGR-171: Under -Z, when a host's first transfer closes its connection (Connection: close or a -f error), PORT runs the waiting transfers one at a...
 
@@ -62,17 +62,37 @@ curl -Z -s -w "%{urlnum} %{exitcode} %{http_code}\n" -o NUL -o NUL -o NUL "http:
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr171Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-28 (lane 8): Cause was not `ParallelHostQueue` but the pool: `PoolingConnector.WaitsForMultiplexing`
+  made the second released transfer wait on the first one's connection being opened until its response
+  arrived. Fix (ADR-0866): a connection's first HTTP/1 session (`ConcurrentTransferLimit` null) records its
+  key in `ConnectionCache.KeysKnownNotToMultiplex`, and no transfer waits for multiplexing on such a key.
+  Touches widened to `Curl.Networking.UnitLibrary/PoolingConnector.cs`, `ConnectionCache.cs`, its `CLAUDE.md`
+  and `Curl.Networking.UnitTests/Cgr171Tests.cs` (no Doing task on origin/work/dark-factory named them); the
+  focused test lives there, the fixed library's own test project, so the Console files were left unchanged.
+- Measured with a C# loopback server (per-path `d=` delay, `close=1`, `s=`), curl 8.22.0 Schannel (Git ucrt64)
+  and Curl's Debug build, three runs each, both identical every run:
+  `curl -Z -s -w "%{urlnum} %{exitcode} %{http_code}\n" -o NUL -o NUL -o NUL "http://127.0.0.1:P/a?d=600&close=1" "http://127.0.0.1:P/b?d=100" "http://127.0.0.1:P/c?d=300"`
+  -> stdout `0 0 200\n1 0 200\n2 0 200\n`, exit 0, empty stderr; with `-f` and `a?d=600&s=500`
+  -> `0 22 500\n1 0 200\n2 0 200\n`, exit 22, empty stderr. Server timeline: both now open b and c on two
+  connections within a few ms of a ending (curl sends b's request first, Curl c's, ADR-0768's order; not
+  visible in output). Requests are default GETs, unchanged by this fix. No files written (`-o NUL`).
+- Unit test `Cgr171Tests.ConnectAsync_AfterTheKeysFirstConnectionHeldAnHttp1Session_...` failed with the
+  `FindShareable` check reverted and passes with it. Fast tests: 44346 passed, 0 failed. Measure-CodeQuality
+  for Curl.Networking.UnitLibrary: 0 failing members. CI on Linux/macOS: the change and tests are pure
+  in-memory and platform-neutral.
+
 ## Log
 
 - 2026-10-26: Created from CGR-171 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Under -Z a host's waiting HTTP/1 transfers open side by side after its first ends, as curl 8.22.0 does (CGR-171)
