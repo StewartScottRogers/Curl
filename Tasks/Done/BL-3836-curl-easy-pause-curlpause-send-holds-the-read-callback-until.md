@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/CallbackReadStream.cs, Curl.Engine.UnitTests/CallbackReadStreamPauseByApiTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3836 — curl_easy_pause(CURLPAUSE_SEND) holds the read callback until unpaused
 
@@ -22,12 +22,15 @@ BL-3564 (CGR-035) made `CallbackWriteStream.WriteAsync` wait on the handle's `Ea
 
 ## Acceptance criteria
 
-- [ ] `CallbackReadStream.ReadAsync` calls no read callback while the gate has `CurlPause.Send` set, and calls it once the gate is cleared; a focused test in `Curl.Engine.UnitTests/CallbackReadStreamPauseByApiTests.cs` fails before the change and passes after it.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `CallbackReadStream.ReadAsync` calls no read callback while the gate has `CurlPause.Send` set, and calls it once the gate is cleared; a focused test in `Curl.Engine.UnitTests/CallbackReadStreamPauseByApiTests.cs` fails before the change and passes after it.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Added the one-line pre-wait on `CurlPause.Send` before the first read callback call, as `CallbackWriteStream` does. Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members. Linux and macOS CI: change and test are platform-neutral.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: f42267b0 779790c0.
+- 2026-10-28: Doing -> Done. ReadAsync waits on the gate for CurlPause.Send before calling the read callback
