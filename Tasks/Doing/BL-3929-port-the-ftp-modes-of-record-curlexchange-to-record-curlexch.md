@@ -41,3 +41,4 @@ pass did.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 6954d3e9 6a11b65a 32b5f73e.
