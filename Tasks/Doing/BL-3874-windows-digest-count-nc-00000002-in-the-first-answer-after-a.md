@@ -31,3 +31,4 @@ Found by BL-3606 (ADR-0924), measured 2026-10-26 with `Record-CurlExchange.ps1` 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 9f476610 d7461e94 779790c0.
