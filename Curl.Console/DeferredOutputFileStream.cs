@@ -139,6 +139,25 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     internal string? OpenFailureWarning { get; private set; }
 
     /// <summary>
+    /// Gets the size of the write (or of the <c>Content-Disposition</c> line) that failed because the
+    /// file could not be opened, or <see langword="null" /> while none has.
+    /// </summary>
+    internal long? FailedWriteLength => failedWriteLength;
+
+    /// <summary>
+    /// Hands over <see cref="OpenFailureWarning" /> to be printed where the failure is reported, and clears it
+    /// so the end of the transfer does not print it again.
+    /// </summary>
+    /// <returns>The warning, or <see langword="null" /> when none is pending.</returns>
+    internal string? TakeOpenFailureWarning()
+    {
+        string? warning = OpenFailureWarning;
+        OpenFailureWarning = null;
+
+        return warning;
+    }
+
+    /// <summary>
     /// Gets a value indicating whether a <c>Content-Disposition</c> header has named the file
     /// (<see cref="TryOpenUnderNameAsync" />), whether or not it could then be opened. It lasts
     /// for the whole transfer, <c>--retry</c> attempts included, as curl 8.21.0's

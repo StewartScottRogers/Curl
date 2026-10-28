@@ -3150,9 +3150,12 @@ internal sealed class CurlCommandRunner(
         ITransferEvents recorded = options.WriteOut is null
             ? events
             : new ResponseCodeRecordingTransferEvents(new TlsResultRecordingTransferEvents(events, state), state);
+        ITransferEvents withFileFailure = options.Trace != TraceKind.None
+            ? new OutputFileOpenFailureTransferEvents(recorded, state, options.Silent ? null : eventStandardError)
+            : recorded;
         state.Events = options.WriteOut is null && !options.TraceIds
-            ? recorded
-            : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
+            ? withFileFailure
+            : new ConnectionIdRecordingTransferEvents(withFileFailure, state, connectionIdsByPoolNumber, takeConnectionId);
         return EventsBeforeConnecting(transfer);
     }
 
@@ -4461,6 +4464,7 @@ internal sealed class CurlCommandRunner(
         ProxyEndpoint? proxy)
     {
         DeferredOutputFileStream output = CreateOutputFileStream(options, target.Path, resumeFrom);
+        Running.OutputFile = output;
         TransferResult completed;
         try
         {

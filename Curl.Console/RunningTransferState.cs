@@ -124,6 +124,12 @@ internal sealed class RunningTransferState(
     internal string? OutputFileOpenWarning { get; set; }
 
     /// <summary>
+    /// Gets or sets the transfer's <c>-o</c> file, which <see cref="OutputFileOpenFailureTransferEvents" /> asks
+    /// whether it could be opened; <see langword="null" /> when the body goes elsewhere.
+    /// </summary>
+    internal DeferredOutputFileStream? OutputFile { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the handler's transfer succeeded and only creating
     /// the empty <c>-o</c> file afterwards failed it with exit 23, so the progress meter finishes
     /// with curl 8.21.0's done rows, as after a success (BL-2039).
