@@ -365,14 +365,13 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task Pause_GivenDirections_SucceedsAndRecordsThem()
+    public async Task Pause_NoPerformRunning_IsBadFunctionArgument()
     {
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
 
         CurlCode code = easy.Pause(CurlPause.Receive);
 
-        Assert.AreEqual(CurlCode.Ok, code);
-        Assert.AreEqual(CurlPause.Receive, easy.PausedDirections);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, code);
     }
 
     [TestMethod]

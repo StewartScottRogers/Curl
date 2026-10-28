@@ -285,7 +285,7 @@ last one on `TransferReport.ProxyError`. BL-2368 added `CURLINFO_CERTINFO` under
 one list per `TransferReport.PeerCertificates` entry, each `label:value` line of `Curl.Output`'s
 `PeerCertificateText` one string and its PEM block the last, `Cert:` and the block
 (`TransferInfoFromReport.CertInfoRecordsOf`). The rest keep their fresh-handle defaults until BL-2369. `Duplicate` copies the options and none of the results, `Reset` restores
-`new EasyOptions()` and a fresh handle's `Info` keeping only its `TransferId` and `CookieList`, as `curl_easy_reset` calls `Curl_initinfo` (response code 0, file time -1; upstream tests 1532 and 1534, BL-2644), `Pause` records the directions and returns `Ok`, and `UpkeepAsync` returns
+`new EasyOptions()` and a fresh handle's `Info` keeping only its `TransferId` and `CookieList`, as `curl_easy_reset` calls `Curl_initinfo` (response code 0, file time -1; upstream tests 1532 and 1534, BL-2644), `Pause` records the directions and returns `Ok` during a perform and `BadFunctionArgument` otherwise (CGR-246), and `UpkeepAsync` returns
 `Ok`. `WebSocket` came with BL-2443, `Headers` with BL-2446 and `Connection` with BL-2423 (below). Their tests are
 `ManagedCurlEngineTests`, `ManagedEasyTransferTests` and `CallbackWriteStreamTests`.
 

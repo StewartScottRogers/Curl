@@ -49,12 +49,18 @@ internal sealed partial class ManagedEasyTransfer
 
     /// <summary>
     /// <c>curl_easy_pause</c>: records the directions to leave paused, and a transfer waiting on a callback's
-    /// pause in a direction now clear hands the callback its data again (ADR-0573). The call always succeeds.
+    /// pause in a direction now clear hands the callback its data again (ADR-0573). A handle with no perform running has no
+    /// connection to pause, which libcurl refuses (CGR-246).
     /// </summary>
     /// <param name="directions">The directions to leave paused.</param>
-    /// <returns><see cref="CurlCode.Ok" />.</returns>
+    /// <returns><see cref="CurlCode.Ok" />, or <see cref="CurlCode.BadFunctionArgument" /> when no perform is running.</returns>
     public CurlCode Pause(CurlPause directions)
     {
+        if (!ConnectOnly.PerformRunning)
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
         pauseGate.Set(directions);
         return CurlCode.Ok;
     }
