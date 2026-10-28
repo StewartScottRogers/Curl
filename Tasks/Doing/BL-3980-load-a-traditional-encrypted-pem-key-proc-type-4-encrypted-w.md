@@ -32,3 +32,4 @@ Found by BL-3624 (CGR-095, ADR-0948): `ClientCertificateLoader` asks for the pas
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: aaef231d 1c276785 0e2075d2 779790c0.
