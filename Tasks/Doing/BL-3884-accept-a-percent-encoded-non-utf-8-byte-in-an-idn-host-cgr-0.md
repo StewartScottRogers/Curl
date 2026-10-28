@@ -40,3 +40,4 @@ Expected (real curl): exit 0, request has `Host: xn--ab-6ka`. Curl today: exit 3
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 12e52b50 1b26f5a2 3be9ea7b 779790c0.
