@@ -66,15 +66,15 @@ public sealed partial class SftpFileDownloadTests
     }
 
     [TestMethod]
-    public void Choose_RangeAndRangeText_ReadsTheRange()
+    public void Choose_RangeAndRangeText_ReadsTheText()
     {
-        Diagnostics.Arrange("range, range text, file size", "2-3, \"5-2\", 10");
+        Diagnostics.Arrange("range, range text, file size", "2-3, \"4-5\", 10");
 
-        SftpDownloadPart part = SftpDownloadPart.Choose(ByteRange.Bounded(2, 3), null, 10, "5-2");
+        SftpDownloadPart part = SftpDownloadPart.Choose(ByteRange.Bounded(2, 3), null, 10, "4-5");
 
         Diagnostics.Act("part", part);
-        Diagnostics.Assert("part", new SftpDownloadPart(2, 2), part);
-        Assert.AreEqual(new SftpDownloadPart(2, 2), part);
+        Diagnostics.Assert("part", new SftpDownloadPart(4, 2), part);
+        Assert.AreEqual(new SftpDownloadPart(4, 2), part);
     }
 
     [TestMethod]
