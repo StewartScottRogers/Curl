@@ -1990,6 +1990,11 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
+        if (UploadsDirectoryAsEmptyStream(opened))
+        {
+            return true;
+        }
+
         await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
             .ConfigureAwait(false);
         return false;
@@ -3873,6 +3878,12 @@ internal sealed class CurlCommandRunner(
         FileOpenResult opened = await fileSystem.OpenForReadAsync(uploadFile, CancellationToken.None).ConfigureAwait(false);
         if (opened.Content is not { } upload)
         {
+            if (UploadsDirectoryAsEmptyStream(opened))
+            {
+                return await TransferUploadingAsync(dispatch, options, url, new StandardInputUploadStream(new MemoryStream()), transfer, headerOutput)
+                    .ConfigureAwait(false);
+            }
+
             await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
                 .ConfigureAwait(false);
             return CannotOpenUploadFileResult();
@@ -3885,6 +3896,18 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Tells whether a <c>-T</c> path that failed to open is a directory curl uploads as an empty stream of
+    /// unknown size, as it uploads standard input: off Windows curl's <c>open(2)</c> of a directory succeeds,
+    /// <c>fstat</c> finds no regular file so the size stays unknown (HTTP sends it chunked), and <c>read(2)</c>'s
+    /// <c>EISDIR</c> ends it, so Linux curl sends only the last chunk and exits 0 (CGR-069, BL-3895). The
+    /// Windows build cannot open a directory and refuses it with <c>cannot open</c>.
+    /// </summary>
+    /// <param name="opened">The failed open of the <c>-T</c> path.</param>
+    /// <returns><see langword="true" /> when the path is a directory and this is not the Windows build.</returns>
+    private bool UploadsDirectoryAsEmptyStream(FileOpenResult opened) =>
+        !runsOnWindows && opened.Status == FileAccessStatus.IsDirectory;
 
     /// <summary>
     /// Performs one transfer that sends <paramref name="upload" /> when given, to
