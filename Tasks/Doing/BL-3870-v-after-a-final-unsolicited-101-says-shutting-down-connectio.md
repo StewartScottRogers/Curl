@@ -39,3 +39,4 @@ to the current behaviour. Measure whether curl really reuses the connection for 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: cbd783e3 5760003f 779790c0.
