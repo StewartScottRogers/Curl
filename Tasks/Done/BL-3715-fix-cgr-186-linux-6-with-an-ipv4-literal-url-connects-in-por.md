@@ -9,7 +9,7 @@ touches: [Curl.Networking.UnitLibrary/AddressFamilyFilter.cs, Curl.Networking.Un
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3715 — Fix CGR-186: Linux: -6 with an IPv4-literal URL connects in PORT; REF 8.18 fails with exit 7
 
@@ -80,3 +80,4 @@ curl -s -6 http://127.0.0.1:20001/
 - Linux curl is not available on this Windows lane, so the Linux result is taken from the report (REF 8.18: `curl -s -6 http://127.0.0.1:20001/` exits 7); Windows REF 8.22 connects and Curl on Windows still does (unchanged, pinned by `Cgr186Tests`). Boxes are ticked on that basis: the unit tests pin both platforms' answers.
 - Decision: off Windows (`TcpConnector.FiltersAddressLiterals`, default `!IsWindows`) `-4`/`-6` also filters an IP-literal host; an empty answer for such a literal is exit 7 `Failed to connect to <host>:<port> after 0 ms: Could not connect to server`. The message text is inferred (Linux curl not measurable here); exit code matches the report.
 - Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members. Fast tests green.
+- 2026-10-28: Doing -> Done. -6 with an IPv4 literal fails with exit 7 off Windows
