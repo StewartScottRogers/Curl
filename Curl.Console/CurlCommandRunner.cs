@@ -3945,9 +3945,33 @@ internal sealed class CurlCommandRunner(
                 .ConfigureAwait(false);
         }
 
-        // smtp and imap upload -F parts as a MIME mail message that is the body itself; every other
-        // scheme sends them as a form body beside any -T upload.
+        return await TransferWithFormAsync(follower, dispatch, options, transferUrl, transfer, range, headerOutput, upload, mimePost)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds and sends the <c>-F</c> parts <paramref name="mimePost" />: smtp and imap upload them as a MIME mail
+    /// message that is the body itself, every other scheme as a form body beside any -T <paramref name="upload" />.
+    /// </summary>
+    private async Task<TransferResult> TransferWithFormAsync(
+        RedirectFollower follower,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        CurlUrl transferUrl,
+        UrlTransfer transfer,
+        ByteRange? range,
+        Stream? headerOutput,
+        Stream? upload,
+        EasyMimeBody mimePost)
+    {
         bool mimeMessage = MailRequestOptionsMapping.SendsFormAsMimeMessage(transferUrl.Scheme);
+        if (!mimeMessage && SendsFormElsewhereInParallel(options, transfer))
+        {
+            return await TransferWithBodyAsync(
+                    follower, dispatch, options, transferUrl, transfer, range, headerOutput, EmptyFormBody, upload)
+                .ConfigureAwait(false);
+        }
+
         MultipartFormBuildResult form = await BuildFormAsync(options, mimePost, transferUrl.Scheme, mimeMessage).ConfigureAwait(false);
         if (!form.IsBuilt)
         {
@@ -3956,14 +3980,77 @@ internal sealed class CurlCommandRunner(
 
         await using (form.Body.Content.ConfigureAwait(false))
         {
-            return mimeMessage
-                ? await TransferWithBodyAsync(
-                        follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, form.Body.Content)
-                    .ConfigureAwait(false)
-                : await TransferWithBodyAsync(
-                        follower, dispatch, options, transferUrl, transfer, range, headerOutput, form.Body, upload)
+            return StandardInputFormShortRead(options, mimePost, form.Body)
+                ?? await TransferWithFormBodyAsync(
+                        follower, dispatch, options, transferUrl, transfer, range, headerOutput, form.Body, upload, mimeMessage)
                     .ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Sends a built <c>-F</c> body: as the upload itself when it is a MIME mail message, otherwise as the form body
+    /// beside any <c>-T</c> <paramref name="upload" />, which a mail message does not send.
+    /// </summary>
+    private Task<TransferResult> TransferWithFormBodyAsync(
+        RedirectFollower follower,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        CurlUrl transferUrl,
+        UrlTransfer transfer,
+        ByteRange? range,
+        Stream? headerOutput,
+        StreamBody formBody,
+        Stream? upload,
+        bool mimeMessage) =>
+        mimeMessage
+            ? TransferWithBodyAsync(follower, dispatch, options, transferUrl, transfer, range, headerOutput, null, formBody.Content)
+            : TransferWithBodyAsync(follower, dispatch, options, transferUrl, transfer, range, headerOutput, formBody, upload);
+
+    /// <summary>
+    /// The body a <c>-Z</c> transfer sends when its option group's form went to a later transfer: no bytes and no
+    /// <c>Content-Type</c>, as curl 8.22.0 sends <c>POST</c> with <c>Content-Length: 0</c> (CGR-175, ADR-0956).
+    /// </summary>
+    private static readonly BytesBody EmptyFormBody = new(ReadOnlyMemory<byte>.Empty, string.Empty);
+
+    /// <summary>
+    /// Whether this <c>-Z</c> transfer sends no form because its option group's form goes to the group's last URL:
+    /// curl 8.22.0 sets one <c>curl_mime</c> on every handle it sets up and <c>CURLOPT_MIMEPOST</c> moves it to the
+    /// newest, so only the last transfer set up sends it (CGR-175, ADR-0956).
+    /// </summary>
+    private bool SendsFormElsewhereInParallel(CommandLineOptions options, UrlTransfer transfer) =>
+        parallelRun is not null && transfer.UrlIndex != options.Urls.Count - 1;
+
+    /// <summary>
+    /// The length of each option group's first <c>-F</c> body that read standard input, by group, so a later
+    /// transfer of the group, whose <c>@-</c> part finds standard input drained, fails as curl 8.22.0's does.
+    /// </summary>
+    private readonly Dictionary<CommandLineOptions, long> standardInputFormLengths = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// Fails a transfer whose <c>-F</c> body reads standard input after an earlier transfer of its option group drained
+    /// it: curl 8.22.0 keeps the length its group's form first declared, so the shorter read fails before anything is
+    /// sent with exit 26, <c>client mime read EOF fail, only &lt;read&gt;/&lt;needed&gt; of needed bytes read</c>, and
+    /// <c>%{size_upload}</c> the bytes read (CGR-175, ADR-0956).
+    /// </summary>
+    /// <returns>The failure, or <see langword="null" /> to send the body.</returns>
+    private TransferResult? StandardInputFormShortRead(CommandLineOptions options, EasyMimeBody mimePost, StreamBody body)
+    {
+        if (!MultipartFormPartMapping.FromMimeBody(mimePost).Any(part => part.ReadsStandardInput))
+        {
+            return null;
+        }
+
+        long read = body.Length.GetValueOrDefault();
+        if (standardInputFormLengths.TryAdd(options, read) || read >= standardInputFormLengths[options])
+        {
+            return null;
+        }
+
+        return TransferResult.Failure(
+                CurlExitCode.ReadError,
+                $"client mime read EOF fail, only {read}/{standardInputFormLengths[options]} of needed bytes read")
+            with
+        { Report = new TransferReport { UploadSize = read } };
     }
 
     /// <summary>
