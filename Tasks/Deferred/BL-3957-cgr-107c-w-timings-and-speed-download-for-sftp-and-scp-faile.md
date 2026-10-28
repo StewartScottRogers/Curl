@@ -38,3 +38,4 @@ Split from BL-3636 (third-party gap report issue CGR-107, `Documentation/Reviews
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 454b7427 d9aa5d84 40bddbd7 bc4b41f1.
 - 2026-10-28: Doing -> Backlog. Waiting on BL-3966: Curl's own Windows run of the SSH-08 repros needs an sshd its SSH preset can exchange keys with; the fix is in the stash
+- 2026-10-28: Backlog -> Deferred. Split for size (cost cap) into BL-3968 and BL-3969
