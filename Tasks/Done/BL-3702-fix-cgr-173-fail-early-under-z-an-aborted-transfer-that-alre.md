@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests/Cgr173Tests.cs, Curl.Console/CurlCommandRunner.cs]
+touches: [Curl.Console.UnitTests/Cgr173Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/RunningTransferState.cs, Curl.Console/ResponseCodeRecordingTransferEvents.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3702 — Fix CGR-173: --fail-early under -Z: an aborted transfer that already had its response loses %{http_code} and %{filename_effective}, and --remove-on-er...
 
@@ -59,17 +59,25 @@ curl -Z --parallel-immediate -s --remove-on-error --fail-early -f -w "%{urlnum} 
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr173Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-28, lane 6. Repro rebuilt with a C# file-based loopback server on 127.0.0.1:22000 (outside the repo): `/a` answers `200` with `Content-Length: 50000` and sends 5 parts of 10000 bytes 300 ms apart, `/b` waits 200 ms and answers `500` with an empty body. Command: `curl -Z --parallel-immediate -s --remove-on-error --fail-early -f -w "%{urlnum} %{exitcode} %{http_code} %{filename_effective}\n" -o a.txt "http://127.0.0.1:22000/a?n=50000&p=5&pd=300" -o b.txt "http://127.0.0.1:22000/b?d=200&s=500"`.
+  - REF (curl 8.22.0 Schannel, Windows): exit 22, stdout `1 22 500 b.txt\r\n0 42 200 a.txt\r\n`, stderr empty, no files left.
+  - PORT before the fix: exit 22, stdout `1 22 500 b.txt\r\n0 42 000 \r\n`, stderr empty, a.txt (10000 bytes) left.
+  - PORT after the fix: exit 22, stdout `1 22 500 b.txt\r\n0 42 200 a.txt\r\n`, stderr empty, no files left. Both send the same two `GET` requests (`Host`, `User-Agent: curl/8.22.0`, `Accept: */*`).
+- Cause: the aborted transfer's handler throws `OperationCanceledException`, so `TransferToOutputFileAsync` never recorded `OutputFileName`/`OpenedOutputFile` (no `%{filename_effective}`, nothing for `--remove-on-error` to delete) and the result carried no report (`%{http_code}` 000). Fix: those two are set in a `finally`; under `-w` a new `ResponseCodeRecordingTransferEvents` records the last status line's code on `RunningTransferState.ReceivedResponseCode`, and `AbortedResultOf` gives `ParallelRun.AbortedResult` a report with that code.
+- Decision (default taken): recorded on the Console side rather than widening the engine's `AbortedHeadRecordingTransferEvents` (timeouts only), because Curl.Engine is outside this task's touches and busy with other lanes; only `%{http_code}` is carried, the variable the issue names. `touches` gained `Curl.Console/RunningTransferState.cs` and `Curl.Console/ResponseCodeRecordingTransferEvents.cs` (no Doing task on origin/work/dark-factory names a Curl.Console file).
+- `Cgr173Tests.RunAsync_FailEarlyAbortsATransferThatHadItsResponse_PrintsItsCodeAndFileAndRemovesTheFile` failed with the runner change reverted and passes with it. The only variant in the issue is the one command above. Platform: the tests use relative names in an in-memory file system and LF output (`runsOnWindows: false`), so they hold on Linux and macOS. `dotnet build` 0 warnings; fast tests green (Curl.Console.UnitTests 2998 passed, 31 skipped); `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-173 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. -Z --fail-early: an aborted transfer that had its response prints its %{http_code} and %{filename_effective}, and --remove-on-error deletes its partial file, as curl 8.22.0 does
