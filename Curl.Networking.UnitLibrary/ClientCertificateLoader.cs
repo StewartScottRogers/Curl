@@ -460,10 +460,13 @@ internal static class ClientCertificateLoader
         throw new CryptographicException();
     }
 
+    // A traditional encrypted key (Proc-Type 4,ENCRYPTED) is decrypted by hand, since the BCL
+    // reads only PKCS#8's ENCRYPTED PRIVATE KEY (BL-3980).
     private static X509Certificate2 CombineWithKey(string certificatePem, string keyPem, string? passphrase) =>
-        passphrase is not null && keyPem.Contains(EncryptedPrivateKeyBegin, StringComparison.Ordinal)
-            ? X509Certificate2.CreateFromEncryptedPem(certificatePem, keyPem, passphrase)
-            : X509Certificate2.CreateFromPem(certificatePem, keyPem);
+        passphrase is null ? X509Certificate2.CreateFromPem(certificatePem, keyPem)
+        : keyPem.Contains(EncryptedPrivateKeyBegin, StringComparison.Ordinal) ? X509Certificate2.CreateFromEncryptedPem(certificatePem, keyPem, passphrase)
+        : keyPem.Contains(LegacyEncryptedPemHeader, StringComparison.Ordinal) ? X509Certificate2.CreateFromPem(certificatePem, TraditionalPemKeyDecryptor.Decrypt(keyPem, passphrase))
+        : X509Certificate2.CreateFromPem(certificatePem, keyPem);
 
     // A key loaded from PEM is ephemeral, and Schannel will not sign with one on Windows;
     // a round trip through PKCS#12 gives it one every platform can use.
