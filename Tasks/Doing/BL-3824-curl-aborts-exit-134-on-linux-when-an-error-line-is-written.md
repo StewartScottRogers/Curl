@@ -31,3 +31,4 @@ Found by BL-3537 (CGR-008) on 2026-10-26 in WSL: `curl -sS http://127.0.0.1:2119
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 8a2d5fed def504f7 779790c0.
