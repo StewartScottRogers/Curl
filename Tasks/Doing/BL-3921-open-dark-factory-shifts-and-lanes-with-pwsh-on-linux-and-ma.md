@@ -43,3 +43,4 @@ update its comments to match what now works.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 8d66c20a 6fc0e2de fd6c9dc9 f62b312e d265299d.
