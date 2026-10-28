@@ -36,3 +36,4 @@ Split from BL-3853 (CGR-016). BL-3853 (ADR-0920) opens `-o`, `-O` and `-J` files
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 1b3b10f1 abe90811 1b81d9c1 5be516e5 3ccadb6a 779790c0.
