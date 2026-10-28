@@ -41,3 +41,20 @@ the platform's curl answers. `CurlUrlTests` pins both readings, each under its o
 Curl matches the Windows curl build byte for byte on a redirect to a UTF-8 host, at the
 cost of not following it there. If the ratchet ever gains a per-platform listing, test1448
 can be listed for Linux and macOS.
+
+## Whole-host reading across platforms
+
+This ADR also records the reading BL-3963 gave `CurlUrlHost` for a whole non-ASCII host,
+which the `Location` decision above follows:
+
+- **Windows:** a host with a byte that is not UTF-8 is read as Windows-1252, the reference
+  machine's ANSI code page, because the Windows curl 8.22.0 build hands the bytes to
+  `idn2_lookup_ul` in that code page (ADR-0942). A `Location` host of UTF-8 bytes takes the
+  same reading, so `åäö` becomes `xn--bbab6cyjbb.se`, not `xn--4cab6c.se`.
+- **Linux and macOS:** the answer is the UTF-8 locale's. The same bytes read as UTF-8, so a
+  `Location` host of UTF-8 bytes is followed to `xn--4cab6c.se`, as upstream test1448 expects,
+  and a byte that is not valid UTF-8 makes the name unconvertible.
+
+The `Location` host answer is not changed because real Windows curl gives the Windows answer
+(measured above), and a drop-in replacement matches the platform's curl, not the other
+platform's.
