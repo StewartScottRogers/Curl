@@ -33,10 +33,27 @@ function Get-CiFailures {
     # <TestName> [..]") or, when the build broke, per compiler error ("error CS1002 in X.cs"),
     # with the platforms it failed on, its test project (or the project that did not build)
     # and the first line of its error message.
+    # A data row whose display name is not its method's ("Failed -4 http://[::1]:47500/ [1 ms]")
+    # is keyed by the method its test logger's START line names, with the row's display name in
+    # Rows, so every failing row of one method is one failure (BL-3998). An upstream case
+    # ("Failed test1034: ...") keeps its case number: that is the name its tasks use.
     param([string[]]$Log)
     $found = [ordered]@{}
     $current = @{}
     $awaitingMessage = @{}
+    # Each job's failing test waits in $current until its block ends, then joins $found.
+    $settle = {
+        param([string]$Job)
+        $pending = $current[$Job]
+        $current[$Job] = $null
+        if (-not $pending) { return }
+        if (-not $found.Contains($pending.Key)) { $found[$pending.Key] = $pending; return }
+        $entry = $found[$pending.Key]
+        foreach ($platform in $pending.Platforms) { if ($entry.Platforms -notcontains $platform) { $entry.Platforms += $platform } }
+        foreach ($row in $pending.Rows) { if ($entry.Rows -notcontains $row) { $entry.Rows += $row } }
+        if (-not $entry.Project) { $entry.Project = $pending.Project }
+        if (-not $entry.Message) { $entry.Message = $pending.Message }
+    }
     foreach ($raw in $Log) {
         $parts = "$raw" -split "`t", 3
         if ($parts.Count -lt 3) { continue }
@@ -45,7 +62,12 @@ function Get-CiFailures {
         $platform = Get-CiPlatform $job
         $item = $null
         if ($text -match '^\s+Failed\s+(\S+)\s') {
-            $item = [pscustomobject]@{ Key = $Matches[1]; Kind = 'test'; Platforms = @(); Project = ''; Message = '' }
+            $key = $Matches[1]
+            & $settle $job
+            $display = ($text.Trim() -replace '^Failed\s+', '') -replace '\s+\[[^\]]*\]$', ''
+            $current[$job] = [pscustomobject]@{ Key = $key; Kind = 'test'; Platforms = @($platform); Project = ''; Message = ''; Rows = @(); Display = $display }
+            $awaitingMessage[$job] = $false
+            continue
         } elseif ($text -match '(?:^|\s)(?:[^\s(]*[/\\])?([^\s/\\(]+)\(\d+,\d+\):\s+error\s+(\w+):\s*(.*?)(?:\s+\[(?:[^\]]*[/\\])?([^\]/\\]+)\.\w+proj\])?\s*$') {
             $item = [pscustomobject]@{ Key = "error $($Matches[2]) in $($Matches[1])"; Kind = 'build'; Platforms = @(); Project = "$($Matches[4])"; Message = $Matches[3] }
         } elseif ($text -match '^Audit guard: (\S+) changed on ') {
@@ -56,11 +78,15 @@ function Get-CiFailures {
             if (-not $found.Contains($item.Key)) { $found[$item.Key] = $item }
             $entry = $found[$item.Key]
             if ($entry.Platforms -notcontains $platform) { $entry.Platforms += $platform }
-            if ($item.Kind -eq 'test') { $current[$job] = $entry; $awaitingMessage[$job] = $false }
             continue
         }
         $entry = $current[$job]
         if (-not $entry) { continue }
+        if ($text -match '^\s*START\s+[\w.`+]*\.(\w+)\s+\((.+)\)\s*$' -and $Matches[2] -ceq $entry.Display -and $entry.Key -notmatch '^test\d+:$') {
+            $entry.Key = $Matches[1]
+            $entry.Rows = @($entry.Display)
+            continue
+        }
         if ($text -match '^\s+Error Message:') { $awaitingMessage[$job] = $true; continue }
         if ($awaitingMessage[$job] -and $text.Trim()) {
             if (-not $entry.Message) { $entry.Message = $text.Trim() }
@@ -71,9 +97,10 @@ function Get-CiFailures {
         if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.(?:UnitTests|IntegrationTests))[/\\]') { $entry.Project = $Matches[1] }
         if ($text -match '^Failed!\s.*-\s+([\w.]+)\.dll') {
             if (-not $entry.Project) { $entry.Project = $Matches[1] }
-            $current[$job] = $null
+            & $settle $job
         }
     }
+    foreach ($job in @($current.Keys)) { & $settle $job }
     # A run that failed with no test, compiler error or audit-guard line in its log (a crashed
     # test host, a timeout, a job step that broke) is still red: file it by the job and step
     # the log names, so the spell does not stay open unfiled (AF-0171). That holds for every
@@ -137,16 +164,20 @@ function Get-CiVerdicts {
         # A regression's first failing commit is the oldest run of its unbroken red streak.
         $first = 0
         $platforms = @($failure.Platforms)
+        $rows = @($failure.Rows)
         if ($verdict -eq 'regression') {
             while ($failing -contains ($first + 1)) {
                 $first++
-                $platforms += @(@($Runs[$first].Failures | Where-Object { $_.Key -ceq $key })[0].Platforms)
+                $earlier = @($Runs[$first].Failures | Where-Object { $_.Key -ceq $key })[0]
+                $platforms += @($earlier.Platforms)
+                $rows += @($earlier.Rows)
             }
         } else { $first = $at }
         $verdicts += [pscustomobject]@{
             Key = $key; Kind = $failure.Kind; Verdict = $verdict; RunId = $Runs[$at].Id; FirstSha = $Runs[$first].Sha
             Platforms = @($platforms | Select-Object -Unique | Sort-Object); Project = $failure.Project; Message = $failure.Message
             GateMembers = @($failure.GateMembers | Where-Object { $_ }); Files = @($failure.Files | Where-Object { $_ })
+            Rows = @($rows | Where-Object { $_ } | Select-Object -Unique)
         }
     }
     return $verdicts
@@ -239,11 +270,14 @@ function Set-CiTaskBody {
     } else { "$what passes on Windows, Linux and macOS, so the ``CI`` workflow on the shift's branch is green again." }
     $message = if ($Verdict.Message) { $Verdict.Message } else { '(no error message in the log)' }
     $first = if ($Verdict.FirstSha) { "First failing commit: $($Verdict.FirstSha.Substring(0, [math]::Min(8, $Verdict.FirstSha.Length)))." } else { 'First failing commit: not found.' }
+    # A data-row test's failing rows by display name (BL-3998).
+    $rows = @(@($Verdict.Rows | Where-Object { $_ }) | ForEach-Object { '`' + $_ + '`' })
     $context = @(
         "Filed by the dark factory's CI watch (BL-987). $what failed on $on in CI run $($Verdict.RunId) ($RunUrl). $first"
         ''
         "    $message"
         ''
+        if ($rows.Count) { "Failing data rows: $($rows -join ', ')."; '' }
         "Lanes test only on Windows, so reproduce with ``gh run view $($Verdict.RunId) --log-failed`` and fix it platform-neutrally (CLAUDE.md, ""Tests pass on Windows, Linux and macOS"")."
     ) -join "`n"
     $criteria = if ($Verdict.Verdict -eq 'flaky') {
@@ -878,6 +912,43 @@ if ($TestCiWatch) {
         "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000004Z Failed!  - Failed:     1, Passed:     3 - SomethingElse.dll (net10.0)")
     & $check 'integration test failure parsed' 'Connect_Loopback_Succeeds|Curl.Networking.IntegrationTests' `
         ((@(Get-CiFailures $integrationLog) | ForEach-Object { "$($_.Key)|$($_.Project)" }) -join ';')
+    # BL-3998: data rows with their own display names, recorded from run 40774593052, are one
+    # failure keyed by their method; an upstream case keeps its case number.
+    $rowLog = @()
+    foreach ($os in 'ubuntu', 'macos') {
+        $j = "Build and test ($os-latest)${t}Fast tests${t}2026-10-28T22:00:51.0000000Z "
+        $method = 'Curl.Networking.TcpConnectorTests.ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral'
+        foreach ($row in '-4 http://[::1]:47500/', '-4 bracketed', '-6 http://127.0.0.1:47500/') {
+            $rowLog += @(
+                "$j  Failed $row [1 ms]"
+                "$j  Error Message:"
+                "$j   Assertion failed. Expected value to not be null."
+                "$j  Stack Trace:"
+                "$j     at $method(String host, AddressFamily family) in /home/runner/work/Curl/Curl/Curl.Networking.UnitTests/TcpConnectorTests.AddressFamily.cs:line 120"
+                "$j  Standard Output Messages:"
+                "$j TestContext Messages:"
+                "$j START $method ($row)"
+                "$j END ${method}: Failed in 1 ms (arrange 1, act 2, assert 1)")
+        }
+        $rowLog += @(
+            "$j  Failed ConnectAsync_UnderIPv6ThroughAnIPv4ProxyLiteral_DialsTheProxy [1 ms]"
+            "$j START Curl.Networking.TcpConnectorTests.ConnectAsync_UnderIPv6ThroughAnIPv4ProxyLiteral_DialsTheProxy"
+            "${j}Failed!  - Failed:     4, Passed:  1666 - Curl.Networking.UnitTests.dll (net10.0)"
+            "$j  Failed test1034: HTTP over proxy with malformatted IDN host name [2 s]"
+            "$j START Curl.Conformance.UnitTests.UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet (test1034: HTTP over proxy with malformatted IDN host name)"
+            "${j}Failed!  - Failed:     1, Passed:  1000 - Curl.Conformance.UnitTests.dll (net10.0)")
+    }
+    $rowFailures = @(Get-CiFailures $rowLog)
+    & $check 'data rows keyed by their method' 'ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral|Linux,macOS|Curl.Networking.UnitTests|-4 http://[::1]:47500/,-4 bracketed,-6 http://127.0.0.1:47500/;ConnectAsync_UnderIPv6ThroughAnIPv4ProxyLiteral_DialsTheProxy|Linux,macOS|Curl.Networking.UnitTests|;test1034:|Linux,macOS|Curl.Conformance.UnitTests|' `
+        (($rowFailures | ForEach-Object { "$($_.Key)|$($_.Platforms -join ',')|$($_.Project)|$($_.Rows -join ',')" }) -join ';')
+    $rowVerdict = @(Get-CiVerdicts -Now $now -Runs @([pscustomobject]@{ Id = '40774593052'; Sha = 'sha1'; FinishedAt = $now; Failures = $rowFailures }))[0]
+    & $check 'data-row task title' 'Fix CI failure ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral on Linux and macOS' (Get-CiTaskTitle $rowVerdict)
+    $rowBody = Join-Path ([IO.Path]::GetTempPath()) "df-ci-rows-$PID.md"
+    Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $rowBody
+    Set-CiTaskBody -Path $rowBody -RunUrl 'https://github.com/o/r/actions/runs/40774593052' -Verdict $rowVerdict
+    $rowText = [IO.File]::ReadAllText($rowBody)
+    Remove-Item $rowBody -ErrorAction SilentlyContinue
+    & $check 'data-row task context' 'True True' "$($rowText.Contains('`ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral` failed on Linux and macOS')) $($rowText.Contains('Failing data rows: `-4 http://[::1]:47500/`, `-4 bracketed`, `-6 http://127.0.0.1:47500/`.'))"
     $body = Join-Path ([IO.Path]::GetTempPath()) "df-ci-body-$PID.md"
     Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $body
     Set-CiTaskBody -Path $body -RunUrl 'https://github.com/o/r/actions/runs/9' -Verdict ([pscustomobject]@{
