@@ -35,7 +35,19 @@ internal sealed partial class TransferPerformer
     /// <param name="rejection">Why the URL was rejected.</param>
     /// <returns>The text.</returns>
     internal static string UrlRejectionText(CurlUrlRejection rejection) =>
-        rejection == CurlUrlRejection.IdnConversionFailed ? rejection.ToCurlMessage() : UrlRejectedPrefix + rejection.ToCurlMessage();
+        IsBareText(rejection) ? rejection.ToCurlMessage() : UrlRejectedPrefix + rejection.ToCurlMessage();
+
+    /// <summary>Whether curl reports <paramref name="rejection" /> with its code's own text: no <c>URL rejected: </c> and no info line.</summary>
+    private static bool IsBareText(CurlUrlRejection rejection) =>
+        rejection is CurlUrlRejection.IdnConversionFailed or CurlUrlRejection.UrlTooLong or CurlUrlRejection.UrlAtLengthLimit;
+
+    private static CurlExitCode ExitCodeOf(CurlUrlRejection rejection) => rejection switch
+    {
+        CurlUrlRejection.UserNotAllowed => CurlExitCode.LoginDenied,
+        CurlUrlRejection.UrlTooLong => CurlExitCode.BadFunctionArgument,
+        CurlUrlRejection.UrlAtLengthLimit => CurlExitCode.OutOfMemory,
+        _ => CurlExitCode.UrlMalformat,
+    };
 
     /// <summary>
     /// The longest percent-decoded host, in bytes, curl 8.21.0 connects to; a longer one
@@ -108,10 +120,20 @@ internal sealed partial class TransferPerformer
         bool disallowUsernameInUrl,
         bool pathAsIs,
         [NotNullWhen(true)] out CurlUrl? url,
-        out CurlUrlRejection rejection) =>
-        disallowUsernameInUrl
+        out CurlUrlRejection rejection)
+    {
+        if (CurlUrl.TransferLengthRejection(text) is { } lengthRejection)
+        {
+            url = null;
+            rejection = lengthRejection;
+
+            return false;
+        }
+
+        return disallowUsernameInUrl
             ? CurlUrl.TryParseDisallowingUser(text, pathAsIs, out url, out rejection)
             : CurlUrl.TryParse(text, pathAsIs, out url, out rejection);
+    }
 
     /// <summary>
     /// Reports a transfer URL curl's parser rejects as the <c>-v</c> info line
@@ -127,14 +149,12 @@ internal sealed partial class TransferPerformer
     internal static TransferResult ReportUrlRejected(CurlUrlRejection rejection, ITransferEvents events)
     {
         string message = UrlRejectionText(rejection);
-        if (rejection != CurlUrlRejection.IdnConversionFailed)
+        if (!IsBareText(rejection))
         {
             events.ReportInfo(message);
         }
 
-        return TransferResult.Failure(
-            rejection == CurlUrlRejection.UserNotAllowed ? CurlExitCode.LoginDenied : CurlExitCode.UrlMalformat,
-            message);
+        return TransferResult.Failure(ExitCodeOf(rejection), message);
     }
 
     /// <summary>

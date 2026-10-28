@@ -31,5 +31,7 @@ public static class CurlUrlRejectionMessages
         "Credentials was passed in the URL when prohibited",
         "Found a backslash where a forward slash was expected",
         "URL using bad/illegal format or missing URL",
+        "A libcurl function was given a bad argument",
+        "Out of memory",
     ];
 }

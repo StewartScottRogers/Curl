@@ -50,4 +50,16 @@ public enum CurlUrlRejection
     /// fails it with <c>CURLE_URL_MALFORMAT</c> and that code's own text, not a <c>CURLUE_*</c> one (CGR-059).
     /// </summary>
     IdnConversionFailed,
+
+    /// <summary>
+    /// A transfer's URL is longer than 8,000,000 bytes, which libcurl's setopt refuses with
+    /// <c>CURLE_BAD_FUNCTION_ARGUMENT</c> and that code's own text (CGR-196).
+    /// </summary>
+    UrlTooLong,
+
+    /// <summary>
+    /// A transfer's URL is exactly 8,000,000 bytes, which curl fails with <c>CURLE_OUT_OF_MEMORY</c> and that
+    /// code's own text before connecting (CGR-196).
+    /// </summary>
+    UrlAtLengthLimit,
 }

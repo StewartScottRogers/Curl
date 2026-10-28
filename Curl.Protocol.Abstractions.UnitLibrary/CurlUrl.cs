@@ -365,6 +365,15 @@ public sealed record CurlUrl
         return url is not null;
     }
 
+    /// <summary>
+    /// Why libcurl's setopt refuses a transfer URL by its length alone, before parsing it: <see cref="CurlUrlRejection.UrlTooLong" />
+    /// above 8,000,000 bytes, <see cref="CurlUrlRejection.UrlAtLengthLimit" /> at exactly 8,000,000, else <see langword="null" />
+    /// (CGR-196). The URL API itself accepts 8,000,000 bytes, so <c>TryParse</c> does not apply this.
+    /// </summary>
+    /// <param name="text">The transfer's URL.</param>
+    /// <returns>The rejection, or <see langword="null" />.</returns>
+    public static CurlUrlRejection? TransferLengthRejection(string text) => CurlUrlParser.TransferLengthRejection(text);
+
     private static string PercentEncodedAboveTilde(string text)
     {
         StringBuilder encoded = new(text.Length);

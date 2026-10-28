@@ -5,11 +5,11 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlParser.cs, Curl.Protocol.Abstractions.UnitTests/Cgr196Tests.cs]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlParser.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrl.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejection.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlRejectionMessages.cs, Curl.Protocol.Abstractions.UnitTests/Cgr196Tests.cs, Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs, Curl.Engine.UnitTests/TransferPerformerTests.Cgr196.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3725 — Fix CGR-196: URL length limit: different exit codes at and above 8,000,000 bytes
 
@@ -66,10 +66,10 @@ curl -sS -K <cfg> -o NUL -w "%{http_code}"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -80,3 +80,10 @@ curl -sS -K <cfg> -o NUL -w "%{http_code}"
 
 - 2026-10-26: Created from CGR-196 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+### Notes (result)
+
+- Measured with `curl -sS -K <cfg> -o NUL -w "%{http_code}"`, cfg `url = "http://127.0.0.1:20200/?aaa..."` of total length 8,000,000 and 8,000,001 (real curl at /ucrt64/bin and Curl.Console): both give `curl: (27) Out of memory` / `000` and `curl: (43) A libcurl function was given a bad argument` / `000`, exit 27 and 43, and no connection is made.
+- Fix: new `CurlUrlRejection.UrlAtLengthLimit` (exit 27) and `UrlTooLong` (exit 43), found by `CurlUrl.TransferLengthRejection` and applied in `TransferPerformer.TryParseTransferUrl` only (the URL API still accepts 8,000,000 bytes, lib1560). Reported bare, no `URL rejected:` prefix and no info line. Added `touches`: Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs, CurlUrl.cs, CurlUrlRejectionMessages.cs, CurlUrlRejection.cs, Curl.Engine.UnitTests/TransferPerformerTests.Cgr196.cs (no other Doing task names them).
+- Platform-neutral (no paths, no OS text); Linux/macOS CI expected green. Quality run: 0 failing members.
+- 2026-10-28: Doing -> Done. CGR-196 fixed: URL of 8,000,000 bytes exits 27, above exits 43, as real curl

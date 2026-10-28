@@ -66,6 +66,22 @@ internal static class CurlUrlParser
     }
 
     /// <summary>
+    /// Why libcurl's setopt refuses a transfer URL by its length alone: <see cref="CurlUrlRejection.UrlTooLong" /> above
+    /// <see cref="MaximumLength" /> bytes, <see cref="CurlUrlRejection.UrlAtLengthLimit" /> at exactly that many, else
+    /// <see langword="null" /> (CGR-196).
+    /// </summary>
+    public static CurlUrlRejection? TransferLengthRejection(string text)
+    {
+        int length = Encoding.UTF8.GetByteCount(text);
+        if (length == MaximumLength)
+        {
+            return CurlUrlRejection.UrlAtLengthLimit;
+        }
+
+        return length > MaximumLength ? CurlUrlRejection.UrlTooLong : null;
+    }
+
+    /// <summary>
     /// Whether curl rejects <paramref name="text" /> as <see cref="CurlUrlRejection.MalformedInput" />: empty,
     /// longer than <see cref="MaximumLength" /> bytes, or holding a control character or a space.
     /// </summary>
