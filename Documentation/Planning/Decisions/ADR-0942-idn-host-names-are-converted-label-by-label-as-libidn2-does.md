@@ -24,7 +24,9 @@ Measured with `Record-CurlExchange.ps1` and the reference build (curl 8.22.0, li
 `CurlUrlHost` maps the name with `CurlUrlHostNameMapping`, splits it at `.` and the ideographic
 and full-width dots, and converts each label itself (`CurlUrlPunycode`, RFC 3492): an empty label
 stays empty; a label, ASCII or not, that starts or ends with `-` or has `--` at its third and
-fourth characters (an `xn--` label aside) is refused; a lone surrogate, a control character or a
+fourth characters (an `xn--` label aside) is refused; a lone surrogate, a control character, the
+replacement character `U+FFFD` (UTS #46 disallows it, so libidn2 refuses it too; it is what a byte
+that is not UTF-8 becomes when a `-K` config file is read as UTF-8 off Windows, upstream test 1034) or a
 label over 63 characters once converted is refused; bidirectional rules are not checked.
 
 On Windows a byte that is not UTF-8 (a lone `U+DC80` to `U+DCFF`) is first read as Windows-1252,

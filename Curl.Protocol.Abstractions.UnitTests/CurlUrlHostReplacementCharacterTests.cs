@@ -20,4 +20,14 @@ public sealed class CurlUrlHostReplacementCharacterTests
         Assert.IsFalse(accepted);
         Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
     }
+
+    [TestMethod]
+    public void TryNormalizeReadingHost_LabelWithReplacementCharacterNotRefused_IsKeptAsDecoded()
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(
+            "invalid-utf8-�.local", refuseUnconvertibleName: false, hostAsWindows1252: false, out string normalized, out _, out _, out _);
+
+        Assert.IsTrue(accepted);
+        Assert.AreEqual("invalid-utf8-�.local", normalized);
+    }
 }
