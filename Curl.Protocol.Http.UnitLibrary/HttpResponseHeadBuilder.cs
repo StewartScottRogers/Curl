@@ -211,8 +211,8 @@ internal sealed class HttpResponseHeadBuilder
 
         string header = pendingHeader.ToString();
         headers.Add(ToHeader(header));
-        Append(header, pendingTerminator);
         hasPendingHeader = false;
+        Append(header, pendingTerminator);
     }
 
     private HttpResponseHeader ToHeader(string header)
