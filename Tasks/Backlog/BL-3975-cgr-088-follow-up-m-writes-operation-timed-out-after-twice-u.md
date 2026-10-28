@@ -1,5 +1,5 @@
 ---
-id: BL-3970
+id: BL-3975
 title: CGR-088 follow-up: -m writes 'Operation timed out after ...' twice under -v; echo it once as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3970 — CGR-088 follow-up: -m writes 'Operation timed out after ...' twice under -v; echo it once as curl does
+# BL-3975 — CGR-088 follow-up: -m writes 'Operation timed out after ...' twice under -v; echo it once as curl does
 
 ## Goal
 

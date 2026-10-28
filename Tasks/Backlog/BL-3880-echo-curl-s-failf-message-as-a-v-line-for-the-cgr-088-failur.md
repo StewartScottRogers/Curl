@@ -4,7 +4,7 @@ title: Echo curl's failf message as a -v line for the CGR-088 failure paths BL-3
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3948, BL-3949, BL-3950, BL-3951, BL-3952, BL-3970]
+depends-on: [BL-3948, BL-3949, BL-3950, BL-3951, BL-3952, BL-3975]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Cgr088FollowUpTests.cs]
 requirement: none
 created: 2026-10-26
@@ -31,7 +31,7 @@ CGR-088 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (see BL-3617, D
 - Filed by BL-3617's run, which narrowed BL-3617 to the issue's explicit repro commands.
 - 2026-10-28 (lane 4, first claim): split for size before any code, as the Context allows. BL-3617 took 80+ turns for three libraries; this list spans four (Http, Ftp, Networking, Console). Filed BL-3948 (HTTP --max-redirs, --max-filesize, -m), BL-3952 (HTTP bad gzip, bad chunk, short body; depends on BL-3948 as both edit HttpProtocolHandler.cs), BL-3949 (FTP STOR/REST/500 greeting/226-451), BL-3950 (SOCKS5 replies, Networking) and BL-3951 (bad -o path, Console), each with file-level touches and its own focused test file and the --trace check. Once they are Done, the next claim of this task only re-measures every path against real curl 8.22.0 under -v and --trace, records the commands in Notes and ticks the criteria; any gap left is a new task.
 - 2026-10-28 (lane 4, second claim): re-measured end to end against real curl 8.22.0 (the Git for Windows debug Schannel build) and Curl (`dotnet run --no-build --project Curl.Console --`, passed as `-Curl dotnet` to `Record-CurlExchange.ps1`), each under `-sv` and `-s --trace-ascii %`. Compared the `*`/`== Info:` lines, ignoring the reference's debug-only lines (`Curl_xfer...`, `sendrecv_dl...`, and the DEBUGF `RANGE 3 to end of file` / `range-download from ...` lines that curl_range.c writes only in debug builds) and normalising ports. Same lines and exit code under both modes: `--max-filesize 5` against Content-Length 100 (63, `Maximum file size exceeded`); `-L --max-redirs 0` on a 302 (47, `Maximum (0) redirects followed`); `--compressed` with a bad gzip body (61); a `zz` chunk size (56, both chunk lines); Content-Length 100 with 5 bytes (18, `end of response with 95 bytes missing`); FTP `-T` with `STOR=550 no` (25); FTP `-C 3` with `REST=500 no` (31, `Could not use REST`, `shutting down connection #0`); `GREETING=500 no` (8); `RETRDONE=451 aborted` (18); `-o nodir/x.txt file:///.../s.txt` (23, `client returned ERROR on write of 12 bytes`). SOCKS5 replies: taken from BL-3950's measurement against a loopback stand-in (same info event, so `--trace` shows it too); not re-run, because the recorder has no SOCKS5 mode.
-- Gap found: `-m 1` with 5 of 100 bytes and the server holding the connection open (`-HoldOpenMilliseconds 3000`): real curl writes `* Operation timed out after N milliseconds with 5 out of 100 bytes received` once, but Curl writes it twice. `HttpProtocolHandler.OutcomeOfTimeout` calls `ReportInfo(message)` twice (c44f09cc4). Filed BL-3970 to fix it. BL-3970 waits on BL-3874, which holds HttpProtocolHandler.cs. Requeued on BL-3970: once it is Done, re-run only the `-m` command (in BL-3970's Context), then tick the criteria. ADR-0482's focused tests are already in each library's Cgr088 test file (BL-3948 to BL-3952, BL-3955) and in BL-3970.
+- Gap found: `-m 1` with 5 of 100 bytes and the server holding the connection open (`-HoldOpenMilliseconds 3000`): real curl writes `* Operation timed out after N milliseconds with 5 out of 100 bytes received` once, but Curl writes it twice. `HttpProtocolHandler.OutcomeOfTimeout` calls `ReportInfo(message)` twice (c44f09cc4). Filed BL-3975 to fix it. BL-3975 waits on BL-3874, which holds HttpProtocolHandler.cs. Requeued on BL-3975: once it is Done, re-run only the `-m` command (in BL-3975's Context), then tick the criteria. ADR-0482's focused tests are already in each library's Cgr088 test file (BL-3948 to BL-3952, BL-3955) and in BL-3975.
 
 ## Log
 
@@ -39,4 +39,4 @@ CGR-088 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (see BL-3617, D
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 27475e82 ee75e456 779790c0.
 - 2026-10-28: Doing -> Backlog. Split for size: waits on BL-3948, BL-3949, BL-3950, BL-3951 and BL-3952, one per library
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 27475e82 ee75e456 779790c0.
-- 2026-10-28: Doing -> Backlog. Waits on BL-3970 (-m writes its timeout line twice; HttpProtocolHandler.cs, held by BL-3874); every other path re-measured and matches
+- 2026-10-28: Doing -> Backlog. Waits on BL-3975 (-m writes its timeout line twice; HttpProtocolHandler.cs, held by BL-3874); every other path re-measured and matches
