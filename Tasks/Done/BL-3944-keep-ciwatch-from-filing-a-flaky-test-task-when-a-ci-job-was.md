@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/CiWatch.ps1]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3944 — Keep CiWatch from filing a flaky-test task when a CI job was never given a runner
 
@@ -45,3 +45,4 @@ Get-CiRuns now takes -ReadJobs (default: gh run view <id> --json jobs); with an 
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: da156d0f 76061afb.
+- 2026-10-28: Doing -> Done. CiWatch records runner capacity and files nothing for jobs never given a runner; self-checks pass
