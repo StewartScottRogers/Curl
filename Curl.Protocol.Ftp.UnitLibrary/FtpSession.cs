@@ -1477,8 +1477,19 @@ internal sealed class FtpSession(
     {
         FtpReply rest = await ExchangeAsync("REST 0").ConfigureAwait(false);
         return await WriteHeaderAsync(rest.Code == 350 ? FtpHeadHeaderLines.AcceptRanges : null).ConfigureAwait(false)
-            ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
-            ?? await QuitAndSucceedAsync().ConfigureAwait(false);
+            ?? await EndHeadAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends a file's <c>-I</c> answer as curl 8.22.0's <c>ftp_done</c> does: the <c>-v</c> line
+    /// naming the remembered directory, the quotes, <c>QUIT</c>, then the line saying the
+    /// connection is left intact (CGR-232).
+    /// </summary>
+    private async ValueTask<TransferResult> EndHeadAsync()
+    {
+        ReportRememberedDirectory();
+        return await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
+            ?? await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
     /// <summary>

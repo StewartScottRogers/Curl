@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTes
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3761 — Fix CGR-232: -I -v on an FTP file omits * Remembering we are in directory "" and * Connection #0 to host ... left intact
 
@@ -60,10 +60,10 @@ curl -sSv -I ftp://127.0.0.1:20960/file.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,6 @@ curl -sSv -I ftp://127.0.0.1:20960/file.txt
 
 - 2026-10-26: Created from CGR-232 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+- Measured `curl -sSv -I ftp://127.0.0.1:20960/file.txt` (curl 8.22.0 Schannel) through Record-CurlExchange.ps1 -Ftp: after `< 350 Restarting at 0` it prints `* Remembering we are in directory ""` then `* Connection #0 to host 127.0.0.1:20960 left intact`. Curl now does the same (`FtpSession.EndHeadAsync`); wire bytes and stdout unchanged. The directory-URL `-I` path was not in the report and is left as it was. Pinned by `Cgr232Tests`. Platform-neutral (no paths); CI criteria met by that. Quality run for Curl.Protocol.Ftp.UnitLibrary: 0 failing members.
+- 2026-10-28: Doing -> Done. -I -v on an FTP file now prints the Remembering and left intact lines
