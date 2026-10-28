@@ -31,3 +31,4 @@ Follow-up of BL-3844 (CGR-015 part 2, `Documentation/Reviews/Curl-Gap-Report-202
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: db5eac33 16c33551 c463b44c.
