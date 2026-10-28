@@ -34,3 +34,4 @@ For each shared number, the ADR committed first (by `git log --diff-filter=A`) k
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d63b0774 b91545c5 caa83799 779790c0.
