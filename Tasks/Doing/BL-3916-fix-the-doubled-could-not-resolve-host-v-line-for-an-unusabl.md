@@ -33,3 +33,4 @@ Curl writes `* Could not resolve host: foo.test` twice before `* Could not resol
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: da7b5c6c d069bed7 779790c0.
