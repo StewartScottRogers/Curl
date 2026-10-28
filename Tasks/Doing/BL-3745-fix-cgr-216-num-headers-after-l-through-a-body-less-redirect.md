@@ -74,3 +74,4 @@ curl -s -o NUL -L -w '%{num_headers}\n' http://127.0.0.1:20700/raw/loc2
 ## Log
 
 - 2026-10-26: Created from CGR-216 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
