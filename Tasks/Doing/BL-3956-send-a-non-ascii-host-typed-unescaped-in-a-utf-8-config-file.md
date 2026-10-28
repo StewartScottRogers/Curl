@@ -31,3 +31,4 @@ Found by BL-3953 on 2026-10-28, measured with Record-CurlExchange.ps1 and `--con
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 9069a70d 4e298cd0 779790c0.
