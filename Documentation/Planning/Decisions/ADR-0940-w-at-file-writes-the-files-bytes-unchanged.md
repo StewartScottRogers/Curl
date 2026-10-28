@@ -1,4 +1,4 @@
-# ADR-0938 — -w @file writes the file's bytes unchanged
+# ADR-0940 — -w @file writes the file's bytes unchanged
 
 - Status: Accepted
 - Date: 2026-10-28
