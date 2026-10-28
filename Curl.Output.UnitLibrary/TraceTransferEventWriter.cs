@@ -226,7 +226,7 @@ public sealed class TraceTransferEventWriter(
 
     private static char ShownAsText(byte value)
     {
-        return value is >= 0x20 and < 0x80 ? (char)value : UnprintableByte;
+        return value is >= 0x20 and < 0x7F ? (char)value : UnprintableByte;
     }
 
     private bool EndsLineAt(ReadOnlySpan<byte> bytes, int index)

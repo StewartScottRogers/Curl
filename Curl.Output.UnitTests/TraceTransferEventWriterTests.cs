@@ -198,7 +198,7 @@ public sealed class TraceTransferEventWriterTests
         new TraceTransferEventWriter(output, TraceDumpFormat.TextOnly, writesTimestamps: false, TimeProvider.System)
             .ReportDataReceived([0x61, 0x0D, 0x80, 0x1F, 0x7F, 0x0D]);
 
-        string expectedText = "<= Recv data, 6 bytes (0x6)\n0000: a..." + (char)0x7F + ".\n";
+        string expectedText = "<= Recv data, 6 bytes (0x6)\n0000: a.....\n";
         string actualText = Written();
         WriteTextDiagnostics(diagnostics, "output", expectedText, actualText);
 
