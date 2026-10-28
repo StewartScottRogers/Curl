@@ -45,7 +45,8 @@ public sealed class Cgr036Tests
     [TestMethod]
     public async Task ConnectAsync_ClosedPort_CallsOpenWithTheAddressThenCloseOnceAndFailsWithCouldntConnect()
     {
-        int port = ClosedLoopbackPort();
+        using Socket reservation = ReserveClosedLoopbackPort();
+        int port = ((IPEndPoint)reservation.LocalEndPoint!).Port;
         List<CurlSocketAddress> opens = [];
         int closes = 0;
         using Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -267,12 +268,12 @@ public sealed class Cgr036Tests
         return listener;
     }
 
-    /// <summary>A loopback port nothing listens on: one the system just handed a socket, now closed.</summary>
-    private static int ClosedLoopbackPort()
+    /// <summary>A loopback port nothing listens on: a socket bound and never listening, held so no other process can take the port while the test runs.</summary>
+    private static Socket ReserveClosedLoopbackPort()
     {
-        using Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return ((IPEndPoint)socket.LocalEndPoint!).Port;
+        return socket;
     }
 
     private sealed class LoopbackResolver : IDnsResolver

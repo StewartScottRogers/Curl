@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/Cgr036Tests.cs, Curl.Engine.UnitTests/MultiCallbackQueueTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3908 — Stabilise ConnectAsync_ClosedPort_CallsOpenWithTheAddressThenCloseOnceAndFailsWithCouldntConnect under a full Engine test run
 
@@ -24,13 +24,16 @@ In the same session, one `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibra
 
 ## Acceptance criteria
 
-- [ ] The test waits for the event it needs rather than on timing, and its assertions are unchanged in meaning.
-- [ ] A test in `MultiCallbackQueueTests.cs` covers `QueuedCallback.WaitUntilRun`'s path where the wait is cancelled after the callback was already taken to run (it waits for the run and answers `true`), deterministically.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The test waits for the event it needs rather than on timing, and its assertions are unchanged in meaning.
+- [x] A test in `MultiCallbackQueueTests.cs` covers `QueuedCallback.WaitUntilRun`'s path where the wait is cancelled after the callback was already taken to run (it waits for the run and answers `true`), deterministically.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Closed-port test: the port was freed after being read, so another process could take it and the connect succeed; it now holds a bound, non-listening socket for the whole test. WaitUntilRun test: the existing callback-cancels test could reach Wait after the run finished; the new test waits until the caller thread is blocked, then cancels, then runs the queue.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: e5c455b0 59abc360 779790c0.
+- 2026-10-28: Doing -> Done. closed-port test holds its port; WaitUntilRun cancelled-after-taken path covered deterministically
