@@ -6,7 +6,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins CGR-157 (ADR-0856, ADR-0956): neither reference build (Schannel, OpenSSL) has <c>HTTPSRR</c>, so under
+/// Pins CGR-157 (ADR-0856, ADR-0957): neither reference build (Schannel, OpenSSL) has <c>HTTPSRR</c>, so under
 /// <c>--doh-url</c> an <c>https://</c> origin is resolved with the A and AAAA queries only, and no
 /// HTTPS (type 65) query tells the DoH server the target port.
 /// </summary>

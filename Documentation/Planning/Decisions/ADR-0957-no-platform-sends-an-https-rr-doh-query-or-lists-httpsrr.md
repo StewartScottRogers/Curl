@@ -1,4 +1,4 @@
-# ADR-0956: No platform sends an HTTPS-RR DoH query or lists HTTPSRR
+# ADR-0957: No platform sends an HTTPS-RR DoH query or lists HTTPSRR
 
 - Status: Accepted
 - Date: 2026-10-28

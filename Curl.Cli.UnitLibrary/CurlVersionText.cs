@@ -39,7 +39,7 @@ public static class CurlVersionText
     /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c> and refuses <c>--http3</c> and <c>--http3-only</c>, as Curl does unless the parse reads as a QUIC build (ADR-0144, ADR-0451, ADR-0521, ADR-0540, BL-2330, BL-2332).
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
     /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>IDN</c>,
-    /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment). No <c>HTTPSRR</c>: neither reference build lists it, though Curl's HTTPS records still work when asked for (ADR-0856, ADR-0956).
+    /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment). No <c>HTTPSRR</c>: neither reference build lists it, though Curl's HTTPS records still work when asked for (ADR-0856, ADR-0957).
     /// No <c>ECH</c>: no reference build lists it, since curl builds ECH only on request, and <c>--ech</c> is refused as every reference build refuses it (ADR-0448, ADR-0520, ADR-0918).
     /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
     /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).

@@ -6,7 +6,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins CGR-157's Linux half (ADR-0956): the OpenSSL reference build (curl 8.18.0 on Ubuntu, as curl
+/// Pins CGR-157's Linux half (ADR-0957): the OpenSSL reference build (curl 8.18.0 on Ubuntu, as curl
 /// 8.22.0's default OpenSSL build) lists no <c>HTTPSRR</c>, so off Windows too a direct connect's
 /// <c>https://foo.test:21805/x</c> under <c>--doh-url</c> asks only for the addresses, never the
 /// <c>_21805._https.foo.test</c> HTTPS (type 65) record.

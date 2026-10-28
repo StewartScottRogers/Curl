@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// An <see cref="IDnsResolver" /> that, for an <c>https://</c> origin, also asks for the origin's
 /// HTTPS record (RFC 9460) before its addresses, as curl 8.22.0's HTTPSRR build does through
 /// <c>--doh-url</c> (ADR-0727, BL-2920). <see cref="TcpConnector" /> calls it when it resolves a
-/// direct connect's <c>https://</c> origin under <see cref="TcpConnector.AsksHttpsRecords" />, off by default (ADR-0856, ADR-0956).
+/// direct connect's <c>https://</c> origin under <see cref="TcpConnector.AsksHttpsRecords" />, off by default (ADR-0856, ADR-0957).
 /// </summary>
 public interface IHttpsOriginDnsResolver : IDnsResolver
 {
