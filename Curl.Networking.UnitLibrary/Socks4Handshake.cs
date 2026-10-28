@@ -123,17 +123,20 @@ internal static class Socks4Handshake
         Func<string, int, CancellationToken, ValueTask<DnsResolution>> resolve,
         CancellationToken cancellationToken)
     {
-        var (addresses, failure) = SocksProxyTunnel.ParseAddressLiteral(host) is { } literal
+        var literal = SocksProxyTunnel.ParseAddressLiteral(host);
+        var (addresses, failure) = literal is not null
             ? new DnsResolution([literal], DnsLookupFailure.None)
             : await resolve(host, port, cancellationToken).ConfigureAwait(false);
-        if (addresses.Count == 0)
+        var ipv4 = addresses.FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork);
+        if (ipv4 is not null)
         {
-            return (default, SocksProxyTunnel.CouldNotResolve(host, port, failure));
+            return (new Socks4Destination(ipv4.GetAddressBytes(), null), null);
         }
 
-        return addresses.FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork) is { } ipv4
-            ? (new Socks4Destination(ipv4.GetAddressBytes(), null), null)
-            : (default, SocksProxyTunnel.Failed(CurlProxyCode.ResolveHost, $"SOCKS4 connection to {addresses[0]} not supported"));
+        // A named host with no IPv4 address is unresolved to curl; only an IPv6 literal is named as unsupported.
+        return literal is not null
+            ? (default, SocksProxyTunnel.Failed(CurlProxyCode.ResolveHost, $"SOCKS4 connection to {literal} not supported"))
+            : (default, SocksProxyTunnel.CouldNotResolve(host, port, failure));
     }
 
     private static byte[] BuildRequest(int port, Socks4Destination destination, byte[] userId)

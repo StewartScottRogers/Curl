@@ -98,7 +98,7 @@ public sealed partial class TcpConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_ThroughSocks4ToANameWithOnlyIPv6Addresses_FailsWithProxy()
+    public async Task ConnectAsync_ThroughSocks4ToANameWithOnlyIPv6Addresses_FailsWithCouldntResolveHost()
     {
         var (result, proxyConnection) = await ConnectThroughSocksAsync(
             ProxyKind.Socks4,
@@ -106,7 +106,9 @@ public sealed partial class TcpConnectorTests
             Socks4Granted,
             resolveEntry: "target.example:8080:[2001:db8::1]");
 
-        AssertProxyFailure(result, proxyConnection, "SOCKS4 connection to 2001:db8::1 not supported");
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: target.example", result.ErrorMessage);
+        Assert.IsTrue(proxyConnection.IsDisposed);
     }
 
     [TestMethod]
