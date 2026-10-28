@@ -33,3 +33,4 @@ CGR-088 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (see BL-3617, D
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 27475e82 ee75e456 779790c0.
