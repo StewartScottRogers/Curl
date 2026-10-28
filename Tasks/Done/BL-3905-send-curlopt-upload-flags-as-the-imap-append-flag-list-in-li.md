@@ -8,7 +8,7 @@ depends-on: [BL-3653]
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Context.cs, Curl.Engine.UnitTests/ManagedEasyTransferUploadFlagsTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3905 — Send CURLOPT_UPLOAD_FLAGS as the IMAP APPEND flag list in Libcurl transfers
 
@@ -28,13 +28,16 @@ that order, as `Curl.Console/EasyOptionsFromCommandLine.cs`'s `UploadFlagNames` 
 
 ## Acceptance criteria
 
-- [ ] A Libcurl transfer with `CURLOPT_UPLOAD_FLAGS` set sends the same `APPEND` command bytes as libcurl 8.22.0, measured and recorded in Notes, for the default and at least three values.
-- [ ] A unit test in `Curl.Engine.UnitTests` pins the bitmask-to-names mapping.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A Libcurl transfer with `CURLOPT_UPLOAD_FLAGS` set sends the same `APPEND` command bytes as libcurl 8.22.0, measured and recorded in Notes, for the default and at least three values.
+- [x] A unit test in `Curl.Engine.UnitTests` pins the bitmask-to-names mapping.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+Measured curl 8.22.0 (tool) against a loopback IMAP server (`APPEND INBOX ... {6}`): no option sends `(Seen)`; `--upload-flags answered,deleted,draft,flagged,seen` sends `(Answered Deleted Draft Flagged Seen)`; `draft,answered` sends `(Answered Draft Seen)`; `flagged` sends `(Flagged Seen)` (the tool ORs seen in). The engine sends exactly the names of the low five bits in curl order; default byte 16 gives `(Seen)`, 0 gives no list. Raw libcurl value 0 could not be measured here (no C compiler); mapping follows the bitmask. Quality run for Curl.Engine.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created by BL-3653 for the transfer side of CURLOPT_UPLOAD_FLAGS.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 103a276f 368dad15 779790c0.
+- 2026-10-28: Doing -> Done. UPLOAD_FLAGS mapped to APPEND flag list

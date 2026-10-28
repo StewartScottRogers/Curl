@@ -196,13 +196,19 @@ internal sealed partial class ManagedEasyTransfer
             FtpSslControlOnly: false,
             SslRequired: false,
             ListOnly: options.Transfer.DirListOnly,
-            UploadFlags: [],
+            UploadFlags: UploadFlagNamesOf(options.Protocols.Smtp.UploadFlags),
             ProxyHeaders: options.Proxy.HeaderOption == HeaderOption.Unified ? [] : options.Proxy.ProxyHeaders,
             ProxyTunnel: options.Proxy.HttpProxyTunnel,
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
             AppendUrlQuery: url => url,
             PostWithoutData: options.Http is { Post: true, PostFields: null } && IsMqttUrl(options));
+
+    // The IMAP APPEND flag names CURLOPT_UPLOAD_FLAGS' CURLULFLAG_* bits (1, 2, 4, 8, 16) name, in curl's fixed order.
+    private static readonly string[] UploadFlagNames = ["answered", "deleted", "draft", "flagged", "seen"];
+
+    private static string[] UploadFlagNamesOf(byte uploadFlags) =>
+        [.. UploadFlagNames.Where((_, bit) => (uploadFlags & (1 << bit)) != 0)];
 
     /// <summary>
     /// The <c>CURLOPT_POSTFIELDS</c> an MQTT transfer publishes, cut to <c>CURLOPT_POSTFIELDSIZE</c> when that is not
