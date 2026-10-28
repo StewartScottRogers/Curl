@@ -1,0 +1,97 @@
+using Curl.Api.EngineContracts.Multi;
+
+namespace Curl.Engine;
+
+[TestClass]
+public sealed class TransferSocketWaitTests
+{
+    private static readonly TimeSpan LongestWait = TimeSpan.FromSeconds(30);
+
+    [TestMethod]
+    public void TakeSocket_NoOperatingSystemSocket_GivesAnEngineNumberAboveFirstEngineSocket()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+
+        wait.TakeSocket(null);
+
+        Assert.IsNotNull(wait.Socket);
+        Assert.IsGreaterThan(TransferSocketWait.FirstEngineSocket, (long)wait.Socket.Value);
+        Assert.IsLessThan(ConnectOnlyConnection.FirstSocket, (long)wait.Socket.Value);
+        Assert.IsGreaterThan((long)ManagedMultiTransfer.FirstTransferSocket, (long)wait.Socket.Value);
+    }
+
+    [TestMethod]
+    public void TakeSocket_TwoTransfersWithNoOperatingSystemSocket_GivesEachItsOwnNumber()
+    {
+        TransferSocketWait first = new(TimeProvider.System);
+        TransferSocketWait second = new(TimeProvider.System);
+
+        first.TakeSocket(null);
+        second.TakeSocket(null);
+
+        Assert.AreNotEqual(first.Socket, second.Socket);
+    }
+
+    [TestMethod]
+    public void TakeSocket_OperatingSystemSocket_KeepsItsHandle()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+
+        wait.TakeSocket(812);
+
+        Assert.AreEqual((nint)812, wait.Socket);
+    }
+
+    [TestMethod]
+    public void TakeSocket_SocketAlreadyKnownFromTheDial_KeepsIt()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        wait.ConnectingOn(640);
+
+        wait.TakeSocket(null);
+
+        Assert.AreEqual((nint)640, wait.Socket);
+    }
+
+    [TestMethod]
+    public void TakeSocket_RaisesChanged()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        int changes = 0;
+        wait.Changed += () => changes++;
+
+        wait.TakeSocket(null);
+
+        Assert.AreEqual(1, changes);
+    }
+
+    [TestMethod]
+    public async Task SignalOn_TheEngineNumber_WakesTheReadWaitingOnIt()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        wait.TakeSocket(null);
+        Task read = wait.WaitUntilReadableAsync(CancellationToken.None).AsTask();
+        CurlPoll waiting = wait.Waiting;
+
+        bool signalled = wait.SignalOn(wait.Socket!.Value, CurlSocketSelect.In);
+
+        await read.WaitAsync(LongestWait);
+        Assert.IsTrue(signalled);
+        Assert.AreEqual(CurlPoll.In, waiting);
+    }
+
+    [TestMethod]
+    public void SignalOn_AnotherSocket_LeavesTheWaitWaiting()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        wait.TakeSocket(null);
+        Task write = wait.WaitUntilWritableAsync(CancellationToken.None).AsTask();
+
+        bool signalled = wait.SignalOn(wait.Socket!.Value + 1, CurlSocketSelect.Out);
+
+        Assert.IsFalse(signalled);
+        Assert.IsFalse(write.IsCompleted);
+        Assert.AreEqual(CurlPoll.Out, wait.Waiting);
+        wait.Signal(CurlSocketSelect.Out);
+    }
+}

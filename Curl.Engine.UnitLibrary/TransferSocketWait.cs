@@ -18,6 +18,9 @@ namespace Curl.Engine;
 /// <param name="timeProvider">The clock the deadlines are reckoned on.</param>
 internal sealed class TransferSocketWait(TimeProvider timeProvider)
 {
+    /// <summary>The last socket number <see cref="TakeSocket" /> gave (<see cref="FirstEngineSocket" /> before any), shared by every transfer in the process.</summary>
+    private static long nextEngineSocket = FirstEngineSocket;
+
     private readonly Lock sync = new();
     private TaskCompletionSource? readableWait;
     private TaskCompletionSource? writableWait;
@@ -39,6 +42,15 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// (<c>DEFAULT_CONNECT_TIMEOUT</c>).
     /// </summary>
     internal static TimeSpan DefaultConnectTimeout { get; } = TimeSpan.FromSeconds(300);
+
+    /// <summary>
+    /// Gets the socket number the engine's own numbering for connections with no operating system socket (an
+    /// in-memory one) starts from; the first such transfer is given <c>FirstEngineSocket + 1</c>, the next
+    /// <c>FirstEngineSocket + 2</c> and so on. The range lies far above any descriptor or handle the operating
+    /// system gives a process and apart from <see cref="ConnectOnlyConnection.FirstSocket" />'s and
+    /// <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers (ADR-0951).
+    /// </summary>
+    internal const long FirstEngineSocket = 0x5000_0000;
 
     /// <summary>
     /// Gets what the transfer waits for on its socket: <see cref="CurlPoll.Out" /> while it connects or a write
@@ -111,6 +123,15 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// <param name="socket">The handle of the socket being connected.</param>
     internal void ConnectingOn(nint socket) => Update(() => Socket = socket);
 
+    /// <summary>
+    /// Records the socket of the connection the transfer dialed, unless <see cref="Socket" /> is already known:
+    /// <paramref name="socketHandle" /> when the connection has an operating system socket, otherwise the engine's
+    /// next number from <see cref="FirstEngineSocket" />, so the application is told of a socket and an action
+    /// naming it wakes the transfer (<see cref="SignalOn" />, ADR-0951).
+    /// </summary>
+    /// <param name="socketHandle">The connection's operating system socket (<c>IConnection.SocketHandle</c>), or <see langword="null" /> when it has none.</param>
+    internal void TakeSocket(nint? socketHandle) => Update(() => Socket ??= socketHandle ?? (nint)Interlocked.Increment(ref nextEngineSocket));
+
     /// <summary>Marks the connect as over, so it no longer waits writable for it and the connect deadline ends.</summary>
     internal void EndConnect() => Update(() =>
     {
@@ -148,6 +169,24 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
 
         readable?.TrySetResult();
         writable?.TrySetResult();
+    }
+
+    /// <summary>
+    /// Signals the socket ready (<see cref="Signal" />) when <paramref name="socket" /> is the transfer's
+    /// <see cref="Socket" />, as the multi handle does for <c>curl_multi_socket_action</c> naming a socket.
+    /// </summary>
+    /// <param name="socket">The socket the action names.</param>
+    /// <param name="events">What the socket is ready for.</param>
+    /// <returns><see langword="true" /> when the socket is the transfer's and was signalled.</returns>
+    internal bool SignalOn(nint socket, CurlSocketSelect events)
+    {
+        if (Socket != socket)
+        {
+            return false;
+        }
+
+        Signal(events);
+        return true;
     }
 
     /// <summary>Waits until the multi handle signals the socket readable, or takes a signal kept for it.</summary>
