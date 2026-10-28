@@ -352,9 +352,10 @@ public sealed class CommandLineOption
     private static CommandLineOptionApplier WarnAboutLeadingUnicodeThen(CommandLineOptionApplier apply) =>
         (options, value, spelledOption, pathExists, dataFileReader) =>
         {
-            if (ReadsValueAsUtf8(options) && value.Length > 0 && value[0] is >= ' ' and <= '‿')
+            string text = options.ValueReadForLeadingUnicodeCheck(value);
+            if (ReadsValueAsUtf8(options) && text.Length > 0 && text[0] is >= ' ' and <= '‿')
             {
-                options.AddWarningLinesUnlessSilent(CommandLineWarning.ArgumentStartsWithUnicode(value));
+                options.AddWarningLinesUnlessSilent(CommandLineWarning.ArgumentStartsWithUnicode(text));
             }
 
             return apply(options, value, spelledOption, pathExists, dataFileReader);

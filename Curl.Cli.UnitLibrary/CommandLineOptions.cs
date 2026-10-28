@@ -94,11 +94,13 @@ public sealed class CommandLineOptions
     internal bool ApplyingValueLedByVariableBytes { get => globals.ApplyingValueLedByVariableBytes; set => globals.ApplyingValueLedByVariableBytes = value; }
 
     /// <summary>
-    /// <see langword="true"/> while <see cref="CommandLineParser"/> applies an <c>--expand-</c> value in
-    /// which at least one variable reference was replaced: <see cref="VariableExpansion"/> builds it from
-    /// UTF-8 bytes, so <see cref="CommandLineTextBytes"/> sends it as UTF-8 (BL-3844).
+    /// <paramref name="value"/> as curl 8.21.0's leading-Unicode check reads it: while <see cref="ApplyingValueLedByVariableBytes"/>,
+    /// the value's bytes (<see cref="CommandLineTextBytes"/>) read as UTF-8 (BL-1814, BL-3848); otherwise unchanged.
     /// </summary>
-    internal bool ApplyingExpandedValue { get => globals.ApplyingExpandedValue; set => globals.ApplyingExpandedValue = value; }
+    /// <param name="value">An option value as parsed.</param>
+    /// <returns>The text the check reads.</returns>
+    internal string ValueReadForLeadingUnicodeCheck(string value) =>
+        ApplyingValueLedByVariableBytes ? InvalidUtf8ByteEscape.Decode(CommandLineTextBytes(value)) : value;
 
     /// <summary>
     /// The encoding the request side sends header text in, when it is not the UTF-8 a config file is
@@ -2404,17 +2406,29 @@ public sealed class CommandLineOptions
     /// <c>--url-query</c> value, goes out as, as curl 8.22.0 sends it (CGR-015, BL-3844): a command-line
     /// argument, or a line of a config file read in <see cref="ConfigFileWireTextEncoding"/>, in that
     /// encoding when it is set, since curl's Windows build gets its arguments in the ANSI code page and
-    /// sends their bytes unchanged; a line of a config file read as UTF-8, an <c>--expand-</c> value
-    /// (<see cref="ApplyingExpandedValue"/>, whose variables hold UTF-8) and every value off Windows in UTF-8,
+    /// sends their bytes unchanged; a line of a config file read as UTF-8 and every value off Windows in UTF-8,
     /// with each byte of an argument that was not valid UTF-8 sent back unchanged (<see cref="InvalidUtf8ByteEscape"/>,
-    /// CGR-016, BL-3849), so <c>-d $'\xff'</c> posts FF as curl 8.18.0 does on Linux.
+    /// CGR-016, BL-3849), so <c>-d $'\xff'</c> posts FF as curl 8.18.0 does on Linux. An <c>--expand-</c>
+    /// value is held as <see cref="CommandLineText"/> of its expanded bytes, so it gets those bytes back (BL-3848).
     /// </summary>
     /// <param name="text">The value as parsed.</param>
     /// <returns>The value's bytes.</returns>
     internal byte[] CommandLineTextBytes(string text) =>
-        ReadingUtf8ConfigFile || ApplyingExpandedValue || ConfigFileWireTextEncoding is null
+        ReadingUtf8ConfigFile || ConfigFileWireTextEncoding is null
             ? InvalidUtf8ByteEscape.Encoding.GetBytes(text)
             : ConfigFileWireTextEncoding.GetBytes(text);
+
+    /// <summary>
+    /// The inverse of <see cref="CommandLineTextBytes"/>: <paramref name="bytes"/> read as the text of a
+    /// typed value, so an <c>--expand-</c> value's bytes reach every option as a typed value's would and go
+    /// out unchanged, as curl 8.21.0 sends them (BL-3848).
+    /// </summary>
+    /// <param name="bytes">An expanded value's bytes.</param>
+    /// <returns>The text to apply.</returns>
+    internal string CommandLineText(byte[] bytes) =>
+        ReadingUtf8ConfigFile || ConfigFileWireTextEncoding is null
+            ? InvalidUtf8ByteEscape.Decode(bytes)
+            : ConfigFileWireTextEncoding.GetString(bytes);
 
     /// <summary>
     /// Appends the bytes of <paramref name="data"/> (<see cref="CommandLineTextBytes"/>) to <see cref="PostData"/>,
