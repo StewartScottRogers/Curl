@@ -73,3 +73,4 @@ curl -sS -H "Transfer-Encoding: chunked" --data-binary @b.bin http://127.0.0.1:2
 ## Log
 
 - 2026-10-26: Created from CGR-199 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
