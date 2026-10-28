@@ -34,3 +34,4 @@ BL-3686 (ADR-0856) fixed the Windows half of third-party gap report issue CGR-15
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 90befad2 74ba9b3c 168cb378 779790c0.
