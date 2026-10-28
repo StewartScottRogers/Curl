@@ -33,3 +33,4 @@ Found by BL-3852 (CGR-016 part 4). The console hands each invalid argv byte b ov
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 75f3ec35 c7c55a1f 57f19d7e 3ccadb6a 779790c0.
