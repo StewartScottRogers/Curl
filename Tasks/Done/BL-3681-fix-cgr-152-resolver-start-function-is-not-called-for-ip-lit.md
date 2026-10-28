@@ -8,7 +8,7 @@ depends-on: [BL-3680]
 touches: [Curl.Engine.UnitLibrary/ResolverStartDnsResolver.cs, Curl.Engine.UnitLibrary/ManagedEngineSharedState.cs, Curl.Engine.UnitTests/Cgr152Tests.cs, Curl.Engine.UnitTests/EasyHandleIsolationTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3681 — Fix CGR-152: RESOLVER_START_FUNCTION is not called for IP-literal hosts, so its abort has no effect
 
@@ -59,10 +59,10 @@ probe.exe C_71 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -75,9 +75,17 @@ probe.exe C_71 2
 - Measured for ADR-0789's test1512 claim: handle A with `CURLOPT_RESOLVE fake.example:21700:127.0.0.1`, then a fresh handle B to `http://fake.example:21700/` with no RESOLVE: REF B gives `rc=6 calls=1`, with or without `CURLOPT_DNS_USE_GLOBAL_CACHE` 1 on both; PORT B gives `rc=0 calls=0`. So libcurl 8.22.0's easy handles do not see each other's resolved names (`dnscache_get` in `lib/vdns/dnscache.c` returns the share's or the handle's multi's cache only), contrary to ADR-0789. Giving each handle its own `DnsCache` may therefore change upstream test1512 on the ratchet (`PassingUpstreamCases.txt` line 1483); whoever lands the fix (BL-3680) should run that case and amend ADR-0789.
 - After BL-3680 lands: rerun the fresh-handle probe above, keep `Cgr152Tests` (it must also gain a two-handle case: A with a RESOLVE entry for one host and ret=1 on another, then B to that host with ret=1 expecting `AbortedByCallback` and one call), and finish.
 
+- 2026-10-28 (lane 3, second claim): BL-3680 (Done) gave each easy handle its own `DnsCache`, which closed this issue; no production change was needed here. Reran the 2026-10-26 probe (`probe.cs`, `resolve.cs`, outside the repo) against this checkout's `Libcurl`. PORT now matches REF line for line:
+  - fresh handle per run: `127.0.0.1 ret=0 rc=0 calls=1 requests=1`, `ret=1 rc=42 calls=1 requests=0`, `[::1] ret=0 rc=7 calls=1`, `ret=1 rc=42 calls=1` (was `rc=0 calls=0` and `rc=7 calls=0`).
+  - one handle for both runs (already matched): `ret=1` gives `rc=0 calls=0 requests=1` and `[::1] rc=7 calls=0`, unchanged.
+  - RESOLVE on handle A, fresh handle B to `fake.example:21700`: `rc=6 calls=1`, as REF; B to `127.0.0.1`: `rc=0 calls=1`, as REF.
+- `Cgr152Tests` (ADR-0482) holds the fresh-handle literals, two handles of one engine, and the RESOLVE two-handle case. The two-handle cases fail when handles share the engine's `DnsCache` (the state before BL-3680) and pass now. They abort before connecting, so they stay unit tests. `ManagedEngineSharedState.cs` and `EasyHandleIsolationTests.cs` needed no change because BL-3680 had already flipped the assertion.
+- `dotnet build` is clean, and `dotnet test --filter "TestCategory!=Integration"` passed all 46 unit-test projects with 0 failures. The change is test-only and platform-neutral (loopback IP literals, no paths or OS text), so nothing runs differently on Linux or macOS and there is no production code for Measure-CodeQuality.ps1 to measure.
+
 ## Log
 
 - 2026-10-26: Created from CGR-152 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3680 (Doing, lane 6): its ManagedEngineSharedState.cs DNS cache fix is this issue's root cause
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. RESOLVER_START_FUNCTION now runs for IP-literal hosts on every fresh handle, so returning 1 gives 42 as libcurl 8.22.0 does (cache fix from BL-3680; Cgr152Tests pins it)
