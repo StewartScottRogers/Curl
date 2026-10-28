@@ -234,14 +234,14 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private async ValueTask<Socket> ConnectFromBoundEndAsync(Socket socket, IPEndPoint endPoint, CancellationToken cancellationToken)
     {
-        var boundEnd = socket.LocalEndPoint as IPEndPoint;
         try
         {
             return await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
         }
-        catch (SocketException exception) when (boundEnd is { Port: not 0 })
+        catch (SocketException exception) when (socket.LocalEndPoint is IPEndPoint { Port: not 0 })
         {
-            throw new BoundConnectFailedException(exception.SocketErrorCode, exception.Message, boundEnd);
+            // The system gives a failed connect an ephemeral local port too, and curl names it (CGR-220).
+            throw new BoundConnectFailedException(exception.SocketErrorCode, exception.Message, (IPEndPoint)socket.LocalEndPoint);
         }
     }
 
