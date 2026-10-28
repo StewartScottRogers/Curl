@@ -1,5 +1,5 @@
 ---
-id: BL-3979
+id: BL-3981
 title: Give a socket-action transfer over a connection with no OS socket a socket number the application is told of and woken on (CGR-034)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3979 — Give a socket-action transfer over a connection with no OS socket a socket number the application is told of and woken on (CGR-034)
+# BL-3981 — Give a socket-action transfer over a connection with no OS socket a socket number the application is told of and woken on (CGR-034)
 
 ## Goal
 

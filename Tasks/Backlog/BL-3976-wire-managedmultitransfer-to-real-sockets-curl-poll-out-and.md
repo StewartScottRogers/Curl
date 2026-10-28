@@ -4,7 +4,7 @@ title: Wire ManagedMultiTransfer to real sockets, CURL_POLL_OUT and deadline tim
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-3979]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-3981]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitTests/Cgr034Tests.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Counts.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Timers.cs, Curl.Engine.UnitTests/Cgr148Tests.cs, Curl.Engine.UnitTests/SocketActionGatedConnectionTests.cs, Curl.Engine.UnitTests/SocketActionGatedTcpDialerTests.cs, Curl.Engine.UnitLibrary/ConnectOnlyConnection.cs]
 requirement: none
 created: 2026-10-28
@@ -32,10 +32,10 @@ Split from BL-3563 (CGR-034 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 - Split from BL-3563 (cost cap).
 - Continues the stashed work of BL-3563.
 - 2026-10-28 run (lane 4): applied stash b2bb31c0's work (one conflict in `ManagedMultiTransfer.cs` beside CGR-150's `CloseIdleConnectionsForRoomAsync`, kept both). With it the engine builds clean and the 151 multi, socket-action, `Cgr033`, `Cgr034` and `Cgr148` tests pass, `Cgr034Tests` pinning `C_20`, `C_74` and `C_75`. Renumbered its ADR from 0864 (taken by the file-URL ADR) to ADR-0948, with the README row and the citations in `ManagedMultiTransfer.cs` and `Cgr034Tests.cs`.
-- What is left for criteria 1 and 2: the stash keeps `FirstTransferSocket` numbers and the 10 ms `RunningTransferCheckInterval` timer for transfers that have no OS socket - test-fake `IEasyTransfer`s and connections over in-memory dialing (`Lib530Run`, `Lib582Run`), which only the 10 ms timer brings back. Removing them first needs such connections to have a socket the application is told of: filed as BL-3979 and added to `depends-on`. Once it is Done, remove both fallbacks here and move the fake-transfer tests in `ManagedMultiTransferTests.SocketAction.cs`, `.Counts.cs`, `.Timers.cs` and `Cgr148Tests.cs` to the real-socket answers (added to `touches`; no task in Doing on origin/work/dark-factory names them). Measure-CodeQuality not run yet.
+- What is left for criteria 1 and 2: the stash keeps `FirstTransferSocket` numbers and the 10 ms `RunningTransferCheckInterval` timer for transfers that have no OS socket - test-fake `IEasyTransfer`s and connections over in-memory dialing (`Lib530Run`, `Lib582Run`), which only the 10 ms timer brings back. Removing them first needs such connections to have a socket the application is told of: filed as BL-3981 and added to `depends-on`. Once it is Done, remove both fallbacks here and move the fake-transfer tests in `ManagedMultiTransferTests.SocketAction.cs`, `.Counts.cs`, `.Timers.cs` and `Cgr148Tests.cs` to the real-socket answers (added to `touches`; no task in Doing on origin/work/dark-factory names them). Measure-CodeQuality not run yet.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 2ff2ee8c 934d3e8d 6e4e49ca 779790c0.
-- 2026-10-28: Doing -> Backlog. Waits on BL-3979: connections with no OS socket need a socket before FirstTransferSocket and the 10 ms timer can go
+- 2026-10-28: Doing -> Backlog. Waits on BL-3981: connections with no OS socket need a socket before FirstTransferSocket and the 10 ms timer can go
