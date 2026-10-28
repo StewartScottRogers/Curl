@@ -73,3 +73,4 @@ curl -s -S --http0.9 -I http://127.0.0.1:20400/st_h09_I
 ## Log
 
 - 2026-10-26: Created from CGR-203 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
