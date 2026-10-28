@@ -34,3 +34,4 @@ Last part of BL-3953 (CGR-059). BL-3963 and BL-3964 change how `CurlUrlHost` rea
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 2a4d9734 c155faee 779790c0.
