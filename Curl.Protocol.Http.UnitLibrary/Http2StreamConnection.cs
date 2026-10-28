@@ -497,7 +497,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
-    /// Takes a response head as nghttp2 checks it (measured, BL-3667 Notes): a <c>content-length</c>
+    /// Takes a response head as nghttp2 checks it (measured, BL-3667 and BL-3665 Notes): a connection-specific field, a <c>content-length</c>
     /// that is not a number, or a second one, is an invalid header field, and a 1xx head that
     /// ends the stream is a protocol error. Either way curl has written the lines before the
     /// failure but not the empty line, and nghttp2 shuts the connection down.
@@ -531,7 +531,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private (byte[] Written, string Message)? MalformedHeadOf(int statusCode, IReadOnlyList<HeaderField> fields, bool isEndStream)
     {
-        int invalidIndex = IndexOfInvalidContentLength(fields);
+        int invalidIndex = IndexOfInvalidField(fields);
         if (invalidIndex >= 0)
         {
             return (HeadWithoutEmptyLine(statusCode, fields.Take(invalidIndex).ToList()), InvalidHeaderFieldReceived(streamId, fields[invalidIndex]));
@@ -588,14 +588,21 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     }
 
     /// <summary>
-    /// Finds the first <c>content-length</c> nghttp2 rejects: one that is not a decimal number
-    /// that fits a 64-bit length, or any after the first; -1 when there is none.
+    /// Finds the first header field nghttp2 rejects in a response head: a connection-specific
+    /// field (<see cref="Http2ResponseHead.IsConnectionSpecific" />, CGR-136), or a
+    /// <c>content-length</c> that is not a decimal number that fits a 64-bit length, or any
+    /// after the first; -1 when there is none.
     /// </summary>
-    private static int IndexOfInvalidContentLength(IReadOnlyList<HeaderField> fields)
+    private static int IndexOfInvalidField(IReadOnlyList<HeaderField> fields)
     {
         bool isSeen = false;
         for (int index = 0; index < fields.Count; index++)
         {
+            if (Http2ResponseHead.IsConnectionSpecific(fields[index]))
+            {
+                return index;
+            }
+
             if (fields[index].Name != "content-length")
             {
                 continue;
@@ -612,7 +619,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         return -1;
     }
 
-    /// <summary>Gives the head's <c>content-length</c>, already checked by <see cref="IndexOfInvalidContentLength" />, or <see langword="null" /> when it has none.</summary>
+    /// <summary>Gives the head's <c>content-length</c>, already checked by <see cref="IndexOfInvalidField" />, or <see langword="null" /> when it has none.</summary>
     private static long? ContentLengthOf(IReadOnlyList<HeaderField> fields) =>
         fields.Where(field => field.Name == "content-length").Select(field => ParseContentLength(field.Value)).FirstOrDefault();
 

@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Frozen;
 using System.Globalization;
 using System.Text;
 using Curl.Http2;
@@ -17,6 +18,9 @@ internal static class Http2ResponseHead
     private static readonly SearchValues<char> TokenCharacters =
         SearchValues.Create("!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
 
+    private static readonly FrozenSet<string> ConnectionSpecificNames =
+        FrozenSet.Create(StringComparer.Ordinal, "connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade");
+
     /// <summary>
     /// Finds the <c>:status</c> of a response header block: three digits from 100 to 999, or
     /// <see langword="null" /> when it has none or another value, which makes the response
@@ -31,6 +35,18 @@ internal static class Http2ResponseHead
             ? int.Parse(status, CultureInfo.InvariantCulture)
             : null;
     }
+
+    /// <summary>
+    /// Tells whether <paramref name="field" /> is a connection-specific field nghttp2 rejects in
+    /// a response (RFC 9113 section 8.2.2): <c>connection</c>, <c>keep-alive</c>,
+    /// <c>proxy-connection</c>, <c>transfer-encoding</c>, <c>upgrade</c>, or <c>te</c> with a
+    /// value other than <c>trailers</c> (CGR-136, measured, BL-3665 Notes).
+    /// </summary>
+    /// <param name="field">A decoded header field.</param>
+    /// <returns><see langword="true" /> for a field that makes the response malformed.</returns>
+    internal static bool IsConnectionSpecific(HeaderField field) =>
+        ConnectionSpecificNames.Contains(field.Name)
+        || (field.Name == "te" && !field.Value.Equals("trailers", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Gives the head bytes for a header block with <paramref name="statusCode" />: the status
