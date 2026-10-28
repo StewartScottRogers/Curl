@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Conformance.UnitTests/MtlsTestCertificates.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3872 — Fix flaky MtlsTestCertificates: File.Copy of test-ca.prm fails 'being used by another process' in the solution-wide fast run
 
@@ -22,12 +22,15 @@ Found by BL-3621 (lane 7, 2026-10-26). In `dotnet test --filter "TestCategory!=I
 
 ## Acceptance criteria
 
-- [ ] `MtlsTestCertificates` no longer overwrites a shared file another process may hold open (each process generates into its own folder, or skips a copy whose bytes already match).
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `MtlsTestCertificates` no longer overwrites a shared file another process may hold open (each process generates into its own folder, or skips a copy whose bytes already match).
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+Each process now generates into its own folder (MtlsCertificates/process-<pid>-<guid>), so no shared file is overwritten. Platform-neutral; fast tests green for the Mtls tests here, solution-wide run left to the shift.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: d362e868 779790c0.
+- 2026-10-28: Doing -> Done. Per-process certificate folder
