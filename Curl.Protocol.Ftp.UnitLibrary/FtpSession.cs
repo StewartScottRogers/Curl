@@ -278,6 +278,12 @@ internal sealed class FtpSession(
 
     private long bytesTransferred;
 
+    /// <summary>When the connect phase ended and the transfer's own commands began, curl's <c>TIMER_PRETRANSFER</c>.</summary>
+    private long? connectPhaseEnded;
+
+    /// <summary>When the first byte of a download arrived on the data connection, curl's <c>TIMER_STARTTRANSFER</c>.</summary>
+    private long? firstByteReceived;
+
     /// <summary>The bytes an upload of a known size has to send, or <see langword="null" /> for a download or an upload of unknown size.</summary>
     private long? uploadSize;
 
@@ -346,7 +352,7 @@ internal sealed class FtpSession(
         TransferResult result;
         try
         {
-            result = (reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection())
+            result = await RunConnectPhaseAsync().ConfigureAwait(false)
                 ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
@@ -365,10 +371,36 @@ internal sealed class FtpSession(
                 FtpEntryPath = entryPath,
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
+                RequestSize = uploaded ? result.BytesTransferred : 0,
+                Timings = TimingsAt(context.TimeProvider.GetTimestamp()),
             },
             SourceLastWriteTimeUtc = result.IsSuccess && context.RemoteTime ? modifiedUtc : null,
         };
     }
+
+    /// <summary>
+    /// Runs curl's connect phase on a new control connection, or takes up a kept one, and
+    /// notes when it ended unless it failed.
+    /// </summary>
+    private async ValueTask<TransferResult?> RunConnectPhaseAsync()
+    {
+        TransferResult? failed = reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection();
+        if (failed is null)
+        {
+            connectPhaseEnded = context.TimeProvider.GetTimestamp();
+        }
+
+        return failed;
+    }
+
+    /// <summary>
+    /// The report's timings, as curl 8.22.0 was measured to fill them for FTP (BL-3962):
+    /// <c>%{time_pretransfer}</c> when the connect phase ended, <c>%{time_starttransfer}</c>
+    /// when a download's first byte arrived, or for an upload or an empty download when the
+    /// transfer <paramref name="completed" />, and neither when the connect phase failed.
+    /// </summary>
+    private TransferTimings TimingsAt(long completed) =>
+        new(TransferStarted, ControlConnectTimings, connectPhaseEnded, null, connectPhaseEnded is null ? null : firstByteReceived ?? completed, completed);
 
     /// <summary>
     /// Runs only curl's connect phase - the greeting, <c>AUTH</c>, the login, <c>PBSZ</c>,
@@ -531,6 +563,18 @@ internal sealed class FtpSession(
     /// upstream's debug build does under <c>CURL_FTP_PWD_STOP</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />).
     /// </summary>
     internal bool StopsBeforeEntryPath { get; init; }
+
+    /// <summary>
+    /// Gets the moment the transfer began, before the control connection was opened: the
+    /// report's <see cref="TransferTimings.Started" />, the zero of every <c>%{time_*}</c>.
+    /// </summary>
+    internal long TransferStarted { get; init; }
+
+    /// <summary>
+    /// Gets the control connection's name resolution and connect times, the source of
+    /// <c>%{time_namelookup}</c>, <c>%{time_connect}</c> and <c>%{time_appconnect}</c>.
+    /// </summary>
+    internal ConnectTimings? ControlConnectTimings { get; init; }
 
     /// <summary>
     /// Under <see cref="StopsBeforeEntryPath" />, waits without sending <c>PWD</c> until the transfer is
@@ -2309,6 +2353,24 @@ internal sealed class FtpSession(
         return await QuitAndFailAsync(exitCode, FtpTransferMessages.RetrieveRefused(code)).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes bytes read from the data connection to the output, noting when the first of them
+    /// arrived (<c>%{time_starttransfer}</c>, BL-3962) and reporting the progress, or returns the
+    /// failed write's result.
+    /// </summary>
+    private async ValueTask<TransferResult?> WriteReceivedAsync(ReadOnlyMemory<byte> received)
+    {
+        firstByteReceived ??= context.TimeProvider.GetTimestamp();
+        if (await WriteOutputAsync(lineEndings.Convert(received)).ConfigureAwait(false) is { } writeFailed)
+        {
+            return writeFailed;
+        }
+
+        bytesTransferred += received.Length;
+        context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
+        return null;
+    }
+
     private async ValueTask<TransferResult?> CopyDataAsync()
     {
         IConnection data = dataConnection!;
@@ -2333,13 +2395,11 @@ internal sealed class FtpSession(
                 return null;
             }
 
-            if (await WriteOutputAsync(lineEndings.Convert(buffer.AsMemory(0, allowed))).ConfigureAwait(false) is { } writeFailed)
+            if (await WriteReceivedAsync(buffer.AsMemory(0, allowed)).ConfigureAwait(false) is { } writeFailed)
             {
                 return writeFailed;
             }
 
-            bytesTransferred += allowed;
-            context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
             if (allowed < wanted)
             {
                 return TransferResult.Failure(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceededWhileReading(maxFileSize!.Value, bytesTransferred), bytesTransferred);
