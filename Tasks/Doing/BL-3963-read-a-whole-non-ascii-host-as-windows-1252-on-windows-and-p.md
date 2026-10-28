@@ -35,3 +35,4 @@ First part of BL-3953 (CGR-059). `CurlUrlHost.cs` (`StrayBytesAsWindows1252`, `R
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 11e178b8 645c13da 981daa30 779790c0.
