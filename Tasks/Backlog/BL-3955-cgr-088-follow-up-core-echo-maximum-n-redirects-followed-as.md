@@ -1,5 +1,5 @@
 ---
-id: BL-3953
+id: BL-3955
 title: CGR-088 follow-up (Core): echo 'Maximum (N) redirects followed' as a -v line when -L hits --max-redirs
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3953 — CGR-088 follow-up (Core): echo 'Maximum (N) redirects followed' as a -v line when -L hits --max-redirs
+# BL-3955 — CGR-088 follow-up (Core): echo 'Maximum (N) redirects followed' as a -v line when -L hits --max-redirs
 
 ## Goal
 
