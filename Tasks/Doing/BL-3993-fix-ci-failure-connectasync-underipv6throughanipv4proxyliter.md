@@ -36,3 +36,4 @@ The same run, from the same commit, also fails `TcpConnectorTests.ConnectAsync_U
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 7afa6c67 2cdeef09.
