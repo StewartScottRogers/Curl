@@ -29,3 +29,4 @@ BL-3957 ran a non-root OpenSSH 10.2 sshd in WSL on port 21957 (setup in its Note
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 886f5a2d.
