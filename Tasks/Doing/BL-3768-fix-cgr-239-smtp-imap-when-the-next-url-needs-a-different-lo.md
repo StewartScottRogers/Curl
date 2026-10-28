@@ -76,3 +76,4 @@ curl "imap://127.0.0.1:21356/836/;MAILINDEX=1" -u user.one:secret -: "imap://127
 ## Log
 
 - 2026-10-26: Created from CGR-239 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
