@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Imap.UnitLibrary/ImapSession.cs, Curl.Protocol.Imap.Unit
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3762 — Fix CGR-233: IMAP -I on a UID fetch: after "Weird server reply" (exit 8), PORT closes without LOGOUT
 
@@ -60,10 +60,10 @@ curl -s -S -u u:p -I "imap://127.0.0.1:21001/INBOX;UID=1"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,11 @@ curl -s -S -u u:p -I "imap://127.0.0.1:21001/INBOX;UID=1"
 
 - 2026-10-26: Created from CGR-233 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+### Run notes (2026-10-28)
+
+- Measured curl 8.22.0 (Schannel) `-s -S -u u:p -I "imap://127.0.0.1:PORT/INBOX;UID=1"`: with `Record-CurlExchange.ps1 -Imap` (whole FETCH response in one segment) exit 8, no LOGOUT (already pinned, matches PORT). With `-Script` splitting the response so the tagged completion arrives after the literal (split mid-literal, or literal ends its segment): exit 8 and `A005 LOGOUT`. That is the report's case.
+- Decision: after `-I` refuses the FETCH literal (exit 8), LOGOUT is sent unless unread bytes (the completion) were already buffered. Small enough not to need an ADR. `ImapSession.DownloadAsync`; tests in `Cgr233Tests.cs` (fail before, pass after for the two split cases; the one-segment case stays pinned).
+- Unrelated oddity seen, not fixed: header line alone in a first segment, literal in the next, `-I` exits 0 with LOGOUT. Not in CGR-233.
+- Measure-CodeQuality for Curl.Protocol.Imap.UnitLibrary: 100% line, 100% branch, 0 failing. Fast tests of the Imap project pass (535). CI on Linux/macOS: tests are platform-neutral (in-memory fakes).
+- 2026-10-28: Doing -> Done. LOGOUT now sent after -I refuses a FETCH literal whose completion has not arrived; measured against curl 8.22.0
