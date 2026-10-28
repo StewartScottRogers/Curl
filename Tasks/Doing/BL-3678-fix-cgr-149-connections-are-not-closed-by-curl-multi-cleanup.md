@@ -74,3 +74,4 @@ probe.exe C_60,C_61 2
 ## Log
 
 - 2026-10-26: Created from CGR-149 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
