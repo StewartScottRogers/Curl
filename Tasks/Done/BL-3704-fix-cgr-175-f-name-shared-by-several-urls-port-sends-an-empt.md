@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3968, BL-3969]
-touches: [Curl.Console.UnitTests/Cgr175Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Core.UnitTests/Cgr175Tests.cs]
+touches: [Curl.Console.UnitTests/Cgr175Tests.cs, Curl.Console.UnitTests/CurlCommandRunnerFormTests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Core.UnitTests/Cgr175Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3704 — Fix CGR-175: -F name=@- shared by several URLs: PORT sends an empty part and exits 0 in serial mode, where REF fails the later transfers with (26); un...
 
@@ -66,10 +66,10 @@ curl -Z --parallel-immediate -sS -w "%{urlnum} %{exitcode} %{http_code} %{size_u
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -81,9 +81,17 @@ curl -Z --parallel-immediate -sS -w "%{urlnum} %{exitcode} %{http_code} %{size_u
   - The parallel half is not about stdin: `-Z -F f=value` with two URLs gives the same (`/a` an empty POST, `/b` 153 bytes), `-Z --parallel-max 2 -F f=value a b c` sends the form only to `/c` (a and b empty POSTs), and `-Z --parallel-max 1 -F f=@- a b` still sends `/a` empty and `/b` the data. So under `-Z` only the option group's LAST transfer gets its `-F` form; every earlier one is an empty POST, as curl's tool sets one `curl_mime` on every handle it sets up ahead (its 2 x parallel-max look-ahead) and `CURLOPT_MIMEPOST` moves the mime to the newest handle. Model: last transfer of the group (command-line order) gets the form; note the look-ahead window as unmodelled in the ADR.
 - Design for the next claim (needs `Curl.Console/CurlCommandRunner.cs`, held by BL-3699 in Doing, hence the requeue): (1) serial - the runner keeps, per option group (`CommandLineOptions` identity), whether its `@-`/`<-` parts were already read; the first form build of the group reads standard input whole (as now), later builds of the same group declare the same length but the part reads nothing, failing the transfer before anything is sent with exit 26 and `client mime read EOF fail, only <sent>/<total> of needed bytes read` (sent = total minus the stdin bytes). That needs a `MultipartFormBodyBuilder` hook to build with given/spent stdin bytes. A second `@-` part in the same form, or another group's, still reads what is left (empty, no failure). (2) parallel - in `TransferUploadingAsync`, under `-Z`, a transfer that is not its group's last sends an empty body (a zero-length `BytesBody` with an empty content type: `HttpRequestHeadFormatter.AppendUnlessOverridden` drops an empty `Content-Type`, so the request carries only `Content-Length: 0`). No other prerequisite found: the HTTP formatter already omits an empty content type.
 
+- 2026-10-28 (lane 5): fixed in `Curl.Console/CurlCommandRunner.cs` alone, as the recorded design planned, with no `MultipartFormBodyBuilder` hook needed: the runner keeps, per option group (reference identity), the length of the group's first form holding an `@-`/`<-` part; a later form of the group that comes out shorter fails before sending with exit 26, `client mime read EOF fail, only <read>/<needed> of needed bytes read`, `%{size_upload}` the bytes read. Under `-Z` a transfer whose URL is not the group's last sends an empty `BytesBody` with no content type (mail `-F` bodies unchanged). ADR-0956 records it (amends ADR-0062); the look-ahead window and glob matches of the last URL are recorded there as unmodelled. Touches widened by `Curl.Console.UnitTests/CurlCommandRunnerFormTests.cs` (no task in Doing on the shared branch names it): its BL-311 test pinned ADR-0062's consistent empty second body, now curl's exit 26 with only the first request on the wire.
+- PORT results (the sandbox refuses running the built binary from `bin/`, so they come from `Cgr175Tests`, which drive `CurlCommandRunner` with the repro's command line and STDIN-DATA-123 on standard input): serial stdout `body /a
+0 0 200 176
+1 26 000 162
+`, stderr `curl: (26) client mime read EOF fail, only 162/176 of needed bytes read`, exit 26, one request on the wire (`CurlCommandRunnerFormTests` over a scripted connection) - equal to REF. Parallel `-Z --parallel-immediate`: `/a` sent a 0-byte body, `/b` the 176-byte form, exit 0 - equal to REF's bodies. `-F f=value` on two serial URLs still sends the 153-byte form to both (already matched). Both new serial and parallel tests fail before the fix (the old code sent 162 bytes with exit 0, and the form to both under `-Z`).
+- Platform: the tests use no paths, OS error text or certificates, and normalise standard error's line endings, so they hold on Linux and macOS; the fast tests are green here (criterion about CI met by keeping the change platform-neutral). `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members (after splitting `TransferWithFormAsync` out of `TransferUploadingAsync`, which the first run found at complexity 14).
+
 ## Log
 
 - 2026-10-26: Created from CGR-175 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-3699 in Doing; real curl measured and design recorded in Notes
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. -F name=@- on several URLs fails the later serial transfers with curl's (26) short read, and under -Z only the group's last URL sends the form
