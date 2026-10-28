@@ -36,3 +36,4 @@ The first request keeps the query as typed; only the retry upper-cases it (curl 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 4c933e76 ad30c61c 779790c0.
