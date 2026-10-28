@@ -57,6 +57,7 @@ public sealed class MultipartFormBodyBuilderMissingFileTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task DirectoryThatMaySendEmptyWhenMissing_StillFailsWithReadError()
     {
         MultipartFormBuildResult result = await BuildAsync(

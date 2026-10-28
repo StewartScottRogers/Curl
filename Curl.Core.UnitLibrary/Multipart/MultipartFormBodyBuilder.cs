@@ -91,6 +91,15 @@ public sealed class MultipartFormBodyBuilder(
     /// </summary>
     public bool SevenBitRefusalWaitsForSend { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether a file part naming a directory is sent as a part with its
+    /// file name and no data, the body's length unknown (chunked), as curl 8.18.0 on Linux sends
+    /// <c>-F f=@dir</c> and exits 0 (measured, CGR-069, BL-3896), instead of failing with exit 26,
+    /// <see cref="ReadFailedMessage" />, as curl's Windows build does. Defaults to the platform
+    /// curl's: <see langword="true" /> off Windows.
+    /// </summary>
+    public bool SendsDirectoryEmpty { get; init; } = !OperatingSystem.IsWindows();
+
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
 
@@ -396,7 +405,8 @@ public sealed class MultipartFormBodyBuilder(
         FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)
         {
-            return OpenFailure(segments, part, opened.Status, disposition, nameEscaping, forMail, encoder);
+            return await AddUnopenedFilePartAsync(segments, part, opened.Status, disposition, nameEscaping, forMail, encoder, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         Stream content = opened.Content!;
@@ -404,6 +414,30 @@ public sealed class MultipartFormBodyBuilder(
         long? length = content.CanSeek ? seekableFileLength(part.Content, opened.Length) : unseekableFileLength(part.Content);
         return await AddFileDataAsync(segments, content, length, encoder, forMail, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Handles a file that did not open: a directory under <see cref="SendsDirectoryEmpty" /> is sent with its file
+    /// name and no data, its length unknown, as <c>fopen</c> opens a directory off Windows and its first read gives
+    /// nothing (CGR-069); any other file is left to <see cref="OpenFailure" />.
+    /// </summary>
+    private ValueTask<TransferResult?> AddUnopenedFilePartAsync(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        FileAccessStatus status,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder,
+        CancellationToken cancellationToken)
+    {
+        if (status != FileAccessStatus.IsDirectory || !SendsDirectoryEmpty)
+        {
+            return ValueTask.FromResult(OpenFailure(segments, part, status, disposition, nameEscaping, forMail, encoder));
+        }
+
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        return AddFileDataAsync(segments, Stream.Null, null, encoder, forMail, cancellationToken);
     }
 
     /// <summary>
