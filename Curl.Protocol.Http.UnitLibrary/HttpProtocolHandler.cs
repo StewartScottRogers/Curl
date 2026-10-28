@@ -1879,7 +1879,8 @@ public sealed class HttpProtocolHandler(
             context.TimeCondition,
             plan.Framing,
             upgradesToH2c,
-            context.Credentials);
+            context.Credentials,
+            plan.RereadsUrl);
         return streams is null ? head : Http2RequestHeaders.WithRequestLineVersion(head, streams.VersionName);
     }
 
@@ -2851,6 +2852,11 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder retryLines = new();
         bool picksNegotiate = HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge);
         HttpAuthRequest request = picksNegotiate ? plan.AuthRequest : plan.AuthRequest with { Events = retryLines };
+        if (plan.Options.RequestTarget is null)
+        {
+            request = request with { RequestTarget = UrlPathEscapes.WithUpperCaseHexDigits(request.RequestTarget) };
+        }
+
         string? authorization;
         try
         {
@@ -2867,7 +2873,9 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
-        return plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan)).HoldingDigestNonceAfter(head);
+        HttpRequestPlan retry = plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan)).HoldingDigestNonceAfter(head);
+        retry.RereadsUrl = true;
+        return retry;
     }
 
     /// <summary>
@@ -3577,6 +3585,13 @@ public sealed class HttpProtocolHandler(
         public bool HoldsDigestNonce { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the request is one curl builds by re-reading the
+        /// URL after a 401, whose target has the query's escapes in upper case
+        /// (<see cref="HttpUrlText.OriginTarget(CurlUrl, System.Text.Encoding, bool)" />, BL-3856).
+        /// </summary>
+        public bool RereadsUrl { get; set; }
+
+        /// <summary>
         /// Marks this retry as holding a Digest nonce (<see cref="HoldsDigestNonce" />) when
         /// <paramref name="head" />, the 401 it answers, offers Digest.
         /// </summary>
@@ -3868,6 +3883,7 @@ public sealed class HttpProtocolHandler(
                 StreamRefusedRetries = StreamRefusedRetries,
                 DowngradedToHttp11 = DowngradedToHttp11,
                 HoldsDigestNonce = HoldsDigestNonce,
+                RereadsUrl = RereadsUrl,
                 AuthSchemesOffered = AuthSchemesOffered,
                 ProxyAuthSchemesOffered = ProxyAuthSchemesOffered,
             };

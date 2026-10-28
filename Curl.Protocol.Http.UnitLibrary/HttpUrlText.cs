@@ -48,10 +48,18 @@ internal static class HttpUrlText
     /// Gives <see cref="OriginTarget(CurlUrl)" /> from the URL's text as its bytes in
     /// <paramref name="encoding" /> (<see cref="RequestTarget(CurlUrl, Encoding)" />).
     /// </summary>
-    internal static string OriginTarget(CurlUrl url, Encoding encoding)
+    internal static string OriginTarget(CurlUrl url, Encoding encoding) => OriginTarget(url, encoding, rereadsUrl: false);
+
+    /// <summary>
+    /// Gives <see cref="OriginTarget(CurlUrl, Encoding)" />, with the query's escapes in upper case
+    /// too when <paramref name="rereadsUrl" />: curl re-reads the URL for the request that answers a
+    /// 401 and sends <c>/a%2fb?q=%2f</c> as <c>/a%2Fb?q=%2F</c> (measured with 8.22.0, BL-3856).
+    /// </summary>
+    internal static string OriginTarget(CurlUrl url, Encoding encoding, bool rereadsUrl)
     {
         string path = Path(url, encoding);
-        return UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url, encoding)[path.Length..];
+        string target = UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url, encoding)[path.Length..];
+        return rereadsUrl ? UrlPathEscapes.WithUpperCaseHexDigits(target) : target;
     }
 
     /// <summary>Gives the path with each byte above <c>~</c> percent-encoded, <see cref="CurlUrl.RequestPath" />.</summary>
