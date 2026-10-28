@@ -1,5 +1,5 @@
 ---
-id: BL-3988
+id: BL-3996
 title: Forward ITransferEvents.ReportWarning in every Curl.Engine wrapper that forwards every member
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3988 — Forward ITransferEvents.ReportWarning in every Curl.Engine wrapper that forwards every member
+# BL-3996 — Forward ITransferEvents.ReportWarning in every Curl.Engine wrapper that forwards every member
 
 ## Goal
 
