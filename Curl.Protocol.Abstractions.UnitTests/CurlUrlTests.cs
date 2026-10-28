@@ -458,7 +458,7 @@ public sealed class CurlUrlTests
     }
 
     [TestMethod]
-    [DataRow("http://a%80b/")]
+    [DataRow("http://a%81b/")]
     [DataRow("http://invalid-utf8-%e2%90.local/page/1034")]
     [DataRow("http://too-long-IDN-name-c%c3%bcrl-r%c3%bcle%c3%9f-la-la-la-dee-da-flooby-nooby.local/page/1035")]
     public void TryParse_WithAHostIdnMappingRefuses_ReturnsFalse(string text)
@@ -472,15 +472,15 @@ public sealed class CurlUrlTests
     public void TryParseForUrlApi_WithAHostIdnMappingRefuses_KeepsTheHostAsWritten()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("url", "http://a%80b/");
+        diagnostics.Arrange("url", "http://a%81b/");
 
-        bool parsed = CurlUrl.TryParseForUrlApi("http://a%80b/", pathAsIs: false, default, out CurlUrl? url, out _);
+        bool parsed = CurlUrl.TryParseForUrlApi("http://a%81b/", pathAsIs: false, default, out CurlUrl? url, out _);
 
         diagnostics.Act("idn host", url?.IdnHost);
-        diagnostics.Assert("idn host", "a\udc80b", url?.IdnHost);
+        diagnostics.Assert("idn host", "a\udc81b", url?.IdnHost);
         Assert.IsTrue(parsed);
-        Assert.AreEqual("a\udc80b", url!.Host);
-        Assert.AreEqual("a\udc80b", url.IdnHost);
+        Assert.AreEqual("a\udc81b", url!.Host);
+        Assert.AreEqual("a\udc81b", url.IdnHost);
     }
 
     [TestMethod]

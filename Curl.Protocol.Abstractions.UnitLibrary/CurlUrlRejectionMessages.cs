@@ -13,17 +13,23 @@ public static class CurlUrlRejectionMessages
     /// <exception cref="ArgumentOutOfRangeException">
     /// <paramref name="rejection" /> is <see cref="CurlUrlRejection.None" /> or not a defined value.
     /// </exception>
-    public static string ToCurlMessage(this CurlUrlRejection rejection) => rejection switch
-    {
-        CurlUrlRejection.MalformedInput => "Malformed input to a URL function",
-        CurlUrlRejection.BadSlashes => "Unsupported number of slashes following scheme",
-        CurlUrlRejection.NoHost => "No host present",
-        CurlUrlRejection.BadPortNumber => "Port number was not a decimal number between 0 and 65535",
-        CurlUrlRejection.BadIPv6 => "Bad IPv6 address",
-        CurlUrlRejection.BadHostname => "Bad hostname",
-        CurlUrlRejection.BadFileUrl => "Bad file:// URL",
-        CurlUrlRejection.UserNotAllowed => "Credentials was passed in the URL when prohibited",
-        CurlUrlRejection.Backslash => "Found a backslash where a forward slash was expected",
-        _ => throw new ArgumentOutOfRangeException(nameof(rejection), rejection, "The URL was not rejected."),
-    };
+    public static string ToCurlMessage(this CurlUrlRejection rejection) =>
+        (uint)(rejection - 1) < (uint)Messages.Length
+            ? Messages[(int)rejection - 1]
+            : throw new ArgumentOutOfRangeException(nameof(rejection), rejection, "The URL was not rejected.");
+
+    /// <summary>The message of each rejection, in <see cref="CurlUrlRejection" />'s order from <see cref="CurlUrlRejection.MalformedInput" />.</summary>
+    private static readonly string[] Messages =
+    [
+        "Malformed input to a URL function",
+        "Unsupported number of slashes following scheme",
+        "No host present",
+        "Port number was not a decimal number between 0 and 65535",
+        "Bad IPv6 address",
+        "Bad hostname",
+        "Bad file:// URL",
+        "Credentials was passed in the URL when prohibited",
+        "Found a backslash where a forward slash was expected",
+        "URL using bad/illegal format or missing URL",
+    ];
 }

@@ -34,7 +34,10 @@ public sealed class Cgr016UrlTests
         Assert.AreEqual(expected, path);
     }
 
+    // Off Windows only: Windows reads such a byte as Windows-1252, as the reference build's
+    // libidn2 does in the ANSI code page, so a%FF is accepted there (CGR-059, ADR-0939).
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void TryParse_HostHoldingAnInvalidUtf8Byte_IsRefused()
     {
         string text = WithEscapedBytes("http://a^FF.example/");

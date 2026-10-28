@@ -44,4 +44,10 @@ public enum CurlUrlRejection
     /// The port's digits end at a backslash, where a slash was expected (<c>CURLUE_BACKSLASH</c>).
     /// </summary>
     Backslash,
+
+    /// <summary>
+    /// The host is a name IDNA cannot convert to punycode, which only a transfer's URL refuses; curl
+    /// fails it with <c>CURLE_URL_MALFORMAT</c> and that code's own text, not a <c>CURLUE_*</c> one (CGR-059).
+    /// </summary>
+    IdnConversionFailed,
 }
