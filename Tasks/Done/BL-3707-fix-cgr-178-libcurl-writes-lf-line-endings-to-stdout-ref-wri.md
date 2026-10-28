@@ -9,7 +9,7 @@ touches: [Curl.Console.UnitTests/Cgr178Tests.cs, Curl.Console/CurlCommandRunner.
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3707 — Fix CGR-178: --libcurl - writes LF line endings to stdout; REF writes CRLF on Windows
 
@@ -75,3 +75,4 @@ curl -s --libcurl - -o NUL @U
 - 2026-10-26: Created from CGR-178 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Fix: `--libcurl -` now writes CR LF line ends to standard output on Windows while standard output is in text mode (as curl does, 1705 bytes with 46 CRLF in the repro), LF once a body switched it to binary or off Windows. Not re-run through real curl in this lane run (no Windows curl exchange recorded); the expected byte counts are from the report. `Cgr178Tests` fails before the fix and passes after; fast Curl.Console tests green; Measure-CodeQuality for Curl.Console: 0 failing members. Linux/macOS CI: change is platform-neutral (runsOnWindows is injected).
+- 2026-10-28: Doing -> Done. --libcurl - writes CR LF on Windows text-mode stdout
