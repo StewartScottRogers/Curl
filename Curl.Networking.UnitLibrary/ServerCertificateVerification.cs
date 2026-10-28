@@ -187,7 +187,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
         {
             RevocationCheckIncomplete = RevocationCheckIncomplete(chain, stapled),
         };
-        var refusal = Refusal(anchoredErrors, chain, targetHost, revocationLists, stapled);
+        (observed, var refusal) = Refusal(observed, anchoredErrors, chain, targetHost, revocationLists, stapled);
         if (JudgesPinnedPublicKeyBeforeVerification)
         {
             var pinned = JudgePinnedPublicKey(observed, peerCertificates);
@@ -216,16 +216,27 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     private bool RevocationCheckIncomplete(X509Chain? chain, OcspStapleStatus? stapled) =>
         !options.Insecure && stapled != OcspStapleStatus.Good && RevocationBestEffortTolerates(chain);
 
-    // The first refusal: a revoked staple, the chain or name, then a --crlfile list.
-    private (CurlExitCode ExitCode, string Message)? Refusal(
+    // The first refusal: a revoked staple, the chain or name, then a --crlfile list. A list's
+    // refusal is OpenSSL's verify result too, so %{ssl_verify_result} reports its code, 23 for
+    // a revoked certificate and 12 for an expired list (measured with curl 8.18.0, CGR-168).
+    private (PeerVerification Observed, (CurlExitCode ExitCode, string Message)? Failure) Refusal(
+        PeerVerification observed,
         SslPolicyErrors anchoredErrors,
         X509Chain? chain,
         string targetHost,
         CertificateRevocationListFile? revocationLists,
-        OcspStapleStatus? stapled) =>
-        RevokedStapleRefusal(stapled)
-            ?? VerifyPeer(anchoredErrors, chain, targetHost, [])
-            ?? RevocationListRefusal(revocationLists, chain);
+        OcspStapleStatus? stapled)
+    {
+        var refusal = RevokedStapleRefusal(stapled) ?? VerifyPeer(anchoredErrors, chain, targetHost, []);
+        if (refusal is not null)
+        {
+            return (observed, refusal);
+        }
+
+        return revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
+            ? (observed with { VerifyResult = verifyResult }, (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult)))
+            : (observed, null);
+    }
 
     // A good staple answers the revocation status the online check could not fetch.
     private SslPolicyErrors WithoutUnavailableRevocationAGoodStapleAnswers(SslPolicyErrors errors, X509Chain? chain, OcspStapleStatus? stapled) =>
@@ -267,11 +278,6 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     }
 
     // Reached only for a chain VerifyPeer accepted without -k, so a chain was built.
-    private (CurlExitCode ExitCode, string Message)? RevocationListRefusal(CertificateRevocationListFile? revocationLists, X509Chain? chain) =>
-        revocationLists?.FirstRefusal(chain!, timeProvider.GetUtcNow()) is { } verifyResult
-            ? (CurlExitCode.PeerFailedVerification, TlsFailureMessages.OpenSslRevocationListRefusal(verifyResult))
-            : null;
-
     /// <summary>
     /// Decides whether the server certificate is accepted, and if not, what curl says.
     /// </summary>

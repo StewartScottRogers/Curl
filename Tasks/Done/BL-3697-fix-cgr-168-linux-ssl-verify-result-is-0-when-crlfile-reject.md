@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/ServerCertificateVerification.cs, Curl.Networking.UnitTests/Cgr168Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3697 — Fix CGR-168: Linux: %{ssl_verify_result} is 0 when --crlfile rejects the certificate (curl reports 23 "certificate revoked" or 12 "CRL has expired")
 
@@ -61,17 +61,21 @@ openssl ca -config ca.cnf -gencrl -crlsec 1 -out expired.crl.pem
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr168Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Measured 2026-10-28 in WSL with curl 8.18.0 (OpenSSL 3.5.5; no 8.22.0 OpenSSL build on this machine, so the report's REF-LINUX version was re-measured): an openssl-made root, a localhost leaf served by `openssl s_server -WWW`, a CRL revoking it and an expired CRL (`openssl ca -gencrl -crlsec 1`). `curl -sS --cacert rca.crt --crlfile rev.crl.pem -o out -w '%{ssl_verify_result} %{exitcode}\n' https://localhost:21997/index.html` gives stdout `23 60`, stderr `curl: (60) SSL certificate OpenSSL verify result: certificate revoked (23)`; with expired.crl.pem `12 60` and `... CRL has expired (12)`; `out` is not written in either case. Curl before the fix: `0 60` with the same stderr (the report's PORT result). Linux PORT cannot run from a Windows lane, so the check is the OpenSSL build's `Judge` in unit tests: the observation now carries the list's code, which `PeerVerification.ReportVerifyResult` reports to `%{ssl_verify_result}`; exit code, message, files and wire bytes are unchanged, since only the observed code changed.
+- Fix: `ServerCertificateVerification.Refusal` now returns the observation too, with `VerifyResult` set to the `--crlfile` refusal's code; `Verified` is left as it was so `-v` handshake lines do not change. Chain, name and staple refusals (the variants that already matched) take the unchanged path. The Schannel build ignores `--crlfile`, so Windows output does not change.
+- `Cgr168Tests`: revoked list 23, expired list 12, accepting list 0, and the reported code 23; 3 of the 4 fail with the fix removed. Platform-neutral (in-memory certificates, temporary list file). Fast tests green; Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 0 failing members. No ADR: this matches measured curl and makes no new design choice.
 
 ## Log
 
 - 2026-10-26: Created from CGR-168 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. %{ssl_verify_result} reports the --crlfile refusal's code (23 revoked, 12 expired list) in the OpenSSL build
