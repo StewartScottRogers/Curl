@@ -34,3 +34,4 @@ Split from BL-3699 (over its cost cap), after BL-3968 lands the fix. Repro measu
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: fee2d392 e7b5cc53 36d6f07e 779790c0.
