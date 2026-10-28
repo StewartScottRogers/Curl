@@ -872,24 +872,25 @@ public static partial class CommandLineOptionTable
             ? CommandLineRefusal.BlankArgument(spelledOption)
             : value[0] == '@'
                 ? AddUrlsFromFile(options, value[1..], spelledOption, dataFileReader)
-                : options.AddUrl(WithUserInformationAsWireText(options, value), spelledOption);
+                : options.AddUrl(WithAuthorityAsWireText(options, value), spelledOption);
 
     /// <summary>
-    /// <paramref name="url"/> with the user information before its host re-spelled by
-    /// <see cref="CommandLineOptions.AsWireText"/>, so a user name or password written raw in a UTF-8
-    /// <c>-K</c> file goes out as the file's own bytes, as curl 8.22.0's Windows build sends them
-    /// (CGR-052, ADR-0911); the host, path and the rest are left as they are.
+    /// <paramref name="url"/> with its authority (user information, host and port) re-spelled by
+    /// <see cref="CommandLineOptions.AsWireText"/>, so a user name, password or host written raw in a
+    /// UTF-8 <c>-K</c> file goes out as the file's own bytes, as curl 8.22.0's Windows build sends them:
+    /// <c>Basic w6k64oKs</c> for <c>é:€@</c> (CGR-052, ADR-0910) and <c>xn--14-ria7423a</c> for the
+    /// host <c>ü</c>, its UTF-8 bytes read as Windows-1252 (CGR-059, BL-3956); the path and the rest are
+    /// left as they are.
     /// </summary>
     /// <param name="options">The options, which say whether a UTF-8 config file is being read.</param>
     /// <param name="url">The <c>--url</c> value.</param>
     /// <returns>The URL to add.</returns>
-    private static string WithUserInformationAsWireText(CommandLineOptions options, string url)
+    private static string WithAuthorityAsWireText(CommandLineOptions options, string url)
     {
         int schemeEnd = url.IndexOf("://", StringComparison.Ordinal);
         int authorityStart = schemeEnd < 0 ? 0 : schemeEnd + 3;
         int authorityLength = url.AsSpan(authorityStart).IndexOfAny('/', '?', '#') is var end and >= 0 ? end : url.Length - authorityStart;
-        int at = url.AsSpan(authorityStart, authorityLength).LastIndexOf('@');
-        return at < 0 ? url : url[..authorityStart] + options.AsWireText(url.Substring(authorityStart, at)) + url[(authorityStart + at)..];
+        return url[..authorityStart] + options.AsWireText(url.Substring(authorityStart, authorityLength)) + url[(authorityStart + authorityLength)..];
     }
 
     /// <summary>
