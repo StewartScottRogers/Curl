@@ -4,7 +4,7 @@ title: Send a non-ASCII host typed unescaped in a UTF-8 config file as its UTF-8
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3957]
+depends-on: [BL-3963]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr059ConfigFileHostTests.cs]
 requirement: none
 created: 2026-10-28

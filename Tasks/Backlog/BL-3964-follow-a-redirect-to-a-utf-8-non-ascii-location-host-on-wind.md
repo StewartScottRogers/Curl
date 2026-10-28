@@ -1,16 +1,16 @@
 ---
-id: BL-3958
+id: BL-3964
 title: Follow a redirect to a UTF-8 non-ASCII Location host on Windows as curl does (upstream test1448, CGR-059)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3957]
+depends-on: [BL-3963]
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlTests.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt]
 requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3958 — Follow a redirect to a UTF-8 non-ASCII Location host on Windows as curl does (upstream test1448, CGR-059)
+# BL-3964 — Follow a redirect to a UTF-8 non-ASCII Location host on Windows as curl does (upstream test1448, CGR-059)
 
 ## Goal
 
@@ -18,7 +18,7 @@ On Windows, a redirect whose `Location` host is typed as UTF-8 (upstream test144
 
 ## Context
 
-Second part of BL-3953 (CGR-059). After BL-3957 makes `CurlUrlHost` read a host as Windows-1252 on Windows, upstream test1448 (redirect to a UTF-8 IDN `åäö.se`) no longer follows the redirect. Real curl sees the raw UTF-8 bytes of a `Location` host, so first measure real Windows curl on test1448 with Record-CurlExchange.ps1, then decide where a `Location` host enters `CurlUrlHost` and which reading it gets. Keep or hold the case in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` per platform, as the measurement says.
+Second part of BL-3953 (CGR-059). After BL-3963 makes `CurlUrlHost` read a host as Windows-1252 on Windows, upstream test1448 (redirect to a UTF-8 IDN `åäö.se`) no longer follows the redirect. Real curl sees the raw UTF-8 bytes of a `Location` host, so first measure real Windows curl on test1448 with Record-CurlExchange.ps1, then decide where a `Location` host enters `CurlUrlHost` and which reading it gets. Keep or hold the case in `Curl.Conformance.UnitTests/PassingUpstreamCases.txt` per platform, as the measurement says.
 
 ## Acceptance criteria
 

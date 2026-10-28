@@ -1,5 +1,5 @@
 ---
-id: BL-3957
+id: BL-3963
 title: Read a whole non-ASCII host as Windows-1252 on Windows and pin the unit tests to a locale (CGR-059)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3957 — Read a whole non-ASCII host as Windows-1252 on Windows and pin the unit tests to a locale (CGR-059)
+# BL-3963 — Read a whole non-ASCII host as Windows-1252 on Windows and pin the unit tests to a locale (CGR-059)
 
 ## Goal
 
@@ -18,7 +18,7 @@ On Windows, Curl converts a non-ASCII host name from bytes read as Windows-1252,
 
 ## Context
 
-First part of BL-3953 (CGR-059). `CurlUrlHost.cs` (`StrayBytesAsWindows1252`, `ReadStrayBytesAsWindows1252`) reads only bytes that are not valid UTF-8 as Windows-1252. Real curl 8.22.0 on Windows reads the whole host in the ANSI code page: `http://%C3%BC.example:20200/a` gives `Host: xn--14-ria7423a.example:20200` (exit 0) and `http://a%D7%90.example:20200/a` exits 3 (`URL using bad/illegal format or missing URL`; 0x90 is undefined in Windows-1252). `%F0%90%82%80a.example` also exits 3. Linux (UTF-8 locale) stays as it is: `Cgr059BidiTests` and `Cgr059PercentEncodedHostTests` pin it with `strayBytesAsWindows1252: false`. The stashed work renames `TryNormalizeReadingStrayBytes` to `TryNormalizeReadingHost(hostAsWindows1252:)`, adds `ReadHostAsWindows1252` (each typed character becomes its Windows-1252 byte, or its UTF-8 when Windows-1252 lacks it, each escape its raw byte, then every byte is read back as Windows-1252) and `Latin1Mappings` in `CurlUrlHostNameMapping` (`¼` to `1⁄4`). Still failing after it, to pin to `hostAsWindows1252: false` (UTF-8 locale) or give per-platform answers: 6 rows of `Cgr019Tests.TryNormalize_HostThatIsNotAscii_ConvertsTheMappedName` (ΣΣ, İstanbul, Ａb, a‍b, NFD école, ﬁle) and `CurlUrlTests.TryParse_ForEachScheme_ExposesTheMembersHandlersRead` (`ex%C3%A5mple`). The old `%F0%90%82%80a` test in `Cgr059PercentEncodedHostTests` was wrong (real curl refuses it). Does not cover test1448 (BL-3958) or the ADR (BL-3959).
+First part of BL-3953 (CGR-059). `CurlUrlHost.cs` (`StrayBytesAsWindows1252`, `ReadStrayBytesAsWindows1252`) reads only bytes that are not valid UTF-8 as Windows-1252. Real curl 8.22.0 on Windows reads the whole host in the ANSI code page: `http://%C3%BC.example:20200/a` gives `Host: xn--14-ria7423a.example:20200` (exit 0) and `http://a%D7%90.example:20200/a` exits 3 (`URL using bad/illegal format or missing URL`; 0x90 is undefined in Windows-1252). `%F0%90%82%80a.example` also exits 3. Linux (UTF-8 locale) stays as it is: `Cgr059BidiTests` and `Cgr059PercentEncodedHostTests` pin it with `strayBytesAsWindows1252: false`. The stashed work renames `TryNormalizeReadingStrayBytes` to `TryNormalizeReadingHost(hostAsWindows1252:)`, adds `ReadHostAsWindows1252` (each typed character becomes its Windows-1252 byte, or its UTF-8 when Windows-1252 lacks it, each escape its raw byte, then every byte is read back as Windows-1252) and `Latin1Mappings` in `CurlUrlHostNameMapping` (`¼` to `1⁄4`). Still failing after it, to pin to `hostAsWindows1252: false` (UTF-8 locale) or give per-platform answers: 6 rows of `Cgr019Tests.TryNormalize_HostThatIsNotAscii_ConvertsTheMappedName` (ΣΣ, İstanbul, Ａb, a‍b, NFD école, ﬁle) and `CurlUrlTests.TryParse_ForEachScheme_ExposesTheMembersHandlersRead` (`ex%C3%A5mple`). The old `%F0%90%82%80a` test in `Cgr059PercentEncodedHostTests` was wrong (real curl refuses it). Does not cover test1448 (BL-3964) or the ADR (BL-3965).
 
 ## Acceptance criteria
 
