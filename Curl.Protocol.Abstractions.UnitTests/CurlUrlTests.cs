@@ -780,6 +780,45 @@ public sealed class CurlUrlTests
         return url!;
     }
 
+    // A Location header's bytes reach CurlUrl one Latin-1 character per byte, so the UTF-8 host
+    // åäö (C3 A5 C3 A4 C3 B6, upstream test1448) arrives as Ã¥Ã¤Ã¶. Windows curl 8.22.0 reads
+    // those bytes as Windows-1252 and follows to xn--bbab6cyjbb.se (exit 6 when it does not
+    // resolve); curl off Windows reads them as UTF-8 and follows to xn--4cab6c.se (BL-3964).
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Parse_LocationHostOfUtf8Bytes_ReadsTheBytesAsWindows1252OnWindows()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        CurlUrl url = ParseLocationHostOfUtf8Bytes(diagnostics);
+
+        diagnostics.Assert("idn host", "xn--bbab6cyjbb.se", url.IdnHost);
+        Assert.AreEqual("xn--bbab6cyjbb.se", url.IdnHost);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_LocationHostOfUtf8Bytes_ReadsTheBytesAsUtf8OffWindows()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        CurlUrl url = ParseLocationHostOfUtf8Bytes(diagnostics);
+
+        diagnostics.Assert("idn host", "xn--4cab6c.se", url.IdnHost);
+        Assert.AreEqual("xn--4cab6c.se", url.IdnHost);
+    }
+
+    private static CurlUrl ParseLocationHostOfUtf8Bytes(TestDiagnostics diagnostics)
+    {
+        string location = System.Text.Encoding.Latin1.GetString([.. "http://"u8, 0xC3, 0xA5, 0xC3, 0xA4, 0xC3, 0xB6, .. ".se:8990/14480001"u8]);
+        diagnostics.Arrange("location", location);
+
+        CurlUrl url = CurlUrl.Parse(location);
+
+        diagnostics.Act("idn host", url.IdnHost);
+        return url;
+    }
+
     private static void AssertRejected(TestDiagnostics diagnostics, string text, string? description = null)
     {
         diagnostics.Arrange("url text", description ?? text);
