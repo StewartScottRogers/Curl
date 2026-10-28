@@ -1,5 +1,6 @@
 using System.Net;
 
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
@@ -10,9 +11,10 @@ namespace Curl.Engine;
 /// with <c>::1</c> and <c>127.0.0.1</c>, as <c>DohDnsResolver</c> does without a query, and every other
 /// name with no address, so its transfer fails with exit 6 <c>Could not resolve host: &lt;host&gt;</c>,
 /// as curl 8.22.0 does with <c>--doh-url "a b"</c> and <c>--doh-url ftp://...</c> without asking anyone
-/// (measured, BL-642, CGR-045).
+/// (measured, BL-642, CGR-045). As an <see cref="IDohUrlDnsResolver" /> its failure writes the <c>-v</c> line
+/// <c>Could not resolve host: &lt;host&gt;</c> once, as curl 8.21.0 does (measured, BL-3916).
 /// </summary>
-internal sealed class UnusableDohUrlResolver : IDnsResolver
+internal sealed class UnusableDohUrlResolver : IDohUrlDnsResolver
 {
     /// <inheritdoc />
     public ValueTask<IReadOnlyList<IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken) =>

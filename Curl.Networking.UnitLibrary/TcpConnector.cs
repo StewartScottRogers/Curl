@@ -1123,7 +1123,8 @@ public sealed partial class TcpConnector(
     /// Fails a connect whose host did not resolve with exit 6 (or 43), first writing, unless the DNS
     /// cache answered, the <c>-v</c> lines curl 8.21.0 writes once its resolver answered nothing for a host
     /// (measured, BL-1157 Notes): <c>Could not resolve host: &lt;host&gt;</c>, twice from the
-    /// system's threaded resolver and so from every resolver but DoH, which writes it once (ADR-0366), then
+    /// system's threaded resolver and so from every resolver but DoH and an <see cref="IDohUrlDnsResolver" />,
+    /// which write it once (ADR-0366, BL-3916), then
     /// <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>, around which a
     /// <see cref="DnsFilterTraceEvents" /> writes its own. A negative DNS cache entry writes
     /// <c>Could not resolve host: &lt;host&gt;</c> once, <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>
@@ -1181,7 +1182,7 @@ public sealed partial class TcpConnector(
     private void ReportLookUpFailed(ITransferEvents events, ConnectDestination destination, string message)
     {
         events.ReportInfo(message);
-        if (KindOfResolver is not DohDnsResolver)
+        if (KindOfResolver is not (DohDnsResolver or IDohUrlDnsResolver))
         {
             events.ReportInfo(message);
         }
