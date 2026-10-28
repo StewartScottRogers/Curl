@@ -50,6 +50,8 @@ internal static class WinLdapLogonBind
 
     private static readonly LdapBindReply LocalError = new(LdapBindReplyStatus.Answered, WinLdapResultText.LocalError);
 
+    private static readonly LdapBindReply ProtocolError = new(LdapBindReplyStatus.Answered, WinLdapResultText.ProtocolError);
+
     /// <summary>Binds as the logged-on user as WinLDAP does.</summary>
     /// <param name="exchange">The session to bind on.</param>
     /// <param name="tokenSource">Starts the logged-on user's authentication.</param>
@@ -225,6 +227,11 @@ internal static class WinLdapLogonBind
         if (!reply.IsSuccess)
         {
             return reply;
+        }
+
+        if (reply.MatchedDn.Length == 0)
+        {
+            return ProtocolError;
         }
 
         return authentication.NextToken(reply.MatchedDn) is { } response
