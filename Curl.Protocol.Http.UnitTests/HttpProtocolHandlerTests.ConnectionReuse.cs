@@ -59,7 +59,6 @@ public sealed partial class HttpProtocolHandlerTests
     [DataRow("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nok", "", DisplayName = "Connection: close")]
     [DataRow("HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok", AssumeClose, DisplayName = "HTTP/1.0 without keep-alive")]
     [DataRow("HTTP/1.1 200 OK\r\n\r\nok", NoEndOfMessage, DisplayName = "Body read to close")]
-    [DataRow("HTTP/1.1 101 Switching Protocols\r\nUpgrade: h2c\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", "", DisplayName = "101")]
     public async Task ExecuteAsync_ResponseDoesNotPersist_LeavesTheConnectionUnmarkedAndShutsItDown(string response, string headInfoLines)
     {
         foreach (int chunkSize in ChunkSizes)
@@ -81,6 +80,26 @@ public sealed partial class HttpProtocolHandlerTests
             string[] expectedInfo = InfoLines(headInfoLines, "shutting down connection #4");
             WriteExpectedLines("info lines", expectedInfo, events.Info);
             CollectionAssert.AreEqual(expectedInfo, events.Info, $"Chunk size {chunkSize}");
+        }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UnsolicitedFinal101BodyRunsToTheClose_MarksTheConnectionReusableAndReportsItLeftIntact()
+    {
+        foreach (int chunkSize in ChunkSizes)
+        {
+            ScriptedConnection connection = Connection("HTTP/1.1 101 Switching\r\n\r\nhello", chunkSize);
+            RecordingTransferEvents events = new();
+            Diagnostics.Arrange("url, chunk size", $"{ReuseUrl}, {chunkSize}");
+
+            TransferResult result = await Handler(new QueueConnector(ConnectResult.Connected(connection, null, connectionNumber: 0)))
+                .ExecuteAsync(ReuseContext(events));
+
+            WriteResult(result);
+            WriteEvents("info lines", events.Info);
+            Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, $"Chunk size {chunkSize}");
+            Assert.IsTrue(connection.IsMarkedReusable, $"Chunk size {chunkSize}");
+            Assert.AreEqual("Connection #0 to host 127.0.0.1:18977 left intact", events.Info[^1], $"Chunk size {chunkSize}");
         }
     }
 

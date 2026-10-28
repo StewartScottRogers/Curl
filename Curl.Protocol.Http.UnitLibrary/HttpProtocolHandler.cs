@@ -2274,8 +2274,20 @@ public sealed class HttpProtocolHandler(
     /// reports it dead before any reuse (ADR-0112).
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
-        DeliveredWhole(head, upload, headReader, delivery)
-            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+        (DeliveredWhole(head, upload, headReader, delivery)
+            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding))
+        || EndedAtUnsolicitedSwitchingProtocols(head, upload, headReader, delivery);
+
+    /// <summary>
+    /// Decides whether the response was a final unsolicited <c>101</c> whose body ran to the close,
+    /// which curl 8.22.0 reports left intact and pools, the pool then finding it dead (measured, BL-3870, ADR-0939).
+    /// </summary>
+    private static bool EndedAtUnsolicitedSwitchingProtocols(HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        !upload.CutShort
+            && delivery == HttpBodyDelivery.Deliver
+            && headReader.SwitchedProtocols
+            && !headReader.IsSwitchedToHttp2()
+            && head.StatusLine.StatusCode == 101;
 
     /// <summary>
     /// Decides whether the exchange ran whole: its request body was not cut short, its
