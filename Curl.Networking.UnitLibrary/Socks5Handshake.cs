@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -64,12 +65,41 @@ internal static class Socks5Handshake
         var hostName = proxy.Kind == ProxyKind.Socks5Hostname && literal is null ? Encoding.UTF8.GetBytes(host) : null;
         if (hostName?.Length > MaximumHostBytes)
         {
-            return SocksProxyTunnel.Failed(CurlProxyCode.LongHostname, "SOCKS5: the destination hostname is too long to be resolved remotely by the proxy.");
+            return EchoFailure(
+                SocksProxyTunnel.Failed(CurlProxyCode.LongHostname, "SOCKS5: the destination hostname is too long to be resolved remotely by the proxy."),
+                events);
         }
 
         var destination = new Socks5Destination(host, port, hostName, literal, proxy.Kind == ProxyKind.Socks5Hostname);
-        return await NegotiateAuthenticationAsync(connection, proxy, authentication, events, trace, cancellationToken).ConfigureAwait(false)
+        var gssapiEchoed = new StrongBox<bool>();
+        var failure = await NegotiateAuthenticationAsync(connection, proxy, authentication, events, trace, gssapiEchoed, cancellationToken).ConfigureAwait(false)
             ?? await RequestConnectAsync(connection, destination, resolve, trace, cancellationToken).ConfigureAwait(false);
+        return gssapiEchoed.Value ? failure : EchoFailure(failure, events);
+    }
+
+    // curl 8.22.0's failf also writes the message as a -v line (measured, BL-3950); a failed
+    // GSS-API exchange has already written its own lines.
+    private static ConnectResult? EchoFailure(ConnectResult? failure, ITransferEvents events)
+    {
+        if (failure is not null)
+        {
+            events.ReportInfo(failure.ErrorMessage!);
+        }
+
+        return failure;
+    }
+
+    private static async ValueTask<ConnectResult?> NegotiateGssapiAsync(
+        IConnection connection,
+        ProxyEndpoint proxy,
+        Socks5AuthenticationOptions authentication,
+        ITransferEvents events,
+        StrongBox<bool> gssapiEchoed,
+        CancellationToken cancellationToken)
+    {
+        var failure = await Socks5GssapiNegotiation.RunAsync(connection, proxy.Host, authentication, events, cancellationToken).ConfigureAwait(false);
+        gssapiEchoed.Value = failure is not null;
+        return failure;
     }
 
     private static async ValueTask<ConnectResult?> NegotiateAuthenticationAsync(
@@ -78,6 +108,7 @@ internal static class Socks5Handshake
         Socks5AuthenticationOptions authentication,
         ITransferEvents events,
         ITransferEvents? trace,
+        StrongBox<bool> gssapiEchoed,
         CancellationToken cancellationToken)
     {
         // Without user name and password allowed, curl forgets the credential (measured).
@@ -95,7 +126,7 @@ internal static class Socks5Handshake
             [_, UserNameAndPassword] => await AuthenticateAsync(connection, credential, cancellationToken).ConfigureAwait(false),
             [_, Gssapi] when !authentication.AllowGssapi =>
                 SocksProxyTunnel.Failed(CurlProxyCode.GssapiPerMessage, "SOCKS5 GSSAPI per-message authentication is not enabled."),
-            [_, Gssapi] => await Socks5GssapiNegotiation.RunAsync(connection, proxy.Host, authentication, events, cancellationToken).ConfigureAwait(false),
+            [_, Gssapi] => await NegotiateGssapiAsync(connection, proxy, authentication, events, gssapiEchoed, cancellationToken).ConfigureAwait(false),
             [_, NoAcceptableMethod] => SocksProxyTunnel.Failed(CurlProxyCode.NoAuthentication, "No authentication method was acceptable."),
             _ => SocksProxyTunnel.Failed(CurlProxyCode.UnknownMode, "Unknown SOCKS5 mode attempted to be used by server."),
         };
