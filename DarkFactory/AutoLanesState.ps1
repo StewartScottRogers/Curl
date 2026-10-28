@@ -71,9 +71,10 @@ function Get-BoardCapacity {
         $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AutoBoardDir '.claude\skills\task-board\task-board.ps1') capacity 2>&1) -join "`n"
         $line = @($out -split "`r?`n" | Where-Object { $_ -match '^Capacity \d+:' }) | Select-Object -First 1
         if ($line) {
-            # A ready task over its cost cap or interactive only gets no lane (BL-3090).
+            # A ready task over its cost cap or interactive only gets no lane (BL-3090); the
+            # recent run costs every cap comes from are read once for the whole check (BL-3988).
             $tasksDir = Join-Path $AutoBoardDir 'Tasks'
-            $notClaimable = @(Get-CapacityReadyIds $line | Where-Object { Get-TaskNotClaimableWhy $_ -TasksDir $tasksDir })
+            $notClaimable = @(Invoke-WithRecentRunCostsReadOnce { Get-CapacityReadyIds $line | Where-Object { Get-TaskNotClaimableWhy $_ -TasksDir $tasksDir } })
             return [pscustomobject]@{ Capacity = (Get-ClaimableCapacity $line $notClaimable); Created = $created; Why = '' }
         }
         return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "the board printed no capacity: $(Get-Short $out 60)" }
