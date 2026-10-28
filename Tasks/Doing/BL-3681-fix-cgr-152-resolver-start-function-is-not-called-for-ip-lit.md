@@ -80,3 +80,4 @@ probe.exe C_71 2
 - 2026-10-26: Created from CGR-152 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3680 (Doing, lane 6): its ManagedEngineSharedState.cs DNS cache fix is this issue's root cause
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
