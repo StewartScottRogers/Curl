@@ -750,6 +750,13 @@ public sealed partial class TcpConnector(
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }
+        catch (CanceledWhileResolvingException) when (cancellationToken.IsCancellationRequested)
+        {
+            // curl names the phase the --max-time limit ended: a resolve still running says "Resolving" (CGR-284).
+            var message = $"Resolving timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            target.Events.ReportInfo(message);
+            return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
+        }
     }
 
     /// <summary>
@@ -1102,6 +1109,9 @@ public sealed partial class TcpConnector(
     private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
         (await ResolveNotingCacheAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Resolution;
 
+    /// <summary>Marks a cancellation that arrived while a host name was being resolved (CGR-284).</summary>
+    private sealed class CanceledWhileResolvingException(CancellationToken cancellationToken) : OperationCanceledException(cancellationToken);
+
     /// <summary>
     /// Fails a connect whose host did not resolve with exit 6 (or 43), first writing, unless the DNS
     /// cache answered, the <c>-v</c> lines curl 8.21.0 writes once its resolver answered nothing for a host
@@ -1177,7 +1187,17 @@ public sealed partial class TcpConnector(
             return (new DnsResolution(fromCache, DnsLookupFailure.None), true);
         }
 
-        var (addresses, failure) = await LookUpAsync(host, port, target, cancellationToken).ConfigureAwait(false);
+        DnsResolution lookedUp;
+        try
+        {
+            lookedUp = await LookUpAsync(host, port, target, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException canceled)
+        {
+            throw new CanceledWhileResolvingException(canceled.CancellationToken);
+        }
+
+        var (addresses, failure) = lookedUp;
         var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
         CacheLookUp(new DnsCacheEntry(host, port, answered), cacheKey, failure, target.Events);
         var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
