@@ -7,7 +7,15 @@
 #     files in the same formats, so a fixture recorded by either is read the same way.
 #     Ported so far: the HTTP and HTTPS (-Tls) server, -NoServer, -UnixSocket, -Ftp
 #     (passive and active mode, explicit and implicit FTPS, PROT, CCC; see FTP below) and
-#     -Smtp, -Imap and -Pop3 (plain, STARTTLS / STLS and implicit TLS with -Tls).
+#     -Smtp, -Imap and -Pop3 (plain, STARTTLS / STLS and implicit TLS with -Tls) and
+#     -Tftp (see TFTP below).
+#
+# TFTP
+#     -Tftp serves one TFTP transfer on UDP -Port with TftpData, TftpReply, TftpNoOack and
+#     TftpIdleMilliseconds as the PowerShell script does, and writes datagrams.txt and
+#     upload.bin (no request.bin). A reply comes from a new UDP port, which bash cannot
+#     open, so a perl (core modules only) written to the state directory serves it; -Tftp
+#     needs perl besides curl.
 #
 # DIFFERENCES FROM THE POWERSHELL SCRIPT (FTP)
 #     A data connection curl opens that no transfer uses (for example after an overridden
@@ -22,7 +30,7 @@
 #     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
 #     Record-CurlExchange.ps1 under pwsh" to stderr, and exits 2:
 #
-#       -Tftp            -Script (scripted binary sessions, LDAP and SMB)
+#       -Script (scripted binary sessions, LDAP and SMB)
 #       -Http2 and -Http2Origin (HTTP/2 proxy and origin framing, HPACK)
 #       -UdpSink         -DnsPort and -DohPort (the DNS and DNS-over-HTTPS responders)
 #       -HalfCloseAfterResponse together with -Tls
@@ -1599,6 +1607,7 @@ RCE_FTP_REPLIES=()
 RCE_FTP_DATA=''
 RCE_FTP_IDLE=5000
 RCE_FTP_HOLD=0
+RCE_TFTP_DATA='hello\n' RCE_TFTP_REPLIES=() RCE_TFTP_NOOACK=0 RCE_TFTP_IDLE=15000 RCE_TFTP_PID=''
 RCE_SMTP_REPLIES=() RCE_IMAP_REPLIES=() RCE_POP3_REPLIES=()
 RCE_SMTP_IDLE=5000 RCE_IMAP_IDLE=5000 RCE_POP3_IDLE=5000
 RCE_IMAP_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n'
@@ -1644,7 +1653,8 @@ while [ $# -gt 0 ]; do
         tftp) RCE_TFTP=1; shift; continue ;;
         http2) RCE_HTTP2=1; shift; continue ;;
         udpsink) RCE_UDP_SINK=1; shift; continue ;;
-        tftpnooack | http2nosettings | dnstruncate) shift; continue ;;
+        tftpnooack) RCE_TFTP_NOOACK=1; shift; continue ;;
+        http2nosettings | dnstruncate) shift; continue ;;
     esac
     rce_require_value "$name" $#
     value=$2
@@ -1697,7 +1707,10 @@ while [ $# -gt 0 ]; do
         smtpidlemilliseconds) rce_integer SmtpIdleMilliseconds "$value" 1 600000; RCE_SMTP_IDLE=$value ;;
         imapidlemilliseconds) rce_integer ImapIdleMilliseconds "$value" 1 600000; RCE_IMAP_IDLE=$value ;;
         pop3idlemilliseconds) rce_integer Pop3IdleMilliseconds "$value" 1 600000; RCE_POP3_IDLE=$value ;;
-        tftpdata | tftpreply | tftpidlemilliseconds | scriptidlemilliseconds | scriptgapmilliseconds | \
+        tftpdata) RCE_TFTP_DATA=$value ;;
+        tftpreply) RCE_TFTP_REPLIES[${#RCE_TFTP_REPLIES[@]}]=$value ;;
+        tftpidlemilliseconds) rce_integer TftpIdleMilliseconds "$value" 1 600000; RCE_TFTP_IDLE=$value ;;
+        scriptidlemilliseconds | scriptgapmilliseconds | \
             proxystatus | proxyalpn | http2resetcode | dnsansweraddress | dnsresponsecode | dnsechconfiglist) ;;
         *) rce_die "unknown parameter '$1'; -help lists them." ;;
     esac
@@ -1727,7 +1740,8 @@ if [ $RCE_HTTP2 = 1 ] && [ $RCE_TLS = 0 ] && [ -z "$RCE_HTTP2_ORIGIN" ]; then rc
 if [ $RCE_HTTP2 = 1 ] && { [ $rce_sessions -gt 0 ] || [ $RCE_NO_SERVER = 1 ] || [ -n "$RCE_UNIX_SOCKET" ] || [ $RCE_TFTP = 1 ]; }; then rce_die '-Http2 serves one HTTPS proxy connection, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp.'; fi
 
 # The modes this port does not serve yet.
-if [ $RCE_TFTP = 1 ]; then rce_not_ported -Tftp; fi
+# -Tftp starts no socat listener and no HTTP server: its own responder serves the UDP port.
+if [ $RCE_TFTP = 1 ]; then RCE_NO_SERVER=1; fi
 if [ -n "$RCE_SCRIPT" ]; then rce_not_ported -Script; fi
 if [ -n "$RCE_HTTP2_ORIGIN" ]; then rce_not_ported -Http2Origin; fi
 if [ $RCE_HTTP2 = 1 ]; then rce_not_ported -Http2; fi
@@ -1777,6 +1791,9 @@ if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ]; then
         rce_missing="$rce_missing, an openssl whose s_server has -msgfile and -naccept ($RCE_OPENSSL has not: LibreSSL? set OPENSSL to an OpenSSL 1.1.1 or later)"
     fi
 fi
+if [ $RCE_TFTP = 1 ] && ! command -v perl >/dev/null 2>&1; then
+    rce_missing="$rce_missing, perl (serves -Tftp: a TFTP answer comes from a new UDP port, which bash cannot open)"
+fi
 if ! command -v "$RCE_CURL" >/dev/null 2>&1; then
     rce_missing="$rce_missing, curl ('$RCE_CURL' was not found; pass -Curl)"
 fi
@@ -1807,6 +1824,7 @@ rce_cleanup() {
     : >"$RCE_STATE/stop" 2>/dev/null
     if [ -n "$RCE_LISTENER_PID" ]; then kill "$RCE_LISTENER_PID" 2>/dev/null; fi
     if [ -n "${RCE_DATA_LISTENER_PID:-}" ]; then kill "$RCE_DATA_LISTENER_PID" 2>/dev/null; fi
+    if [ -n "$RCE_TFTP_PID" ]; then kill "$RCE_TFTP_PID" 2>/dev/null; fi
     # Whatever is still serving a connection: handlers, held connections, s_servers.
     for rce_pid_file in "$RCE_STATE"/pid.* "$RCE_STATE"/tls-pid.*; do
         [ -f "$rce_pid_file" ] && kill -KILL "$(cat "$rce_pid_file")" 2>/dev/null
@@ -1976,6 +1994,269 @@ if [ $RCE_FTP = 1 ]; then
     printf '%s' "${rce_data_port##*:}" >"$RCE_STATE/dataport"
 fi
 
+# --- The TFTP responder ---------------------------------------------------------------
+# One transfer on UDP: the request arrives on the listening port and every answer comes from
+# a new port, as RFC 1350 requires. Bash cannot hold two UDP sockets, so perl (core modules
+# only) serves it, as RecorderTftpResponder does in the PowerShell script. It writes the
+# datagram log and the uploaded bytes to files as it goes.
+if [ $RCE_TFTP = 1 ]; then
+    rce_decode_escaped "$RCE_TFTP_DATA" "$RCE_STATE/tftp.data"
+    : >"$RCE_STATE/tftp.steps"
+    rce_index=0
+    for rce_entry in ${RCE_TFTP_REPLIES[@]+"${RCE_TFTP_REPLIES[@]}"}; do
+        case $rce_entry in
+            ?*=*) ;;
+            *) rce_die "TftpReply '$rce_entry' is not VERB=reply." ;;
+        esac
+        rce_step=$(printf '%s' "${rce_entry%%=*}" | tr '[:lower:]' '[:upper:]')
+        rce_decode_escaped "${rce_entry#*=}" "$RCE_STATE/tftp.reply.$rce_index"
+        rce_reply=$(cat "$RCE_STATE/tftp.reply.$rce_index")
+        # Only a step's first reply is checked, as the PowerShell script checks it.
+        if ! grep -q -x -F -e "$rce_step" "$RCE_STATE/tftp.steps"; then
+            if [[ $rce_reply == 'PACKET '* ]]; then
+                if ! [[ $rce_step =~ ^(RRQ|WRQ|(ACK|DATA)[0-9]{1,5})$ ]] || ! [[ $rce_reply =~ ^PACKET\ ([0-9a-fA-F]{2})+$ ]]; then rce_die "TftpReply '$rce_step=$rce_reply': 'PACKET <hex>' needs whole bytes in hex, on step RRQ, WRQ, ACK<n> or DATA<n>."; fi
+            elif [[ $rce_step =~ ^(RRQ|WRQ)$ ]]; then
+                if ! [[ $rce_reply =~ ^ERROR\ ([0-9]{1,5})(\ |$) ]] || [ $((10#${BASH_REMATCH[1]})) -gt 65535 ]; then rce_die "TftpReply '$rce_step=$rce_reply': a request is answered 'ERROR <code> <text>', the code 0 to 65535."; fi
+            elif [[ $rce_step =~ ^(ACK|DATA)[0-9]{1,5}$ ]]; then
+                if [ "$rce_reply" != DROP ]; then rce_die "TftpReply '$rce_step=$rce_reply': an ACK or DATA packet can only be DROP."; fi
+            else
+                rce_die "TftpReply '$rce_step=$rce_reply': the step is RRQ, WRQ, ACK<n> or DATA<n>."
+            fi
+        fi
+        printf '%s\n' "$rce_step" >>"$RCE_STATE/tftp.steps"
+        rce_index=$((rce_index + 1))
+    done
+    cat >"$RCE_STATE/tftp.pl" <<'RCE_TFTP_PERL'
+use strict;
+use warnings;
+use IO::Socket::IP;
+use IO::Select;
+
+my ($state, $address, $port, $noOack, $idleMilliseconds) = @ARGV;
+my (%overrides, %dropped);
+{
+    open(my $steps, '<', "$state/tftp.steps") or die "tftp.steps: $!";
+    my $index = 0;
+    while (my $step = <$steps>) {
+        chomp $step;
+        open(my $reply, '<:raw', "$state/tftp.reply.$index") or die "tftp.reply.$index: $!";
+        local $/;
+        my $text = <$reply>;
+        $overrides{$step} = defined $text ? $text : '';
+        close $reply;
+        $index++;
+    }
+}
+open(my $dataFile, '<:raw', "$state/tftp.data") or die "tftp.data: $!";
+my $data = do { local $/; <$dataFile> };
+$data = '' unless defined $data;
+open(my $log, '>:raw', "$state/tftp.log") or die "tftp.log: $!";
+open(my $upload, '>:raw', "$state/tftp.upload") or die "tftp.upload: $!";
+select((select($log), $| = 1)[0]);
+select((select($upload), $| = 1)[0]);
+
+my $listen = IO::Socket::IP->new(Proto => 'udp', LocalAddr => $address, LocalPort => $port);
+if (!$listen) {
+    open(my $failure, '>', "$state/tftp.error");
+    print $failure "cannot bind UDP $address:$port: $@\n";
+    close $failure;
+    exit 1;
+}
+$SIG{TERM} = sub { exit 0 };
+open(my $ready, '>', "$state/tftp.ready");
+close $ready;
+
+my ($transfer, $peer, $firstAnswer, $lastSent);
+
+sub number {
+    my ($packet, $offset) = @_;
+    return length($packet) < $offset + 2 ? -1 : (ord(substr($packet, $offset, 1)) << 8) | ord(substr($packet, $offset + 1, 1));
+}
+# The NUL-terminated strings from the offset on; a last one without its NUL is kept.
+sub strings {
+    my ($packet, $offset) = @_;
+    my @strings;
+    my $start = $offset;
+    for (my $i = $offset; $i < length($packet); $i++) {
+        next if substr($packet, $i, 1) ne "\0";
+        push @strings, substr($packet, $start, $i - $start);
+        $start = $i + 1;
+    }
+    push @strings, substr($packet, $start) if $start < length($packet);
+    return @strings;
+}
+sub describe {
+    my ($packet) = @_;
+    my $opcode = number($packet, 0);
+    if ($opcode == 1 || $opcode == 2) {
+        my @fields = strings($packet, 2);
+        my $text = $opcode == 1 ? 'RRQ' : 'WRQ';
+        $text .= " $fields[0]" if @fields > 0;
+        $text .= " $fields[1]" if @fields > 1;
+        for (my $i = 2; $i + 1 < @fields; $i += 2) { $text .= " $fields[$i]=$fields[$i + 1]"; }
+        return $text;
+    }
+    return 'DATA ' . number($packet, 2) . ' ' . (length($packet) > 4 ? length($packet) - 4 : 0) . ' bytes' if $opcode == 3;
+    return 'ACK ' . number($packet, 2) if $opcode == 4;
+    if ($opcode == 5) {
+        my @fields = strings($packet, 4);
+        return 'ERROR ' . number($packet, 2) . (@fields > 0 ? " $fields[0]" : '');
+    }
+    if ($opcode == 6) {
+        my @fields = strings($packet, 2);
+        my $text = 'OACK';
+        for (my $i = 0; $i + 1 < @fields; $i += 2) { $text .= " $fields[$i]=$fields[$i + 1]"; }
+        return $text;
+    }
+    return "opcode $opcode";
+}
+sub record {
+    my ($direction, $packet) = @_;
+    print $log $direction, ' ', unpack('H*', $packet), ' ', describe($packet), "\n";
+}
+# Logged before it is sent, so curl cannot exit between the send and the log line.
+sub transmit {
+    my ($packet) = @_;
+    record('<', $packet);
+    $transfer->send($packet, 0, $peer);
+}
+sub resend {
+    my ($packet) = @_;
+    transmit($packet) if defined $packet;
+}
+sub ackPacket { return pack('nn', 4, $_[0]); }
+sub errorPacket { return pack('nn', 5, $_[0]) . $_[1] . "\0"; }
+sub oackPacket { return pack('n', 6) . join('', map { "$_\0" } @_); }
+# True, once, when the step is overridden with DROP.
+sub dropOnce {
+    my ($step) = @_;
+    return 0 unless defined $overrides{$step} && $overrides{$step} eq 'DROP' && !$dropped{$step};
+    $dropped{$step} = 1;
+    return 1;
+}
+# Sends the raw datagram a step is overridden with, "PACKET <hex>", once.
+sub sendInjected {
+    my ($step) = @_;
+    my $reply = $overrides{$step};
+    return unless defined $reply && $reply =~ /^PACKET / && !$dropped{"$step PACKET"};
+    $dropped{"$step PACKET"} = 1;
+    transmit(pack('H*', substr($reply, 7)));
+}
+sub sendPacket {
+    my ($packet, $step) = @_;
+    $lastSent = $packet;
+    return if defined $step && dropOnce($step);
+    transmit($packet);
+}
+# Sends DATA block n of the file; true when it is the last one (shorter than a block).
+sub sendDataBlock {
+    my ($block, $blockSize) = @_;
+    my $offset = ($block - 1) * $blockSize;
+    my $length = length($data) - $offset;
+    $length = $blockSize if $length > $blockSize;
+    $length = 0 if $length < 0;
+    sendPacket(pack('nn', 3, $block) . ($length > 0 ? substr($data, $offset, $length) : ''), "DATA$block");
+    return $length < $blockSize;
+}
+# The next datagram curl sends to either port, or undef after the idle time.
+sub receive {
+    my @readable = IO::Select->new($transfer, $listen)->can_read($idleMilliseconds / 1000);
+    return (undef, 0) unless @readable;
+    my $socket = $readable[0];
+    my $packet;
+    $socket->recv($packet, 65536);
+    record('>', $packet);
+    return ($packet, $socket == $listen ? 1 : 0);
+}
+
+sub serveRead {
+    my ($oack, $options, $blockSize) = @_;
+    my $expectedAck = 0;
+    my $finalSent = 0;
+    if ($oack) { sendPacket(oackPacket(@$options), undef); } else { $expectedAck = 1; $finalSent = sendDataBlock($expectedAck, $blockSize); }
+    $firstAnswer = $lastSent;
+    while (1) {
+        my ($packet, $fromListen) = receive();
+        return unless defined $packet;
+        if ($fromListen) { resend($firstAnswer); next; }
+        my $opcode = number($packet, 0);
+        return if $opcode == 5;
+        next if $opcode != 4 || length($packet) < 4;
+        my $block = number($packet, 2);
+        if ($block != $expectedAck) { resend($lastSent); next; }
+        next if dropOnce("ACK$block");
+        sendInjected("ACK$block");
+        return if $finalSent;
+        $expectedAck = ($expectedAck + 1) & 0xFFFF;
+        $finalSent = sendDataBlock($expectedAck, $blockSize);
+    }
+}
+sub serveWrite {
+    my ($oack) = @_;
+    my $expectedData = 1;
+    if ($oack) { sendPacket(oackPacket(@{$_[1]}), undef); } else { sendPacket(ackPacket(0), 'ACK0'); }
+    $firstAnswer = $lastSent;
+    while (1) {
+        my ($packet, $fromListen) = receive();
+        return unless defined $packet;
+        if ($fromListen) { resend($firstAnswer); next; }
+        my $opcode = number($packet, 0);
+        return if $opcode == 5;
+        next if $opcode != 3 || length($packet) < 4;
+        my $block = number($packet, 2);
+        # A repeated block means curl missed its ACK; acknowledge it again.
+        if ($block != $expectedData) { resend($lastSent); next; }
+        next if dropOnce("DATA$block");
+        print $upload substr($packet, 4);
+        sendInjected("DATA$block");
+        sendPacket(ackPacket($block), "ACK$block");
+        $expectedData = ($expectedData + 1) & 0xFFFF;
+    }
+}
+
+my $request;
+$peer = $listen->recv($request, 65536);
+record('>', $request);
+$transfer = IO::Socket::IP->new(Proto => 'udp', LocalAddr => $address, LocalPort => 0) or exit 1;
+my $opcode = number($request, 0);
+if ($opcode != 1 && $opcode != 2) {
+    sendPacket(errorPacket(4, 'Illegal TFTP operation'), undef);
+    exit 0;
+}
+my $kind = $opcode == 1 ? 'RRQ' : 'WRQ';
+sendInjected($kind);
+if (defined $overrides{$kind} && $overrides{$kind} =~ /^ERROR /) {
+    # "ERROR <code> <text>", checked before the responder starts.
+    my @parts = split(/ /, $overrides{$kind}, 3);
+    sendPacket(errorPacket($parts[1], defined $parts[2] ? $parts[2] : ''), undef);
+    exit 0;
+}
+my @fields = strings($request, 2);
+my @options;
+my $blockSize = 512;
+for (my $i = 2; $i + 1 < @fields; $i += 2) {
+    my $name = lc $fields[$i];
+    next unless $name eq 'blksize' || $name eq 'tsize' || $name eq 'timeout';
+    my $value = ($name eq 'tsize' && $opcode == 1) ? length($data) : $fields[$i + 1];
+    push @options, $fields[$i], $value;
+    $blockSize = int($value) if $name eq 'blksize';
+}
+my $oack = @options > 0 && !$noOack;
+$blockSize = 512 unless $oack;
+if ($opcode == 1) { serveRead($oack, \@options, $blockSize); } else { serveWrite($oack, \@options); }
+RCE_TFTP_PERL
+    perl "$RCE_STATE/tftp.pl" "$RCE_STATE" "$RCE_LISTEN_ADDRESS" "$RCE_PORT" "$RCE_TFTP_NOOACK" "$RCE_TFTP_IDLE" </dev/null >/dev/null 2>"$RCE_STATE/tftp.err" &
+    RCE_TFTP_PID=$!
+    rce_polls=0
+    while [ ! -e "$RCE_STATE/tftp.ready" ]; do
+        if ! kill -0 "$RCE_TFTP_PID" 2>/dev/null || [ $rce_polls -ge 250 ]; then
+            rce_die "the TFTP responder did not start: $(cat "$RCE_STATE/tftp.error" "$RCE_STATE/tftp.err" 2>/dev/null | head -n 3)"
+        fi
+        rce_polls=$((rce_polls + 1))
+        sleep 0.02
+    done
+fi
+
 if [ $RCE_USE_SOCAT = 1 ]; then
     if [ -n "$RCE_UNIX_SOCKET" ]; then
         case $RCE_UNIX_SOCKET in /*) ;; *) RCE_UNIX_SOCKET="$(pwd)/$RCE_UNIX_SOCKET" ;; esac
@@ -2053,6 +2334,16 @@ rce_elapsed=$((RCE_NOW_MS - rce_started))
 wait "$rce_curl_pid"
 rce_exit_code=$?
 
+# --- Stopping the TFTP responder ------------------------------------------------------
+
+if [ $RCE_TFTP = 1 ]; then
+    # The responder logs a datagram as it handles it, and curl may exit as it sends its last
+    # one: give that a moment, then end a transfer still waiting.
+    sleep 0.2
+    kill "$RCE_TFTP_PID" 2>/dev/null
+    wait "$RCE_TFTP_PID" 2>/dev/null
+fi
+
 # --- Stopping the server --------------------------------------------------------------
 
 if [ $RCE_NO_SERVER = 0 ]; then
@@ -2113,6 +2404,10 @@ if [ $RCE_NO_SERVER = 0 ]; then
 fi
 if [ $RCE_LINE_SESSION = 1 ]; then cat "$RCE_STATE/transcript.txt" >"$RCE_OUT_DIRECTORY/transcript.txt"; fi
 if [ $RCE_FTP = 1 ]; then cat "$RCE_STATE/upload.bin" >"$RCE_OUT_DIRECTORY/upload.bin"; fi
+if [ $RCE_TFTP = 1 ]; then
+    cat "$RCE_STATE/tftp.log" >"$RCE_OUT_DIRECTORY/datagrams.txt"
+    cat "$RCE_STATE/tftp.upload" >"$RCE_OUT_DIRECTORY/upload.bin"
+fi
 cat "$RCE_STATE/stdout.bin" >"$RCE_OUT_DIRECTORY/stdout.bin"
 cat "$RCE_STATE/stderr.txt" >"$RCE_OUT_DIRECTORY/stderr.txt"
 printf '%s' "$rce_exit_code" >"$RCE_OUT_DIRECTORY/exitcode.txt"
