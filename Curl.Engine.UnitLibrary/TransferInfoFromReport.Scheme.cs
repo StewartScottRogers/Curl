@@ -45,8 +45,16 @@ internal static partial class TransferInfoFromReport
     /// <param name="requestUrl">The URL, with any <c>-G</c> / <c>--url-query</c> query.</param>
     /// <param name="result">The transfer's result.</param>
     /// <returns>The scheme, or <see langword="null" />.</returns>
-    internal static string? RequestSchemeOf(string requestUrl, TransferResult result) =>
-        result.ExitCode != CurlExitCode.UnsupportedProtocol ? SchemeOf(requestUrl) : null;
+    internal static string? RequestSchemeOf(string requestUrl, TransferResult result)
+    {
+        if (RedirectRefused(result))
+        {
+            return SchemeOf(requestUrl);
+        }
+
+        // A followed redirect moves the handle's scheme to its target's, even when that hop then fails (CGR-194).
+        return result.ExitCode != CurlExitCode.UnsupportedProtocol ? SchemeOf(result.Report?.EffectiveUrl ?? requestUrl) : null;
+    }
 
     /// <summary>
     /// <paramref name="info" /> with the scheme and <c>CURLPROTO_*</c> bit libcurl's handle keeps from its last connection:

@@ -5,11 +5,11 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr194Tests.cs]
+touches: [Curl.Engine.UnitLibrary/TransferInfoFromReport.Scheme.cs, Curl.Engine.UnitTests/Cgr194Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3723 — Fix CGR-194: %{scheme} is wrong after a redirect that fails
 
@@ -65,10 +65,10 @@ curl -sS -L --proto-redir =https "http://127.0.0.1:20200/__loc=http://127.0.0.1:
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -79,3 +79,12 @@ curl -sS -L --proto-redir =https "http://127.0.0.1:20200/__loc=http://127.0.0.1:
 
 - 2026-10-26: Created from CGR-194 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+### Notes (lane 6, 2026-10-28)
+
+- `%{scheme}` is computed by `TransferInfoFromReport.RequestSchemeOf` (Curl.Engine), not `RedirectFollower`; `touches` changed to the engine file and test accordingly (no other Doing task named them).
+- Measured with a loopback C# server (302 for `__loc=`). REF = curl on PATH.
+  - `curl -sS -L "http://127.0.0.1:20200/__loc=ftp://127.0.0.1:20299/y" -w "[%{scheme}]"`: REF `[ftp]` exit 7; PORT before `[http]` exit 7, after `[ftp]` exit 7.
+  - `curl -sS -L --proto-redir =https "http://127.0.0.1:20200/__loc=http://127.0.0.1:20200/y" -w "[%{scheme}]"`: REF `[http]` exit 1 and `Protocol "http" is disabled (in redirect)`; PORT before `[]`, after `[http]`, same stderr.
+- Fix: scheme of the report's effective URL (the last followed hop), the request URL's when a redirect is refused, none for other exit-1 unsupported schemes. Tests: `Cgr194Tests`. Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing. Linux/macOS: tests are platform-neutral.
+- 2026-10-28: Doing -> Done. CGR-194 fixed: %{scheme} follows the last hop
