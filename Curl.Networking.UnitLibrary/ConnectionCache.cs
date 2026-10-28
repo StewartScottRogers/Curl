@@ -28,7 +28,7 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     /// <summary>
     /// Gets the keys whose first connection turned out to carry one transfer at a time, for which
     /// no transfer waits for a connection being opened any more, as curl 8.22.0 opens the waiting
-    /// transfers of a host side by side once its first connection showed HTTP/1.1 (CGR-171, ADR-0866).
+    /// transfers of a host side by side once its first connection showed HTTP/1.1 (CGR-171, ADR-0933).
     /// </summary>
     internal HashSet<ConnectionPoolKey> KeysKnownNotToMultiplex { get; } = [];
 

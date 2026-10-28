@@ -5,7 +5,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-171 (ADR-0866): under <c>-Z</c>, once a host's first connection has shown it carries one
+/// CGR-171 (ADR-0933): under <c>-Z</c>, once a host's first connection has shown it carries one
 /// transfer at a time (HTTP/1.1), curl 8.22.0 opens the host's waiting transfers side by side; a
 /// <see cref="PoolingConnector" /> that waits for multiplexing stops waiting for a connection
 /// being opened to that key, so the second waiter no longer runs after the first has ended.

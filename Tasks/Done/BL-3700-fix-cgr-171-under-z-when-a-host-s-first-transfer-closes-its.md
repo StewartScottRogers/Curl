@@ -74,7 +74,7 @@ curl -Z -s -w "%{urlnum} %{exitcode} %{http_code}\n" -o NUL -o NUL -o NUL "http:
 
 - 2026-10-28 (lane 8): Cause was not `ParallelHostQueue` but the pool: `PoolingConnector.WaitsForMultiplexing`
   made the second released transfer wait on the first one's connection being opened until its response
-  arrived. Fix (ADR-0866): a connection's first HTTP/1 session (`ConcurrentTransferLimit` null) records its
+  arrived. Fix (ADR-0933): a connection's first HTTP/1 session (`ConcurrentTransferLimit` null) records its
   key in `ConnectionCache.KeysKnownNotToMultiplex`, and no transfer waits for multiplexing on such a key.
   Touches widened to `Curl.Networking.UnitLibrary/PoolingConnector.cs`, `ConnectionCache.cs`, its `CLAUDE.md`
   and `Curl.Networking.UnitTests/Cgr171Tests.cs` (no Doing task on origin/work/dark-factory named them); the

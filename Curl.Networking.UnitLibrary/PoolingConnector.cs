@@ -341,7 +341,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// Records that a transfer handed <paramref name="entry" /> its session, which tells
     /// whether it multiplexes, and wakes the transfers waiting to learn it. A session that carries
     /// one transfer at a time (HTTP/1.x) marks the key as known not to multiplex, so later
-    /// transfers to it open their own connections without waiting (CGR-171, ADR-0866).
+    /// transfers to it open their own connections without waiting (CGR-171, ADR-0933).
     /// </summary>
     /// <param name="entry">The connection now holding a session.</param>
     internal void SessionHeld(PoolEntry entry)

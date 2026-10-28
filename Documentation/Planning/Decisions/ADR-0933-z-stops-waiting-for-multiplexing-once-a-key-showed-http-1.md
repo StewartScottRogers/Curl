@@ -1,4 +1,4 @@
-# ADR-0866 — -Z stops waiting for multiplexing once a connection to the key showed HTTP/1
+# ADR-0933 — -Z stops waiting for multiplexing once a connection to the key showed HTTP/1
 
 - Status: Accepted
 - Date: 2026-10-28
