@@ -4,7 +4,7 @@ title: Fix CGR-107: -w connection counts, request sizes, header counts and timin
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3955, BL-3956, BL-3957, BL-3958, BL-3959, BL-3960]
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitTests/Cgr107Tests.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/Cgr107Tests.cs, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests/Cgr107Tests.cs, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/Cgr107Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -117,7 +117,10 @@ curl -sS ws://127.0.0.1:21802/x -w "%{num_connects}\n"
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr107Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-28 (lane 9): Split for size before any code edit. The fix spans the engine plus eight protocol libraries (Ftp, Ssh, Smtp, Dict, Gopher, Mqtt, Ws, Rtsp), each needing its own real-curl measurement, which is too much for one run. Filed BL-3955 (num_connects, engine-wide through ConnectionEndPointRecorder), BL-3956 (FTP timings and upload size_request), BL-3957 (SFTP/SCP timings and speed), BL-3958 (SMTP size_request), BL-3959 (DICT/GOPHER/MQTT size_request) and BL-3960 (WS/RTSP num_headers, RTSP http_version). They are independent of each other, so none depends on another. Once they are Done, this task only reruns the repros and records them.
+
 ## Log
 
 - 2026-10-26: Created from CGR-107 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Split for size: waits on BL-3955, BL-3956, BL-3957, BL-3958, BL-3959 and BL-3960
