@@ -41,3 +41,4 @@ so they get no `.sh` launcher; `pwsh -File <script>` is the way to run them.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 4ad30a1a 35623d92 677155f8.
