@@ -1,5 +1,5 @@
 ---
-id: BL-3998
+id: BL-3999
 title: WinLDAP logon bind: open curl's extra empty TCP connection before the WinLDAP connection (CGR-234 remainder)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3998 — WinLDAP logon bind: open curl's extra empty TCP connection before the WinLDAP connection (CGR-234 remainder)
+# BL-3999 — WinLDAP logon bind: open curl's extra empty TCP connection before the WinLDAP connection (CGR-234 remainder)
 
 ## Goal
 
