@@ -107,7 +107,7 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
     /// later <c>@-</c>, <c>-K -</c> or <c>-T -</c> in the command line reads end of file, which is
     /// empty data, rather than failing on a closed stream (CGR-017). A standard input the process was
     /// started with closed (<see cref="ClosedStandardInputStream"/>) throws an <see cref="IOException"/>,
-    /// as curl 8.22.0's <c>fread</c> on a closed <c>stdin</c> fails (CGR-110, ADR-0948).
+    /// as curl 8.22.0's <c>fread</c> on a closed <c>stdin</c> fails (CGR-110, ADR-0949).
     /// </remarks>
     /// <exception cref="IOException">Standard input was closed when the process started.</exception>
     public byte[] ReadStandardInput()

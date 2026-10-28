@@ -3,7 +3,7 @@ namespace Curl.Cli;
 /// <summary>
 /// The stream standard input is when the process was started with it closed: it reads as end of
 /// file, but a reader that must fail on it, as curl 8.22.0's <c>fread</c> on a closed <c>stdin</c>
-/// fails, can tell it apart from an empty standard input by its type (CGR-110, ADR-0948).
+/// fails, can tell it apart from an empty standard input by its type (CGR-110, ADR-0949).
 /// </summary>
 /// <remarks>
 /// .NET hands back <see cref="Stream.Null"/> for a closed standard input, which reads as an empty

@@ -1,4 +1,4 @@
-# ADR-0948: A closed standard input fails `@-` data reads and reads as empty elsewhere
+# ADR-0949: A closed standard input fails `@-` data reads and reads as empty elsewhere
 
 - Status: Accepted
 - Date: 2026-10-28

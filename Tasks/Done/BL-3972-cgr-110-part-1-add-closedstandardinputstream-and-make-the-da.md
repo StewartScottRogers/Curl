@@ -30,10 +30,10 @@ Split from BL-3639 (CGR-110, Documentation/Reviews/Curl-Gap-Report-2026-10-25.md
 
 - Split from BL-3639. Continues the stashed work of BL-3639.
 - Program.cs is NOT changed here (BL-3973 swaps Stream.Null for the new stream), so nothing observable changes until that task lands. Record the ADR (Decided by Claude under Stewart's delegation) for the whole CGR-110 plan here.
-- 2026-10-28 (lane 9): carried over the stashed ClosedStandardInputStream (moved from Curl.Core to Curl.Cli as this task names, kept `InPlaceOfNull` for BL-3973, dropped the redundant `Read(Span)` override) and the DiskDataFileReader throw. The stash's `-K -` change called a helper in CommandLineOptionTable.cs, outside `touches`, so ConfigFileApplier got its own private `ReadStandardInputOrEmpty`. ADR-0864 was taken; the plan is ADR-0948. Measure-CodeQuality for Curl.Cli.UnitLibrary: 0 failing members. Full build clean, fast tests green; change is platform-neutral (streams only, no paths).
+- 2026-10-28 (lane 9): carried over the stashed ClosedStandardInputStream (moved from Curl.Core to Curl.Cli as this task names, kept `InPlaceOfNull` for BL-3973, dropped the redundant `Read(Span)` override) and the DiskDataFileReader throw. The stash's `-K -` change called a helper in CommandLineOptionTable.cs, outside `touches`, so ConfigFileApplier got its own private `ReadStandardInputOrEmpty`. ADR-0864 was taken; the plan is ADR-0949. Measure-CodeQuality for Curl.Cli.UnitLibrary: 0 failing members. Full build clean, fast tests green; change is platform-neutral (streams only, no paths).
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 3b7d81e9 20e1fbb4 dae853c9.
-- 2026-10-28: Doing -> Done. ClosedStandardInputStream added; ReadStandardInput throws for it; -K - reads it as empty; ADR-0948
+- 2026-10-28: Doing -> Done. ClosedStandardInputStream added; ReadStandardInput throws for it; -K - reads it as empty; ADR-0949

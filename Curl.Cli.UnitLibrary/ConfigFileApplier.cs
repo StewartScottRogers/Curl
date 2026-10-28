@@ -59,7 +59,7 @@ internal static class ConfigFileApplier
 
     /// <summary>
     /// Reads standard input for <c>-K -</c>; curl 8.22.0 reads a closed standard input there as
-    /// an empty config file rather than failing (CGR-110, ADR-0948).
+    /// an empty config file rather than failing (CGR-110, ADR-0949).
     /// </summary>
     private static byte[] ReadStandardInputOrEmpty(IDataFileReader dataFileReader)
     {

@@ -4,7 +4,7 @@ namespace Curl.Cli;
 /// Pins CGR-110 part 1 (BL-3972): a standard input the process was started with closed is a
 /// <see cref="ClosedStandardInputStream"/>, which reads as end of file but makes
 /// <see cref="DiskDataFileReader.ReadStandardInput"/> throw, while <c>-K -</c> reads it as an
-/// empty config file, as curl 8.22.0 does (ADR-0948).
+/// empty config file, as curl 8.22.0 does (ADR-0949).
 /// </summary>
 [TestClass]
 public sealed class Cgr110ClosedStandardInputStreamTests
