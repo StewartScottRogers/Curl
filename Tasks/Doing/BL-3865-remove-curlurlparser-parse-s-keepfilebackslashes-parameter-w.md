@@ -30,3 +30,4 @@ BL-3589 found that curl (8.21.0 Schannel and 8.18.0) keeps every backslash in a 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: e80e2c50 779790c0.
