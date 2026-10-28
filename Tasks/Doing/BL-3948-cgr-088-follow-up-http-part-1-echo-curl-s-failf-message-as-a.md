@@ -31,3 +31,4 @@ CGR-088 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`; split from BL-
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 30167198 1f60500d 779790c0.
