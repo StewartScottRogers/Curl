@@ -29,3 +29,4 @@ BL-3687 (CGR-158) made `DohDnsResolver` report a name `DnsQueryEncoder` refuses 
 ## Log
 
 - 2026-10-26: Created by BL-3687's run for the https:// half of CGR-158.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 25cd3fad df87ecac 779790c0.
