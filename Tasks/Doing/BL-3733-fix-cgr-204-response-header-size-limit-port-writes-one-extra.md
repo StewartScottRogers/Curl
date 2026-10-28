@@ -97,3 +97,4 @@ curl -s -S -i -o o.txt http://127.0.0.1:21360/497
 ## Log
 
 - 2026-10-26: Created from CGR-204 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
