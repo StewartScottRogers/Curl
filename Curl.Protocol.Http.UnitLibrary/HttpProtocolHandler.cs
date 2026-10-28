@@ -1426,12 +1426,12 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
-    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c> as a <c>-v</c> line, as
+    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c>, <c>--max-redirs</c>'s and <c>--max-filesize</c>'s messages as a <c>-v</c> line, as
     /// curl 8.22.0's <c>failf</c> does, before the head's held empty line (measured, BL-3617).
     /// </summary>
     private static void ReportReturnedError(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        if (failure.ExitCode is CurlExitCode.HttpReturnedError or CurlExitCode.TooManyRedirects or CurlExitCode.FilesizeExceeded)
         {
             events.ReportInfo(failure.Message);
         }
@@ -1489,6 +1489,8 @@ public sealed class HttpProtocolHandler(
         headReader.ReportHeldLines();
         exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
         string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+        plan.Context.Events.ReportInfo(message);
+        plan.Context.Events.ReportInfo(message);
         TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
             with
         { Report = exchange.Report(body) };

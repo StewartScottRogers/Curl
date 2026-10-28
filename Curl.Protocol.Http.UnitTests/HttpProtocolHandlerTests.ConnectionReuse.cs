@@ -225,7 +225,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.FilesizeExceeded, result.ExitCode);
         Diagnostics.Assert("connection marked reusable", false, connection.IsMarkedReusable);
         Assert.IsFalse(connection.IsMarkedReusable);
-        string[] expectedInfo = [UsingHttp1, RequestSent, "closing connection #2"];
+        string[] expectedInfo = [UsingHttp1, RequestSent, HttpTransferMessages.MaximumFileSizeExceeded, "closing connection #2"];
         WriteExpectedLines("info lines", expectedInfo, events.Info);
         CollectionAssert.AreEqual(expectedInfo, events.Info);
     }
