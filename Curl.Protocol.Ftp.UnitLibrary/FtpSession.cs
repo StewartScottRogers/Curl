@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ftp;
@@ -759,7 +761,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult?> LogInAsync()
     {
-        FtpReply user = await ExchangeAsync("USER " + (context.Credentials?.UserName ?? AnonymousUser)).ConfigureAwait(false);
+        FtpReply user = await ExchangeAsync("USER " + CommandTextOfCredential(context.Credentials?.UserName ?? AnonymousUser)).ConfigureAwait(false);
         return await AnswerLoginReplyAsync(user, passwordSent: false).ConfigureAwait(false);
     }
 
@@ -788,7 +790,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult?> SendPasswordAsync()
     {
-        FtpReply pass = await ExchangeAsync("PASS " + (context.Credentials?.Password ?? AnonymousPassword)).ConfigureAwait(false);
+        FtpReply pass = await ExchangeAsync("PASS " + CommandTextOfCredential(context.Credentials?.Password ?? AnonymousPassword)).ConfigureAwait(false);
         return await AnswerLoginReplyAsync(pass, passwordSent: true).ConfigureAwait(false);
     }
 
@@ -841,6 +843,75 @@ internal sealed class FtpSession(
     /// second command follow it (BL-2162).
     /// </summary>
     private static bool HasControlByte(string? value) => value is not null && value.Any(character => character < ' ');
+
+    /// <summary>The code page of Windows-1252, the ANSI code page of an English Windows system.</summary>
+    private const int Windows1252CodePage = 1252;
+
+    /// <summary>The first surrogate that stands for one byte of a credential, U+DC00 + 0x80 (CGR-053).</summary>
+    private const char FirstEscapedByte = '\uDC80';
+
+    /// <summary>The last surrogate that stands for one byte of a credential, U+DC00 + 0xFF.</summary>
+    private const char LastEscapedByte = '\uDCFF';
+
+    /// <summary>This host's system ANSI code page, or <see langword="null" /> on Linux and macOS.</summary>
+    private static readonly Encoding? SystemAnsiCodePage = ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0));
+
+    /// <summary>
+    /// Turns a user name or password into the text <see cref="FtpControlChannel" /> sends, whose
+    /// Latin-1 bytes are the bytes this platform's curl sends (BL-3855).
+    /// </summary>
+    private static string CommandTextOfCredential(string credential) =>
+        CommandTextOfCredential(credential, OperatingSystem.IsWindows(), SystemAnsiCodePage);
+
+    /// <summary>
+    /// Reads the host's system ANSI code page, asking a second time when the first answer is
+    /// <see langword="null" />: Windows fails one of several first calls made at once (BL-1200).
+    /// </summary>
+    /// <param name="readCodePageZero">Asks the code page provider for code page 0.</param>
+    /// <returns>The system ANSI code page, or <see langword="null" /> when the host has none.</returns>
+    internal static Encoding? ReadSystemAnsiCodePage(Func<Encoding?> readCodePageZero) =>
+        readCodePageZero() ?? readCodePageZero();
+
+    /// <summary>
+    /// Turns a user name or password, held as the engine holds credentials (ADR-0022), into
+    /// the text whose Latin-1 bytes are the bytes the platform's curl sends in <c>USER</c> and
+    /// <c>PASS</c>: the system ANSI code page on Windows (Windows-1252 when there is none),
+    /// and UTF-8 elsewhere, each surrogate U+DC80 to U+DCFF giving back the one byte it stands
+    /// for (CGR-053). Measured with curl 8.22.0 on Windows: <c>ftp://u%C3%A9:p%E2%82%AC%FF@host/</c>
+    /// sends <c>75 C3 A9</c> and <c>70 E2 82 AC FF</c>, and <c>-u ué:p€</c> sends <c>75 E9</c> and
+    /// <c>70 80</c> (BL-3855).
+    /// </summary>
+    /// <param name="credential">The user name or password.</param>
+    /// <param name="isWindows"><see langword="true" /> for the Windows (Schannel) build's bytes.</param>
+    /// <param name="systemAnsiCodePage">The host's system ANSI code page, or <see langword="null" /> when it has none.</param>
+    /// <returns>One character per byte sent, each below U+0100.</returns>
+    internal static string CommandTextOfCredential(string credential, bool isWindows, Encoding? systemAnsiCodePage) =>
+        Encoding.Latin1.GetString(isWindows
+            ? (systemAnsiCodePage ?? CodePagesEncodingProvider.Instance.GetEncoding(Windows1252CodePage)!).GetBytes(credential)
+            : Utf8KeepingEscapedBytes(credential));
+
+    /// <summary>Encodes <paramref name="text" /> as UTF-8, giving each escaping surrogate back its byte.</summary>
+    private static byte[] Utf8KeepingEscapedBytes(ReadOnlySpan<char> text)
+    {
+        ArrayBufferWriter<byte> bytes = new(text.Length + 1);
+        Span<byte> utf8 = stackalloc byte[4];
+        while (!text.IsEmpty)
+        {
+            Rune.DecodeFromUtf16(text, out Rune rune, out int consumed);
+            if (text[0] is >= FirstEscapedByte and <= LastEscapedByte)
+            {
+                bytes.Write([(byte)(text[0] - 0xDC00)]);
+            }
+            else
+            {
+                bytes.Write(utf8[..rune.EncodeToUtf8(utf8)]);
+            }
+
+            text = text[consumed..];
+        }
+
+        return bytes.WrittenSpan.ToArray();
+    }
 
     /// <summary>Logs the login complete and goes on.</summary>
     private TransferResult? LoggedIn()
