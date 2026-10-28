@@ -31,3 +31,4 @@ Found by BL-3628 (CGR-099), measured with `Record-CurlExchange.ps1 -Ftp -FtpRepl
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: c063f202 aea6cad8 779790c0.
