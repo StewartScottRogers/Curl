@@ -15,7 +15,7 @@ public sealed class Cgr059LabelRulesTests
     [DataRow("a.-ü")]
     public void TryNormalize_LabelWithAHyphenFirstOrLast_IsAnIdnConversionFailure(string host)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
 
         Assert.IsFalse(accepted);
         Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
@@ -26,7 +26,7 @@ public sealed class Cgr059LabelRulesTests
     [DataRow("a..ü", "a..xn--tda")]
     public void TryNormalize_NameWithAnEmptyLabel_KeepsTheEmptyLabel(string host, string expected)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: false, out _, out string idnHost, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
 
         Assert.IsTrue(accepted);
         Assert.AreEqual(expected, idnHost);

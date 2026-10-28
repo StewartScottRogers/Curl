@@ -175,7 +175,7 @@ public sealed class CurlUrlTests
     [DataRow("http://example.com:8080", "http", "example.com", "example.com", 8080, false, "/")]
     [DataRow("http://example.com:080/", "http", "example.com", "example.com", 80, true, "/")]
     [DataRow("https://example.com", "https", "example.com", "example.com", 443, true, "/")]
-    [DataRow("https://ex%C3%A5mple.com:8443/", "https", "ex\u00e5mple.com", "xn--exmple-jua.com", 8443, false, "/")]
+    [DataRow("https://exåmple.com:8443/", "https", "ex\u00e5mple.com", "xn--exmple-jua.com", 8443, false, "/")]
     [DataRow("dict://example.com/d", "dict", "example.com", "example.com", 2628, true, "/d")]
     [DataRow("dict://h:2629/d", "dict", "h", "h", 2629, false, "/d")]
     [DataRow("gopher://example.com", "gopher", "example.com", "example.com", 70, true, "/")]

@@ -46,10 +46,11 @@ internal static class CurlUrlHost
     private static readonly char[] LabelSeparators = ['.', '。', '．', '｡'];
 
     /// <summary>
-    /// Whether a byte of a host name that is not UTF-8 is read as Windows-1252, as the Windows
-    /// curl 8.22.0 build's <c>idn2_lookup_ul</c> reads the name in the ANSI code page (CGR-059).
+    /// Whether a host name that is not ASCII is converted from its bytes read as Windows-1252, every
+    /// byte and not only those that are not UTF-8, as the Windows curl 8.22.0 build's
+    /// <c>idn2_lookup_ul</c> reads the name in the ANSI code page (CGR-059, ADR-0939).
     /// </summary>
-    private static readonly bool StrayBytesAsWindows1252 = OperatingSystem.IsWindows();
+    private static readonly bool HostAsWindows1252 = OperatingSystem.IsWindows();
 
     /// <summary>
     /// Normalises <paramref name="host" />, or returns <see langword="false" /> when curl
@@ -65,17 +66,18 @@ internal static class CurlUrlHost
         out string idnHost,
         out string? zoneId,
         out CurlUrlRejection rejection) =>
-        TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName, StrayBytesAsWindows1252, out normalized, out idnHost, out zoneId, out rejection);
+        TryNormalizeReadingHost(host, refuseUnconvertibleName, HostAsWindows1252, out normalized, out idnHost, out zoneId, out rejection);
 
     /// <summary>
     /// Normalises <paramref name="host" /> as <see cref="TryNormalize(string, bool, out string, out string, out string?, out CurlUrlRejection)" />
-    /// does, reading a byte that is not UTF-8 as Windows-1252 when <paramref name="strayBytesAsWindows1252" />
-    /// is set, so both platforms' rules can be tested on either.
+    /// does, converting a name that is not ASCII from its bytes read as Windows-1252 when
+    /// <paramref name="hostAsWindows1252" /> is set (<see cref="ReadHostAsWindows1252" />) and from
+    /// its UTF-8 otherwise, so both platforms' rules can be tested on either.
     /// </summary>
-    internal static bool TryNormalizeReadingStrayBytes(
+    internal static bool TryNormalizeReadingHost(
         string host,
         bool refuseUnconvertibleName,
-        bool strayBytesAsWindows1252,
+        bool hostAsWindows1252,
         out string normalized,
         out string idnHost,
         out string? zoneId,
@@ -98,7 +100,8 @@ internal static class CurlUrlHost
             return rejection == CurlUrlRejection.None;
         }
 
-        rejection = NormalizeAddressOrName(decoded, refuseUnconvertibleName, strayBytesAsWindows1252, out normalized, out idnHost);
+        string nameToConvert = hostAsWindows1252 ? ReadHostAsWindows1252(host) : decoded;
+        rejection = NormalizeAddressOrName(decoded, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
 
         return rejection == CurlUrlRejection.None;
     }
@@ -112,8 +115,8 @@ internal static class CurlUrlHost
     /// <returns>Why curl rejects the host, or <see cref="CurlUrlRejection.None" />.</returns>
     private static CurlUrlRejection NormalizeAddressOrName(
         string host,
+        string nameToConvert,
         bool refuseUnconvertibleName,
-        bool strayBytesAsWindows1252,
         out string normalized,
         out string idnHost)
     {
@@ -131,19 +134,20 @@ internal static class CurlUrlHost
             return CurlUrlRejection.None;
         }
 
-        return NormalizeName(host, refuseUnconvertibleName, strayBytesAsWindows1252, out normalized, out idnHost);
+        return NormalizeName(host, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
     }
 
     /// <summary>
-    /// Checks a name and converts it to punycode. A name IDNA cannot convert is
+    /// Checks a name and converts <paramref name="nameToConvert" />, the name as the platform's curl
+    /// reads it for IDNA, to punycode. A name IDNA cannot convert is
     /// <see cref="CurlUrlRejection.IdnConversionFailed" /> when <paramref name="refuseUnconvertibleName" />
     /// is set, which curl 8.22.0 fails with exit 3 and <c>URL using bad/illegal format or missing URL</c>
     /// rather than a <c>URL rejected:</c> text, as its IDN conversion runs after the URL parsed.
     /// </summary>
     private static CurlUrlRejection NormalizeName(
         string decoded,
+        string nameToConvert,
         bool refuseUnconvertibleName,
-        bool strayBytesAsWindows1252,
         out string normalized,
         out string idnHost)
     {
@@ -153,7 +157,7 @@ internal static class CurlUrlHost
             return CurlUrlRejection.BadHostname;
         }
 
-        string? converted = Ascii.IsValid(decoded) ? decoded : ToPunycode(decoded, strayBytesAsWindows1252);
+        string? converted = Ascii.IsValid(decoded) ? decoded : ToPunycode(nameToConvert);
         if (converted is null && refuseUnconvertibleName)
         {
             return CurlUrlRejection.IdnConversionFailed;
@@ -175,7 +179,51 @@ internal static class CurlUrlHost
     /// </summary>
     private static string? PercentDecode(string text)
     {
-        byte[] encoded = UrlByteText.ToBytes(text);
+        byte[] decoded = PercentDecodeBytes(UrlByteText.ToBytes(text));
+
+        return decoded.Any(value => value < 0x20) ? null : UrlByteText.ToText(decoded);
+    }
+
+    /// <summary>
+    /// The host as the Windows curl 8.22.0 build hands it to <c>idn2_lookup_ul</c>, read back as
+    /// Windows-1252 (CGR-059, ADR-0939): a character typed in the URL is its Windows-1252 byte, as the
+    /// ANSI <c>argv</c> holds it (<c>ü</c> is <c>FC</c>), or its UTF-8 when Windows-1252 lacks it; an
+    /// escape is the byte it decodes to, so <c>%C3%BC</c> is <c>Ã¼</c> and not <c>ü</c>. A byte
+    /// Windows-1252 leaves undefined stays a lone <c>U+DC80</c> to <c>U+DCFF</c>, which no label converts
+    /// with (<c>a%D7%90</c>).
+    /// </summary>
+    private static string ReadHostAsWindows1252(string host) =>
+        new([.. PercentDecodeBytes(ToWindows1252Bytes(host)).Select(Windows1252CharacterOf)]);
+
+    private static byte[] ToWindows1252Bytes(string text)
+    {
+        var bytes = new List<byte>(text.Length);
+        for (int index = 0; index < text.Length; index++)
+        {
+            int length = char.IsSurrogatePair(text, index) ? 2 : 1;
+            int windows1252Byte = Windows1252ByteOf(text[index]);
+            bytes.AddRange(length == 1 && windows1252Byte >= 0 ? [(byte)windows1252Byte] : UrlByteText.ToBytes(text.Substring(index, length)));
+            index += length - 1;
+        }
+
+        return [.. bytes];
+    }
+
+    /// <summary>The Windows-1252 byte of <paramref name="character" />, or -1 when Windows-1252 lacks it.</summary>
+    private static int Windows1252ByteOf(char character) =>
+        character is < '\u0080' or (>= ' ' and <= 'ÿ')
+            ? character
+            : Windows1252ByteFrom80To9FOf(character);
+
+    private static int Windows1252ByteFrom80To9FOf(char character)
+    {
+        int index = character == '￿' ? -1 : Windows1252Characters80To9F.IndexOf(character, StringComparison.Ordinal);
+
+        return index < 0 ? -1 : 0x80 + index;
+    }
+
+    private static byte[] PercentDecodeBytes(byte[] encoded)
+    {
         var decoded = new List<byte>(encoded.Length);
         for (int index = 0; index < encoded.Length; index++)
         {
@@ -189,7 +237,7 @@ internal static class CurlUrlHost
             decoded.Add(value);
         }
 
-        return decoded.Any(value => value < 0x20) ? null : UrlByteText.ToText([.. decoded]);
+        return [.. decoded];
     }
 
     private static bool TryReadEscape(byte[] bytes, int start, out byte value)
@@ -217,15 +265,14 @@ internal static class CurlUrlHost
     /// Maps a host name that is not ASCII as UTS #46 does (<see cref="CurlUrlHostNameMapping" />,
     /// so <c>BÜCHER</c> is <c>xn--bcher-kva</c> and <c>Ａb</c> is <c>ab</c>) and converts it to
     /// punycode label by label as libidn2 does for curl 8.22.0, or returns <see langword="null" />
-    /// when a label cannot be converted (<see cref="ToAsciiLabel" />). Under
-    /// <paramref name="strayBytesAsWindows1252" /> a byte that is not UTF-8 is first read as
-    /// Windows-1252 (<c>a%FFb</c> is <c>xn--ab-6ka</c>); otherwise, as in a UTF-8 locale, it
+    /// when a label cannot be converted (<see cref="ToAsciiLabel" />). A byte that is not UTF-8
+    /// (in a UTF-8 locale) or not Windows-1252 (on Windows, <see cref="ReadHostAsWindows1252" />)
     /// makes the name unconvertible (<c>invalid-utf8-%e2%90.local</c>, upstream test 1034).
     /// curl fails a transfer to such a host with exit 3, while its URL API keeps the name (ADR-0734).
     /// </summary>
-    private static string? ToPunycode(string name, bool strayBytesAsWindows1252)
+    private static string? ToPunycode(string name)
     {
-        string mapped = CurlUrlHostNameMapping.Map(strayBytesAsWindows1252 ? ReadStrayBytesAsWindows1252(name) : name);
+        string mapped = CurlUrlHostNameMapping.Map(name);
         if (Ascii.IsValid(mapped))
         {
             return mapped;
@@ -282,30 +329,14 @@ internal static class CurlUrlHost
     }
 
     /// <summary>
-    /// Replaces each lone <c>U+DC80</c> to <c>U+DCFF</c> (a byte that is not UTF-8, as
-    /// <see cref="UrlByteText" /> carries it) with the Windows-1252 character of that byte,
-    /// keeping it when Windows-1252 leaves the byte undefined. A low surrogate after a high one
-    /// is part of a character and stays.
+    /// The Windows-1252 character of <paramref name="value" />, or the lone <c>U+DC80</c> to
+    /// <c>U+DCFF</c> <see cref="UrlByteText" /> carries the byte as when Windows-1252 leaves it undefined.
     /// </summary>
-    private static string ReadStrayBytesAsWindows1252(string name)
+    private static char Windows1252CharacterOf(byte value)
     {
-        var text = new StringBuilder(name.Length);
-        for (int index = 0; index < name.Length; index++)
-        {
-            char character = name[index];
-            bool stray = character is >= '\uDC80' and <= '\uDCFF' && (index == 0 || !char.IsHighSurrogate(name[index - 1]));
-            text.Append(stray ? Windows1252CharacterOf(character) : character);
-        }
+        char mapped = value is < 0x80 or >= 0xA0 ? (char)value : Windows1252Characters80To9F[value - 0x80];
 
-        return text.ToString();
-    }
-
-    private static char Windows1252CharacterOf(char strayByte)
-    {
-        int value = strayByte - 0xDC00;
-        char mapped = value >= 0xA0 ? (char)value : Windows1252Characters80To9F[value - 0x80];
-
-        return mapped == '￿' ? strayByte : mapped;
+        return mapped == '￿' ? (char)(0xDC00 + value) : mapped;
     }
 
     /// <summary>

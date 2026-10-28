@@ -14,7 +14,7 @@ public sealed class Cgr059BidiTests
     [DataRow("aא", "xn--a-0hc")]
     public void TryNormalize_LabelMixingLatinAndRightToLeftInAUtf8Locale_IsConverted(string host, string expected)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: false, out _, out string idnHost, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
 
         Assert.IsTrue(accepted);
         Assert.AreEqual(expected, idnHost);

@@ -17,7 +17,7 @@ public sealed class Cgr059PercentEncodedHostTests
     [DataRow("a%80b", "xn--ab-8fu")]
     public void TryNormalize_StrayBytesAsWindows1252_ReadsThemInThatCodePage(string host, string expected)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: true, out _, out string idnHost, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: true, out _, out string idnHost, out _, out _);
 
         Assert.IsTrue(accepted);
         Assert.AreEqual(expected, idnHost);
@@ -26,27 +26,19 @@ public sealed class Cgr059PercentEncodedHostTests
     [TestMethod]
     [DataRow("a%81b")]
     [DataRow("invalid-utf8-%e2%90.local")]
-    public void TryNormalize_StrayByteWindows1252LeavesUndefined_IsRefused(string host)
+    [DataRow("%F0%90%82%80a")]
+    public void TryNormalize_ByteWindows1252LeavesUndefined_IsRefused(string host)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: true, out _, out _, out _, out CurlUrlRejection rejection);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: true, out _, out _, out _, out CurlUrlRejection rejection);
 
         Assert.IsFalse(accepted);
         Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
     }
 
     [TestMethod]
-    public void TryNormalize_CharacterOutsideTheBmpAsWindows1252_IsNotAStrayByte()
-    {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes("%F0%90%82%80a", refuseUnconvertibleName: true, strayBytesAsWindows1252: true, out _, out string idnHost, out _, out _);
-
-        Assert.IsTrue(accepted);
-        Assert.AreEqual(new System.Globalization.IdnMapping().GetAscii("\U00010080a"), idnHost);
-    }
-
-    [TestMethod]
     public void TryNormalize_StrayByteInAUtf8Locale_IsRefused()
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes("a%FFb", refuseUnconvertibleName: true, strayBytesAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a%FFb", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
 
         Assert.IsFalse(accepted);
         Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
@@ -62,7 +54,7 @@ public sealed class Cgr059PercentEncodedHostTests
     [DataRow("%C3%BC%E3%80%82a", "xn--tda.a")]
     public void TryNormalize_NameInAUtf8Locale_ConvertsEachLabel(string host, string expected)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: false, out _, out string idnHost, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
 
         Assert.IsTrue(accepted);
         Assert.AreEqual(expected, idnHost);
@@ -80,7 +72,7 @@ public sealed class Cgr059PercentEncodedHostTests
     [DataRow("%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC%C3%BC")]
     public void TryNormalize_LabelIdnaRefuses_IsAnIdnConversionFailure(string host)
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes(host, refuseUnconvertibleName: true, strayBytesAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
 
         Assert.IsFalse(accepted);
         Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
@@ -89,7 +81,7 @@ public sealed class Cgr059PercentEncodedHostTests
     [TestMethod]
     public void TryNormalize_UnconvertibleNameNotRefused_KeepsTheName()
     {
-        bool accepted = CurlUrlHost.TryNormalizeReadingStrayBytes("-%C3%BC.example", refuseUnconvertibleName: false, strayBytesAsWindows1252: false, out string normalized, out string idnHost, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("-%C3%BC.example", refuseUnconvertibleName: false, hostAsWindows1252: false, out string normalized, out string idnHost, out _, out _);
 
         Assert.IsTrue(accepted);
         Assert.AreEqual("-ü.example", normalized);

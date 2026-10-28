@@ -7,7 +7,8 @@ namespace Curl.Protocol.Abstractions;
 /// converted to punycode, as libidn2 does for curl 8.22.0: characters mapped to nothing are
 /// dropped, letters are lower-cased (<c>İ</c> to <c>i</c> and a combining dot above),
 /// full-width ASCII and the Latin ligatures <c>U+FB00</c> to <c>U+FB06</c> become plain
-/// ASCII, and a lower-case Latin, Greek or Cyrillic letter followed by a combining mark is
+/// ASCII, the Latin-1 ordinals, superscript digits, <c>µ</c> and vulgar fractions are spelled
+/// out (<c>¼</c> to <c>1⁄4</c>), and a lower-case Latin, Greek or Cyrillic letter followed by a combining mark is
 /// composed into the precomposed letter. <c>ß</c> and final sigma stay as they are. Curl runs
 /// with invariant globalization, where <see cref="System.Globalization.IdnMapping" /> and
 /// <see cref="string.Normalize()" /> map nothing, so the mapping is done here (ADR-0816).
@@ -34,6 +35,24 @@ internal static class CurlUrlHostNameMapping
     private const int FullWidthOffset = FirstFullWidthAscii - '!';
 
     private static readonly string[] Ligatures = ["ff", "fi", "fl", "ffi", "ffl", "st", "st"];
+
+    /// <summary>
+    /// The Latin-1 letters, superscript digits and vulgar fractions UTS #46 maps to other text, as a
+    /// Windows host read as Windows-1252 meets them: <c>%C3%BC</c> is <c>Ã¼</c>, which curl 8.22.0
+    /// sends as <c>xn--14-ria7423a</c> (<c>ã1⁄4</c>, BL-3953).
+    /// </summary>
+    private static readonly Dictionary<char, string> Latin1Mappings = new()
+    {
+        ['ª'] = "a",
+        ['²'] = "2",
+        ['³'] = "3",
+        ['µ'] = "μ",
+        ['¹'] = "1",
+        ['º'] = "o",
+        ['¼'] = "1⁄4",
+        ['½'] = "1⁄2",
+        ['¾'] = "3⁄4",
+    };
 
     /// <summary>
     /// Triples of a lower-case letter, a combining mark and the precomposed letter they make,
@@ -131,9 +150,15 @@ internal static class CurlUrlHostNameMapping
 
     private static string MapCharacter(char character) => character switch
     {
-        'İ' => "i̇",
         >= FirstFullWidthAscii and <= LastFullWidthAscii => char.ToLowerInvariant((char)(character - FullWidthOffset)).ToString(),
         >= FirstLigature and <= LastLigature => Ligatures[character - FirstLigature],
+        _ => MapCharacterOutsideTheRanges(character),
+    };
+
+    private static string MapCharacterOutsideTheRanges(char character) => character switch
+    {
+        'İ' => "i̇",
+        _ when Latin1Mappings.TryGetValue(character, out string? latin1Mapping) => latin1Mapping,
         _ => char.ToLowerInvariant(character).ToString(),
     };
 
