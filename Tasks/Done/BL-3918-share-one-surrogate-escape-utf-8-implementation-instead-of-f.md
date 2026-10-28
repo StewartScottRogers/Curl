@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/InvalidUtf8ByteEscape.cs, Curl.Authentication.UnitLibrary/InvalidUtf8ByteEscapingEncoding.cs, Curl.Protocol.Abstractions.UnitLibrary/RawBytePath.cs, Curl.Cli.UnitLibrary/HeaderFileText.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3918 — Share one surrogate-escape UTF-8 implementation instead of four copies
 
@@ -31,15 +31,18 @@ Neither `Encoding` subclass overrides `GetDecoder()`. A `StreamReader` or chunke
 
 ## Acceptance criteria
 
-- [ ] The escape and unescape loop exists once, in `Curl.Protocol.Abstractions.UnitLibrary`. `git grep -n "0xDC00\|SurrogateOffset" -- "*.cs" ":!*UnitTests*"` finds it only there.
-- [ ] `InvalidUtf8ByteEscape`, `InvalidUtf8ByteEscapingEncoding` (or their replacement) and `HeaderFileText` call the shared implementation, and every such `Encoding` reports code page 65001.
-- [ ] The shared type's doc comment states that it decodes whole buffers only, not chunked streams.
-- [ ] The existing tests of all four call sites still pass. The shared implementation has its own tests in `Curl.Protocol.Abstractions.UnitTests` and holds 100% line and branch coverage.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
+- [x] The escape and unescape loop exists once, in `Curl.Protocol.Abstractions.UnitLibrary`. `git grep -n "0xDC00\|SurrogateOffset" -- "*.cs" ":!*UnitTests*"` finds it only there.
+- [x] `InvalidUtf8ByteEscape`, `InvalidUtf8ByteEscapingEncoding` (or their replacement) and `HeaderFileText` call the shared implementation, and every such `Encoding` reports code page 65001.
+- [x] The shared type's doc comment states that it decodes whole buffers only, not chunked streams.
+- [x] The existing tests of all four call sites still pass. The shared implementation has its own tests in `Curl.Protocol.Abstractions.UnitTests` and holds 100% line and branch coverage.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` is green.
 
 ## Notes
+
+Added SurrogateEscapeUtf8 (public, Curl.Protocol.Abstractions.UnitLibrary) with Decode, Encode, HoldsEscape and a code-page-65001 Encoding. The Cli and Authentication names stay as thin forwarders so callers and tests are unchanged; RawBytePath and HeaderFileText call it. Other files with DC00 (UrlByteText, CookieEngine and so on) are different algorithms, outside touches.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 1289ed73 b93f505f 4d002e90 dc720966 44447f62.
+- 2026-10-28: Doing -> Done. One SurrogateEscapeUtf8 in Abstractions; Cli, Authentication, RawBytePath, HeaderFileText use it
