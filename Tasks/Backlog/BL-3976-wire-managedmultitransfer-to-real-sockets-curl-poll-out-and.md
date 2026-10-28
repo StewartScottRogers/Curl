@@ -1,5 +1,5 @@
 ---
-id: BL-3968
+id: BL-3976
 title: Wire ManagedMultiTransfer to real sockets, CURL_POLL_OUT and deadline timers for CGR-034 (C_20, C_74, C_75)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3968 — Wire ManagedMultiTransfer to real sockets, CURL_POLL_OUT and deadline timers for CGR-034 (C_20, C_74, C_75)
+# BL-3976 — Wire ManagedMultiTransfer to real sockets, CURL_POLL_OUT and deadline timers for CGR-034 (C_20, C_74, C_75)
 
 ## Goal
 

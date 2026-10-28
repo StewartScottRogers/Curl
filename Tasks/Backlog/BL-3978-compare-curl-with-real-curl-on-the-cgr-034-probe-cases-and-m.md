@@ -1,16 +1,16 @@
 ---
-id: BL-3970
+id: BL-3978
 title: Compare Curl with real curl on the CGR-034 probe cases and meet the quality gates
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-3968, BL-3969]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-3976, BL-3977]
 touches: [Documentation/Reviews/Cgr034ProbeResults.md, Curl.Engine.UnitTests/Cgr034Tests.cs]
 requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3970 — Compare Curl with real curl on the CGR-034 probe cases and meet the quality gates
+# BL-3978 — Compare Curl with real curl on the CGR-034 probe cases and meet the quality gates
 
 ## Goal
 
@@ -23,7 +23,7 @@ Split from BL-3563 (CGR-034), the verification part. The probe is a C# file-base
 ## Acceptance criteria
 
 - [ ] The probe commands and both REF and PORT results for `C_20`, `C_21`, `C_65`, `C_74`, `C_75` are recorded in `Documentation/Reviews/Cgr034ProbeResults.md`, and PORT equals REF in each.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports no member outside a gate for the files BL-3968 and BL-3969 changed.
+- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports no member outside a gate for the files BL-3976 and BL-3977 changed.
 - [ ] Repro variants that already matched curl still match.
 - [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
