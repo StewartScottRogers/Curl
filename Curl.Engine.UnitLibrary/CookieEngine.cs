@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using Curl.Api.Options.Http;
 using Curl.Cookies;
 using Curl.Protocol.Abstractions;
@@ -136,7 +137,17 @@ internal sealed class CookieEngine
     /// when <paramref name="encoding" /> is <see langword="null" />.
     /// </summary>
     private static string WireTextOf(string text, Encoding? encoding) =>
-        encoding is null ? text : Encoding.Latin1.GetString(encoding.GetBytes(text));
+        encoding is null
+            ? text
+            : string.Concat(ArgvByteSplitter.Split(text).Select((piece, index) => index % 2 == 1
+                ? ((char)(piece[0] - 0xDC00)).ToString()
+                : Encoding.Latin1.GetString(encoding.GetBytes(piece))));
+
+    /// <summary>
+    /// Splits text around each lone surrogate from U+DC80 to U+DCFF, an <c>argv</c> byte that is not valid UTF-8
+    /// (ADR-0909), keeping the surrogate as the piece between two ordinary ones.
+    /// </summary>
+    private static readonly Regex ArgvByteSplitter = new("((?<![\uD800-\uDBFF])[\uDC80-\uDCFF])", RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Creates the cookies a handle attached to a share handle that shares cookies applies its <c>CURLOPT_COOKIELIST</c>

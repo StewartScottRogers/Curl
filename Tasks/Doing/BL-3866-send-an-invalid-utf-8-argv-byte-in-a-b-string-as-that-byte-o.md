@@ -22,12 +22,13 @@ ADR-0909 hands each `argv` byte that is not valid UTF-8 over as the lone surroga
 
 ## Acceptance criteria
 
-- [ ] A `-b` string holding a lone surrogate U+DC80 to U+DCFF goes out as that byte under a UTF-8 command-line encoding, pinned by a unit test in `Curl.Engine.UnitTests/CookieEngineArgvByteTests.cs` that fails before the fix.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A `-b` string holding a lone surrogate U+DC80 to U+DCFF goes out as that byte under a UTF-8 command-line encoding, pinned by a unit test in `Curl.Engine.UnitTests/CookieEngineArgvByteTests.cs` that fails before the fix.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Filed by BL-3594, which left this out of CGR-065's scope.
+- `CookieEngine.WireTextOf` splits the string around each lone surrogate U+DC80 to U+DCFF (not after a high surrogate) and gives it as its byte, the rest in the platform encoding; ADR not needed (same rule as `HttpRequestHeadFormatter.WireText`, ADR-0909). WSL measurement skipped: curl copies argv bytes unchanged. Platform-neutral test. Quality run: 0 failing members.
 
 ## Log
 
