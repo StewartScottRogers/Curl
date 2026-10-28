@@ -16,6 +16,26 @@ function Select-LanesToStop {
     } | Sort-Object)
 }
 
+function Set-ForwardedArgument {
+    # The old shift's arguments (-Forward) with each parameter passed beside -Restart
+    # (-Override: name -> value, a switch as a SwitchParameter) put in place of the old one,
+    # so `-Restart -MaxLanes 12` restarts the same shift with a new lane maximum.
+    param([string[]]$Forward, [hashtable]$Override)
+    $kept = [Collections.Generic.List[string]]::new()
+    for ($i = 0; $i -lt $Forward.Count; $i++) {
+        $name = if ($Forward[$i] -match '^-(\w+)$') { $Matches[1] } else { '' }
+        if (-not $name -or -not $Override.ContainsKey($name)) { $kept.Add($Forward[$i]); continue }
+        if ($i + 1 -lt $Forward.Count -and $Forward[$i + 1] -notmatch '^-\w') { $i++ }
+    }
+    foreach ($name in $Override.Keys | Sort-Object) {
+        $value = $Override[$name]
+        if ($value -is [System.Management.Automation.SwitchParameter]) {
+            if ($value.IsPresent) { $kept.Add("-$name") }
+        } else { $kept.Add("-$name"); $kept.Add("$value") }
+    }
+    return @($kept)
+}
+
 function Add-StoppedShiftEnd {
     # -Restart kills the coordinator before it can log its own "shift end", and the process
     # audit counts any shift log without one as a live shift, so the replaced shift's
@@ -49,7 +69,14 @@ if ($TestRestart) {
     $ok5 = $sleeper.WaitForExit(10000)
     if (-not $ok5) { $sleeper.Kill() }
     Write-Host "$(if ($ok5) { 'PASS' } else { 'FAIL' }) -Restart stops a process and its tree on this OS: $ok5" -ForegroundColor $(if ($ok5) { 'Green' } else { 'Red' })
-    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4 -and $ok5) { 0 } else { 1 })
+    $old = @('-NewTab', '-Lanes', 'Auto', '-MaxLanes', '9', '-Continuous', '-Model', 'auto')
+    $set = (Set-ForwardedArgument $old @{ MaxLanes = 12; WeeklyPace = [switch]$true }) -join ' '
+    $ok6 = $set -ceq '-NewTab -Lanes Auto -Continuous -Model auto -MaxLanes 12 -WeeklyPace'
+    Write-Host "$(if ($ok6) { 'PASS' } else { 'FAIL' }) a parameter passed beside -Restart replaces the old shift's: $set" -ForegroundColor $(if ($ok6) { 'Green' } else { 'Red' })
+    $same = (Set-ForwardedArgument $old @{}) -join ' '
+    $ok7 = $same -ceq ($old -join ' ')
+    Write-Host "$(if ($ok7) { 'PASS' } else { 'FAIL' }) with nothing beside -Restart the old arguments carry over unchanged: $same" -ForegroundColor $(if ($ok7) { 'Green' } else { 'Red' })
+    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4 -and $ok5 -and $ok6 -and $ok7) { 0 } else { 1 })
 }
 
 if ($Restart) {
@@ -65,6 +92,10 @@ if ($Restart) {
     # The same arguments, so a fixed lane count, -WeeklyPace or -Hours carry over.
     $rest = ($coordinator.CommandLine -split [regex]::Escape((Split-Path $FactoryScript -Leaf)), 2)[1]
     $forward = @([regex]::Matches("$rest".Trim().TrimStart('"').Trim(), '"[^"]*"|\S+') | ForEach-Object { $_.Value })
+    # Anything passed beside -Restart (e.g. -MaxLanes 12) replaces the old shift's value.
+    $override = @{}
+    foreach ($name in $PSBoundParameters.Keys | Where-Object { $_ -notin 'Restart', 'NewTab' }) { $override[$name] = $PSBoundParameters[$name] }
+    $forward = Set-ForwardedArgument $forward $override
     $branchNow = "$(git -C $Root rev-parse --abbrev-ref HEAD)".Trim()
     if ($forward -notcontains '-ShiftBranch' -and $branchNow -notin 'master', 'main', 'HEAD') { $forward += @('-ShiftBranch', $branchNow) }
     $lanesDir = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1

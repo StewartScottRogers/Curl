@@ -160,7 +160,9 @@
     lanes, then each lane as soon as that lane is neither claiming nor integrating nor
     within two minutes of taking its task (AF-0129), and
     starts a new shift with the old one's arguments, which adopts the stopped lanes and
-    their tasks (BL-895). Only this checkout's shift is touched.
+    their tasks (BL-895). A parameter passed beside -Restart replaces the old one's value,
+    so `RunDarkFactory.cmd -Restart -MaxLanes 12` restarts with a new lane maximum. Only
+    this checkout's shift is touched.
 
     A shift keeps this checkout on its branch: if something switched it (Visual Studio did,
     once), the coordinator switches it back before its shift-end pull, and -Continuous
