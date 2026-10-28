@@ -32,3 +32,4 @@ BL-3620 (ADR-0926) made `-w %{certs}` follow the platform: `PeerCertificateText.
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 15703830 fbd00c8c a526f176 779790c0.
