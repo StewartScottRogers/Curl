@@ -68,7 +68,7 @@ function Get-BoardCapacity {
         git -C $AutoBoardDir checkout -q --detach $Ref 2>&1 | Out-Null
         if ($LASTEXITCODE) { return [pscustomobject]@{ Capacity = $null; Created = $created; Why = "cannot check out $Ref in $AutoBoardDir" } }
         $env:CLAUDE_PROJECT_DIR = $AutoBoardDir
-        $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AutoBoardDir '.claude\skills\task-board\task-board.ps1') capacity 2>&1) -join "`n"
+        $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File (Join-Path $AutoBoardDir '.claude\skills\task-board\task-board.ps1') capacity 2>&1) -join "`n"
         $line = @($out -split "`r?`n" | Where-Object { $_ -match '^Capacity \d+:' }) | Select-Object -First 1
         if ($line) {
             # A ready task over its cost cap or interactive only gets no lane (BL-3090).

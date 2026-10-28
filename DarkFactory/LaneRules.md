@@ -21,7 +21,7 @@ interfaces so it can be unit tested without a network.
 - Integration tests only: `dotnet test --filter "TestCategory=Integration"`
 - Long-running tests: `dotnet test --filter "TestCategory=LongRunning"` with
   `CURL_RUN_LONG_RUNNING_TESTS=1`; without it they show as skipped.
-- Format: `dotnet format`. Quality: `powershell -NoProfile -File Measure-CodeQuality.ps1`.
+- Format: `dotnet format`. Quality: `powershell -NoProfile -File Measure-CodeQuality.ps1` (`pwsh` instead of `powershell` on Linux and macOS).
 - Always build and run the fast tests before declaring a task finished.
 
 An Integration test touches something real outside the process (a socket, the disk, the

@@ -12,7 +12,7 @@ function Get-AuditDueFromMaster {
     if ($LASTEXITCODE -ne 0 -or -not $copy) { return $null }
     try {
         [IO.File]::WriteAllText($tool, ($copy -join "`r`n"))
-        $json = & powershell -NoProfile -ExecutionPolicy Bypass -File $tool -Json -Repository $Root -Ref "origin/$Branch" -ScorecardsRef $MasterRef 2>$null
+        $json = & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $tool -Json -Repository $Root -Ref "origin/$Branch" -ScorecardsRef $MasterRef 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $json) { return $null }
         return ($json -join '') | ConvertFrom-Json
     } catch { return $null }

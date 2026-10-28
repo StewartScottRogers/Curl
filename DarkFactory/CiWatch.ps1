@@ -308,7 +308,7 @@ function Send-CiWhisper {
         $stdinFile = Join-Path $LogDir "ci-whisper-$Stamp-$([guid]::NewGuid().ToString('N').Substring(0, 8)).json"
         $json = [pscustomobject]@{ cwd = $Root; tool_input = @{ command = 'task-board.ps1 new' }; tool_response = @{ stdout = $Line } } | ConvertTo-Json -Compress
         [IO.File]::WriteAllText($stdinFile, $json, (New-Object Text.UTF8Encoding $false))
-        Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$hook`"") `
+        Start-Process -FilePath (Get-FactoryPowerShellExe) -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$hook`"") `
             -RedirectStandardInput $stdinFile -WindowStyle Hidden | Out-Null
     } catch { }
 }
@@ -583,7 +583,7 @@ function New-CiFailureTasks {
                 if (Test-CiFailureCovered -Key $verdict.Key -Sha $sha -Repo $CiWatchDir) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = 'covered by a task'; continue }
                 $touches = if ($verdict.Kind -eq 'job') { @(Get-CiJobTouches -Verdict $verdict -Repo $CiWatchDir) } else { @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir) }
                 $newArgs = Get-CiTaskNewArgs -Verdict $verdict -Touches $touches
-                $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+                $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
                 if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file $($verdict.Key): $(Get-Short $out 60)" 'DarkYellow'; continue }
                 $id = $Matches[1]; $line = $Matches[0]
                 $url = "https://github.com/$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null)/actions/runs/$($verdict.RunId)"
@@ -663,7 +663,7 @@ function Move-FixedCiTasksToDeferred {
             if (-not $ids.Count) { return }
             $env:CLAUDE_PROJECT_DIR = $CiWatchDir
             $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
-            foreach ($id in $ids) { & powershell -NoProfile -ExecutionPolicy Bypass -File $board move -Id $id -To Deferred -Reason "already fixed, CI green on $on" 2>&1 | Out-Null }
+            foreach ($id in $ids) { & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board move -Id $id -To Deferred -Reason "already fixed, CI green on $on" 2>&1 | Out-Null }
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
             git -C $CiWatchDir commit -q -m "chore(tasks): defer $($ids -join ', '), already fixed, CI green on $on" -m "Moved by the dark factory's CI watch (BL-3028)." -m $SkipCiNote 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { return }
@@ -737,16 +737,16 @@ function Invoke-SplitHotspotFiling {
             if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'split' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return }
             $env:CLAUDE_PROJECT_DIR = $CiWatchDir
             $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
-            $status = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board status 2>&1 | ForEach-Object { "$_" })
-            $capacityLine = (@(& powershell -NoProfile -ExecutionPolicy Bypass -File $board capacity 2>&1 | ForEach-Object { "$_" }) -join "`n")
+            $status = @(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board status 2>&1 | ForEach-Object { "$_" })
+            $capacityLine = (@(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board capacity 2>&1 | ForEach-Object { "$_" }) -join "`n")
             $waiting = Get-OverlapWaitingCount -StatusLines $status -CapacityLine $capacityLine
             if (-not (Test-SplitHotspotDue -CapacityStreak $script:Auto.CapacityStreak -Waiting $waiting)) { return }
-            $lines = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board hotspots 2>&1 | ForEach-Object { "$_" })
+            $lines = @(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board hotspots 2>&1 | ForEach-Object { "$_" })
             $exit = $LASTEXITCODE
             $choice = Select-SplitHotspot -Lines $lines -ExitCode $exit -LiveTitles (Get-LiveTaskTitles $CiWatchDir) -Filed $script:Auto.SplitFiled
             if ($choice.Action -ne 'file') { Write-Trace '-' 'split' $choice.Reason 'DarkGray'; return }
             $newArgs = @('new', '-Title', (Get-SplitTaskTitle $choice.Path), '-Priority', 'High', '-Pipeline', 'feature', '-Touches', $choice.Path)
-            $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+            $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
             if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'split' "cannot file a split task for $($choice.Path): $(Get-Short $out 60)" 'DarkYellow'; return }
             $id = $Matches[1]; $line = $Matches[0]
             Set-SplitTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Hotspot $choice -Waiting $waiting
@@ -982,7 +982,7 @@ if ($TestCiWatch) {
         $env:CLAUDE_PROJECT_DIR = $board
         $env:CURL_DARK_FACTORY_LANE = '0'
         $boardScript = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
-        $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $boardScript @(Get-CiTaskNewArgs -Verdict $auditVerdicts[0] -Touches @()) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $boardScript @(Get-CiTaskNewArgs -Verdict $auditVerdicts[0] -Touches @()) 2>&1 | ForEach-Object { "$_" }) -join "`n"
         $filedPath = if ($out -match '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Join-Path $board $Matches[2] } else { '' }
         & $check 'audit task filed with CURL_DARK_FACTORY_LANE=0' 'filed' $(if ($filedPath -and (Test-Path $filedPath)) { 'filed' } else { "not filed: $out" })
         if ($filedPath -and (Test-Path $filedPath)) {

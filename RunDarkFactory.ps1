@@ -35,6 +35,7 @@
     never touched. The file is checked at each sound, so creating or deleting it reaches a
     shift that is already running, and -QuietAlarm is then not needed (BL-1456).
     -TestAudioOff proves it without playing a sound.
+    -TestPlatform proves the PowerShell executable and data folder the factory picks for this OS (BL-3919).
 
     KEEPING THE BOARD MOVING
 
@@ -433,6 +434,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskReadiness
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestLaneFlags
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestPlatform
 #>
 [CmdletBinding()]
 param(
@@ -508,6 +510,7 @@ param(
     [switch]$TestAuditCadence,
     # Prove the audio-off file silences the alarm, chimes and spoken notices, and that they
     # sound as before without it, playing nothing (BL-1456), and exit.
+    [switch]$TestPlatform,
     [switch]$TestAudioOff,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
@@ -611,6 +614,7 @@ $FactoryScript = $PSCommandPath
 $FactoryScriptDir = $PSScriptRoot
 $FactoryParameters = $PSBoundParameters
 foreach ($AreaFile in @(
+        'Platform',
         'Setup',
         'Heartbeat',
         'HerdrTabs',
