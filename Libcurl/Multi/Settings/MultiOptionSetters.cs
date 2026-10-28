@@ -82,7 +82,7 @@ internal static class MultiOptionSetters
 
     /// <summary>
     /// The four <c>*DATA</c> options, whose user data the callback's closure carries, and the five
-    /// options libcurl has ignored since 7.62.0: each takes its value and changes nothing.
+    /// options libcurl has ignored since 7.62.0, with the two it takes and Curl has no use for: each takes its value and changes nothing.
     /// </summary>
     /// <param name="setters">The rows to add to.</param>
     private static void AddIgnoredSetters(Dictionary<CurlMultiOption, MultiOptionSetter> setters)
@@ -92,6 +92,7 @@ internal static class MultiOptionSetters
             CurlMultiOption.SocketData, CurlMultiOption.TimerData, CurlMultiOption.PushData, CurlMultiOption.NotifyData,
             CurlMultiOption.MaxPipelineLength, CurlMultiOption.ContentLengthPenaltySize, CurlMultiOption.ChunkLengthPenaltySize,
             CurlMultiOption.PipeliningSiteBlocklist, CurlMultiOption.PipeliningServerBlocklist,
+            CurlMultiOption.ResolveThreadsMax, CurlMultiOption.QuickExit,
         ];
         foreach (var option in ignored)
         {
