@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr059LabelRulesTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3885 — Reject a leading-hyphen IDN label and accept empty-label IDN hosts (CGR-059 -ü and ü..)
 
@@ -26,10 +26,10 @@ Expected (real curl): host -ü.example: exit 3, `URL using bad/illegal format or
 
 ## Acceptance criteria
 
-- [ ] The repro above run through real curl and through Curl gives the same exit code, stdout bytes, stderr text and request bytes on the wire; the command and both results are recorded in Notes.
-- [ ] A focused unit test in `Cgr059*Tests.cs` named in `touches` (in Curl.Protocol.Abstractions.UnitTests) fails before the fix and passes after it (ADR-0482).
-- [ ] Host cases that already matched curl still match (existing CurlUrlHost tests stay green).
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The repro above run through real curl and through Curl gives the same exit code, stdout bytes, stderr text and request bytes on the wire; the command and both results are recorded in Notes.
+- [x] A focused unit test in `Cgr059*Tests.cs` named in `touches` (in Curl.Protocol.Abstractions.UnitTests) fails before the fix and passes after it (ADR-0482).
+- [x] Host cases that already matched curl still match (existing CurlUrlHost tests stay green).
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -41,3 +41,4 @@ Expected (real curl): host -ü.example: exit 3, `URL using bad/illegal format or
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 12e52b50 1b26f5a2 3be9ea7b 779790c0.
+- 2026-10-28: Doing -> Done. -ü.example fails with exit 3 and ü..example goes out as Host: xn--tda..example, as curl does; pinned by Cgr059LabelRulesTests
