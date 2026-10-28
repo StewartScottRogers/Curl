@@ -9,7 +9,7 @@ touches: [Curl.Cli.UnitLibrary/CurlAiHelpText.cs, Curl.Cli.UnitLibrary/CurlHelpT
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3706 — Fix CGR-177: Port-only --ai-help and --httpsig-* options are accepted and listed, and curl --help prints an extra --ai-help line
 
@@ -96,3 +96,4 @@ E\verify\v3_misc.ps1
 - 2026-10-26: Created from CGR-177 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Decided by Claude under Stewart's delegation: no code change. Every difference CGR-177 lists is deliberate and already decided: `--ai-help` and its footer line and `--help all` row (ADR-0224, CLAUDE.md "`--ai-help` keeps pace with the options"; Stewart kept the footer when reversing ADR-0762 in ADR-0769), and the `--httpsig-*` options (ADR-0485, ADR-0487). Removing them would contradict those decisions and CLAUDE.md. The conformance runner already strips the Curl-only help lines (`UpstreamCurlOnlyHelpLines`), so upstream cases still compare byte for byte. Criteria are ticked on that basis: the "failing test before the fix" criterion has no fix to test; the existing `CurlHelpTextTests`, `CommandLineAiHelpOptionTests` and `CommandLineHttpSignatureOptionTests` pin the intended behaviour. Real curl was not re-run; no output text was changed. A gap re-measurement should list these as accepted Curl-only extensions.
+- 2026-10-28: Doing -> Done. CGR-177 differences are deliberate Curl extensions (ADR-0224, ADR-0485, ADR-0769); no code change, recorded in Notes.
