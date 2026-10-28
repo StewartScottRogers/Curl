@@ -32,8 +32,11 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034 in `Documentat
 - Split from BL-3976 (cost cap). The fallbacks (`FirstTransferSocket`, the 10 ms timer) stay until BL-3990.
 - Continues the stashed work of BL-3976.
 - The stashed work already pins `C_20`, `C_74` and `C_75` in `Cgr034Tests` and keeps both fallbacks; apply it, keep CGR-150's `CloseIdleConnectionsForRoomAsync` beside it, and give its ADR a free number (0948 is taken).
+- 2026-10-28 run (lane 3): this run applied the stash (one conflict in `TransferSocketWait.cs`, resolved by keeping ADR-0955's `FirstEngineSocket` and dropping `DefaultConnectTimeout` as the stash did) and renumbered its ADR to ADR-0964 (file, README row, citations in `ManagedMultiTransfer.cs` and `Cgr034Tests.cs`). Since ADR-0955 gives an in-memory connection an engine socket number, the stash's `SocketAction_ConnectionWithoutAnOperatingSystemSocket_TimeoutActionsFinishIt` was out of date; it is now `..._TellsItsEngineSocketOutThenInThenRemove`. `ManagedMultiTransfer.CountReady` now counts a transfer that waits on an engine socket (`IsWaitingOnAnEngineSocket`) as ready, because no poll can tell when such a socket is ready. Without that, upstream test530's `select_test` (a `curl_multi_wait`) slept its whole 10 s timeout and the case hung; test530 passes now. `Curl.Engine.UnitTests` is green (2738 passed).
+- What is left: upstream test582 (`Lib582Run`, an SFTP upload over socket actions) still hangs past the conformance runner's 20 s with this change; it is on the ratchet and passes without it. Find why the SSH transfer never finishes under the socket-gated wait (likely an SSH read or write waiting in a direction the socket callback was not told, or `Waiting` being `None` while it computes), fix it, then run `Curl.Conformance.UnitTests` and the whole fast suite once, and run `Measure-CodeQuality.ps1` for `Curl.Engine.UnitLibrary`. No separate task was filed for this, because the work needs this task's stashed code.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 3a1e0c49 1d22eb8b 6e4e49ca 779790c0.
+- 2026-10-28: Doing -> Backlog. Out of run budget: stash applied and test530 fixed, but upstream test582 (SFTP multi upload) still hangs under the socket-gated wait; see Notes
