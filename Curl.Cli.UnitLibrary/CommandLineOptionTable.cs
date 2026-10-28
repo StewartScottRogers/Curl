@@ -295,7 +295,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
-        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') && options.ReadingConfigFile ? AsRawWireText(options, cookie) : cookie))),
+        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') && options.ReadingConfigFile && !(options.ReadsArgumentsAsUtf8 && options.ReadingUtf8ConfigFile) ? AsRawWireText(options, cookie) : cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
         CommandLineOption.NegatableFlag("follow", null, SetFollow),
