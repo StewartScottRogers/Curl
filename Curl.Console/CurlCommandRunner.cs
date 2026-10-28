@@ -3467,8 +3467,11 @@ internal sealed class CurlCommandRunner(
             return await ReportCannotCreateDirectoryAsync(options, failure).ConfigureAwait(false);
         }
 
-        FileOpenResult opened = await fileSystem
+        // A -D name holding an argument byte that is not valid UTF-8 opens under its raw bytes off
+        // Windows, as curl 8.18.0's fopen does (CGR-016, BL-3868).
+        FileOpenResult opened = await RawByteFileName
             .OpenForWriteAsync(
+                fileSystem,
                 headerFile,
                 transfer.TransferId == Running.FirstTransferIdOfGroup ? FileWriteMode.Truncate : FileWriteMode.Append,
                 DeferredOutputFileStream.CreateMode,

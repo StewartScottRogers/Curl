@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Curl.Engine;
 namespace Curl.Console;
 
@@ -9,20 +10,47 @@ namespace Curl.Console;
 /// <c>--remove-on-error</c> delete; <see langword="null" /> skips the test, as on Windows (ADR-0332).
 /// </param>
 /// <param name="errorNumbers">The C runtime numbers a failed <c>--create-dirs</c> directory is reported in.</param>
-internal sealed class PhysicalOutputPaths(Func<string, bool>? isRegularFile, CRuntimeErrorNumbers errorNumbers) : IOutputPaths
+/// <param name="makeDirectoryUnderRawBytes">
+/// Makes the directory named by NUL-terminated raw bytes and gives <c>mkdir</c>'s <c>errno</c>, or 0;
+/// used for a name holding an argument byte that is not valid UTF-8 (<see cref="RawByteFileName" />,
+/// CGR-016, BL-3868). <see langword="null" /> makes every directory through
+/// <see cref="Directory.CreateDirectory(string)" />, as on Windows.
+/// </param>
+internal sealed class PhysicalOutputPaths(
+    Func<string, bool>? isRegularFile,
+    CRuntimeErrorNumbers errorNumbers,
+    Func<byte[], int>? makeDirectoryUnderRawBytes = null) : IOutputPaths
 {
     /// <summary>
     /// Initializes an instance with the running platform's regular-file test,
-    /// <see cref="NativeRegularFileTest.ForCurrentPlatform" />, and C runtime numbers.
+    /// <see cref="NativeRegularFileTest.ForCurrentPlatform" />, C runtime numbers and, off Windows,
+    /// <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" />.
     /// </summary>
     public PhysicalOutputPaths()
-        : this(NativeRegularFileTest.ForCurrentPlatform(), CRuntimeErrorNumbers.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()))
+        : this(
+            NativeRegularFileTest.ForCurrentPlatform(),
+            CRuntimeErrorNumbers.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()),
+            RawDirectoryMakerForCurrentPlatform())
     {
     }
+
+    /// <summary>
+    /// The running platform's raw-byte directory maker: none on Windows, where argument bytes are
+    /// never escaped, otherwise <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" />.
+    /// </summary>
+    /// <returns>The maker, or <see langword="null" />.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    private static Func<byte[], int>? RawDirectoryMakerForCurrentPlatform() =>
+        OperatingSystem.IsWindows() ? null : RawByteFileName.MakeDirectoryUnderRawBytes;
 
     /// <inheritdoc />
     public bool TryCreateDirectory(string path, out int errorNumber)
     {
+        if (makeDirectoryUnderRawBytes is { } makeRaw && RawByteFileName.HoldsEscapedByte(path))
+        {
+            return TryMakeDirectoryUnderRawBytes(makeRaw, path, out errorNumber);
+        }
+
         errorNumber = 0;
         if (Exists(path))
         {
@@ -48,6 +76,25 @@ internal sealed class PhysicalOutputPaths(Func<string, bool>? isRegularFile, CRu
 
             return false;
         }
+    }
+
+    /// <summary>
+    /// Makes the directory <paramref name="path" /> under its raw bytes with
+    /// <paramref name="makeRaw" />; one that already exists counts as made, as for every other name.
+    /// </summary>
+    /// <param name="makeRaw">Makes the directory and gives <c>mkdir</c>'s <c>errno</c>, or 0.</param>
+    /// <param name="path">The directory's name, holding an escaped byte.</param>
+    /// <param name="errorNumber">The <c>errno</c> when the directory could not be made, otherwise 0.</param>
+    /// <returns><see langword="true" /> when the directory is there afterwards.</returns>
+    internal static bool TryMakeDirectoryUnderRawBytes(Func<byte[], int> makeRaw, string path, out int errorNumber)
+    {
+        errorNumber = makeRaw(RawByteFileName.NullTerminatedBytes(path));
+        if (errorNumber == CRuntimeErrorNumbers.AlreadyExists)
+        {
+            errorNumber = 0;
+        }
+
+        return errorNumber == 0;
     }
 
     /// <inheritdoc />

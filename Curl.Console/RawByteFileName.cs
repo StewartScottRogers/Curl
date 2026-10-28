@@ -158,6 +158,33 @@ internal static partial class RawByteFileName
     }
 
     /// <summary>
+    /// Makes the directory named by the NUL-terminated raw bytes <paramref name="path" /> with the
+    /// runtime's <c>mkdir</c>, as curl's <c>--create-dirs</c> does (BL-3868), with the mode
+    /// <see cref="Directory.CreateDirectory(string)" /> gives every other name.
+    /// </summary>
+    /// <param name="path">The name's raw bytes and a NUL.</param>
+    /// <returns>0 when the directory was made, otherwise <c>mkdir</c>'s <c>errno</c>.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0920: a thin adapter over a mkdir only Linux and macOS take raw bytes in.")]
+    internal static int MakeDirectoryUnderRawBytes(byte[] path)
+    {
+        const int AllPermissions = 0x1FF;
+        unsafe
+        {
+            fixed (byte* name = path)
+            {
+                return MakeDirectory(name, AllPermissions) == 0 ? 0 : Marshal.GetLastSystemError();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The runtime's <c>mkdir</c> shim, which every .NET build on Linux and macOS ships and Native
+    /// AOT links in; as with <see cref="Open" />, the caller reads <c>errno</c> straight after.
+    /// </summary>
+    [LibraryImport("libSystem.Native", EntryPoint = "SystemNative_MkDir")]
+    private static unsafe partial int MakeDirectory(byte* path, int mode);
+
+    /// <summary>
     /// The runtime's non-variadic <c>open</c> shim, which every .NET build on Linux and macOS ships
     /// and Native AOT links in. libc's own <c>open</c> is variadic, which a P/Invoke cannot call
     /// correctly on Apple silicon. Its arguments are blittable, so no marshalling stub is generated;
