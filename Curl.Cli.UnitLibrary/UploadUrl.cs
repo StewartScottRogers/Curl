@@ -12,6 +12,8 @@ public static class UploadUrl
 {
     private const int MaximumSlashesAfterScheme = 3;
 
+    private const int MaximumSlashesAfterFileScheme = 2;
+
     private static readonly SearchValues<char> SchemeCharacters = SearchValues.Create(
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+.-");
 
@@ -112,7 +114,12 @@ public static class UploadUrl
                 return 0;
             }
 
-            int slashes = Math.Min(CountLeadingSlashes(url.AsSpan(colon + 1)), MaximumSlashesAfterScheme);
+            // A file URL has an empty authority and then the path, so file:///NUL has the path
+            // /NUL: only the first two slashes belong to the authority (CGR-230).
+            int maximumSlashes = url.AsSpan(0, colon).Equals("file", StringComparison.OrdinalIgnoreCase)
+                ? MaximumSlashesAfterFileScheme
+                : MaximumSlashesAfterScheme;
+            int slashes = Math.Min(CountLeadingSlashes(url.AsSpan(colon + 1)), maximumSlashes);
             return slashes == 0 ? 0 : colon + 1 + slashes;
         }
 
