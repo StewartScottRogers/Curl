@@ -154,8 +154,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     // OpenSSL 3's default security level allows no version below TLS 1.2, so the OpenSSL
-    // build has nothing to offer under a lower ceiling (measured, BL-1152, ADR-0364).
-    private bool RefusesItsVersionRange => !_matchesSchannelBuild && OffersOnlyVersionsBelowTls12;
+    // build has nothing to offer under a lower ceiling (measured, BL-1152, ADR-0364), unless
+    // --ciphers ends at @SECLEVEL=0 (measured against curl 8.18.0 OpenSSL 3.5.5, BL-3879, ADR-0364).
+    private bool RefusesItsVersionRange =>
+        !_matchesSchannelBuild && OffersOnlyVersionsBelowTls12 && !LowersSecurityLevelToZero(_options.Ciphers);
 
     // Under a TLS 1.2 or later ceiling, the same security level raises a --tlsv1.0 or
     // --tlsv1.1 minimum to TLS 1.2 in the OpenSSL build, unless --ciphers ends at
