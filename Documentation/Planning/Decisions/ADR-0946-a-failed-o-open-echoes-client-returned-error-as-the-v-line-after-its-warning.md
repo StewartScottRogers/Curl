@@ -1,4 +1,4 @@
-# ADR-0944: A failed `-o` open echoes `client returned ERROR on write of N bytes` as the `-v` line, after its warning
+# ADR-0946: A failed `-o` open echoes `client returned ERROR on write of N bytes` as the `-v` line, after its warning
 
 - Status: Accepted
 - Date: 2026-10-28
