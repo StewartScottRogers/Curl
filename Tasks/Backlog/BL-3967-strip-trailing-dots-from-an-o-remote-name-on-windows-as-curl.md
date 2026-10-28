@@ -1,5 +1,5 @@
 ---
-id: BL-3966
+id: BL-3967
 title: Strip trailing dots from an -O remote name on Windows as curl's sanitizer does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3966 — Strip trailing dots from an -O remote name on Windows as curl's sanitizer does
+# BL-3967 — Strip trailing dots from an -O remote name on Windows as curl's sanitizer does
 
 ## Goal
 
