@@ -38,3 +38,4 @@ keep as pre-built byte files than to build in bash.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 30a358d0 6a7980b6 541414b4.
