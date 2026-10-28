@@ -199,7 +199,7 @@ internal static class CurlUrlHost
     /// The host as curl off Windows hands it to <c>idn2_lookup_ul</c> in a UTF-8 locale: a name whose
     /// every character is one byte, as a <c>Location</c> header's bytes reach <c>CurlUrl</c>, and whose
     /// bytes are valid UTF-8 is that UTF-8, so <c>Ã¥Ã¤Ã¶</c> is <c>åäö</c> (upstream test1448,
-    /// ADR-0957); any other name is kept as decoded.
+    /// ADR-0960); any other name is kept as decoded.
     /// </summary>
     private static string ReadLatin1BytesAsUtf8(string name)
     {

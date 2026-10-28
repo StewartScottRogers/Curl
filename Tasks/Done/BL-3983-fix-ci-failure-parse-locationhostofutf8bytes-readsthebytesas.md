@@ -30,7 +30,7 @@ Lanes test only on Windows, so reproduce with `gh run view 40755947165 --log-fai
 
 ## Notes
 
-- Cause: a `Location` header's bytes reach `CurlUrl` one Latin-1 character per byte, and off Windows `CurlUrlHost` converted them as decoded (`Ã¥Ã¤Ã¶` -> `xn--bbab6cyjbb.se`). Fix: off Windows, a host whose characters are all at most `U+00FF` and whose Latin-1 bytes are valid UTF-8 is read as that UTF-8 (ADR-0957), kept in `CurlUrlHost` inside this task's touches.
+- Cause: a `Location` header's bytes reach `CurlUrl` one Latin-1 character per byte, and off Windows `CurlUrlHost` converted them as decoded (`Ã¥Ã¤Ã¶` -> `xn--bbab6cyjbb.se`). Fix: off Windows, a host whose characters are all at most `U+00FF` and whose Latin-1 bytes are valid UTF-8 is read as that UTF-8 (ADR-0960), kept in `CurlUrlHost` inside this task's touches.
 - The named test is skipped on Windows by its `OSCondition`; locally its off-Windows reading is checked by the new `Cgr019Tests.TryNormalize_HostOfOneByteCharactersThatAreUtf8_ConvertsTheUtf8Name`, which calls `TryNormalizeReadingHost(hostAsWindows1252: false)` on every platform and passes. Fast tests green on Windows (46 projects, 0 failed); `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary`: 0 failing members.
 - CI on Linux and macOS: the change is platform-neutral (string and byte logic only, no paths or OS text) and the fast tests are green here; the shift's CI watch files any failure.
 

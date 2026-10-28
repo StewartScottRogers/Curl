@@ -1,4 +1,4 @@
-# ADR-0957: Off Windows, a host of one-byte characters that are UTF-8 is read as that UTF-8
+# ADR-0960: Off Windows, a host of one-byte characters that are UTF-8 is read as that UTF-8
 
 - Status: Accepted
 - Date: 2026-10-28
