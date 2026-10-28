@@ -238,6 +238,13 @@ public sealed partial class TcpConnector(
     /// </summary>
     public bool AsksHttpsRecords { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether <c>-4</c> or <c>-6</c> also filters an IP address literal host, so
+    /// <c>-6 http://127.0.0.1/</c> has nothing to dial and fails with exit 7, as curl 8.18.0 on Linux does
+    /// (CGR-186). The default is the platform build's: off on Windows, where the literal is dialled as written.
+    /// </summary>
+    public bool FiltersAddressLiterals { get; init; } = !OperatingSystem.IsWindows();
+
     // Gives a random index below its argument for ShufflesResolveEntryAddresses; tests pin it.
     internal Func<int, int> ResolveEntryShuffleRandomBelow { get; init; } = DnsAddressShuffle.CryptographicRandomBelow;
 
@@ -938,7 +945,7 @@ public sealed partial class TcpConnector(
         var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return HostNotResolved(target, destination, failure, fromCache);
+            return NothingToDial(target, destination, failure, fromCache);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -1125,6 +1132,15 @@ public sealed partial class TcpConnector(
     /// <c>Could not resolve proxy: &lt;proxy&gt;</c>, as curl 8.22.0 reports <c>-x</c>, <c>--proxy1.0</c> and an
     /// <c>https://</c> proxy (measured, BL-3168).
     /// </summary>
+    /// <summary>
+    /// Reports an empty answer: exit 7 for an IP address literal that <c>-4</c> or <c>-6</c> leaves nothing to dial off
+    /// Windows (curl 8.18.0 on Linux, CGR-186), otherwise <see cref="HostNotResolved" />.
+    /// </summary>
+    private ConnectResult NothingToDial(ConnectTarget target, ConnectDestination destination, DnsLookupFailure failure, bool fromCache) =>
+        AddressFamilyFilter.IsRefusedLiteral(destination.Host, addressFamily, !FiltersAddressLiterals)
+            ? ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {HostWithoutZoneId(target.Host)}:{target.Port} after 0 ms: Could not connect to server")
+            : HostNotResolved(target, destination, failure, fromCache);
+
     private ConnectResult HostNotResolved(ConnectTarget target, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
     {
         var events = target.Events;
@@ -1198,9 +1214,9 @@ public sealed partial class TcpConnector(
         }
 
         var (addresses, failure) = lookedUp;
-        var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
+        var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily, !FiltersAddressLiterals);
         CacheLookUp(new DnsCacheEntry(host, port, answered), cacheKey, failure, target.Events);
-        var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
+        var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily, !FiltersAddressLiterals);
         LogResolution(log, host, port, dialable, fromCache: false, resolveStarted);
         return (new DnsResolution(dialable, failure), false);
     }
@@ -1313,7 +1329,7 @@ public sealed partial class TcpConnector(
 
     private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)
     {
-        var dialable = AddressFamilyFilter.Dialable(host, cached.Addresses, addressFamily);
+        var dialable = AddressFamilyFilter.Dialable(host, cached.Addresses, addressFamily, !FiltersAddressLiterals);
         if (dialable.Count == 0)
         {
             events.ReportInfo("Negative DNS entry");
