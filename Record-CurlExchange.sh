@@ -8,7 +8,7 @@
 #     Ported so far: the HTTP and HTTPS (-Tls) server, -NoServer, -UnixSocket, -Ftp
 #     (passive and active mode, explicit and implicit FTPS, PROT, CCC; see FTP below) and
 #     -Smtp, -Imap and -Pop3 (plain, STARTTLS / STLS and implicit TLS with -Tls) and
-#     -Tftp (see TFTP below).
+#     -Tftp (see TFTP below), -UdpSink, and -DnsPort and -DohPort (see DNS below).
 #
 # TFTP
 #     -Tftp serves one TFTP transfer on UDP -Port with TftpData, TftpReply, TftpNoOack and
@@ -25,6 +25,14 @@
 #     log of BL-3929): passive, active (EPRT), explicit and implicit FTPS, PROT P data,
 #     CCC in passive and active mode, a refused CCC, uploads, REST, FtpReply overrides.
 #
+# DNS
+#     -UdpSink writes datagrams.txt, -DnsPort (with -DnsSilentPort, -DnsAnswerAddress,
+#     -DnsTruncate, -DnsResponseCode and -DnsEchConfigList) and -DohPort write dns.txt, as the
+#     PowerShell script does. bash cannot receive a UDP datagram, so a perl (core modules only)
+#     written to the state directory serves them; -DohPort puts TLS 1.2 in front of it with
+#     socat and the throwaway certificate of -Tls. They need perl, and -DohPort socat and openssl.
+#     -DnsAnswerAddress may be repeated or take a comma-separated list.
+#
 # NOT PORTED YET
 #     These modes of Record-CurlExchange.ps1 are not in this port. Each one stops at once,
 #     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
@@ -32,10 +40,9 @@
 #
 #       -Script (scripted binary sessions, LDAP and SMB)
 #       -Http2 and -Http2Origin (HTTP/2 proxy and origin framing, HPACK)
-#       -UdpSink         -DnsPort and -DohPort (the DNS and DNS-over-HTTPS responders)
 #       -HalfCloseAfterResponse together with -Tls
 #
-#     Their parameters (FtpReply, SmtpReply, ..., DnsAnswerAddress) are still accepted, and
+#     Their parameters (FtpReply, SmtpReply, ..., ProxyStatus) are still accepted, and
 #     ignored without their mode, as the PowerShell script ignores them.
 #
 # DESCRIPTION
@@ -1614,6 +1621,7 @@ RCE_IMAP_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubje
 RCE_POP3_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n'
 RCE_FTP=0 RCE_SMTP=0 RCE_IMAP=0 RCE_POP3=0 RCE_TFTP=0 RCE_SCRIPT='' RCE_HTTP2=0 RCE_HTTP2_ORIGIN=''
 RCE_HTTP2_ANSWER='' RCE_UDP_SINK=0 RCE_DNS_PORTS='' RCE_DNS_SILENT_PORTS='' RCE_DOH_PORTS=''
+RCE_DNS_ANSWER_ADDRESSES='' RCE_DNS_TRUNCATE=0 RCE_DNS_RESPONSE_CODE=0 RCE_DNS_ECH='' RCE_DNS_PID='' RCE_DOH_PID='' RCE_SINK_PID=''
 
 rce_require_value() {
     if [ "$2" -lt 2 ]; then rce_die "-$1 needs a value."; fi
@@ -1654,7 +1662,8 @@ while [ $# -gt 0 ]; do
         http2) RCE_HTTP2=1; shift; continue ;;
         udpsink) RCE_UDP_SINK=1; shift; continue ;;
         tftpnooack) RCE_TFTP_NOOACK=1; shift; continue ;;
-        http2nosettings | dnstruncate) shift; continue ;;
+        dnstruncate) RCE_DNS_TRUNCATE=1; shift; continue ;;
+        http2nosettings) shift; continue ;;
     esac
     rce_require_value "$name" $#
     value=$2
@@ -1695,6 +1704,9 @@ while [ $# -gt 0 ]; do
         dnsport) RCE_DNS_PORTS="$RCE_DNS_PORTS $value" ;;
         dnssilentport) RCE_DNS_SILENT_PORTS="$RCE_DNS_SILENT_PORTS $value" ;;
         dohport) RCE_DOH_PORTS="$RCE_DOH_PORTS $value" ;;
+        dnsansweraddress) RCE_DNS_ANSWER_ADDRESSES="$RCE_DNS_ANSWER_ADDRESSES ${value//,/ }" ;;
+        dnsresponsecode) rce_integer DnsResponseCode "$value" 0 15; RCE_DNS_RESPONSE_CODE=$value ;;
+        dnsechconfiglist) RCE_DNS_ECH=$value ;;
         ftpreply) RCE_FTP_REPLIES[${#RCE_FTP_REPLIES[@]}]=$value ;;
         ftpdata) RCE_FTP_DATA=$value ;;
         ftpidlemilliseconds) rce_integer FtpIdleMilliseconds "$value" 1 600000; RCE_FTP_IDLE=$value ;;
@@ -1711,7 +1723,7 @@ while [ $# -gt 0 ]; do
         tftpreply) RCE_TFTP_REPLIES[${#RCE_TFTP_REPLIES[@]}]=$value ;;
         tftpidlemilliseconds) rce_integer TftpIdleMilliseconds "$value" 1 600000; RCE_TFTP_IDLE=$value ;;
         scriptidlemilliseconds | scriptgapmilliseconds | \
-            proxystatus | proxyalpn | http2resetcode | dnsansweraddress | dnsresponsecode | dnsechconfiglist) ;;
+            proxystatus | proxyalpn | http2resetcode) ;;
         *) rce_die "unknown parameter '$1'; -help lists them." ;;
     esac
     shift 2
@@ -1745,9 +1757,6 @@ if [ $RCE_TFTP = 1 ]; then RCE_NO_SERVER=1; fi
 if [ -n "$RCE_SCRIPT" ]; then rce_not_ported -Script; fi
 if [ -n "$RCE_HTTP2_ORIGIN" ]; then rce_not_ported -Http2Origin; fi
 if [ $RCE_HTTP2 = 1 ]; then rce_not_ported -Http2; fi
-if [ $RCE_UDP_SINK = 1 ]; then rce_not_ported -UdpSink; fi
-if [ -n "$RCE_DNS_PORTS" ]; then rce_not_ported -DnsPort; fi
-if [ -n "$RCE_DOH_PORTS" ]; then rce_not_ported -DohPort; fi
 if [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; then rce_not_ported '-HalfCloseAfterResponse with -Tls'; fi
 
 # One connection per Response entry unless -Connections says otherwise, so a --retry
@@ -1791,6 +1800,13 @@ if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ]; then
         rce_missing="$rce_missing, an openssl whose s_server has -msgfile and -naccept ($RCE_OPENSSL has not: LibreSSL? set OPENSSL to an OpenSSL 1.1.1 or later)"
     fi
 fi
+if [ -n "$RCE_DOH_PORTS" ]; then
+    command -v "$RCE_OPENSSL" >/dev/null 2>&1 || rce_missing="$rce_missing, openssl (the throwaway certificate of -DohPort; set OPENSSL to name it)"
+    command -v "$RCE_SOCAT" >/dev/null 2>&1 || rce_missing="$rce_missing, socat (terminates TLS for -DohPort; set SOCAT to name it)"
+fi
+if { [ $RCE_UDP_SINK = 1 ] || [ -n "$RCE_DNS_PORTS" ] || [ -n "$RCE_DOH_PORTS" ]; } && ! command -v perl >/dev/null 2>&1; then
+    rce_missing="$rce_missing, perl (serves -UdpSink, -DnsPort and -DohPort: bash cannot receive a UDP datagram)"
+fi
 if [ $RCE_TFTP = 1 ] && ! command -v perl >/dev/null 2>&1; then
     rce_missing="$rce_missing, perl (serves -Tftp: a TFTP answer comes from a new UDP port, which bash cannot open)"
 fi
@@ -1825,6 +1841,9 @@ rce_cleanup() {
     if [ -n "$RCE_LISTENER_PID" ]; then kill "$RCE_LISTENER_PID" 2>/dev/null; fi
     if [ -n "${RCE_DATA_LISTENER_PID:-}" ]; then kill "$RCE_DATA_LISTENER_PID" 2>/dev/null; fi
     if [ -n "$RCE_TFTP_PID" ]; then kill "$RCE_TFTP_PID" 2>/dev/null; fi
+    if [ -n "$RCE_DNS_PID" ]; then kill "$RCE_DNS_PID" 2>/dev/null; fi
+    if [ -n "$RCE_DOH_PID" ]; then kill $RCE_DOH_PID 2>/dev/null; fi
+    if [ -n "$RCE_SINK_PID" ]; then kill "$RCE_SINK_PID" 2>/dev/null; fi
     # Whatever is still serving a connection: handlers, held connections, s_servers.
     for rce_pid_file in "$RCE_STATE"/pid.* "$RCE_STATE"/tls-pid.*; do
         [ -f "$rce_pid_file" ] && kill -KILL "$(cat "$rce_pid_file")" 2>/dev/null
@@ -1913,7 +1932,7 @@ rce_make_tls_certificate() {
     if [ -n "$RCE_TLS_REVOKING_CRL" ]; then rce_write_crl "$RCE_TLS_REVOKING_CRL" "$serial"; fi
 }
 
-if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ]; then
+if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ] || [ -n "$RCE_DOH_PORTS" ]; then
     rce_make_tls_certificate
     "$RCE_OPENSSL" x509 -in "$RCE_STATE/server.crt" -noout -pubkey >"$RCE_STATE/public.pem" || rce_die 'openssl x509 -pubkey failed'
     "$RCE_OPENSSL" pkey -pubin -in "$RCE_STATE/public.pem" -outform DER -out "$RCE_STATE/public.der" || rce_die 'openssl pkey failed'
@@ -2257,6 +2276,209 @@ RCE_TFTP_PERL
     done
 fi
 
+# --- The UDP sink and the DNS and DNS-over-HTTPS responders -----------------------------
+# A UDP datagram, and a TCP or UDP answer from the bound port, are beyond bash, so one perl
+# (core modules only) written to the state directory serves them as RecorderDnsResponder and
+# the UDP sink do in the PowerShell script. TLS for -DohPort is socat's, one listener per
+# port, each connection handed to the same perl in its doh mode.
+
+# Waits for Marker to appear in the state directory, or dies with what Name reported.
+rce_wait_for_marker() {
+    local marker=$1 pid=$2 name=$3 polls=0
+    while [ ! -e "$RCE_STATE/$marker" ]; do
+        if ! kill -0 "$pid" 2>/dev/null || [ $polls -ge 250 ]; then
+            rce_die "the $name did not start: $(cat "$RCE_STATE/dns.error" "$RCE_STATE/$marker.err" 2>/dev/null | head -n 3)"
+        fi
+        polls=$((polls + 1))
+        sleep 0.02
+    done
+}
+
+if [ $RCE_UDP_SINK = 1 ] || [ -n "$RCE_DNS_PORTS" ] || [ -n "$RCE_DOH_PORTS" ]; then
+    cat >"$RCE_STATE/dns.pl" <<'RCE_DNS_PERL'
+use strict;
+use warnings;
+use IO::Socket::IP;
+use IO::Select;
+use Socket qw(inet_pton AF_INET AF_INET6);
+use MIME::Base64;
+use Fcntl qw(:flock);
+use Time::HiRes;
+
+my ($state, $mode, $port) = @ARGV;
+my %config;
+open(my $configFile, '<', "$state/dns.conf") or die "dns.conf: $!";
+while (my $line = <$configFile>) { chomp $line; my ($key, $value) = split(/=/, $line, 2); $config{$key} = $value; }
+close $configFile;
+
+sub fail { open(my $failure, '>', "$state/dns.error"); print $failure $_[0]; close $failure; exit 1; }
+
+sub record {
+    my ($transport, $onPort, $query) = @_;
+    open(my $log, '>>:raw', "$state/dns.log") or return;
+    flock($log, LOCK_EX);
+    print $log int(Time::HiRes::time() * 1000) - $config{start}, " $transport $onPort ", unpack('H*', $query), "\n";
+    close $log;
+}
+
+# The query's header and question, then one answer record per address of the asked family.
+sub answer {
+    my ($query, $truncate) = @_;
+    my $end = 12;
+    while ($end < length($query) && ord(substr($query, $end, 1)) != 0) { $end += 1 + ord(substr($query, $end, 1)); }
+    $end += 5;
+    my $reply = substr($query, 0, $end);
+    $reply .= "\0" x ($end - length($reply));
+    my $type = unpack('n', substr($reply, $end - 4, 2));
+    substr($reply, 2, 1) = chr($truncate ? 0x83 : 0x81);
+    substr($reply, 3, 1) = chr(0x80 | $config{rcode});
+    substr($reply, 6, 6) = "\0" x 6;
+    my $answers = 0;
+    if (!$truncate && $config{rcode} == 0) {
+        foreach my $address (split(/ /, $config{answers})) {
+            next if $address eq '';
+            my $version6 = index($address, ':') >= 0;
+            next unless $type == ($version6 ? 28 : 1);
+            my $data = inet_pton($version6 ? AF_INET6 : AF_INET, $address);
+            next unless defined $data;
+            $reply .= pack('nnnNn', 0xC00C, $type, 1, 60, length($data)) . $data;
+            $answers++;
+        }
+        if ($type == 65 && length($config{ech})) {
+            # ServiceMode, priority 1, target ".", then ech=<list> (RFC 9460, key 5).
+            my $list = decode_base64($config{ech});
+            $reply .= pack('nnnNn', 0xC00C, 65, 1, 60, 2 + 1 + 4 + length($list)) . pack('nCnn', 1, 0, 5, length($list)) . $list;
+            $answers++;
+        }
+    }
+    substr($reply, 7, 1) = chr($answers);
+    return $reply;
+}
+
+sub ready { open(my $marker, '>', "$state/$_[0]"); close $marker; }
+
+if ($mode eq 'sink') {
+    my $sink = IO::Socket::IP->new(LocalAddr => $config{address}, LocalPort => $port, Proto => 'udp') or fail("UDP $port: $@");
+    open(my $datagrams, '>:raw', "$state/udp.log") or fail("udp.log: $!");
+    select((select($datagrams), $| = 1)[0]);
+    ready('udp.ready');
+    while (1) {
+        my $datagram;
+        defined($sink->recv($datagram, 65535)) or next;
+        print $datagrams unpack('H*', $datagram), "\n";
+    }
+} elsif ($mode eq 'doh') {
+    binmode STDIN;
+    binmode STDOUT;
+    $| = 1;
+    while (1) {
+        my $head = '';
+        while ($head !~ /\r\n\r\n\z/) { read(STDIN, my $byte, 1) or exit 0; $head .= $byte; }
+        $head =~ s/\r\n\r\n\z//;
+        my @lines = split(/\r\n/, $head, -1);
+        my @requestLine = split(/ /, $lines[0]);
+        my $query;
+        if ($requestLine[0] eq 'POST') {
+            my $length = 0;
+            foreach my $line (@lines) { $length = $1 + 0 if $line =~ /^Content-Length:\s*(\d+)/i; }
+            $query = '';
+            if ($length > 0) { (read(STDIN, $query, $length) // -1) == $length or exit 0; }
+        } else {
+            my $encoded = (split(/&/, substr($requestLine[1], index($requestLine[1], 'dns=') + 4)))[0];
+            $encoded =~ tr{-_}{+/};
+            $query = decode_base64($encoded);
+        }
+        record('doh', $port, $query);
+        my $reply = answer($query, 0);
+        print "HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: " . length($reply) . "\r\n\r\n" . $reply;
+    }
+} else {
+    my (%udp, %tcp);
+    my $selector = IO::Select->new;
+    my %silent = map { $_ => 1 } split(/ /, $config{silent});
+    foreach my $bound (split(/ /, $config{ports})) {
+        next if $bound eq '';
+        my $udpSocket = IO::Socket::IP->new(LocalAddr => $config{address}, LocalPort => $bound, Proto => 'udp') or fail("UDP $bound: $@");
+        my $tcpSocket = IO::Socket::IP->new(LocalAddr => $config{address}, LocalPort => $bound, Proto => 'tcp', Listen => 16, ReuseAddr => 1) or fail("TCP $bound: $@");
+        $udp{fileno($udpSocket)} = [$udpSocket, $bound];
+        $tcp{fileno($tcpSocket)} = [$tcpSocket, $bound];
+        $selector->add($udpSocket, $tcpSocket);
+    }
+    $SIG{CHLD} = 'IGNORE';
+    ready('dns.ready');
+    while (1) {
+        foreach my $socket ($selector->can_read) {
+            my $number = fileno($socket);
+            if ($udp{$number}) {
+                my $onPort = $udp{$number}[1];
+                my $query;
+                my $sender = $socket->recv($query, 65535);
+                defined($sender) or next;
+                record('udp', $onPort, $query);
+                $socket->send(answer($query, $config{truncate}), 0, $sender) unless $silent{$onPort};
+            } else {
+                my $client = $socket->accept or next;
+                my $onPort = $tcp{$number}[1];
+                if (fork() == 0) {
+                    binmode $client;
+                    while (1) {
+                        read($client, my $prefix, 2) == 2 or exit 0;
+                        my $length = unpack('n', $prefix);
+                        (read($client, my $query, $length) // -1) == $length or exit 0;
+                        record('tcp', $onPort, $query);
+                        my $reply = answer($query, 0);
+                        print $client pack('n', length($reply)) . $reply;
+                        $client->flush;
+                    }
+                }
+                close $client;
+            }
+        }
+    }
+}
+RCE_DNS_PERL
+    {
+        printf 'address=%s\n' "$RCE_LISTEN_ADDRESS"
+        printf 'ports=%s\n' "$RCE_DNS_PORTS"
+        printf 'silent=%s\n' "$RCE_DNS_SILENT_PORTS"
+        printf 'answers=%s\n' "${RCE_DNS_ANSWER_ADDRESSES:- 127.0.0.1}"
+        printf 'truncate=%s\n' "$RCE_DNS_TRUNCATE"
+        printf 'rcode=%s\n' "$RCE_DNS_RESPONSE_CODE"
+        printf 'ech=%s\n' "$RCE_DNS_ECH"
+    } >"$RCE_STATE/dns.conf"
+    rce_now_ms
+    printf 'start=%s\n' "$RCE_NOW_MS" >>"$RCE_STATE/dns.conf"
+    : >"$RCE_STATE/dns.log"
+    if [ -n "$RCE_DNS_PORTS" ]; then
+        perl "$RCE_STATE/dns.pl" "$RCE_STATE" serve 0 </dev/null >/dev/null 2>"$RCE_STATE/dns.ready.err" &
+        RCE_DNS_PID=$!
+        rce_wait_for_marker dns.ready "$RCE_DNS_PID" 'DNS responder'
+    fi
+    if [ $RCE_UDP_SINK = 1 ]; then
+        perl "$RCE_STATE/dns.pl" "$RCE_STATE" sink "$RCE_PORT" </dev/null >/dev/null 2>"$RCE_STATE/udp.ready.err" &
+        RCE_SINK_PID=$!
+        rce_wait_for_marker udp.ready "$RCE_SINK_PID" 'UDP sink'
+    fi
+    for rce_doh_port in $RCE_DOH_PORTS; do
+        case $RCE_LISTEN_ADDRESS in
+            *:*) rce_doh_listen="OPENSSL-LISTEN:$rce_doh_port,pf=ip6,bind=[$RCE_LISTEN_ADDRESS]" ;;
+            *) rce_doh_listen="OPENSSL-LISTEN:$rce_doh_port,bind=$RCE_LISTEN_ADDRESS" ;;
+        esac
+        "$RCE_SOCAT" -d -d -lf "$RCE_STATE/doh.$rce_doh_port.log" "$rce_doh_listen,reuseaddr,fork,cert=$RCE_STATE/server.crt,key=$RCE_STATE/server.key,verify=0,openssl-min-proto-version=TLS1.2,openssl-max-proto-version=TLS1.2" \
+            "EXEC:perl $RCE_STATE/dns.pl $RCE_STATE doh $rce_doh_port" </dev/null >/dev/null 2>&1 &
+        rce_doh_pid=$!
+        RCE_DOH_PID="$RCE_DOH_PID $rce_doh_pid"
+        rce_polls=0
+        while ! grep -q 'listening on' "$RCE_STATE/doh.$rce_doh_port.log" 2>/dev/null; do
+            if ! kill -0 "$rce_doh_pid" 2>/dev/null || [ $rce_polls -ge 250 ]; then
+                rce_die "socat did not start listening for DNS over HTTPS on port $rce_doh_port: $(grep -E ' [EF] ' "$RCE_STATE/doh.$rce_doh_port.log" 2>/dev/null | head -n 3)"
+            fi
+            rce_polls=$((rce_polls + 1))
+            sleep 0.02
+        done
+    done
+fi
+
 if [ $RCE_USE_SOCAT = 1 ]; then
     if [ -n "$RCE_UNIX_SOCKET" ]; then
         case $RCE_UNIX_SOCKET in /*) ;; *) RCE_UNIX_SOCKET="$(pwd)/$RCE_UNIX_SOCKET" ;; esac
@@ -2336,6 +2558,13 @@ rce_exit_code=$?
 
 # --- Stopping the TFTP responder ------------------------------------------------------
 
+if [ -n "$RCE_DNS_PID$RCE_SINK_PID" ]; then
+    # A datagram sent as curl exits is still being logged: give that a moment too.
+    sleep 0.2
+    kill $RCE_DNS_PID $RCE_SINK_PID 2>/dev/null
+    wait $RCE_DNS_PID $RCE_SINK_PID 2>/dev/null
+    RCE_DNS_PID='' RCE_SINK_PID=''
+fi
 if [ $RCE_TFTP = 1 ]; then
     # The responder logs a datagram as it handles it, and curl may exit as it sends its last
     # one: give that a moment, then end a transfer still waiting.
@@ -2408,6 +2637,8 @@ if [ $RCE_TFTP = 1 ]; then
     cat "$RCE_STATE/tftp.log" >"$RCE_OUT_DIRECTORY/datagrams.txt"
     cat "$RCE_STATE/tftp.upload" >"$RCE_OUT_DIRECTORY/upload.bin"
 fi
+if [ $RCE_UDP_SINK = 1 ]; then cat "$RCE_STATE/udp.log" >"$RCE_OUT_DIRECTORY/datagrams.txt"; fi
+if [ -n "$RCE_DNS_PORTS$RCE_DOH_PORTS" ]; then cat "$RCE_STATE/dns.log" >"$RCE_OUT_DIRECTORY/dns.txt"; fi
 cat "$RCE_STATE/stdout.bin" >"$RCE_OUT_DIRECTORY/stdout.bin"
 cat "$RCE_STATE/stderr.txt" >"$RCE_OUT_DIRECTORY/stderr.txt"
 printf '%s' "$rce_exit_code" >"$RCE_OUT_DIRECTORY/exitcode.txt"
