@@ -1,5 +1,5 @@
 ---
-id: BL-3945
+id: BL-3947
 title: CGR-016 part 7: Linux and macOS check --skip-existing and --remove-on-error on output names holding invalid UTF-8 argument bytes under those raw bytes
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3945 — CGR-016 part 7: Linux and macOS check --skip-existing and --remove-on-error on output names holding invalid UTF-8 argument bytes under those raw bytes
+# BL-3947 — CGR-016 part 7: Linux and macOS check --skip-existing and --remove-on-error on output names holding invalid UTF-8 argument bytes under those raw bytes
 
 ## Goal
 

@@ -37,7 +37,7 @@ Split from BL-3853 (CGR-016). BL-3853 (ADR-0920) opens `-o`, `-O` and `-J` files
   - `curl -s -D $'\xfc.h' -o a.txt file:///etc/hostname`: curl 8.18.0 exit 0, files `./a.txt` and `./\374.h` (FC 2E 68); Curl exit 0, the same two names.
   - `curl -s --create-dirs -o $'\xfd/b.txt' file:///etc/hostname`: curl 8.18.0 exit 0, `./\375` and `./\375/b.txt`; Curl exit 0, the same.
   - Before the change Curl wrote EF BF BD in both (BL-3853's measurement in the Context).
-- `--skip-existing`'s `Exists` and `--remove-on-error`'s delete were not measured in this run; filed as BL-3945.
+- `--skip-existing`'s `Exists` and `--remove-on-error`'s delete were not measured in this run; filed as BL-3947.
 - Unit tests `Cgr016HeaderFileAndDirectoryTests` inject a fake maker, so they run on every platform; they do not compile before the change (no maker parameter). The `-D` route reuses `RawByteFileName.OpenForWriteAsync`, already pinned by `Cgr016OutputFileTests`.
 - CI on Linux and macOS: the tests are platform-neutral (fake maker; real-disk tests use valid names or the null-maker path) and the fast tests are green here.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Console` 100% line, 100% branch, 0 failing members, worst CRAP 10 (the platform choice of maker sits in an ADR-0083 excluded method).
