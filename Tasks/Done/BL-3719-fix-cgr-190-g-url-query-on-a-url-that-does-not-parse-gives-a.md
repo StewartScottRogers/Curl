@@ -9,7 +9,7 @@ touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Cgr190Tests.
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3719 — Fix CGR-190: -G/--url-query on a URL that does not parse gives a different error text, and %{url_effective} is not empty
 
@@ -83,3 +83,4 @@ curl -sS -G -d a=b "http://127.0.0.1:99999/a" -w "[%{url_effective}]"
 
 - Measured curl 8.22.0 Schannel: `curl -sS --url-query a=b "http://127.0.0.1:1/a b" -w "[%{url_effective}]"` prints `curl: (3) Could not parse the URL, failed to set query` and `[]`, exit 3. A bad query on a good URL (`--url-query "a b=c" http://127.0.0.1:1/p`) still gives `URL rejected: Malformed input to a URL function` and `[http://127.0.0.1:1/p?a b=c]` (unchanged, FR-064 test still passes).
 - Curl now matches both repros (`/a b`, port 99999) in `Cgr190Tests`; nothing is sent. Fix is in `Curl.Console/CurlCommandRunner.cs` (`TryParseQueriedUrl`, `QueryRejected`, `WriteOutRequestUrl`), not `QueryUrl.cs`, so `touches` was changed; no other Doing task names that file. Measure-CodeQuality for Curl.Console: 0 failing. Linux/macOS: tests are platform-neutral.
+- 2026-10-28: Doing -> Done. Fixed in CurlCommandRunner; Cgr190Tests pin it
