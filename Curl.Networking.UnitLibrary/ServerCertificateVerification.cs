@@ -61,7 +61,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
     /// Reads the roots the chain may lead to. The chain policy replaces the system store,
     /// from <c>--cacert</c>; without <c>--cacert</c> the chain is verified against the system
     /// store, with the <c>--capath</c> roots trusted beside it, and the chain policy is the
-    /// Schannel build's revocation check (online, every certificate but the root, ADR-0868),
+    /// Schannel build's revocation check (online, every certificate but the root, ADR-0930),
     /// or <see langword="null" /> under <c>--ssl-no-revoke</c> and in the OpenSSL build. With
     /// <c>--cacert</c> the Schannel build checks revocation below the root unless
     /// <see cref="TlsClientOptions.SkipRevocationCheck" /> is set, so a private CA with no
@@ -129,7 +129,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
 
     // The Schannel build checks the system store chain for revocation as Schannel's default
     // flags do: online, CRL distribution points and OCSP, every certificate but the root,
-    // unless --ssl-no-revoke (ADR-0868). The OpenSSL build checks none: SslStream's default.
+    // unless --ssl-no-revoke (ADR-0930). The OpenSSL build checks none: SslStream's default.
     private X509ChainPolicy? SystemStoreChainPolicy()
     {
         if (!matchesSchannelBuild || options.SkipRevocationCheck)

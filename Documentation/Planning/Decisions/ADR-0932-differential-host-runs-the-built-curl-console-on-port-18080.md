@@ -1,4 +1,4 @@
-# ADR-0870 — The differential host runs the built Curl.Console against a loopback server on port 18080
+# ADR-0932 — The differential host runs the built Curl.Console against a loopback server on port 18080
 
 - Status: Accepted
 - Date: 2026-10-23

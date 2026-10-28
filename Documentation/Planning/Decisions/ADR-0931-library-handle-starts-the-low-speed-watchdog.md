@@ -1,4 +1,4 @@
-# ADR-0869: A library handle starts the low-speed watchdog
+# ADR-0931: A library handle starts the low-speed watchdog
 
 - Status: Accepted
 - Date: 2026-10-23

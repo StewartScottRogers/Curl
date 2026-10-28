@@ -1,4 +1,4 @@
-# ADR-0819: The HTTP/2 options keep running on Windows under ADR-0871; CGR-040 is not fixed by refusing them
+# ADR-0929: The HTTP/2 options keep running on Windows under ADR-0871; CGR-040 is not fixed by refusing them
 
 - Status: Accepted
 - Date: 2026-10-26

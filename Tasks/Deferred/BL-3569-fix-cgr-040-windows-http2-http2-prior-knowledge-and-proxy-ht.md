@@ -90,7 +90,7 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
   - `--http2-prior-knowledge -s URL`: REF exit 2, same refusal naming the option; NG exit 55, no output; PORT exit 55, no output.
   - `--proxy-http2 -s URL`: REF exit 2, refusal; NG exit 0, `hello`; PORT exit 0, `hello`, the same plain HTTP/1.1 request.
   - `-s -S --http2 URL` (UC-16): REF exit 2, refusal; NG exit 16, `curl: (16) Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.`; PORT exit 56, `curl: (56) Recv failure: Connection was aborted`. That NG difference is BL-3650's (CGR-121).
-- Decision (ADR-0819): Curl keeps Stewart's ADR-0871 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0871, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
+- Decision (ADR-0929): Curl keeps Stewart's ADR-0871 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0871, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
 
 ## Log
 

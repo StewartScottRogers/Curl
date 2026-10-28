@@ -8,7 +8,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins revocation for a chain checked against the system store (BL-3215, ADR-0868): curl
+/// Pins revocation for a chain checked against the system store (BL-3215, ADR-0930): curl
 /// 8.22.0's Schannel build refuses a revoked server or intermediate certificate with exit 35
 /// and <c>CRYPT_E_REVOKED</c>, unless <c>--ssl-no-revoke</c>; <c>--ssl-revoke-best-effort</c>
 /// tolerates only a status it could not fetch; the OpenSSL build checks nothing. A revoked

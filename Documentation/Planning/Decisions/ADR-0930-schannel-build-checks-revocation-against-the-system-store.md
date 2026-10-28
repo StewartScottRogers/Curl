@@ -1,4 +1,4 @@
-# ADR-0868 — The Schannel build checks revocation against the system store
+# ADR-0930 — The Schannel build checks revocation against the system store
 
 - Status: Accepted
 - Date: 2026-10-22

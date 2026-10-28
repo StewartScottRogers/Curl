@@ -33,9 +33,9 @@ For each shared number, the ADR committed first (by `git log --diff-filter=A`) k
 
 Renumbered (the ADR committed first keeps its number; 61 ADRs moved, to 0868-0928, 0868 being the next free number at the time). Old number -> new number, title:
 
-- ADR-0783 -> ADR-0868: The Schannel build checks revocation against the system store
-- ADR-0785 -> ADR-0869: A library handle starts the low-speed watchdog
-- ADR-0785 -> ADR-0870: The differential host runs the built Curl.Console against a loopback server on port 18080
+- ADR-0783 -> ADR-0930: The Schannel build checks revocation against the system store
+- ADR-0785 -> ADR-0931: A library handle starts the low-speed watchdog
+- ADR-0785 -> ADR-0932: The differential host runs the built Curl.Console against a loopback server on port 18080
 - ADR-0786 -> ADR-0871: The HTTP/2 options keep running on Windows under ADR-0871; CGR-040 is not fixed by refusing them The Windows build runs HTTP/2 and lists HTTP2 in curl -V
 - ADR-0791 -> ADR-0872: A Curl.Api request removes a default header through `RemovedHeaders`
 - ADR-0791 -> ADR-0873: A SHA Digest challenge fails with exit 94 where the SSPI build is matched
@@ -71,7 +71,7 @@ Renumbered (the ADR committed first keeps its number; 61 ADRs moved, to 0868-092
 - ADR-0818 -> ADR-0903: A connect asks its socket opener before each TCP attempt
 - ADR-0818 -> ADR-0904: DoH requests go through the proxy environment variables
 - ADR-0818 -> ADR-0905: An ASCII FTP download writes LF line endings off Windows
-- ADR-0819 -> ADR-0906: An HTTP/2 stream reset with HTTP_1_1_REQUIRED is sent again over HTTP/1.1
+- ADR-0929 -> ADR-0906: An HTTP/2 stream reset with HTTP_1_1_REQUIRED is sent again over HTTP/1.1
 - ADR-0820 -> ADR-0907: Gopher, dict, POP3 and MQTT send command-line text in the ANSI code page on Windows
 - ADR-0820 -> ADR-0908: The Windows build resolves no IPv4 address written in shorthand
 - ADR-0821 -> ADR-0909: Linux and macOS read argv's raw bytes and keep each invalid UTF-8 byte as a surrogate escape
@@ -98,7 +98,7 @@ Renumbered (the ADR committed first keeps its number; 61 ADRs moved, to 0868-092
 - Shared numbers at run time were the 14 listed in Context plus 0818-0826, which clashed after the task was filed; all are fixed.
 - Each reference was told apart by title words and file-name links on the same lines, with a hand decision for each that gave no clue. Every ADR-0786 outside the -Z start-order ADR and Curl.Console/ParallelHostQueue.cs means the Windows HTTP/2 ADR (now ADR-0871).
 - Left alone as the rules require: archived tasks under Tasks/Done, and the audit and gap offices' folders (off limits to a lane). The audit findings AF-0381, AF-0423 and AF-0432, the audit conformance instructions and the gap finding GF-0099 still say ADR-0786 for the Windows HTTP/2 decision, which is now ADR-0871; an interactive session should update them.
-- ADR-0819's file name held adr-0786 in its slug; it is now ...-under-adr-0871-despite-cgr-040 and its links are updated.
+- ADR-0929's file name held adr-0786 in its slug; it is now ...-under-adr-0871-despite-cgr-040 and its links are updated.
 
 ## Log
 
