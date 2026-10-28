@@ -137,7 +137,7 @@ internal sealed class SslStreamConnection(
     /// <inheritdoc />
     /// <remarks>
     /// Sends <c>close_notify</c> first, as curl 8.18.0's OpenSSL build and curl 8.22.0's Schannel
-    /// build both do when they close a connection (BL-3984, ADR-0957), unless TLS has already
+    /// build both do when they close a connection (BL-3984, ADR-0959), unless TLS has already
     /// ended or the server has closed the transport; a failure to send it is ignored, as curl's is.
     /// </remarks>
     public async ValueTask DisposeAsync()

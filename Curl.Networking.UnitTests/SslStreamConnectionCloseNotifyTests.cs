@@ -12,7 +12,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins <see cref="SslStreamConnection.DisposeAsync" />'s <c>close_notify</c> (BL-3984,
-/// ADR-0957): closing an https connection sends the alert first, as curl 8.18.0's OpenSSL build
+/// ADR-0959): closing an https connection sends the alert first, as curl 8.18.0's OpenSSL build
 /// and curl 8.22.0's Schannel build both do, but not a second time after TLS has ended, not after
 /// the server has closed the transport, and a failure to send it does not escape. The server is a
 /// server-side <see cref="SslStream" /> over an <see cref="InMemoryDuplexStream" /> pair, which

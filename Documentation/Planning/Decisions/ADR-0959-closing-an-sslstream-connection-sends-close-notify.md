@@ -1,4 +1,4 @@
-# ADR-0957: Closing an SslStream connection sends close_notify
+# ADR-0959: Closing an SslStream connection sends close_notify
 
 - Status: Accepted
 - Date: 2026-10-28

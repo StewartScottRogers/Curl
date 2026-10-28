@@ -18,7 +18,7 @@ When Curl's hand-built TLS client (`HandBuiltTlsConnection`, used for `--tls-max
 
 ## Context
 
-Filed by BL-3984 (ADR-0957), which made `SslStreamConnection.DisposeAsync` send `close_notify` first: curl 8.18.0 (OpenSSL 3.5.5) and curl 8.22.0 (Schannel) both send `TLS 1.3, Alert [length 0002], warning close_notify` after the body against `openssl s_server -tls1_3 -ign_eof -msg` answering `HTTP/1.0 200 OK` with `Content-Length: 5`. `HandBuiltTlsConnection.DisposeAsync` disposes its `tlsStream` and the plaintext connection; whether that sends the alert was not checked. Check first (a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, reading the raw bytes after the handshake, as `SslStreamConnectionCloseNotifyTests` does), and change only if it sends none; keep BL-3984's exceptions (TLS already ended by `ShutDownSendingAsync` or `ClearTlsAsync`, transport already ended, a send failure ignored).
+Filed by BL-3984 (ADR-0959), which made `SslStreamConnection.DisposeAsync` send `close_notify` first: curl 8.18.0 (OpenSSL 3.5.5) and curl 8.22.0 (Schannel) both send `TLS 1.3, Alert [length 0002], warning close_notify` after the body against `openssl s_server -tls1_3 -ign_eof -msg` answering `HTTP/1.0 200 OK` with `Content-Length: 5`. `HandBuiltTlsConnection.DisposeAsync` disposes its `tlsStream` and the plaintext connection; whether that sends the alert was not checked. Check first (a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, reading the raw bytes after the handshake, as `SslStreamConnectionCloseNotifyTests` does), and change only if it sends none; keep BL-3984's exceptions (TLS already ended by `ShutDownSendingAsync` or `ClearTlsAsync`, transport already ended, a send failure ignored).
 
 ## Acceptance criteria
 

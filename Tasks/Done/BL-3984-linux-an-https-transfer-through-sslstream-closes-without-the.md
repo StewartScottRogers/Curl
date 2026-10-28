@@ -28,7 +28,7 @@ Found by BL-3698 (CGR-169, ADR-0956). In WSL, `openssl s_server -tls1_3 -accept 
 
 ## Notes
 
-- Measured (scripts rebuilt as a WSL shell script, s_server -tls1_3 -ign_eof -msg): real curl 8.18.0 (OpenSSL 3.5.5) in WSL and real curl 8.22.0 Schannel on Windows both send TLS 1.3, Alert [length 0002], warning close_notify after the body, and the server answers with its own. So the change applies to both builds (ADR-0957).
+- Measured (scripts rebuilt as a WSL shell script, s_server -tls1_3 -ign_eof -msg): real curl 8.18.0 (OpenSSL 3.5.5) in WSL and real curl 8.22.0 Schannel on Windows both send TLS 1.3, Alert [length 0002], warning close_notify after the body, and the server answers with its own. So the change applies to both builds (ADR-0959).
 - Fix: SslStreamConnection.DisposeAsync calls SslStream.ShutdownAsync first, except after ShutDownSendingAsync or ClearTlsAsync (TLS already ended; after a cleared TLS the bytes are plain text) or once the server ended the transport; an IOException or InvalidOperationException sending it is ignored.
 - After the fix a linux-x64 publish run in WSL: exit 0, body reneg, s_server logs <<< TLS 1.3, Alert [length 0002], warning close_notify and answers >>> ... close_notify - the same client alerts as real curl. (s_server's stdin must stay open longer than the 4 s first used: the self-contained build from /mnt/c starts slowly and the server closed first.)
 - SslStreamConnectionCloseNotifyTests.DisposeAsync_AfterATransfer_SendsCloseNotify (both builds) failed with the call removed and passes with it.
