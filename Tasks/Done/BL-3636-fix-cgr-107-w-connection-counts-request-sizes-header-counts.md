@@ -8,7 +8,7 @@ depends-on: [BL-3961, BL-3962, BL-3970, BL-3971, BL-3958, BL-3959, BL-3960]
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitTests/Cgr107Tests.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/Cgr107Tests.cs, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests/Cgr107Tests.cs, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/Cgr107Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3636 — Fix CGR-107: -w connection counts, request sizes, header counts and timings are not filled in for non-HTTP protocols (FTP, SMTP, POP3, IMAP, DICT, GOP...
 
@@ -107,10 +107,10 @@ curl -sS ws://127.0.0.1:21802/x -w "%{num_connects}\n"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -119,9 +119,23 @@ curl -sS ws://127.0.0.1:21802/x -w "%{num_connects}\n"
 
 - 2026-10-28 (lane 9): Split for size before any code edit. The fix spans the engine plus eight protocol libraries (Ftp, Ssh, Smtp, Dict, Gopher, Mqtt, Ws, Rtsp), each needing its own real-curl measurement, which is too much for one run. Filed BL-3961 (num_connects, engine-wide through ConnectionEndPointRecorder), BL-3962 (FTP timings and upload size_request), BL-3957 (SFTP/SCP timings and speed), BL-3958 (SMTP size_request), BL-3959 (DICT/GOPHER/MQTT size_request) and BL-3960 (WS/RTSP num_headers, RTSP http_version). They are independent of each other, so none depends on another. Once they are Done, this task only reruns the repros and records them.
 
+- 2026-10-28 (lane 4): Every subtask was Done (BL-3957's SSH work landed through BL-3970 and BL-3971), so this run only reran the repros at 4236c9751 with `Record-CurlExchange.ps1` (real curl 8.22.0 Schannel as REF, `dotnet run --no-build --project Curl.Console` as PORT). Results, REF / PORT:
+  - FTP-8 `-sS -o out.bin -w "%{num_connects}\n" ftp://127.0.0.1:P/file.txt` (`-Ftp`): `2` exit 0 / `2` exit 0.
+  - FTP-8 `-sS -T up.txt -w "%{size_upload} %{size_download} %{size_request} %{size_header}\n" ftp://127.0.0.1:P/s.txt` (8-byte file): `8 0 8 0` / `8 0 8 0`, exit 0 both.
+  - FTP-9 `-sS -o o -w "%{time_total} %{time_connect} %{time_starttransfer} %{time_pretransfer}\n" ftp://127.0.0.1:P/file.txt`: `0.031533 0.001185 0.031270 0.029435` / `0.161594 0.065291 0.161594 0.116508`; both non-zero, differing by timing only.
+  - OP-10/OP-11 SMTP `-s -S -w "%{num_connects} %{size_request}\n" smtp://127.0.0.1:P --mail-from a@b --mail-rcpt c@d -T msg.txt` (27-byte CRLF body): `1 30` / `1 30`.
+  - DICT `-s -o NUL -w "%{num_connects} %{size_request}\n" dict://127.0.0.1:P/d:word`: `1 44` / `1 44`. GOPHER `.../1/x`: `1 4` / `1 4`.
+  - OP-11 RTSP `-sS -o NUL -w "%{num_connects} %{num_headers} %{http_version}\n" rtsp://127.0.0.1:P/m` (200 with CSeq and Content-Length): `1 2 1.1` / `1 2 1.1`.
+  - DOH-20 `-sS -w "%{num_connects}\n" ws://127.0.0.1:P/x` against a 200: stdout `1`, exit 22, `curl: (22) Refused WebSocket upgrade: 200` from both.
+  - stderr empty and exit 0 for both on every other case; request.bin byte-identical for every case but ws, which differs only in the port in Host and the random Sec-WebSocket-Key (normalised by the report's section 1).
+  - Not rerun here: SSH-08 (needs the WSL sshd; BL-3971 recorded real curl and Curl with the same shape, times non-zero and ordered, num_connects 1, failed transfer exit 78) and MQTT (the recorder has no MQTT server; BL-3959 pins 34 from the report). WS 101 `num_headers` 3 was measured equal by BL-3960.
+- Focused unit tests (ADR-0482): each subtask added `Cgr107Tests.cs` in its library's `.UnitTests` project (Smtp, Dict, Gopher, Mqtt, Ws, Rtsp) or its own named test file (engine, FTP, SSH) and recorded it failing before its fix and passing after; no further code change was needed here.
+- `dotnet build` clean; `dotnet test --no-build --filter "TestCategory!=Integration"` exit 0, no failed project. No code changed, so no quality run. Platform-neutral: no code or test changed in this run.
+
 ## Log
 
 - 2026-10-26: Created from CGR-107 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Split for size: waits on BL-3961, BL-3962, BL-3957, BL-3958, BL-3959 and BL-3960
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Every CGR-107 repro now matches real curl: num_connects, size_request, num_headers, http_version and timings for FTP, SMTP, DICT, GOPHER, RTSP, WS (and SSH/MQTT via their subtasks)
