@@ -44,3 +44,4 @@ from the desktop.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 94c4a726 76247ba0 b872ce3a 3ac8007a d265299d.
