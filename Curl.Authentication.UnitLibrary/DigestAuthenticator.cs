@@ -28,7 +28,7 @@ namespace Curl.Authentication;
 /// <see langword="null" />. It never answers before a challenge, as curl does not. Which
 /// scheme to answer when several are offered and allowed is decided by
 /// <see cref="RankedHttpAuthenticator" />. Keeping no
-/// state (ADR-0014), every answer to a challenge is the first for its nonce: <c>nc=00000001</c>.
+/// state (ADR-0014), every answer to a challenge is the first for its nonce: <c>nc=00000001</c>, except under <c>--anyauth</c> to the origin, where curl 8.22.0 has already made the Digest value once while picking the scheme and sends <c>nc=00000002</c> (BL-3897).
 /// An answer sent again on a request that keeps it (<see cref="RepeatAuthorization" />) is
 /// read back from the value as sent and counted on, as curl counts its kept nonce (BL-869).
 /// <c>auth-int</c> hashes an empty body, as curl does whatever the body. The algorithm and qop
@@ -48,6 +48,8 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
     private const string SchemeName = "Digest";
 
     private const uint FirstNonceCount = 1;
+
+    private const uint AnyAuthNonceCount = 2;
 
     private const string LoginDeniedMessage = "Login denied";
 
@@ -119,7 +121,7 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
     private string CreateFirstAnswer(DigestChallenge challenge, string userName, string? realm, NetworkCredential credential, HttpAuthRequest request)
     {
         log.DigestParametersChosen(challenge.AlgorithmName, challenge.Qop);
-        return SchemeName + " " + CreateResponse(challenge, userName, realm, credential.Password, request, createClientNonce(), FirstNonceCount);
+        return SchemeName + " " + CreateResponse(challenge, userName, realm, credential.Password, request, createClientNonce(), request is { AllowedSchemes: HttpAuthSchemes.Any, IsProxy: false } ? AnyAuthNonceCount : FirstNonceCount);
     }
 
     /// <summary>
