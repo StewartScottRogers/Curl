@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console, Curl.Console.UnitTests/Cgr064Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3593 — Fix CGR-064: -O keeps the whole URL path when it contains a backslash, where curl uses the part after the last backslash
 
@@ -60,17 +60,25 @@ curl -sS -O --output-dir <dir> "http://127.0.0.1:20200/a\b.txt" -w "[%{filename_
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr064Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-28 (lane 7): Fix in `Curl.Console/RemoteFileName.cs`: after the dot segments are resolved on `/`, each kept segment is split at `\` and the last non-empty part is the name (dot segments stay `/`-only, as curl's `dedotdotify`). No ADR: plain match of curl's measured behaviour.
+- Measured with `Record-CurlExchange.ps1` (REF = Git for Windows curl 8.22.0 Schannel; PORT = this build via `dotnet run --no-build`), `-sS -O --output-dir <dir> <url> -w "[%{filename_effective}]"`, server replying `200` with `ok\n`:
+  - `http://127.0.0.1:<port>/a\b.txt`: REF exit 0, stdout `[<dir>/b.txt]`, stderr empty, writes `<dir>\b.txt`, request line `GET /a\b.txt HTTP/1.1`. PORT after the fix: identical (request bytes equal but for the listen port). Before the fix Curl wrote to `a\b.txt` (exit 23 on Windows, per the report).
+  - Variant `http://127.0.0.1:<port>/x/a\`: REF exit 0, `[<dir>/a]`, writes `a`; PORT identical.
+- Linux: not measurable from this lane; the change is platform-neutral (string split), and the report says Linux curl 8.18.0 also saves `b.txt`, so one test pins both.
+- Focused test `Curl.Console.UnitTests/Cgr064Tests.cs` (4 rows); before the fix `FromUrlPath("/a\b.txt")` returned `a\b.txt`, so each row fails without it.
+- `dotnet build` clean; fast tests: 46 test projects passed, 0 failed (Curl.Console.UnitTests 3066 passed, 31 skipped). `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-064 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. -O takes the name after the last backslash, so /a\b.txt saves b.txt as curl does
