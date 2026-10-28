@@ -793,9 +793,19 @@ public sealed class HttpProtocolHandler(
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
-            ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
+            ? await ConnectAndExchangeAsync(CountedOnIfResent(reconnect, outcome.DiedBeforeResponse), outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
             : outcome.Result;
     }
+
+    /// <summary>
+    /// Gives a request sent again on a fresh connection because its reused one died before the
+    /// response (<paramref name="resentAfterConnectionDied" />) its <c>Authorization</c> value as
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" /> sends it again, so a Digest answer
+    /// counts its nonce on (the same <c>cnonce</c>, <c>nc=00000002</c>), as curl 8.22.0 makes the
+    /// answer again for the resend (measured, BL-3874, ADR-0948); <paramref name="retry" /> itself otherwise.
+    /// </summary>
+    private HttpRequestPlan CountedOnIfResent(HttpRequestPlan retry, bool resentAfterConnectionDied) =>
+        resentAfterConnectionDied ? retry.WithAuthorizationSentAgain(RepeatAuthorization(retry)) : retry;
 
     /// <summary>
     /// Reports the progress of a request now connected: the transfer started for the first, a
@@ -3801,6 +3811,15 @@ public sealed class HttpProtocolHandler(
         /// </summary>
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed, AuthorizationAnswersChallenge);
+
+        /// <summary>
+        /// Makes the same request with <paramref name="authorization" /> as its <c>Authorization</c>
+        /// value, its <see cref="UploadRewindFailure" /> kept; this plan when the value is unchanged.
+        /// </summary>
+        /// <param name="authorization">The value to send; <see langword="null" /> for none.</param>
+        /// <returns>The request's plan with that value.</returns>
+        public HttpRequestPlan WithAuthorizationSentAgain(string? authorization) =>
+            authorization == Authorization ? this : With(Framing, authorization).FailingUploadRewind(UploadRewindFailure);
 
         /// <summary>
         /// Makes the same request, sent again over HTTP/1.1 on a new connection because the server
