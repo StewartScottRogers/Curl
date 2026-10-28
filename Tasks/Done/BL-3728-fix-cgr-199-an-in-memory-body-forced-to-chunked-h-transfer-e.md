@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Protocol
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3728 — Fix CGR-199: An in-memory body forced to chunked (-H 'Transfer-Encoding: chunked' with -d, --data-binary or --json) goes out as one chunk; curl uses c...
 
@@ -76,3 +76,4 @@ curl -sS -H "Transfer-Encoding: chunked" --data-binary @b.bin http://127.0.0.1:2
 
 - 2026-10-26: Created from CGR-199 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. chunked in-memory bodies go out in upload-buffer chunks like curl
