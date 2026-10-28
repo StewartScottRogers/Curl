@@ -31,7 +31,7 @@ Split from BL-3853 (CGR-016). BL-3853 (ADR-0920) opens `-o`, `-O` and `-J` files
 
 ## Notes
 
-- Plan (feature pipeline run inline; the change is three small edits in files the task names): `CurlCommandRunner.TransferWithHeaderFileAsync` opens `-D` through `RawByteFileName.OpenForWriteAsync`; `PhysicalOutputPaths` takes an optional raw directory maker (`RawByteFileName.MakeDirectoryUnderRawBytes`, `SystemNative_MkDir`, off Windows only) used for a name holding an escaped byte; EEXIST counts as made. Decision recorded in ADR-0942.
+- Plan (feature pipeline run inline; the change is three small edits in files the task names): `CurlCommandRunner.TransferWithHeaderFileAsync` opens `-D` through `RawByteFileName.OpenForWriteAsync`; `PhysicalOutputPaths` takes an optional raw directory maker (`RawByteFileName.MakeDirectoryUnderRawBytes`, `SystemNative_MkDir`, off Windows only) used for a name holding an escaped byte; EEXIST counts as made. Decision recorded in ADR-0943.
 - Mode choice: 0777 before the umask, the mode `Directory.CreateDirectory` gives every other name, so raw and valid names get the same permissions (default kept rather than introducing a difference between the two kinds of name).
 - Measured 2026-10-28 in WSL against curl 8.18.0 (OpenSSL 3.5.5, Ubuntu) and a linux-x64 self-contained publish of this branch, each in an empty directory, file listing through `find . | od -c`:
   - `curl -s -D $'\xfc.h' -o a.txt file:///etc/hostname`: curl 8.18.0 exit 0, files `./a.txt` and `./\374.h` (FC 2E 68); Curl exit 0, the same two names.

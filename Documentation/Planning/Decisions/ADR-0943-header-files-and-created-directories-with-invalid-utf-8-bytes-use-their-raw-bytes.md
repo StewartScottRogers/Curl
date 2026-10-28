@@ -1,4 +1,4 @@
-# ADR-0942: `-D` files and `--create-dirs` directories holding invalid UTF-8 argument bytes use their raw bytes
+# ADR-0943: `-D` files and `--create-dirs` directories holding invalid UTF-8 argument bytes use their raw bytes
 
 - Status: Accepted
 - Date: 2026-10-28
