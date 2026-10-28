@@ -33,3 +33,4 @@ Found by BL-3850 (CGR-016 part 2). The request side writes a `-b` cookie string 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: f55d9e64 5d40e100 1e950046 c285e6d4 779790c0.
