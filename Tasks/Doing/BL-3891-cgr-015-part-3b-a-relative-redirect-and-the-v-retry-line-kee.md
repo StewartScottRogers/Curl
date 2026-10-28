@@ -31,3 +31,4 @@ Follow-up from BL-3840 (CGR-015 part 3). BL-3840 made the request line encode a 
 ## Log
 
 - 2026-10-26: Created by BL-3840's run.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 6539f7d0 c664fab7 4979ce11.
