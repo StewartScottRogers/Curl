@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/WindowsOutputFileNameSanitizer.cs, Curl.Console.UnitTests/WindowsOutputFileNameSanitizerTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3967 — Strip trailing dots from an -O remote name on Windows as curl's sanitizer does
 
@@ -22,13 +22,16 @@ Found by BL-3592 (CGR-063), measured 2026-10-28 with Record-CurlExchange.ps1 aga
 
 ## Acceptance criteria
 
-- [ ] The repro in Goal, run through real curl and Curl on Windows, gives the same exit code, stdout bytes, stderr text and files written; the commands and results are in Notes.
-- [ ] A unit test marked `[OSCondition(OperatingSystems.Windows)]` in `Curl.Console.UnitTests/WindowsOutputFileNameSanitizerTests.cs` pins the stripped name.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The repro in Goal, run through real curl and Curl on Windows, gives the same exit code, stdout bytes, stderr text and files written; the commands and results are in Notes.
+- [x] A unit test marked `[OSCondition(OperatingSystems.Windows)]` in `Curl.Console.UnitTests/WindowsOutputFileNameSanitizerTests.cs` pins the stripped name.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Measured 2026-10-28 with Record-CurlExchange.ps1 (curl.exe vs dotnet curl.dll), `-sS -O --path-as-is --output-dir <dir> http://127.0.0.1:18967/a/... -w "[%{filename_effective}]"`: both exit 23, stdout `[<dir>/]`, empty stderr, no file written. Fix: `SanitizeRemoteName` now TrimEnd('.', ' '). Unit test rows pin `...`, `a.`, `a..b.`, `a. `, `con.` under OSCondition(Windows). Measure-CodeQuality Curl.Console: 0 failing members. Fast Curl.Console tests green; Linux/macOS CI unaffected as the test is Windows-only.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 024af981 a41efccc 779790c0.
+- 2026-10-28: Doing -> Done. Trailing dots and spaces stripped from -O name on Windows; matches curl 8.21.0

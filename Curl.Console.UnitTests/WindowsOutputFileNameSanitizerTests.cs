@@ -26,6 +26,12 @@ public sealed class WindowsOutputFileNameSanitizerTests
     [DataRow("a.con", "a.con", DisplayName = "SanitizeRemoteName_ReservedExtension_IsKept")]
     [DataRow("nul%20", "nul%20", DisplayName = "SanitizeRemoteName_ReservedNameWithMore_IsKept")]
     [DataRow("CON%3Ax", "CON%3Ax", DisplayName = "SanitizeRemoteName_EncodedColon_IsKept")]
+    [DataRow("...", "", DisplayName = "SanitizeRemoteName_OnlyDots_BecomesEmpty")]
+    [DataRow("a.", "a", DisplayName = "SanitizeRemoteName_TrailingDot_IsStripped")]
+    [DataRow("a..b.", "a..b", DisplayName = "SanitizeRemoteName_TrailingDotAfterInnerDots_KeepsInnerDots")]
+    [DataRow("a. ", "a", DisplayName = "SanitizeRemoteName_TrailingDotAndSpace_AreStripped")]
+    [DataRow("con.", "_con", DisplayName = "SanitizeRemoteName_ReservedNameWithTrailingDot_IsStrippedThenRenamed")]
+    [OSCondition(OperatingSystems.Windows)]
     public void SanitizeRemoteName_MeasuredName_IsRewrittenAsCurlDoes(string fileName, string expected)
     {
         Diagnostics.Arrange("remote name", fileName);
