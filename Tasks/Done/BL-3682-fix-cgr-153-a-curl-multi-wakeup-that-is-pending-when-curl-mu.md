@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr153Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3682 — Fix CGR-153: A curl_multi_wakeup that is pending when curl_multi_poll returns for transfer activity is not consumed, so it ends a later poll early
 
@@ -59,17 +59,23 @@ probe.exe C_77,C_13 2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr153Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause: `ManagedMultiTransfer.WaitOrPollAsync` returned on `ready > 0` before `WaitEnds` ran `TakeWakeup`, so a wakeup pending when a poll returned for transfer activity stayed pending and ended the next poll at once. Fix: the new `ReturnsNow` takes a pending wakeup on every look a poll makes, as libcurl 8.22.0's `multi_wait` drains its wakeup socket after every poll. Done directly rather than through the full `/feature` stages: a two-line, single-method fix whose behaviour the report pins. No ADR: this matches libcurl rather than choosing between behaviours.
+- Focused test `Cgr153Tests.PollAsync_ReturningForTransferActivityWithAWakeupPending_TakesTheWakeup`: it failed with the old condition restored (`ready == 0 && poll && TakeWakeup()`) and passes with the fix.
+- Repro (Windows): the report's probe (`SCR\evidence\libcurl-multi-callbacks\probe\out`), copied to a temp folder with this build's `Libcurl\bin\Debug\net10.0\*.dll` laid over it, `probe.exe C_77,C_13 2`: `MATCH C_13_wakeup_poll` x2, `MATCH C_77_wakeup_consumed_with_activity` x2, `TOTAL cases=4 diffs=0`. REF and PORT both give `poll0:n=1,<100 poll1:n=0,>=700 poll2:n=0,>=700 poll3:n=1,100-700`, `openAtEnd=0`, and C_13's `poll-busy-wakeup rc=0 n=0 t=150-900`. The unmodified probe (PORT at b0d27d68) still gives the issue's Actual (`poll1:n=0,<100 ... poll3:n=0,>=700`, `openAtEnd=1`), which shows the overlay took effect. C_13's other sub-tests (wakeup before a poll, two wakeups, wakeup from a thread, wait ignoring wakeup, negative timeouts) still match REF.
+- Linux and macOS: not run here (lanes test on Windows only). The change is platform-neutral managed code, and the unit test runs on the fake clock, so the fast tests cover it on every platform.
+- Gates: `dotnet build` clean; fast tests green (Curl.Engine.UnitTests 2690 passed, 7 skipped; no project failed). `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: the first run found `WaitOrPollAsync` at complexity 12, so the check moved into `ReturnsNow`; the second run found 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-153 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. A curl_multi_wakeup pending when curl_multi_poll returns for transfer activity is taken by that poll, so later polls wait their full timeout as libcurl's do (CGR-153)
