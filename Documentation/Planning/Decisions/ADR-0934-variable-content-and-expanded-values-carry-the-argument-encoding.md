@@ -1,4 +1,4 @@
-# ADR-0870 — Variable content and expanded values carry the argument encoding
+# ADR-0934 — Variable content and expanded values carry the argument encoding
 
 - Status: Accepted
 - Date: 2026-10-28
