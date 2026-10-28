@@ -82,7 +82,7 @@ internal static class EasyHttpOptionSetters
 
     private static CurlCode SetCopyPostFields(ref EasyOptions o, object? v) => SetPostBody(ref o, v, copy: true);
 
-    private static CurlCode SetPostFieldSize(ref EasyOptions o, object? v) => SetAtLeastMinusOne(ref o, v, (h, n) => h with { PostFieldSize = n });
+    private static CurlCode SetPostFieldSize(ref EasyOptions o, object? v) => SetAtLeastMinusOne(ref o, v, (h, n) => h with { PostFieldSize = n, PostFields = h.PostFieldsAreCopy ? null : h.PostFields, PostFieldsAreCopy = false });
 
     private static CurlCode SetMimeOptions(ref EasyOptions o, object? v) => Set(ref o, h => h with { MimeOptions = (MimeOptions)(NumberOf(v) & (long)MimeOptions.FormEscape) });
 
@@ -172,7 +172,7 @@ internal static class EasyHttpOptionSetters
 
     /// <summary>
     /// <c>CURLOPT_POSTFIELDS</c> keeps the caller's buffer by reference; <c>CURLOPT_COPYPOSTFIELDS</c>
-    /// copies it, only the first <c>CURLOPT_POSTFIELDSIZE</c> bytes when that is set. Either makes the
+    /// copies it, only the first <c>CURLOPT_POSTFIELDSIZE</c> bytes when that is set; setting <c>CURLOPT_POSTFIELDSIZE</c> afterwards discards that copy. Either makes the
     /// request a <c>POST</c>, clearing <c>CURLOPT_UPLOAD</c> as <c>CURLOPT_POST</c> does. A string is sent as its UTF-8 bytes.
     /// </summary>
     private static CurlCode SetPostBody(ref EasyOptions options, object? value, bool copy)
@@ -190,7 +190,7 @@ internal static class EasyHttpOptionSetters
         }
 
         options = options with { Transfer = options.Transfer with { Upload = false } };
-        return Set(ref options, h => h with { PostFields = copy ? CopyOf(fields, h.PostFieldSize) : fields, Post = true, HttpGet = false });
+        return Set(ref options, h => h with { PostFields = copy ? CopyOf(fields, h.PostFieldSize) : fields, PostFieldsAreCopy = copy && fields is not null, Post = true, HttpGet = false });
     }
 
     /// <summary>A private copy of <paramref name="fields"/>, cut to <paramref name="size"/> bytes when that is not negative and shorter; <see langword="null"/> stays <see langword="null"/>.</summary>
