@@ -39,3 +39,4 @@ BL-3686 (ADR-0856) fixed the Windows half of third-party gap report issue CGR-15
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 90befad2 74ba9b3c 168cb378 779790c0.
 - 2026-10-28: Doing -> Backlog. Waits on BL-3946, which holds Curl.Conformance.UnitTests and Curl.Conformance.UnitLibrary (UpstreamCurlPlatformTests.cs, UpstreamUnixFeatures.cs); measurement and decision recorded in Notes
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 90befad2 74ba9b3c 168cb378 779790c0.
