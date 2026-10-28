@@ -42,3 +42,4 @@ Neither `Encoding` subclass overrides `GetDecoder()`. A `StreamReader` or chunke
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 1289ed73 b93f505f 4d002e90 dc720966 44447f62.
