@@ -108,7 +108,7 @@ internal static class EasyHttpOptionSetters
 
     private static CurlCode SetAltSvc(ref EasyOptions o, object? v) => Set(ref o, h => h with { AltSvc = (string?)v });
 
-    private static CurlCode SetAltSvcControl(ref EasyOptions o, object? v) => Set(ref o, h => h with { AltSvcControl = (AltSvcControl)NumberOf(v) });
+    private static CurlCode SetAltSvcControl(ref EasyOptions o, object? v) => NumberOf(v) == 0 ? CurlCode.BadFunctionArgument : Set(ref o, h => h with { AltSvcControl = (AltSvcControl)NumberOf(v) });
 
     private static CurlCode SetHsts(ref EasyOptions o, object? v) => Set(ref o, h => h with { Hsts = (string?)v });
 
