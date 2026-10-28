@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs, Curl.Protocol.Http.UnitTests/Cgr016MethodTests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestHeadFormatter.cs, Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs, Curl.Protocol.Http.UnitTests/Cgr016MethodTests.cs, Curl.Cli.UnitTests/Cgr016Tests.cs, Curl.Cli.UnitTests/Cgr020Tests.cs, Curl.Protocol.Http.UnitTests/Cgr065Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3902 — CGR-016 follow-up: Linux and macOS send a -X method holding an invalid UTF-8 byte as that byte
 
@@ -22,14 +22,17 @@ Found by BL-3545 (CGR-016), measured 2026-10-26 in WSL Ubuntu with curl 8.18.0 (
 
 ## Acceptance criteria
 
-- [ ] `-X $'G\xffT'` sends the same request bytes as curl 8.18.0 on Linux, measured as above and recorded in Notes.
-- [ ] Every `-X` value on Windows and every config-file `request` value goes out as before.
-- [ ] A focused unit test pins the request line bytes and passes on every platform.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `-X $'G\xffT'` sends the same request bytes as curl 8.18.0 on Linux, measured as above and recorded in Notes.
+- [x] Every `-X` value on Windows and every config-file `request` value goes out as before.
+- [x] A focused unit test pins the request line bytes and passes on every platform.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- 2026-10-28: Cause: since CGR-065 the request line encodes the method with the command-line encoding itself, so the parse's Latin-1 re-spelling (BL-3850) double-encoded it on Linux and macOS (this also double-encoded a valid non-ASCII -X such as é). Fix: AsRawWireText keeps a command-line value unchanged when arguments are read as UTF-8 (the escape is given back as its byte by the request head); Windows and config-file values go through as before. Measured in WSL Ubuntu: curl 8.18.0 and a linux-x64 build of Curl each send `47 ff 54 20 2f 20 48 54 54 50 2f 31` for `-X $'G�T'`. Pinned by Cgr065Tests.Format_MethodHoldingAnEscapedInvalidByte_SendsThatByte; old parse pins in Cgr016Tests, Cgr016HeaderCookieTests and Cgr020Tests updated. Measure-CodeQuality for Curl.Cli.UnitLibrary: 0 failing members. Curl.Cli and Curl.Protocol.Http fast tests pass.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: af9dd051 b46d1a73 3645b810 779790c0.
+- 2026-10-28: Doing -> Done. Linux and macOS send a -X method holding an invalid UTF-8 byte as that byte

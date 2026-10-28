@@ -1029,17 +1029,17 @@ public static partial class CommandLineOptionTable
     /// <paramref name="value"/> as the request side must hold a <c>-b</c> cookie string or <c>-X</c> method
     /// to send it as curl 8.22.0 does: while a config file is read, re-spelled one character per byte of
     /// the file's own bytes, since the request side writes those values one character per byte
-    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise with each
-    /// byte of an argument that was not valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>) given as that
-    /// byte's one character, so <c>-b $'a=\xff'</c> sends the byte FF as curl 8.18.0 does on Linux
-    /// (CGR-016, BL-3850), and every other character unchanged. A command-line <c>-b</c> string is not passed here:
-    /// it keeps the escape, which the console's cookie string encoding gives back as its byte (BL-3545).
+    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise, on Windows, with each
+    /// escaped byte given as that byte's one character, and elsewhere unchanged: the escape
+    /// (<see cref="InvalidUtf8ByteEscape"/>) is kept for the request head's encoding of command-line text, which
+    /// gives it back as its byte, so <c>-X $'G\xffT'</c> sends the byte FF as curl 8.18.0 does on Linux
+    /// (CGR-016, BL-3902). A command-line <c>-b</c> string is not passed here and keeps the escape likewise (BL-3545).
     /// </summary>
     private static string AsRawWireText(CommandLineOptions options, string value) =>
         options.ReadingConfigFile
             ? Encoding.Latin1.GetString((options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : Encoding.UTF8).GetBytes(value))
             : options.ReadsArgumentsAsUtf8
-                ? Encoding.Latin1.GetString(InvalidUtf8ByteEscape.Encoding.GetBytes(value))
+                ? value
                 : WithEscapedBytesAsCharacters(value);
 
     /// <summary>

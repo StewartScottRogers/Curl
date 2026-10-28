@@ -94,7 +94,7 @@ public sealed class Cgr020Tests
         CommandLineOptions options = Parse(["-b", "c=é", "-X", "é", Url], false);
 
         Assert.AreEqual("c=é", options.Cookies.Single().Value);
-        Assert.AreEqual("Ã©", options.RequestMethod);
+        Assert.AreEqual("é", options.RequestMethod);
     }
 
     [TestMethod]

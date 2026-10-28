@@ -27,7 +27,7 @@ public sealed class Cgr016HeaderCookieTests
     {
         CommandLineOptions options = Parse(["-X", "G" + EscapedFF + "T", Url]);
 
-        Assert.AreEqual("GÿT", options.RequestMethod);
+        Assert.AreEqual("G\uDCFFT", options.RequestMethod);
     }
 
     [TestMethod]
@@ -35,7 +35,7 @@ public sealed class Cgr016HeaderCookieTests
     {
         CommandLineOptions options = Parse(["-X", "GÉT", Url]);
 
-        Assert.AreEqual("GÃ\u0089T", options.RequestMethod);
+        Assert.AreEqual("GÉT", options.RequestMethod);
     }
 
     [TestMethod]

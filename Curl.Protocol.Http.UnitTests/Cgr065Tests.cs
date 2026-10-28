@@ -23,6 +23,16 @@ public sealed class Cgr065Tests
     }
 
     [TestMethod]
+    public void Format_MethodHoldingAnEscapedInvalidByte_SendsThatByte()
+    {
+        HttpRequestOptions options = new() { CustomMethod = "G\uDCFFT", CommandLineTextEncoding = Encoding.UTF8 };
+
+        byte[] head = HttpRequestHeadFormatter.Format(CurlUrl.Parse("http://127.0.0.1/a"), options);
+
+        Assert.StartsWith("GÿT /a HTTP/1.1\r\n", Encoding.Latin1.GetString(head));
+    }
+
+    [TestMethod]
     public void Format_AsciiMethod_SendsItUnchanged()
     {
         HttpRequestOptions options = new() { CustomMethod = "PATCH", CommandLineTextEncoding = Encoding.UTF8 };

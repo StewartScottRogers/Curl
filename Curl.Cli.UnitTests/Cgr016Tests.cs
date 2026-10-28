@@ -15,17 +15,17 @@ public sealed class Cgr016Tests
     {
         CommandLineOptions options = Parse(["-X", InvalidUtf8ByteEscape.Decode([0xFF]) + "T", Url]);
 
-        Assert.AreEqual("ÿT", options.RequestMethod);
+        Assert.AreEqual("\uDCFFT", options.RequestMethod);
     }
 
     [TestMethod]
-    public void Parse_MethodWithPairEndingInDcSurrogate_SendsThePairsUtf8Bytes()
+    public void Parse_MethodWithPairEndingInDcSurrogate_KeepsThePair()
     {
         const string Method = "G􏳿T";
 
         CommandLineOptions options = Parse(["-X", Method, Url]);
 
-        Assert.AreEqual(System.Text.Encoding.Latin1.GetString(System.Text.Encoding.UTF8.GetBytes(Method)), options.RequestMethod);
+        Assert.AreEqual(Method, options.RequestMethod);
     }
 
     private static CommandLineOptions Parse(string[] arguments)
