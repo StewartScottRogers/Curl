@@ -4,7 +4,7 @@ title: Fix CGR-107: -w connection counts, request sizes, header counts and timin
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3961, BL-3962, BL-3968, BL-3969, BL-3958, BL-3959, BL-3960]
+depends-on: [BL-3961, BL-3962, BL-3970, BL-3971, BL-3958, BL-3959, BL-3960]
 touches: [Curl.Engine.UnitLibrary/ManagedEasyTransfer.Finish.cs, Curl.Engine.UnitTests/Cgr107Tests.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/Cgr107Tests.cs, Curl.Protocol.Ftp.UnitLibrary, Curl.Protocol.Ftp.UnitTests/Cgr107Tests.cs, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/Cgr107Tests.cs]
 requirement: none
 created: 2026-10-26

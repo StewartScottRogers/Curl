@@ -1,5 +1,5 @@
 ---
-id: BL-3968
+id: BL-3970
 title: CGR-107c1: SshTransferClock stamps -w timings on every SFTP and SCP result
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3968 — CGR-107c1: SshTransferClock stamps -w timings on every SFTP and SCP result
+# BL-3970 — CGR-107c1: SshTransferClock stamps -w timings on every SFTP and SCP result
 
 ## Goal
 
