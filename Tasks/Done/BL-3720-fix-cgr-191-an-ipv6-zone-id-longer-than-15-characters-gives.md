@@ -9,7 +9,7 @@ touches: [Curl.Core.UnitLibrary/Globbing/UrlGlobParser.cs, Curl.Core.UnitTests/C
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3720 — Fix CGR-191: An IPv6 zone id longer than 15 characters gives a different error text
 
@@ -84,3 +84,4 @@ curl -sS "http://[::1%25zzzzzzzzzzzzzzzz]:20200/a" -w "[%{url_effective}]"
 - Measured with Curl after the fix: `curl -sS "http://[::1%25zzzzzzzzzzzzzzzz]:20200/a" -w "[%{url_effective}]"` gives exit 3, `curl: (3) bad range specification in position 9:` plus caret lines, empty url_effective (glob parser already matched); with `-g` gives `curl: (3) URL rejected: Bad IPv6 address`, exit 3. Both equal the report's Expected (real curl not rerun; the report states them).
 - Fix: `CurlUrlHost.ReadZoneId` returned BadHostname for a zone id over 15 characters; it now returns BadIPv6. A control character in the host is rejected as a bad host name earlier by the percent decoder, so that stays. Tests in Cgr191Tests.cs. Quality run for the library: 100% line and branch.
 - No UrlGlobParser change was needed. CI on Linux/macOS: tests are platform-neutral.
+- 2026-10-28: Doing -> Done. CGR-191 fixed: zone id over 15 characters is Bad IPv6 address
