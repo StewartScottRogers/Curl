@@ -1,0 +1,67 @@
+# Runs the dark factory's self-tests (RunDarkFactory.ps1 -Test*) under pwsh on Linux and macOS,
+# so a change that breaks the factory off Windows shows up red (BL-3923). One step per
+# self-test, taken from the help examples in RunDarkFactory.ps1. Lives apart from ci.yml,
+# a guard file that changes only through the audit branch.
+name: dark-factory-unix
+
+on:
+  push:
+    branches: [work/dark-factory, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  self-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Configure git identity
+        run: |
+          git config --global user.name "dark-factory-ci"
+          git config --global user.email "dark-factory-ci@example.invalid"
+      - name: -TestAlarm
+        run: ./RunDarkFactory.ps1 -TestAlarm -QuietAlarm -AlarmScale 0.1
+      - name: -TestOutOfTokens
+        run: ./RunDarkFactory.ps1 -TestOutOfTokens
+      - name: -TestAutoLanes
+        run: ./RunDarkFactory.ps1 -TestAutoLanes
+      - name: -TestMachineProbe
+        run: ./RunDarkFactory.ps1 -TestMachineProbe
+      - name: -TestHeartbeat
+        run: ./RunDarkFactory.ps1 -TestHeartbeat
+      - name: -TestCiWatch
+        run: ./RunDarkFactory.ps1 -TestCiWatch
+      - name: -TestAffectedTests
+        run: ./RunDarkFactory.ps1 -TestAffectedTests
+      - name: -TestTaskIds
+        run: ./RunDarkFactory.ps1 -TestTaskIds
+      - name: -TestAdrIds
+        run: ./RunDarkFactory.ps1 -TestAdrIds
+      - name: -TestTaskBudget
+        run: ./RunDarkFactory.ps1 -TestTaskBudget
+      - name: -TestModelChoice
+        run: ./RunDarkFactory.ps1 -TestModelChoice
+      - name: -TestClaimDuplicates
+        run: ./RunDarkFactory.ps1 -TestClaimDuplicates
+      - name: -TestTaskReadiness
+        run: ./RunDarkFactory.ps1 -TestTaskReadiness
+      - name: -TestIntegrateLock
+        run: ./RunDarkFactory.ps1 -TestIntegrateLock
+      - name: -TestLaneFlags
+        run: ./RunDarkFactory.ps1 -TestLaneFlags
+      - name: -TestPlatform
+        run: ./RunDarkFactory.ps1 -TestPlatform
