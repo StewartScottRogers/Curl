@@ -184,7 +184,8 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// and the reuse as above. One whose streams are all taken is reported as curl's
     /// <c>MAX_CONCURRENT_STREAMS reached, skip (N)</c>, N the transfers on it, and passed over.
     /// With <see cref="WaitsForMultiplexing" />, a connection with the key that is still being
-    /// opened, or that may multiplex and has no session yet, is waited for first (BL-717).
+    /// opened, or that may multiplex and has no session yet, is waited for first (BL-717), until
+    /// a connection with the key has held a session that carries one transfer at a time (CGR-171).
     /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -338,7 +339,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
 
     /// <summary>
     /// Records that a transfer handed <paramref name="entry" /> its session, which tells
-    /// whether it multiplexes, and wakes the transfers waiting to learn it.
+    /// whether it multiplexes, and wakes the transfers waiting to learn it. A session that carries
+    /// one transfer at a time (HTTP/1.x) marks the key as known not to multiplex, so later
+    /// transfers to it open their own connections without waiting (CGR-171, ADR-0866).
     /// </summary>
     /// <param name="entry">The connection now holding a session.</param>
     internal void SessionHeld(PoolEntry entry)
@@ -349,6 +352,10 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         {
             negotiation = entry.Negotiation;
             entry.Negotiation = null;
+            if (negotiation is not null && entry.Session!.ConcurrentTransferLimit is null)
+            {
+                _cache.KeysKnownNotToMultiplex.Add(negotiation.Key);
+            }
         }
 
         Decide(negotiation);
@@ -415,7 +422,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
                 fullLeaseCount = limit > 0 ? entry.LeaseCount : fullLeaseCount;
             }
 
-            var negotiation = WaitsForMultiplexing ? _cache.Negotiations.Find(pending => key.Equals(pending.Key)) : null;
+            var negotiation = WaitsForMultiplexing && !_cache.KeysKnownNotToMultiplex.Contains(key) ? _cache.Negotiations.Find(pending => key.Equals(pending.Key)) : null;
             return (null, fullLeaseCount, negotiation);
         }
     }

@@ -25,6 +25,13 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     /// <summary>Gets the connections being opened, or opened, that may yet multiplex.</summary>
     internal List<MultiplexingNegotiation> Negotiations { get; } = [];
 
+    /// <summary>
+    /// Gets the keys whose first connection turned out to carry one transfer at a time, for which
+    /// no transfer waits for a connection being opened any more, as curl 8.22.0 opens the waiting
+    /// transfers of a host side by side once its first connection showed HTTP/1.1 (CGR-171, ADR-0866).
+    /// </summary>
+    internal HashSet<ConnectionPoolKey> KeysKnownNotToMultiplex { get; } = [];
+
     /// <summary>Gets the clock idle times are measured on.</summary>
     internal TimeProvider TimeProvider { get; } = timeProvider;
 

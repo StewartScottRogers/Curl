@@ -343,7 +343,10 @@ closes) when the last lease ends, pooled only if every lease marked it reusable 
 `ClearTlsAsync`. With `WaitsForMultiplexing` (`-Z` without `--parallel-immediate`, curl's
 `CURLOPT_PIPEWAIT`) a transfer that finds a connection with its key still being opened waits
 (`MultiplexingNegotiation`) until it holds a session or turns out not to multiplex, as curl 8.18.0
-does (measured, BL-717 Notes).
+does (measured, BL-717 Notes); once a connection with the key has held a session carrying one
+transfer at a time (HTTP/1.x), the key is in `ConnectionCache.KeysKnownNotToMultiplex` and no
+transfer to it waits any more, as curl 8.22.0 opens a host's waiting transfers side by side
+(ADR-0866, CGR-171).
 
 Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
 and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, whose
