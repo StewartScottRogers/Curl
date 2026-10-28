@@ -3,7 +3,8 @@ namespace Curl.Console;
 /// <summary>
 /// The file name <c>-O</c> / <c>--remote-name</c> and <c>--remote-name-all</c> take from a
 /// URL's path, as curl 8.21.0 takes it: the last segment that is not empty, still
-/// percent-encoded, without the query or fragment.
+/// percent-encoded, without the query or fragment, after its <c>.</c> and <c>..</c> segments
+/// are resolved (which only <c>--path-as-is</c> leaves in the path).
 /// </summary>
 /// <remarks>
 /// Measured on Windows with curl 8.21.0 on 2026-09-27 (BL-239 Notes), <c>curl -sS -O &lt;url&gt;</c>
@@ -28,14 +29,42 @@ internal static class RemoteFileName
     /// </summary>
     /// <param name="absolutePath">The URL's path, as <see cref="Protocol.Abstractions.CurlUrl.AbsolutePath" /> gives it.</param>
     /// <returns>
-    /// The last segment of the path that is not empty, or <see langword="null" /> when every
-    /// segment is empty.
+    /// The last segment that is not empty of the path with its dot segments resolved, or
+    /// <see langword="null" /> when no such segment is left.
     /// </returns>
     internal static string? FromUrlPath(string absolutePath)
     {
-        string trimmed = absolutePath.TrimEnd('/');
-        string name = trimmed[(trimmed.LastIndexOf('/') + 1)..];
+        var segments = new List<string>();
+        foreach (string segment in absolutePath.Split('/'))
+        {
+            KeepOrDropSegment(segments, segment);
+        }
 
-        return name.Length == 0 ? null : name;
+        return segments.LastOrDefault(segment => segment.Length != 0);
+    }
+
+    /// <summary>
+    /// Adds one path segment to the segments kept so far, as curl 8.21.0's <c>dedotdotify</c>
+    /// resolves it before the name is taken: a <c>.</c> segment is dropped and a <c>..</c>
+    /// segment drops the one before it, with <c>%2e</c> or <c>%2E</c> counted as a dot, so
+    /// <c>--path-as-is</c> on <c>/a/..</c> names no file and <c>/a/.</c> names <c>a</c>
+    /// (measured 2026-10-28, BL-3592).
+    /// </summary>
+    /// <param name="segments">The segments kept so far.</param>
+    /// <param name="segment">The next segment, still percent-encoded.</param>
+    private static void KeepOrDropSegment(List<string> segments, string segment)
+    {
+        string dotted = segment.Replace("%2e", ".", StringComparison.OrdinalIgnoreCase);
+        if (dotted == "..")
+        {
+            if (segments.Count != 0)
+            {
+                segments.RemoveAt(segments.Count - 1);
+            }
+        }
+        else if (dotted != ".")
+        {
+            segments.Add(segment);
+        }
     }
 }
