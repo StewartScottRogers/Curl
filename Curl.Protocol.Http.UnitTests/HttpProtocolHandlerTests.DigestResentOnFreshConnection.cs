@@ -9,7 +9,7 @@ namespace Curl.Protocol.Http;
 /// Pins the <c>Authorization</c> value a request sends again on a fresh connection after the
 /// reused one it answered a 401 on died before the response: the answer sent, made again by
 /// <see cref="IHttpAuthenticator.RepeatAuthorization" />, as curl 8.22.0 counts a Digest nonce on
-/// for the resend (<c>nc=00000002</c>, measured, BL-3874, ADR-0948).
+/// for the resend (<c>nc=00000002</c>, measured, BL-3874, ADR-0950).
 /// </content>
 public sealed partial class HttpProtocolHandlerTests
 {

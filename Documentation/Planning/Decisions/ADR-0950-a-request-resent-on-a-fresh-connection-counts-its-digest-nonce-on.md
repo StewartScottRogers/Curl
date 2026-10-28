@@ -1,4 +1,4 @@
-# ADR-0948: A request resent on a fresh connection counts its Digest nonce on
+# ADR-0950: A request resent on a fresh connection counts its Digest nonce on
 
 - Status: Accepted
 - Date: 2026-10-28

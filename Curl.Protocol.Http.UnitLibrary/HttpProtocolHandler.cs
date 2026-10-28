@@ -802,7 +802,7 @@ public sealed class HttpProtocolHandler(
     /// response (<paramref name="resentAfterConnectionDied" />) its <c>Authorization</c> value as
     /// <see cref="IHttpAuthenticator.RepeatAuthorization" /> sends it again, so a Digest answer
     /// counts its nonce on (the same <c>cnonce</c>, <c>nc=00000002</c>), as curl 8.22.0 makes the
-    /// answer again for the resend (measured, BL-3874, ADR-0948); <paramref name="retry" /> itself otherwise.
+    /// answer again for the resend (measured, BL-3874, ADR-0950); <paramref name="retry" /> itself otherwise.
     /// </summary>
     private HttpRequestPlan CountedOnIfResent(HttpRequestPlan retry, bool resentAfterConnectionDied) =>
         resentAfterConnectionDied ? retry.WithAuthorizationSentAgain(RepeatAuthorization(retry)) : retry;

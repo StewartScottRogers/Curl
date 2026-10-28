@@ -7,7 +7,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Pins the Digest answer curl 8.22.0's Schannel build sends again on a fresh connection when the
-/// reused connection its first answer went out on died before the response (BL-3874, ADR-0948):
+/// reused connection its first answer went out on died before the response (BL-3874, ADR-0950):
 /// the same cnonce, <c>nc=00000002</c> and the hash for that count, which
 /// <see cref="DigestAuthenticator.RepeatAuthorization" /> makes from the answer sent.
 /// </summary>
