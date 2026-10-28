@@ -604,7 +604,7 @@ internal sealed class FtpSession(
         {
             230 when !authStillRequired => LoggedIn(),
             220 or 230 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
-            _ => TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
+            _ => FailClosingAfterTraceEnds(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
         };
     }
 
@@ -2249,7 +2249,7 @@ internal sealed class FtpSession(
     {
         context.Events.ReportInfo(FtpTransferMessages.ResumingFrom(offset));
         FtpReply rest = await ExchangeAsync("REST " + offset.ToString(System.Globalization.CultureInfo.InvariantCulture)).ConfigureAwait(false);
-        return rest.Code == 350 ? null : TransferResult.Failure(CurlExitCode.FtpCouldntUseRest, FtpTransferMessages.CouldNotUseRest);
+        return rest.Code == 350 ? null : FailShuttingDown(CurlExitCode.FtpCouldntUseRest, FtpTransferMessages.CouldNotUseRest);
     }
 
     /// <summary>
@@ -2731,6 +2731,19 @@ internal sealed class FtpSession(
     private TransferResult FailClosing(CurlExitCode exitCode, string message)
     {
         context.Events.ReportInfo(message);
+        context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(controlName.Number));
+        return TransferResult.Failure(exitCode, message);
+    }
+
+    /// <summary>
+    /// Fails as <see cref="FailClosing" /> does, with the state trace's <c>done</c> line between
+    /// the failure's text and <c>closing connection #N</c>, as curl 8.22.0 writes them for a
+    /// greeting other than <c>220</c> (measured with <c>--trace-config ftp</c>, BL-3949).
+    /// </summary>
+    private TransferResult FailClosingAfterTraceEnds(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(message);
+        trace.Ended(exitCode);
         context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(controlName.Number));
         return TransferResult.Failure(exitCode, message);
     }
