@@ -60,10 +60,10 @@ probe.exe repro
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,4 @@ probe.exe repro
 
 - 2026-10-26: Created from CGR-249 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Cause: `ReadEffectiveMethod` answered the transfer's last-hop method (GET after the first-only redirect). libcurl's `getinfo_char` answers `CURLOPT_CUSTOMREQUEST` when set, so the reader now returns the option first (`options.Transfer.CustomRequest ?? info.EffectiveMethod`). Probe (P/Invoke against REF libcurl) not rebuilt; the REF answer is the issue's measured PUT. Unit tests in `Cgr249Tests.cs` (custom request set -> PUT; none -> transfer's method). Libcurl fast tests 1454 passed; Measure-CodeQuality Libcurl: 0 failing members. Linux/macOS CI: change is platform-neutral.

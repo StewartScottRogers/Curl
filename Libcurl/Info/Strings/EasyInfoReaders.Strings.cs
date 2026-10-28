@@ -35,7 +35,7 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadEffectiveUrl(TransferInfo info, EasyOptions options) => info.EffectiveUrl;
 
-    private static object? ReadEffectiveMethod(TransferInfo info, EasyOptions options) => info.EffectiveMethod;
+    private static object? ReadEffectiveMethod(TransferInfo info, EasyOptions options) => options.Transfer.CustomRequest ?? info.EffectiveMethod;
 
     private static object? ReadRedirectUrl(TransferInfo info, EasyOptions options) => info.RedirectUrl;
 
