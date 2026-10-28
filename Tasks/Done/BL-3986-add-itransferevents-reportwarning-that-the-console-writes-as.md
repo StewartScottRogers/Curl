@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Console/ConnectionIdRecordingTransferEvents.cs, Curl.Console/MultiStateTraceEvents.cs, Curl.Console/OutputFileOpenFailureTransferEvents.cs, Curl.Console/ResponseCodeRecordingTransferEvents.cs, Curl.Console/TlsResultRecordingTransferEvents.cs, Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TransferEventWarningTests.cs, Curl.Console/WarningWritingTransferEvents.cs, Curl.Console.UnitTests/CurlCommandRunnerTransferEventTests.cs, Curl.Protocol.Abstractions.UnitTests/ITransferEventsTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3986 — Add ITransferEvents.ReportWarning that the console writes as a Warning: line on stderr
 
@@ -36,3 +36,4 @@ Needed by BL-3714 (CGR-185): a refused `SO_PRIORITY` must print `Warning: VLAN p
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 4fb3633e c4add7fc d418a7e3.
+- 2026-10-28: Doing -> Done. ReportWarning added; console writes Warning: lines on stderr unless -s; build clean, fast tests green, quality gates pass
