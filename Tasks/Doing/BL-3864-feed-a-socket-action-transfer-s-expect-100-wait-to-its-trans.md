@@ -32,3 +32,4 @@ BL-3859 (ADR-0917) routed `SocketActionGatedTcpDialer` and carries the wait on `
 
 ## Log
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 4700c00b a15d924b c3428d92.
