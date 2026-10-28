@@ -48,7 +48,8 @@ internal static class TlsClientOptionsMapping
     /// the provider already verifies against the operating system's store, and with it curl 8.21.0
     /// still verifies against the file on both builds (measured, ADR-0124). The record's
     /// <see cref="TlsPeerOptions.Certificate" /> and <see cref="TlsPeerOptions.KeyPassword" /> arrive
-    /// already split from <c>-E</c> (ADR-0514), so they are copied as they are.
+    /// already split from <c>-E</c> (ADR-0514), so they are copied as they are; an encrypted PEM key given
+    /// without one is asked for on the terminal, <see cref="TerminalPemPassPhrasePrompt.Instance" /> (ADR-0948).
     /// </summary>
     /// <param name="tls">The option group's TLS options.</param>
     /// <param name="useAlpn">Whether ALPN is offered: <see langword="false" /> under <c>--no-alpn</c>, which is not on the TLS record (ADR-0514).</param>
@@ -94,7 +95,8 @@ internal static class TlsClientOptionsMapping
             origin.SslOptions.HasFlag(SslOptions.AllowBeast),
             KeyLogFile(readEnvironmentVariable),
             ChecksHostNameWhenInsecure(origin),
-            origin.CertificateAuthorityBlob);
+            origin.CertificateAuthorityBlob,
+            TerminalPemPassPhrasePrompt.Instance);
     }
 
     /// <summary>
@@ -138,7 +140,8 @@ internal static class TlsClientOptionsMapping
             AllowBeast: proxy.SslOptions.HasFlag(SslOptions.AllowBeast),
             KeyLogFile: KeyLogFile(readEnvironmentVariable),
             ChecksHostNameWhenInsecure: ChecksHostNameWhenInsecure(proxy),
-            CaCertificateBlob: proxy.CertificateAuthorityBlob);
+            CaCertificateBlob: proxy.CertificateAuthorityBlob,
+            PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance);
     }
 
     /// <summary>

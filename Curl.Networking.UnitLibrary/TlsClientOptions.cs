@@ -189,6 +189,11 @@ namespace Curl.Networking;
 /// when both are set, as libcurl's blob wins over the file (ADR-0704). <see langword="null" /> when not
 /// set; the curl tool never sets it.
 /// </param>
+/// <param name="PemPassPhrasePrompt">
+/// Asks for the pass phrase of an encrypted PEM <paramref name="PrivateKey" /> given without
+/// <paramref name="Passphrase" />, in the OpenSSL build only, as OpenSSL's default callback does
+/// (ADR-0948, CGR-095); <see langword="null" /> asks nothing and the key does not load.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -221,7 +226,8 @@ public sealed record TlsClientOptions(
     bool AllowBeast = false,
     string? KeyLogFile = null,
     bool ChecksHostNameWhenInsecure = false,
-    ReadOnlyMemory<byte>? CaCertificateBlob = null)
+    ReadOnlyMemory<byte>? CaCertificateBlob = null,
+    IPemPassPhrasePrompt? PemPassPhrasePrompt = null)
 {
     /// <summary>
     /// Whether the chain must lead to roots of the handshake's own, a <see cref="CaCertificateFile" />

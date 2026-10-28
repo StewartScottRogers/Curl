@@ -16,6 +16,9 @@ internal static class ClientCertificateLoader
 {
     private const string EncryptedPrivateKeyBegin = "-----BEGIN ENCRYPTED PRIVATE KEY-----";
 
+    // A traditional OpenSSL PEM key encrypted with its own DEK-Info header.
+    private const string LegacyEncryptedPemHeader = "Proc-Type: 4,ENCRYPTED";
+
     private const string PrivateKeyLabel = "PRIVATE KEY";
 
     private const string EncryptedPrivateKeyLabel = "ENCRYPTED PRIVATE KEY";
@@ -80,11 +83,11 @@ internal static class ClientCertificateLoader
     /// <param name="options">The handshake's settings.</param>
     /// <returns>
     /// No certificate and no failure without <c>--cert</c>; otherwise the certificate with its
-    /// key, or the exit 58 or exit 43 failure <see cref="LoadAsOpenSslBuild(string, string?, string?, string?, string?)" /> reports.
+    /// key, or the exit 58 or exit 43 failure <see cref="LoadAsOpenSslBuild(string, string?, string?, string?, string?, IPemPassPhrasePrompt?)" /> reports.
     /// </returns>
     public static (X509Certificate2? Certificate, ConnectResult? Failure) LoadAsOpenSslBuild(TlsClientOptions options) =>
         options.ClientCertificate is { } path
-            ? LoadAsOpenSslBuild(path, options.Passphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType)
+            ? LoadAsOpenSslBuild(path, options.Passphrase, options.PrivateKey, options.CertificateType, options.PrivateKeyType, options.PemPassPhrasePrompt)
             : (null, null);
 
     /// <summary>
@@ -188,6 +191,11 @@ internal static class ClientCertificateLoader
     /// <param name="privateKeyPath">The <c>--key</c> file, or <see langword="null" />.</param>
     /// <param name="certificateType">The <c>--cert-type</c> value, or <see langword="null" /> for PEM.</param>
     /// <param name="privateKeyType">The <c>--key-type</c> value, or <see langword="null" /> for PEM.</param>
+    /// <param name="passPhrasePrompt">
+    /// Asks for the pass phrase of an encrypted PEM key given without one, as OpenSSL's default
+    /// callback does (ADR-0948): once when a line is read, twice at the end of the input; or
+    /// <see langword="null" /> to ask nothing.
+    /// </param>
     /// <returns>
     /// The certificate with its key, or the exit 58 or exit 43
     /// (<see cref="CurlExitCode.BadFunctionArgument" />) failure curl's OpenSSL build reports.
@@ -197,7 +205,8 @@ internal static class ClientCertificateLoader
         string? passphrase,
         string? privateKeyPath,
         string? certificateType,
-        string? privateKeyType)
+        string? privateKeyType,
+        IPemPassPhrasePrompt? passPhrasePrompt = null)
     {
         var certificateFileType = ClientCertificateFileTypeName.Parse(certificateType);
         if (certificateFileType == ClientCertificateFileType.Pkcs12)
@@ -214,7 +223,30 @@ internal static class ClientCertificateLoader
 
         return certificatePem is null
             ? (null, failure)
-            : CombineWithPrivateKeyFile(certificatePem, privateKeyPath ?? path, privateKeyType, passphrase);
+            : CombineWithPrivateKeyFile(certificatePem, privateKeyPath ?? path, privateKeyType, passphrase ?? AskedPassPhrase(privateKeyPath ?? path, privateKeyType, passPhrasePrompt));
+    }
+
+    // curl 8.18.0's OpenSSL build asks once when a line is read and again at the end of the
+    // input, then fails as a key the pass phrase does not open (measured, ADR-0948).
+    private static string? AskedPassPhrase(string keyPath, string? privateKeyType, IPemPassPhrasePrompt? passPhrasePrompt) =>
+        passPhrasePrompt is not null
+        && ClientCertificateFileTypeName.Parse(privateKeyType) == ClientCertificateFileType.Pem
+        && HoldsEncryptedPemKey(keyPath)
+            ? passPhrasePrompt.AskPassPhrase() ?? passPhrasePrompt.AskPassPhrase()
+            : null;
+
+    private static bool HoldsEncryptedPemKey(string keyPath)
+    {
+        try
+        {
+            var keyPem = File.ReadAllText(keyPath);
+            return keyPem.Contains(EncryptedPrivateKeyBegin, StringComparison.Ordinal)
+                || keyPem.Contains(LegacyEncryptedPemHeader, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static (string? CertificatePem, ConnectResult? Failure) ReadPemCertificate(string path)

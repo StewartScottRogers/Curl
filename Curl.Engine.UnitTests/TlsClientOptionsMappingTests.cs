@@ -279,7 +279,8 @@ public sealed class TlsClientOptionsMappingTests
             EchPublicName: "example.com",
             EchConfigList: "AEX+DQ==",
             SslSessionsFile: "sess.bin",
-            Engine: "pkcs11");
+            Engine: "pkcs11",
+            PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance);
 
         TlsClientOptions mapped = Map(
             "--curves", "X25519", "--sigalgs", "rsa_pss_rsae_sha256", "--tls-earlydata", "--ech", "hard",
@@ -533,11 +534,11 @@ public sealed class TlsClientOptionsMappingTests
     private static TlsClientOptions MapProxyOf(CommandLineOptions options) =>
         TlsClientOptionsMapping.ProxyOf(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn);
 
-    /// <summary>Notes the options the next <see cref="Mapped" /> is expected to give, and returns them.</summary>
+    /// <summary>Notes the options the next <see cref="Mapped" /> is expected to give, with the terminal pass phrase prompt every mapping sets (ADR-0948), and returns them.</summary>
     private TlsClientOptions Expect(TlsClientOptions expected)
     {
-        _expected = expected;
-        return expected;
+        _expected = expected with { PemPassPhrasePrompt = TerminalPemPassPhrasePrompt.Instance };
+        return _expected;
     }
 
     /// <summary>Writes the command line and the options it mapped to, against the expected options if any were noted.</summary>
