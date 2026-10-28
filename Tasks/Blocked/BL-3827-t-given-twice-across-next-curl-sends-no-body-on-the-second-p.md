@@ -28,7 +28,10 @@ Found by BL-3546 (CGR-017) while measuring stdin repros with Record-CurlExchange
 
 ## Notes
 
+- 2026-10-28 measurement (Record-CurlExchange.ps1, `-s -T - URL/a --next -T - URL/b`, stdin `abc`, two `Connection: close` 200 responses, `-Connections 2`): the difference does not reproduce deterministically. Real curl 8.22.0 itself varies with timing: with `-RespondAfterBodyBytes 0` it sent no body on either PUT in 4 of 4 runs (150-550 ms), yet a single-PUT run of the same setup took ~5.5 s and sent `3\r\nabc\r\n0\r\n\r\n`. Without early response (`-RequestReadMilliseconds 3000`) curl and Curl are byte-identical: `/a` gets `3 abc 0`, `/b` gets an empty chunked body (`0`). In no run did real curl send `abc` on the second PUT, and Curl never sent a bodiless second PUT; the task's reported bytes did not appear. With no stable real-curl answer to pin, no fix and no failing unit test could be written. Needs a deterministic repro (a recorder mode that holds the 200 until the 100-continue wait has expired) before another lane tries it.
+
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 84b47d48 0ee60237 779790c0.
+- 2026-10-28: Doing -> Blocked. Stewart: BL-3827 does not reproduce: real curl 8.22.0 varies run to run on the early-response -T - PUT, and Curl matches it where it is stable; can it be closed as not reproducible?
