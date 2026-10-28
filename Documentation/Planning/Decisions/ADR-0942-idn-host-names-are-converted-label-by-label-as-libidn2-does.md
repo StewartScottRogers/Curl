@@ -1,4 +1,4 @@
-# ADR-0939: IDN host names are converted label by label as libidn2 does
+# ADR-0942: IDN host names are converted label by label as libidn2 does
 
 - Status: Accepted
 - Date: 2026-10-26

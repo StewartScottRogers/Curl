@@ -18,7 +18,7 @@ A transfer to a non-ASCII host holding an `xn--` label that is not valid punycod
 
 ## Context
 
-BL-3588 (CGR-059, ADR-0939) converts a non-ASCII host label by label in `CurlUrlHost.ToAsciiLabel` and passes an ASCII `xn--` label as written. libidn2 decodes an `xn--` label and refuses one that does not decode (measured with the reference curl 8.22.0 through `Record-CurlExchange.ps1` on 2026-10-26: `xn--zz.%FC` exit 3, `xn--tda.%FC` exit 0). Needs a punycode decoder beside `CurlUrlPunycode.Encode`.
+BL-3588 (CGR-059, ADR-0942) converts a non-ASCII host label by label in `CurlUrlHost.ToAsciiLabel` and passes an ASCII `xn--` label as written. libidn2 decodes an `xn--` label and refuses one that does not decode (measured with the reference curl 8.22.0 through `Record-CurlExchange.ps1` on 2026-10-26: `xn--zz.%FC` exit 3, `xn--tda.%FC` exit 0). Needs a punycode decoder beside `CurlUrlPunycode.Encode`.
 
 ## Acceptance criteria
 
