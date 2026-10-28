@@ -37,3 +37,4 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 37a11300 0ffe192b a91492c4 779790c0.
