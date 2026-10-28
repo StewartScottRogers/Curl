@@ -57,8 +57,29 @@ internal static class HttpRedirectLocation
     /// <returns>The resolved target, or <see langword="null" /> when no <c>Location</c> header has a value.</returns>
     internal static string? Find(CurlUrl requestUrl, HttpResponseHead head, Encoding encoding)
     {
-        HttpResponseHeader? location = head.Headers.FirstOrDefault(IsNonEmptyLocation);
-        return location is null ? null : Resolve(requestUrl, location.Value, encoding, OperatingSystem.IsWindows());
+        string? location = head.Headers.FirstOrDefault(IsNonEmptyLocation)?.Value ?? InterimLocation(head);
+        return location is null ? null : Resolve(requestUrl, location, encoding, OperatingSystem.IsWindows());
+    }
+
+    /// <summary>
+    /// Finds the last non-empty <c>Location</c> value among the heads read, which the final head
+    /// leaves in place when it has none: curl 8.22.0 reports a <c>Location</c> from a 1xx head in
+    /// <c>%{redirect_url}</c> (CGR-208).
+    /// </summary>
+    private static string? InterimLocation(HttpResponseHead head)
+    {
+        string? found = null;
+        foreach (string line in Encoding.Latin1.GetString(head.HeadBytes.Span).Split('\n'))
+        {
+            int colon = line.IndexOf(':', StringComparison.Ordinal);
+            if (colon > 0 && string.Equals(line[..colon], HeaderName, StringComparison.OrdinalIgnoreCase))
+            {
+                string value = line[(colon + 1)..].Trim(' ', '\t', '\r');
+                found = value.Length > 0 ? value : found;
+            }
+        }
+
+        return found;
     }
 
     /// <summary>
