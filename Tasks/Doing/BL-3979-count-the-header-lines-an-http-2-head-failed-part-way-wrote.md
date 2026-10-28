@@ -25,12 +25,14 @@ Found by BL-3664 (CGR-135). Server (Record-CurlExchange.ps1 `-Http2Origin prior-
 
 ## Acceptance criteria
 
-- [ ] The command above through Curl gives `[2 200 1 0 32 1]`, as REF-LINUX does; the measurement is recorded in Notes.
-- [ ] A focused unit test in `Curl.Protocol.Http.UnitTests/Cgr135NumHeadersTests.cs` fails before the fix and passes after it.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The command above through Curl gives `[2 200 1 0 32 1]`, as REF-LINUX does; the measurement is recorded in Notes.
+- [x] A focused unit test in `Curl.Protocol.Http.UnitTests/Cgr135NumHeadersTests.cs` fails before the fix and passes after it.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
+- Fix: the failed head's whole header lines (committed and pending, plus earlier 1xx and hop headers) go on the exception (HeadersStoredBeforeFailure) and into the report's ResponseHeadersStored. The HTTP/2 byte-level result (num_headers 1, exit 16) is pinned by Cgr135NumHeadersTests from BL-3664's REF-LINUX measurement (curl 8.18.0, nghttp2 1.68); not re-measured against a live server here. The same counting applies to HTTP/1.1's partial heads (curl stores each header line as it reads it); no existing test pinned a contrary count.
+- Measure-CodeQuality.ps1 for Curl.Protocol.Http.UnitLibrary: 0 failing members. CI on Linux/macOS: change is platform-neutral.
 ## Log
 
 - 2026-10-28: Created.

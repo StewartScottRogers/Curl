@@ -65,6 +65,13 @@ internal sealed class HttpTransferException(CurlExitCode exitCode, string messag
     internal HttpStatusLine? StatusLineBeforeFailure { get; set; }
 
     /// <summary>
+    /// Gets or sets how many response headers the transfer had stored when the failure cut the head short, counting the
+    /// whole header lines of the failed head, which curl 8.18.0 has already stored and so counts in <c>%{num_headers}</c>
+    /// (BL-3979); zero by default.
+    /// </summary>
+    internal int HeadersStoredBeforeFailure { get; set; }
+
+    /// <summary>
     /// Gets or sets the <c>Content-Type</c> of the 1xx head a failure came after, which libcurl 8.22.0 still reports as
     /// <c>CURLINFO_CONTENT_TYPE</c> (BL-3301); <see langword="null" /> by default.
     /// </summary>

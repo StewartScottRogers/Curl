@@ -1509,6 +1509,7 @@ public sealed class HttpProtocolHandler(
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
+                ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
 
