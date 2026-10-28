@@ -37,3 +37,4 @@ that order, as `Curl.Console/EasyOptionsFromCommandLine.cs`'s `UploadFlagNames` 
 ## Log
 
 - 2026-10-26: Created by BL-3653 for the transfer side of CURLOPT_UPLOAD_FLAGS.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 103a276f 368dad15 779790c0.
