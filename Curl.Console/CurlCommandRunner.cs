@@ -1378,6 +1378,8 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private static async Task<CurlExitCode?> EndParallelRunAsync(ParallelRun run, CurlExitCode? exitCode)
     {
+        // A first batch that ran out of URLs before it was complete starts now (BL-3699).
+        await run.StartHeldAsync().ConfigureAwait(false);
         await run.EndAsync().ConfigureAwait(false);
 
         return exitCode is null ? null : run.ExitCode;
@@ -1532,12 +1534,11 @@ internal sealed class CurlCommandRunner(
     {
         for (int index = 0; index < options.Urls.Count; index++)
         {
-            if (!TryParseUploadFiles(options, index, out IReadOnlyList<UrlGlobMatch?>? uploadFiles, out TransferResult? globFailure)
-                || !TryParseGlob(options, index, out UrlGlob? glob, out globFailure))
+            (IReadOnlyList<UrlGlobMatch?>? uploadFiles, UrlGlob? glob, TransferResult? globFailure) =
+                await ReadUploadFilesAndGlobAsync(options, index).ConfigureAwait(false);
+            if (uploadFiles is null || glob is null)
             {
-                await WriteGlobFailureLinesAsync(options, globFailure).ConfigureAwait(false);
-                await RecordParallelRunEndAsync(globFailure).ConfigureAwait(false);
-                return (globFailure.ExitCode, true);
+                return (globFailure!.ExitCode, true);
             }
 
             if (await RefusedAtSetupAsync(options, index).ConfigureAwait(false) is { } refusedExitCode)
@@ -1555,6 +1556,59 @@ internal sealed class CurlCommandRunner(
         }
 
         return (exitCode, false);
+    }
+
+    /// <summary>
+    /// Reads the <c>-T</c> value and the URL at <paramref name="index" /> as globs. One that is not a
+    /// well-formed glob prints its lines and ends the run, except a URL past a <c>-Z</c> run's first batch:
+    /// curl 8.22.0 then takes that URL as written and carries on, the glob's code becoming the run's
+    /// (CGR-170, BL-3699 Notes).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="index">The URL's position in the group.</param>
+    /// <returns>
+    /// The upload files and the URL's glob, or <see langword="null" /> for both and the failure that
+    /// ended the run.
+    /// </returns>
+    private async Task<(IReadOnlyList<UrlGlobMatch?>? UploadFiles, UrlGlob? Glob, TransferResult? Failure)> ReadUploadFilesAndGlobAsync(
+        CommandLineOptions options,
+        int index)
+    {
+        if (!TryParseUploadFiles(options, index, out IReadOnlyList<UrlGlobMatch?>? uploadFiles, out TransferResult? failure))
+        {
+            return (null, null, await EndRunAtBadGlobAsync(options, failure).ConfigureAwait(false));
+        }
+
+        if (TryParseGlob(options, index, out UrlGlob? glob, out failure))
+        {
+            return (uploadFiles, glob, null);
+        }
+
+        if (parallelRun is not { HoldsFirstBatch: false } run)
+        {
+            return (null, null, await EndRunAtBadGlobAsync(options, failure).ConfigureAwait(false));
+        }
+
+        await WriteGlobFailureLinesAsync(options, failure).ConfigureAwait(false);
+        await writeGate.RunExclusiveAsync(() =>
+        {
+            run.RecordSetupFailure(failure, endsTheRun: false);
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
+        return (uploadFiles, UrlGlob.Unglobbed(options.Urls[index]), null);
+    }
+
+    /// <summary>
+    /// Writes a bad glob's lines and records, under <c>-Z</c>, that it ended the run.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="failure">The glob's failure.</param>
+    /// <returns><paramref name="failure" />, once recorded.</returns>
+    private async Task<TransferResult> EndRunAtBadGlobAsync(CommandLineOptions options, TransferResult failure)
+    {
+        await WriteGlobFailureLinesAsync(options, failure).ConfigureAwait(false);
+        await RecordParallelRunEndAsync(failure).ConfigureAwait(false);
+        return failure;
     }
 
     /// <summary>
@@ -1858,9 +1912,9 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
-    /// Starts one transfer of a <c>-Z</c> run once fewer than <c>--parallel-max</c> are running, without
-    /// waiting for it to end (ADR-0127, decision 1). Once <c>--fail-early</c> has aborted the run the
-    /// transfer is not started, and its report is left for the end of the run.
+    /// Starts one transfer of a <c>-Z</c> run as <see cref="StartNowInParallelAsync" /> does, unless it is
+    /// one of the run's first batch, which <see cref="HoldInFirstBatchAsync" /> holds until the batch is
+    /// set up (CGR-170, BL-3699).
     /// </summary>
     /// <param name="run">The run.</param>
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
@@ -1870,11 +1924,94 @@ internal sealed class CurlCommandRunner(
     /// <see langword="true" /> when a result that ends the run without <c>--fail-early</c> has stopped
     /// every further start.
     /// </returns>
-    private async Task<bool> StartInParallelAsync(
+    private Task<bool> StartInParallelAsync(
         ParallelRun run,
         TransferDispatch dispatch,
         CommandLineOptions options,
         UrlTransfer transfer)
+    {
+        StandardOutputFailureDeferringStream transferStandardOutput = new(standardOutput);
+        RunningTransferState state = NewRunningTransferState(run.AbortToken, transferStandardOutput, writeGate.Guard(transferStandardOutput));
+
+        return run.HoldsFirstBatch
+            ? HoldInFirstBatchAsync(run, dispatch, options, transfer, state)
+            : StartNowInParallelAsync(run, dispatch, options, transfer, state);
+    }
+
+    /// <summary>
+    /// Holds a transfer of a <c>-Z</c> run's first batch unstarted, as curl 8.22.0 sets up
+    /// <c>--parallel-max</c> plus one transfers before it performs any: its <c>-T</c> file is opened now,
+    /// and one that cannot be opened abandons the batch (<see cref="ParallelRun.AbandonFirstBatchAsync" />),
+    /// this transfer included, after curl's <c>cannot open</c> lines. Once the batch is complete its
+    /// transfers start (BL-3699 Notes).
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <returns>As <see cref="StartInParallelAsync" />.</returns>
+    private async Task<bool> HoldInFirstBatchAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state)
+    {
+        bool batchIsComplete = run.HoldInFirstBatch(
+            () => StartNowInParallelAsync(run, dispatch, options, transfer, state),
+            failure => ReportSkippedAsync(dispatch, options, transfer, state, failure));
+        if (!await UploadFileOpensAsync(transfer.UploadFile).ConfigureAwait(false))
+        {
+            await run.AbandonFirstBatchAsync(CannotOpenUploadFileFailure).ConfigureAwait(false);
+            return true;
+        }
+
+        return batchIsComplete && await run.StartHeldAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Tells whether a transfer's <c>-T</c> file opens, writing curl's <c>cannot open</c> and try-help
+    /// lines, even under <c>-s</c>, when it does not. Standard input and no upload always open.
+    /// </summary>
+    /// <param name="uploadFile">The <c>-T</c> file, or <see langword="null" /> when the transfer uploads nothing.</param>
+    /// <returns><see langword="false" /> when the file cannot be opened.</returns>
+    private async Task<bool> UploadFileOpensAsync(string? uploadFile)
+    {
+        if (uploadFile is null || UploadUrl.IsStandardInput(uploadFile))
+        {
+            return true;
+        }
+
+        FileOpenResult opened = await fileSystem.OpenForReadAsync(uploadFile, CancellationToken.None).ConfigureAwait(false);
+        if (opened.Content is { } content)
+        {
+            await content.DisposeAsync().ConfigureAwait(false);
+            return true;
+        }
+
+        await WriteErrorLinesAsync([$"curl: cannot open '{uploadFile}'", CommandLineRefusal.TryHelpLine], commandLineEchoEncoding)
+            .ConfigureAwait(false);
+        return false;
+    }
+
+    /// <summary>
+    /// Starts one transfer of a <c>-Z</c> run once fewer than <c>--parallel-max</c> are running, without
+    /// waiting for it to end (ADR-0127, decision 1). Once <c>--fail-early</c> has aborted the run the
+    /// transfer is not started, and its report is left for the end of the run.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
+    /// <param name="options">The transfer's option group.</param>
+    /// <param name="transfer">The transfer.</param>
+    /// <param name="state">The transfer's state.</param>
+    /// <returns>As <see cref="StartInParallelAsync" />.</returns>
+    private async Task<bool> StartNowInParallelAsync(
+        ParallelRun run,
+        TransferDispatch dispatch,
+        CommandLineOptions options,
+        UrlTransfer transfer,
+        RunningTransferState state)
     {
         Task slotFree = run.WaitForFreeSlotAsync();
         bool beginsABatch = !slotFree.IsCompleted || !run.Queue.HasStartedAny;
@@ -1889,8 +2026,6 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        StandardOutputFailureDeferringStream transferStandardOutput = new(standardOutput);
-        RunningTransferState state = NewRunningTransferState(run.AbortToken, transferStandardOutput, writeGate.Guard(transferStandardOutput));
         if (run.IsAborted)
         {
             run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
@@ -2091,6 +2226,11 @@ internal sealed class CurlCommandRunner(
             return Task.CompletedTask;
         }
 
+        if (ReferenceEquals(ended.Result, CannotOpenUploadFileFailure))
+        {
+            run.RecordSetupFailure(ended.Result, endsTheRun: true);
+        }
+
         run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly);
 
         return ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl);
@@ -2133,18 +2273,22 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Records, under <c>-Z</c> and holding the run's <see cref="writeGate" />, a failure that ends the
-    /// run before its transfer starts, such as a URL that is not a well-formed glob.
+    /// run before its transfer starts, such as a URL that is not a well-formed glob. One in the run's
+    /// first batch abandons it (<see cref="ParallelRun.AbandonFirstBatchAsync" />, BL-3699).
     /// </summary>
     /// <param name="failure">The failure.</param>
     /// <returns>A task that completes when it is recorded, at once without <c>-Z</c>.</returns>
     private Task RecordParallelRunEndAsync(TransferResult failure) =>
-        parallelRun is { } run
-            ? writeGate.RunExclusiveAsync(() =>
+        parallelRun switch
+        {
+            null => Task.CompletedTask,
+            { HoldsFirstBatch: true } run => run.AbandonFirstBatchAsync(failure),
+            { } run => writeGate.RunExclusiveAsync(() =>
             {
                 run.RecordEnd(failure, endsTheRun: true, failEarly: false);
                 return Task.CompletedTask;
-            })
-            : Task.CompletedTask;
+            }),
+        };
 
     /// <summary>
     /// Makes the state of a transfer starting now, in the running option group.
@@ -3318,7 +3462,8 @@ internal sealed class CurlCommandRunner(
     /// <see cref="CurlEasyErrorText" /> gives it, when that transfer failed, and exit 26 when it
     /// succeeded or there was none. <c>-T '{local.txt,nosuch}' http://127.0.0.1:1/g/</c> printed
     /// <c>curl: (7) Could not connect to server</c> for <c>nosuch</c> and exited 7 (measured
-    /// 2026-09-27, BL-440 Notes). Either way the run ends.
+    /// 2026-09-27, BL-440 Notes). Either way the run ends. Under <c>-Z</c> curl 8.22.0 sets the
+    /// transfer up apart from the others and reports exit 26 whatever failed before it (BL-3699 Notes).
     /// </summary>
     /// <returns>
     /// <see cref="CannotOpenUploadFileFailure" />, or the previous transfer's failure code with
@@ -3326,7 +3471,7 @@ internal sealed class CurlCommandRunner(
     /// </returns>
     private TransferResult CannotOpenUploadFileResult()
     {
-        if (previousTransferResult is not { IsSuccess: false } previous)
+        if (parallelRun is not null || previousTransferResult is not { IsSuccess: false } previous)
         {
             return CannotOpenUploadFileFailure;
         }

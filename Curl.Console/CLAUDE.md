@@ -250,7 +250,11 @@ holds the exit code - the first failure's in completion order, not the last's - 
 started and ends with the first failure's code and `CurlEasyErrorText`'s text, and both are reported
 in command-line order after the run's other transfers. A result that ends a serial run without
 `--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
-the running transfers finish. Each transfer also writes standard output through a
+the running transfers finish. As curl 8.22.0 sets up `--parallel-max` plus one transfers before it
+performs any, `ParallelRun` holds that first batch unstarted, opening each `-T` file as it is held; a
+setup failure among them abandons the batch, nothing starts and each held transfer is reported with
+the failure's code, while a URL past it that is not a well-formed glob is taken as written and the run
+carries on with the glob's exit code (CGR-170, ADR-0951). Each transfer also writes standard output through a
 `StandardOutputFailureDeferringStream` of its own (`RunningTransferState.StandardOutput`), so a write
 failure ends only the transfer whose write failed with exit 23, and the others' bodies and `-w` text
 still reach standard output (BL-773). Without `-Z` nothing changes: every transfer shares the run's one.

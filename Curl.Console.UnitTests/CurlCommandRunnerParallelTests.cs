@@ -306,19 +306,17 @@ public sealed class CurlCommandRunnerParallelTests
     }
 
     [TestMethod]
-    public async Task RunAsync_BadGlobAfterARunningTransfer_WaitsForItAndExitsWithTheGlobsCode()
+    public async Task RunAsync_BadGlobAfterATransferOfTheFirstBatch_StartsNoTransferAndExitsWithTheGlobsCode()
     {
+        // curl 8.22.0 abandons the first batch at a bad glob, so /a never starts (CGR-170, ADR-0951).
         HeldTransferHandler http = new();
 
-        Task<int> run = RunAsync(http, ["-Z", "-s", A, "http://h/[1-"]);
-        await http.WhenStartedAsync("/a");
-        http.Finish("/a", "a");
+        int exitCode = await RunAsync(http, ["-Z", "-s", A, "http://h/[1-"]);
 
-        int exitCode = await run;
         Diagnostics.Assert("exit code", 3, exitCode);
-        Diagnostics.Diff("stdout", "a", Lf(standardOutput.Text));
         Assert.AreEqual(3, exitCode);
-        Assert.AreEqual("a", standardOutput.Text);
+        Assert.AreEqual(string.Empty, standardOutput.Text);
+        Assert.IsEmpty(http.Started);
     }
 
     [TestMethod]
