@@ -346,7 +346,9 @@ closes) when the last lease ends, pooled only if every lease marked it reusable 
 does (measured, BL-717 Notes); once a connection with the key has held a session carrying one
 transfer at a time (HTTP/1.x), the key is in `ConnectionCache.KeysKnownNotToMultiplex` and no
 transfer to it waits any more, as curl 8.22.0 opens a host's waiting transfers side by side
-(ADR-0933, CGR-171).
+(ADR-0933, CGR-171). A plain TCP connection straight to the origin is waited for only while
+`PlainTcpMayMultiplex` holds, which the engine sets for `--http2` and `--http2-prior-knowledge`
+alone: an HTTP/1.x group's transfer finding one busy opens its own (ADR-0934, CGR-172).
 
 Per ADR-0269 (BL-600) `TcpConnector` takes an optional `LocalBinding` (`--interface`, `--local-port`)
 and dials every TCP address, a proxy's included, through the internal `LocalBindingTcpDialer`, whose

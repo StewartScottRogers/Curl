@@ -85,10 +85,19 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// being opened, or may yet multiplex, instead of opening one of its own: curl's
     /// <c>CURLOPT_PIPEWAIT</c>, which <c>-Z</c> sets unless <c>--parallel-immediate</c> is given
     /// (measured, BL-717 Notes). A connection may multiplex until its session is known when it
-    /// agreed <c>h2</c> with ALPN, or when it is plain TCP straight to the origin, which may
-    /// speak HTTP/2 with prior knowledge.
+    /// agreed <c>h2</c> with ALPN, or when it is plain TCP straight to the origin and
+    /// <see cref="PlainTcpMayMultiplex" /> says it may speak HTTP/2 with prior knowledge.
     /// </summary>
     public bool WaitsForMultiplexing { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a plain TCP connection straight to the origin may multiplex,
+    /// so that <see cref="WaitsForMultiplexing" /> waits for its session: <see langword="true" /> unless
+    /// the option group speaks HTTP/1.x over cleartext, whose connection curl 8.22.0 knows carries one
+    /// transfer at a time once it is open, so a transfer released while it is busy opens its own
+    /// (CGR-172, ADR-0934).
+    /// </summary>
+    public bool PlainTcpMayMultiplex { get; init; } = true;
 
     /// <summary>
     /// Gives a connector over the same <see cref="ConnectionCache" />, configuration and
@@ -100,7 +109,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
     /// <returns>The connector.</returns>
     public PoolingConnector Over(IConnector innerConnector) =>
-        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
+        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, PlainTcpMayMultiplex = PlainTcpMayMultiplex, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
 
     /// <summary>
     /// Gets a value indicating whether this connector's transfers open a new connection although the pool holds an
@@ -372,9 +381,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         }
     }
 
-    private static bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
+    private bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
         connect.ApplicationProtocol == "h2"
-            || (!target.IsForwardProxy && target.Proxy is null);
+            || (!target.IsForwardProxy && target.Proxy is null && (PlainTcpMayMultiplex || connect.ApplicationProtocol is not null || connect.PeerCertificates.Count > 0));
 
     private static int? ConcurrentTransferLimitOf(PoolEntry entry, ConnectionPoolKey key) =>
         key.Equals(entry.Key) && !entry.IsShareBarred && !entry.HasReadPeerClose
