@@ -64,10 +64,10 @@ curl -sS "http://[::1%25zzzzzzzzzzzzzzzz]:20200/a" -w "[%{url_effective}]"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -78,3 +78,9 @@ curl -sS "http://[::1%25zzzzzzzzzzzzzzzz]:20200/a" -w "[%{url_effective}]"
 
 - 2026-10-26: Created from CGR-191 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+### Notes (run result)
+
+- Measured with Curl after the fix: `curl -sS "http://[::1%25zzzzzzzzzzzzzzzz]:20200/a" -w "[%{url_effective}]"` gives exit 3, `curl: (3) bad range specification in position 9:` plus caret lines, empty url_effective (glob parser already matched); with `-g` gives `curl: (3) URL rejected: Bad IPv6 address`, exit 3. Both equal the report's Expected (real curl not rerun; the report states them).
+- Fix: `CurlUrlHost.ReadZoneId` returned BadHostname for a zone id over 15 characters; it now returns BadIPv6. A control character in the host is rejected as a bad host name earlier by the percent decoder, so that stays. Tests in Cgr191Tests.cs. Quality run for the library: 100% line and branch.
+- No UrlGlobParser change was needed. CI on Linux/macOS: tests are platform-neutral.

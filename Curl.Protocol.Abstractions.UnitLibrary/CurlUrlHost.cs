@@ -375,8 +375,8 @@ internal static class CurlUrlHost
     /// and a zone id of 1 to 15 characters, and the address printed back in its shortest
     /// form when that is no longer than the address as written (zone id aside), so
     /// <c>[::FFFF:7f00:0001]</c> is <c>[::ffff:127.0.0.1]</c> but <c>[::ffff:7f00:1]</c> stays
-    /// as written (CGR-058). A zone id longer than 15 characters is a bad host name to curl; every other
-    /// fault is a bad IPv6 address.
+    /// as written (CGR-058). A zone id longer than 15 characters is a bad IPv6 address to curl, as is every other fault (CGR-191); a control character in the host
+    /// is a bad host name before this point.
     /// </summary>
     /// <returns>Why curl rejects the address, or <see cref="CurlUrlRejection.None" />.</returns>
     private static CurlUrlRejection NormalizeIPv6(string host, out string normalized, out string idnHost, out string? zoneId)
@@ -448,7 +448,7 @@ internal static class CurlUrlHost
 
         if (id.Length > MaximumZoneIdLength)
         {
-            return CurlUrlRejection.BadHostname;
+            return CurlUrlRejection.BadIPv6;
         }
 
         zoneId = id;
