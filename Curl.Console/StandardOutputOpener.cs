@@ -16,8 +16,10 @@ namespace Curl.Console;
 /// </para>
 /// <para>
 /// So a redirected standard output - a file, a pipe, a device - is opened as a
-/// <see cref="FileStream" /> over the process's own standard-output handle, with no buffer,
-/// which reports those failures as an <see cref="IOException" />; a closed one becomes a
+/// <see cref="SharedOffsetHandleStream" /> over the process's own standard-output handle, with
+/// no buffer, which reports those failures as an <see cref="IOException" /> and writes at the
+/// handle's shared file offset, as curl's <c>fwrite</c> does, not at a position of its own as a
+/// <see cref="FileStream" /> would (BL-3937, ADR-0944); a closed one becomes a
 /// <see cref="ClosedStandardOutputStream" />. On Windows a console is still opened with
 /// <see cref="System.Console.OpenStandardOutput()" />; elsewhere a terminal is opened over
 /// descriptor 1 too, because a write through .NET's console stream first writes terminfo's
@@ -79,10 +81,10 @@ internal static class StandardOutputOpener
     /// <returns>
     /// A <see cref="ClosedStandardOutputStream" /> when <paramref name="handleValue" /> is
     /// zero or <c>-1</c>, which is how a closed standard output reads, or when it cannot be
-    /// opened; otherwise a <see cref="FileStream" /> with no buffer over it, so each write
-    /// reaches the handle before the call returns.
+    /// opened; otherwise a <see cref="SharedOffsetHandleStream" /> with no buffer over it, so each
+    /// write reaches the handle, at its shared file offset, before the call returns.
     /// </returns>
-    internal static Stream OpenHandle(nint handleValue) => OpenHandle(handleValue, OpenUnbufferedFileStream);
+    internal static Stream OpenHandle(nint handleValue) => OpenHandle(handleValue, OpenUnbufferedSharedOffsetStream);
 
     /// <summary>
     /// Opens a raw standard-output handle with <paramref name="openHandleStream" />, as a
@@ -114,13 +116,15 @@ internal static class StandardOutputOpener
     }
 
     /// <summary>
-    /// Opens <paramref name="handle" /> for writing with no buffer, so each write reaches the
-    /// handle before the call returns and a failed write throws at once.
+    /// Opens <paramref name="handle" /> for writing with no buffer, at the handle's shared file
+    /// offset, so each write reaches the handle before the call returns, a failed write throws
+    /// at once, and a file shared with the shell or with standard error gets the bytes where
+    /// curl's would go (BL-3937, ADR-0944).
     /// </summary>
     /// <param name="handle">The standard-output handle.</param>
     /// <returns>The unbuffered stream.</returns>
-    private static FileStream OpenUnbufferedFileStream(SafeFileHandle handle) =>
-        new(handle, FileAccess.Write, bufferSize: 0);
+    private static SharedOffsetHandleStream OpenUnbufferedSharedOffsetStream(SafeFileHandle handle) =>
+        new(handle.DangerousGetHandle(), NativeSharedOffsetWrite.Write);
 
     /// <summary>
     /// Reads the raw standard-output handle for the platform.

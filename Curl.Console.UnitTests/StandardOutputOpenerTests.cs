@@ -72,6 +72,36 @@ public sealed class StandardOutputOpenerTests
     }
 
     [TestMethod]
+    public void OpenHandle_TwoStreamsOverOneFile_WritesEachAfterTheOther()
+    {
+        string path = Path.Combine(TestContext.TestRunResultsDirectory ?? Path.GetTempPath(), $"{Guid.NewGuid():N}.out");
+        Diagnostics.Arrange("handle", "a new file in the test results directory, opened twice as 1>f 2>&1 shares it");
+        Diagnostics.Arrange("writes", "'out' through the first, then 'err' through the second");
+
+        try
+        {
+            using (SafeFileHandle file = File.OpenHandle(path, FileMode.CreateNew, FileAccess.Write))
+            {
+                using Stream standardOutput = StandardOutputOpener.OpenHandle(file.DangerousGetHandle());
+                using Stream standardError = StandardOutputOpener.OpenHandle(file.DangerousGetHandle());
+
+                standardOutput.Write("out"u8);
+                standardError.Write("err"u8);
+            }
+
+            string written = File.ReadAllText(path);
+            Diagnostics.Act("file", written);
+
+            Diagnostics.Assert("file", "outerr", written);
+            Assert.AreEqual("outerr", written);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
     public void OpenHandle_DoesNotOwnTheHandle()
     {
         using AnonymousPipeServerStream reader = new(PipeDirection.In);

@@ -531,8 +531,8 @@ handler's own `(23)` write failure once it would not.
 stream models: it returns `Stream.Null` for a closed standard output and reports a write
 to a pipe whose reader has gone as a success. A Windows console is still opened the .NET
 way; a redirected standard output, and off Windows a terminal too, becomes an unbuffered
-`FileStream` over the process's own handle (`GetStdHandle` on Windows, descriptor 1
-elsewhere), and a closed one a `ClosedStandardOutputStream` whose writes throw. Off Windows `StandardErrorOpener` opens
+`SharedOffsetHandleStream` over the process's own handle (`GetStdHandle` on Windows, descriptor 1
+elsewhere), writing at the handle's shared file offset as curl's `fwrite` does, so a file shared with the shell or between standard output and standard error (`> f 2>&1`) gets each write in order (`NativeSharedOffsetWrite`, ADR-0944, BL-3937), and a closed one a `ClosedStandardOutputStream` whose writes throw. Off Windows `StandardErrorOpener` opens
 standard error over descriptor 2 the same way: there a write through .NET's console streams,
 or a read of `Console.WindowWidth`, writes terminfo's `keypad_xmit` (`ESC[?1h ESC=`) to the
 terminal, which curl never writes (CGR-115, ADR-0866).
