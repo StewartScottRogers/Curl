@@ -45,8 +45,7 @@ public sealed class Cgr036Tests
     [TestMethod]
     public async Task ConnectAsync_ClosedPort_CallsOpenWithTheAddressThenCloseOnceAndFailsWithCouldntConnect()
     {
-        using Socket reservation = ReserveClosedLoopbackPort();
-        int port = ((IPEndPoint)reservation.LocalEndPoint!).Port;
+        int port = ClosedLoopbackPort();
         List<CurlSocketAddress> opens = [];
         int closes = 0;
         using Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -268,12 +267,15 @@ public sealed class Cgr036Tests
         return listener;
     }
 
-    /// <summary>A loopback port nothing listens on: a socket bound and never listening, held so no other process can take the port while the test runs.</summary>
-    private static Socket ReserveClosedLoopbackPort()
+    /// <summary>
+    /// A loopback port nothing listens on: one the system just handed a socket, now closed. It is not held by a bound,
+    /// non-listening socket, because macOS refuses no connect to such a port and the attempt times out (BL-3954).
+    /// </summary>
+    private static int ClosedLoopbackPort()
     {
-        Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        using Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return socket;
+        return ((IPEndPoint)socket.LocalEndPoint!).Port;
     }
 
     private sealed class LoopbackResolver : IDnsResolver
