@@ -1,4 +1,4 @@
-# ADR-0949: A Location host is read as Windows-1252 on Windows, so test1448 stays off the ratchet
+# ADR-0953: A Location host is read as Windows-1252 on Windows, so test1448 stays off the ratchet
 
 - Status: Accepted
 - Date: 2026-10-28
