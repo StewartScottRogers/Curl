@@ -31,3 +31,4 @@ Found by BL-3592 (CGR-063), measured 2026-10-28 with Record-CurlExchange.ps1 aga
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 024af981 a41efccc 779790c0.
