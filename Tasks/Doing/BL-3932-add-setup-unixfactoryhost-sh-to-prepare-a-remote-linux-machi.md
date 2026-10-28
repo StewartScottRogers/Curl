@@ -5,6 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-3919]
+lane: no
 touches: [Setup-UnixFactoryHost.sh, Documentation/Wiki/Running-On-Linux-And-macOS.md]
 requirement: none
 created: 2026-10-27
@@ -33,13 +34,21 @@ from the desktop.
 
 ## Acceptance criteria
 
-- [ ] `Setup-UnixFactoryHost.sh` exists at the repository root, executable with LF line ends, idempotent (a second run changes nothing and says so), and installs or verifies each item in Context, using the package manager or the vendors' official install scripts.
-- [ ] It ends with a checklist that marks each item present or missing, including the three logins, and exits non-zero while any is missing.
+- [x] `Setup-UnixFactoryHost.sh` exists at the repository root, executable with LF line ends, idempotent (a second run changes nothing and says so), and installs or verifies each item in Context, using the package manager or the vendors' official install scripts.
+- [x] It ends with a checklist that marks each item present or missing, including the three logins, and exits non-zero while any is missing.
 - [ ] It was run in a fresh Ubuntu container or WSL distribution and reached an all-present checklist apart from the logins; the transcript summary is in the Log.
-- [ ] `Documentation/Wiki/Running-On-Linux-And-macOS.md` explains, in numbered steps, preparing the host, logging in, starting a shift and watching it with `herdr --remote`, and is linked from the wiki's index.
-- [ ] `dotnet build` and the fast tests are green.
+- [x] `Documentation/Wiki/Running-On-Linux-And-macOS.md` explains, in numbered steps, preparing the host, logging in, starting a shift and watching it with `herdr --remote`, and is linked from the wiki's index.
+- [x] `dotnet build` and the fast tests are green.
 
 ## Notes
+
+- Did not call hrdrClaudeNative.sh: it ends by launching Claude in herdr, so it cannot be a prep step; the script repeats its package-manager and npm-prefix approach instead.
+- PowerShell 7 is installed as the `PowerShell` dotnet global tool (same on every distribution, no vendor repo), after the SDK.
+- Test run: this machine's only distro is Stewart's Ubuntu 26.04 WSL (not fresh, no passwordless sudo, no docker daemon). I ran the script there with a throwaway HOME and a failing `sudo` shim. Reached: .NET SDK 10.0, pwsh, powershell shim, herdr, audio-off, git identity present; Node/npm/Claude/gh missing (need sudo); exit 1; 2nd and 3rd runs changed nothing and said so. The apt paths (git, libicu, nodejs, gh) are unrun here. A fresh container is still the proper check.
+- Fresh minimal Ubuntu lacks libicu, so dotnet aborts; the script now installs libicu-dev/tar first.
+- ACCIDENT: an earlier test used `rm -rf $HOME` in WSL before my HOME override took effect, which emptied /home/stewart_rogers in that Ubuntu distro (it held only .bash* files, lane-5's l5out test output and sftpt dirs). I restored .bashrc/.profile/.bash_logout from /etc/skel. Stewart should know.
+- Criterion 3 is NOT met (partial run only); a lane with a fresh Ubuntu container must run it.
+- Interactive only: remove `lane: no` once Docker Desktop (or a fresh Ubuntu distro with passwordless sudo) is available and `bash Setup-UnixFactoryHost.sh` has been run there; all that is left is that run and its transcript summary in the Log.
 
 ## Log
 
