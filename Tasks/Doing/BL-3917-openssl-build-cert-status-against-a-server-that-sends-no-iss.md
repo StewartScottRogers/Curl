@@ -31,3 +31,4 @@ Found by BL-3696 (CGR-167), measured in WSL: `openssl s_server -accept <p> -cert
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: e22c8789 5720596e 779790c0.
