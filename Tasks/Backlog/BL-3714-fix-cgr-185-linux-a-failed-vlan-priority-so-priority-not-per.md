@@ -4,7 +4,7 @@ title: Fix CGR-185: Linux: a failed --vlan-priority (SO_PRIORITY not permitted) 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3984]
 touches: [Curl.Networking.UnitLibrary/QualityOfServiceSocketOptions.cs, Curl.Networking.UnitTests/Cgr185Tests.cs]
 model: sonnet
 requirement: none
@@ -67,6 +67,8 @@ curl -o /dev/null --vlan-priority 7 http://127.0.0.1:20001/
 
 ## Notes
 
+- 2026-10-28: Requeued. TcpDialer has no way to print a non-verbose `Warning:` line (ITransferEvents.ReportInfo is -v only); BL-3984 adds ITransferEvents.ReportWarning. Then: call events.ReportWarning("VLAN priority N failed with errno E: <strerror>") from TcpDialer when TrySet of the SO_PRIORITY option fails (QualityOfServiceSocketOptions.TrySet must return the SocketException; errno 1 = EPERM, text "Operation not permitted"), test in Cgr185Tests.cs. Not measurable on this Windows lane (SO_PRIORITY is Linux only).
+
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr185Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
@@ -74,3 +76,4 @@ curl -o /dev/null --vlan-priority 7 http://127.0.0.1:20001/
 
 - 2026-10-26: Created from CGR-185 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs BL-3984 (ITransferEvents.ReportWarning) so the dialer can print a non-verbose Warning: line
