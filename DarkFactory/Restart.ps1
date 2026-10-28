@@ -50,10 +50,10 @@ if ($TestRestart) {
 if ($Restart) {
     # This checkout's coordinator only: another repository's factory runs its own copy.
     $mine = [regex]::Escape($FactoryScript)
-    $coordinator = Get-CimInstance Win32_Process | Where-Object {
+    $coordinator = Get-FactoryProcessTable | Where-Object {
         $_.ProcessId -ne $PID -and $_.CommandLine -match "-File\s+`"?$mine`"?(\s|$)" -and
         $_.CommandLine -notmatch '\s-Lane\s' -and $_.CommandLine -notmatch '\s-(Restart|NewTab)\b'
-    } | Sort-Object CreationDate -Descending | Select-Object -First 1
+    } | Sort-Object CreationDate, ProcessId -Descending | Select-Object -First 1
     # The newest: an ended shift's coordinator can still be running its shift-end review
     # beside the next shift (ADR-0710), and it is not the shift to restart.
     if (-not $coordinator) { Write-Host 'No dark factory shift is running in this checkout.'; exit 1 }
@@ -70,7 +70,7 @@ if ($Restart) {
         $phases = @{}
         foreach ($n in 1..16) {
             $lanePid = Get-LaneState $n 'pid' $stamp
-            if (-not $lanePid -or -not (Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue | Where-Object ProcessName -eq 'powershell')) { continue }
+            if (-not $lanePid -or -not (Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue | Where-Object ProcessName -in 'powershell', 'pwsh')) { continue }
             $beat = Get-LaneStatePath $n 'heartbeat.json' $stamp
             $phases[$n] = if (Test-Path $beat) { "$((Get-Content $beat -Raw | ConvertFrom-Json).phase)" } else { '' }
         }

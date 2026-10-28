@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: [BL-3919]
-touches: [DarkFactory/Platform.ps1, DarkFactory/MachineProbe.ps1, DarkFactory/AutoLanesState.ps1, DarkFactory/LaneState.ps1, DarkFactory/Restart.ps1, DarkFactory/HerdrTabs.ps1]
+touches: [DarkFactory/ShiftStart.ps1, DarkFactory/Platform.ps1, DarkFactory/MachineProbe.ps1, DarkFactory/AutoLanesState.ps1, DarkFactory/LaneState.ps1, DarkFactory/Restart.ps1, DarkFactory/HerdrTabs.ps1]
 requirement: none
 created: 2026-10-27
-completed:
+completed: 2026-10-28
 ---
 # BL-3920 — Read memory and the process table through the platform seam so lane sizing and restarts work on Linux and macOS
 
@@ -35,15 +35,19 @@ plus `/proc/<pid>/stat` (or `ps -axo pid=,ppid=,args=`); macOS uses `sysctl -n h
 
 ## Acceptance criteria
 
-- [ ] `DarkFactory/Platform.ps1` defines `Get-FactoryTotalMemoryBytes`, `Get-FactoryFreeMemoryBytes` and `Get-FactoryProcessTable` (objects with `ProcessId`, `ParentProcessId`, `CommandLine`), each with a Windows branch that returns what the old `Get-CimInstance` calls returned and Linux and macOS branches as described in Context.
-- [ ] `grep -n "Get-CimInstance" DarkFactory/*.ps1` matches only inside `DarkFactory/Platform.ps1`.
-- [ ] `DarkFactory/Restart.ps1` recognises a lane process named `powershell` or `pwsh`.
-- [ ] `RunDarkFactory.ps1 -TestPlatform` also checks the three new helpers (memory above zero, free not above total, the current process found in the table with its parent), and passes on Windows.
-- [ ] `-TestMachineProbe`, `-TestAutoLanes` and the restart self-test still pass on Windows, and `dotnet build` plus the fast tests are green.
+- [x] `DarkFactory/Platform.ps1` defines `Get-FactoryTotalMemoryBytes`, `Get-FactoryFreeMemoryBytes` and `Get-FactoryProcessTable` (objects with `ProcessId`, `ParentProcessId`, `CommandLine`), each with a Windows branch that returns what the old `Get-CimInstance` calls returned and Linux and macOS branches as described in Context.
+- [x] `grep -n "Get-CimInstance" DarkFactory/*.ps1` matches only inside `DarkFactory/Platform.ps1`.
+- [x] `DarkFactory/Restart.ps1` recognises a lane process named `powershell` or `pwsh`.
+- [x] `RunDarkFactory.ps1 -TestPlatform` also checks the three new helpers (memory above zero, free not above total, the current process found in the table with its parent), and passes on Windows.
+- [x] `-TestMachineProbe`, `-TestAutoLanes` and the restart self-test still pass on Windows, and `dotnet build` plus the fast tests are green.
 
 ## Notes
+
+- Added DarkFactory/ShiftStart.ps1 to touches: it held a fifth Get-CimInstance call that the grep criterion requires moved; no other Doing task touches it.
+- Linux and macOS process tables both use `ps -axo pid=,ppid=,args=`; the table also carries CreationDate (null off Windows) so Restart picks the newest coordinator, falling back to the highest process id.
 
 ## Log
 
 - 2026-10-27: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: ea931375 9d75da91 70c1db98 96f55cf5 c112e270.
+- 2026-10-28: Doing -> Done. Memory and process table read through the platform seam

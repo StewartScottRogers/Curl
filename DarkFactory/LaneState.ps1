@@ -57,7 +57,7 @@ function Test-LaneAlive {
     $lanePid = Get-LaneState $N 'pid' $ForStamp
     if (-not $lanePid) { return $true }
     $p = Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue
-    return [bool]($p -and $p.ProcessName -match 'powershell')
+    return [bool]($p -and $p.ProcessName -match 'powershell|pwsh')
 }
 
 function Test-TokensAvailable {

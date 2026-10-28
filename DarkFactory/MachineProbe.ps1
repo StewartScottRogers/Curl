@@ -68,9 +68,8 @@ function Invoke-ProbeBuilds {
     # Runs -Count concurrent builds of the checkout, each with its own artifacts folder
     # under -ProbeDir, sampling free memory every 2 s. Returns the step's measurements.
     param([string]$ProbeDir, [int]$Count, [switch]$Incremental)
-    $os = Get-CimInstance Win32_OperatingSystem
-    $totalKB = [double]$os.TotalVisibleMemorySize
-    $minFreeKB = [double]$os.FreePhysicalMemory
+    $totalKB = (Get-FactoryTotalMemoryBytes) / 1KB
+    $minFreeKB = (Get-FactoryFreeMemoryBytes) / 1KB
     $clock = [Diagnostics.Stopwatch]::StartNew()
     $builds = foreach ($i in 1..$Count) {
         $artifacts = Join-Path $ProbeDir "$i"
@@ -85,7 +84,7 @@ function Invoke-ProbeBuilds {
     }
     while (@($builds | Where-Object { -not $_.HasExited }).Count) {
         Start-Sleep -Seconds 2
-        $minFreeKB = [math]::Min($minFreeKB, [double](Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory)
+        $minFreeKB = [math]::Min($minFreeKB, (Get-FactoryFreeMemoryBytes) / 1KB)
     }
     $clock.Stop()
     $builds | ForEach-Object { $_.WaitForExit() }
@@ -120,7 +119,7 @@ function Invoke-MachineProbe {
         if (-not $passed) { break }
     }
     $result = Get-MachineLaneCap -Steps $steps -MaxLanes $ProbeMaxLanes
-    $memoryBytes = [double](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory
+    $memoryBytes = Get-FactoryTotalMemoryBytes
     $record = [ordered]@{
         schema = 1; probedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
         logicalProcessors = [Environment]::ProcessorCount; memoryGB = [math]::Round($memoryBytes / 1GB, 1)

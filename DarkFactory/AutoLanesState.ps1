@@ -28,7 +28,7 @@ function Get-MachineProbeNeed {
     if (-not $Record.complete) { return 'the last probe was incomplete' }
     if ("$($Record.rule)" -ne $MachineProbeRule) { return 'the probe rule changed' }
     if ([int]$Record.logicalProcessors -ne [Environment]::ProcessorCount) { return 'the processor count changed' }
-    $memoryGB = [double](Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+    $memoryGB = (Get-FactoryTotalMemoryBytes) / 1GB
     if ([math]::Abs([double]$Record.memoryGB - $memoryGB) -gt 1) { return 'the memory size changed' }
     return ''
 }

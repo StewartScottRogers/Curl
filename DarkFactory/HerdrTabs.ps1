@@ -154,7 +154,7 @@ function Close-FinishedHerdrTabs {
     try {
         $tabs = @(((& $herdr tab list) -join "`n" | ConvertFrom-Json).result.tabs)
         $panes = @(((& $herdr pane list) -join "`n" | ConvertFrom-Json).result.panes)
-        $processes = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CommandLine)
+        $processes = @(Get-FactoryProcessTable)
         foreach ($tab in $tabs) {
             if ($env:HERDR_WORKSPACE_ID -and $tab.workspace_id -ne $env:HERDR_WORKSPACE_ID) { continue }
             if ($tab.tab_id -eq $env:HERDR_TAB_ID) { continue }
