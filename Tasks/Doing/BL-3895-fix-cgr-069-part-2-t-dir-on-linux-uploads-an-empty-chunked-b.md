@@ -39,3 +39,4 @@ Part of BL-3598 (CGR-069, `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`)
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: e7706e08 a7c0fc04 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-3868 in Doing; depends-on BL-3868
+- 2026-10-28: Backlog -> Doing. Criteria at claim: e7706e08 a7c0fc04 779790c0.
