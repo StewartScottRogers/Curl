@@ -5,8 +5,8 @@ namespace Curl.Console;
 /// <summary>
 /// Holds back the transfers of a <c>-Z</c> run that would talk to a busy host (BL-520): while
 /// <c>--parallel-max-host</c> transfers to a host are running, and, without
-/// <c>--parallel-immediate</c>, while no <c>http://</c> transfer to it has ended yet, the next
-/// <c>http://</c> transfer to it waits. curl 8.21.0 waits there for the first connection to show whether
+/// <c>--parallel-immediate</c>, while no <c>http://</c> transfer to it has ended yet and no transfer of the
+/// run has ended since it began to wait (CGR-172, ADR-0934), the next <c>http://</c> transfer to it waits. curl 8.21.0 waits there for the first connection to show whether
 /// it can multiplex, which an HTTP/1.1 connection over plain TCP only shows once its transfer ends
 /// (measured 2026-09-28, BL-520 Notes). A waiting transfer keeps its <c>--parallel-max</c> slot, as it
 /// does in curl, and waiting transfers start in the order they began to wait, except that when a host's
@@ -70,7 +70,8 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
 
     /// <summary>
     /// Counts the transfer of <paramref name="url" /> as no longer running at its host, and frees the
-    /// transfers waiting for it that may now start, for <see cref="StartReleased" /> to start. When it is the
+    /// transfers waiting for it that may now start, and those waiting for another host's first transfer to end
+    /// (CGR-172), for <see cref="StartReleased" /> to start. When it is the
     /// host's first to end and its connection was closed, the first transfer to wait for the host is freed after
     /// the others (ADR-0768); when the connection stayed open they are freed in the order they waited (ADR-0786).
     /// </summary>
@@ -78,18 +79,33 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// <param name="connectionStayedOpen">Whether the ended transfer's connection was kept for reuse.</param>
     internal void Leave(string url, bool connectionStayedOpen = false)
     {
-        if (DestinationOf(url) is not { } destination)
-        {
-            return;
-        }
-
         lock (hosts)
         {
-            HostTransfers transfers = hosts[destination.Host];
-            transfers.Running--;
-            WaitingTransfer? pending = transfers.FirstHasEnded || connectionStayedOpen ? null : transfers.Waiting.First?.Value;
+            if (DestinationOf(url) is { } destination)
+            {
+                HostTransfers transfers = hosts[destination.Host];
+                transfers.Running--;
+                WaitingTransfer? pending = transfers.FirstHasEnded || connectionStayedOpen ? null : transfers.Waiting.First?.Value;
+                transfers.FirstHasEnded = true;
+                FreeWaiting(transfers, pending);
+            }
+
+            FreeWaitersForFirstToEnd();
+        }
+    }
+
+    /// <summary>
+    /// Frees the transfers still waiting for another host's first transfer to end: curl 8.22.0 retries its
+    /// pending transfers whenever any transfer ends, at any host or with a failed connect, and by then that
+    /// host's first connection shows it does not multiplex, so the retried transfer opens a connection of its
+    /// own (CGR-172, ADR-0934). Each host's transfers are freed in the order they waited.
+    /// </summary>
+    private void FreeWaitersForFirstToEnd()
+    {
+        foreach (HostTransfers transfers in hosts.Values.Where(transfers => !transfers.FirstHasEnded && transfers.Waiting.Count > 0))
+        {
             transfers.FirstHasEnded = true;
-            FreeWaiting(transfers, pending);
+            FreeWaiting(transfers, pending: null);
         }
     }
 
