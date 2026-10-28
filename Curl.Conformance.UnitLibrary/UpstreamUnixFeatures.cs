@@ -1,14 +1,13 @@
 namespace Curl.Conformance;
 
 /// <summary>
-/// The features Linux and macOS report: HTTPS records through DoH (<c>HTTPSRR</c>, which the Schannel build lacks, ADR-0856), the OpenSSL build, TLS session export (<c>SSLS-EXPORT</c>, which
+/// The features Linux and macOS report: the OpenSSL build (which, like the Schannel build, has no <c>HTTPSRR</c>, ADR-0956), TLS session export (<c>SSLS-EXPORT</c>, which
 /// <c>runtests.pl</c> also names <c>ssl-sessions</c>, BL-2858), and extended attributes.
 /// </summary>
 internal static class UpstreamUnixFeatures
 {
     public static readonly string[] Names =
     [
-        "HTTPSRR",
         "OpenSSL",
         "SSLS-EXPORT",
         "ssl-sessions",

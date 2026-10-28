@@ -15,7 +15,7 @@ public sealed class CurlVersionTextTests
 
     private const string Protocols = "Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt mqtts pop3 pop3s rtsp scp sftp smtp smtps telnet tftp ws wss";
 
-    private const string Features = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
+    private const string Features = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     private const string WindowsFeatures = "Features: alt-svc AsynchDNS brotli HSTS HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSPI threadsafe UnixSockets zstd";
 

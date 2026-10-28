@@ -232,11 +232,11 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Gets a value indicating whether a direct connect's <c>https://</c> origin is resolved through
     /// <see cref="IHttpsOriginDnsResolver.ResolveHttpsOriginAsync" />, asking its HTTPS record first,
-    /// as curl 8.22.0's HTTPSRR build does (ADR-0727). The default is the platform build's: off on
-    /// Windows, where the Schannel build has no <c>HTTPSRR</c> and sends only the A and AAAA DoH
-    /// queries, on elsewhere (ADR-0856, CGR-157).
+    /// as curl 8.22.0's HTTPSRR build does (ADR-0727). The default is off on every platform, as neither
+    /// reference build (Schannel on Windows, OpenSSL elsewhere) has <c>HTTPSRR</c>: each sends only the A and AAAA DoH
+    /// queries (ADR-0856, ADR-0956, CGR-157).
     /// </summary>
-    public bool AsksHttpsRecords { get; init; } = !OperatingSystem.IsWindows();
+    public bool AsksHttpsRecords { get; init; }
 
     // Gives a random index below its argument for ShufflesResolveEntryAddresses; tests pin it.
     internal Func<int, int> ResolveEntryShuffleRandomBelow { get; init; } = DnsAddressShuffle.CryptographicRandomBelow;
