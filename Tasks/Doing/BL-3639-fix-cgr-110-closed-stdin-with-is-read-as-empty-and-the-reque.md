@@ -77,3 +77,4 @@ curl -sS -d @- $H/ok <&-
 - 2026-10-26: Created from CGR-110 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waiting on BL-3570 (holds Curl.Cli.UnitLibrary/CommandLineOptionTable.cs) and BL-3893 (holds Curl.Cli.UnitLibrary/CommandLineRefusal.cs); measurements and plan in Notes
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
