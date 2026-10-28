@@ -1,4 +1,4 @@
-# ADR-0871: CURLMOPT_MAX_TOTAL_CONNECTIONS closes the oldest idle connection to make room
+# ADR-0935: CURLMOPT_MAX_TOTAL_CONNECTIONS closes the oldest idle connection to make room
 
 - Status: Accepted
 - Date: 2026-10-28
