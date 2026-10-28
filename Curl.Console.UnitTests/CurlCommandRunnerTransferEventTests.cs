@@ -741,14 +741,16 @@ public sealed class CurlCommandRunnerTransferEventTests
     }
 
     [TestMethod]
-    public async Task RunAsync_NoTraceOption_GivesTheHandlerTheSinkThatDoesNothing()
+    public async Task RunAsync_NoTraceOption_GivesTheHandlerTheWarningWriterOverTheSinkThatDoesNothing()
     {
         RecordingProtocolHandler handler = MeasuredExchange(18422, 51405);
 
         await RunAsync(["http://127.0.0.1:18422/f.txt", "-o", "o"], handler);
 
-        Diagnostics.Assert("handler's events are the sink that does nothing", true, ReferenceEquals(NoTransferEvents.Instance, handler.Contexts[0].Events));
-        Assert.AreSame(NoTransferEvents.Instance, handler.Contexts[0].Events);
+        var warningWriter = handler.Contexts[0].Events as WarningWritingTransferEvents;
+        Diagnostics.Assert("handler's events write warnings over the sink that does nothing", true, ReferenceEquals(NoTransferEvents.Instance, warningWriter?.Inner));
+        Assert.IsNotNull(warningWriter);
+        Assert.AreSame(NoTransferEvents.Instance, warningWriter.Inner);
         Diagnostics.Diff("stderr", string.Empty, StandardErrorText);
         Assert.AreEqual(string.Empty, StandardErrorText);
     }
