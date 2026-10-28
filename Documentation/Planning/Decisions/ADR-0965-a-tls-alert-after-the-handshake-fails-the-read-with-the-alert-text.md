@@ -1,4 +1,4 @@
-# ADR-0964: A fatal TLS alert after the handshake fails the read with the build's alert text
+# ADR-0965: A fatal TLS alert after the handshake fails the read with the build's alert text
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-3752, CGR-223).
 
