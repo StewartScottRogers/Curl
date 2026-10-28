@@ -81,6 +81,11 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
     /// </summary>
     internal IReadOnlyList<string> Challenges => challenges;
 
+    private readonly List<KeyValuePair<string, string>> headerLines = [];
+
+    /// <summary>Gets every header line read so far, name and value, in order, for <c>%{num_headers}</c> (BL-3960).</summary>
+    internal IReadOnlyList<KeyValuePair<string, string>> HeaderLines => headerLines;
+
     /// <summary>Gets a value indicating whether the status line has been read.</summary>
     internal bool HasStatus { get; private set; }
 
@@ -130,6 +135,8 @@ internal sealed class RtspReplyHeadParser(RtspSessionState session, long? maxFil
             RefuseCarriageReturn(text);
             RefuseMissingColon(text);
             AcceptHeader(text);
+            int colon = text.IndexOf(':', StringComparison.Ordinal);
+            headerLines.Add(new(text[..colon], text.AsSpan(colon + 1).Trim(WhiteSpace).ToString()));
         }
     }
 

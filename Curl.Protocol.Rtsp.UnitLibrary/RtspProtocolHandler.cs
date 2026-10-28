@@ -374,6 +374,8 @@ public sealed class RtspProtocolHandler(
         TransferReport report = new()
         {
             ResponseCode = head.StatusCode,
+            HttpVersion = System.Net.HttpVersion.Version11,
+            PseudoHeaders = head.HeaderLines,
             Method = plan.MethodName,
             HeaderSize = head.Length,
             RequestSize = requestSize,

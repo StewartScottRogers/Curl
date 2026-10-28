@@ -20,4 +20,11 @@ internal sealed record RtspReplyHead(
 {
     /// <summary>Gets the value of every <c>WWW-Authenticate</c> header, in order; empty when there is none.</summary>
     public IReadOnlyList<string> Challenges { get; init; } = [];
+
+    /// <summary>
+    /// Gets every header line of the head, name and value, in order; empty when there is none.
+    /// curl 8.22.0 counts them in <c>%{num_headers}</c> but its <c>%header{}</c> finds none of
+    /// them (measured, BL-3960), so the handler reports them as pseudo-headers.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>> HeaderLines { get; init; } = [];
 }
