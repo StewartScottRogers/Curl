@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/FileSystem/PhysicalFileSystem.cs, Curl.Core.UnitTests/Cgr174Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3703 — Fix CGR-174: Two concurrent -Z transfers writing the same -o file: PORT fails one of them with exit 23 on Windows
 
@@ -59,17 +59,25 @@ curl -Z --parallel-immediate -sS -w "%{urlnum} %{exitcode} %{http_code}\n" -o sa
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr174Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause: `PhysicalFileSystem.OpenForWriteAsync` opened writes with `FileShare.Read`, so on Windows the second `-Z` writer's open of the same `-o` file was a sharing violation (exit 23). Fix: both write-open paths share `FileShare.ReadWrite`, as the C runtime's `fopen` does (ADR-0868). Off Windows .NET enforces only `FileShare.None`, so Linux, which already matched, is unchanged.
+- Repro (2026-10-28, Windows, a throwaway C# file-based loopback server on 127.0.0.1:22000 sending `Content-Length: 20000` and the body in 4 parts 200 ms apart, `/b` after a 100 ms delay; folder deleted after the run): `curl -Z --parallel-immediate -sS -w "%{urlnum} %{exitcode} %{http_code}\n" -o same.txt "http://127.0.0.1:22000/a?n=20000&p=4&pd=200" -o same.txt "http://127.0.0.1:22000/b?n=20000&p=4&pd=200&d=100"`.
+  - REF (Git for Windows' curl 8.22.0): exit 0, stdout `0 0 200` / `1 0 200`, no stderr, same.txt 20000 bytes (all `/b`'s bytes, the later writes at the same offsets), requests `GET /a?... HTTP/1.1` and `GET /b?... HTTP/1.1` with Host, `User-Agent: curl/8.22.0`, `Accept: */*`.
+  - PORT after the fix: identical on every count (exit, stdout, stderr, same.txt bytes, both request byte blocks).
+  - The issue names no other variant; nothing that matched before changed (fast tests green).
+- Focused test `Curl.Core.UnitTests/Cgr174Tests.cs` opens one file for writing twice and checks both writes land; it failed with the share set back to `FileShare.Read` and passes with the fix. It uses a temporary directory it creates and deletes, so it is a unit test and platform-neutral.
+- `dotnet build` clean; fast tests 46 projects, 0 failed. `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary`: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created from CGR-174 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Two -Z transfers writing one -o file both succeed on Windows, as curl 8.22.0 does
