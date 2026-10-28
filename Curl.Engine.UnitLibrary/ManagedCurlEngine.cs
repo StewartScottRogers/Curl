@@ -162,7 +162,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
     public IMultiTransfer CreateMulti()
     {
         ManagedEngineSharedState caches = shared.WithOwnCaches();
-        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.Connections.CloseIdleAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear);
+        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.Connections.CloseIdleAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear)
+        {
+            CloseIdleConnectionsToMakeRoom = caches.Connections.CloseIdleToMakeRoomAsync,
+        };
         shared.MultiCaches.Add(multi, caches);
         return multi;
     }

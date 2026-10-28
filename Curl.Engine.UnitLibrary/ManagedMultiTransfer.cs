@@ -114,6 +114,14 @@ internal sealed class ManagedMultiTransfer(
     internal static long DefaultConnectsPerTransfer { get; } = 4;
 
     /// <summary>
+    /// Gets the step that, before a transfer starts under <see cref="MultiOptions.MaxTotalConnections" />, closes the
+    /// handle's oldest idle connections until the one it may open stays within that limit, unless one to its host and
+    /// port waits to be reused (<see cref="ConnectionCache.CloseIdleToMakeRoomAsync" />), as libcurl 8.22.0's pool
+    /// does (CGR-150); it takes the limit, the host and the port. By default it closes nothing.
+    /// </summary>
+    internal Func<long, string, int, ValueTask> CloseIdleConnectionsToMakeRoom { get; init; } = static (_, _, _) => ValueTask.CompletedTask;
+
+    /// <summary>
     /// Gets or sets every option of the handle (<c>curl_multi_setopt</c>). <c>CURLMOPT_NETWORK_CHANGED</c>
     /// is an action, not a setting, as in libcurl: a value whose <see cref="MultiOptions.NetworkChanged" />
     /// is not <see cref="CurlNetworkChange.None" /> closes the engine's idle connections
@@ -924,6 +932,7 @@ internal sealed class ManagedMultiTransfer(
         entry.StartTimestamp = timeProvider.GetTimestamp();
         entry.Origin = OriginOf(entry.Transfer);
         entry.Multiplexed = IsMultiplexed(entry.Transfer, entry.Origin);
+        await CloseIdleConnectionsForRoomAsync(entry.Transfer).ConfigureAwait(false);
         PerformingHandle.Value = this;
         TransferCallbackMarshal callbacks = new(callbackQueue, entry.Cancellation.Token);
         if (entry.Transfer is ManagedEasyTransfer easy)
@@ -939,6 +948,23 @@ internal sealed class ManagedMultiTransfer(
         {
             callbacks.Stop();
         }
+    }
+
+    /// <summary>
+    /// Under <see cref="MultiOptions.MaxTotalConnections" />, closes idle connections so the one
+    /// <paramref name="transfer" /> may open stays within it, as libcurl counts idle connections against the limit and
+    /// closes its oldest idle one to make room (CGR-150).
+    /// </summary>
+    private ValueTask CloseIdleConnectionsForRoomAsync(IEasyTransfer transfer)
+    {
+        long limit = Options.MaxTotalConnections;
+        if (limit <= 0)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        bool parsed = Uri.TryCreate(transfer.Options.Network.Url, UriKind.Absolute, out Uri? uri);
+        return CloseIdleConnectionsToMakeRoom(limit, parsed ? uri!.IdnHost : string.Empty, parsed ? uri!.Port : 0);
     }
 
     private long RemainingMilliseconds(MultiEntry entry)

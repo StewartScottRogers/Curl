@@ -102,6 +102,33 @@ public sealed class ConnectionCache(TimeProvider timeProvider) : IAsyncDisposabl
     }
 
     /// <summary>
+    /// Makes room for a transfer to <paramref name="host" /> and <paramref name="port" /> under a limit of
+    /// <paramref name="limit" /> connections: unless an idle connection to that host and port waits to be reused,
+    /// closes the oldest idle connections until fewer than <paramref name="limit" />, idle and in use, remain, as
+    /// libcurl 8.22.0's <c>Curl_cpool_check_limits</c> closes its oldest idle connection under
+    /// <c>CURLMOPT_MAX_TOTAL_CONNECTIONS</c> (CGR-150). A connection in use is never closed; the ones closed leave the
+    /// cache before this returns its task.
+    /// </summary>
+    /// <param name="limit">The most connections open at once.</param>
+    /// <param name="host">The host the transfer connects to, compared ignoring case.</param>
+    /// <param name="port">The port the transfer connects to.</param>
+    /// <returns>A task that completes when every connection closed for room is closed.</returns>
+    public async ValueTask CloseIdleToMakeRoomAsync(long limit, string host, int port)
+    {
+        List<PoolEntry> closing;
+
+        lock (Gate)
+        {
+            bool reusable = Idle.Exists(entry => entry.Key!.Port == port && string.Equals(entry.Key.Host, host, StringComparison.OrdinalIgnoreCase));
+            long excess = reusable ? 0 : Idle.Count + Leased.Count - Math.Max(limit - 1, 0);
+            closing = Idle.GetRange(0, (int)Math.Clamp(excess, 0, Idle.Count));
+            Idle.RemoveRange(0, closing.Count);
+        }
+
+        await CloseAllAsync(closing);
+    }
+
+    /// <summary>
     /// Gets or sets the owner each connection opened from here on, in this asynchronous flow only, belongs to, which
     /// <see cref="CloseIdleOwnedByAsync" /> closes; <see langword="null" />, the default, for none. A value set inside an
     /// <see langword="async" /> method reaches the connects it awaits and is undone when it returns, as an
