@@ -7,7 +7,7 @@ namespace Curl.Conformance.UnitProgram.UrlParsing;
 /// <summary>
 /// The port of curl 8.22.0's <c>tests/unit/unit1627.c</c>: <c>Curl_get_scheme</c>, curl's one table of the
 /// schemes it knows, transfer and proxy schemes alike. Curl keeps that table in two places, so the lookup asks
-/// <see cref="CommandLineProtocolSet.KnownScheme"/> (the transfer schemes) and then
+/// <see cref="CommandLineProtocolSet.SchemeLibcurlNames"/> (the transfer schemes) and then
 /// <see cref="CommandLineProxy.TryGetKind"/> (the proxy schemes, <c>socks</c> to <c>socks5h</c>). Every
 /// <c>okay</c> name must be found, under its own name compared case-insensitively and with that name in lower
 /// case; every <c>notokay</c> name must not be. As in the C program, each loop stops at its first wrong row and
@@ -117,7 +117,7 @@ public sealed class Unit1627SchemeLookup(Func<string, string?> getScheme) : IUni
 
     /// <summary>
     /// Curl's counterpart of <c>Curl_get_scheme</c>: the lower-case name of a transfer scheme
-    /// <see cref="CommandLineProtocolSet.KnownScheme"/> knows, else of a proxy scheme
+    /// <see cref="CommandLineProtocolSet.SchemeLibcurlNames"/> knows, else of a proxy scheme
     /// <see cref="CommandLineProxy.TryGetKind"/> accepts, else <see langword="null"/>.
     /// </summary>
     /// <param name="name">The scheme, in any case.</param>
@@ -127,7 +127,7 @@ public sealed class Unit1627SchemeLookup(Func<string, string?> getScheme) : IUni
         ArgumentNullException.ThrowIfNull(name);
         bool isProxyScheme = new CommandLineProxy(name + "://host", ProxyKind.Http).TryGetKind(out _, out _);
 
-        return CommandLineProtocolSet.KnownScheme(name) ?? (isProxyScheme ? name.ToLowerInvariant() : null);
+        return CommandLineProtocolSet.SchemeLibcurlNames(name) ?? (isProxyScheme ? name.ToLowerInvariant() : null);
     }
 
     /// <inheritdoc />

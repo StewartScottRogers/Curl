@@ -177,7 +177,7 @@ public sealed class CommandLineProtocolSetOptionTests
     [DataRow("ldap", "ldap")]
     [DataRow("HTTPS", "https")]
     [DataRow("ftp", "ftp")]
-    [DataRow("SMBS", "smbs")]
+    [DataRow("DICT", "dict")]
     public void Parse_ProtoDefaultNamingKnownScheme_RecordsItLowercase(string value, string expected)
     {
         CommandLineParseResult result = Parse(["--proto-default", value, Url]);
