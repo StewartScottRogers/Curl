@@ -32,3 +32,4 @@ ADR-0909 hands each `argv` byte that is not valid UTF-8 over as the lone surroga
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: dde753b0 779790c0.
