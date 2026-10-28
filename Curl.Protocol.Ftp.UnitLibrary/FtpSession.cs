@@ -2553,7 +2553,17 @@ internal sealed class FtpSession(
         ReportRememberedDirectory();
         trace.ClosingDataConnection();
         await CloseDataConnectionAsync().ConfigureAwait(false);
-        FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
+        FtpReply complete;
+        try
+        {
+            complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead, FtpTransferMessages.FtpResponseTimeout).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // The overall time limit ran out while the end-of-transfer reply was awaited; curl 8.22.0 names the reply (CGR-231).
+            return TransferResult.Failure(CurlExitCode.OperationTimedOut, FtpTransferMessages.FtpResponseTimeout, bytesTransferred);
+        }
+
         trace.TransferReplyRead(complete);
         if (expectedSize is { } expected && bytesTransferred < expected)
         {
@@ -2948,8 +2958,8 @@ internal sealed class FtpSession(
     /// <paramref name="closingMessage" /> and no <c>QUIT</c>, or for no reply within
     /// <see cref="ITransferContext.FtpServerResponseTimeout" /> (exit 28, no <c>QUIT</c>).
     /// </summary>
-    private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached) =>
-        await CheckReplyAsync(ReadReplyWithinServerResponseTimeoutAsync(), closingMessage).ConfigureAwait(false);
+    private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached, string timeoutMessage = FtpTransferMessages.ServerResponseTimeout) =>
+        await CheckReplyAsync(ReadReplyWithinServerResponseTimeoutAsync(timeoutMessage), closingMessage).ConfigureAwait(false);
 
     /// <summary>
     /// Awaits <paramref name="reading" /> and ends the conversation as
@@ -2998,12 +3008,12 @@ internal sealed class FtpSession(
     /// is lost; a timer that fires early is waited out, and the control channel's own token
     /// still ends the read.
     /// </summary>
-    private async ValueTask<FtpReply?> ReadReplyWithinServerResponseTimeoutAsync()
+    private async ValueTask<FtpReply?> ReadReplyWithinServerResponseTimeoutAsync(string timeoutMessage)
     {
         Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
         return await CompletesWithinAsync(read, context.FtpServerResponseTimeout).ConfigureAwait(false)
             ? await read.ConfigureAwait(false)
-            : throw Failed(CurlExitCode.OperationTimedOut, FtpTransferMessages.ServerResponseTimeout);
+            : throw Failed(CurlExitCode.OperationTimedOut, timeoutMessage);
     }
 
     /// <summary>
