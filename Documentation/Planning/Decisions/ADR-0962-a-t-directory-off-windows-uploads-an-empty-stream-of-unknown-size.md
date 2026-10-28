@@ -1,4 +1,4 @@
-# ADR-0960: A -T directory off Windows uploads an empty stream of unknown size
+# ADR-0962: A -T directory off Windows uploads an empty stream of unknown size
 
 - Status: Accepted
 - Date: 2026-10-28
