@@ -71,7 +71,7 @@ public sealed class Cgr088LimitTests
         TransferResult result = await transfer;
 
         Assert.AreEqual(CurlExitCode.OperationTimedOut, result.ExitCode);
-        CollectionAssert.Contains(events.Info, "Operation timed out after 1000 milliseconds with 5 out of 100 bytes received");
+        Assert.AreEqual(1, events.Info.Count(line => line == "Operation timed out after 1000 milliseconds with 5 out of 100 bytes received"));
     }
 
     private static ValueTask<TransferResult> Execute(string response, RecordingTransferEvents events, HttpRequestOptions http, long? maxFileSize) =>

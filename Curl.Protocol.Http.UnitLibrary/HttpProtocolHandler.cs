@@ -1536,7 +1536,6 @@ public sealed class HttpProtocolHandler(
         exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
         string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
         plan.Context.Events.ReportInfo(message);
-        plan.Context.Events.ReportInfo(message);
         TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
             with
         { Report = exchange.Report(body) };
