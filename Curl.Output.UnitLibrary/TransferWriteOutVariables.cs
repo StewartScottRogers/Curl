@@ -148,7 +148,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         ["remote_ip"] = variables => WriteOutValue.FromText(variables.info.PrimaryIp),
         ["remote_port"] = variables => WriteOutValue.FromNumber(FindRemotePort(variables.info)),
         ["exitcode"] = variables => WriteOutValue.FromNumber((int)variables.result.ExitCode),
-        ["errormsg"] = variables => WriteOutValue.FromText(variables.result.ErrorMessage),
+        ["errormsg"] = variables => WriteOutValue.FromText(variables.result.WriteOutErrorMessage ?? variables.result.ErrorMessage),
         ["url"] = variables => WriteOutValue.FromText(variables.url),
         ["urlnum"] = variables => WriteOutValue.FromNumber(variables.urlNumber),
         ["scheme"] = variables => WriteOutValue.FromText(variables.info.Scheme),

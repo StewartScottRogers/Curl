@@ -523,6 +523,12 @@ internal static class HttpTransferMessages
     internal const string DecodedFileSizeLimitExceeded = "Would have exceeded max file size";
 
     /// <summary>
+    /// The generic text of exit 22, which <c>%{errormsg}</c> prints after <c>--fail-with-body</c>
+    /// (measured, CGR-214).
+    /// </summary>
+    internal const string HttpResponseCodeSaidError = "HTTP response code said error";
+
+    /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or
     /// <c>--fail-with-body</c>.
     /// </summary>

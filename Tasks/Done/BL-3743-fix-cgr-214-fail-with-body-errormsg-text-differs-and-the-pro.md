@@ -5,11 +5,11 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Curl.Protocol.Http.UnitTests/Cgr214Tests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/Cgr214Tests.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferResult.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/Cgr214Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3743 — Fix CGR-214: --fail-with-body: %{errormsg} text differs, and the progress meter shows 0 bytes
 
@@ -64,10 +64,10 @@ curl --fail-with-body -o NUL http://127.0.0.1:20700/code/404
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -78,3 +78,5 @@ curl --fail-with-body -o NUL http://127.0.0.1:20700/code/404
 
 - 2026-10-26: Created from CGR-214 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28 Notes: Fix: TransferResult.WriteOutErrorMessage (new, null by default) carries curl 8.22.0's generic "HTTP response code said error" after --fail-with-body; %{errormsg} prefers it, the `curl: (22)` line keeps "The requested URL returned error: 404". Added the Abstractions, Output and HttpProtocolHandler files to touches (no other live task named them checked at claim). The meter already reports the 9 body bytes in Curl (unit test pins "down 9/9"). Measure-CodeQuality.ps1 on the three libraries: 0 failing members. Linux/macOS CI: change is platform-neutral.
+- 2026-10-28: Doing -> Done. CGR-214: %{errormsg} gives the generic text after --fail-with-body

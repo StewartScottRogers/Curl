@@ -1430,7 +1430,12 @@ public sealed class HttpProtocolHandler(
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
-        { Report = WithHeadBeforeFailure(exchange.Report(body), failure) };
+        {
+            Report = WithHeadBeforeFailure(exchange.Report(body), failure),
+            WriteOutErrorMessage = failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.FailWithBody
+                ? HttpTransferMessages.HttpResponseCodeSaidError
+                : null,
+        };
         HttpAttemptOutcome outcome = FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
         ReportEmptyReply(plan.Context.Events, failure, outcome);
         return outcome;
