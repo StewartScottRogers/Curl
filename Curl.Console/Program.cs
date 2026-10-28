@@ -15,7 +15,7 @@ internal static class Program
         ArgumentNullException.ThrowIfNull(args);
 
         using Stream standardOutput = StandardOutputOpener.Open();
-        using Stream standardError = new WriteFailureIgnoringStream(System.Console.OpenStandardError());
+        using Stream standardError = new WriteFailureIgnoringStream(StandardErrorOpener.Open());
         using Stream standardInput = System.Console.OpenStandardInput();
         bool standardOutputIsTerminal = !System.Console.IsOutputRedirected;
         using StandardOutputVirtualTerminal virtualTerminal = StandardOutputVirtualTerminal.ForWindowsConsole();

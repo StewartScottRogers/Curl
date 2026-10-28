@@ -64,7 +64,8 @@ prints `Note: Read config file from '<path>'`, wrapped as a warning is and hidde
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
 width `TerminalColumns` resolves (`COLUMNS` from 21 to 10000, else the standard-error
-console, else 79).
+console on Windows or the standard-input terminal elsewhere, `ioctl(TIOCGWINSZ)` through
+`NativeTerminalWindowSize`, else 79).
 On Windows each `-o` name is first rewritten by `Curl.Core`'s `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does; not under `-g`, see below),
 and that name is the one opened, sized for `-C -` and named in every message.
@@ -528,10 +529,13 @@ handler's own `(23)` write failure once it would not.
 `Program.Main` opens standard output with `StandardOutputOpener`, not
 `System.Console.OpenStandardOutput()`, because the latter hides both failures that
 stream models: it returns `Stream.Null` for a closed standard output and reports a write
-to a pipe whose reader has gone as a success. A console is still opened the .NET way; a
-redirected standard output becomes an unbuffered `FileStream` over the process's own
-handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
-`ClosedStandardOutputStream` whose writes throw.
+to a pipe whose reader has gone as a success. A Windows console is still opened the .NET
+way; a redirected standard output, and off Windows a terminal too, becomes an unbuffered
+`FileStream` over the process's own handle (`GetStdHandle` on Windows, descriptor 1
+elsewhere), and a closed one a `ClosedStandardOutputStream` whose writes throw. Off Windows `StandardErrorOpener` opens
+standard error over descriptor 2 the same way: there a write through .NET's console streams,
+or a read of `Console.WindowWidth`, writes terminfo's `keypad_xmit` (`ESC[?1h ESC=`) to the
+terminal, which curl never writes (CGR-115, ADR-0864).
 
 Standard error is wrapped in `WriteFailureIgnoringStream`, which ignores an
 `IOException` from any write, flush or close, as curl ignores a failed `fputs` to `stderr`: with

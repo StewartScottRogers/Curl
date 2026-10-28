@@ -26,7 +26,7 @@ internal static class TerminalColumns
     /// </summary>
     /// <returns>The terminal width.</returns>
     internal static int Resolve() =>
-        Resolve(Environment.GetEnvironmentVariable(ColumnsVariableName), ReadStandardErrorConsoleColumns);
+        Resolve(Environment.GetEnvironmentVariable(ColumnsVariableName), ReadConsoleColumns);
 
     /// <summary>
     /// Resolves the width from <paramref name="columnsVariable" />, then
@@ -63,11 +63,33 @@ internal static class TerminalColumns
         && columns is > 20 and <= 10000;
 
     /// <summary>
-    /// Reads the width of the console standard error is attached to, in curl's terms.
+    /// Reads the console width in curl's terms for this process's platform.
+    /// </summary>
+    /// <returns>The width, or <see langword="null" /> when there is no console to read it from.</returns>
+    internal static int? ReadConsoleColumns() =>
+        ReadConsoleColumns(OperatingSystem.IsWindows(), ReadStandardErrorConsoleColumns, NativeTerminalWindowSize.ReadStandardInputColumns);
+
+    /// <summary>
+    /// Reads the console width as curl does: the standard-error console's on Windows, the
+    /// standard-input terminal's elsewhere, never through <see cref="System.Console.WindowWidth" />
+    /// (CGR-115, ADR-0864).
+    /// </summary>
+    /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
+    /// <param name="readStandardErrorConsoleColumns">Reads the standard-error console's width (Windows).</param>
+    /// <param name="readStandardInputTerminalColumns">Reads the standard-input terminal's width (elsewhere).</param>
+    /// <returns>The width, or <see langword="null" /> when there is no console to read it from.</returns>
+    internal static int? ReadConsoleColumns(
+        bool runsOnWindows,
+        Func<int?> readStandardErrorConsoleColumns,
+        Func<int?> readStandardInputTerminalColumns) =>
+        runsOnWindows ? readStandardErrorConsoleColumns() : readStandardInputTerminalColumns();
+
+    /// <summary>
+    /// Reads the width of the console standard error is attached to, in curl's Windows terms.
     /// </summary>
     /// <returns>The width, or <see langword="null" /> when standard error is not a console.</returns>
     internal static int? ReadStandardErrorConsoleColumns() =>
-        ReadStandardErrorConsoleColumns(System.Console.IsErrorRedirected, ReadConsoleWindowWidth, OperatingSystem.IsWindows());
+        ReadStandardErrorConsoleColumns(System.Console.IsErrorRedirected, ReadConsoleWindowWidth, runsOnWindows: true);
 
     /// <summary>
     /// Reads the console width in curl's terms: one less than the window width on Windows,

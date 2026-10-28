@@ -18,8 +18,10 @@ namespace Curl.Console;
 /// So a redirected standard output - a file, a pipe, a device - is opened as a
 /// <see cref="FileStream" /> over the process's own standard-output handle, with no buffer,
 /// which reports those failures as an <see cref="IOException" />; a closed one becomes a
-/// <see cref="ClosedStandardOutputStream" />. A console is still opened with
-/// <see cref="System.Console.OpenStandardOutput()" />, unchanged.
+/// <see cref="ClosedStandardOutputStream" />. On Windows a console is still opened with
+/// <see cref="System.Console.OpenStandardOutput()" />; elsewhere a terminal is opened over
+/// descriptor 1 too, because a write through .NET's console stream first writes terminfo's
+/// <c>keypad_xmit</c> to the terminal (CGR-115, ADR-0864).
 /// </para>
 /// </remarks>
 internal static class StandardOutputOpener
@@ -40,23 +42,35 @@ internal static class StandardOutputOpener
     /// <returns>The stream a transfer to standard output writes through.</returns>
     internal static Stream Open() =>
         Open(
-            System.Console.IsOutputRedirected,
+            OpensOverHandle(System.Console.IsOutputRedirected, OperatingSystem.IsWindows()),
             System.Console.OpenStandardOutput,
             ReadStandardOutputHandleValue(OperatingSystem.IsWindows(), GetStandardOutputHandleOnWindows));
 
     /// <summary>
-    /// Opens standard output as a console stream when it is a console, and over its handle
-    /// otherwise.
+    /// Tells whether standard output is opened over its handle rather than as a console
+    /// stream: when it is redirected, and always off Windows, where a write through .NET's
+    /// console stream writes terminfo's <c>keypad_xmit</c> (<c>ESC[?1h ESC=</c>) to the terminal
+    /// first (CGR-115, ADR-0864).
     /// </summary>
     /// <param name="isOutputRedirected">Whether standard output is anything but a console.</param>
+    /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
+    /// <returns>Whether to open standard output over its handle.</returns>
+    internal static bool OpensOverHandle(bool isOutputRedirected, bool runsOnWindows) =>
+        isOutputRedirected || !runsOnWindows;
+
+    /// <summary>
+    /// Opens standard output over its handle when <paramref name="opensOverHandle" /> is
+    /// set, and as a console stream otherwise.
+    /// </summary>
+    /// <param name="opensOverHandle">Whether to open standard output over its handle (see <see cref="OpensOverHandle" />).</param>
     /// <param name="openConsoleStream">Opens standard output as a console stream.</param>
     /// <param name="standardOutputHandleValue">The raw standard-output handle, or file descriptor.</param>
     /// <returns>The stream a transfer to standard output writes through.</returns>
     internal static Stream Open(
-        bool isOutputRedirected,
+        bool opensOverHandle,
         Func<Stream> openConsoleStream,
         nint standardOutputHandleValue) =>
-        isOutputRedirected ? OpenHandle(standardOutputHandleValue) : openConsoleStream();
+        opensOverHandle ? OpenHandle(standardOutputHandleValue) : openConsoleStream();
 
     /// <summary>
     /// Opens a raw standard-output handle as an unbuffered stream it does not own.

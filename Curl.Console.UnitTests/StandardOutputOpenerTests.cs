@@ -23,7 +23,7 @@ public sealed class StandardOutputOpenerTests
         using MemoryStream console = new();
         Diagnostics.Arrange("output redirected / handle", "False / 0");
 
-        Stream opened = StandardOutputOpener.Open(isOutputRedirected: false, () => console, standardOutputHandleValue: 0);
+        Stream opened = StandardOutputOpener.Open(opensOverHandle: false, () => console, standardOutputHandleValue: 0);
         Diagnostics.Act("opened the console stream", ReferenceEquals(console, opened));
 
         Diagnostics.Assert("opened the console stream", true, ReferenceEquals(console, opened));
@@ -36,7 +36,7 @@ public sealed class StandardOutputOpenerTests
     public void Open_RedirectedToAClosedHandle_OpensAStreamWhoseWritesFail(int handleValue)
     {
         Diagnostics.Arrange("output redirected / handle", $"True / {handleValue}");
-        using Stream opened = StandardOutputOpener.Open(isOutputRedirected: true, () => new MemoryStream(), handleValue);
+        using Stream opened = StandardOutputOpener.Open(opensOverHandle: true, () => new MemoryStream(), handleValue);
         Diagnostics.Act("opened", opened.GetType().Name);
 
         Diagnostics.Assert("opened", nameof(ClosedStandardOutputStream), opened.GetType().Name);
