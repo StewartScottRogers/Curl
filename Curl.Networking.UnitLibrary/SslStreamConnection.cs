@@ -39,6 +39,9 @@ internal sealed class SslStreamConnection(
     // Set once close_notify has been sent or TLS cleared, so disposing sends no second one.
     private bool _tlsEnded;
 
+    /// <summary>Gets whether the curl build being matched is the Schannel one, which words a read cut by an alert its own way.</summary>
+    internal bool MatchesSchannelBuild { get; init; }
+
     /// <summary>
     /// Gets the detector that tells, at the first read returning plaintext, how many session
     /// ticket records came before it; <see langword="null" /> when none is watching (BL-1089).
@@ -81,6 +84,13 @@ internal sealed class SslStreamConnection(
         catch (IOException) when (transport.TransportEnded)
         {
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
+        }
+        catch (IOException failure) when (
+            TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null) is not null)
+        {
+            // MissingCloseNotifyException is the exception whose message the HTTP handler prints as it stands.
+            throw new MissingCloseNotifyException(
+                TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null)!);
         }
 
         if (read == 0 && !buffer.IsEmpty && transport.TransportEnded)

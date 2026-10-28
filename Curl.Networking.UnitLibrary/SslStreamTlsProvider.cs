@@ -430,6 +430,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
                 {
+                    MatchesSchannelBuild = _matchesSchannelBuild,
                     TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
                     TicketEvents = events,
                 },

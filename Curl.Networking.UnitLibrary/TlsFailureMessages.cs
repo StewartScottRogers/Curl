@@ -96,6 +96,48 @@ internal static class TlsFailureMessages
     internal static string MissingCloseNotify(bool matchesSchannelBuild) =>
         matchesSchannelBuild ? SchannelMissingCloseNotify : OpenSslMissingCloseNotify;
 
+    // The text of a read that a fatal alert after the handshake ended (CGR-223): the Schannel
+    // build names the security status, the OpenSSL build the alert, which SslStream does not
+    // say, so the two a server sends after the handshake are told by the client certificate:
+    // none presented is certificate_required, one presented is unknown_ca (the measured pair).
+    private const string OpenSslCertificateRequiredAlert = "error:0A00045C:SSL routines::tlsv13 alert certificate required";
+
+    // SslStream reports the alert record a server sends after the handshake as either status.
+    private const int SecEDecryptFailure = unchecked((int)0x80090330);
+
+    private const string OpenSslUnknownCaAlert = "error:0A000418:SSL routines::tlsv1 alert unknown ca";
+
+    /// <summary>
+    /// The exit 56 message for a read that failed because the server sent a fatal alert after
+    /// the handshake, or <see langword="null" /> when the failure shows none.
+    /// </summary>
+    /// <param name="failure">What the read threw.</param>
+    /// <param name="matchesSchannelBuild"><see langword="true" /> for curl's Schannel build.</param>
+    /// <param name="presentedClientCertificate"><see langword="true" /> when <c>--cert</c> was presented.</param>
+    /// <returns>The message curl prints, or <see langword="null" />.</returns>
+    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate) =>
+        matchesSchannelBuild
+            ? SchannelAlertReadFailure(failure)
+            : OpenSslAlertReadFailure(failure, presentedClientCertificate);
+
+    private static string? SchannelAlertReadFailure(IOException failure)
+    {
+        var code = FindInnerException<Win32Exception>(failure)?.NativeErrorCode;
+        return code == SecEIllegalMessage || code == SecEDecryptFailure
+            ? SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal)
+            : null;
+    }
+
+    private static string? OpenSslAlertReadFailure(IOException failure, bool presentedClientCertificate)
+    {
+        if (failure.InnerException is null || FindInnerException<SocketException>(failure) is not null)
+        {
+            return null;
+        }
+
+        var alert = presentedClientCertificate ? OpenSslUnknownCaAlert : OpenSslCertificateRequiredAlert;
+        return $"OpenSSL SSL_read: OpenSSL/3.5.7: {alert}, errno 0";
+    }
     // The SEC_E_* names curl's Schannel build prints for a security status; any other is
     // "Unknown error", as curl's own table falls back to.
     private static readonly FrozenDictionary<int, string> SecurityStatusNames = new Dictionary<int, string>
