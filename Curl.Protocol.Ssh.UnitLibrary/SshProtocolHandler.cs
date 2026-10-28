@@ -225,7 +225,13 @@ public sealed class SshProtocolHandler : IProtocolHandler
     // %{num_connects}; a reused one does not (CGR-130). A failure's count is left to the
     // engine, as it was before connections were kept.
     private static TransferResult CountNewConnection(TransferResult result, IConnection connection) =>
-        connection.Session is SshKeptSession ? result with { Report = (result.Report ?? new TransferReport()) with { ConnectionCount = 1 } } : result;
+        connection.Session is SshKeptSession ? result with { Report = ReportOf(result) with { ConnectionCount = 1 } } : result;
+
+    // The result's report, or a new one; a download leaves no report of its own, so its bytes
+    // go in DownloadSize, the source of %{size_download} and %{speed_download} (measured,
+    // BL-3971).
+    private static TransferReport ReportOf(TransferResult result) =>
+        result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred };
 
     /// <summary>
     /// Connects, and closes a reused connection whose session another login authenticated and
@@ -551,7 +557,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             ConnectTimings connect = (Connect ?? new ConnectTimings(started, null, null, null)) with { TlsHandshakeCompleted = authenticated };
             long? requestReady = result.IsSuccess || firstByteReceived is not null ? transferReady : null;
             TransferTimings timings = new(started, connect, requestReady, null, firstByteReceived, timeProvider.GetTimestamp());
-            return result with { Report = (result.Report ?? new TransferReport()) with { Timings = timings } };
+            return result with { Report = ReportOf(result) with { Timings = timings } };
         }
     }
 }

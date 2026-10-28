@@ -43,6 +43,19 @@ public sealed class Cgr107TimingTests
     }
 
     [TestMethod]
+    [DataRow("sftp", DisplayName = "sftp")]
+    [DataRow("scp", DisplayName = "scp")]
+    public async Task ExecuteAsync_Download_ReportsTheBytesAsTheDownloadSize(string scheme)
+    {
+        InMemorySshServer server = new(User, Password);
+        server.Files["/data/big.bin"] = new byte[100_000];
+
+        TransferResult result = await RunAsync(server, $"{scheme}://files.example/data/big.bin");
+
+        Assert.AreEqual(100_000, result.Report!.DownloadSize);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_SftpMissingFile_StillReportsTheConnectAndTotalTimes()
     {
         InMemorySshServer server = new(User, Password);

@@ -38,6 +38,8 @@ public sealed class Cgr130Tests
         Assert.AreEqual("0123456789", Encoding.ASCII.GetString(digits));
         Assert.AreEqual(1, first.Report?.ConnectionCount);
         Assert.AreEqual(0, second.Report?.ConnectionCount);
+        Assert.AreEqual(11, first.Report?.DownloadSize);
+        Assert.AreEqual(10, second.Report?.DownloadSize);
         Assert.HasCount(1, server.Targets);
         Assert.AreEqual(1, server.Events.Count(line => line.StartsWith("auth password", StringComparison.Ordinal)));
         Assert.AreEqual(1, server.Events.Count(line => line == "subsystem sftp"));
