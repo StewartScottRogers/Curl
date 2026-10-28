@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Console/ConnectionIdRecordingTransferEvents.cs, Curl.Console/MultiStateTraceEvents.cs, Curl.Console/OutputFileOpenFailureTransferEvents.cs, Curl.Console/ResponseCodeRecordingTransferEvents.cs, Curl.Console/TlsResultRecordingTransferEvents.cs, Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TransferEventWarningTests.cs]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Console/ConnectionIdRecordingTransferEvents.cs, Curl.Console/MultiStateTraceEvents.cs, Curl.Console/OutputFileOpenFailureTransferEvents.cs, Curl.Console/ResponseCodeRecordingTransferEvents.cs, Curl.Console/TlsResultRecordingTransferEvents.cs, Curl.Console/TransferEventOutput.cs, Curl.Console.UnitTests/TransferEventWarningTests.cs, Curl.Console/WarningWritingTransferEvents.cs, Curl.Console.UnitTests/CurlCommandRunnerTransferEventTests.cs, Curl.Protocol.Abstractions.UnitTests/ITransferEventsTests.cs]
 requirement: none
 created: 2026-10-28
 completed:
@@ -22,11 +22,15 @@ Needed by BL-3714 (CGR-185): a refused `SO_PRIORITY` must print `Warning: VLAN p
 
 ## Acceptance criteria
 
-- [ ] `ITransferEvents.ReportWarning(string)` exists with a default no-op body, and each Console wrapper that forwards `ReportInfo` forwards it.
-- [ ] A focused test in `Curl.Console.UnitTests/TransferEventWarningTests.cs` shows `TransferEventOutput` writes `Warning: <text>` on stderr without `-v`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; Curl.Console and Abstractions stay at their quality gates.
+- [x] `ITransferEvents.ReportWarning(string)` exists with a default no-op body, and each Console wrapper that forwards `ReportInfo` forwards it.
+- [x] A focused test in `Curl.Console.UnitTests/TransferEventWarningTests.cs` shows `TransferEventOutput` writes `Warning: <text>` on stderr without `-v`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes; Curl.Console and Abstractions stay at their quality gates.
 
 ## Notes
+
+- Warnings are written by a new `WarningWritingTransferEvents` wrapper that `TransferEventOutput.OpenAsync` puts around the run's events unless `-s` is given (curl's `warnf` is silenced only by `-s`), wrapped at the default terminal width as `warnf` wraps. Added it, the runner test that pinned the bare no-op sink, and the Abstractions default-body test to touches; no task in Doing on origin/work/dark-factory names them.
+- Nine `Curl.Engine.UnitLibrary` wrappers forward every member (`ReportTlsTrust` included) but are outside this task's touches; their `ReportWarning` forward is filed as BL-3988 so BL-3714's warning reaches the console through the engine.
+- Linux/macOS CI: the tests use in-memory streams and pin LF and CR LF via the `runsOnWindows` argument, so they are platform-neutral.
 
 ## Log
 
