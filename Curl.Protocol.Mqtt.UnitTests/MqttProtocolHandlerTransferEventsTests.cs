@@ -334,7 +334,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         TransferResult result = await ExecuteAsync(connection, context, 0);
 
-        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Weird server reply"), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, "Weird server reply"), result with { Report = null });
         Assert.IsEmpty(output.Writes);
         CollectionAssert.AreEqual(
             DiffTranscript(ConnectedAndSubscribed()
@@ -360,7 +360,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         TransferResult result = await ExecuteAsync(connection, context, 0);
 
-        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 0, "Maximum file size exceeded"), result with { Report = null });
         CollectionAssert.AreEqual(
             AssertTranscriptEnds(new[] { "* Remaining length: 10 bytes", "* Maximum file size exceeded", "* shutting down connection #0" }),
             events.Transcript.TakeLast(3).ToArray());
@@ -383,7 +383,7 @@ public sealed class MqttProtocolHandlerTransferEventsTests
 
         TransferResult result = await ExecuteAsync(connection, context, 0);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual(
             DiffTranscript(ConnectAccepted()
                 .Concat([Sent("30 0A 00 01 74 70 61 79 6C 6F 61 64"), Sent("E0 00"), "* shutting down connection #0"])

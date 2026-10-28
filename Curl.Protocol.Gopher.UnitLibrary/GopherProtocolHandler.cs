@@ -171,12 +171,11 @@ public sealed class GopherProtocolHandler : IProtocolHandler
 
         // lib/transfer.c: gopher has no response-header writer, so under -I curl never
         // receives and the transfer ends once the selector is sent.
-        if (context.NoBody)
-        {
-            return TransferResult.Success(0);
-        }
-
-        return await CopyReplyAsync(connection, context).ConfigureAwait(false);
+        // curl 8.22.0 prints the selector and CRLF it sent as %{size_request} (CGR-107, BL-3959).
+        TransferResult result = context.NoBody
+            ? TransferResult.Success(0)
+            : await CopyReplyAsync(connection, context).ConfigureAwait(false);
+        return result with { Report = new TransferReport { DownloadSize = result.BytesTransferred, RequestSize = selector.Length + LineEnd.Length } };
     }
 
     /// <summary>

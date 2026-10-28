@@ -40,7 +40,7 @@ public sealed class GopherProtocolHandlerNoBodyAndMaxFileSizeTests
         Diagnostics.Diff("selector sent", "/x\r\n"u8, connection.Written);
         Diagnostics.Assert("read count", 0, connection.ReadCount);
         Diagnostics.Diff("transcript", DiagnosticText.Lines(["* shutting down connection #0"]), DiagnosticText.Lines(events.Transcript));
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual("/x\r\n"u8.ToArray(), connection.Written);
         Assert.AreEqual(0, connection.ReadCount);
         Assert.AreEqual(0, output.Length);
@@ -65,7 +65,7 @@ public sealed class GopherProtocolHandlerNoBodyAndMaxFileSizeTests
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.FilesizeExceeded, 3, Message), result);
         Diagnostics.Diff("output", "hel", Encoding.Latin1.GetString(output.ToArray()));
         Diagnostics.Diff("transcript", DiagnosticText.Lines(["<= " + Reply, "* " + Message, "* closing connection #0"]), DiagnosticText.Lines(events.Transcript));
-        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 3, Message), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.FilesizeExceeded, 3, Message), result with { Report = null });
         Assert.AreEqual("hel", Encoding.Latin1.GetString(output.ToArray()));
         CollectionAssert.AreEqual(new[] { "<= " + Reply, "* " + Message, "* closing connection #0" }, events.Transcript);
     }
@@ -87,7 +87,7 @@ public sealed class GopherProtocolHandlerNoBodyAndMaxFileSizeTests
         Diagnostics.Diff("output", "hell", Encoding.Latin1.GetString(output.ToArray()));
         Assert.AreEqual(
             new TransferResult(CurlExitCode.FilesizeExceeded, 4, "Exceeded the maximum allowed file size (4) with 4 bytes"),
-            result);
+            result with { Report = null });
         Assert.AreEqual("hell", Encoding.Latin1.GetString(output.ToArray()));
     }
 
@@ -109,7 +109,7 @@ public sealed class GopherProtocolHandlerNoBodyAndMaxFileSizeTests
 
         Diagnostics.Assert("result", TransferResult.Success(10), result);
         Diagnostics.Diff("output", Reply, Encoding.Latin1.GetString(output.ToArray()));
-        Assert.AreEqual(TransferResult.Success(10), result);
+        Assert.AreEqual(TransferResult.Success(10), result with { Report = null });
         Assert.AreEqual(Reply, Encoding.Latin1.GetString(output.ToArray()));
     }
 

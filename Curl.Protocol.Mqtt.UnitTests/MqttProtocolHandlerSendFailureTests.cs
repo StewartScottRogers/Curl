@@ -77,8 +77,8 @@ public sealed class MqttProtocolHandlerSendFailureTests
     {
         Run run = await RunAsync(WithoutSocketError(), writesBeforeFailure: 0, postData: null);
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result with { Report = null });
         Assert.IsTrue(run.Transcript[^3].StartsWith("> ", StringComparison.Ordinal));
         CollectionAssert.AreEqual(new[] { ConnectNotSent, ShuttingDown }, run.Transcript.TakeLast(2).ToArray());
     }
@@ -108,8 +108,8 @@ public sealed class MqttProtocolHandlerSendFailureTests
     {
         Run run = await RunAsync(WithoutSocketError(), writesBeforeFailure: 1, postData: null);
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result with { Report = null });
         CollectionAssert.AreEqual(new[] { Sent(Subscribe), ShuttingDown }, run.Transcript.TakeLast(2).ToArray());
     }
 
@@ -138,8 +138,8 @@ public sealed class MqttProtocolHandlerSendFailureTests
     {
         Run run = await RunAsync(WithoutSocketError(), writesBeforeFailure: 1, postData: "x"u8.ToArray());
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, "Failed sending data to the peer"), run.Result with { Report = null });
         CollectionAssert.AreEqual(new[] { Sent(Publish), ShuttingDown }, run.Transcript.TakeLast(2).ToArray());
     }
 
@@ -150,8 +150,8 @@ public sealed class MqttProtocolHandlerSendFailureTests
     /// </summary>
     private void AssertSendFailure(Run run, string message, string neighbour)
     {
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, message), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, message), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.SendError, 0, message), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.SendError, 0, message), run.Result with { Report = null });
         string[] expected = neighbour == ConnectNotSent
             ? ["* " + message, neighbour, ShuttingDown]
             : [neighbour, "* " + message, ShuttingDown];

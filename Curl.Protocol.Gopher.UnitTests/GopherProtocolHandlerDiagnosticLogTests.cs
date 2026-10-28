@@ -31,7 +31,7 @@ public sealed class GopherProtocolHandlerDiagnosticLogTests
         Diagnostics.Assert("log line count", 2, log.Lines.Count);
         Diagnostics.Diff("first info line", "sent selector /foo", info.ElementAtOrDefault(0) ?? string.Empty);
         Diagnostics.Assert("second info line matches", "^transfer finished: 5 bytes in [0-9]+ ms$", DiagnosticText.Escape(info.ElementAtOrDefault(1)));
-        Assert.AreEqual(TransferResult.Success(5), result);
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
         Assert.HasCount(2, log.Lines);
         Assert.AreEqual("sent selector /foo", info[0]);
         StringAssert.Matches(info[1], new Regex("^transfer finished: 5 bytes in [0-9]+ ms$"));

@@ -176,12 +176,10 @@ public sealed class DictProtocolHandler(IConnector connector) : IProtocolHandler
 
         context.Events.ReportDataSent(request);
         log.CommandSent(request);
-        if (context.NoBody)
-        {
-            return TransferResult.Success(0);
-        }
-
-        return await CopyReplyAsync(connection, context).ConfigureAwait(false);
+        TransferResult result = context.NoBody
+            ? TransferResult.Success(0)
+            : await CopyReplyAsync(connection, context).ConfigureAwait(false);
+        return result with { Report = new TransferReport { DownloadSize = result.BytesTransferred, RequestSize = request.Length } };
     }
 
     private static async Task<TransferResult> CopyReplyAsync(IConnection connection, ITransferContext context)

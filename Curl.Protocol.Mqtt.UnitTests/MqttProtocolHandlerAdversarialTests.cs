@@ -51,8 +51,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(body, output.ToArray());
-        Diagnostics.AssertResult(TransferResult.Success(127), result);
-        Assert.AreEqual(TransferResult.Success(127), result);
+        Diagnostics.AssertResult(TransferResult.Success(127), result with { Report = null });
+        Assert.AreEqual(TransferResult.Success(127), result with { Report = null });
     }
 
     [TestMethod]
@@ -65,8 +65,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(body, output.ToArray());
-        Diagnostics.AssertResult(TransferResult.Success(128), result);
-        Assert.AreEqual(TransferResult.Success(128), result);
+        Diagnostics.AssertResult(TransferResult.Success(128), result with { Report = null });
+        Assert.AreEqual(TransferResult.Success(128), result with { Report = null });
     }
 
     /// <summary>
@@ -83,8 +83,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(Bytes("00 01", "tabc"), output.ToArray());
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.PartialFile, 6, "Transferred a partial file"), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.PartialFile, 6, "Transferred a partial file"), result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.PartialFile, 6, "Transferred a partial file"), result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.PartialFile, 6, "Transferred a partial file"), result with { Report = null });
     }
 
     [TestMethod]
@@ -94,8 +94,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
         TransferResult result = await RunAsync(connection, "mqtt://h/t", new RecordingStream());
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result with { Report = null });
     }
 
     [TestMethod]
@@ -107,8 +107,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         Assert.AreEqual(0, output.ToArray().Length);
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result with { Report = null });
     }
 
     // Malformed input: fields that are almost right.
@@ -126,8 +126,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(Bytes("00 01", "thi"), output.ToArray());
-        Diagnostics.AssertResult(TransferResult.Success(5), result);
-        Assert.AreEqual(TransferResult.Success(5), result);
+        Diagnostics.AssertResult(TransferResult.Success(5), result with { Report = null });
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
     }
 
     /// <summary>
@@ -143,8 +143,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(Bytes("00 FF", "A"), output.ToArray());
-        Diagnostics.AssertResult(TransferResult.Success(3), result);
-        Assert.AreEqual(TransferResult.Success(3), result);
+        Diagnostics.AssertResult(TransferResult.Success(3), result with { Report = null });
+        Assert.AreEqual(TransferResult.Success(3), result with { Report = null });
     }
 
     [TestMethod]
@@ -154,8 +154,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
         TransferResult result = await RunAsync(connection, "mqtt://h/t", new RecordingStream());
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), result with { Report = null });
     }
 
     [TestMethod]
@@ -165,8 +165,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
         TransferResult result = await RunAsync(connection, "mqtt://h/t", new RecordingStream());
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.WeirdServerReply, 0, WeirdServerReply), result with { Report = null });
     }
 
     [TestMethod]
@@ -202,7 +202,7 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
         TransferResult expected = new(CurlExitCode.WeirdServerReply, 0, "Expected 0000 but got 00" + returnCode);
         Diagnostics.AssertResult(expected, result);
-        Assert.AreEqual(expected, result);
+        Assert.AreEqual(expected, result with { Report = null });
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
 
@@ -221,8 +221,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/t", output);
 
         CollectionAssert.AreEqual(Bytes("00 01", "tok"), output.ToArray());
-        Diagnostics.AssertResult(TransferResult.Success(5), result);
-        Assert.AreEqual(TransferResult.Success(5), result);
+        Diagnostics.AssertResult(TransferResult.Success(5), result with { Report = null });
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
     }
 
     /// <summary>
@@ -252,7 +252,7 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
         TransferResult expected = new(CurlExitCode.WeirdServerReply, 0, "CONNACK expected Remaining Length 2, got 3");
         Diagnostics.AssertResult(expected, result);
-        Assert.AreEqual(expected, result);
+        Assert.AreEqual(expected, result with { Report = null });
         CollectionAssert.AreEqual(MeasuredConnect, connection.Written);
     }
 
@@ -268,8 +268,8 @@ public sealed class MqttProtocolHandlerAdversarialTests
         TransferResult result = await RunAsync(connection, "mqtt://h/a/b/c", output);
 
         CollectionAssert.AreEqual(Bytes("00 05", "a/b/c", string.Empty, "HELLO"), output.ToArray());
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 12, ConnectionDisconnected), result with { Report = null });
     }
 
     [TestMethod]
@@ -286,7 +286,7 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
             Diagnostics.Act("split offset", split);
             CollectionAssert.AreEqual(body, output.ToArray(), $"split at {split}");
-            Assert.AreEqual(TransferResult.Success(203), result, $"split at {split}");
+            Assert.AreEqual(TransferResult.Success(203), result with { Report = null }, $"split at {split}");
         }
     }
 
@@ -302,7 +302,7 @@ public sealed class MqttProtocolHandlerAdversarialTests
 
         Diagnostics.ActResult(secondResult);
         Assert.AreEqual(firstResult, secondResult);
-        Assert.AreEqual(TransferResult.Success(7), secondResult);
+        Assert.AreEqual(TransferResult.Success(7), secondResult with { Report = null });
         CollectionAssert.AreEqual(first.Written, second.Written);
     }
 
@@ -318,7 +318,7 @@ public sealed class MqttProtocolHandlerAdversarialTests
             Task.Run(async () => await handler.ExecuteAsync(Context("mqtt://h/t", output)))));
 
         Diagnostics.Act("results", string.Join("; ", results));
-        CollectionAssert.AreEqual(Enumerable.Repeat(TransferResult.Success(8), 16).ToArray(), results);
+        CollectionAssert.AreEqual(Enumerable.Repeat(TransferResult.Success(8), 16).ToArray(), results.Select(result => result with { Report = null }).ToArray());
         foreach (ScriptedConnection connection in connections)
         {
             CollectionAssert.AreEqual(Concat(MeasuredConnect, Bytes("82 06 00 01 00 01", "t", "00")), connection.Written);
