@@ -713,7 +713,7 @@ public static partial class CommandLineOptionTable
         byte[] contents;
         if (file == "-")
         {
-            contents = dataFileReader.ReadStandardInput();
+            contents = ReadStandardInputOrEmpty(dataFileReader);
         }
         else if (!dataFileReader.TryReadFile(file, out contents))
         {
@@ -799,7 +799,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, false, out byte[] contents);
         if (refusal is null)
         {
             options.AppendPostData(RemoveLineBreaksAndNuls(contents));
@@ -839,7 +839,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, false, out byte[] contents);
         if (refusal is null)
         {
             append(contents);
@@ -905,7 +905,7 @@ public static partial class CommandLineOptionTable
         byte[] contents;
         if (file == "-")
         {
-            contents = dataFileReader.ReadStandardInput();
+            contents = ReadStandardInputOrEmpty(dataFileReader);
         }
         else if (!dataFileReader.TryReadFile(file, out contents))
         {
@@ -1001,7 +1001,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, false, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, false, false, out byte[] contents);
         encoded = contents.Length == 0 ? string.Empty : NameAndEscapedContent(name, contents);
         return refusal;
     }
@@ -1088,7 +1088,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, true, out byte[] contents);
         if (refusal is null)
         {
             foreach (string line in HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
@@ -1106,14 +1106,16 @@ public static partial class CommandLineOptionTable
     /// or with <see cref="CommandLineRefusal.DataFileOpenedButUnreadable"/> for a directory that curl's Linux and
     /// macOS builds open but cannot read (<see cref="IDataFileReader.OpensAsUnreadableDirectory"/>, CGR-069).
     /// Standard input is read as curl's Windows build reads it in text mode when <paramref name="readsStandardInputAsText"/>
-    /// and the build is Windows (<see cref="WindowsTextModeInput"/>), and unchanged otherwise.
+    /// and the build is Windows (<see cref="WindowsTextModeInput"/>), and unchanged otherwise. A closed standard input
+    /// (<see cref="ClosedStandardInputStream"/>) reads as empty when <paramref name="readsClosedStandardInputAsEmpty"/>, as
+    /// curl 8.22.0's <c>fgets</c>-based reader for <c>-H @-</c> reads it, and is refused with
+    /// <see cref="CommandLineRefusal.StandardInputUnreadable"/> otherwise, as its <c>fread</c>-based <c>file2memory</c> refuses it (CGR-110).
     /// </summary>
-    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, out byte[] contents)
+    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, bool readsClosedStandardInputAsEmpty, out byte[] contents)
     {
         if (file == "-")
         {
-            contents = WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), readsStandardInputAsText && options.ActsAsWindowsSchannelBuild);
-            return null;
+            return ReadStandardInputAtFile(options, spelledOption, dataFileReader, readsStandardInputAsText, readsClosedStandardInputAsEmpty, out contents);
         }
 
         return dataFileReader.TryReadFile(file, out contents)
@@ -1121,6 +1123,36 @@ public static partial class CommandLineOptionTable
             : dataFileReader.OpensAsUnreadableDirectory(file)
                 ? CommandLineRefusal.DataFileOpenedButUnreadable(spelledOption)
                 : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
+    }
+
+    private static CommandLineRefusal? ReadStandardInputAtFile(CommandLineOptions options, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, bool readsClosedStandardInputAsEmpty, out byte[] contents)
+    {
+        try
+        {
+            contents = WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), readsStandardInputAsText && options.ActsAsWindowsSchannelBuild);
+            return null;
+        }
+        catch (IOException)
+        {
+            contents = [];
+            return readsClosedStandardInputAsEmpty ? null : CommandLineRefusal.StandardInputUnreadable(spelledOption);
+        }
+    }
+
+    /// <summary>
+    /// Reads standard input for an <c>@-</c> value curl 8.22.0 reads with <c>fgets</c>-style readers
+    /// (<c>--url @-</c>, <c>--ech ecl:@-</c>), which read a closed standard input as empty (CGR-110, ADR-0949).
+    /// </summary>
+    private static byte[] ReadStandardInputOrEmpty(IDataFileReader dataFileReader)
+    {
+        try
+        {
+            return dataFileReader.ReadStandardInput();
+        }
+        catch (IOException)
+        {
+            return [];
+        }
     }
 
     /// <summary>
@@ -1142,7 +1174,7 @@ public static partial class CommandLineOptionTable
         }
 
         string file = value[1..];
-        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, true, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, true, false, out byte[] contents);
         if (refusal is not null)
         {
             return refusal;

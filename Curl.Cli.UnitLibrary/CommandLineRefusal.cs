@@ -166,6 +166,17 @@ public sealed class CommandLineRefusal
         return new CommandLineRefusal(CurlExitCode.ReadError, [], spelledOption, ReadErrorReason);
     }
 
+    /// <summary>
+    /// Refuses an <c>@-</c> value (<c>-d @-</c>, <c>--data-binary @-</c>, <c>--json @-</c>,
+    /// <c>--data-urlencode</c>, <c>--url-query</c>, <c>--variable</c>, <c>-w</c>) when the process was started with
+    /// standard input closed (<see cref="ClosedStandardInputStream"/>): curl 8.22.0's <c>fread</c> fails there
+    /// and it stops with exit 26 and no <c>Failed to open</c> line (CGR-110, ADR-0949).
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c>.</param>
+    /// <returns>A refusal reading <c>error encountered when reading a file</c>, exit 26.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal StandardInputUnreadable(string spelledOption) => UrlFileUnreadable(spelledOption);
+
     /// <summary>Refuses a numeric option value that is not a well-formed number.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
     /// <returns>A refusal reading <c>expected a proper numerical parameter</c>.</returns>

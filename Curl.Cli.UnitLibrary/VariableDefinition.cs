@@ -114,13 +114,32 @@ internal static class VariableDefinition
     {
         if (file == StandardInputName)
         {
-            // curl's Windows build reads it in text mode (WindowsTextModeInput, CGR-112).
-            return Set(options, name, range.Cut(WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), options.ActsAsWindowsSchannelBuild)));
+            return ReadStandardInput(options, name, range, spelledOption, dataFileReader);
         }
 
         return dataFileReader.TryReadFile(file, out byte[] contents)
             ? Set(options, name, range.Cut(contents))
             : CommandLineRefusal.VariableFileUnreadable(spelledOption, file, OpenFailureReason(file, pathExists), options.ErrorsHidden);
+    }
+
+    /// <summary>
+    /// Sets a <c>--variable name@-</c> from standard input, read in text mode by curl's Windows build
+    /// (<see cref="WindowsTextModeInput"/>, CGR-112); a closed standard input is refused with
+    /// <see cref="CommandLineRefusal.StandardInputUnreadable"/>, as curl 8.22.0 refuses it (CGR-110).
+    /// </summary>
+    private static CommandLineRefusal? ReadStandardInput(CommandLineOptions options, string name, VariableByteRange range, string spelledOption, IDataFileReader dataFileReader)
+    {
+        byte[] contents;
+        try
+        {
+            contents = dataFileReader.ReadStandardInput();
+        }
+        catch (IOException)
+        {
+            return CommandLineRefusal.StandardInputUnreadable(spelledOption);
+        }
+
+        return Set(options, name, range.Cut(WindowsTextModeInput.Contents(contents, options.ActsAsWindowsSchannelBuild)));
     }
 
     /// <summary>
