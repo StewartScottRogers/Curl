@@ -1,5 +1,5 @@
 ---
-id: BL-3996
+id: BL-3997
 title: Report the negotiated key-exchange group, signature type and handshake messages from the Linux SslStream TLS path (CGR-226 source)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3996 — Report the negotiated key-exchange group, signature type and handshake messages from the Linux SslStream TLS path (CGR-226 source)
+# BL-3997 — Report the negotiated key-exchange group, signature type and handshake messages from the Linux SslStream TLS path (CGR-226 source)
 
 ## Goal
 
