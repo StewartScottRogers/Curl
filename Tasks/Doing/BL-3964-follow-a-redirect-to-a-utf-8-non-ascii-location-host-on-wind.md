@@ -36,3 +36,4 @@ Second part of BL-3953 (CGR-059). After BL-3963 makes `CurlUrlHost` read a host 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 36ff046c 425054c3 eb77ae41 779790c0.
