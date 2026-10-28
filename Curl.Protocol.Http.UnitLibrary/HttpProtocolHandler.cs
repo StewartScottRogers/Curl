@@ -2529,22 +2529,23 @@ public sealed class HttpProtocolHandler(
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
         SetBodyLimitAndSinks(plan, body, discardsBody);
-        HttpTransferException? tooManyTrailers = null;
+        HttpTransferException? failedTransfer = null;
         try
         {
             await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (HttpTransferException failure) when (failure.Message == HttpTransferMessages.TooManyResponseHeaders)
+        catch (HttpTransferException failure)
         {
-            tooManyTrailers = failure;
+            failedTransfer = failure;
         }
 
-        if (tooManyTrailers is not null)
+        if (failedTransfer is not null)
         {
-            // curl 8.21.0 writes the trailers it stored before the one past the limit (measured, BL-1448 Notes).
+            // curl writes the trailers it stored before the one that failed: the one past the limit
+            // (8.21.0, BL-1448 Notes) or a malformed one (8.22.0, CGR-202).
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
-            throw tooManyTrailers;
+            throw failedTransfer;
         }
 
         ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, requestStream, cancellationToken).ConfigureAwait(false);
