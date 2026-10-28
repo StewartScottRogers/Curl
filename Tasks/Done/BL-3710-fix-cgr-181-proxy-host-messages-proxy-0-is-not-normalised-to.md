@@ -9,7 +9,7 @@ touches: [Curl.Core.UnitLibrary/ProxyUrlParser.cs, Curl.Core.UnitTests/Cgr181Tes
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3710 — Fix CGR-181: Proxy host messages: proxy 0 is not normalised to 0.0.0.0, and a proxy string starting with : reports the wrong reason
 
@@ -75,10 +75,10 @@ curl -sS http://127.0.0.1:21200/echo
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -89,3 +89,6 @@ curl -sS http://127.0.0.1:21200/echo
 
 - 2026-10-26: Created from CGR-181 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+- 2026-10-28 results (real curl 8.22.0 Schannel): `--proxy 0` -> exit 7 `Failed to connect to 0.0.0.0:80 over proxy 0.0.0.0` (Curl already normalised it, BL-3575; pinned by Cgr181Tests). `--proxy :`, `-x ::1`, `http_proxy=::::` -> exit 5 `Unsupported proxy syntax in '<text>': No host present`. Fix: `ProxyUrlParser` finds an empty host before reading the port when the text has no scheme; with a scheme (`http://:abc`) the port reason stays, as measured earlier. Platform-neutral; Core fast tests green, quality gate clean for Curl.Core.UnitLibrary.
+- 2026-10-28: Doing -> Done. Empty proxy host without a scheme now reports No host present; proxy 0 already normalised

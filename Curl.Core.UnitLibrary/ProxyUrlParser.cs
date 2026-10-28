@@ -205,13 +205,28 @@ public static class ProxyUrlParser
             authority = authority[(at + 1)..];
         }
 
-        int? port = null;
-        string? reason = SplitHostAndPort(authority, out string host, out string? portText)
-            ?? ReadPort(portText, hasScheme, out port);
-        reason ??= host.Length == 0 ? NoHostReason : null;
+        string? reason = ReadHostAndPort(authority, hasScheme, out string host, out int? port);
         reason ??= CheckHost(ref host);
         parts = (host, port, credential);
         return reason;
+    }
+
+    private static string? ReadHostAndPort(string authority, bool hasScheme, out string host, out int? port)
+    {
+        port = null;
+        string? reason = SplitHostAndPort(authority, out host, out string? portText);
+        if (reason is not null)
+        {
+            return reason;
+        }
+
+        // Without a scheme curl finds the empty host before it reads the port (':' and '::1').
+        if (host.Length == 0 && !hasScheme)
+        {
+            return NoHostReason;
+        }
+
+        return ReadPort(portText, hasScheme, out port) ?? (host.Length == 0 ? NoHostReason : null);
     }
 
     private static NetworkCredential? ReadCredential(string userInformation)
