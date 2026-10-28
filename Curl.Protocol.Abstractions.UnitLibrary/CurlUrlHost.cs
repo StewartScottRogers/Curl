@@ -317,7 +317,7 @@ internal static class CurlUrlHost
         ReadOnlySpan<char> rest = label;
         while (!rest.IsEmpty && codePoints.Count <= MaximumLabelLength)
         {
-            if (Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed) != OperationStatus.Done || Rune.IsControl(rune) || rune == Rune.ReplacementChar)
+            if (Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed) != OperationStatus.Done || IsRefusedInLabel(rune))
             {
                 return null;
             }
@@ -328,6 +328,9 @@ internal static class CurlUrlHost
 
         return codePoints.Count > MaximumLabelLength ? null : "xn--" + CurlUrlPunycode.Encode(codePoints);
     }
+
+    /// <summary>Whether IDNA refuses <paramref name="rune" /> in a label: a control character or <c>U+FFFD</c>.</summary>
+    private static bool IsRefusedInLabel(Rune rune) => Rune.IsControl(rune) || rune == Rune.ReplacementChar;
 
     /// <summary>
     /// The Windows-1252 character of <paramref name="value" />, or the lone <c>U+DC80</c> to
