@@ -132,6 +132,9 @@ internal sealed class ProgressBarRecorder
     /// <summary>Calls the callback with no bytes, as curl first does once the transfer is under way.</summary>
     internal void ReportTransferStarted() => Call();
 
+    /// <summary>Calls the callback again with nothing new reported, as curl does once a second while no data arrives.</summary>
+    internal void ReportTimePassed() => Call();
+
     /// <summary>Calls the callback with the bytes received so far.</summary>
     /// <param name="bytesSoFar">The body bytes received.</param>
     /// <param name="expectedTotal">The body size expected, or <see langword="null" /> when unknown (curl's 0).</param>

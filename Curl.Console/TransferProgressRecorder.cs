@@ -44,6 +44,9 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </summary>
     private const int SpeedSampleCount = 6;
 
+    /// <summary>How often the meter and the bar are refreshed while no data arrives, as curl's progress callback runs about once a second.</summary>
+    private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
+
     /// <summary>
     /// How many times curl 8.21.0 draws the status line once a transfer is done: after the
     /// transfer state, after the done state, and in <c>Curl_pgrsDone</c>. Measured on a
@@ -126,6 +129,15 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// <summary>Whether the handler reported any bytes this hop, which decides whether <see cref="Finish" /> draws.</summary>
     private bool bytesReported;
 
+    /// <summary>Held by every report, the timer's tick and <see cref="Finish" />, which run on different threads.</summary>
+    private readonly object gate = new();
+
+    /// <summary>The timer that ticks once a second so the meter and the bar move while no data arrives, or <see langword="null" />.</summary>
+    private readonly ITimer? ticker;
+
+    /// <summary>Whether <see cref="Finish" /> ran, after which a tick draws nothing.</summary>
+    private bool finished;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="TransferProgressRecorder" /> class: the
     /// transfer starts now, and the first status line, every counter zero, is drawn.
@@ -159,6 +171,10 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         this.eventOutput = eventOutput;
         this.parallelProgress = parallelProgress;
         StartHop(restartsClock: true);
+        if (writeLive is not null || progressBar is not null)
+        {
+            ticker = timeProvider.CreateTimer(_ => ReportTimePassed(), null, TickInterval, TickInterval);
+        }
     }
 
     /// <summary>
@@ -220,28 +236,53 @@ internal sealed class TransferProgressRecorder : ITransferProgress
         parallelProgress?.ReportTransferStarted();
     }
 
+    /// <summary>
+    /// Refreshes the status line and the bar for time that passed with no data, as curl's progress
+    /// callback does once a second whatever the transfer is doing (CGR-217).
+    /// </summary>
+    internal void ReportTimePassed()
+    {
+        lock (gate)
+        {
+            if (finished || !HasTransferStarted)
+            {
+                return;
+            }
+
+            Draw(done: false);
+            WriteLive();
+            progressBar?.ReportTimePassed();
+        }
+    }
+
     /// <inheritdoc />
     public void ReportDownloaded(long bytesSoFar, long? expectedTotal)
     {
-        downloaded = bytesSoFar;
-        downloadTotal = expectedTotal;
-        bytesReported = true;
-        Draw(done: false);
-        WriteLive();
-        progressBar?.ReportDownloaded(bytesSoFar, expectedTotal);
-        parallelProgress?.ReportDownloaded(bytesSoFar, expectedTotal);
+        lock (gate)
+        {
+            downloaded = bytesSoFar;
+            downloadTotal = expectedTotal;
+            bytesReported = true;
+            Draw(done: false);
+            WriteLive();
+            progressBar?.ReportDownloaded(bytesSoFar, expectedTotal);
+            parallelProgress?.ReportDownloaded(bytesSoFar, expectedTotal);
+        }
     }
 
     /// <inheritdoc />
     public void ReportUploaded(long bytesSoFar, long? expectedTotal)
     {
-        uploaded = bytesSoFar;
-        uploadTotal = expectedTotal;
-        bytesReported = true;
-        Draw(done: false);
-        WriteLive();
-        progressBar?.ReportUploaded(bytesSoFar, expectedTotal);
-        parallelProgress?.ReportUploaded(bytesSoFar, expectedTotal);
+        lock (gate)
+        {
+            uploaded = bytesSoFar;
+            uploadTotal = expectedTotal;
+            bytesReported = true;
+            Draw(done: false);
+            WriteLive();
+            progressBar?.ReportUploaded(bytesSoFar, expectedTotal);
+            parallelProgress?.ReportUploaded(bytesSoFar, expectedTotal);
+        }
     }
 
     /// <inheritdoc />
@@ -295,6 +336,18 @@ internal sealed class TransferProgressRecorder : ITransferProgress
     /// </summary>
     /// <param name="succeeded">Whether the transfer succeeded.</param>
     internal void Finish(bool succeeded)
+    {
+        lock (gate)
+        {
+            finished = true;
+            ticker?.Dispose();
+            FinishDraws(succeeded);
+        }
+    }
+
+    /// <summary>Makes the draws <see cref="Finish" /> describes.</summary>
+    /// <param name="succeeded">Whether the transfer succeeded.</param>
+    private void FinishDraws(bool succeeded)
     {
         if (!bytesReported)
         {
