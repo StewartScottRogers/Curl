@@ -267,9 +267,17 @@ public sealed record FileUrlPath
         urlPath.Length >= 3
         && urlPath[0] == '/'
         && char.IsAsciiLetter(urlPath[1])
-        && (urlPath[2] == ':' || urlPath[2] == '|')
+        && IsDriveSeparator(urlPath.AsSpan(2))
             ? urlPath[1..]
             : urlPath;
+
+    /// <summary>
+    /// Tells whether the text starts with the <c>:</c> or <c>|</c> after a drive letter, or the escape <c>%3A</c> curl decodes to <c>:</c> first.
+    /// </summary>
+    /// <param name="rest">The path after the drive letter.</param>
+    /// <returns><see langword="true" /> for a drive separator.</returns>
+    private static bool IsDriveSeparator(ReadOnlySpan<char> rest) =>
+        rest[0] is ':' or '|' || rest.StartsWith("%3A", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Percent-encodes every non-ASCII character as its UTF-8 bytes, leaving ASCII,
