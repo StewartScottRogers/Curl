@@ -162,6 +162,30 @@ internal static class HttpTransferMessages
         string.Create(CultureInfo.InvariantCulture, $"nghttp2 shuts down connection with error {(uint)errorCode}: {Http2ErrorName(errorCode)}");
 
     /// <summary>
+    /// Formats the exit 92 message for a PUSH_PROMISE on a connection with push disabled:
+    /// <c>[HTTP2] [1] received invalid frame: FRAME[PUSH_PROMISE, len=7, hend=1], error -505:
+    /// Protocol error</c> (measured with curl 8.22.0, BL-3912 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream the PUSH_PROMISE came on.</param>
+    /// <param name="payloadLength">The frame's payload length.</param>
+    /// <param name="isEndHeaders">Whether the frame carries END_HEADERS.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2PushPromiseReceivedWithPushDisabled(int streamId, int payloadLength, bool isEndHeaders) =>
+        string.Create(CultureInfo.InvariantCulture, $"[HTTP2] [{streamId}] received invalid frame: FRAME[PUSH_PROMISE, len={payloadLength}, hend={(isEndHeaders ? 1 : 0)}], error -505: Protocol error");
+
+    /// <summary>
+    /// Formats the exit 8 message for a response head with no <c>:status</c>:
+    /// <c>[HTTP2] [1] received invalid frame: FRAME[HEADERS, len=4, hend=1, eos=1], error -532:
+    /// Violation in HTTP messaging rule</c> (measured with curl 8.22.0, BL-3912 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <param name="headerBlockLength">The length of the head's header block.</param>
+    /// <param name="isEndStream">Whether the head ended the stream.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2HeadWithoutStatusReceived(int streamId, int headerBlockLength, bool isEndStream) =>
+        string.Create(CultureInfo.InvariantCulture, $"[HTTP2] [{streamId}] received invalid frame: FRAME[HEADERS, len={headerBlockLength}, hend=1, eos={(isEndStream ? 1 : 0)}], error -532: Violation in HTTP messaging rule");
+
+    /// <summary>
     /// The exit 3 message for <c>--http3-only</c> with a URL that is not <c>https://</c>
     /// (measured, ADR-0144).
     /// </summary>

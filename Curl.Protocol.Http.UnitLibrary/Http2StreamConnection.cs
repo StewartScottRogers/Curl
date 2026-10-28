@@ -429,11 +429,20 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             RequiresHttp11 = reset.ErrorCode == Http2ErrorCode.Http11Required,
             LeavesConnectionIntact = true,
         },
-        Http2ProtocolException error => new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode)),
+        Http2ProtocolException error => ConnectionErrorOf(error),
         Http2GoAwayException => new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed),
         EndOfStreamException => Closed(),
         _ => null,
     };
+
+    /// <summary>
+    /// Gives the transfer failure for a connection error: exit 92 for a frame nghttp2 calls
+    /// invalid (a PUSH_PROMISE with push disabled, CGR-142, measured with curl 8.22.0, BL-3912
+    /// Notes), else exit 16 saying nghttp2 shut the connection down.
+    /// </summary>
+    private static HttpTransferException ConnectionErrorOf(Http2ProtocolException error) => error.InvalidFrame is { } frame
+        ? new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2PushPromiseReceivedWithPushDisabled(frame.StreamId, frame.Payload.Length, frame.HasFlag(Http2FrameFlags.EndHeaders)))
+        : new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode));
 
     /// <summary>
     /// Tells whether the server refused this stream: reset it with REFUSED_STREAM, or sent a
@@ -477,7 +486,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         }
         else
         {
-            int statusCode = Http2ResponseHead.StatusOf(fields) ?? throw await ResetMalformedAsync(cancellationToken).ConfigureAwait(false);
+            int statusCode = Http2ResponseHead.StatusOf(fields) ?? throw await RejectHeadWithoutValidStatusAsync(frame, fields, cancellationToken).ConfigureAwait(false);
             if (!await IsHeadTakenAsync(statusCode, fields, frame.IsEndStream, cancellationToken).ConfigureAwait(false))
             {
                 return;
@@ -619,14 +628,28 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         string.Create(CultureInfo.InvariantCulture, $"Invalid HTTP header field was received: frame type: 1, stream: {streamId}, name: [{field.Name}], value: [{field.Value}]");
 
     /// <summary>
-    /// Resets the stream with PROTOCOL_ERROR for a malformed response - a head with no valid
-    /// <c>:status</c>, or DATA before the head - as nghttp2 does, and gives the exit 92 failure
-    /// to throw.
+    /// Resets the stream with PROTOCOL_ERROR for a malformed response - DATA before the head -
+    /// as nghttp2 does, and gives the exit 92 failure to throw.
     /// </summary>
     private async ValueTask<HttpTransferException> ResetMalformedAsync(CancellationToken cancellationToken)
     {
         await ResetAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
         return new HttpTransferException(CurlExitCode.Http2Stream, HttpTransferMessages.Http2StreamNotClosedCleanly(streamId, Http2ErrorCode.ProtocolError));
+    }
+
+    /// <summary>
+    /// Resets the stream with PROTOCOL_ERROR for a response head whose <c>:status</c> is not
+    /// three digits, as nghttp2 does, and gives the failure curl 8.22.0 reports (CGR-142,
+    /// measured, BL-3912 Notes): exit 92 naming the invalid field when the head has a
+    /// <c>:status</c>, exit 8 naming the invalid HEADERS frame when it has none.
+    /// </summary>
+    private async ValueTask<HttpTransferException> RejectHeadWithoutValidStatusAsync(Http2StreamFrame frame, IReadOnlyList<HeaderField> fields, CancellationToken cancellationToken)
+    {
+        await ResetAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
+        HeaderField status = fields.FirstOrDefault(field => field.Name == ":status");
+        return status.Name is null
+            ? new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.Http2HeadWithoutStatusReceived(streamId, frame.Content.Length, frame.IsEndStream))
+            : new HttpTransferException(CurlExitCode.Http2Stream, InvalidHeaderFieldReceived(streamId, status));
     }
 
     /// <summary>Resets the stream with <paramref name="errorCode" /> and logs the RST_STREAM sent.</summary>
