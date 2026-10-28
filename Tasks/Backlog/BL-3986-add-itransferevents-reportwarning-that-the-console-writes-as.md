@@ -1,5 +1,5 @@
 ---
-id: BL-3984
+id: BL-3986
 title: Add ITransferEvents.ReportWarning that the console writes as a Warning: line on stderr
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3984 — Add ITransferEvents.ReportWarning that the console writes as a Warning: line on stderr
+# BL-3986 — Add ITransferEvents.ReportWarning that the console writes as a Warning: line on stderr
 
 ## Goal
 
