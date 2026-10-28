@@ -40,3 +40,4 @@ Stewart (the audio-off file exists), so test with `-QuietAlarm` or a scratch dat
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 76423c17 fa8686c1 c0a14fd3 d265299d.
