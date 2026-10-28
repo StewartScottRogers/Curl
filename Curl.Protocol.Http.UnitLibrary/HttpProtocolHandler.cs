@@ -277,6 +277,21 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     public bool TracesClientReaders { get; init; }
 
+    /// <summary>
+    /// Gets or sets what is told, with the wait's length, when a request starts waiting for <c>100 Continue</c>
+    /// (<see cref="HttpContinueWaitConnection.WaitBegins" />), so a transfer driven by
+    /// <c>curl_multi_socket_action</c> can hold the expect-100 deadline (BL-3864); <see langword="null" />, the
+    /// default, for nothing.
+    /// </summary>
+    public Action<TimeSpan>? ContinueWaitBegins { get; init; }
+
+    /// <summary>
+    /// Gets or sets what is told when a request's wait for <c>100 Continue</c> ends, the answer come or the wait
+    /// run out (<see cref="HttpContinueWaitConnection.WaitEnds" />, BL-3864); <see langword="null" />, the
+    /// default, for nothing.
+    /// </summary>
+    public Action? ContinueWaitEnds { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException">
@@ -1486,10 +1501,10 @@ public sealed class HttpProtocolHandler(
     /// while a read of the body stays pending (<see cref="HttpEarlyResponseConnection" />, BL-2729); and
     /// else <paramref name="timedConnection" /> itself.
     /// </summary>
-    private static IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
+    private IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
         (plan.Framing.AwaitsContinue, plan.Framing.Body is StreamBody && requestStream is null) switch
         {
-            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait },
+            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait, WaitBegins = ContinueWaitBegins, WaitEnds = ContinueWaitEnds },
             (false, true) => new HttpEarlyResponseConnection(timedConnection),
             _ => timedConnection,
         };

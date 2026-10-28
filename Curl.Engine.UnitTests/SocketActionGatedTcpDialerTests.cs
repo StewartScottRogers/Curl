@@ -5,6 +5,7 @@ using System.Text;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts.Multi;
 using Curl.Api.Options;
+using Curl.Api.Options.Http;
 using Curl.Api.Options.Network;
 using Curl.Networking;
 using Curl.Protocol.Abstractions;
@@ -62,6 +63,47 @@ public sealed class SocketActionGatedTcpDialerTests
         Assert.AreEqual(0, writtenBeforeSignal);
         Assert.IsGreaterThanOrEqualTo(2, signals);
         Assert.StartsWith("GET / HTTP/1.1\r\n", Encoding.ASCII.GetString(server.Written));
+    }
+
+    [TestMethod]
+    public async Task PerformAsync_SocketActionModeExpectingContinue_HoldsTheExpectContinueDeadlineWhileItWaits()
+    {
+        ScriptedConnector server = new([[.. "HTTP/1.1 100 Continue\r\n\r\n"u8, .. Response]]);
+        HeldTcpDialer dialer = new(new ScriptedTcpDialer(server));
+        dialer.Release.SetResult();
+        EngineDialing dialing = new(dialer, new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp"));
+        await using ManagedCurlEngine engine = new(TimeProvider.System, null, dialing: dialing);
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+        TransferSocketWait wait = new(TimeProvider.System);
+        easy.SocketWait = wait;
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" },
+            Http = new EasyHttpOptions { Post = true, PostFields = "x=1"u8.ToArray(), HttpHeaders = ["Expect: 100-continue"], Expect100Timeout = TimeSpan.FromHours(1) },
+        };
+        DateTimeOffset before = TimeProvider.System.GetUtcNow();
+
+        Task<CurlCode> perform = easy.PerformAsync(CancellationToken.None).AsTask();
+        DateTimeOffset? deadlineWhileWaitingForContinue = null;
+        while (!perform.IsCompleted)
+        {
+            await Task.WhenAny(perform, UntilAsync(wait, () => wait.Waiting != CurlPoll.None));
+            if ((wait.Waiting & CurlPoll.In) != 0)
+            {
+                deadlineWhileWaitingForContinue ??= wait.EarliestDeadline;
+            }
+
+            SignalWhatWaits(wait);
+        }
+
+        DateTimeOffset after = TimeProvider.System.GetUtcNow();
+
+        Assert.AreEqual(CurlCode.Ok, await perform);
+        Assert.IsNotNull(deadlineWhileWaitingForContinue);
+        Assert.IsGreaterThanOrEqualTo(before + TimeSpan.FromHours(1), deadlineWhileWaitingForContinue.Value);
+        Assert.IsLessThanOrEqualTo(after + TimeSpan.FromHours(1), deadlineWhileWaitingForContinue.Value);
+        Assert.IsNull(wait.EarliestDeadline);
+        Assert.Contains("Expect: 100-continue\r\n", Encoding.ASCII.GetString(server.Written));
     }
 
     [TestMethod]

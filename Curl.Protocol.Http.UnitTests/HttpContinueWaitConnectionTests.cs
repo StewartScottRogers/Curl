@@ -125,6 +125,64 @@ public sealed class HttpContinueWaitConnectionTests
     }
 
     [TestMethod]
+    public async Task WaitForContinueAsync_ContinueArrives_TellsTheWaitBeginningWithItsLengthAndEnding()
+    {
+        List<string> told = [];
+        HttpContinueWaitConnection connection = new(Connection("HTTP/1.1 100 Continue\r\n\r\n" + Final, 65536))
+        {
+            ContinueWait = TimeSpan.FromMilliseconds(250),
+            WaitBegins = wait => told.Add($"begins {wait.TotalMilliseconds}"),
+            WaitEnds = () => told.Add("ends"),
+        };
+
+        bool sends = await connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), CancellationToken.None);
+
+        Assert.IsTrue(sends);
+        CollectionAssert.AreEqual(new[] { "begins 250", "ends" }, told);
+    }
+
+    [TestMethod]
+    public async Task WaitForContinueAsync_WaitRunsOut_TellsTheWaitBeginningWithItsLengthAndEndingOnlyWhenItRunsOut()
+    {
+        List<string> told = [];
+        FakeTimeProvider time = new(DateTimeOffset.UnixEpoch);
+        HttpContinueWaitConnection connection = new(new GatedConnection(Encoding.Latin1.GetBytes(Final), 65536, 1))
+        {
+            WaitBegins = wait => told.Add($"begins {wait.TotalMilliseconds}"),
+            WaitEnds = () => told.Add("ends"),
+        };
+
+        Task<bool> wait = connection.WaitForContinueAsync(time, CancellationToken.None).AsTask();
+        await time.FirstTimerCreated;
+        string[] toldWhileWaiting = [.. told];
+        time.Advance(connection.ContinueWait);
+        bool sends = await wait;
+
+        Assert.IsTrue(sends);
+        CollectionAssert.AreEqual(new[] { "begins 1000" }, toldWhileWaiting);
+        CollectionAssert.AreEqual(new[] { "begins 1000", "ends" }, told);
+    }
+
+    [TestMethod]
+    public async Task WaitForContinueAsync_WaitLongerThanATimerTakes_TellsNoBeginningButStillTheEnd()
+    {
+        using CancellationTokenSource cancellation = new();
+        List<string> told = [];
+        HttpContinueWaitConnection connection = new(new GatedConnection([], 1, 1))
+        {
+            ContinueWait = HttpContinueWaitConnection.LongestTimedWait + TimeSpan.FromMilliseconds(1),
+            WaitBegins = _ => told.Add("begins"),
+            WaitEnds = () => told.Add("ends"),
+        };
+
+        Task<bool> wait = connection.WaitForContinueAsync(new FakeTimeProvider(DateTimeOffset.UnixEpoch), cancellation.Token).AsTask();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await wait);
+        CollectionAssert.AreEqual(new[] { "ends" }, told);
+    }
+
+    [TestMethod]
     public async Task WaitForContinueAsync_ContinueArrives_SendsTheBodyAndReplaysIt()
     {
         const string response = "HTTP/1.1 100 Continue\r\n\r\n" + Final;

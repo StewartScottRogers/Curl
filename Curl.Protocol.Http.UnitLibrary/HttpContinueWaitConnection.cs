@@ -36,6 +36,18 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// </summary>
     internal TimeSpan ContinueWait { get; init; } = HttpRequestOptions.DefaultContinueWait;
 
+    /// <summary>
+    /// Gets what <see cref="WaitForContinueAsync" /> tells <see cref="ContinueWait" /> as it starts a timed wait
+    /// (one no longer than <see cref="LongestTimedWait" />), or <see langword="null" /> for nothing (BL-3864).
+    /// </summary>
+    internal Action<TimeSpan>? WaitBegins { get; init; }
+
+    /// <summary>
+    /// Gets what <see cref="WaitForContinueAsync" /> tells when its wait ends, however it ends, or
+    /// <see langword="null" /> for nothing (BL-3864).
+    /// </summary>
+    internal Action? WaitEnds { get; init; }
+
     private readonly byte[] received = new byte[HttpLineReader.MaximumLineLength];
 
     private int receivedLength;
@@ -64,6 +76,29 @@ internal sealed class HttpContinueWaitConnection(IConnection connection) : IConn
     /// </returns>
     /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
     internal async ValueTask<bool> WaitForContinueAsync(TimeProvider timeProvider, CancellationToken cancellationToken)
+    {
+        TellWaitBegins();
+        try
+        {
+            return await WaitForStatusLineOrTimeoutAsync(timeProvider, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            WaitEnds?.Invoke();
+        }
+    }
+
+    /// <summary>Tells <see cref="WaitBegins" /> the wait's length, when the wait is a timed one.</summary>
+    private void TellWaitBegins()
+    {
+        if (ContinueWait <= LongestTimedWait)
+        {
+            WaitBegins?.Invoke(ContinueWait);
+        }
+    }
+
+    /// <summary>The wait <see cref="WaitForContinueAsync" /> makes, between telling it begins and ends.</summary>
+    private async Task<bool> WaitForStatusLineOrTimeoutAsync(TimeProvider timeProvider, CancellationToken cancellationToken)
     {
         statusLineRead = ReadStatusLineAsync(cancellationToken);
         using CancellationTokenSource waitEnded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

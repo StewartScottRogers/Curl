@@ -239,7 +239,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
             webSocketPerformConnection: webSocketPerformConnection,
             http2PushSink: pushSink,
             webSocketRandomSource: shared.WebSocketRandomSource,
-            ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true));
+            ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true,
+            socketWait: shared.SocketWait));
     }
 
     /// <summary>
