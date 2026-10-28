@@ -9,7 +9,7 @@ touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.Uni
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3752 — Fix CGR-223: A TLS alert after the handshake (certificate required / unknown CA) is reported as a generic 'Failure when receiving data from the peer'
 
@@ -77,3 +77,4 @@ curl -sS -k https://localhost:<p>/index.txt
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 
 - Notes (2026-10-28, lane 13): Could not run real curl against `openssl s_server -Verify` here; the expected texts come from the report. Fix: `SslStreamConnection.ReadAsync` maps an alert-shaped `IOException` through `TlsFailureMessages.AlertReadFailure` (ADR-0964). SslStream does not name the alert, so OpenSSL build picks `certificate required` without `--cert` and `unknown ca` with it (the report's three cases); Schannel build treats `SEC_E_ILLEGAL_MESSAGE`/`SEC_E_DECRYPT_FAILURE` as the alert and prints the ILLEGAL_MESSAGE text. Tests: Cgr223Tests (an in-memory handshake plus a bad record exercises the read path on Windows). Non-alert failures and socket errors keep the old text. Linux/macOS CI: tests are platform-neutral. Quality run for Curl.Networking.UnitLibrary: 0 failing members.
+- 2026-10-28: Doing -> Done. A fatal TLS alert after the handshake fails the read with the build's alert text (CGR-223)
