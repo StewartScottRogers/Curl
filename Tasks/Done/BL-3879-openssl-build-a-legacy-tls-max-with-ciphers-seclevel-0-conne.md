@@ -33,7 +33,7 @@ ADR-0364 (BL-1152) makes `HandBuiltTlsProvider` refuse a legacy ceiling before a
   - `-tls1_1`, max 1.0, SECLEVEL=0: exit 35 `curl: (35) TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version`. Without: exit 35 `no protocols available`.
   - `-tls1`, max 1.1, SECLEVEL=0: exit 0, the file. Without: exit 35 `no protocols available`.
   - `-tls1`, max 1.0, SECLEVEL=0: exit 0, the file. Without: exit 35 `no protocols available`.
-- Decision (ADR-0939): `RefusesItsVersionRange` holds only when `LowersSecurityLevelToZero(--ciphers)` does not. The four SECLEVEL=0 rows are pinned in `HandBuiltTlsProviderTests.LegacyVersions` (exit code and error text, which the console prints as `curl: (35) <text>`; stdout is the transfer body); the rows without it stay pinned by ADR-0364's existing tests.
+- Decision (ADR-0941): `RefusesItsVersionRange` holds only when `LowersSecurityLevelToZero(--ciphers)` does not. The four SECLEVEL=0 rows are pinned in `HandBuiltTlsProviderTests.LegacyVersions` (exit code and error text, which the console prints as `curl: (35) <text>`; stdout is the transfer body); the rows without it stay pinned by ADR-0364's existing tests.
 - Added `Curl.Networking.UnitLibrary/CLAUDE.md` to touches to keep its ADR-0364 sentence true; no Doing task on origin/work/dark-factory names it.
 - Pipeline `feature` run directly: a one-condition change with its plan given in Context, so no architect stage was worth its cost.
 - Verified: dotnet build clean, fast tests green (46 test runs, 0 failed; Curl.Networking.UnitTests 3706 passed), Measure-CodeQuality -Library Curl.Networking.UnitLibrary: 0 failing members.

@@ -1,4 +1,4 @@
-# ADR-0939: `@SECLEVEL=0` lifts the OpenSSL build's refusal of a legacy `--tls-max`
+# ADR-0941: `@SECLEVEL=0` lifts the OpenSSL build's refusal of a legacy `--tls-max`
 
 - Status: Accepted
 - Date: 2026-10-28
