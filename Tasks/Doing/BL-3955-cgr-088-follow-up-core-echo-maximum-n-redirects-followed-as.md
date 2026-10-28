@@ -30,3 +30,4 @@ Split from BL-3948 (HTTP part 1), which did the handler paths. Real curl (`Recor
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 0cf7a71c 779790c0.
