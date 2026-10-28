@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/Cgr166Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3695 — Fix CGR-166: --disable-eprt on an IPv6 control connection: PORT sends PORT h,h,h,h,p,p where curl still sends EPRT
 
@@ -60,17 +60,25 @@ curl -sS -P 127.0.0.1 --disable-eprt ftp://localhost:21900/file.txt
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr166Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Measured 2026-10-28 with `Record-CurlExchange.ps1 -Ftp -FtpData hello` against curl 8.22.0 Schannel (`C:\Program Files\Git\ucrt64\bin\curl.exe`) and Curl (`-Curl dotnet -CurlArgs run,--project,Curl.Console,--no-build,--,...`). Rather than rely on `localhost` resolution, the repro uses `ftp://[::1]:<port>/file.txt` with `-ListenAddress ::1`, which gives the same IPv6 control connection.
+  - `curl -sS -P 127.0.0.1 --disable-eprt ftp://[::1]:<port>/file.txt`: REF exit 0, stdout `hello`, empty stderr, wire `USER anonymous / PASS ftp@example.com / PWD / EPRT |1|127.0.0.1|<p>| / TYPE I / SIZE file.txt / RETR file.txt / QUIT`. Curl before the fix sent `PORT 127,0,0,1,...` (per the report); after it, the same exit code, stdout, stderr and wire as REF.
+  - Control variant `ftp://127.0.0.1:<port>/` (IPv4 control connection): REF and Curl both send `PORT 127,0,0,1,<p1>,<p2>`, exit 0, `hello`, empty stderr: still matches.
+  - Extra variant with `-FtpReply 'EPRT=500 no'` and `-v`: REF sends `EPRT`, prints `* disabling EPRT usage`, then sends `PORT 127,0,0,1,...` on a fresh port and succeeds. Curl now does the same. In `-v` only, the `Established connection to [::1]` host form is left to BL-3750, and the active-mode `Established 2nd connection to [::1]` host to BL-3935 (filed by this run).
+- Fix: `FtpSession.AnnounceActivePortAsync` also sends EPRT when the control connection is IPv6 (`ControlIsIpv6`, curl's `conn->bits.ipv6` check in `ftp_state_use_port`, which turns `ftp_use_eprt` back on). This ignores `--disable-eprt` and an earlier refusal kept on a reused connection, as curl does. No ADR: there was no design choice, only matching measured curl.
+- `Measure-CodeQuality.ps1 -Library Curl.Protocol.Ftp.UnitLibrary`: 100% line and branch coverage, 0 failing members, worst CRAP 10. A third test, with the control address unknown, covers `ControlIsIpv6`'s null branch.
+- Platform check: the unit test uses fakes only (no sockets, paths or OS text), so it is platform-neutral. CI on Linux and macOS is covered by that and by the fast tests passing here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-166 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. --disable-eprt on an IPv6 control connection sends EPRT, then PORT only after a refusal, as curl 8.22.0 does
