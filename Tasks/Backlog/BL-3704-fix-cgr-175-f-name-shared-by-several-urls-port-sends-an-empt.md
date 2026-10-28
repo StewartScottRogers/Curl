@@ -4,7 +4,7 @@ title: Fix CGR-175: -F name=@- shared by several URLs: PORT sends an empty part 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3699]
+depends-on: [BL-3968, BL-3969]
 touches: [Curl.Console.UnitTests/Cgr175Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Core.UnitTests/Cgr175Tests.cs]
 requirement: none
 created: 2026-10-26

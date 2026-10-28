@@ -90,3 +90,4 @@ curl -Z --parallel-max 1 -sS -w "%{urlnum} %{exitcode} %{url}\n" "http://127.0.0
 - 2026-10-26: Created from CGR-170 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Fix and ADR-0866 written and stashed, but the change makes a -Z test in Curl.Console.UnitTests hang; find and fix it (Notes)
+- 2026-10-28: Backlog -> Deferred. Over cost cap; split into BL-3968 and BL-3969
