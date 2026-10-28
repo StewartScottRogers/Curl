@@ -42,7 +42,7 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
     - `%F0%90%82%80a.example`: exit 3, same text.
     - `ü.example` typed unescaped in the config file: exit 0, `xn--14-ria7423a`.
     - `ü` typed in an argument: exit 0, `xn--tda`.
-  - Stashed change: on Windows, `ReadHostAsWindows1252` turns each typed character into its Windows-1252 byte (its UTF-8 when Windows-1252 lacks it) and each escape into its raw byte, then reads every byte back as Windows-1252. `Latin1Mappings` was added to `CurlUrlHostNameMapping`. Run through Curl the same way, the first two criterion URLs, `%F0...` and the argument case all match real curl in exit code, stdout, stderr and request bytes. The config-file literal does not; that is filed as BL-3954.
+  - Stashed change: on Windows, `ReadHostAsWindows1252` turns each typed character into its Windows-1252 byte (its UTF-8 when Windows-1252 lacks it) and each escape into its raw byte, then reads every byte back as Windows-1252. `Latin1Mappings` was added to `CurlUrlHostNameMapping`. Run through Curl the same way, the first two criterion URLs, `%F0...` and the argument case all match real curl in exit code, stdout, stderr and request bytes. The config-file literal does not; that is filed as BL-3956.
   - Still failing (why this run requeued, budget spent):
     - 6 rows of `Cgr019Tests.TryNormalize_HostThatIsNotAscii_ConvertsTheMappedName`: ΣΣ, İstanbul, Ａb, a‍b, an NFD école, ﬁle.
     - `CurlUrlTests.TryParse_ForEachScheme_ExposesTheMembersHandlersRead` (`ex%C3%A5mple`).

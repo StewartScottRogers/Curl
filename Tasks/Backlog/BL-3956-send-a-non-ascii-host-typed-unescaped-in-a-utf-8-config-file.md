@@ -1,5 +1,5 @@
 ---
-id: BL-3954
+id: BL-3956
 title: Send a non-ASCII host typed unescaped in a UTF-8 config file as its UTF-8 bytes read as Windows-1252 on Windows (CGR-059)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3954 — Send a non-ASCII host typed unescaped in a UTF-8 config file as its UTF-8 bytes read as Windows-1252 on Windows (CGR-059)
+# BL-3956 — Send a non-ASCII host typed unescaped in a UTF-8 config file as its UTF-8 bytes read as Windows-1252 on Windows (CGR-059)
 
 ## Goal
 
