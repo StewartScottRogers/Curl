@@ -36,3 +36,4 @@ Found by BL-3974 (CGR-110 part 3, Documentation/Reviews/Curl-Gap-Report-2026-10-
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 65e5ab67 4380765b e0cd4d6e c259902e.
