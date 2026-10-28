@@ -31,3 +31,4 @@ Split from BL-3931 (part of BL-3934); follows BL-3929 and BL-3930 in the same fi
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: ebe547a6 49b8818c 541414b4.
