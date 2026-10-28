@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3963]
-touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr059ConfigFileHostTests.cs]
+touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr059ConfigFileHostTests.cs, Curl.Cli.UnitTests/Cgr052Tests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3956 — Send a non-ASCII host typed unescaped in a UTF-8 config file as its UTF-8 bytes read as Windows-1252 on Windows (CGR-059)
 
@@ -22,9 +22,9 @@ Found by BL-3953 on 2026-10-28, measured with Record-CurlExchange.ps1 and `--con
 
 ## Acceptance criteria
 
-- [ ] On Windows, the config file above run through real curl and Curl gives the same exit code, stdout, stderr and request bytes; the commands and results are recorded in Notes.
-- [ ] A unit test in `Curl.Cli.UnitTests/Cgr059ConfigFileHostTests.cs` pins it and fails before the fix.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] On Windows, the config file above run through real curl and Curl gives the same exit code, stdout, stderr and request bytes; the commands and results are recorded in Notes.
+- [x] A unit test in `Curl.Cli.UnitTests/Cgr059ConfigFileHostTests.cs` pins it and fails before the fix.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -32,3 +32,4 @@ Found by BL-3953 on 2026-10-28, measured with Record-CurlExchange.ps1 and `--con
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 9069a70d 4e298cd0 779790c0.
+- 2026-10-28: Doing -> Done. Config file URL host re-spelled as the file bytes; matches curl 8.22.0 on Windows
