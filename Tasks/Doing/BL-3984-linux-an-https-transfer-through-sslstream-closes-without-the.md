@@ -31,3 +31,4 @@ Found by BL-3698 (CGR-169, ADR-0956). In WSL, `openssl s_server -tls1_3 -accept 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: c3955a84 5720596e 779790c0.
