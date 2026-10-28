@@ -8,7 +8,7 @@ depends-on: [BL-3946]
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitLibrary/IHttpsOriginDnsResolver.cs, Curl.Engine.UnitLibrary/ManagedCurlVersion.cs, Curl.Conformance.UnitTests/PassingUpstreamCases.txt, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Conformance.UnitLibrary/UpstreamUnixFeatures.cs, Curl.Networking.UnitTests/Cgr157LinuxTests.cs, Curl.Networking.UnitTests/Cgr157Tests.cs, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.cs, Curl.Conformance.UnitLibrary/UpstreamCurlVersionLineFeatures.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3914 — Decide and match the Linux build's HTTPS-RR DoH query and HTTPSRR feature (CGR-157 Linux half)
 
@@ -42,3 +42,4 @@ BL-3686 (ADR-0856) fixed the Windows half of third-party gap report issue CGR-15
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 90befad2 74ba9b3c 168cb378 779790c0.
 - 2026-10-28: Doing -> Backlog. Waits on BL-3946, which holds Curl.Conformance.UnitTests and Curl.Conformance.UnitLibrary (UpstreamCurlPlatformTests.cs, UpstreamUnixFeatures.cs); measurement and decision recorded in Notes
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 90befad2 74ba9b3c 168cb378 779790c0.
+- 2026-10-28: Doing -> Done. Curl sends only the A and AAAA DoH queries and lists no HTTPSRR on every platform, matching the OpenSSL and Schannel reference builds (ADR-0956)
