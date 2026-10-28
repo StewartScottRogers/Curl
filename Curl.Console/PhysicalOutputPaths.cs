@@ -21,12 +21,25 @@ namespace Curl.Console;
 /// for <see cref="Exists(string)" /> and <see cref="RemoveFile(string)" /> (BL-3947).
 /// <see langword="null" /> checks and deletes every name through .NET's file APIs, as on Windows.
 /// </param>
+/// <param name="directoryPathLengthLimit">
+/// The length a directory's full path must stay under: a longer one fails as <c>ENOENT</c> without
+/// being made, as curl's <c>mkdir</c> does on Windows (CGR-188, BL-3717). <see langword="null" />
+/// leaves the length to the platform, as off Windows.
+/// </param>
 internal sealed class PhysicalOutputPaths(
     Func<string, bool>? isRegularFile,
     CRuntimeErrorNumbers errorNumbers,
     Func<byte[], int>? makeDirectoryUnderRawBytes = null,
-    RawByteFileName.FileOperations? rawByteFiles = null) : IOutputPaths
+    RawByteFileName.FileOperations? rawByteFiles = null,
+    int? directoryPathLengthLimit = null) : IOutputPaths
 {
+    /// <summary>
+    /// Windows' <c>CreateDirectory</c> limit: a directory's full path must be shorter than 248
+    /// characters (MAX_PATH less room for an 8.3 file name), and curl's <c>mkdir</c> has no long-path
+    /// support (CGR-188, BL-3717).
+    /// </summary>
+    internal const int WindowsDirectoryPathLengthLimit = 248;
+
     /// <summary>
     /// Initializes an instance with the running platform's regular-file test,
     /// <see cref="NativeRegularFileTest.ForCurrentPlatform" />, C runtime numbers and, off Windows,
@@ -37,7 +50,8 @@ internal sealed class PhysicalOutputPaths(
             NativeRegularFileTest.ForCurrentPlatform(),
             CRuntimeErrorNumbers.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()),
             OffWindows<Func<byte[], int>>(RawByteFileName.MakeDirectoryUnderRawBytes),
-            OffWindows(RawByteFileName.FileOperations.Native))
+            OffWindows(RawByteFileName.FileOperations.Native),
+            OnWindows(WindowsDirectoryPathLengthLimit))
     {
     }
 
@@ -52,6 +66,19 @@ internal sealed class PhysicalOutputPaths(
     private static T? OffWindows<T>(T rawByteOperation)
         where T : class =>
         OperatingSystem.IsWindows() ? null : rawByteOperation;
+
+    /// <summary>Gives <paramref name="windowsValue" /> on Windows and none elsewhere.</summary>
+    /// <param name="windowsValue">The value for Windows.</param>
+    /// <returns>The value, or <see langword="null" />.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
+    private static int? OnWindows(int windowsValue) =>
+        OperatingSystem.IsWindows() ? windowsValue : null;
+
+    /// <summary>Whether the full path of <paramref name="path" /> reaches the directory length limit.</summary>
+    /// <param name="path">The directory's name.</param>
+    /// <returns><see langword="true" /> when the directory would not be made for its length.</returns>
+    private bool IsTooLong(string path) =>
+        directoryPathLengthLimit is { } limit && Path.GetFullPath(path).Length >= limit;
 
     /// <inheritdoc />
     public bool TryCreateDirectory(string path, out int errorNumber)
@@ -76,6 +103,13 @@ internal sealed class PhysicalOutputPaths(
 
         try
         {
+            if (IsTooLong(path))
+            {
+                errorNumber = CRuntimeErrorNumbers.NoSuchFileOrDirectory;
+
+                return false;
+            }
+
             Directory.CreateDirectory(path);
 
             return true;
