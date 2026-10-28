@@ -83,7 +83,8 @@ public sealed class Cgr115Tests
             {
                 openedHandle = handle;
                 return handleStream;
-            });
+            },
+            _ => true);
         Diagnostics.Act("descriptor", openedHandle);
 
         Diagnostics.Assert("descriptor", (nint)StandardErrorOpener.UnixStandardErrorFileDescriptor, openedHandle);
@@ -100,7 +101,8 @@ public sealed class Cgr115Tests
         Stream opened = StandardErrorOpener.Open(
             runsOnWindows: true,
             () => console,
-            _ => throw new AssertFailedException("A descriptor was opened."));
+            _ => throw new AssertFailedException("A descriptor was opened."),
+            _ => throw new AssertFailedException("A descriptor was checked."));
         Diagnostics.Act("opened the console stream", ReferenceEquals(console, opened));
 
         Diagnostics.Assert("opened the console stream", true, ReferenceEquals(console, opened));
