@@ -31,3 +31,4 @@ Found by BL-3824 on 2026-10-28 in WSL (Ubuntu): `curl -sS file:///etc/hostname 1
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 91513d3a def504f7 779790c0.
