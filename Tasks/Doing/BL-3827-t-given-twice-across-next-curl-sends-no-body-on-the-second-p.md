@@ -31,3 +31,4 @@ Found by BL-3546 (CGR-017) while measuring stdin repros with Record-CurlExchange
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 84b47d48 0ee60237 779790c0.
