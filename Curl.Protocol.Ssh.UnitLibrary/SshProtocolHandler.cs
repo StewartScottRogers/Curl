@@ -149,6 +149,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        SshTransferClock clock = new(context.TimeProvider);
         using SshConnectPhaseLimit connectPhase = new(context);
         SshOptions options = context.Ssh ?? new SshOptions();
         CurlUrl url = context.Url;
@@ -156,8 +157,8 @@ public sealed class SshProtocolHandler : IProtocolHandler
         KnownHostsFile? knownHosts = options.KnownHostsPath is { } knownHostsPath
             ? await KnownHostsFile.LoadAsync(fileSystem, knownHostsPath, context.CancellationToken).ConfigureAwait(false)
             : null;
-        SshSessionTarget target = new(url.IdnHost, port, options, knownHosts);
-        return await ConnectAndRunSessionAsync(context, target, connectPhase).ConfigureAwait(false);
+        SshSessionTarget target = new(url.IdnHost, port, options, knownHosts, clock);
+        return clock.Stamp(await ConnectAndRunSessionAsync(context, target, connectPhase).ConfigureAwait(false));
     }
 
     // Connects, then runs the session the connection already holds, or a new one.
@@ -172,6 +173,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         };
         string loginKey = SshKeptSession.LoginKeyOf(context);
         ConnectResult connect = await ConnectServingAsync(connectTarget, loginKey, context.CancellationToken).ConfigureAwait(false);
+        target.Clock.Connect = connect.Timings;
         if (connect.Connection is not { } connection)
         {
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
@@ -249,7 +251,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     {
         kept.UseConnection(connection);
         SshStateTrace trace = new(context.Events, TracesStateMachine);
-        return RunSessionAsync(context, target, connectionNumber, connectPhase, trace, _ => TransferAndKeepOrDisconnectAsync(context, connection, kept, () => TransferAsync(context, kept.Transport, context.Url.Scheme == ScpScheme, trace, kept.Sftp)));
+        return RunSessionAsync(context, target, connectionNumber, connectPhase, trace, _ => TransferAndKeepOrDisconnectAsync(context, connection, kept, () => TransferAsync(context, kept.Transport, context.Url.Scheme == ScpScheme, trace, kept.Sftp, target.Clock)));
     }
 
     // Runs the transfer, then leaves the session on the connection for the run's connection
@@ -409,6 +411,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         await authentication.AuthenticateAsync(context.Credentials, connectPhase).ConfigureAwait(false);
         trace.Enter(SshUserAuthentication.AuthDoneState);
         events.ReportInfo(SshInfoLines.AuthenticationComplete);
+        target.Clock.MarkAuthenticated();
         bool overScp = context.Url.Scheme == ScpScheme;
         if (overScp)
         {
@@ -416,7 +419,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             trace.Rest();
         }
 
-        return await TransferAsync(context, transport, overScp, trace, session.Sftp).ConfigureAwait(false);
+        return await TransferAsync(context, transport, overScp, trace, session.Sftp, target.Clock).ConfigureAwait(false);
     }
 
     // curl's SSH_HOSTKEY state, which with neither --hostpubsha256 nor --hostpubmd5 says it
@@ -440,15 +443,16 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
     // The transfer's failure message is a -v line too, as curl's failf writes it, unless
     // curl returns it without one.
-    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp, SshStateTrace trace, SftpSessionSlot sftp)
+    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp, SshStateTrace trace, SftpSessionSlot sftp, SshTransferClock clock)
     {
         TransferResult result;
         SshDiagnosticLog log = transport.DiagnosticLog;
         log.TransferStarted(context.Url.Scheme, context.Url.AbsolutePath, context.Upload is not null);
         long started = context.TimeProvider.GetTimestamp();
+        clock.MarkTransferReady();
         try
         {
-            ReceivedDataReportingStream output = new(context.Output, context.Events);
+            ReceivedDataReportingStream output = new(context.Output, context.Events) { Written = clock.MarkByteReceived };
             result = overScp
                 ? await TransferOverScpAsync(context, transport, output, trace).ConfigureAwait(false)
                 : await TransferOverSftpAsync(context, transport, output, trace, sftp).ConfigureAwait(false);
@@ -513,6 +517,41 @@ public sealed class SshProtocolHandler : IProtocolHandler
             : await new SftpFileDownload(transport) { Trace = trace, NoBody = context.NoBody, Sessions = sftp }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize, context.RangeText).ConfigureAwait(false);
     }
 
-    // What the host-key check and the key files need to know about the session.
-    private sealed record SshSessionTarget(string Host, int Port, SshOptions Options, KnownHostsFile? KnownHosts);
+    // What the host-key check and the key files need to know about the session, and the
+    // clock that records the transfer's -w times.
+    private sealed record SshSessionTarget(string Host, int Port, SshOptions Options, KnownHostsFile? KnownHosts, SshTransferClock Clock);
+
+    // The points in time curl's libssh2 backend records for -w (CGR-107, BL-3957): the
+    // connector's name lookup and connect, appconnect at "Authentication complete", where
+    // curl's SSH_AUTH_DONE sets TIMER_APPCONNECT, pretransfer as the transfer starts,
+    // starttransfer at the first byte written to the output, and the total as the handler
+    // returns, a failure's included. A transfer that fails before its first byte, such as a
+    // missing file, has no pretransfer, as curl sets it only once its DO phase is done
+    // (measured, BL-3957).
+    private sealed class SshTransferClock(TimeProvider timeProvider)
+    {
+        private readonly long started = timeProvider.GetTimestamp();
+
+        private long? authenticated;
+
+        private long? transferReady;
+
+        private long? firstByteReceived;
+
+        public ConnectTimings? Connect { get; set; }
+
+        public void MarkAuthenticated() => authenticated = timeProvider.GetTimestamp();
+
+        public void MarkTransferReady() => transferReady = timeProvider.GetTimestamp();
+
+        public void MarkByteReceived() => firstByteReceived ??= timeProvider.GetTimestamp();
+
+        public TransferResult Stamp(TransferResult result)
+        {
+            ConnectTimings connect = (Connect ?? new ConnectTimings(started, null, null, null)) with { TlsHandshakeCompleted = authenticated };
+            long? requestReady = result.IsSuccess || firstByteReceived is not null ? transferReady : null;
+            TransferTimings timings = new(started, connect, requestReady, null, firstByteReceived, timeProvider.GetTimestamp());
+            return result with { Report = (result.Report ?? new TransferReport()) with { Timings = timings } };
+        }
+    }
 }

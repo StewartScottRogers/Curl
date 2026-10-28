@@ -12,6 +12,13 @@ namespace Curl.Protocol.Ssh;
 /// <param name="events">Where each write is reported.</param>
 internal sealed class ReceivedDataReportingStream(Stream output, ITransferEvents events) : Stream
 {
+    /// <summary>
+    /// Gets what runs after each write is reported and before it is passed on, which the
+    /// handler uses to take <c>%{time_starttransfer}</c> at the first one (BL-3957); by
+    /// default nothing.
+    /// </summary>
+    public Action Written { get; init; } = static () => { };
+
     /// <inheritdoc />
     public override bool CanRead => false;
 
@@ -50,6 +57,7 @@ internal sealed class ReceivedDataReportingStream(Stream output, ITransferEvents
     public override void Write(byte[] buffer, int offset, int count)
     {
         events.ReportDataReceived(buffer.AsSpan(offset, count));
+        Written();
         output.Write(buffer, offset, count);
     }
 
@@ -57,6 +65,7 @@ internal sealed class ReceivedDataReportingStream(Stream output, ITransferEvents
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         events.ReportDataReceived(buffer.Span);
+        Written();
         return output.WriteAsync(buffer, cancellationToken);
     }
 }

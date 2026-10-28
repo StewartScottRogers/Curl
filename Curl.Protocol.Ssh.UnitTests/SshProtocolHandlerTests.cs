@@ -55,7 +55,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/hello.txt", preferences: preferences);
 
-        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result, platform);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result with { Report = null }, platform);
         CollectionAssert.AreEqual(Hello, outcome.Output);
         Assert.AreEqual(Host, server.Targets[0].Host);
         Assert.AreEqual(22, server.Targets[0].Port, "both schemes default to port 22");
@@ -80,7 +80,7 @@ public sealed partial class SshProtocolHandlerTests
 
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/", listOnly: listOnly);
 
-        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result with { Report = null });
         CollectionAssert.AreEqual(expected, outcome.Output);
         AssertEvents(
             server,
@@ -100,7 +100,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}{path}");
 
         Diagnostics.AssertResult(TransferResult.Success(expected.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result with { Report = null });
         Diagnostics.AssertBytes("output", expected, outcome.Output);
         CollectionAssert.AreEqual(expected, outcome.Output);
         CollectionAssert.Contains(server.Events.ToList(), "sftp 11 /home/fake/");
@@ -127,7 +127,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: preferences);
 
         Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, platform);
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result with { Report = null }, platform);
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
     }
@@ -158,7 +158,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: SshAlgorithmPreferences.OpenSslReference);
 
         Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result with { Report = null });
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
     }
@@ -173,7 +173,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", preferences: SshAlgorithmPreferences.Full);
 
         Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result with { Report = null });
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
     }
@@ -189,7 +189,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"scp://{Host}/data/large.bin", preferences: preferences);
 
         Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, platform);
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result with { Report = null }, platform);
         CollectionAssert.AreEqual(large, outcome.Output);
         AssertEvents(
             server,
@@ -206,7 +206,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/~/notes.txt");
 
         Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result with { Report = null });
         CollectionAssert.AreEqual(Hello, outcome.Output);
     }
 
@@ -292,7 +292,7 @@ public sealed partial class SshProtocolHandlerTests
         ActTransfer(result, context, server);
 
         Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.UploadFailed, "SCP requires a known file size for upload"), result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, "SCP requires a known file size for upload"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, "SCP requires a known file size for upload"), result with { Report = null });
         CollectionAssert.DoesNotContain(server.Events.ToArray(), "channel open session");
         CollectionAssert.Contains(server.Events.ToArray(), "disconnect 11 Shutdown");
     }
@@ -363,7 +363,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, new NetworkCredential(User, string.Empty), files: new() { ["id_test"] = TestUserKeys.RsaPkcs1 });
 
         Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result with { Report = null });
         CollectionAssert.Contains(server.Events.ToArray(), $"auth publickey {User} ok");
     }
 
@@ -378,7 +378,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, new NetworkCredential(User, string.Empty), files: new() { ["id_test"] = TestUserKeys.Ed25519OpenSshEncrypted["aes256-ctr"] });
 
         Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result with { Report = null });
         CollectionAssert.Contains(server.Events.ToArray(), $"auth publickey {User} ok");
     }
 
@@ -419,7 +419,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"scp://{Host}/f", options);
 
         Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result with { Report = null });
     }
 
     [TestMethod]
@@ -432,7 +432,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/f", options, files: new() { ["known_hosts"] = server.KnownHostsLine(Host) });
 
         Diagnostics.AssertResult(TransferResult.Success(Hello.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), outcome.Result with { Report = null });
     }
 
     [TestMethod]
@@ -523,7 +523,7 @@ public sealed partial class SshProtocolHandlerTests
         ActTransfer(result, context, server);
 
         Diagnostics.AssertResult(TransferResult.Success(Hello.Length), result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), result with { Report = null });
         Assert.AreEqual("257 \"/data/hello.txt\" is current directory.\n", Encoding.UTF8.GetString(header.ToArray()));
         AssertEvents(
             server,
@@ -550,7 +550,7 @@ public sealed partial class SshProtocolHandlerTests
 
         ActTransfer(result, context, server);
         Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.QuoteError, "Unknown SFTP command"), result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, "Unknown SFTP command"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, "Unknown SFTP command"), result with { Report = null });
     }
 
     [TestMethod]

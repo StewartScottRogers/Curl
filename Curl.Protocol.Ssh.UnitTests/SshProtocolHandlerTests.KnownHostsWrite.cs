@@ -50,7 +50,7 @@ public sealed partial class SshProtocolHandlerTests
         await server.WhenSessionsEndAsync();
 
         Diagnostics.Assert("result", TransferResult.Success(Hello.Length), result);
-        Assert.AreEqual(TransferResult.Success(Hello.Length), result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), result with { Report = null });
         string expected = existing.Replace("\n", Environment.NewLine, StringComparison.Ordinal)
             + $"{Host} ssh-rsa {Convert.ToBase64String(server.HostKeyBlob)}{Environment.NewLine}";
         Assert.AreEqual(refusesWrites ? null : expected, fileSystem.Written.TryGetValue("known_hosts", out byte[]? bytes) ? Encoding.UTF8.GetString(bytes) : null);

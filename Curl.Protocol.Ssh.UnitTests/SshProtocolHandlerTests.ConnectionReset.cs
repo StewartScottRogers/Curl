@@ -54,7 +54,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunResetAsync("sftp 3 " + ResetFile, $"sftp://{Host}{ResetFile}");
 
         Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Assert.AreEqual(TransferResult.Success(0), outcome.Result with { Report = null });
         Assert.IsEmpty(outcome.Output);
     }
 

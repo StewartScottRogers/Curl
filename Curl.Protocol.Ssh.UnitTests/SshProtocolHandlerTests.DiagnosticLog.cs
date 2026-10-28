@@ -31,7 +31,7 @@ public sealed partial class SshProtocolHandlerTests
             new Dictionary<string, string> { ["known_hosts"] = server.KnownHostsLine(Host) });
 
         AssertCheckedOutcomeDiagnostic();
-        Assert.AreEqual(TransferResult.Success(Hello.Length), result);
+        Assert.AreEqual(TransferResult.Success(Hello.Length), result with { Report = null });
         string[] info = log.At(DiagnosticLogLevel.Info);
         Assert.AreEqual("server identification: " + InMemorySshServer.Identification, info[0]);
         StringAssert.Matches(info[1], new Regex("^negotiated kex [^,]+, host key [^,]+, cipher [^/]+/[^,]+, MAC [^/]+/[^,]+, compression none/none$"));

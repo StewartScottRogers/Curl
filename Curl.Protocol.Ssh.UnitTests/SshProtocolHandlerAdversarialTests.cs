@@ -141,7 +141,8 @@ public sealed class SshProtocolHandlerAdversarialTests
         });
 
         Diagnostics.Act("result", result);
-        return result;
+        // The -w times differ from run to run (BL-3957); the outcome is what is compared.
+        return result with { Report = null };
     }
 
     private void AssertSessionFailed(TransferResult result)
