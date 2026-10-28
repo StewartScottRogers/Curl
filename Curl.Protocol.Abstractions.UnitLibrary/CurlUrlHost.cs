@@ -289,8 +289,9 @@ internal static class CurlUrlHost
     /// or has two at its third and fourth characters without being an <c>xn--</c> label, is refused
     /// (<c>-ü</c>, <c>ab--c</c>), ASCII or not; bidirectional text is not checked
     /// (<c>aא</c> is <c>xn--a-0hc</c>); and a label with a lone surrogate (a byte that is not
-    /// UTF-8), a control character (<c>U+0090</c>, upstream test 1034) or longer than 63 characters
-    /// once converted (upstream test 1035) is refused.
+    /// UTF-8), a control character (<c>U+0090</c>, upstream test 1034), the replacement character
+    /// <c>U+FFFD</c>, which UTS #46 disallows (test 1034's bytes as a config file off Windows reads
+    /// them, BL-3946), or longer than 63 characters once converted (upstream test 1035) is refused.
     /// </summary>
     /// <returns>The ASCII label, or <see langword="null" /> when it cannot be converted.</returns>
     private static string? ToAsciiLabel(string label)
@@ -316,7 +317,7 @@ internal static class CurlUrlHost
         ReadOnlySpan<char> rest = label;
         while (!rest.IsEmpty && codePoints.Count <= MaximumLabelLength)
         {
-            if (Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed) != OperationStatus.Done || Rune.IsControl(rune))
+            if (Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed) != OperationStatus.Done || Rune.IsControl(rune) || rune == Rune.ReplacementChar)
             {
                 return null;
             }
