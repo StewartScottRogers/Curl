@@ -31,6 +31,9 @@ internal static partial class RawByteFileName
     /// <summary>The runtime's <c>O_TRUNC</c>.</summary>
     internal const int Truncate = 0x0080;
 
+    /// <summary>POSIX <c>S_IFREG</c>: the file type of a regular file.</summary>
+    internal const int RegularFileType = 0x8000;
+
     /// <summary>The status of each <c>errno</c> an <c>open</c> names specially; any other is an I/O error.</summary>
     private static readonly Dictionary<int, FileAccessStatus> StatusesByErrno = new()
     {
@@ -183,6 +186,76 @@ internal static partial class RawByteFileName
     /// </summary>
     [LibraryImport("libSystem.Native", EntryPoint = "SystemNative_MkDir")]
     private static unsafe partial int MakeDirectory(byte* path, int mode);
+
+    /// <summary>
+    /// Stats and deletes files under the raw bytes of their names, as curl's <c>--skip-existing</c>
+    /// and <c>--remove-on-error</c> do on Linux and macOS (BL-3947).
+    /// </summary>
+    /// <param name="FileTypeOf">
+    /// Gives the <c>S_IFMT</c> bits of the NUL-terminated name's <c>stat</c> mode, or -1 when
+    /// <c>stat</c> fails.
+    /// </param>
+    /// <param name="Remove">Deletes the NUL-terminated name with <c>unlink</c>; <see langword="true" /> when it went.</param>
+    internal sealed record FileOperations(Func<byte[], int> FileTypeOf, Func<byte[], bool> Remove)
+    {
+        /// <summary>The runtime's <c>stat</c> and <c>unlink</c> shims.</summary>
+        internal static FileOperations Native { get; } = new(FileTypeUnderRawBytes, RemoveUnderRawBytes);
+    }
+
+    /// <summary>
+    /// The file type bits of the <c>stat</c> mode of the file named by the NUL-terminated raw bytes
+    /// <paramref name="path" />, following symbolic links.
+    /// </summary>
+    /// <param name="path">The name's raw bytes and a NUL.</param>
+    /// <returns>The mode's <c>S_IFMT</c> bits, or -1 when <c>stat</c> fails.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0920: a thin adapter over a stat only Linux and macOS take raw bytes in.")]
+    internal static int FileTypeUnderRawBytes(byte[] path)
+    {
+        const int FileTypeMask = 0xF000;
+        RawFileStatus status;
+        unsafe
+        {
+            fixed (byte* name = path)
+            {
+                return Stat(name, &status) == 0 ? status.Mode & FileTypeMask : -1;
+            }
+        }
+    }
+
+    /// <summary>Deletes the file named by the NUL-terminated raw bytes <paramref name="path" /> with <c>unlink</c>.</summary>
+    /// <param name="path">The name's raw bytes and a NUL.</param>
+    /// <returns><see langword="true" /> when the file was deleted.</returns>
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0920: a thin adapter over an unlink only Linux and macOS take raw bytes in.")]
+    internal static bool RemoveUnderRawBytes(byte[] path)
+    {
+        unsafe
+        {
+            fixed (byte* name = path)
+            {
+                return Unlink(name) == 0;
+            }
+        }
+    }
+
+    /// <summary>The runtime's <c>stat</c> shim, which follows symbolic links.</summary>
+    [LibraryImport("libSystem.Native", EntryPoint = "SystemNative_Stat")]
+    private static unsafe partial int Stat(byte* path, RawFileStatus* status);
+
+    /// <summary>The runtime's <c>unlink</c> shim.</summary>
+    [LibraryImport("libSystem.Native", EntryPoint = "SystemNative_Unlink")]
+    private static unsafe partial int Unlink(byte* path);
+
+    /// <summary>
+    /// The head of the runtime's <c>FileStatus</c> record: its flags and mode, padded past the
+    /// record's full length so the shim's write stays inside it.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Size = 256)]
+    private struct RawFileStatus
+    {
+        public int Flags;
+
+        public int Mode;
+    }
 
     /// <summary>
     /// The runtime's non-variadic <c>open</c> shim, which every .NET build on Linux and macOS ships

@@ -16,32 +16,42 @@ namespace Curl.Console;
 /// CGR-016, BL-3868). <see langword="null" /> makes every directory through
 /// <see cref="Directory.CreateDirectory(string)" />, as on Windows.
 /// </param>
+/// <param name="rawByteFiles">
+/// Stats and deletes a name holding an argument byte that is not valid UTF-8 under its raw bytes,
+/// for <see cref="Exists(string)" /> and <see cref="RemoveFile(string)" /> (BL-3947).
+/// <see langword="null" /> checks and deletes every name through .NET's file APIs, as on Windows.
+/// </param>
 internal sealed class PhysicalOutputPaths(
     Func<string, bool>? isRegularFile,
     CRuntimeErrorNumbers errorNumbers,
-    Func<byte[], int>? makeDirectoryUnderRawBytes = null) : IOutputPaths
+    Func<byte[], int>? makeDirectoryUnderRawBytes = null,
+    RawByteFileName.FileOperations? rawByteFiles = null) : IOutputPaths
 {
     /// <summary>
     /// Initializes an instance with the running platform's regular-file test,
     /// <see cref="NativeRegularFileTest.ForCurrentPlatform" />, C runtime numbers and, off Windows,
-    /// <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" />.
+    /// <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" /> and <see cref="RawByteFileName.FileOperations.Native" />.
     /// </summary>
     public PhysicalOutputPaths()
         : this(
             NativeRegularFileTest.ForCurrentPlatform(),
             CRuntimeErrorNumbers.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()),
-            RawDirectoryMakerForCurrentPlatform())
+            OffWindows<Func<byte[], int>>(RawByteFileName.MakeDirectoryUnderRawBytes),
+            OffWindows(RawByteFileName.FileOperations.Native))
     {
     }
 
     /// <summary>
-    /// The running platform's raw-byte directory maker: none on Windows, where argument bytes are
-    /// never escaped, otherwise <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" />.
+    /// Gives <paramref name="rawByteOperation" /> off Windows and none on Windows, where argument
+    /// bytes are never escaped.
     /// </summary>
-    /// <returns>The maker, or <see langword="null" />.</returns>
+    /// <typeparam name="T">The operation's type.</typeparam>
+    /// <param name="rawByteOperation">A raw-byte file operation.</param>
+    /// <returns>The operation, or <see langword="null" />.</returns>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: the platform picks the branch.")]
-    private static Func<byte[], int>? RawDirectoryMakerForCurrentPlatform() =>
-        OperatingSystem.IsWindows() ? null : RawByteFileName.MakeDirectoryUnderRawBytes;
+    private static T? OffWindows<T>(T rawByteOperation)
+        where T : class =>
+        OperatingSystem.IsWindows() ? null : rawByteOperation;
 
     /// <inheritdoc />
     public bool TryCreateDirectory(string path, out int errorNumber)
@@ -98,7 +108,9 @@ internal sealed class PhysicalOutputPaths(
     }
 
     /// <inheritdoc />
-    public bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
+    public bool Exists(string path) => rawByteFiles is { } raw && RawByteFileName.HoldsEscapedByte(path)
+        ? raw.FileTypeOf(RawByteFileName.NullTerminatedBytes(path)) >= 0
+        : File.Exists(path) || Directory.Exists(path);
 
     /// <summary>
     /// Tells whether the directory <paramref name="path" /> would be created in is a regular file,
@@ -116,6 +128,11 @@ internal sealed class PhysicalOutputPaths(
     /// <inheritdoc />
     public OutputFileRemoval RemoveFile(string path)
     {
+        if (rawByteFiles is { } raw && RawByteFileName.HoldsEscapedByte(path))
+        {
+            return RemoveFileUnderRawBytes(raw, path);
+        }
+
         if (isRegularFile is not null && !isRegularFile(path))
         {
             return OutputFileRemoval.NotRegularFile;
@@ -136,6 +153,24 @@ internal sealed class PhysicalOutputPaths(
         {
             return OutputFileRemoval.Failed;
         }
+    }
+
+    /// <summary>
+    /// Deletes <paramref name="path" /> under its raw bytes when <c>stat</c> finds a regular file
+    /// there, as curl's <c>--remove-on-error</c> does on Linux and macOS.
+    /// </summary>
+    /// <param name="raw">The raw-byte <c>stat</c> and <c>unlink</c>.</param>
+    /// <param name="path">The output file's name, holding an escaped byte.</param>
+    /// <returns>How the removal went.</returns>
+    private static OutputFileRemoval RemoveFileUnderRawBytes(RawByteFileName.FileOperations raw, string path)
+    {
+        byte[] name = RawByteFileName.NullTerminatedBytes(path);
+        if (raw.FileTypeOf(name) != RawByteFileName.RegularFileType)
+        {
+            return OutputFileRemoval.NotRegularFile;
+        }
+
+        return raw.Remove(name) ? OutputFileRemoval.Removed : OutputFileRemoval.Failed;
     }
 
     /// <summary>
