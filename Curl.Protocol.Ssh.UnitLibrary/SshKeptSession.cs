@@ -7,7 +7,7 @@ namespace Curl.Protocol.Ssh;
 /// <summary>
 /// An authenticated SSH session a transfer left on its connection for the run's connection
 /// cache, as curl 8.22.0 leaves an <c>scp</c> or <c>sftp</c> connection intact and reuses it
-/// for the next URL of the same login (CGR-130, ADR-0864): the transport, its SFTP session
+/// for the next URL of the same login (CGR-130, ADR-0865): the transport, its SFTP session
 /// and home directory, and the login it serves. Shut down when the cache closes the
 /// connection, it closes the SFTP channel and sends <c>DISCONNECT</c> 11 <c>Shutdown</c>.
 /// </summary>

@@ -7,7 +7,7 @@ namespace Curl.Protocol.Ssh;
 /// The connection an SSH session's transport reads and writes, passed through to the
 /// connection of the transfer using the session now: a reused connection is handed to each
 /// transfer as a connection of its own, so <see cref="Current" /> is switched to it while the
-/// transport, its keys and its counters stay as they were (CGR-130, ADR-0864).
+/// transport, its keys and its counters stay as they were (CGR-130, ADR-0865).
 /// </summary>
 /// <param name="current">The connection of the transfer that opened the session.</param>
 internal sealed class SshSessionConnection(IConnection current) : IConnection

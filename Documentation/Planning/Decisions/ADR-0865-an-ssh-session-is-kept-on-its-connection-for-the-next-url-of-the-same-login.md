@@ -1,4 +1,4 @@
-# ADR-0864 — An SSH session is kept on its connection for the next URL of the same login
+# ADR-0865 — An SSH session is kept on its connection for the next URL of the same login
 
 - Status: Accepted
 - Date: 2026-10-28

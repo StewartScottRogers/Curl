@@ -5,7 +5,7 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <summary>
 /// The SFTP session one SSH connection carries and the home directory its <c>REALPATH .</c>
 /// found, kept from one transfer to the next as curl 8.22.0 keeps both on a reused
-/// connection (CGR-130, ADR-0864): the first transfer starts the session and asks for the
+/// connection (CGR-130, ADR-0865): the first transfer starts the session and asks for the
 /// home directory, and every later one uses them as they are.
 /// </summary>
 /// <remarks>

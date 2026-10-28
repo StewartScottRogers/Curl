@@ -20,7 +20,7 @@ or `ScpFileDownload` - or `SftpDirectoryListing` for an `sftp` path
 ending with a slash - into the output, and after a success leaves the session
 (`SshKeptSession`, with its SFTP session and home directory in `SftpSessionSlot`) on the
 connection for the next URL of the same login, which skips the handshake and the
-authentication (ADR-0864); a failure, or the connection cache's close, ends the session with
+authentication (ADR-0865); a failure, or the connection cache's close, ends the session with
 `DISCONNECT` 11 `Shutdown`; every `SshTransferException` becomes a failed
 `TransferResult`. On the way it reports curl's `-v` lines, worded in `SshInfoLines`, through
 `ITransferEvents`, and each block written to the output through

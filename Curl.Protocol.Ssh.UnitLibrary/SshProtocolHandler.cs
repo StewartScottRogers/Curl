@@ -228,7 +228,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     /// <summary>
     /// Connects, and closes a reused connection whose session another login authenticated and
     /// connects again, as curl reuses an SSH connection only for the same user, password and
-    /// key files (ADR-0864).
+    /// key files (ADR-0865).
     /// </summary>
     private async ValueTask<ConnectResult> ConnectServingAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
     {
@@ -254,7 +254,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
     // Runs the transfer, then leaves the session on the connection for the run's connection
     // cache after a success, and otherwise closes the SFTP channel and ends the session with
-    // DISCONNECT, as it ends when the connection cannot be kept (ADR-0864).
+    // DISCONNECT, as it ends when the connection cannot be kept (ADR-0865).
     // Not an await in a finally: the compiler's rethrow for one tests whether the captured
     // object is an Exception, a branch no C# code can take the other way (BL-1357).
     private static async ValueTask<TransferResult> TransferAndKeepOrDisconnectAsync(ITransferContext context, IConnection connection, SshKeptSession session, Func<ValueTask<TransferResult>> transfer)
