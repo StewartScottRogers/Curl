@@ -155,9 +155,9 @@ public sealed class ResolveOverrides
         return true;
     }
 
-    // An empty entry, and a bracketed host with no "]:", are ignored (measured: "+" and "[::1:80:127.0.0.1").
+    // An empty entry, an entry with an empty host whatever follows it, and a bracketed host with no "]:", are ignored\n    // (measured: "+", ":", "::", ":::", ":x" and "[::1:80:127.0.0.1").
     private static bool IsIgnoredAddition(string entry) =>
-        entry.Length == 0 || (entry.StartsWith('[') && !entry.Contains("]:", StringComparison.Ordinal));
+        entry.Length == 0 || entry.StartsWith(':') || (entry.StartsWith('[') && !entry.Contains("]:", StringComparison.Ordinal));
 
 
     private static bool TrySplitHostAndPort(string text, out string host, out int port, out string rest)
