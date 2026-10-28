@@ -35,3 +35,4 @@ Found by BL-3606 (ADR-0924), measured 2026-10-26 with `Record-CurlExchange.ps1` 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 9f476610 d7461e94 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs and HttpAuthRequest.cs, held by BL-3864 (depends-on BL-3874 -> BL-3864).
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 9f476610 d7461e94 779790c0.
