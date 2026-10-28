@@ -534,6 +534,11 @@
     gets is the answer's HEADERS (BL-3668, CGR-139: curl answers GOAWAY "SETTINGS expected"
     and exits 16). A GOAWAY's debug data is noted after its error code.
     Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2NoSettings -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-no-settings
+.PARAMETER Http2HeaderField
+    With -Http2Origin, more response header fields, each "name: value", sent in order after
+    :status in the HEADERS frame as literals without indexing (BL-3665: transfer-encoding).
+    Default none.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2HeaderField 'transfer-encoding: chunked' -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-resp-te
 
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
@@ -722,6 +727,7 @@ param(
     [int] $Http2ResetCode = -1,
     [ValidatePattern('^(|push|nostatus|status:.*)$')] [string] $Http2Answer = '',
     [switch] $Http2NoSettings,
+    [string[]] $Http2HeaderField = @(),
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -2244,10 +2250,12 @@ public sealed class RecorderHttp2Proxy
     private readonly int _resetCode;
     public bool OmitSettings { get; set; }
     public string Answer { get; set; } = "";
+    private readonly string[] _headerFields;
 
-    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode)
+    public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode, string[] headerFields)
     {
         _resetCode = resetCode;
+        _headerFields = headerFields ?? new string[0];
         _origin = origin;
         _listener = listener;
         _certificate = certificate;
@@ -2532,6 +2540,14 @@ public sealed class RecorderHttp2Proxy
         var block = new List<byte> { 0x08 };
         AppendLiteral(block, _status.ToString());
         bool refused = _status / 100 != 2 || !connect;
+        foreach (string headerField in _headerFields)
+        {
+            // A literal without indexing with a new name: 0x00, the name, then the value.
+            int colon = headerField.IndexOf(':');
+            block.Add(0x00);
+            AppendLiteral(block, headerField.Substring(0, colon));
+            AppendLiteral(block, headerField.Substring(colon + 1).Trim());
+        }
         if (refused)
         {
             // content-length is static index 28: 15 in the 4-bit prefix, then 13.
@@ -2543,6 +2559,7 @@ public sealed class RecorderHttp2Proxy
         WriteFrame(stream, 1, flags, streamId, block.ToArray());
         Note("< HEADERS stream " + streamId + " flags 0x" + flags.ToString("x2"));
         Note("<   :status: " + _status);
+        foreach (string headerField in _headerFields) { Note("<   " + headerField); }
         if (refused) { Note("<   content-length: 0"); }
     }
 
@@ -2695,7 +2712,7 @@ public sealed class RecorderHttp2Proxy
 '@
     $server.Dispose()
     $server = $null
-    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode)
+    $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode, [string[]] $Http2HeaderField)
     $http2Proxy.OmitSettings = [bool]$Http2NoSettings
     $http2Proxy.Answer = $Http2Answer
 }
