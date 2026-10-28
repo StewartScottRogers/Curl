@@ -32,3 +32,4 @@ Split from BL-3636 (third-party gap report issue CGR-107, `Documentation/Reviews
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 83d17d63 d9aa5d84 40bddbd7 bc4b41f1.
