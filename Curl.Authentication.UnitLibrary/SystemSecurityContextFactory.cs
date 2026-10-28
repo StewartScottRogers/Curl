@@ -20,6 +20,12 @@ public sealed class SystemSecurityContextFactory : ISecurityContextFactory
         return new SystemSecurityContext(OptionsFor(request));
     }
 
+    /// <summary>Gets the user name as curl's SSPI NTLM sends it: ANSI bytes read through the OEM code page (CGR-209).</summary>
+    private static string UserNameSspiReads(SecurityContextRequest request) =>
+        request.Mechanism == SecurityMechanism.Ntlm
+            ? NtlmUserNameCodePages.ReadAsSspiDoes(request.UserName!)
+            : request.UserName!;
+
     /// <summary>Gets the client options <paramref name="request" /> asks for.</summary>
     /// <param name="request">The mechanism, acceptor and credential.</param>
     /// <returns>The options.</returns>
@@ -29,7 +35,7 @@ public sealed class SystemSecurityContextFactory : ISecurityContextFactory
         TargetName = $"{request.ServiceName}/{request.HostName}",
         Credential = request.UserName is null
             ? CredentialCache.DefaultNetworkCredentials
-            : new NetworkCredential(request.UserName, request.Password, request.Domain),
+            : new NetworkCredential(UserNameSspiReads(request), request.Password, request.Domain),
         // NegotiateAuthentication has GSS_C_DELEG_FLAG but no GSS_C_DELEG_POLICY_FLAG, so
         // policy asks none rather than hand the credential to a host not trusted for it (ADR-0188).
         AllowedImpersonationLevel = request.Delegation == SecurityDelegation.Always
