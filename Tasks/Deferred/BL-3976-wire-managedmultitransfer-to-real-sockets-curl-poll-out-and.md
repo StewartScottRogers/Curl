@@ -41,3 +41,4 @@ Split from BL-3563 (CGR-034 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 2ff2ee8c 934d3e8d 6e4e49ca 779790c0.
 - 2026-10-28: Doing -> Backlog. Waits on BL-3981: connections with no OS socket need a socket before FirstTransferSocket and the 10 ms timer can go
+- 2026-10-28: Backlog -> Deferred. Split into BL-3989 (wire real sockets, POLL_OUT then POLL_IN, deadline timer) and BL-3990 (remove FirstTransferSocket and the 10 ms timer)
