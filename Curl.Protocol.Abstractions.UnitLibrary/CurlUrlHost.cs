@@ -317,7 +317,7 @@ internal static class CurlUrlHost
         ReadOnlySpan<char> rest = label;
         while (!rest.IsEmpty && codePoints.Count <= MaximumLabelLength)
         {
-            if (Rune.DecodeFromUtf16(rest, out Rune rune, out int consumed) != OperationStatus.Done || IsRefusedInLabel(rune))
+            if (!TryDecodeEncodableRune(rest, out Rune rune, out int consumed))
             {
                 return null;
             }
@@ -331,6 +331,14 @@ internal static class CurlUrlHost
 
     /// <summary>Whether IDNA refuses <paramref name="rune" /> in a label: a control character or <c>U+FFFD</c>.</summary>
     private static bool IsRefusedInLabel(Rune rune) => Rune.IsControl(rune) || rune == Rune.ReplacementChar;
+
+    /// <summary>
+    /// Decodes the first character of <paramref name="text" /> and reports whether Punycode may
+    /// carry it: a well-formed scalar value that is neither a control character nor <c>U+FFFD</c>.
+    /// </summary>
+    private static bool TryDecodeEncodableRune(ReadOnlySpan<char> text, out Rune rune, out int consumed) =>
+        Rune.DecodeFromUtf16(text, out rune, out consumed) == OperationStatus.Done
+        && !IsRefusedInLabel(rune);
 
     /// <summary>
     /// The Windows-1252 character of <paramref name="value" />, or the lone <c>U+DC80</c> to
