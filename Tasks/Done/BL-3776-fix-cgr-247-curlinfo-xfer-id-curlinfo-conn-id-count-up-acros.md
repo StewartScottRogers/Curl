@@ -76,8 +76,8 @@ probe.exe repro
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 
 ### Notes (lane 9, 2026-10-28)
-- The counters live in the engine (`TransferPerformer`, shared engine-wide), not in `EasyInfoReaders.Longs.cs`, so the fix is in `Curl.Engine.UnitLibrary` (no other live task names those files; added to `touches`). ADR-0965.
+- The counters live in the engine (`TransferPerformer`, shared engine-wide), not in `EasyInfoReaders.Longs.cs`, so the fix is in `Curl.Engine.UnitLibrary` (no other live task names those files; added to `touches`). ADR-0966.
 - Real-curl behaviour taken from the report (REF XFER_ID=0, CONN_ID=0 per new handle); the probe is not rebuilt. Repro equivalent: two new handles each perform a GET; unit tests `Libcurl.UnitTests/Cgr247Tests.cs` (second handle was 1 before the fix) and `Curl.Engine.UnitTests/Cgr247Tests.cs` pin 0 for each.
 - Two engine tests that pinned the old engine-wide numbering were updated. Fast tests green; Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members.
 - CI criterion: change is platform-neutral (file URL via `Uri.AbsoluteUri`, temp file).
-- 2026-10-28: Doing -> Done. Each library easy and multi handle numbers xfer_id and conn_id from 0 (ADR-0965)
+- 2026-10-28: Doing -> Done. Each library easy and multi handle numbers xfer_id and conn_id from 0 (ADR-0966)

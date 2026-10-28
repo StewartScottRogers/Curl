@@ -1,4 +1,4 @@
-# ADR-0965: Each library easy and multi handle numbers its transfers and connections from 0
+# ADR-0966: Each library easy and multi handle numbers its transfers and connections from 0
 
 - Status: Accepted
 - Date: 2026-10-28
