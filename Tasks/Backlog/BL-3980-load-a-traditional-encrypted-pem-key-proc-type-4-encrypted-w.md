@@ -1,5 +1,5 @@
 ---
-id: BL-3966
+id: BL-3980
 title: Load a traditional encrypted PEM key (Proc-Type 4,ENCRYPTED with DEK-Info) in the OpenSSL build
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3966 — Load a traditional encrypted PEM key (Proc-Type 4,ENCRYPTED with DEK-Info) in the OpenSSL build
+# BL-3980 — Load a traditional encrypted PEM key (Proc-Type 4,ENCRYPTED with DEK-Info) in the OpenSSL build
 
 ## Goal
 

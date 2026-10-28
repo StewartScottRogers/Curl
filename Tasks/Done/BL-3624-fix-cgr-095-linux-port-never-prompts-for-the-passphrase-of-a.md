@@ -75,7 +75,7 @@ curl -sS -k --cert pki/cli.crt --key pki/cli_enc.key https://localhost:<p>/index
 - PORT was checked through the unit tests on Windows, which drive the OpenSSL-build loader path directly. The tests use only temp files and no OS text, so they are platform-neutral and CI on Linux and macOS is expected to stay green.
 - Touches: added `Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs` (where the tool's options get the prompt) with its tests, and `Curl.Engine.UnitTests/EngineCompositionTests.cs`, whose record-equality expectations now include the prompt. No live task in Doing on origin/work/dark-factory names them.
 - Choice: a `null` prompt (the record's default) asks nothing, so tests and library callers that build the options themselves never block on the console.
-- A traditional `Proc-Type: 4,ENCRYPTED` key gets the prompt, but the BCL cannot decrypt it, so it still fails exit 43 where curl loads it. Filed as BL-3966.
+- A traditional `Proc-Type: 4,ENCRYPTED` key gets the prompt, but the BCL cannot decrypt it, so it still fails exit 43 where curl loads it. Filed as BL-3980.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary,Curl.Engine.UnitLibrary` reports 0 failing members. `dotnet build` is clean and the fast tests pass.
 
 ## Log

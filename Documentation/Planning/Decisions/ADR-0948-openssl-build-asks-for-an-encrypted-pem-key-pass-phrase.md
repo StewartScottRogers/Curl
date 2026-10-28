@@ -37,4 +37,4 @@ proxy. A `null` prompt, the record's default, asks nothing, so tests and other c
 block on the console.
 
 A traditional encrypted PEM key is asked for, but the BCL cannot decrypt one, so even the
-right answer fails exit 43 where curl loads it; that is left to BL-3966.
+right answer fails exit 43 where curl loads it; that is left to BL-3980.
