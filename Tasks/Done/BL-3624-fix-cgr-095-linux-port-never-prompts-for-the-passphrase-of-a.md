@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/Cgr095Tests.cs]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/Cgr095Tests.cs, Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs, Curl.Engine.UnitTests/TlsClientOptionsMappingTests.cs, Curl.Engine.UnitTests/EngineCompositionTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3624 — Fix CGR-095: Linux: PORT never prompts for the passphrase of an encrypted PEM key given without --pass
 
@@ -60,17 +60,26 @@ curl -sS -k --cert pki/cli.crt --key pki/cli_enc.key https://localhost:<p>/index
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr095Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Measured REF-LINUX (curl 8.18.0, OpenSSL 3.5.5, WSL; no 8.22.0 OpenSSL build is available, and the prompt comes from OpenSSL's default callback, not from curl's code) against `openssl s_server -WWW` with an AES-256 PKCS#8 key, passphrase `secret`, under `setsid`: `curl -sS -k --cert cli.crt --key cli_enc.key https://localhost:<p>/index.txt </dev/null` gives stderr `Enter PEM pass phrase:\n` twice, then `curl: (43) unable to set private key file: 'cli_enc.key' type PEM`, with stdout empty. With `secret` on stdin it prompts once, prints `hello tls` on stdout and exits 0. With a wrong line it prompts once, then prints the exit 43 line. Before the fix PORT printed only the exit 43 line. Details are in ADR-0948.
+- Fix: `TlsClientOptions.PemPassPhrasePrompt` (`IPemPassPhrasePrompt`, `TerminalPemPassPhrasePrompt`). `ClientCertificateLoader`'s OpenSSL-build path calls it when no pass phrase was given and the PEM key file is encrypted. The engine's `TlsClientOptionsMapping` sets the terminal prompt for the origin and the proxy. `Cgr095Tests` pins three cases: end of input (two prompts, exit 43), the right answer (one prompt, the key loads) and a wrong answer (one prompt, exit 43). They fail before the fix and pass after it. Variants that already matched (`--pass` given, unencrypted key, DER key type, missing key) ask nothing and are unchanged; `Cgr095Tests` covers them too.
+- PORT was checked through the unit tests on Windows, which drive the OpenSSL-build loader path directly. The tests use only temp files and no OS text, so they are platform-neutral and CI on Linux and macOS is expected to stay green.
+- Touches: added `Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs` (where the tool's options get the prompt) with its tests, and `Curl.Engine.UnitTests/EngineCompositionTests.cs`, whose record-equality expectations now include the prompt. No live task in Doing on origin/work/dark-factory names them.
+- Choice: a `null` prompt (the record's default) asks nothing, so tests and library callers that build the options themselves never block on the console.
+- A traditional `Proc-Type: 4,ENCRYPTED` key gets the prompt, but the BCL cannot decrypt it, so it still fails exit 43 where curl loads it. Filed as BL-3966.
+- Quality: `Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary,Curl.Engine.UnitLibrary` reports 0 failing members. `dotnet build` is clean and the fast tests pass.
+
 ## Log
 
 - 2026-10-26: Created from CGR-095 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. The OpenSSL build now prompts Enter PEM pass phrase: for an encrypted PEM key given without --pass, as curl does (ADR-0948).
