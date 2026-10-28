@@ -41,7 +41,9 @@
 #     does: HTTP/2 framing and HPACK (Huffman included) are served by a perl (core modules only)
 #     written to the state directory. Over TLS socat has no ALPN option, so openssl s_server offers the
 #     protocol and perl serves its plaintext through FIFOs; that needs openssl and mkfifo as -Tls does.
-#     s_server takes one connection, so -Http2ResetCode with -Tls (several connections) is not ported.
+#     With -Http2ResetCode over TLS every connection curl opens is served: perl listens on the port,
+#     and each connection gets an s_server of its own on a Unix socket, a perl relay copying curl's
+#     bytes to it and its plaintext on two pipes.
 #     A run with several connections (-Http2ResetCode) logs their frames in the order they arrive, which
 #     differs between runs here as in the PowerShell script.
 #
@@ -65,14 +67,8 @@
 #     response; s_server goes on reading, so with HoldOpenMilliseconds what curl still sends is
 #     recorded. Needs perl besides socat, openssl and mkfifo.
 #
-# NOT PORTED YET
-#     This mode of Record-CurlExchange.ps1 is not in this port. It stops at once,
-#     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
-#     Record-CurlExchange.ps1 under pwsh" to stderr, and exits 2:
-#
-#       -Http2ResetCode together with -Tls (s_server serves one connection)
-#
-#     Their parameters (FtpReply, SmtpReply, ..., ProxyStatus) are still accepted, and
+# PARAMETERS OF OTHER MODES
+#     A mode's parameters (FtpReply, SmtpReply, ..., ProxyStatus) are accepted, and
 #     ignored without their mode, as the PowerShell script ignores them.
 #
 # DESCRIPTION
@@ -345,10 +341,6 @@ rce_die() {
     exit 1
 }
 
-rce_not_ported() {
-    printf '%s: mode %s is not ported yet; use Record-CurlExchange.ps1 under pwsh\n' "$RCE_NAME" "$1" >&2
-    exit 2
-}
 
 rce_print_help() {
     # The comment block at the top of this file, from the line after the shebang to the
@@ -1819,8 +1811,7 @@ if [ $RCE_HTTP2 = 1 ] && { [ $rce_sessions -gt 0 ] || [ $RCE_NO_SERVER = 1 ] || 
 if [ $RCE_TFTP = 1 ]; then RCE_NO_SERVER=1; fi
 # -Script runs its own perl server (script.pl), like -Http2; it needs a script file that parses.
 if [ -n "$RCE_SCRIPT" ]; then RCE_NO_SERVER=1; fi
-# -Http2 and -Http2Origin run their own perl server, not socat or the HTTP handlers; s_server serves a TLS connection one at a time.
-if [ $RCE_HTTP2 = 1 ] && [ $RCE_TLS = 1 ] && [ "$RCE_HTTP2_RESET_CODE" -ge 0 ]; then rce_not_ported '-Http2ResetCode with -Tls'; fi
+# -Http2 and -Http2Origin run their own perl server, not socat or the HTTP handlers.
 if [ $RCE_HTTP2 = 1 ]; then RCE_NO_SERVER=1; fi
 
 # One connection per Response entry unless -Connections says otherwise, so a --retry
@@ -2900,6 +2891,7 @@ use strict;
 use warnings;
 use IO::Socket::IP;
 use IO::Select;
+use IO::Socket::UNIX;
 use Fcntl qw(:flock);
 use POSIX ();
 
@@ -2908,6 +2900,8 @@ my %config;
 open(my $configFile, '<', "$state/h2.conf") or die "h2.conf: $!";
 while (my $line = <$configFile>) { chomp $line; my ($key, $value) = split(/=/, $line, 2); $config{$key} = $value; }
 close $configFile;
+# s_server's message file, where the negotiated protocol is read: one per connection of a reset run over TLS.
+my $messageFile = "$state/h2.msg";
 $SIG{PIPE} = 'IGNORE';
 my $stopping = 0;
 $SIG{TERM} = sub { $stopping = 1 };
@@ -3238,7 +3232,7 @@ sub negotiated_protocol {
     my $select = IO::Select->new($in);
     my ($messages, $readable) = ('', 0);
     while (1) {
-        if (open(my $file, '<', "$state/h2.msg")) { local $/; $messages = <$file>; close $file; }
+        if (open(my $file, '<', $messageFile)) { local $/; $messages = <$file>; close $file; }
         last if $messages =~ /^<<< [^\n]*Finished/m && $messages =~ /^>>> [^\n]*Finished/m;
         return undef if $stopping;
         # Bytes or the end of the stream before a Finished: give the message file a second.
@@ -3263,6 +3257,55 @@ sub serve_client {
     else { serve_http11($in, $out); }
 }
 
+# Copies bytes both ways between curl's connection and s_server's Unix socket; the end of
+# one side's stream shuts down sending to the other, until both have ended.
+sub relay_to_tls_server {
+    my ($client, $socketPath) = @_;
+    my $server = IO::Socket::UNIX->new(Peer => $socketPath) or return;
+    binmode $server;
+    my $select = IO::Select->new($client, $server);
+    while ($select->count) {
+        foreach my $from ($select->can_read) {
+            my $to = $from == $client ? $server : $client;
+            my $read = sysread($from, my $chunk, 65536);
+            if ($read) { write_all($to, $chunk); next; }
+            $select->remove($from);
+            shutdown($to, 1);
+        }
+    }
+}
+
+# One connection of a reset run over TLS: an s_server of its own takes it on a Unix socket,
+# its plaintext on two pipes, while a relay process copies curl's bytes to and from that socket.
+# It offers h2 and http/1.1, as the PowerShell script does for a reset run, so curl's retry over
+# HTTP/1.1 is answered.
+sub serve_tls_connection {
+    my ($client, $number) = @_;
+    my $socketPath = "$state/h2.$number.sock";
+    $messageFile = "$state/h2.$number.msg";
+    pipe(my $fromServer, my $serverOut) or die "pipe: $!";
+    pipe(my $serverIn, my $toServer) or die "pipe: $!";
+    my $server = fork();
+    if (!$server) {
+        open(STDIN, '<&', $serverIn); open(STDOUT, '>&', $serverOut); open(STDERR, '>>', "$state/h2.tls.err");
+        exec($config{openssl}, 's_server', '-quiet', '-naccept', '1', '-tls1_2', '-alpn', 'h2,http/1.1', '-unix', $socketPath,
+            '-cert', "$state/server.crt", '-key', "$state/server.key", '-msg', '-msgfile', $messageFile) or POSIX::_exit(127);
+    }
+    close $serverIn;
+    close $serverOut;
+    for (my $polls = 0; !-S $socketPath && $polls < 250; $polls++) { select(undef, undef, undef, 0.02); }
+    my $relay = fork();
+    if (!$relay) { relay_to_tls_server($client, $socketPath); POSIX::_exit(0); }
+    close $client;
+    binmode $fromServer;
+    binmode $toServer;
+    serve_client($fromServer, $toServer);
+    close $toServer;
+    kill 'KILL', $server, $relay;
+    waitpid($server, 0);
+    waitpid($relay, 0);
+}
+
 sub finish { open(my $done, '>', "$state/h2.done"); close $done; exit 0; }
 
 # --- Serving ------------------------------------------------------------------------------
@@ -3274,7 +3317,7 @@ $config{tunnelResponse} = '' unless defined $config{tunnelResponse};
 binmode STDIN;
 binmode STDOUT;
 
-if ($config{tls}) {
+if ($config{tls} && $config{reset} < 0) {
     # s_server owns the port; the connection's plaintext is on stdin and stdout.
     serve_client(\*STDIN, \*STDOUT);
     finish();
@@ -3293,7 +3336,11 @@ for (my $number = 1; ; $number++) {
     if ($config{reset} < 0) { serve_client($client, $client); close $client; last; }
     note("= connection $number");
     my $child = fork();
-    if (!$child) { $listener->close; serve_client($client, $client); POSIX::_exit(0); }
+    if (!$child) {
+        $listener->close;
+        if ($config{tls}) { serve_tls_connection($client, $number); } else { serve_client($client, $client); }
+        POSIX::_exit(0);
+    }
     close $client;
     push @children, $child;
 }
@@ -3314,10 +3361,11 @@ RCE_H2_PERL
         printf 'reset=%s\n' "$RCE_HTTP2_RESET_CODE"
         printf 'omitsettings=%s\n' "$RCE_HTTP2_NO_SETTINGS"
         printf 'answer=%s\n' "$RCE_HTTP2_ANSWER"
+        printf 'openssl=%s\n' "$RCE_OPENSSL"
     } >"$RCE_STATE/h2.conf"
     : >"$RCE_STATE/h2.log"
     : >"$RCE_STATE/h2.received"
-    if [ $RCE_TLS = 1 ]; then
+    if [ $RCE_TLS = 1 ] && [ "$RCE_HTTP2_RESET_CODE" -lt 0 ]; then
         # socat has no ALPN option, so s_server takes the one connection and offers the
         # protocol; perl serves its plaintext through two FIFOs, opened in the same order
         # on both sides.
@@ -3332,6 +3380,8 @@ RCE_H2_PERL
         RCE_H2_PID=$!
         rce_wait_for_listening_port "$RCE_PORT" || rce_die "openssl s_server did not start listening on port $RCE_PORT: $(cat "$RCE_STATE/h2.tls.err" "$RCE_STATE/h2.err" 2>/dev/null)"
     else
+        # Plain TCP, or a reset run over TLS: perl listens and serves every connection, over
+        # TLS each through an s_server of its own.
         perl "$RCE_STATE/h2.pl" "$RCE_STATE" </dev/null >/dev/null 2>"$RCE_STATE/h2.err" &
         RCE_H2_PID=$!
         rce_polls=0
