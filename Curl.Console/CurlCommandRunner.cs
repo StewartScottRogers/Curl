@@ -1173,7 +1173,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>
     /// Writes the <c>--libcurl</c> source file once the transfers are done, as curl 8.21.0 does whether
     /// they succeeded or not (<see cref="LibcurlSourceCode" />): <c>-</c> to standard output with
-    /// <c>\n</c> line ends, and a file in text mode, so with <c>\r\n</c> on Windows. A file that cannot
+    /// <c>\r\n</c> line ends on Windows while standard output is in text mode (CGR-178, BL-3707), and a file in text mode, so with <c>\r\n</c> on Windows. A file that cannot
     /// be opened gets curl's warning, unless <c>-s</c> was given (measured 2026-10-01, BL-652 Notes).
     /// </summary>
     /// <param name="options">The first option group; <c>--libcurl</c> is global.</param>
@@ -1188,7 +1188,7 @@ internal sealed class CurlCommandRunner(
         string source = LibcurlSourceCode.Generate(libcurlTransfers);
         if (file == "-")
         {
-            await GatedStandardOutput.WriteAsync(Encoding.UTF8.GetBytes(source)).ConfigureAwait(false);
+            await GatedStandardOutput.WriteAsync(LibcurlSourceBytes(source, runsOnWindows && !standardOutputSwitchedToBinary)).ConfigureAwait(false);
             await GatedStandardOutput.FlushAsync().ConfigureAwait(false);
             return;
         }
@@ -1204,9 +1204,16 @@ internal sealed class CurlCommandRunner(
 
         await using (content.ConfigureAwait(false))
         {
-            await content.WriteAsync(Encoding.UTF8.GetBytes(runsOnWindows ? source.Replace("\n", "\r\n", StringComparison.Ordinal) : source)).ConfigureAwait(false);
+            await content.WriteAsync(LibcurlSourceBytes(source, runsOnWindows)).ConfigureAwait(false);
         }
     }
+
+    /// <summary>The <c>--libcurl</c> source as UTF-8, with <c>\r\n</c> line ends when the output is in text mode on Windows.</summary>
+    /// <param name="source">The generated source, with <c>\n</c> line ends.</param>
+    /// <param name="textMode">Whether the output turns each line feed into a carriage return and line feed.</param>
+    /// <returns>The bytes to write.</returns>
+    private static byte[] LibcurlSourceBytes(string source, bool textMode) =>
+        Encoding.UTF8.GetBytes(textMode ? source.Replace("\n", "\r\n", StringComparison.Ordinal) : source);
 
     /// <summary>
     /// Runs the <c>-:</c> / <c>--next</c> option groups in order, for <see cref="RunAcceptedAsync" />,

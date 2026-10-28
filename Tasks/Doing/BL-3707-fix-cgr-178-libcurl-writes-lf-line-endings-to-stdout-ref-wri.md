@@ -60,10 +60,10 @@ curl -s --libcurl - -o NUL @U
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,4 @@ curl -s --libcurl - -o NUL @U
 
 - 2026-10-26: Created from CGR-178 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Fix: `--libcurl -` now writes CR LF line ends to standard output on Windows while standard output is in text mode (as curl does, 1705 bytes with 46 CRLF in the repro), LF once a body switched it to binary or off Windows. Not re-run through real curl in this lane run (no Windows curl exchange recorded); the expected byte counts are from the report. `Cgr178Tests` fails before the fix and passes after; fast Curl.Console tests green; Measure-CodeQuality for Curl.Console: 0 failing members. Linux/macOS CI: change is platform-neutral (runsOnWindows is injected).
