@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptions.cs, Curl.Cli.UnitLibrary/CommandLineParseResult.cs, Curl.Cli.UnitTests/Cgr049Tests.cs, Curl.Console, Curl.Console.UnitTests/Cgr049Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3578 — Fix CGR-049: A help line in a -K config file is silently ignored; curl prints the help page
 
@@ -68,12 +68,18 @@ E\verify\v2_misc.ps1
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- 2026-10-28 (lane 2): Cause: `CommandLineParseResult.ConfigFileHelpSubjects` was filled by the parser but no code in Curl.Console read it. Fix: `CurlCommandRunner.RunParsedAsync` now writes each config-file help page first (`WriteConfigFileHelpPagesAsync`): the usage page, a category or `all` from `CurlHelpText.Lines` on standard output, an option subject through `WriteOptionManualSectionAsync`, and then carries on with the refusal or the run. Only `Curl.Console/CurlCommandRunner.cs` and the new `Curl.Console.UnitTests/Cgr049Tests.cs` changed; Curl.Cli needed nothing.
+- Real curl measured (curl 8.21.0 Schannel, `C:\Windows\System32\curl.exe`, fresh temp directory): `k.cfg` = `help`, `curl -sS -K k.cfg` -> stdout the usage page (1226 bytes, CRLF), stderr `curl: (2) no URL specified` + try-help line, exit 2. `a.cfg` = `help = all`, `curl -sS -K a.cfg file:///nonexist_x` -> stdout the full option list (274 lines), then the transfer runs (exit 37 there, its own failure); so with a reachable URL the page comes first and the transfer exits 0.
+- Curl now: `Cgr049Tests` runs the same command lines through `CurlCommandRunner`: `-sS -K k.cfg http://127.0.0.1/hp03` -> usage page then the body, exit 0; `-sS -K k.cfg` -> usage page only on stdout, `curl: (2) no URL specified` on stderr, exit 2; `help = all` -> the full list first, then the transfer; `help = --silent` -> that option's manual section. Lines end with `Environment.NewLine`, CRLF on Windows as curl's text-mode stdout, LF elsewhere, so the tests hold on all three platforms. No files are written and the request bytes are unchanged (the help pages add only stdout). The tests failed before the fix since nothing wrote the page (no Console code read `ConfigFileHelpSubjects`); a revert-and-rerun was refused by this lane's permissions, so that is shown by the grep, not a rerun.
+- Variants that already matched (`-K` with no help line, `--help` on the command line) go through unchanged code; the fast tests pass. `dotnet build` clean, `dotnet test --filter "TestCategory!=Integration"` green, `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members.
+- CI criterion on Linux and macOS: met by keeping the change platform-neutral (no paths, OS error text or certificates), as the lane rules say.
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr049Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
@@ -82,3 +88,4 @@ E\verify\v2_misc.ps1
 
 - 2026-10-26: Created from CGR-049 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. A help line in a -K config file prints its help page on stdout before the run carries on, as curl does (CGR-049)
