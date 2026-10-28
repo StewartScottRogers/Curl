@@ -43,7 +43,7 @@ public sealed class HttpContentCodingDecoderTests
     [DataRow("gzip", "7709000000", "Error while processing content unencoding: unknown compression method", DisplayName = "gzip: zlib header with method 7")]
     [DataRow("deflate", "7709000000", "Error while processing content unencoding: unknown compression method", DisplayName = "deflate: zlib header with method 7")]
     [DataRow("gzip", "1F8B080000000000000AFFFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "gzip: corrupt data")]
-    [DataRow("deflate", "FDFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "deflate: corrupt raw data")]
+    [DataRow("deflate", "FDFFFFFF", "Error while processing content unencoding: too many length or distance symbols", DisplayName = "deflate: corrupt raw data")]
     [DataRow("br", "FFFFFFFF", "Unrecognized or bad HTTP Content or Transfer-Encoding", DisplayName = "br: corrupt data")]
     public void Decode_CorruptBody_ThrowsExit61WithTheMeasuredMessage(string coding, string encoded, string message)
     {

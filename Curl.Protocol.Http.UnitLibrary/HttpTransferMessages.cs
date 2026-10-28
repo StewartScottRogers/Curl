@@ -422,6 +422,19 @@ internal static class HttpTransferMessages
     internal const string InvalidStoredBlockLengths = "Error while processing content unencoding: invalid stored block lengths";
 
     /// <summary>
+    /// The exit 61 message for a <c>deflate</c> body without a zlib header whose first block is dynamic
+    /// and declares more than 286 length or 30 distance symbols: zlib's text (CGR-200, BL-3729).
+    /// </summary>
+    internal const string TooManyLengthOrDistanceSymbols = "Error while processing content unencoding: too many length or distance symbols";
+
+    /// <summary>
+    /// The exit 61 message for a <c>deflate</c> body without a zlib header whose first block is dynamic
+    /// and whose code of code lengths is over-subscribed or incomplete: zlib's text, what curl 8.22.0
+    /// says for text sent as <c>deflate</c> (CGR-200, BL-3729).
+    /// </summary>
+    internal const string InvalidCodeLengthsSet = "Error while processing content unencoding: invalid code lengths set";
+
+    /// <summary>
     /// The exit 61 message for a gzip member whose CRC-32, or a zlib stream whose Adler-32,
     /// does not match the bytes it decoded to: zlib's text (CGR-071, BL-3600).
     /// </summary>

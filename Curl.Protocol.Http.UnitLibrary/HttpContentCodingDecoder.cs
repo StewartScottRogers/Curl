@@ -61,6 +61,15 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
 
     private const int StoredBlockType = 0;
 
+    private const int DynamicBlockType = 2;
+
+    /// <summary>The bits before the dynamic block's code length code lengths: 3 of block header and 14 of counts.</summary>
+    private const int DynamicCountsEnd = 17;
+
+    private const int MaximumLengthSymbols = 286;
+
+    private const int MaximumDistanceSymbols = 30;
+
     private const int ReservedBlockType = 3;
 
     /// <summary>
@@ -358,22 +367,103 @@ internal sealed class HttpContentCodingDecoder(HttpContentCoding coding) : IDisp
             throw Corrupt(HttpTransferMessages.InvalidBlockType);
         }
 
-        if (blockType == StoredBlockType)
+        bool checkable = blockType switch
         {
-            if (first.Length < StoredBlockHeaderLength)
-            {
-                return null;
-            }
+            StoredBlockType => StoredHeaderIsChecked(first),
+            DynamicBlockType => DynamicHeaderIsChecked(first),
+            _ => true,
+        };
+        return checkable ? new DeflateStream(input, CompressionMode.Decompress) : null;
+    }
 
-            int length = first[1] | (first[2] << 8);
-            int complement = first[3] | (first[4] << 8);
-            if (length != (~complement & 0xFFFF))
+    /// <summary>
+    /// Throws zlib's text for a stored block whose length and its complement disagree; false while too few bytes have arrived to check.
+    /// </summary>
+    private static bool StoredHeaderIsChecked(ReadOnlySpan<byte> first)
+    {
+        if (first.Length < StoredBlockHeaderLength)
+        {
+            return false;
+        }
+
+        int length = first[1] | (first[2] << 8);
+        int complement = first[3] | (first[4] << 8);
+        return length == (~complement & 0xFFFF) ? true : throw Corrupt(HttpTransferMessages.InvalidStoredBlockLengths);
+    }
+
+    /// <summary>
+    /// Throws zlib's text for a faulty dynamic block header; false while too few bytes have arrived to check.
+    /// </summary>
+    private static bool DynamicHeaderIsChecked(ReadOnlySpan<byte> first)
+    {
+        string? fault = DynamicHeaderFault(first, out bool complete);
+        return fault is null ? complete : throw Corrupt(fault);
+    }
+
+    /// <summary>
+    /// Applies zlib's checks of a dynamic block's header to the first bytes: the symbol counts
+    /// and the code of code lengths (over-subscribed or incomplete). <paramref name="complete" />
+    /// is false while too few bytes have arrived to check.
+    /// </summary>
+    private static string? DynamicHeaderFault(ReadOnlySpan<byte> first, out bool complete)
+    {
+        complete = false;
+        if (first.Length * 8 < DynamicCountsEnd)
+        {
+            return null;
+        }
+
+        int hclen = ReadBits(first, 13, 4) + 4;
+        if (ReadBits(first, 3, 5) + 257 > MaximumLengthSymbols || ReadBits(first, 8, 5) + 1 > MaximumDistanceSymbols)
+        {
+            complete = true;
+            return HttpTransferMessages.TooManyLengthOrDistanceSymbols;
+        }
+
+        if (first.Length * 8 < DynamicCountsEnd + (hclen * 3))
+        {
+            return null;
+        }
+
+        complete = true;
+        return CodeLengthCodeIsComplete(first, hclen) ? null : HttpTransferMessages.InvalidCodeLengthsSet;
+    }
+
+    /// <summary>
+    /// Tells whether the 3-bit code lengths that follow the dynamic block's counts form a
+    /// complete prefix code, or none at all, as zlib's table builder requires.
+    /// </summary>
+    private static bool CodeLengthCodeIsComplete(ReadOnlySpan<byte> first, int count)
+    {
+        Span<int> perLength = stackalloc int[8];
+        for (int i = 0; i < count; i++)
+        {
+            perLength[ReadBits(first, DynamicCountsEnd + (i * 3), 3)]++;
+        }
+
+        int left = 1;
+        for (int length = 1; length < perLength.Length; length++)
+        {
+            left = (left << 1) - perLength[length];
+            if (left < 0)
             {
-                throw Corrupt(HttpTransferMessages.InvalidStoredBlockLengths);
+                return false;
             }
         }
 
-        return new DeflateStream(input, CompressionMode.Decompress);
+        return left == 0 || perLength[1..].IndexOfAnyExcept(0) < 0;
+    }
+
+    private static int ReadBits(ReadOnlySpan<byte> bytes, int position, int count)
+    {
+        int value = 0;
+        for (int i = 0; i < count; i++)
+        {
+            int bit = position + i;
+            value |= ((bytes[bit >> 3] >> (bit & 7)) & 1) << i;
+        }
+
+        return value;
     }
 
     private GZipStream Gzip(byte method)
