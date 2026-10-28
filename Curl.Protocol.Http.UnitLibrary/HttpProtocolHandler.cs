@@ -1416,6 +1416,7 @@ public sealed class HttpProtocolHandler(
         ReportReturnedError(plan.Context.Events, failure);
         headReader.ReportHeldLines();
         ReportReceiveFailure(plan.Context.Events, failure);
+        ReportBodyFailure(plan.Context.Events, failure);
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
@@ -1434,6 +1435,41 @@ public sealed class HttpProtocolHandler(
         if (failure.ExitCode is CurlExitCode.HttpReturnedError or CurlExitCode.TooManyRedirects or CurlExitCode.FilesizeExceeded)
         {
             events.ReportInfo(failure.Message);
+        }
+    }
+
+    /// <summary>
+    /// Echoes the failf line of a body that failed as a <c>-v</c> line, as curl 8.22.0 does: a bad
+    /// gzip or deflate stream, a bad chunk (its line and the one naming the chunk-decoder error),
+    /// and a body the peer left short or a chunked body it cut off (measured, BL-3952).
+    /// </summary>
+    private static void ReportBodyFailure(ITransferEvents events, HttpTransferException failure)
+    {
+        string message = failure.Message;
+        if (failure.ExitCode == CurlExitCode.RecvError)
+        {
+            ReportChunkFailure(events, message);
+        }
+        else if (failure.ExitCode == CurlExitCode.BadContentEncoding
+            ? HttpTransferMessages.IsContentUnencodingError(message)
+            : failure.ExitCode == CurlExitCode.PartialFile
+                && (message == HttpTransferMessages.ChunkedBodyIncomplete || HttpTransferMessages.IsBodyBytesMissing(message)))
+        {
+            events.ReportInfo(message);
+        }
+    }
+
+    private static void ReportChunkFailure(ITransferEvents events, string message)
+    {
+        string? followUp = HttpTransferMessages.ChunkSizeFollowUpLine(message);
+        if (followUp is not null)
+        {
+            events.ReportInfo(message);
+            events.ReportInfo(followUp);
+        }
+        else if (message == HttpTransferMessages.MalformedChunkedEncoding)
+        {
+            events.ReportInfo(message);
         }
     }
 

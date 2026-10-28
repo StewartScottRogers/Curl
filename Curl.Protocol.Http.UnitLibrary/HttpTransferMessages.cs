@@ -343,6 +343,42 @@ internal static class HttpTransferMessages
     internal const string MalformedChunkedEncoding = "Malformed encoding found in chunked-encoding";
 
     /// <summary>
+    /// The <c>-v</c> line curl 8.22.0 writes after <see cref="ChunkSizeTooLong" /> (measured, BL-3952).
+    /// </summary>
+    internal const string TooLongHexadecimalNumberInChunkedEncoding = "Too long hexadecimal number in chunked-encoding";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.22.0 writes after a chunk size that is not hexadecimal or does not
+    /// fit 63 bits (measured, BL-3952).
+    /// </summary>
+    internal const string IllegalHexadecimalSequenceInChunkedEncoding = "Illegal or missing hexadecimal sequence in chunked-encoding";
+
+    /// <summary>
+    /// Whether <paramref name="message" /> is the exit 18 text of a Content-Length body the peer left short.
+    /// </summary>
+    internal static bool IsBodyBytesMissing(string message) =>
+        message.StartsWith("end of response with ", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether <paramref name="message" /> is a content-decoding failure curl's zlib wrapper words
+    /// (<c>Error while processing content unencoding: ...</c>).
+    /// </summary>
+    internal static bool IsContentUnencodingError(string message) =>
+        message.StartsWith("Error while processing content unencoding", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.22.0 writes after the failf line of a chunk size that is not
+    /// hexadecimal, does not fit, or is too long; <see langword="null" /> for any other message.
+    /// </summary>
+    internal static string? ChunkSizeFollowUpLine(string message) =>
+        message == ChunkSizeTooLong
+            ? TooLongHexadecimalNumberInChunkedEncoding
+            : message.StartsWith("chunk hex-length char not a hex digit", StringComparison.Ordinal)
+                || message.StartsWith("invalid chunk size", StringComparison.Ordinal)
+                ? IllegalHexadecimalSequenceInChunkedEncoding
+                : null;
+
+    /// <summary>
     /// The exit 100 message for a trailer line of
     /// <see cref="HttpChunkedDecoder.MaximumTrailerLineLength" /> bytes or more once its
     /// carriage return and line feed are added.

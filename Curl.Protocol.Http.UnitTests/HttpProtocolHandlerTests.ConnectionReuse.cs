@@ -247,7 +247,7 @@ public sealed partial class HttpProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
         Diagnostics.Assert("connection marked reusable", false, connection.IsMarkedReusable);
         Assert.IsFalse(connection.IsMarkedReusable);
-        string[] expectedInfo = [UsingHttp1, RequestSent, "closing connection #3"];
+        string[] expectedInfo = [UsingHttp1, RequestSent, "end of response with 3 bytes missing", "closing connection #3"];
         WriteExpectedLines("info lines", expectedInfo, events.Info);
         CollectionAssert.AreEqual(expectedInfo, events.Info);
     }
