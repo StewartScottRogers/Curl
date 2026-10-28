@@ -1,5 +1,5 @@
 ---
-id: BL-3972
+id: BL-3979
 title: Count the header lines an HTTP/2 head failed part way wrote in num_headers (CGR-135 cltwo)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3972 — Count the header lines an HTTP/2 head failed part way wrote in num_headers (CGR-135 cltwo)
+# BL-3979 — Count the header lines an HTTP/2 head failed part way wrote in num_headers (CGR-135 cltwo)
 
 ## Goal
 
