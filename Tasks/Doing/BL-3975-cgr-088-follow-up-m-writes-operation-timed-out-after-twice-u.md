@@ -32,3 +32,4 @@ Found by BL-3880's re-measurement (2026-10-28, lane 4). `Record-CurlExchange.ps1
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 574ad612 75ef2ed9 18ae20b9 66b7b870.
