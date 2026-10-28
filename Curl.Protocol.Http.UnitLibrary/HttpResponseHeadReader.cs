@@ -464,7 +464,8 @@ internal sealed class HttpResponseHeadReader
     /// Gives the head of an HTTP/0.9 response <see cref="AcceptsHttp09" /> accepts, its bytes
     /// so far the start of the body, or <see langword="null" /> when HTTP/0.9 is not accepted
     /// or the response can still begin <c>HTTP/</c>. A HEAD request's HTTP/0.9 answer fails
-    /// with exit 8 and <c>Weird server reply</c>, as curl fails it (upstream test1144, BL-1805, BL-2005).
+    /// with exit 8 and <c>Weird server reply</c>, as curl fails it (upstream test1144, BL-1805, BL-2005),
+    /// unless it is a single line or less: then exit 52 and <c>Empty reply from server</c> (CGR-203, BL-3732).
     /// </summary>
     /// <exception cref="HttpTransferException">The answer is HTTP/0.9 and <see cref="IsHeadRequest" /> is set (exit 8).</exception>
     private async ValueTask<HttpResponseHead?> ReadHttp09HeadAsync(CancellationToken cancellationToken)
@@ -476,7 +477,9 @@ internal sealed class HttpResponseHeadReader
 
         if (IsHeadRequest)
         {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.WeirdServerReply);
+            throw await lines.HasBytesAfterFirstLineAsync(cancellationToken).ConfigureAwait(false)
+                ? new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.WeirdServerReply)
+                : EmptyReply();
         }
 
         EndedAtEmptyLine = true;

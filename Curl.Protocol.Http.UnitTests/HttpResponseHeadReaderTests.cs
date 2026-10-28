@@ -418,7 +418,7 @@ public sealed class HttpResponseHeadReaderTests
     public async Task ReadAsync_Http09AnswerToHeadRequest_ReturnsWeirdServerReply()
     {
         Diagnostics.Arrange("scripted response", "body only, HTTP/0.9 accepted, HEAD request");
-        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("just a body\n"), 65536);
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("just a body\nand more\n"), 65536);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
             async () => await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true, IsHeadRequest = true }.ReadAsync(CancellationToken.None));

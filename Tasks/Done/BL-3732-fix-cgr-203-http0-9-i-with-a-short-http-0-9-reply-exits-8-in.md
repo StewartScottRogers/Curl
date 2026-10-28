@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs, Curl.Protoco
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3732 — Fix CGR-203: --http0.9 -I with a short HTTP/0.9 reply exits 8 instead of 52
 
@@ -60,10 +60,10 @@ curl -s -S --http0.9 -I http://127.0.0.1:20400/st_h09_I
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,5 @@ curl -s -S --http0.9 -I http://127.0.0.1:20400/st_h09_I
 
 - 2026-10-26: Created from CGR-203 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- Measured curl 8.22.0 (Schannel): 'hello\r\n', 'hello', and a long line with no line feed give exit 52 'Empty reply from server'; 'hello\r\nmore' and two-line replies give exit 8. Curl now matches (HttpResponseHeadReader + HttpLineReader.HasBytesAfterFirstLineAsync). Tests: Cgr203Tests.cs; HttpResponseHeadReaderTests head test now uses two lines. Quality run: 0 failing members. CI on Linux/macOS: platform-neutral tests.
+- 2026-10-28: Doing -> Done. Fixed CGR-203: HEAD HTTP/0.9 reply of one line or less exits 52
