@@ -89,12 +89,12 @@ public sealed class Cgr020Tests
     }
 
     [TestMethod]
-    public void Parse_CommandLineCookieAndRequest_KeepsTheValuesAsGiven()
+    public void Parse_CommandLineCookieAndRequest_KeepsTheCookieAndSendsTheMethodAsUtf8Bytes()
     {
         CommandLineOptions options = Parse(["-b", "c=é", "-X", "é", Url], false);
 
         Assert.AreEqual("c=é", options.Cookies.Single().Value);
-        Assert.AreEqual("é", options.RequestMethod);
+        Assert.AreEqual("Ã©", options.RequestMethod);
     }
 
     [TestMethod]

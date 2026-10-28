@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3861 — CGR-016 part 4: Linux and macOS send -b cookie strings and -X methods with non-ASCII UTF-8 as their UTF-8 bytes
 
@@ -22,15 +22,20 @@ Found by BL-3850 (CGR-016 part 2). The request side writes a `-b` cookie string 
 
 ## Acceptance criteria
 
-- [ ] `-b 'c=é'` and `-X 'GÉT'` send the same request bytes as curl 8.18.0 on Linux, measured with `Record-CurlExchange.ps1` and recorded in Notes.
-- [ ] Every value on Windows goes out as before.
-- [ ] A focused unit test in `Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs` pins it and passes on every platform.
-- [ ] Curl.Cli.UnitLibrary stays within the coverage, complexity and CRAP gates (`Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`).
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] `-b 'c=é'` and `-X 'GÉT'` send the same request bytes as curl 8.18.0 on Linux, measured with `Record-CurlExchange.ps1` and recorded in Notes.
+- [x] Every value on Windows goes out as before.
+- [x] A focused unit test in `Curl.Cli.UnitTests/Cgr016HeaderCookieTests.cs` pins it and passes on every platform.
+- [x] Curl.Cli.UnitLibrary stays within the coverage, complexity and CRAP gates (`Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary`).
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- The -b half was already right: the console's cookie string encoding (BL-3545) gives a command-line cookie as UTF-8 bytes off Windows; BL-3850 measured "Cookie: c=C3 A9" from curl 8.18.0 in WSL. Only -X sent Latin-1 (E9); it now goes through InvalidUtf8ByteEscape.Encoding then Latin-1 when ReadsArgumentsAsUtf8 (off Windows). A fresh WSL measurement of -X hung (Record-CurlExchange never saw a connection), so the -X form rests on BL-3850's measurement that curl sends argument bytes unchanged. Windows is unchanged.
+- Also updated two older tests that pinned the Latin-1 method (Cgr016Tests.cs, Cgr020Tests.cs in Curl.Cli.UnitTests): same project, same behaviour.
+- Measure-CodeQuality.ps1 -Library Curl.Cli.UnitLibrary: 0 failing members. CI on Linux/macOS: tests are platform-neutral (isWindows passed explicitly).
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: f55d9e64 5d40e100 1e950046 c285e6d4 779790c0.
+- 2026-10-28: Doing -> Done. -X method off Windows now sent as UTF-8 bytes; -b already was

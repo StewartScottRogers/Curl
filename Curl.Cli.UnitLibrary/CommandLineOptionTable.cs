@@ -1038,7 +1038,9 @@ public static partial class CommandLineOptionTable
     private static string AsRawWireText(CommandLineOptions options, string value) =>
         options.ReadingConfigFile
             ? Encoding.Latin1.GetString((options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : Encoding.UTF8).GetBytes(value))
-            : WithEscapedBytesAsCharacters(value);
+            : options.ReadsArgumentsAsUtf8
+                ? Encoding.Latin1.GetString(InvalidUtf8ByteEscape.Encoding.GetBytes(value))
+                : WithEscapedBytesAsCharacters(value);
 
     /// <summary>
     /// <paramref name="value"/> with each lone surrogate U+DC80 to U+DCFF, an argument byte that was not

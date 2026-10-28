@@ -19,13 +19,13 @@ public sealed class Cgr016Tests
     }
 
     [TestMethod]
-    public void Parse_MethodWithPairEndingInDcSurrogate_KeepsThePair()
+    public void Parse_MethodWithPairEndingInDcSurrogate_SendsThePairsUtf8Bytes()
     {
         const string Method = "G􏳿T";
 
         CommandLineOptions options = Parse(["-X", Method, Url]);
 
-        Assert.AreEqual(Method, options.RequestMethod);
+        Assert.AreEqual(System.Text.Encoding.Latin1.GetString(System.Text.Encoding.UTF8.GetBytes(Method)), options.RequestMethod);
     }
 
     private static CommandLineOptions Parse(string[] arguments)
