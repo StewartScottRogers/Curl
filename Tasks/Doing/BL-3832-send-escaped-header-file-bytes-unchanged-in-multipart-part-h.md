@@ -37,3 +37,4 @@ Repro (Linux): `printf 'X-C: \xff\x80\xc3(\n' > h.txt; curl -s -F "a=b;headers=@
 ## Log
 
 - 2026-10-26: Created by BL-3549.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 12b0f17a 32e4c64d 779790c0.
