@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Core;
-using Curl.Protocol.Abstractions;
 using Curl.Engine;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -61,6 +61,13 @@ internal sealed class RunningTransferState(
     /// it fails; <see langword="null" /> while no file was opened.
     /// </summary>
     internal string? OpenedOutputFile { get; set; }
+
+    /// <summary>
+    /// Gets or sets, under <c>-w</c>, the code of the last response status line the transfer received
+    /// (<see cref="ResponseCodeRecordingTransferEvents" />), which a <c>-Z</c> transfer <c>--fail-early</c>
+    /// aborted prints as <c>%{http_code}</c>; <see langword="null" /> while none was received.
+    /// </summary>
+    internal int? ReceivedResponseCode { get; set; }
 
     /// <summary>
     /// Gets or sets what records whether the transfer's handler reported it past connect or open, and

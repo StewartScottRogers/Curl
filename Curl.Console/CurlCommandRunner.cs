@@ -1929,7 +1929,7 @@ internal sealed class CurlCommandRunner(
         }
         catch (OperationCanceledException) when (state.AbortToken.IsCancellationRequested)
         {
-            ended = (ParallelRun.AbortedResult, transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
+            ended = (AbortedResultOf(state), transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
         }
 
         LogParallelScheduler("finished", transfer);
@@ -2086,7 +2086,7 @@ internal sealed class CurlCommandRunner(
         {
             run.DeferReport(
                 transfer.TransferId,
-                () => ReportAsync(dispatch, options, transfer, state, ParallelRun.AbortedResult, ended.GivenUrl, ended.TransferUrl));
+                () => ReportAsync(dispatch, options, transfer, state, AbortedResultOf(state), ended.GivenUrl, ended.TransferUrl));
             return Task.CompletedTask;
         }
 
@@ -2094,6 +2094,18 @@ internal sealed class CurlCommandRunner(
 
         return ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl);
     }
+
+    /// <summary>
+    /// Gives the result a transfer <c>--fail-early</c> aborted is reported with: <see cref="ParallelRun.AbortedResult" />,
+    /// carrying the code of the response it had already received, if any, for <c>%{http_code}</c>, as curl 8.22.0
+    /// prints it (BL-3702, CGR-173).
+    /// </summary>
+    /// <param name="state">The aborted transfer's state.</param>
+    /// <returns>The aborted result.</returns>
+    private static TransferResult AbortedResultOf(RunningTransferState state) =>
+        state.ReceivedResponseCode is { } code
+            ? ParallelRun.AbortedResult with { Report = new TransferReport { ResponseCode = code } }
+            : ParallelRun.AbortedResult;
 
     /// <summary>
     /// Writes the report of a transfer <c>--fail-early</c> kept from starting: it ends with the first
@@ -3135,7 +3147,9 @@ internal sealed class CurlCommandRunner(
         Func<long> takeConnectionId = ConnectionIdTakerFor(state);
         ITransferEvents output = transferEventOutput.EventsFor(transfer.TransferId, () => takeConnectionId());
         ITransferEvents events = WithTraceLineEvents(options, output, takeConnectionId);
-        ITransferEvents recorded = options.WriteOut is null ? events : new TlsResultRecordingTransferEvents(events, state);
+        ITransferEvents recorded = options.WriteOut is null
+            ? events
+            : new ResponseCodeRecordingTransferEvents(new TlsResultRecordingTransferEvents(events, state), state);
         state.Events = options.WriteOut is null && !options.TraceIds
             ? recorded
             : new ConnectionIdRecordingTransferEvents(recorded, state, connectionIdsByPoolNumber, takeConnectionId);
@@ -4444,22 +4458,30 @@ internal sealed class CurlCommandRunner(
         ProxyEndpoint? proxy)
     {
         DeferredOutputFileStream output = CreateOutputFileStream(options, target.Path, resumeFrom);
-        TransferResult completed = await TransferIntoOutputFileAsync(
-                follower,
-                options,
-                url,
-                output,
-                HeaderOutputWatcher(options, target, output),
-                range,
-                resumeFrom,
-                headerOutput,
-                formBody,
-                upload,
-                proxy)
-            .ConfigureAwait(false);
+        TransferResult completed;
+        try
+        {
+            completed = await TransferIntoOutputFileAsync(
+                    follower,
+                    options,
+                    url,
+                    output,
+                    HeaderOutputWatcher(options, target, output),
+                    range,
+                    resumeFrom,
+                    headerOutput,
+                    formBody,
+                    upload,
+                    proxy)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            // Also when -Z --fail-early aborts it: its report names the file and --remove-on-error deletes it (BL-3702).
+            Running.OutputFileName = output.Path;
+            Running.OpenedOutputFile = output.IsOpen ? output.Path : null;
+        }
 
-        Running.OutputFileName = output.Path;
-        Running.OpenedOutputFile = output.IsOpen ? output.Path : null;
         await FinishOutputFileAsync(options, output, url, completed).ConfigureAwait(false);
 
         return completed;
