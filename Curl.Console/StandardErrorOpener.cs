@@ -11,7 +11,7 @@ namespace Curl.Console;
 /// never resets it (CGR-115, ADR-0866). When descriptor 2 was not inherited, because the shell
 /// closed it (<c>2&gt;&amp;-</c>) and the runtime took the number for one of its own pipes, it is
 /// replaced by <see cref="Stream.Null" />, as curl writes to the <c>/dev/null</c> its
-/// <c>main_checkfds</c> opens there (BL-3824, ADR-0868).
+/// <c>main_checkfds</c> opens there (BL-3824, ADR-0869).
 /// </remarks>
 internal static class StandardErrorOpener
 {

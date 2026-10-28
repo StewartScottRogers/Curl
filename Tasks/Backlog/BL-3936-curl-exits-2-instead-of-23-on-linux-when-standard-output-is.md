@@ -18,7 +18,7 @@ On Linux, Curl run with standard output closed (`1>&-`) writes curl's error and 
 
 ## Context
 
-Found by BL-3824 on 2026-10-28 in WSL (Ubuntu): `curl -sS file:///etc/hostname 1>&-; echo $?` prints `curl: Failed writing body` and exits 23 with curl 8.18.0 (OpenSSL); Curl (linux-x64 publish of `Curl.Console`) prints `curl: (2) Access to the path is denied.` and exits 2. curl's `main_checkfds` opens `/dev/null` on a closed descriptor 1 (read-only, hence the failed write). The .NET runtime may take descriptor 1 for its own pipe at start-up (ADR-0868, which fixed descriptor 2 with `NativeInheritedFileDescriptor.IsInherited`). Start in `Curl.Console/StandardOutputOpener.cs`: use `NativeInheritedFileDescriptor.IsInherited(1)` off Windows and give a stream whose writes fail as curl's `/dev/null` write does. Measure real curl's stderr bytes before pinning them.
+Found by BL-3824 on 2026-10-28 in WSL (Ubuntu): `curl -sS file:///etc/hostname 1>&-; echo $?` prints `curl: Failed writing body` and exits 23 with curl 8.18.0 (OpenSSL); Curl (linux-x64 publish of `Curl.Console`) prints `curl: (2) Access to the path is denied.` and exits 2. curl's `main_checkfds` opens `/dev/null` on a closed descriptor 1 (read-only, hence the failed write). The .NET runtime may take descriptor 1 for its own pipe at start-up (ADR-0869, which fixed descriptor 2 with `NativeInheritedFileDescriptor.IsInherited`). Start in `Curl.Console/StandardOutputOpener.cs`: use `NativeInheritedFileDescriptor.IsInherited(1)` off Windows and give a stream whose writes fail as curl's `/dev/null` write does. Measure real curl's stderr bytes before pinning them.
 
 ## Acceptance criteria
 

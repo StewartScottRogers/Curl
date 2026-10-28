@@ -1,4 +1,4 @@
-# ADR-0868 — Standard error is the null stream when descriptor 2 was not inherited
+# ADR-0869 — Standard error is the null stream when descriptor 2 was not inherited
 
 - Status: Accepted
 - Date: 2026-10-28

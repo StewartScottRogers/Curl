@@ -7,7 +7,7 @@ namespace Curl.Console;
 /// Tells whether a file descriptor is open and was inherited from the process that started Curl,
 /// through <c>fcntl(F_GETFD)</c> in the runtime's own <c>SystemNative_FcntlGetFD</c> shim in
 /// <c>libSystem.Native</c>, whose fixed signature a plain import can call on macOS arm64, unlike
-/// libc's variadic <c>fcntl</c> (ADR-0868).
+/// libc's variadic <c>fcntl</c> (ADR-0869).
 /// </summary>
 /// <remarks>
 /// curl's <c>main_checkfds</c> opens <c>/dev/null</c> on descriptors 0, 1 and 2 before anything
@@ -19,7 +19,7 @@ namespace Curl.Console;
 /// Windows coverage measure and checked by <c>NativeInheritedFileDescriptorTests</c> on Linux and
 /// macOS.
 /// </remarks>
-[ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0868: a thin fcntl adapter, tested off Windows.")]
+[ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0869: a thin fcntl adapter, tested off Windows.")]
 internal static partial class NativeInheritedFileDescriptor
 {
     /// <summary>POSIX <c>FD_CLOEXEC</c>, the same on Linux and macOS.</summary>

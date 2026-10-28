@@ -4,7 +4,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Checks that <see cref="StandardErrorOpener" /> writes nothing to a descriptor 2 the shell did not
-/// give, as curl writes nothing to a closed standard error (<c>2&gt;&amp;-</c>, BL-3824, ADR-0868).
+/// give, as curl writes nothing to a closed standard error (<c>2&gt;&amp;-</c>, BL-3824, ADR-0869).
 /// </summary>
 [TestClass]
 public sealed class StandardErrorOpenerTests
