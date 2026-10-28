@@ -130,7 +130,7 @@ internal static partial class RawByteFileName
     /// <param name="createMode">The permissions a created file gets, before the umask.</param>
     /// <returns>The open's answer.</returns>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0920: a thin adapter over an open only Linux and macOS take raw bytes in.")]
-    private static FileOpenResult OpenUnderRawBytes(byte[] path, FileWriteMode mode, UnixFileMode createMode)
+    internal static FileOpenResult OpenUnderRawBytes(byte[] path, FileWriteMode mode, UnixFileMode createMode)
     {
         nint descriptor;
         int errno;
