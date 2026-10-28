@@ -106,3 +106,4 @@ curl -s file:///<dir>/%E6%97%A5%E6%9C%AC.txt
 - 2026-10-26: Created from CGR-114 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3900 (Windows -o/-T/config file names in ANSI bytes, Curl.Console) and BL-3899 (Unix raw-byte file open hook); the file:// decode here follows them
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
