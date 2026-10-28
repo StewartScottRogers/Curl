@@ -1,4 +1,4 @@
-# ADR-0864 — Off Windows Curl never touches .NET's terminfo console
+# ADR-0866 — Off Windows Curl never touches .NET's terminfo console
 
 - Status: Accepted
 - Date: 2026-10-28

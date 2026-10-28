@@ -535,7 +535,7 @@ way; a redirected standard output, and off Windows a terminal too, becomes an un
 elsewhere), and a closed one a `ClosedStandardOutputStream` whose writes throw. Off Windows `StandardErrorOpener` opens
 standard error over descriptor 2 the same way: there a write through .NET's console streams,
 or a read of `Console.WindowWidth`, writes terminfo's `keypad_xmit` (`ESC[?1h ESC=`) to the
-terminal, which curl never writes (CGR-115, ADR-0864).
+terminal, which curl never writes (CGR-115, ADR-0866).
 
 Standard error is wrapped in `WriteFailureIgnoringStream`, which ignores an
 `IOException` from any write, flush or close, as curl ignores a failed `fputs` to `stderr`: with

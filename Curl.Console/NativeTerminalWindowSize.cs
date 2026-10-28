@@ -7,7 +7,7 @@ namespace Curl.Console;
 /// Reads the width of the terminal standard input is attached to, as curl's
 /// <c>get_terminal_columns</c> does off Windows with <c>ioctl(STDIN_FILENO, TIOCGWINSZ)</c>,
 /// through the .NET runtime's own shim (<c>SystemNative_GetWindowSize</c> in
-/// <c>libSystem.Native</c>) (ADR-0864).
+/// <c>libSystem.Native</c>) (ADR-0866).
 /// </summary>
 /// <remarks>
 /// <see cref="System.Console.WindowWidth" /> is not used off Windows: reading it initialises
@@ -17,7 +17,7 @@ namespace Curl.Console;
 /// needs the real call, which Windows has not, so per ADR-0083 the type is left out of the
 /// Windows coverage measure.
 /// </remarks>
-[ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0864: a thin TIOCGWINSZ adapter, used off Windows.")]
+[ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0866: a thin TIOCGWINSZ adapter, used off Windows.")]
 internal static partial class NativeTerminalWindowSize
 {
     /// <summary>The file descriptor of standard input on Linux and macOS.</summary>

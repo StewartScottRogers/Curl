@@ -21,7 +21,7 @@ namespace Curl.Console;
 /// <see cref="ClosedStandardOutputStream" />. On Windows a console is still opened with
 /// <see cref="System.Console.OpenStandardOutput()" />; elsewhere a terminal is opened over
 /// descriptor 1 too, because a write through .NET's console stream first writes terminfo's
-/// <c>keypad_xmit</c> to the terminal (CGR-115, ADR-0864).
+/// <c>keypad_xmit</c> to the terminal (CGR-115, ADR-0866).
 /// </para>
 /// </remarks>
 internal static class StandardOutputOpener
@@ -50,7 +50,7 @@ internal static class StandardOutputOpener
     /// Tells whether standard output is opened over its handle rather than as a console
     /// stream: when it is redirected, and always off Windows, where a write through .NET's
     /// console stream writes terminfo's <c>keypad_xmit</c> (<c>ESC[?1h ESC=</c>) to the terminal
-    /// first (CGR-115, ADR-0864).
+    /// first (CGR-115, ADR-0866).
     /// </summary>
     /// <param name="isOutputRedirected">Whether standard output is anything but a console.</param>
     /// <param name="runsOnWindows">Whether the process runs on Windows.</param>

@@ -5,7 +5,7 @@ namespace Curl.Console;
 /// <summary>
 /// Pins CGR-115: off Windows nothing reads <see cref="System.Console.WindowWidth" /> or writes
 /// through .NET's console streams, either of which writes terminfo's <c>keypad_xmit</c>
-/// (<c>ESC[?1h ESC=</c>) to the terminal, which curl 8.18.0 on Linux never writes (ADR-0864).
+/// (<c>ESC[?1h ESC=</c>) to the terminal, which curl 8.18.0 on Linux never writes (ADR-0866).
 /// </summary>
 [TestClass]
 public sealed class Cgr115Tests

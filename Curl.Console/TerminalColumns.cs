@@ -72,7 +72,7 @@ internal static class TerminalColumns
     /// <summary>
     /// Reads the console width as curl does: the standard-error console's on Windows, the
     /// standard-input terminal's elsewhere, never through <see cref="System.Console.WindowWidth" />
-    /// (CGR-115, ADR-0864).
+    /// (CGR-115, ADR-0866).
     /// </summary>
     /// <param name="runsOnWindows">Whether the process runs on Windows.</param>
     /// <param name="readStandardErrorConsoleColumns">Reads the standard-error console's width (Windows).</param>

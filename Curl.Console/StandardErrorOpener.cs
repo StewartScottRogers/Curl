@@ -8,7 +8,7 @@ namespace Curl.Console;
 /// Elsewhere it is opened over descriptor 2 as <see cref="StandardOutputOpener" /> opens
 /// descriptor 1, because a write through .NET's console stream there first initialises the
 /// terminfo console, which writes <c>keypad_xmit</c> (<c>ESC[?1h ESC=</c>) to the terminal and
-/// never resets it (CGR-115, ADR-0864).
+/// never resets it (CGR-115, ADR-0866).
 /// </remarks>
 internal static class StandardErrorOpener
 {
