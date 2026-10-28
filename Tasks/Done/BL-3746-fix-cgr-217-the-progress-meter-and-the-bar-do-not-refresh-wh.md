@@ -9,7 +9,7 @@ touches: [Curl.Console.UnitTests/Cgr217Tests.cs, Curl.Console/ProgressBarRecorde
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3746 — Fix CGR-217: The progress meter and the -# bar do not refresh while no data arrives
 
@@ -80,3 +80,4 @@ curl -# -o x http://127.0.0.1:20700/hang/2500
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 
 - 2026-10-28: Fix: `TransferProgressRecorder` starts a 1 s repeating timer (only when the meter or `-#` bar is shown) whose tick redraws the meter row and calls `ProgressBarRecorder.ReportTimePassed`, under a lock shared with the byte reports and `Finish`; `Finish` stops it. `ImmediateTimerTimeProvider` (test fake) now fires only one-shot timers, so retry-wait tests do not see the tick. Tests in `Cgr217Tests.cs`. Real-curl comparison of the two repro commands was not re-run (time budget); the expected rows are those the report gives. Platform-neutral: manual clocks only. Measure-CodeQuality for Curl.Console: 0 failing members.
+- 2026-10-28: Doing -> Done. Meter and bar refresh once a second while no data arrives
