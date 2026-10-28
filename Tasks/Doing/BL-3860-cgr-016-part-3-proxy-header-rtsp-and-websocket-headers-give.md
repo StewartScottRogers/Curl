@@ -32,3 +32,4 @@ Found by BL-3850 (CGR-016 part 2). The console hands an argument byte that is no
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 83fe42ce 5f97d26d 1fba41f5 779790c0.
