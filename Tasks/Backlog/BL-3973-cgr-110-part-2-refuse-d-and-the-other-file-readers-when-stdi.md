@@ -1,16 +1,16 @@
 ---
-id: BL-3969
+id: BL-3973
 title: CGR-110 part 2: refuse -d @- and the other file readers when stdin is closed (exit 26)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3570, BL-3893, BL-3968]
+depends-on: [BL-3570, BL-3893, BL-3972]
 touches: [Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitLibrary/VariableDefinition.cs, Curl.Console/Program.cs, Curl.Cli.UnitTests/Cgr110DataOptionTests.cs]
 requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3969 — CGR-110 part 2: refuse -d @- and the other file readers when stdin is closed (exit 26)
+# BL-3973 — CGR-110 part 2: refuse -d @- and the other file readers when stdin is closed (exit 26)
 
 ## Goal
 

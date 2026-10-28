@@ -1,16 +1,16 @@
 ---
-id: BL-3970
+id: BL-3974
 title: CGR-110 part 3: abort -F f=@- with exit 42 when stdin is closed
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3570, BL-3893, BL-3968, BL-3969]
+depends-on: [BL-3570, BL-3893, BL-3972, BL-3973]
 touches: [Curl.Engine.UnitLibrary/MimePostForm.cs, Curl.Console.UnitTests/Cgr110Tests.cs]
 requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3970 — CGR-110 part 3: abort -F f=@- with exit 42 when stdin is closed
+# BL-3974 — CGR-110 part 3: abort -F f=@- with exit 42 when stdin is closed
 
 ## Goal
 
@@ -29,7 +29,7 @@ Split from BL-3639 (CGR-110, Documentation/Reviews/Curl-Gap-Report-2026-10-25.md
 ## Notes
 
 - Split from BL-3639.
-- Needs ClosedStandardInputStream from BL-3968; end to end it also needs BL-3969's Program.cs swap, so verify the real-curl comparison once that has landed (if not yet, record the unit-level result and say so).
+- Needs ClosedStandardInputStream from BL-3972; end to end it also needs BL-3973's Program.cs swap, so verify the real-curl comparison once that has landed (if not yet, record the unit-level result and say so).
 
 ## Log
 

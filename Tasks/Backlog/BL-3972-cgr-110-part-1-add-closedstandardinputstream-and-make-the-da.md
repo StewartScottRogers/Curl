@@ -1,5 +1,5 @@
 ---
-id: BL-3968
+id: BL-3972
 title: CGR-110 part 1: add ClosedStandardInputStream and make the data file reader throw for it
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3968 — CGR-110 part 1: add ClosedStandardInputStream and make the data file reader throw for it
+# BL-3972 — CGR-110 part 1: add ClosedStandardInputStream and make the data file reader throw for it
 
 ## Goal
 
@@ -29,7 +29,7 @@ Split from BL-3639 (CGR-110, Documentation/Reviews/Curl-Gap-Report-2026-10-25.md
 ## Notes
 
 - Split from BL-3639. Continues the stashed work of BL-3639.
-- Program.cs is NOT changed here (BL-3969 swaps Stream.Null for the new stream), so nothing observable changes until that task lands. Record the ADR (Decided by Claude under Stewart's delegation) for the whole CGR-110 plan here.
+- Program.cs is NOT changed here (BL-3973 swaps Stream.Null for the new stream), so nothing observable changes until that task lands. Record the ADR (Decided by Claude under Stewart's delegation) for the whole CGR-110 plan here.
 
 ## Log
 

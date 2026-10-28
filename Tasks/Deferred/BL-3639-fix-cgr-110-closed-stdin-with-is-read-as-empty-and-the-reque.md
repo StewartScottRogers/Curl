@@ -79,4 +79,4 @@ curl -sS -d @- $H/ok <&-
 - 2026-10-26: Doing -> Backlog. Waiting on BL-3570 (holds Curl.Cli.UnitLibrary/CommandLineOptionTable.cs) and BL-3893 (holds Curl.Cli.UnitLibrary/CommandLineRefusal.cs); measurements and plan in Notes
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3639-20261028-052757-L9.jsonl
-- 2026-10-28: Backlog -> Deferred. Split into BL-3968, BL-3969 and BL-3970 (over its cost cap)
+- 2026-10-28: Backlog -> Deferred. Split into BL-3972, BL-3973 and BL-3974 (over its cost cap)
