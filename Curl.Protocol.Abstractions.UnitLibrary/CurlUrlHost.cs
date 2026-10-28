@@ -100,7 +100,7 @@ internal static class CurlUrlHost
             return rejection == CurlUrlRejection.None;
         }
 
-        string nameToConvert = hostAsWindows1252 ? ReadHostAsWindows1252(host) : decoded;
+        string nameToConvert = hostAsWindows1252 ? ReadHostAsWindows1252(host) : ReadLatin1BytesAsUtf8(decoded);
         rejection = NormalizeAddressOrName(decoded, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
 
         return rejection == CurlUrlRejection.None;
@@ -194,6 +194,24 @@ internal static class CurlUrlHost
     /// </summary>
     private static string ReadHostAsWindows1252(string host) =>
         new([.. PercentDecodeBytes(ToWindows1252Bytes(host)).Select(Windows1252CharacterOf)]);
+
+    /// <summary>
+    /// The host as curl off Windows hands it to <c>idn2_lookup_ul</c> in a UTF-8 locale: a name whose
+    /// every character is one byte, as a <c>Location</c> header's bytes reach <c>CurlUrl</c>, and whose
+    /// bytes are valid UTF-8 is that UTF-8, so <c>Ã¥Ã¤Ã¶</c> is <c>åäö</c> (upstream test1448,
+    /// ADR-0957); any other name is kept as decoded.
+    /// </summary>
+    private static string ReadLatin1BytesAsUtf8(string name)
+    {
+        if (name.Any(character => character > 'ÿ'))
+        {
+            return name;
+        }
+
+        byte[] bytes = Encoding.Latin1.GetBytes(name);
+
+        return System.Text.Unicode.Utf8.IsValid(bytes) ? Encoding.UTF8.GetString(bytes) : name;
+    }
 
     private static byte[] ToWindows1252Bytes(string text)
     {

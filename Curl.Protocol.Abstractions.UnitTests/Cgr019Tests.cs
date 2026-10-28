@@ -29,6 +29,17 @@ public sealed class Cgr019Tests
     }
 
     [TestMethod]
+    [DataRow("Ã¥Ã¤Ã¶.se", "xn--4cab6c.se")]
+    [DataRow("Ã¼.se", "xn--tda.se")]
+    public void TryNormalize_HostOfOneByteCharactersThatAreUtf8_ConvertsTheUtf8Name(string host, string expected)
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
+
+        Assert.IsTrue(accepted);
+        Assert.AreEqual(expected, idnHost);
+    }
+
+    [TestMethod]
     [DataRow("BÜCHER", "bücher")]
     [DataRow("İ", "i̇")]
     [DataRow("Ａｚ０", "az0")]
