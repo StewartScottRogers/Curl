@@ -4,7 +4,7 @@ title: Echo curl's failf message as a -v line for the CGR-088 failure paths BL-3
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-3948, BL-3949, BL-3950, BL-3951, BL-3952]
 touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Cgr088FollowUpTests.cs]
 requirement: none
 created: 2026-10-26
@@ -29,8 +29,10 @@ CGR-088 of `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md` (see BL-3617, D
 ## Notes
 
 - Filed by BL-3617's run, which narrowed BL-3617 to the issue's explicit repro commands.
+- 2026-10-28 (lane 4, first claim): split for size before any code, as the Context allows. BL-3617 took 80+ turns for three libraries; this list spans four (Http, Ftp, Networking, Console). Filed BL-3948 (HTTP --max-redirs, --max-filesize, -m), BL-3952 (HTTP bad gzip, bad chunk, short body; depends on BL-3948 as both edit HttpProtocolHandler.cs), BL-3949 (FTP STOR/REST/500 greeting/226-451), BL-3950 (SOCKS5 replies, Networking) and BL-3951 (bad -o path, Console), each with file-level touches and its own focused test file and the --trace check. Once they are Done, the next claim of this task only re-measures every path against real curl 8.22.0 under -v and --trace, records the commands in Notes and ticks the criteria; any gap left is a new task.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 27475e82 ee75e456 779790c0.
+- 2026-10-28: Doing -> Backlog. Split for size: waits on BL-3948, BL-3949, BL-3950, BL-3951 and BL-3952, one per library
