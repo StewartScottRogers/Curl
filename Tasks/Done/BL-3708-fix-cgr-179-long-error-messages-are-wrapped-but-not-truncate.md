@@ -5,11 +5,11 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/WrappedMessage.cs, Curl.Cli.UnitTests/Cgr179Tests.cs]
+touches: [Curl.Cli.UnitLibrary/WrappedMessage.cs, Curl.Cli.UnitTests/Cgr179Tests.cs, Curl.Console/CurlCommandRunner.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3708 — Fix CGR-179: Long error messages are wrapped but not truncated like REF's; --dump-header open failure is not wrapped
 
@@ -61,17 +61,21 @@ curl -sS --dump-header $L -o NUL http://127.0.0.1:20002/
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr179Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Measured curl 8.22.0 (Windows): 3000-x name for `--cacert` exits 2, 17 lines; for `--dump-header` exits 23, 16 lines; voutf cuts the message at 1023 bytes. Curl before fix: 45 lines and one unwrapped line. After fix both stderr outputs and exit codes are byte-identical to curl (diffed).
+- Added Curl.Console/CurlCommandRunner.cs to touches (no other Doing task names it): the -D open failure now goes through WrappedMessage. Fix: WrappedMessage caps messages at 1023 bytes. CI on Linux/macOS: tests are platform-neutral.
+
 ## Log
 
 - 2026-10-26: Created from CGR-179 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. WrappedMessage caps messages at 1023 bytes; -D open failure wrapped; output matches curl 8.22.0

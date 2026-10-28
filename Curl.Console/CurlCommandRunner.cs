@@ -3536,7 +3536,7 @@ internal sealed class CurlCommandRunner(
     {
         if (ShowsErrors(options))
         {
-            await WriteErrorLineAsync($"curl: Failed to open {headerFile}").ConfigureAwait(false);
+            await WriteErrorPiecesAsync(WrappedMessage.Lines("curl: ", $"Failed to open {headerFile}", terminalColumns)).ConfigureAwait(false);
         }
 
         return CannotOpenHeaderFileFailure;
