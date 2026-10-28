@@ -1,4 +1,4 @@
-# ADR-0937: A socket-action transfer holds the expect-100 deadline through hooks on the HTTP handler
+# ADR-0938: A socket-action transfer holds the expect-100 deadline through hooks on the HTTP handler
 
 - Status: Accepted
 - Date: 2026-10-28
