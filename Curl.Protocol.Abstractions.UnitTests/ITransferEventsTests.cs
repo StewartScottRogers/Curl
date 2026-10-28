@@ -63,6 +63,20 @@ public sealed class ITransferEventsTests
     }
 
     [TestMethod]
+    public void ReportWarning_NotOverridden_DoesNothing()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        var sink = new TlsDataRecordingEvents();
+        diagnostics.Arrange("warning", "VLAN priority 7 failed");
+
+        ((ITransferEvents)sink).ReportWarning("VLAN priority 7 failed");
+
+        diagnostics.Act("recorded bytes", sink.Bytes);
+        diagnostics.Assert("recorded bytes", null, sink.Bytes);
+        Assert.IsNull(sink.Bytes);
+    }
+
+    [TestMethod]
     public void ReportCertificateVerifyResult_NotOverridden_DoesNothing()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
