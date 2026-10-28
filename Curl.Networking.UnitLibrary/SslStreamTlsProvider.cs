@@ -400,7 +400,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             EnabledSslProtocols = _offeredProtocols,
             AllowTlsResume = SessionPartitions.MayResume(targetHost, _options),
             CertificateChainPolicy = chainPolicy,
-            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
+            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate, _matchesSchannelBuild),
             CipherSuitesPolicy = cipherSuitesPolicy,
             ApplicationProtocols = ToSslApplicationProtocols(offeredApplicationProtocols),
             RemoteCertificateValidationCallback = (sender, certificate, chain, errors) =>
@@ -743,9 +743,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // then caches that handle as the one for "no certificate", so every later handshake
     // without --cert in the process presented it (BL-254). A callback leaves that first
     // handle anonymous, and the certificate is sent only when the server asks for one,
-    // whatever issuers it names, as curl sends --cert.
-    private static LocalCertificateSelectionCallback? ToCertificateSelection(X509Certificate2? clientCertificate) =>
-        clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate;
+    // whatever issuers it names, as curl sends --cert. The OpenSSL build passes a callback
+    // even without --cert: SslStream on Linux offers post_handshake_auth only when it has a
+    // way to choose a certificate, and curl's OpenSSL build always offers it and answers a
+    // TLS 1.3 post-handshake CertificateRequest with an empty Certificate (ADR-0949, CGR-169).
+    private static LocalCertificateSelectionCallback? ToCertificateSelection(X509Certificate2? clientCertificate, bool matchesSchannelBuild) =>
+        clientCertificate is not null ? (_, _, _, _, _) => clientCertificate
+        : matchesSchannelBuild ? null
+        : (_, _, _, _, _) => null!;
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
         ? TlsFailureMessages.SchannelSslConnectError(failure, _offeredMaximumVersion)
