@@ -41,3 +41,4 @@ The method's full name is in the same block, in the test logger's ` START <Names
 ## Log
 
 - 2026-10-28: Created after BL-3991 and BL-3992 were filed for data rows "-4" and "-6".
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 83a704cc 187365af c02f9240 56ebb31d.
