@@ -8,7 +8,7 @@ namespace Curl.Engine;
 /// its reads and writes wait here until the multi handle signals the socket ready (<see cref="Signal" />), and it
 /// publishes the direction it waits in (<see cref="Waiting" />) and its earliest deadline
 /// (<see cref="EarliestDeadline" />), so the multi handle can give the application libcurl's socket and timer
-/// callbacks (ADR-0821, BL-3847).
+/// callbacks (ADR-0914, BL-3847).
 /// </summary>
 /// <remarks>
 /// A signal that comes while nothing waits in its direction is kept, and the next wait in that direction takes it

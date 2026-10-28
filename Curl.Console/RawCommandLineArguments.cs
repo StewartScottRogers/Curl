@@ -6,7 +6,7 @@ using Curl.Cli;
 namespace Curl.Console;
 
 /// <summary>
-/// Gives <c>Main</c>'s arguments with every byte that is not valid UTF-8 kept (CGR-016, BL-3849, ADR-0821).
+/// Gives <c>Main</c>'s arguments with every byte that is not valid UTF-8 kept (CGR-016, BL-3849, ADR-0909).
 /// On Linux and macOS .NET decodes argv as UTF-8 and replaces each invalid byte with U+FFFD, where curl
 /// uses argv's bytes unchanged; so off Windows the arguments are read again from the process's raw argv
 /// (<c>/proc/self/cmdline</c> on Linux, <c>_NSGetArgv</c> on macOS) and decoded with
@@ -20,7 +20,7 @@ internal static partial class RawCommandLineArguments
     /// </summary>
     /// <param name="arguments">The arguments .NET handed <c>Main</c>.</param>
     /// <returns>The arguments to parse.</returns>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0821: picks the platform's argv reader, which only that platform has.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0909: picks the platform's argv reader, which only that platform has.")]
     internal static IReadOnlyList<string> ForCurrentPlatform(string[] arguments) =>
         OperatingSystem.IsLinux() ? Select(arguments, ReadLinuxCommandLine())
         : OperatingSystem.IsMacOS() ? Select(arguments, ReadMacOSArgv())
@@ -81,7 +81,7 @@ internal static partial class RawCommandLineArguments
 
     /// <summary>Reads <c>/proc/self/cmdline</c>.</summary>
     /// <returns>argv's bytes, or <see langword="null"/> when the file cannot be read.</returns>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0821: reads a file only Linux has.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0909: reads a file only Linux has.")]
     private static IReadOnlyList<byte[]>? ReadLinuxCommandLine()
     {
         try
@@ -100,7 +100,7 @@ internal static partial class RawCommandLineArguments
 
     /// <summary>Reads the process's argv through libSystem's <c>_NSGetArgc</c> and <c>_NSGetArgv</c>.</summary>
     /// <returns>argv's bytes.</returns>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0821: a thin libSystem adapter only macOS has.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0909: a thin libSystem adapter only macOS has.")]
     private static unsafe IReadOnlyList<byte[]> ReadMacOSArgv()
     {
         int count = *GetArgc();

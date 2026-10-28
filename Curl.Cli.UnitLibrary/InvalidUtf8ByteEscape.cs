@@ -4,7 +4,7 @@ using System.Text;
 namespace Curl.Cli;
 
 /// <summary>
-/// Keeps every byte of an argument losslessly when it is not valid UTF-8 (CGR-016, BL-3849, ADR-0821):
+/// Keeps every byte of an argument losslessly when it is not valid UTF-8 (CGR-016, BL-3849, ADR-0909):
 /// <see cref="Decode"/> reads the bytes as UTF-8 but turns each byte <c>b</c> that is not part of a valid
 /// sequence into the lone surrogate U+DC00 + <c>b</c> (the "surrogate escape" scheme), and
 /// <see cref="Encoding"/> turns each such surrogate back into its byte. curl never re-encodes its

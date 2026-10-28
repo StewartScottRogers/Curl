@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-26
 - Decision: Decided by Claude under Stewart's delegation (BL-3594)
-- Relates to: [ADR-0067](ADR-0067-command-line-header-text-becomes-bytes-in-the-platform-curls-encoding-inside-the-http-formatter.md), [ADR-0821](ADR-0821-linux-and-macos-read-argv-raw-bytes-with-surrogate-escapes.md)
+- Relates to: [ADR-0067](ADR-0067-command-line-header-text-becomes-bytes-in-the-platform-curls-encoding-inside-the-http-formatter.md), [ADR-0909](ADR-0909-linux-and-macos-read-argv-raw-bytes-with-surrogate-escapes.md)
 
 ## Context
 
@@ -30,4 +30,4 @@ Windows, which matches the Schannel build's ANSI `argv`).
 
 Linux and macOS send the argument's UTF-8 bytes; Windows still sends its ANSI bytes (`?` where the code
 page has no character), as curl's Schannel build does. An `argv` byte that is not valid UTF-8 (a lone
-surrogate, ADR-0821) in a `-b` string is not yet given back as that byte; a follow-up task covers it.
+surrogate, ADR-0909) in a `-b` string is not yet given back as that byte; a follow-up task covers it.

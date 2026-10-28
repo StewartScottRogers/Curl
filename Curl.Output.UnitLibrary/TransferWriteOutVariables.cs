@@ -56,7 +56,7 @@ namespace Curl.Output;
 /// part. <c>header_json</c> prints the response headers as <see cref="WriteOutJson"/>
 /// describes. <c>content_type</c>, <c>header_json</c> and the <c>%header{…}</c> values
 /// are marked with <see cref="WriteOutTemplateRenderer.MarkHeaderBytes"/>, so they render as
-/// the raw header bytes (CGR-021, ADR-0816). Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
+/// the raw header bytes (CGR-021, ADR-0893). Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
 /// and BL-227.
 /// </para>
 /// <para>

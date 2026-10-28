@@ -743,13 +743,13 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The Schannel build's message for exit 59: a <c>--ciphers</c> entry names no ALG_ID
-    /// (ADR-0011, ADR-0816).
+    /// (ADR-0011, ADR-0896).
     /// </summary>
     public const string SchannelCipherListRefused = "schannel: Failed setting algorithm cipher list";
 
     /// <summary>
     /// The Schannel build's message for exit 35 when AcquireCredentialsHandle accepts none of
-    /// the <c>--ciphers</c> algorithms (ADR-0816, measured with curl 8.22.0).
+    /// the <c>--ciphers</c> algorithms (ADR-0896, measured with curl 8.22.0).
     /// </summary>
     public const string SchannelAlgorithmMismatch =
         "schannel: AcquireCredentialsHandle failed: SEC_E_ALGORITHM_MISMATCH (0x80090331) - The client and server cannot communicate, because they do not possess a common algorithm.";

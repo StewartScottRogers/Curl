@@ -66,7 +66,7 @@ public sealed class CommandLineBlankArgumentTests
     // empty one as blank (BL-3203). Each platform's answer is pinned in its own test.
     private const string SslSessions = "ssl-sessions";
 
-    // Refused as not supported, blank or not, by every reference build, as Cgr042Tests pins (ADR-0822).
+    // Refused as not supported, blank or not, by every reference build, as Cgr042Tests pins (ADR-0918).
     private const string Ech = "ech";
 
     public TestContext TestContext { get; set; } = null!;

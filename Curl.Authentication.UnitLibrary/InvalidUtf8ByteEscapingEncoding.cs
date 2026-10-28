@@ -10,7 +10,7 @@ namespace Curl.Authentication;
 /// <see cref="Encoding.UTF8" /> does, so valid text encodes exactly as UTF-8. It is the credential
 /// encoding off Windows (<see cref="CredentialEncoding.ForPlatform" />), so a URL credential that
 /// percent-decodes to bytes that are not UTF-8 (<c>http://user:pa%FFss@host/</c>) is sent as those
-/// bytes, as curl 8.18.0 OpenSSL on Linux sends them (CGR-053, ADR-0822). It reports UTF-8's code page.
+/// bytes, as curl 8.18.0 OpenSSL on Linux sends them (CGR-053, ADR-0920). It reports UTF-8's code page.
 /// </summary>
 internal sealed class InvalidUtf8ByteEscapingEncoding() : Encoding(Utf8CodePage)
 {

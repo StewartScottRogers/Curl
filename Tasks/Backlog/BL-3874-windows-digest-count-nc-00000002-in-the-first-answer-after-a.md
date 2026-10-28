@@ -18,7 +18,7 @@ On Windows, Curl's first Digest answer after a 401 whose connection the server c
 
 ## Context
 
-Found by BL-3606 (ADR-0824), measured 2026-10-26 with `Record-CurlExchange.ps1` and curl 8.22.0 from Git for Windows' ucrt64: with `-Response` 401 (`WWW-Authenticate: Digest realm="testrealm", nonce="abc123", qop="auth"`) then 200, where the script closes each connection, real curl reconnects and sends `nc=00000002` (its response verifies with nc 2); with a `-Script` that keeps one connection it sends `nc=00000001`. Curl sends `nc=00000001` in both. `DigestAuthenticator` keeps no state (ADR-0014), so the engine must tell it the answer goes on a new connection (find where the HTTP transfer redials after a 401 and calls `CreateAuthorization`); widen `touches` to that Engine file before editing. Applies only where `matchesSspiBuild` is set.
+Found by BL-3606 (ADR-0924), measured 2026-10-26 with `Record-CurlExchange.ps1` and curl 8.22.0 from Git for Windows' ucrt64: with `-Response` 401 (`WWW-Authenticate: Digest realm="testrealm", nonce="abc123", qop="auth"`) then 200, where the script closes each connection, real curl reconnects and sends `nc=00000002` (its response verifies with nc 2); with a `-Script` that keeps one connection it sends `nc=00000001`. Curl sends `nc=00000001` in both. `DigestAuthenticator` keeps no state (ADR-0014), so the engine must tell it the answer goes on a new connection (find where the HTTP transfer redials after a 401 and calls `CreateAuthorization`); widen `touches` to that Engine file before editing. Applies only where `matchesSspiBuild` is set.
 
 ## Acceptance criteria
 

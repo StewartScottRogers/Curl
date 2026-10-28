@@ -18,7 +18,7 @@ An `ftp://` transfer whose user name or password is non-ASCII (percent-encoded i
 
 ## Context
 
-Found in BL-3581 (CGR-052, ADR-0821). `FtpSession` writes `USER ` + `context.Credentials.UserName` through `FtpControlChannel`, which encodes every command in Latin-1 (`Encoding.Latin1.GetBytes`). The credentials `TransferCredentialLookup` hands over are now held so that the platform's credential encoding (`CredentialEncoding.ForPlatform`: ANSI code page on Windows, UTF-8 elsewhere) gives back the bytes curl sends, as the HTTP, SASL and SSH authenticators use. Latin-1 gives a different answer: on Linux `ftp://u%C3%A9@host/` sends `75 E9` where curl (expected) sends `75 C3 A9`; on Windows a password `%E2%82%AC` becomes `?`. Measure real curl first (Record-CurlExchange.ps1 with an FTP greeting script) on Windows; Linux behaviour comes from the OpenSSL build's raw-bytes rule.
+Found in BL-3581 (CGR-052, ADR-0910). `FtpSession` writes `USER ` + `context.Credentials.UserName` through `FtpControlChannel`, which encodes every command in Latin-1 (`Encoding.Latin1.GetBytes`). The credentials `TransferCredentialLookup` hands over are now held so that the platform's credential encoding (`CredentialEncoding.ForPlatform`: ANSI code page on Windows, UTF-8 elsewhere) gives back the bytes curl sends, as the HTTP, SASL and SSH authenticators use. Latin-1 gives a different answer: on Linux `ftp://u%C3%A9@host/` sends `75 E9` where curl (expected) sends `75 C3 A9`; on Windows a password `%E2%82%AC` becomes `?`. Measure real curl first (Record-CurlExchange.ps1 with an FTP greeting script) on Windows; Linux behaviour comes from the OpenSSL build's raw-bytes rule.
 
 ## Acceptance criteria
 

@@ -131,7 +131,7 @@ internal sealed class LocalBindingAddressChooser(
 
     private async ValueTask<IReadOnlyList<IPAddress>> LookUpAsync(string hostName, CancellationToken cancellationToken)
     {
-        // An IPv4 address in shorthand goes to the resolver, which the Windows build's refuses (ADR-0820).
+        // An IPv4 address in shorthand goes to the resolver, which the Windows build's refuses (ADR-0908).
         if (!Ipv4ShorthandAddress.IsShorthand(hostName) && IPAddress.TryParse(hostName, out var address))
         {
             return [address];

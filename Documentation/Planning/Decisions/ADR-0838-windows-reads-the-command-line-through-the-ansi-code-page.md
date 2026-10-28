@@ -29,7 +29,7 @@ Measured on 2026-10-26 with `Record-CurlExchange.ps1` (reference curl, then Curl
    converted to the system ANSI code page (`CredentialEncoding.ForPlatform`) and back. .NET's code-page
    encodings use Windows' best-fit tables by default, so no hand-built table is needed
    (`Cgr015ArgumentTests` pins `中` to `?` and U+FF10 to `0` under cp1252). Off Windows the arguments pass
-   through unchanged (UTF-8, with ADR-0821's byte escapes).
+   through unchanged (UTF-8, with ADR-0909's byte escapes).
 2. Tests pass the code page in (cp1252 from `CodePagesEncodingProvider`), so they pass on every host.
 3. Writing the standard-error lines that echo argument text in the ANSI code page is CGR-015 part 1b
    (BL-3893).

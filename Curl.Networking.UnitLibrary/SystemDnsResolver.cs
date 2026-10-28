@@ -17,7 +17,7 @@ namespace Curl.Networking;
 /// refuses, the any-address such as host <c>0</c>, resolves to itself. <c>localhost</c> and every
 /// name under <c>.localhost</c> resolve to <c>::1</c> and <c>127.0.0.1</c> without a lookup, as
 /// curl answers them itself. On Windows an IPv4 address in shorthand, such as <c>127.1</c> or
-/// <c>2130706433</c>, resolves to nothing, as curl's Schannel build resolves none (ADR-0820).
+/// <c>2130706433</c>, resolves to nothing, as curl's Schannel build resolves none (ADR-0908).
 /// </remarks>
 public sealed class SystemDnsResolver : IDnsResolver
 {
@@ -87,7 +87,7 @@ public sealed class SystemDnsResolver : IDnsResolver
         if (_refusesIpv4Shorthand && Ipv4ShorthandAddress.IsShorthand(host))
         {
             // curl 8.21.0's Windows build resolves no IPv4 address in shorthand: --connect-to
-            // foo.test:80:127.1:80 is exit 6 "Could not resolve host: 127.1" (BL-3575, ADR-0820).
+            // foo.test:80:127.1:80 is exit 6 "Could not resolve host: 127.1" (BL-3575, ADR-0908).
             return [];
         }
 

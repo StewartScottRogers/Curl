@@ -878,7 +878,7 @@ public static partial class CommandLineOptionTable
     /// <paramref name="url"/> with the user information before its host re-spelled by
     /// <see cref="CommandLineOptions.AsWireText"/>, so a user name or password written raw in a UTF-8
     /// <c>-K</c> file goes out as the file's own bytes, as curl 8.22.0's Windows build sends them
-    /// (CGR-052, ADR-0821); the host, path and the rest are left as they are.
+    /// (CGR-052, ADR-0911); the host, path and the rest are left as they are.
     /// </summary>
     /// <param name="options">The options, which say whether a UTF-8 config file is being read.</param>
     /// <param name="url">The <c>--url</c> value.</param>

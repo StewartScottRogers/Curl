@@ -947,7 +947,7 @@ public sealed class RedirectFollower(
         /// target with its header bytes unmarked (<see cref="HeaderByteText" />), for parsing and
         /// following. A target that held marked bytes came whole from an absolute <c>Location</c>,
         /// so the effective URL it becomes is marked again, and <c>%{url_effective}</c> writes
-        /// those bytes back as curl 8.22.0 does (CGR-062, ADR-0824).
+        /// those bytes back as curl 8.22.0 does (CGR-062, ADR-0923).
         /// </summary>
         public string Targeted(string redirectUrl)
         {

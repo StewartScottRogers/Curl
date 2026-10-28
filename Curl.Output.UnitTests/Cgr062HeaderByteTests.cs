@@ -9,7 +9,7 @@ namespace Curl.Output;
 /// Pins CGR-062 part 2 (BL-3867): curl 8.22.0 Schannel writes a raw byte 0x80 to 0xFF of an
 /// absolute <c>Location</c> back as that one byte in <c>%{redirect_url}</c> and, once followed,
 /// <c>%{url_effective}</c>. The HTTP handler and the follower carry those bytes marked
-/// (<see cref="HeaderByteText"/>, ADR-0824); text from the command line, such as an IDN host a
+/// (<see cref="HeaderByteText"/>, ADR-0923); text from the command line, such as an IDN host a
 /// relative <c>Location</c> keeps, stays UTF-8.
 /// </summary>
 [TestClass]

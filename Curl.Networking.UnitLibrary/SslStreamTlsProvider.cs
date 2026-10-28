@@ -59,7 +59,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     private readonly SslProtocols _offeredProtocols;
 
     // The highest version offered: the options' ceiling, or TLS 1.2 for the Schannel build
-    // with --ciphers (ADR-0816), whose failure text names it.
+    // with --ciphers (ADR-0896), whose failure text names it.
     private readonly TlsVersion _offeredMaximumVersion;
 
     private readonly TimeProvider _timeProvider;
@@ -699,7 +699,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         : targetHost;
 
     /// <summary>
-    /// Returns the name the handshake sends as SNI, as curl sends it (CGR-093, ADR-0825): the
+    /// Returns the name the handshake sends as SNI, as curl sends it (CGR-093, ADR-0925): the
     /// target host lowercased, without the one trailing dot a fully qualified name may carry,
     /// which RFC 6066 section 3 forbids in SNI. curl lowercases the URL host when it parses the
     /// URL, so <c>https://LOCALHOST/</c> sends <c>localhost</c>; the Host header keeps its case.
@@ -712,7 +712,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return lowercased.EndsWith('.') ? lowercased[..^1] : lowercased;
     }
 
-    // ADR-0011, ADR-0816: the Schannel build reads --ciphers as ALG_IDs and ignores
+    // ADR-0011, ADR-0896: the Schannel build reads --ciphers as ALG_IDs and ignores
     // --tls13-ciphers; the OpenSSL build offers what they name. CipherSuitesPolicy cannot be
     // constructed on Windows, where only the tests run the OpenSSL build, so there the
     // factory builds none and the build cannot apply them.

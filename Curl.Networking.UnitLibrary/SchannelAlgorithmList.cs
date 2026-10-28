@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// Applies <c>--ciphers</c> as the Schannel build of curl does (ADR-0011, ADR-0816): the
+/// Applies <c>--ciphers</c> as the Schannel build of curl does (ADR-0011, ADR-0896): the
 /// list is ALG_ID entries split on <c>:</c>, each a non-zero decimal value or a
 /// <c>CALG_*</c> name matched exactly, or a <c>USE_STRONG_CRYPTO</c> /
 /// <c>SCH_USE_STRONG_CRYPTO</c> flag. Any other entry is exit 59; a list whose algorithms

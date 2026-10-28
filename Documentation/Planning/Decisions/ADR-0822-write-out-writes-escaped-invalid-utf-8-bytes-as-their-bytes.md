@@ -3,12 +3,12 @@
 - Status: Accepted
 - Date: 2026-10-26
 - Decision: Decided by Claude under Stewart's delegation (BL-3852)
-- Relates to: [ADR-0821](ADR-0821-linux-and-macos-read-argv-raw-bytes-with-surrogate-escapes.md), [ADR-0816](ADR-0816-write-out-header-values-keep-their-raw-bytes.md)
+- Relates to: [ADR-0909](ADR-0909-linux-and-macos-read-argv-raw-bytes-with-surrogate-escapes.md), [ADR-0893](ADR-0893-write-out-header-values-keep-their-raw-bytes.md)
 
 ## Context
 
 CGR-016 part 4: on Linux and macOS the console hands each argument byte b that is not valid UTF-8 over
-as the lone surrogate U+DC00 + b (ADR-0821's argv decoding). `WriteOutTemplateRenderer` encoded its
+as the lone surrogate U+DC00 + b (ADR-0909's argv decoding). `WriteOutTemplateRenderer` encoded its
 text with `Encoding.UTF8`, which writes a lone surrogate as U+FFFD, so `-w $'\xfe'` wrote EF BF BD.
 Measured with `Record-CurlExchange.ps1 -Curl wsl.exe` against curl 8.18.0 (OpenSSL, Ubuntu in WSL):
 `curl -s -o /dev/null -w $'\xfe' URL | od -An -tx1` prints ` fe`.

@@ -85,7 +85,7 @@ public sealed class CommandLineOption
     /// <summary>
     /// <see langword="true"/> for a row returned by <see cref="RefusedWithoutEch"/>: every reference build -
     /// Schannel on Windows, OpenSSL built without ECH on Linux and macOS - refuses the option with exit 2, and so
-    /// does Curl unless the parse reads as an ECH build (<see cref="CommandLineOptions.ActsAsEchBuild"/>, ADR-0822).
+    /// does Curl unless the parse reads as an ECH build (<see cref="CommandLineOptions.ActsAsEchBuild"/>, ADR-0918).
     /// </summary>
     public bool RefusedByBuildsWithoutEch { get; }
 
@@ -179,7 +179,7 @@ public sealed class CommandLineOption
     /// applied as before. curl builds ECH only on request, so no reference build has it - curl 8.22.0's Schannel
     /// build answers <c>curl: option --ech: the installed libcurl version does not support this</c> and exit 2
     /// (measured 2026-10-26, BL-3571), as does the OpenSSL build from the release tarball - and <c>--ech</c> is
-    /// refused on every platform (CGR-042, ADR-0822).
+    /// refused on every platform (CGR-042, ADR-0918).
     /// </summary>
     /// <returns>The row, refused on every reference build.</returns>
     public CommandLineOption RefusedWithoutEch()
@@ -225,7 +225,7 @@ public sealed class CommandLineOption
     /// <summary>
     /// Wraps <paramref name="apply"/> so it refuses when <paramref name="refuses"/> says the build lacks the
     /// feature. curl 8.21.0 checks the feature before it reads the toggle, so the <c>--no-</c> spelling of a
-    /// negatable row is refused too (measured with <c>--no-proxy-http2</c> before ADR-0786 turned HTTP/2 on).
+    /// negatable row is refused too (measured with <c>--no-proxy-http2</c> before ADR-0871 turned HTTP/2 on).
     /// </summary>
     private static CommandLineOptionApplier Refusing(Func<CommandLineOptions, bool> refuses, CommandLineOptionApplier apply) =>
         (options, value, spelledOption, pathExists, dataFileReader) => refuses(options)

@@ -19,13 +19,13 @@ Linux): with a file named by the raw bytes `63 61 66 E9 2E 74 78 74`,
 1. `Curl.Protocol.Abstractions.UnitLibrary`'s `RawBytePath` is the text form of a path that may hold
    bytes that are not valid UTF-8: `FromBytes` reads UTF-8 and keeps each byte `b` outside a valid
    sequence as the lone surrogate U+DC00 + `b` (U+DC80 to U+DCFF), and `ToBytes` gives each one back
-   its byte. This is the scheme `Curl.Cli`'s `InvalidUtf8ByteEscape` uses for arguments (ADR-0821);
+   its byte. This is the scheme `Curl.Cli`'s `InvalidUtf8ByteEscape` uses for arguments (ADR-0909);
    it is written again in Abstractions because the file protocol references nothing else, and the
    two are the same mapping. A path of valid UTF-8 is unchanged by it.
 2. `Curl.Core`'s `PhysicalFileSystem.OpenForReadAsync`, off Windows, opens a path holding such a
    surrogate with the runtime's non-variadic `SystemNative_Open` shim (`O_RDONLY | O_CLOEXEC`) on its
    NUL-terminated raw bytes, through `LibraryImport` (AOT-safe, as `Curl.Console`'s `RawByteFileName`
-   does for `-o`, ADR-0822), and wraps the descriptor in a `FileStream`. A failed open is the status
+   does for `-o`, ADR-0920), and wraps the descriptor in a `FileStream`. A failed open is the status
    of its `errno` (`ENOENT` is `NotFound`, `EACCES` and `EPERM` `AccessDenied`, `ENOTDIR`
    `NotADirectory`, `EISDIR` `IsDirectory`, any other `IoError`), so a missing name still fails as a
    missing file does. Every other path, and every path on Windows (whose file APIs take UTF-16 and

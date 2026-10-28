@@ -24,7 +24,7 @@ public static class CurlAiHelpText
     private const string NoQuicRefusalLine =
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) have no QUIC library.";
 
-    /// <summary>The line an option's section carries when every reference build refuses it for want of ECH (ADR-0822).</summary>
+    /// <summary>The line an option's section carries when every reference build refuses it for want of ECH (ADR-0918).</summary>
     private const string NoEchRefusalLine =
         "- On every platform: refused with exit 2 (`the installed libcurl version does not support this`), as curl's reference builds (Schannel on Windows, OpenSSL on Linux and macOS) are built without ECH.";
 

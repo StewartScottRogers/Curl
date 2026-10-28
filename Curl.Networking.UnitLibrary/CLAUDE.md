@@ -27,7 +27,7 @@ for `--cert-status` by ADR-0191, and `Curves` or `SignatureAlgorithms` by ADR-01
 adds its row and a data row in `TlsClientRoutingTests`; `KeyLogFile`, the OpenSSL build's `SSLKEYLOGFILE`, is ADR-0518's row (BL-2327): the provider hands `Curl.Tls`'s TLS 1.2 and TLS 1.3 settings one `NssKeyLogFile`, which appends each `CLIENT_RANDOM` line and each TLS 1.3 traffic secret line (BL-2339) and skips a file it cannot write), `SslStreamTlsProvider` otherwise. Per
 ADR-0284 (BL-709) `CurvesAndSignatureAlgorithms.Apply` reads `--curves` through `OpenSslGroupList`
 and `--sigalgs` through `OpenSslSignatureAlgorithmList` (OpenSSL 3.5's syntax on every platform)
-and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms` in the OpenSSL build; the Schannel build ignores both, as curl 8.22.0 Schannel does (ADR-0793, BL-3305);
+and swaps the result into the profile's `supported_groups`, `key_share` and `signature_algorithms` in the OpenSSL build; the Schannel build ignores both, as curl 8.22.0 Schannel does (ADR-0874, BL-3305);
 a refused value is exit 59 and an empty list exit 35, with OpenSSL's text. With `--cert-status` the hand-built
 client asks for the stapled OCSP response and a rejected one is exit 91 with
 `CertificateStatusFailureMessages`' text on every platform; a good, revoked or unknown status is
@@ -107,7 +107,7 @@ first reads the value as a store path (`CurrentUser\MY\<thumbprint>`, parsed by
 opens (`SystemClientCertificateStore`, through `X509Store`, in production; a fake in tests). A certificate that does not
 load is exit 58; in the OpenSSL build a key that does not load is exit 43, as curl reports
 it. `--ciphers` and `--tls13-ciphers` (`TlsClientOptions.Ciphers`, `Tls13Ciphers`) follow
-ADR-0011: the Schannel build reads `--ciphers` as ALG_IDs through `SchannelAlgorithmList` (ADR-0816: an entry naming none is exit 59, a list Schannel accepts none of exit 35, and a list stops the range at TLS 1.2) and ignores `--tls13-ciphers`;
+ADR-0011: the Schannel build reads `--ciphers` as ALG_IDs through `SchannelAlgorithmList` (ADR-0896: an entry naming none is exit 59, a list Schannel accepts none of exit 35, and a list stops the range at TLS 1.2) and ignores `--tls13-ciphers`;
 the OpenSSL build turns both into one `CipherSuitesPolicy` through `OpenSslCipherSuites`,
 the hand-written OpenSSL-name table in OpenSSL's `ALL` order, `--ciphers` expanded as an OpenSSL
 cipher string by `OpenSslCipherString` (ADR-0817), and a list left with no suite is exit 59. On
@@ -120,7 +120,7 @@ the policy into `SslClientAuthenticationOptions` on Windows too (BL-268).
 Per ADR-0138 (BL-502) the handshake offers every TLS version from `TlsClientOptions.MinimumVersion`
 to `MaximumVersion` (`TlsVersion`; `--tlsv1.x`, `--tls-max`), as `TlsVersionRange` computes it,
 the one place here that names the obsolete TLS 1.0 and 1.1 members; with neither set, or only a
-TLS 1.3 ceiling, it offers TLS 1.2 and 1.3, never the system default (ADR-0815, CGR-004); a minimum above the ceiling
+TLS 1.3 ceiling, it offers TLS 1.2 and 1.3, never the system default (ADR-0886, CGR-004); a minimum above the ceiling
 throws, since the parser refuses it. With a ceiling of TLS 1.0 or 1.1 the Schannel build reports
 any security status as `failed to receive handshake`, as curl's did in every measured case.
 Per ADR-0364 (BL-1152) the hand-built OpenSSL build refuses such a ceiling before any hello, as
@@ -138,7 +138,7 @@ the console's to print. No type here constructs an `HttpClient`.
 first address's family in turn, the other family beside it once `happyEyeballsTimeout`
 (`--happy-eyeballs-timeout-ms`, 200 ms by default) has passed on its `TimeProvider` or the first
 family has failed on every address; the first connection wins and the rest are cancelled or closed.
-Per ADR-0818 (BL-3833) a target with a `SocketOpener` (`ITcpSocketOpener`) is raced through
+Per ADR-0903 (BL-3833) a target with a `SocketOpener` (`ITcpSocketOpener`) is raced through
 `SocketOpenerTcpDialer`, which asks it before each attempt to proceed, refuse (a `SocketException`, no
 socket) or use a supplied handle (adopted unowned by `TcpDialer.DialSuppliedSocketAsync`), and tells it
 `SocketClosed` when an opened attempt fails.
@@ -277,7 +277,7 @@ is exit 6 (exit 5 for a proxy) as in curl 8.21.0, which accepts hosts up to 6553
 an address literal `Dns` refuses with `ArgumentException` (the any-address, host `0`) as itself,
 so the dial fails with exit 7 as curl's does (BL-2084). It answers `localhost` and every name
 under `.localhost` itself, `::1` then `127.0.0.1`, without asking `Dns` (`TcpConnector.IsLocalhost`,
-test389, BL-2113). Per ADR-0820 (BL-3575) on Windows it resolves an IPv4 address in shorthand
+test389, BL-2113). Per ADR-0908 (BL-3575) on Windows it resolves an IPv4 address in shorthand
 (`Ipv4ShorthandAddress`: `127.1`, `0`, `2130706433`) to nothing, as the Schannel build does, and
 `LocalBindingAddressChooser` hands such an `--interface` host to the resolver. Every
 `Could not resolve host:` and `Could not resolve proxy:` message goes through `CurlErrorBuffer`,
@@ -567,7 +567,7 @@ Everything else takes the Abstractions contracts (`IDnsResolver`, `ITlsProvider`
 milliseconds after a peer's RST WSAECONNABORTED where curl's prompt `recv` sees WSAECONNRESET; per
 ADR-0708 (BL-2821) not when the last write found unread bytes on the socket (`HasUnreadBytesOrEndBeforeWrite`),
 as test1802's proxy leaves after its CONNECT reply before closing, where curl prints the abort,
-nor per ADR-0796 (BL-3304) when it found the peer's unread FIN, as on a kept connection the server
+nor per ADR-0878 (BL-3304) when it found the peer's unread FIN, as on a kept connection the server
 closed and curl reused. `UdpDatagramConnector` opens channels
 through an internal seam, so its tests need no socket. `UdpDatagramChannelTests` opens,
 cancels and disposes local UDP sockets without sending anything.

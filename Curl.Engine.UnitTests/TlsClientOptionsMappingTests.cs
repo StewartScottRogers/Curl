@@ -556,7 +556,7 @@ public sealed class TlsClientOptionsMappingTests
 
     private static CommandLineOptions Parse(string[] arguments)
     {
-        // As the OpenSSL build reads it, but built with ECH, so --ech is accepted rather than refused (ADR-0822).
+        // As the OpenSSL build reads it, but built with ECH, so --ech is accepted rather than refused (ADR-0918).
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: false, actsAsEchBuild: true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;

@@ -177,7 +177,7 @@ internal sealed partial class ManagedEasyTransfer(
     /// <summary>
     /// Gets or sets what the handle's transfers wait for on their socket while a multi handle drives them by
     /// <c>curl_multi_socket_action</c>: each perform starts its clock (<see cref="TransferSocketWait.Start" />) and
-    /// dials through a <see cref="SocketActionGatedTcpDialer" /> over it (ADR-0822, BL-3859); <see langword="null" />,
+    /// dials through a <see cref="SocketActionGatedTcpDialer" /> over it (ADR-0917, BL-3859); <see langword="null" />,
     /// the default, outside socket-action mode, where nothing changes.
     /// </summary>
     internal TransferSocketWait? SocketWait { get; set; }

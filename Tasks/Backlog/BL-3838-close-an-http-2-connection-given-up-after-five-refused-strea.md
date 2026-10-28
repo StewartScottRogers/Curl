@@ -18,7 +18,7 @@ When an HTTP/2 server refuses the request every time, Curl closes the sixth conn
 
 ## Context
 
-Found by BL-3560 (CGR-031, ADR-0817). A scenario server that answers every HEADERS with RST_STREAM REFUSED_STREAM shows the difference: real curl 8.18.0 (WSL) sent GOAWAY (type 7, len 17) on connections 1 to 5 and none on 6, in both measurements, while Curl sends one on all six. In curl the given-up connection is closed prematurely, after `multi_done` with an error, so it gets no graceful shutdown. Curl's held `Http2Session` sends `ShutDownAsync`'s GOAWAY when the connection closes (`HttpProtocolHandler.ExchangeOnConnectionAsync`, `UnheldHttp2Session`; BL-817). The fix probably needs a way to close a session without the GOAWAY on the give-up path of `StreamRefusedOutcome`. The scenario server is a C# file-based app, h2srv.cs; its source is in BL-3560's Notes.
+Found by BL-3560 (CGR-031, ADR-0900). A scenario server that answers every HEADERS with RST_STREAM REFUSED_STREAM shows the difference: real curl 8.18.0 (WSL) sent GOAWAY (type 7, len 17) on connections 1 to 5 and none on 6, in both measurements, while Curl sends one on all six. In curl the given-up connection is closed prematurely, after `multi_done` with an error, so it gets no graceful shutdown. Curl's held `Http2Session` sends `ShutDownAsync`'s GOAWAY when the connection closes (`HttpProtocolHandler.ExchangeOnConnectionAsync`, `UnheldHttp2Session`; BL-817). The fix probably needs a way to close a session without the GOAWAY on the give-up path of `StreamRefusedOutcome`. The scenario server is a C# file-based app, h2srv.cs; its source is in BL-3560's Notes.
 
 ## Acceptance criteria
 

@@ -28,7 +28,7 @@ namespace Curl.Console;
 /// with the ANSI file API (byte E9 writes <c>café.txt</c>, bytes C3 A9 write <c>cafÃ©.txt</c>
 /// under code page 1252; BL-3580 Notes, CGR-051), and UTF-8 elsewhere, the encoding .NET
 /// file names round-trip through, so a name that is not valid UTF-8 off Windows gets U+FFFD
-/// in place of its raw bytes (ADR-0821).
+/// in place of its raw bytes (ADR-0912).
 /// </para>
 /// </remarks>
 internal static class ContentDispositionFileName

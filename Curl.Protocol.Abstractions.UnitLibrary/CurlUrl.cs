@@ -130,7 +130,7 @@ public sealed record CurlUrl
     /// above <c>~</c> as <c>%XX</c>, the bytes being <see cref="UrlByteText.ToBytes" />'s, so a
     /// character is its UTF-8 and an argument byte that was not valid UTF-8 (a lone
     /// <c>U+DC80</c> to <c>U+DCFF</c>) is itself: <c>/%FF</c>, as curl 8.18.0 sends
-    /// <c>http://h/</c> and the byte <c>0xFF</c> on Linux (CGR-016, BL-3851, ADR-0823).
+    /// <c>http://h/</c> and the byte <c>0xFF</c> on Linux (CGR-016, BL-3851, ADR-0921).
     /// </summary>
     public string RequestPath => PercentEncodedAboveTilde(AbsolutePath);
 

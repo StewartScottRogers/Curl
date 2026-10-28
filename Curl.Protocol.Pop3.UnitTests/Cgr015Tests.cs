@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Protocol.Pop3;
 
 /// <summary>
-/// Pins CGR-015 part 5 (BL-3842, ADR-0820): a POP3 <c>-X</c> custom request holding a non-ASCII character is sent as its bytes in the system ANSI code
+/// Pins CGR-015 part 5 (BL-3842, ADR-0907): a POP3 <c>-X</c> custom request holding a non-ASCII character is sent as its bytes in the system ANSI code
 /// page on Windows and as UTF-8 elsewhere. Real curl 8.22.0 on Windows (code page 1252) was
 /// measured with <c>Record-CurlExchange.ps1</c> on 2026-10-26; the encoding is passed in, so
 /// every case runs the same on Linux and macOS.

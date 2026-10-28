@@ -14,7 +14,7 @@ namespace Curl.Authentication;
 /// </param>
 /// <param name="isAnsweredBySspi">
 /// <see langword="true" /> for MD5 and MD5-sess, the only ones Windows SSPI answers; curl's
-/// Schannel build fails the others with exit 94 (BL-3281, ADR-0791).
+/// Schannel build fails the others with exit 94 (BL-3281, ADR-0873).
 /// </param>
 internal sealed class DigestAlgorithm(Func<byte[], byte[]> hash, bool isSession, bool isAnsweredBySspi)
 {

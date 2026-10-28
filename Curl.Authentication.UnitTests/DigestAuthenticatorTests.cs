@@ -520,7 +520,7 @@ public sealed class DigestAuthenticatorTests
 
     /// <summary>
     /// The differential case auth-digest256 on Windows, where the engine matches the SSPI build:
-    /// curl 8.21.0 and 8.22.0 (Schannel) send one request and exit 94 (ADR-0791).
+    /// curl 8.21.0 and 8.22.0 (Schannel) send one request and exit 94 (ADR-0873).
     /// </summary>
     [TestMethod]
     [OSCondition(OperatingSystems.Windows)]
@@ -541,7 +541,7 @@ public sealed class DigestAuthenticatorTests
 
     /// <summary>
     /// The differential case auth-digest256 off Windows, where curl's OpenSSL build answers
-    /// SHA-256 with its own Digest code and the server says <c>sha256 ok</c> (ADR-0791).
+    /// SHA-256 with its own Digest code and the server says <c>sha256 ok</c> (ADR-0873).
     /// </summary>
     [TestMethod]
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]

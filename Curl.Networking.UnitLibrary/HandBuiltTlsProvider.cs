@@ -742,7 +742,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return tls12.Stream is { } tls12Stream ? HandBuiltHandshake.Completed(tls12Stream) : HandBuiltHandshake.Failed(tls12.Failure!);
     }
 
-    // ADR-0011 and ADR-0816 as SslStreamTlsProvider applies them: the Schannel build reads
+    // ADR-0011 and ADR-0896 as SslStreamTlsProvider applies them: the Schannel build reads
     // --ciphers as ALG_IDs and ignores --tls13-ciphers; the OpenSSL build offers what they
     // name that the client can run, and a list naming none of those is exit 59.
     private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) SelectCipherSuites() =>
@@ -772,7 +772,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
 
-    // The Schannel build ignores --sigalgs and --curves (ADR-0793), so its failed handshake
+    // The Schannel build ignores --sigalgs and --curves (ADR-0874), so its failed handshake
     // prints Schannel's text whether or not either is given.
     private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
         _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12)

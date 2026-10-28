@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// ADR-0284): the ClientHello's <c>supported_groups</c>, <c>key_share</c> and
 /// <c>signature_algorithms</c> for each value, as Ubuntu's curl 8.18.0 with OpenSSL 3.5.5 sent
 /// them (captured 2026-09-30), and the measured failures, in the OpenSSL build; the Schannel
-/// build ignores both, as curl 8.22.0 Schannel does (BL-3305, ADR-0793).
+/// build ignores both, as curl 8.22.0 Schannel does (BL-3305, ADR-0874).
 /// </summary>
 public sealed partial class HandBuiltTlsProviderTests
 {
@@ -244,7 +244,7 @@ public sealed partial class HandBuiltTlsProviderTests
 
     // The failures come before a ClientHello is sent, in the OpenSSL build's order (measured;
     // stars on TLS 1.2-only groups alone, BL-1082, measured 2026-10-01); the Schannel build
-    // has none, ignoring both lists (ADR-0793).
+    // has none, ignoring both lists (ADR-0874).
     [TestMethod]
     [DataRow(OpenSslBuild, "bogus", null, CurlExitCode.SslCipher, "failed setting curves list: 'bogus'")]
     [DataRow(OpenSslBuild, "bogus", "bogus", CurlExitCode.SslCipher, "failed setting curves list: 'bogus'")]
@@ -523,7 +523,7 @@ public sealed partial class HandBuiltTlsProviderTests
 
     // curl 8.22.0 Schannel ignores --curves and --sigalgs, whatever their value: -sSk with
     // --curves nope, X25519 or P-256:nope, or --sigalgs nope or ecdsa_secp256r1_sha256, exits 0
-    // with the body (measured 2026-10-23, BL-3305, ADR-0793), so the hello is the profile's.
+    // with the body (measured 2026-10-23, BL-3305, ADR-0874), so the hello is the profile's.
     [TestMethod]
     [DataRow("nope", null)]
     [DataRow("X25519", null)]

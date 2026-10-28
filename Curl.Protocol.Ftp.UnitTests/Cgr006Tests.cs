@@ -10,7 +10,7 @@ namespace Curl.Protocol.Ftp;
 /// connection with <c>close_notify</c> and FIN, then reads what the server still sends (a
 /// TLS 1.3 session ticket) until the server closes, for at most two seconds, before it is
 /// disposed. Disposing it with the ticket unread made Windows reset the connection, and the
-/// reset threw away the upload the server had not read yet (ADR-0816).
+/// reset threw away the upload the server had not read yet (ADR-0891).
 /// </summary>
 [TestClass]
 public sealed class Cgr006Tests

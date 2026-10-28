@@ -16,7 +16,7 @@ namespace Curl.Protocol.Http;
 /// sent, with its scheme lowercased and, when it names an authority, its dot segments
 /// removed and an empty path made <c>/</c>; one that is not a valid URL is kept whole. Its bytes from
 /// 0x80 are marked (<see cref="HeaderByteText" />), so <c>%{redirect_url}</c> and, once followed,
-/// <c>%{url_effective}</c> write each back as that one byte, as curl 8.22.0 does (CGR-062, ADR-0824).
+/// <c>%{url_effective}</c> write each back as that one byte, as curl 8.22.0 does (CGR-062, ADR-0923).
 /// </para>
 /// <para>
 /// Any other value is a reference resolved by RFC 3986 section 5.2: scheme-relative

@@ -544,7 +544,7 @@ Standard error is wrapped in `WriteFailureIgnoringStream`, which ignores an
 `WriteFailureIgnoringWriteOutFileOpener`), and a `-D` file's close: on `/dev/full` the first three
 leave the exit code alone, and `-D` ends with its `Failed writing headers` line and the handler's
 exit 23 rather than the close's exception; a `-c` jar whose close fails is a jar not written
-(ADR-0818, CGR-026, BL-3830).
+(ADR-0902, CGR-026, BL-3830).
 
 Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
 `-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;

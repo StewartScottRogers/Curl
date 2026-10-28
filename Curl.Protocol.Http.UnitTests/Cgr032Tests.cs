@@ -12,7 +12,7 @@ namespace Curl.Protocol.Http;
 /// a stream the server resets with RST_STREAM HTTP_1_1_REQUIRED (0xd) is sent again over
 /// HTTP/1.1 on a new connection, its body too, as curl 8.18.0 with nghttp2 does
 /// (<c>Downgrades to HTTP/1.1</c>, exit 0), and a TLS connection for it offers only
-/// <c>http/1.1</c> through ALPN (ADR-0819, BL-3561 Notes).
+/// <c>http/1.1</c> through ALPN (ADR-0906, BL-3561 Notes).
 /// </summary>
 [TestClass]
 public sealed class Cgr032Tests

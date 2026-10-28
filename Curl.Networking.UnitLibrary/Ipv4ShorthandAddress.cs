@@ -13,7 +13,7 @@ namespace Curl.Networking;
 /// does, but curl 8.21.0's Schannel build on Windows resolves none of them: <c>--connect-to</c> to
 /// <c>127.1</c> is exit 6 <c>Could not resolve host: 127.1</c> and <c>--interface 127.1</c> exit 45,
 /// while curl 8.18.0's OpenSSL build on Linux reads them as the system resolver does (measured, BL-3575,
-/// ADR-0820). A URL's host never reaches here in shorthand: the URL parser writes it as a dotted quad.
+/// ADR-0908). A URL's host never reaches here in shorthand: the URL parser writes it as a dotted quad.
 /// </remarks>
 internal static class Ipv4ShorthandAddress
 {

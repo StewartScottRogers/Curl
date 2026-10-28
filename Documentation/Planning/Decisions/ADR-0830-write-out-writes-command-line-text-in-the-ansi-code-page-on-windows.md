@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-26
 - Decision: Decided by Claude under Stewart's delegation (BL-3841, CGR-015 part 4)
-- Relates to: [ADR-0820](ADR-0820-gopher-dict-pop3-mqtt-send-command-line-text-in-the-ansi-code-page-on-windows.md), [ADR-0816](ADR-0816-write-out-header-values-keep-their-raw-bytes.md), [ADR-0822](ADR-0822-write-out-writes-escaped-invalid-utf-8-bytes-as-their-bytes.md)
+- Relates to: [ADR-0907](ADR-0907-gopher-dict-pop3-mqtt-send-command-line-text-in-the-ansi-code-page-on-windows.md), [ADR-0893](ADR-0893-write-out-header-values-keep-their-raw-bytes.md), [ADR-0822](ADR-0822-write-out-writes-escaped-invalid-utf-8-bytes-as-their-bytes.md)
 
 ## Context
 

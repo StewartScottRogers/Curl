@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-26
 - Decision: Decided by Claude under Stewart's delegation (BL-3591)
-- Relates to: [ADR-0824](ADR-0824-sspi-digest-reads-and-answers-challenges-as-windows-curl-does.md)
+- Relates to: [ADR-0924](ADR-0924-sspi-digest-reads-and-answers-challenges-as-windows-curl-does.md)
 
 ## Context
 

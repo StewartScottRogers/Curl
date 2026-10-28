@@ -289,7 +289,7 @@ namespace Curl.Console;
 /// <param name="lateBoundDiagnosticLog">The log the authenticators were composed with, bound to the run's diagnostic log once it is open (BL-923); <see langword="null" /> when none was composed.</param>
 /// <param name="parsesAsEchBuild">
 /// Whether the command line is read as a curl built with ECH reads it (<see cref="CommandLineOptions.ActsAsEchBuild" />),
-/// accepting <c>--ech</c>; off by default, as every reference build refuses it (ADR-0822). Tests and the conformance
+/// accepting <c>--ech</c>; off by default, as every reference build refuses it (ADR-0918). Tests and the conformance
 /// harness turn it on to reach the hand-built ECH.
 /// </param>
 /// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>

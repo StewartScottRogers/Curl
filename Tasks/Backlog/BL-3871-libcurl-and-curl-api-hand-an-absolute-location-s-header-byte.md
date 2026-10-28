@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-ADR-0824 (BL-3867) carries an absolute `Location`'s bytes from 0x80 marked as U+F700 + byte in `TransferReport.RedirectUrl` and `EffectiveUrl`, and they reach `TransferInfo` and the libcurl string readers (`Libcurl/Info/Strings/EasyInfoReaders.Strings.cs`, `ReadRedirectUrl` and `ReadEffectiveUrl`) unchanged. Converting them there with `HeaderByteText.Unmark`, Latin-1 bytes and `UrlByteText.ToText` gives libcurl's byte answer; `Curl.Console/EasyHandleWriteOutInfo.cs` reads these back for `-w`, and `WriteOutTemplateRenderer` writes a lone U+DC80 to U+DCFF as its byte too (ADR-0822), so `%{redirect_url}` keeps writing E9 - re-run BL-3867's repro (Notes there) to confirm. Check `Curl.Api`'s `CurlHttpMessageHandler.Behaviour.cs` use of `EffectiveUrl` as well.
+ADR-0923 (BL-3867) carries an absolute `Location`'s bytes from 0x80 marked as U+F700 + byte in `TransferReport.RedirectUrl` and `EffectiveUrl`, and they reach `TransferInfo` and the libcurl string readers (`Libcurl/Info/Strings/EasyInfoReaders.Strings.cs`, `ReadRedirectUrl` and `ReadEffectiveUrl`) unchanged. Converting them there with `HeaderByteText.Unmark`, Latin-1 bytes and `UrlByteText.ToText` gives libcurl's byte answer; `Curl.Console/EasyHandleWriteOutInfo.cs` reads these back for `-w`, and `WriteOutTemplateRenderer` writes a lone U+DC80 to U+DCFF as its byte too (ADR-0822), so `%{redirect_url}` keeps writing E9 - re-run BL-3867's repro (Notes there) to confirm. Check `Curl.Api`'s `CurlHttpMessageHandler.Behaviour.cs` use of `EffectiveUrl` as well.
 
 ## Acceptance criteria
 

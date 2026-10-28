@@ -4,7 +4,7 @@ namespace Curl.Conformance.Differential.IntegrationTests.Host;
 /// Finds the two binaries a differential run compares: the reference curl named by
 /// <c>CURL_DIFFERENTIAL_REFERENCE</c> (ADR-0782) and the Curl under test, named by
 /// <c>CURL_DIFFERENTIAL_OURS</c> or else the <c>Curl.Console</c> build in this project's
-/// output (ADR-0785).
+/// output (ADR-0870).
 /// </summary>
 internal static class DifferentialBinaries
 {

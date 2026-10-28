@@ -8,7 +8,7 @@ namespace Curl.Engine;
 /// A transfer's plaintext TCP connection under <c>curl_multi_socket_action</c>: each read waits until the multi
 /// handle signals the socket readable and each write until it signals it writable
 /// (<see cref="TransferSocketWait" />), so the transfer never takes bytes the application's poll has not seen and
-/// the application is woken again when more come (ADR-0821, BL-3847).
+/// the application is woken again when more come (ADR-0914, BL-3847).
 /// </summary>
 /// <remarks>
 /// It wraps the dialed connection beneath TLS and any HTTP/2 framing, so a read those layers answer from bytes they

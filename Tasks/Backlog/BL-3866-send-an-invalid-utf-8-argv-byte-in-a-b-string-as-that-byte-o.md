@@ -18,7 +18,7 @@ On Linux and macOS, `curl -b $'c=\xfe'` sends `Cookie: c=` followed by the byte 
 
 ## Context
 
-ADR-0821 hands each `argv` byte that is not valid UTF-8 over as the lone surrogate U+DC00 + byte. BL-3594 (ADR-0823) made `CookieEngine.FromHttpOptions` turn `-b` strings into their bytes in the platform encoding (`WireTextOf`), but `Encoding.UTF8` turns a lone surrogate into EF BF BD. `HttpRequestHeadFormatter.WireText` (Curl.Protocol.Http.UnitLibrary, internal) already gives such a surrogate back as its byte for `-H` and `-X`; `CookieEngine.WireTextOf` should do the same. Measure real curl under WSL first.
+ADR-0909 hands each `argv` byte that is not valid UTF-8 over as the lone surrogate U+DC00 + byte. BL-3594 (ADR-0823) made `CookieEngine.FromHttpOptions` turn `-b` strings into their bytes in the platform encoding (`WireTextOf`), but `Encoding.UTF8` turns a lone surrogate into EF BF BD. `HttpRequestHeadFormatter.WireText` (Curl.Protocol.Http.UnitLibrary, internal) already gives such a surrogate back as its byte for `-H` and `-X`; `CookieEngine.WireTextOf` should do the same. Measure real curl under WSL first.
 
 ## Acceptance criteria
 

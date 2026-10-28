@@ -4,7 +4,7 @@ namespace Curl.Protocol.Pop3;
 
 /// <summary>
 /// Turns text taken from the command line - a <c>-X</c> custom request - into the bytes the platform's curl sends,
-/// which are the bytes curl received in its argv (BL-3842, ADR-0820): the system ANSI code
+/// which are the bytes curl received in its argv (BL-3842, ADR-0907): the system ANSI code
 /// page on Windows, where a character the code page lacks is best-fitted (measured with
 /// <c>Record-CurlExchange.ps1</c>: <c>é</c> went out as <c>E9</c>), and UTF-8 on Linux and macOS.
 /// </summary>

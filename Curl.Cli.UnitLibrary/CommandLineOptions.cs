@@ -283,7 +283,7 @@ public sealed class CommandLineOptions
     /// <see langword="true"/> when the command line is read as curl's Windows Schannel build reads it: that
     /// build's libcurl has no SSL session export, so <c>--ssl-sessions</c> is refused with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedBySchannelBuild"/>,
-    /// ADR-0397). The HTTP/2 options run on Windows as elsewhere (ADR-0786). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
+    /// ADR-0397). The HTTP/2 options run on Windows as elsewhere (ADR-0871). Set by <see cref="CommandLineParser"/> for the platform it is asked to behave as.
     /// </summary>
     public bool ActsAsWindowsSchannelBuild { get => globals.ActsAsWindowsSchannelBuild; internal set => globals.ActsAsWindowsSchannelBuild = value; }
 
@@ -304,7 +304,7 @@ public sealed class CommandLineOptions
     /// (ADR-0327). <see langword="false"/> as every reference build reads it - Schannel on Windows, OpenSSL without
     /// ECH on Linux and macOS - which refuses <c>--ech</c> with
     /// <see cref="CommandLineRefusal.InstalledLibcurlDoesNotSupport"/> (<see cref="CommandLineOption.RefusedWithoutEch"/>,
-    /// ADR-0822). The executable never sets it; tests and the conformance harness ask
+    /// ADR-0918). The executable never sets it; tests and the conformance harness ask
     /// <see cref="CommandLineParser"/> for it to reach the ECH code.
     /// </summary>
     public bool ActsAsEchBuild { get => globals.ActsAsEchBuild; internal set => globals.ActsAsEchBuild = value; }

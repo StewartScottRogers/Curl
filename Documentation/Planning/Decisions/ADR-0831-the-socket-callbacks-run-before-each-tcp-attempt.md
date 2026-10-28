@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-26
 - Decision: Decided by Claude under Stewart's delegation (BL-3565)
-- Relates to: [ADR-0610](ADR-0610-socket-callbacks-over-opaque-connection-handles.md), [ADR-0818](ADR-0818-a-connect-asks-its-socket-opener-before-each-tcp-attempt.md)
+- Relates to: [ADR-0610](ADR-0610-socket-callbacks-over-opaque-connection-handles.md), [ADR-0903](ADR-0903-a-connect-asks-its-socket-opener-before-each-tcp-attempt.md)
 
 ## Context
 
@@ -15,7 +15,7 @@ port called neither the open nor the close callback. curl 8.22.0's `cf_socket_op
 open-socket callback for each address before the connect, connects the socket it returns, calls
 the socket-option callback before connecting (skipping the connect on
 `CURL_SOCKOPT_ALREADY_CONNECTED`), and calls the close-socket callback for each attempt's socket
-that fails. ADR-0818 (BL-3833) gave `ConnectTarget` a per-attempt `ITcpSocketOpener` for this.
+that fails. ADR-0903 (BL-3833) gave `ConnectTarget` a per-attempt `ITcpSocketOpener` for this.
 
 ## Decision
 

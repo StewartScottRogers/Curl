@@ -4,7 +4,7 @@ namespace Curl.Authentication;
 
 /// <summary>
 /// Pins <see cref="InvalidUtf8ByteEscapingEncoding" />: UTF-8 that keeps each byte outside a valid
-/// sequence as a lone surrogate U+DC80 to U+DCFF and encodes it back (CGR-053, ADR-0822).
+/// sequence as a lone surrogate U+DC80 to U+DCFF and encodes it back (CGR-053, ADR-0916).
 /// </summary>
 [TestClass]
 public sealed class InvalidUtf8ByteEscapingEncodingTests

@@ -90,11 +90,11 @@ curl -s -S http://127.0.0.1:21374/1801 --http2
   - `--http2-prior-knowledge -s URL`: REF exit 2, same refusal naming the option; NG exit 55, no output; PORT exit 55, no output.
   - `--proxy-http2 -s URL`: REF exit 2, refusal; NG exit 0, `hello`; PORT exit 0, `hello`, the same plain HTTP/1.1 request.
   - `-s -S --http2 URL` (UC-16): REF exit 2, refusal; NG exit 16, `curl: (16) Remote peer returned unexpected data while we expected SETTINGS frame.  Perhaps, peer does not support HTTP/2 properly.`; PORT exit 56, `curl: (56) Recv failure: Connection was aborted`. That NG difference is BL-3650's (CGR-121).
-- Decision (ADR-0819): Curl keeps Stewart's ADR-0786 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0786, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
+- Decision (ADR-0819): Curl keeps Stewart's ADR-0871 (the three options run on Windows as the nghttp2 build runs them); refusing them would reverse a decision Stewart made himself, which the delegation does not cover, so the criteria (match REF's exit 2) cannot be met as written. Blocked for Stewart. If he reverses ADR-0871, the fix is `.RefusedBySchannelBuild()` on the three rows (`--proxy-http2` lives outside HttpVersionRows) plus `Cgr040Tests.cs` and `--ai-help`.
 
 ## Log
 
 - 2026-10-26: Created from CGR-040 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-26: Doing -> Blocked. Stewart: CGR-040 asks Windows to refuse --http2/--http2-prior-knowledge/--proxy-http2 (exit 2) as Schannel curl does, reversing your ADR-0786 - keep ADR-0786 (ADR-0819) and close CGR-040 as accepted, or refuse them?
-- 2026-10-26: Blocked -> Deferred. Stewart, 2026-10-26: keep HTTP/2 on Windows (ADR-0786, ADR-0819); CGR-040 is an accepted difference from the Schannel build, not a defect. Revisit only if Stewart reverses ADR-0786.
+- 2026-10-26: Doing -> Blocked. Stewart: CGR-040 asks Windows to refuse --http2/--http2-prior-knowledge/--proxy-http2 (exit 2) as Schannel curl does, reversing your ADR-0871 - keep ADR-0871 (ADR-0906) and close CGR-040 as accepted, or refuse them?
+- 2026-10-26: Blocked -> Deferred. Stewart, 2026-10-26: keep HTTP/2 on Windows (ADR-0871, ADR-0906); CGR-040 is an accepted difference from the Schannel build, not a defect. Revisit only if Stewart reverses ADR-0871.

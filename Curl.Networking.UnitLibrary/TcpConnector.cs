@@ -177,7 +177,7 @@ public sealed partial class TcpConnector(
         ? new LocalBindingTcpDialer(tcpDialer, addressChooser, events)
         : tcpDialer;
 
-    // The race's dialer: BindingDialer's, asking the target's socket opener before each attempt when it has one (ADR-0818).
+    // The race's dialer: BindingDialer's, asking the target's socket opener before each attempt when it has one (ADR-0903).
     private ITcpDialer AttemptDialer(ConnectTarget target) => target.SocketOpener is { } opener
         ? new SocketOpenerTcpDialer(BindingDialer(target.Events), opener)
         : BindingDialer(target.Events);

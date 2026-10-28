@@ -6,7 +6,7 @@ namespace Curl.Protocol.Http;
 /// Pins CGR-062 part 2 (BL-3867): curl 8.22.0 Schannel writes a raw byte 0x80 to 0xFF of an
 /// absolute <c>Location</c> back as that byte in <c>%{redirect_url}</c>, so
 /// <see cref="HttpRedirectLocation" /> marks those bytes (<see cref="HeaderByteText" />,
-/// ADR-0824); a relative <c>Location</c> keeps the request URL's own authority, which is
+/// ADR-0923); a relative <c>Location</c> keeps the request URL's own authority, which is
 /// command-line text and is not marked (upstream tests 2046 and 2047).
 /// </summary>
 [TestClass]

@@ -12,7 +12,7 @@ namespace Curl.Engine;
 /// creates it (<see cref="TransferSocketWait.ConnectingOn" />, BL-3890), a dial that connects ends the connect
 /// (<see cref="TransferSocketWait.EndConnect" />), and each dialed connection is wrapped, beneath TLS, in a
 /// <see cref="SocketActionGatedConnection" />, so its reads and writes wait for the multi handle's signal
-/// (ADR-0822, BL-3859). Every other member is the inner dialer's.
+/// (ADR-0917, BL-3859). Every other member is the inner dialer's.
 /// </summary>
 /// <remarks>
 /// A dial that fails leaves the transfer connecting, as libcurl's does while it tries the next address; the

@@ -2197,7 +2197,7 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Builds the outcome of an exchange whose HTTP/2 stream the server reset with
     /// <c>HTTP_1_1_REQUIRED</c>, as curl 8.18.0's <c>multi_runsingle</c> does for
-    /// <c>Curl_h2_http_1_1_error</c> (CGR-032, ADR-0819): <c>-v</c> says <c>Downgrades to HTTP/1.1</c>,
+    /// <c>Curl_h2_http_1_1_error</c> (CGR-032, ADR-0906): <c>-v</c> says <c>Downgrades to HTTP/1.1</c>,
     /// the HTTP/2 connection is closed and the request is sent again, once, over HTTP/1.1 on a
     /// new connection, its body rewound as for a refused stream.
     /// </summary>

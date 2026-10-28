@@ -4,7 +4,7 @@ namespace Curl.Protocol.Abstractions;
 /// Writes the percent-escapes of a URL path as curl 8.22.0 sends them to the origin: each
 /// <c>%</c> followed by two hex digits with those digits in upper case, so <c>/a%2fb%7e</c>
 /// goes on the wire as <c>/a%2Fb%7E</c>. An escape that is not two hex digits (<c>%zz</c>,
-/// a trailing <c>%a</c>) is left as it is (ADR-0821, CGR-054).
+/// a trailing <c>%a</c>) is left as it is (ADR-0911, CGR-054).
 /// </summary>
 public static class UrlPathEscapes
 {

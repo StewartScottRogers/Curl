@@ -18,7 +18,7 @@ Off Windows, `curl_easy_getinfo(CURLINFO_CERTINFO)` returns the OpenSSL build's 
 
 ## Context
 
-BL-3620 (ADR-0825) made `-w %{certs}` follow the platform: `PeerCertificateText.FormatFor(certificate, PlatformTlsBackend.ForProcess)`. `TransferInfoFromReport.CertInfo` still builds `CURLINFO_CERTINFO` from `PeerCertificateText.Format`, the x509asn1.c layout, and splits that text back into records (`CertInfoRecordsOf`), so on Linux and macOS it disagrees with `%{certs}` and with libcurl's OpenSSL build. Note the OpenSSL layout's authority key identifier value can span several lines, so splitting the `%{certs}` text by line no longer gives one record per label; the records need building directly (or a split that knows the labels). The record labels and order are in ADR-0825; the last record is `Cert` with the PEM.
+BL-3620 (ADR-0926) made `-w %{certs}` follow the platform: `PeerCertificateText.FormatFor(certificate, PlatformTlsBackend.ForProcess)`. `TransferInfoFromReport.CertInfo` still builds `CURLINFO_CERTINFO` from `PeerCertificateText.Format`, the x509asn1.c layout, and splits that text back into records (`CertInfoRecordsOf`), so on Linux and macOS it disagrees with `%{certs}` and with libcurl's OpenSSL build. Note the OpenSSL layout's authority key identifier value can span several lines, so splitting the `%{certs}` text by line no longer gives one record per label; the records need building directly (or a split that knows the labels). The record labels and order are in ADR-0926; the last record is `Cert` with the PEM.
 
 ## Acceptance criteria
 

@@ -16,7 +16,7 @@ public sealed record LibcurlPrintfScenario(int Index, string Format, IReadOnlyLi
     /// <summary>
     /// Whether the format has a floating-point conversion with the <c>L</c> (<c>long double</c>)
     /// length modifier, which crashes the reference libcurl 8.22.0 with an access violation (the
-    /// tester's <c>EXC OSError</c>), so the scenario is not run against it (ADR-0794).
+    /// tester's <c>EXC OSError</c>), so the scenario is not run against it (ADR-0876).
     /// </summary>
     public bool CrashesReference => LongDoubleConversion.IsMatch(Format);
 }

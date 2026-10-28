@@ -12,7 +12,7 @@ namespace Curl.Authentication;
 /// and SHA-512-256, their <c>-sess</c> variants, <c>qop=auth</c> and <c>auth-int</c>, and
 /// <c>userhash</c>. Matching the Schannel build, the challenge is read as SSPI reads it
 /// (<see cref="DigestSspiChallenge" />) and one SSPI refuses, such as a SHA-256 or SHA-512-256
-/// one, fails with exit 94 (ADR-0791, BL-3606).
+/// one, fails with exit 94 (ADR-0873, BL-3606).
 /// </summary>
 /// <param name="credentialEncoding">
 /// The encoding the user name and password are hashed and sent in; see
@@ -55,7 +55,7 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
     /// <exception cref="HttpAuthenticationFailedException">
     /// <c>matchesSspiBuild</c> is set and SSPI refuses the challenge (<see cref="DigestSspiChallenge" />)
     /// or a user name with a control character: exit 94; or the user name is empty: exit 67,
-    /// "Login denied", as curl's Schannel build (ADR-0791, BL-3606).
+    /// "Login denied", as curl's Schannel build (ADR-0873, BL-3606).
     /// </exception>
     public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
     {

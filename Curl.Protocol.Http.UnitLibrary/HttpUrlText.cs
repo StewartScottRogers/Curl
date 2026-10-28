@@ -40,7 +40,7 @@ internal static class HttpUrlText
     /// Gives the origin-form request target the request line and authentication send:
     /// <see cref="RequestTarget(CurlUrl)" /> with the path's <c>%XX</c> escapes in upper case and the
     /// query as typed, as curl 8.22.0 sends <c>/a%2fb?x=%2f</c> as <c>/a%2Fb?x=%2f</c>. The
-    /// absolute form a forward proxy gets keeps the escapes as typed (ADR-0821, CGR-054).
+    /// absolute form a forward proxy gets keeps the escapes as typed (ADR-0911, CGR-054).
     /// </summary>
     internal static string OriginTarget(CurlUrl url) => OriginTarget(url, Encoding.UTF8);
 

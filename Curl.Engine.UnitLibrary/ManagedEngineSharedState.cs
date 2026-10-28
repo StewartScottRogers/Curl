@@ -229,7 +229,7 @@ internal sealed class ManagedEngineSharedState
     /// <summary>
     /// Gets what the transfer running over this state waits for on its socket while a multi handle drives it by
     /// <c>curl_multi_socket_action</c>, which its dialer gates each dialed connection on
-    /// (<see cref="SocketActionGatedTcpDialer" />, ADR-0822); <see langword="null" /> outside socket-action mode.
+    /// (<see cref="SocketActionGatedTcpDialer" />, ADR-0917); <see langword="null" /> outside socket-action mode.
     /// </summary>
     internal TransferSocketWait? SocketWait { get; private init; }
 

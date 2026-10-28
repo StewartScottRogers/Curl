@@ -101,7 +101,7 @@ internal static partial class EngineComposition
         };
 
     /// <summary>
-    /// The proxy curl 8.22.0's DoH sub-transfers go through (CGR-037, ADR-0818): the one the proxy
+    /// The proxy curl 8.22.0's DoH sub-transfers go through (CGR-037, ADR-0904): the one the proxy
     /// environment variables (<c>http_proxy</c>, <c>https_proxy</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>)
     /// name for the DoH URL, as <see cref="ProxySelector" /> reads them; <c>-x</c> and
     /// <c>--noproxy</c> never apply, as <c>lib/doh.c</c> copies neither to the sub-transfer.

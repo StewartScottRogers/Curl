@@ -8,7 +8,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Opens an output file whose name holds argument bytes that are not valid UTF-8 under those raw
-/// bytes, as curl 8.18.0 does on Linux and macOS (CGR-016, BL-3853, ADR-0822): <c>-o $'\xff.txt'</c>
+/// bytes, as curl 8.18.0 does on Linux and macOS (CGR-016, BL-3853, ADR-0920): <c>-o $'\xff.txt'</c>
 /// creates the file named FF 2E 74 78 74. Such a byte reaches the name as the lone surrogate
 /// U+DC00 + byte (<see cref="InvalidUtf8ByteEscape" />), which .NET's file APIs would write as
 /// EF BF BD, so the name is opened with the runtime's own <c>open</c> shim instead. Every other
@@ -129,7 +129,7 @@ internal static partial class RawByteFileName
     /// <param name="mode">How existing content is treated.</param>
     /// <param name="createMode">The permissions a created file gets, before the umask.</param>
     /// <returns>The open's answer.</returns>
-    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0822: a thin adapter over an open only Linux and macOS take raw bytes in.")]
+    [ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0920: a thin adapter over an open only Linux and macOS take raw bytes in.")]
     private static FileOpenResult OpenUnderRawBytes(byte[] path, FileWriteMode mode, UnixFileMode createMode)
     {
         nint descriptor;

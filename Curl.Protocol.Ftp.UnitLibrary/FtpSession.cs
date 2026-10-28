@@ -1214,7 +1214,7 @@ internal sealed class FtpSession(
     /// whatever the server still sends - a TLS 1.3 session ticket, its own <c>close_notify</c> -
     /// until it closes its side, for at most curl 8.22.0's two-second shutdown timeout. A socket
     /// closed with unread bytes is reset on Windows, and the reset throws away the upload the
-    /// server has not read yet (CGR-006, ADR-0816).
+    /// server has not read yet (CGR-006, ADR-0891).
     /// </summary>
     private async ValueTask CloseUploadDataConnectionAsync(IConnection data)
     {

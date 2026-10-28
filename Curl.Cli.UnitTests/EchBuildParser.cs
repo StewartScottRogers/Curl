@@ -2,7 +2,7 @@ namespace Curl.Cli;
 
 /// <summary>
 /// Parses a command line as a curl built with ECH reads it (<see cref="CommandLineOptions.ActsAsEchBuild"/>,
-/// ADR-0822), otherwise as the Linux and macOS OpenSSL build reads it, on every platform, so tests of
+/// ADR-0918), otherwise as the Linux and macOS OpenSSL build reads it, on every platform, so tests of
 /// <c>--ech</c>, which every reference build refuses, still reach what it sets.
 /// </summary>
 internal static class EchBuildParser

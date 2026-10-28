@@ -5,7 +5,7 @@ namespace Curl.Protocol.Abstractions;
 /// that text carried on from a header - an absolute <c>Location</c> in
 /// <see cref="TransferReport.RedirectUrl" /> and the <see cref="TransferReport.EffectiveUrl" />
 /// that follows it - is written back as those bytes, as curl writes them, and not as UTF-8
-/// (CGR-062, ADR-0824). Byte <c>b</c> is carried as the private-use character
+/// (CGR-062, ADR-0923). Byte <c>b</c> is carried as the private-use character
 /// <c>U+F700 + b</c> (<c>U+F780</c> to <c>U+F7FF</c>), the marking <c>Curl.Output</c>'s
 /// write-out renderer writes as the raw byte.
 /// </summary>

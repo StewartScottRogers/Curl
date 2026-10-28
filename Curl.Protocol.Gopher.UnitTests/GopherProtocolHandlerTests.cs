@@ -148,7 +148,7 @@ public sealed class GopherProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_NonAsciiItemType_RemovesTwoCommandLineBytes()
     {
-        // "é" is one byte in the Windows ANSI code page and two in UTF-8 (ADR-0820), so on
+        // "é" is one byte in the Windows ANSI code page and two in UTF-8 (ADR-0907), so on
         // Windows "/é" goes whole and elsewhere only its last UTF-8 byte stays.
         ScriptedConnection connection = new();
         byte[] expected = [.. GopherCommandLineText.Platform.GetBytes("/é/x")[2..], 13, 10];

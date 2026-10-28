@@ -19,7 +19,7 @@ its trace as curl 8.22.0 does: `* Connection #0 to host 127.0.0.1:PORT left inta
 
 ## Context
 
-Found by BL-3599 (CGR-070, ADR-0824). Since BL-3599 an unsolicited 101 is the final head and
+Found by BL-3599 (CGR-070, ADR-0922). Since BL-3599 an unsolicited 101 is the final head and
 its body runs to the close. curl 8.22.0 (`Record-CurlExchange.ps1`, 2026-10-26) then writes
 `sendrecv_dl: we are done` and `Connection #0 to host ... left intact`. Curl still writes
 `shutting down connection #N`, because `HttpResponseHeadReader.SwitchedProtocols` keeps

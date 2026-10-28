@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// CGR-037 (ADR-0818): curl 8.22.0's DoH sub-transfers go through the proxy the environment
+/// CGR-037 (ADR-0904): curl 8.22.0's DoH sub-transfers go through the proxy the environment
 /// names - an <c>http://</c> DoH URL POSTed to an HTTP proxy in absolute form, an <c>https://</c>
 /// one tunnelled with a CONNECT carrying no <c>User-Agent</c> - with the bytes measured from real
 /// curl against a proxy answering 403.

@@ -294,7 +294,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// Adopts the operating system socket <paramref name="handle" /> an application supplied
     /// (<see cref="TcpSocketOpenDecision.Supplied" />, libcurl's <c>CURLOPT_OPENSOCKETFUNCTION</c>) without
     /// taking ownership, so closing the connection never closes the handle, and connects it to
-    /// <paramref name="endPoint" /> unless <paramref name="alreadyConnected" /> (ADR-0818).
+    /// <paramref name="endPoint" /> unless <paramref name="alreadyConnected" /> (ADR-0903).
     /// </summary>
     /// <param name="handle">The socket handle.</param>
     /// <param name="alreadyConnected">Whether the socket is already connected.</param>
