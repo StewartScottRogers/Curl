@@ -8,7 +8,8 @@
 #     Ported so far: the HTTP and HTTPS (-Tls) server, -NoServer, -UnixSocket, -Ftp
 #     (passive and active mode, explicit and implicit FTPS, PROT, CCC; see FTP below) and
 #     -Smtp, -Imap and -Pop3 (plain, STARTTLS / STLS and implicit TLS with -Tls) and
-#     -Tftp (see TFTP below), -UdpSink, and -DnsPort and -DohPort (see DNS below).
+#     -Tftp (see TFTP below), -UdpSink, -DnsPort and -DohPort (see DNS below), and -Http2 and
+#     -Http2Origin (see HTTP/2 below).
 #
 # TFTP
 #     -Tftp serves one TFTP transfer on UDP -Port with TftpData, TftpReply, TftpNoOack and
@@ -33,13 +34,24 @@
 #     socat and the throwaway certificate of -Tls. They need perl, and -DohPort socat and openssl.
 #     -DnsAnswerAddress may be repeated or take a comma-separated list.
 #
+# HTTP/2
+#     -Http2 (an HTTPS proxy that picks h2 or http/1.1 by ALPN, with ProxyAlpn and ProxyStatus) and
+#     -Http2Origin (h2c-upgrade, h2c-upgrade-ignored, prior-knowledge, alpn; with Http2ResetCode,
+#     Http2Answer and Http2NoSettings) write request.bin and transcript.txt as the PowerShell script
+#     does: HTTP/2 framing and HPACK (Huffman included) are served by a perl (core modules only)
+#     written to the state directory. Over TLS socat has no ALPN option, so openssl s_server offers the
+#     protocol and perl serves its plaintext through FIFOs; that needs openssl and mkfifo as -Tls does.
+#     s_server takes one connection, so -Http2ResetCode with -Tls (several connections) is not ported.
+#     A run with several connections (-Http2ResetCode) logs their frames in the order they arrive, which
+#     differs between runs here as in the PowerShell script.
+#
 # NOT PORTED YET
 #     These modes of Record-CurlExchange.ps1 are not in this port. Each one stops at once,
 #     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
 #     Record-CurlExchange.ps1 under pwsh" to stderr, and exits 2:
 #
 #       -Script (scripted binary sessions, LDAP and SMB)
-#       -Http2 and -Http2Origin (HTTP/2 proxy and origin framing, HPACK)
+#       -Http2ResetCode together with -Tls (s_server serves one connection)
 #       -HalfCloseAfterResponse together with -Tls
 #
 #     Their parameters (FtpReply, SmtpReply, ..., ProxyStatus) are still accepted, and
@@ -1620,7 +1632,7 @@ RCE_SMTP_IDLE=5000 RCE_IMAP_IDLE=5000 RCE_POP3_IDLE=5000
 RCE_IMAP_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n'
 RCE_POP3_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n'
 RCE_FTP=0 RCE_SMTP=0 RCE_IMAP=0 RCE_POP3=0 RCE_TFTP=0 RCE_SCRIPT='' RCE_HTTP2=0 RCE_HTTP2_ORIGIN=''
-RCE_HTTP2_ANSWER='' RCE_UDP_SINK=0 RCE_DNS_PORTS='' RCE_DNS_SILENT_PORTS='' RCE_DOH_PORTS=''
+RCE_HTTP2_ANSWER='' RCE_HTTP2_NO_SETTINGS=0 RCE_PROXY_STATUS=200 RCE_PROXY_ALPN=h2 RCE_HTTP2_RESET_CODE=-1 RCE_H2_PID='' RCE_UDP_SINK=0 RCE_DNS_PORTS='' RCE_DNS_SILENT_PORTS='' RCE_DOH_PORTS=''
 RCE_DNS_ANSWER_ADDRESSES='' RCE_DNS_TRUNCATE=0 RCE_DNS_RESPONSE_CODE=0 RCE_DNS_ECH='' RCE_DNS_PID='' RCE_DOH_PID='' RCE_SINK_PID=''
 
 rce_require_value() {
@@ -1663,7 +1675,7 @@ while [ $# -gt 0 ]; do
         udpsink) RCE_UDP_SINK=1; shift; continue ;;
         tftpnooack) RCE_TFTP_NOOACK=1; shift; continue ;;
         dnstruncate) RCE_DNS_TRUNCATE=1; shift; continue ;;
-        http2nosettings) shift; continue ;;
+        http2nosettings) RCE_HTTP2_NO_SETTINGS=1; shift; continue ;;
     esac
     rce_require_value "$name" $#
     value=$2
@@ -1700,7 +1712,20 @@ while [ $# -gt 0 ]; do
                 *) rce_die "-Http2Origin must be one of h2c-upgrade, h2c-upgrade-ignored, prior-knowledge or alpn; '$value' is not." ;;
             esac
             ;;
-        http2answer) RCE_HTTP2_ANSWER=$value ;;
+        http2answer)
+            case $value in
+                '' | push | nostatus | status:*) RCE_HTTP2_ANSWER=$value ;;
+                *) rce_die "-Http2Answer must be push, nostatus or status:<value>; '$value' is not." ;;
+            esac
+            ;;
+        proxystatus) rce_integer ProxyStatus "$value" 100 999; RCE_PROXY_STATUS=$value ;;
+        proxyalpn)
+            case $value in
+                h2 | http/1.1) RCE_PROXY_ALPN=$value ;;
+                *) rce_die "-ProxyAlpn must be h2 or http/1.1; '$value' is not." ;;
+            esac
+            ;;
+        http2resetcode) rce_integer Http2ResetCode "$value" -1 2147483647; RCE_HTTP2_RESET_CODE=$value ;;
         dnsport) RCE_DNS_PORTS="$RCE_DNS_PORTS $value" ;;
         dnssilentport) RCE_DNS_SILENT_PORTS="$RCE_DNS_SILENT_PORTS $value" ;;
         dohport) RCE_DOH_PORTS="$RCE_DOH_PORTS $value" ;;
@@ -1722,8 +1747,7 @@ while [ $# -gt 0 ]; do
         tftpdata) RCE_TFTP_DATA=$value ;;
         tftpreply) RCE_TFTP_REPLIES[${#RCE_TFTP_REPLIES[@]}]=$value ;;
         tftpidlemilliseconds) rce_integer TftpIdleMilliseconds "$value" 1 600000; RCE_TFTP_IDLE=$value ;;
-        scriptidlemilliseconds | scriptgapmilliseconds | \
-            proxystatus | proxyalpn | http2resetcode) ;;
+        scriptidlemilliseconds | scriptgapmilliseconds) ;;
         *) rce_die "unknown parameter '$1'; -help lists them." ;;
     esac
     shift 2
@@ -1755,8 +1779,9 @@ if [ $RCE_HTTP2 = 1 ] && { [ $rce_sessions -gt 0 ] || [ $RCE_NO_SERVER = 1 ] || 
 # -Tftp starts no socat listener and no HTTP server: its own responder serves the UDP port.
 if [ $RCE_TFTP = 1 ]; then RCE_NO_SERVER=1; fi
 if [ -n "$RCE_SCRIPT" ]; then rce_not_ported -Script; fi
-if [ -n "$RCE_HTTP2_ORIGIN" ]; then rce_not_ported -Http2Origin; fi
-if [ $RCE_HTTP2 = 1 ]; then rce_not_ported -Http2; fi
+# -Http2 and -Http2Origin run their own perl server, not socat or the HTTP handlers; s_server serves a TLS connection one at a time.
+if [ $RCE_HTTP2 = 1 ] && [ $RCE_TLS = 1 ] && [ "$RCE_HTTP2_RESET_CODE" -ge 0 ]; then rce_not_ported '-Http2ResetCode with -Tls'; fi
+if [ $RCE_HTTP2 = 1 ]; then RCE_NO_SERVER=1; fi
 if [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; then rce_not_ported '-HalfCloseAfterResponse with -Tls'; fi
 
 # One connection per Response entry unless -Connections says otherwise, so a --retry
@@ -1807,6 +1832,9 @@ fi
 if { [ $RCE_UDP_SINK = 1 ] || [ -n "$RCE_DNS_PORTS" ] || [ -n "$RCE_DOH_PORTS" ]; } && ! command -v perl >/dev/null 2>&1; then
     rce_missing="$rce_missing, perl (serves -UdpSink, -DnsPort and -DohPort: bash cannot receive a UDP datagram)"
 fi
+if [ $RCE_HTTP2 = 1 ] && ! command -v perl >/dev/null 2>&1; then
+    rce_missing="$rce_missing, perl (serves -Http2 and -Http2Origin: HTTP/2 framing and HPACK)"
+fi
 if [ $RCE_TFTP = 1 ] && ! command -v perl >/dev/null 2>&1; then
     rce_missing="$rce_missing, perl (serves -Tftp: a TFTP answer comes from a new UDP port, which bash cannot open)"
 fi
@@ -1841,6 +1869,7 @@ rce_cleanup() {
     if [ -n "$RCE_LISTENER_PID" ]; then kill "$RCE_LISTENER_PID" 2>/dev/null; fi
     if [ -n "${RCE_DATA_LISTENER_PID:-}" ]; then kill "$RCE_DATA_LISTENER_PID" 2>/dev/null; fi
     if [ -n "$RCE_TFTP_PID" ]; then kill "$RCE_TFTP_PID" 2>/dev/null; fi
+    if [ -n "$RCE_H2_PID" ]; then kill "$RCE_H2_PID" 2>/dev/null; fi
     if [ -n "$RCE_DNS_PID" ]; then kill "$RCE_DNS_PID" 2>/dev/null; fi
     if [ -n "$RCE_DOH_PID" ]; then kill $RCE_DOH_PID 2>/dev/null; fi
     if [ -n "$RCE_SINK_PID" ]; then kill "$RCE_SINK_PID" 2>/dev/null; fi
@@ -2479,6 +2508,460 @@ RCE_DNS_PERL
     done
 fi
 
+# RFC 7541 appendix B, the Huffman codes of symbols 0 to 255 as hex code/bit length.
+RCE_HPACK_HUFFMAN='1ff8/13 7fffd8/23 fffffe2/28 fffffe3/28 fffffe4/28 fffffe5/28 fffffe6/28 fffffe7/28 fffffe8/28 ffffea/24 3ffffffc/30 fffffe9/28 fffffea/28 3ffffffd/30 fffffeb/28 fffffec/28 fffffed/28 fffffee/28 fffffef/28 ffffff0/28 ffffff1/28 ffffff2/28 3ffffffe/30 ffffff3/28 ffffff4/28 ffffff5/28 ffffff6/28 ffffff7/28 ffffff8/28 ffffff9/28 ffffffa/28 ffffffb/28 14/6 3f8/10 3f9/10 ffa/12 1ff9/13 15/6 f8/8 7fa/11 3fa/10 3fb/10 f9/8 7fb/11 fa/8 16/6 17/6 18/6 0/5 1/5 2/5 19/6 1a/6 1b/6 1c/6 1d/6 1e/6 1f/6 5c/7 fb/8 7ffc/15 20/6 ffb/12 3fc/10 1ffa/13 21/6 5d/7 5e/7 5f/7 60/7 61/7 62/7 63/7 64/7 65/7 66/7 67/7 68/7 69/7 6a/7 6b/7 6c/7 6d/7 6e/7 6f/7 70/7 71/7 72/7 fc/8 73/7 fd/8 1ffb/13 7fff0/19 1ffc/13 3ffc/14 22/6 7ffd/15 3/5 23/6 4/5 24/6 5/5 25/6 26/6 27/6 6/5 74/7 75/7 28/6 29/6 2a/6 7/5 2b/6 76/7 2c/6 8/5 9/5 2d/6 77/7 78/7 79/7 7a/7 7b/7 7ffe/15 7fc/11 3ffd/14 1ffd/13 ffffffc/28 fffe6/20 3fffd2/22 fffe7/20 fffe8/20 3fffd3/22 3fffd4/22 3fffd5/22 7fffd9/23 3fffd6/22 7fffda/23 7fffdb/23 7fffdc/23 7fffdd/23 7fffde/23 ffffeb/24 7fffdf/23 ffffec/24 ffffed/24 3fffd7/22 7fffe0/23 ffffee/24 7fffe1/23 7fffe2/23 7fffe3/23 7fffe4/23 1fffdc/21 3fffd8/22 7fffe5/23 3fffd9/22 7fffe6/23 7fffe7/23 ffffef/24 3fffda/22 1fffdd/21 fffe9/20 3fffdb/22 3fffdc/22 7fffe8/23 7fffe9/23 1fffde/21 7fffea/23 3fffdd/22 3fffde/22 fffff0/24 1fffdf/21 3fffdf/22 7fffeb/23 7fffec/23 1fffe0/21 1fffe1/21 3fffe0/22 1fffe2/21 7fffed/23 3fffe1/22 7fffee/23 7fffef/23 fffea/20 3fffe2/22 3fffe3/22 3fffe4/22 7ffff0/23 3fffe5/22 3fffe6/22 7ffff1/23 3ffffe0/26 3ffffe1/26 fffeb/20 7fff1/19 3fffe7/22 7ffff2/23 3fffe8/22 1ffffec/25 3ffffe2/26 3ffffe3/26 3ffffe4/26 7ffffde/27 7ffffdf/27 3ffffe5/26 fffff1/24 1ffffed/25 7fff2/19 1fffe3/21 3ffffe6/26 7ffffe0/27 7ffffe1/27 3ffffe7/26 7ffffe2/27 fffff2/24 1fffe4/21 1fffe5/21 3ffffe8/26 3ffffe9/26 ffffffd/28 7ffffe3/27 7ffffe4/27 7ffffe5/27 fffec/20 fffff3/24 fffed/20 1fffe6/21 3fffe9/22 1fffe7/21 1fffe8/21 7ffff3/23 3fffea/22 3fffeb/22 1ffffee/25 1ffffef/25 fffff4/24 fffff5/24 3ffffea/26 7ffff4/23 3ffffeb/26 7ffffe6/27 3ffffec/26 3ffffed/26 7ffffe7/27 7ffffe8/27 7ffffe9/27 7ffffea/27 7ffffeb/27 ffffffe/28 7ffffec/27 7ffffed/27 7ffffee/27 7ffffef/27 7fffff0/27 3ffffee/26'
+if [ $RCE_HTTP2 = 1 ]; then
+    cat >"$RCE_STATE/h2.pl" <<'RCE_H2_PERL'
+use strict;
+use warnings;
+use IO::Socket::IP;
+use IO::Select;
+use Fcntl qw(:flock);
+use POSIX ();
+
+my ($state) = @ARGV;
+my %config;
+open(my $configFile, '<', "$state/h2.conf") or die "h2.conf: $!";
+while (my $line = <$configFile>) { chomp $line; my ($key, $value) = split(/=/, $line, 2); $config{$key} = $value; }
+close $configFile;
+$SIG{PIPE} = 'IGNORE';
+my $stopping = 0;
+$SIG{TERM} = sub { $stopping = 1 };
+
+sub append { my ($name, $data) = @_; open(my $file, '>>:raw', "$state/$name") or return; flock($file, LOCK_EX); print $file $data; close $file; }
+sub note { append('h2.log', "$_[0]\n"); }
+sub escape { my $text = $_[0]; $text =~ s/\r/\\r/g; $text =~ s/\n/\\n/g; return $text; }
+sub note_lines { my ($prefix, $text) = @_; foreach my $line (split(/\r\n/, $text, -1)) { note($prefix . $line) if length $line; } }
+
+# Reads exactly count bytes, recording them; undef when curl hung up or the recorder is stopping.
+sub read_exact {
+    my ($in, $count) = @_;
+    my $buffer = '';
+    while (length($buffer) < $count) {
+        my $read = sysread($in, my $chunk, $count - length($buffer));
+        return undef unless $read;
+        $buffer .= $chunk;
+    }
+    append('h2.received', $buffer) if $count > 0;
+    return $buffer;
+}
+
+sub write_all {
+    my ($out, $data) = @_;
+    my $offset = 0;
+    while ($offset < length($data)) {
+        my $written = syswrite($out, $data, length($data) - $offset, $offset);
+        return unless defined $written;
+        $offset += $written;
+    }
+}
+
+sub write_frame {
+    my ($out, $type, $flags, $id, $payload) = @_;
+    my $length = length($payload);
+    write_all($out, pack('CnCCN', $length >> 16, $length & 0xffff, $type, $flags, $id) . $payload);
+}
+
+# Reads up to and including the blank line ending a header block; undef if curl stops first.
+sub read_header_block {
+    my ($in) = @_;
+    my $block = '';
+    while (1) {
+        my $one = read_exact($in, 1);
+        return undef unless defined $one;
+        $block .= $one;
+        return $block if $block =~ /\r\n\r\n\z/;
+    }
+}
+
+sub wait_for_hang_up {
+    my ($in) = @_;
+    while (defined read_exact($in, 1)) { }
+    note('= curl closed the connection');
+}
+
+# --- HPACK (RFC 7541) --------------------------------------------------------------------
+
+my @staticNames = (':authority', ':method', ':method', ':path', ':path', ':scheme', ':scheme', ':status', ':status', ':status',
+    ':status', ':status', ':status', ':status', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-ranges', 'accept', 'access-control-allow-origin',
+    'age', 'allow', 'authorization', 'cache-control', 'content-disposition', 'content-encoding', 'content-language', 'content-length', 'content-location', 'content-range',
+    'content-type', 'cookie', 'date', 'etag', 'expect', 'expires', 'from', 'host', 'if-match', 'if-modified-since',
+    'if-none-match', 'if-range', 'if-unmodified-since', 'last-modified', 'link', 'location', 'max-forwards', 'proxy-authenticate', 'proxy-authorization', 'range',
+    'referer', 'refresh', 'retry-after', 'server', 'set-cookie', 'strict-transport-security', 'transfer-encoding', 'user-agent', 'vary', 'via',
+    'www-authenticate');
+my @staticValues = ('', 'GET', 'POST', '/', '/index.html', 'http', 'https', '200', '204', '206',
+    '304', '400', '404', '500', '', 'gzip, deflate');
+
+# The 256 codes of RFC 7541 appendix B as code/length in hex and decimal, symbol 0 first.
+my %huffman;
+{
+    my $symbol = 0;
+    foreach my $entry (split(/ /, '@@HUFFMAN@@')) {
+        my ($code, $bits) = split(/\//, $entry);
+        $huffman{substr(unpack('B32', pack('N', hex($code))), 32 - $bits)} = chr($symbol);
+        $symbol++;
+    }
+}
+
+my @dynamicTable;
+
+sub read_integer {
+    my ($block, $position, $prefixBits) = @_;
+    my $limit = (1 << $prefixBits) - 1;
+    my $value = ord(substr($$block, $$position++, 1)) & $limit;
+    return $value if $value < $limit;
+    my $shift = 0;
+    my $next;
+    do {
+        $next = ord(substr($$block, $$position++, 1));
+        $value += ($next & 0x7f) << $shift;
+        $shift += 7;
+    } while ($next & 0x80);
+    return $value;
+}
+
+sub read_string {
+    my ($block, $position) = @_;
+    my $huffmanCoded = ord(substr($$block, $$position, 1)) & 0x80;
+    my $length = read_integer($block, $position, 7);
+    my $text = substr($$block, $$position, $length);
+    $$position += $length;
+    return $text unless $huffmanCoded;
+    my ($bits, $decoded, $candidate) = (unpack('B*', $text), '', '');
+    foreach my $bit (split(//, $bits)) {
+        $candidate .= $bit;
+        if (exists $huffman{$candidate}) { $decoded .= $huffman{$candidate}; $candidate = ''; }
+    }
+    return $decoded;
+}
+
+sub lookup {
+    my ($index) = @_;
+    if ($index <= @staticNames) { return [$staticNames[$index - 1], $index <= @staticValues ? $staticValues[$index - 1] : '']; }
+    return $dynamicTable[$index - @staticNames - 1];
+}
+
+# Indexed fields, literals with, without and never indexed, and size updates. The dynamic
+# table is never evicted: one CONNECT never fills it.
+sub decode_header_block {
+    my ($block) = @_;
+    my @fields;
+    my $position = 0;
+    while ($position < length($block)) {
+        my $first = ord(substr($block, $position, 1));
+        if ($first & 0x80) {
+            push @fields, lookup(read_integer(\$block, \$position, 7));
+        } elsif (($first & 0xe0) == 0x20) {
+            read_integer(\$block, \$position, 5);
+        } else {
+            my $indexed = ($first & 0xc0) == 0x40;
+            my $index = read_integer(\$block, \$position, $indexed ? 6 : 4);
+            my $name = $index == 0 ? read_string(\$block, \$position) : lookup($index)->[0];
+            my $field = [$name, read_string(\$block, \$position)];
+            unshift @dynamicTable, $field if $indexed;
+            push @fields, $field;
+        }
+    }
+    return @fields;
+}
+
+sub literal { return chr(length($_[0])) . $_[0]; }
+
+# --- HTTP/2 -------------------------------------------------------------------------------
+
+# :status as a literal without indexing (name index 8). A refusal, or the answer to a request
+# that is not a CONNECT (a forwarded GET), has no body and ends the stream.
+sub answer_connect {
+    my ($out, $streamId, $connect) = @_;
+    if ($config{reset} >= 0) {
+        write_frame($out, 3, 0, $streamId, pack('N', $config{reset}));
+        note("< RST_STREAM stream $streamId error $config{reset}");
+        return;
+    }
+    if (length($config{answer}) > 0 && !$connect) { answer_scenario($out, $streamId); return; }
+    my $block = "\x08" . literal($config{status});
+    my $refused = int($config{status} / 100) != 2 || !$connect;
+    # content-length is static index 28: 15 in the 4-bit prefix, then 13.
+    $block .= "\x0f\x0d" . literal('0') if $refused;
+    my $flags = $refused ? 0x05 : 0x04;
+    write_frame($out, 1, $flags, $streamId, $block);
+    note("< HEADERS stream $streamId flags 0x" . sprintf('%02x', $flags));
+    note("<   :status: $config{status}");
+    note('<   content-length: 0') if $refused;
+}
+
+# push, status:<value> and nostatus answers; each ends the stream with content-length 0.
+sub answer_scenario {
+    my ($out, $streamId) = @_;
+    my $answer = $config{answer};
+    if ($answer eq 'push') {
+        write_frame($out, 5, 0x04, $streamId, "\0\0\0\2\x82\x86\x84");
+        note("< PUSH_PROMISE stream $streamId flags 0x04 promised stream 2");
+    }
+    my $block = '';
+    my $status = $answer =~ /^status:/ ? substr($answer, 7) : $answer eq 'push' ? '200' : undef;
+    $block .= "\x08" . literal($status) if defined $status;
+    $block .= "\x0f\x0d" . literal('0');
+    write_frame($out, 1, 0x05, $streamId, $block);
+    note("< HEADERS stream $streamId flags 0x05");
+    note(defined $status ? "<   :status: $status" : '<   (no :status)');
+    note('<   content-length: 0');
+}
+
+# already: connection bytes the caller has read. upgraded: the request that asked for the
+# h2c upgrade becomes stream 1 and is answered once SETTINGS are out.
+sub serve_http2 {
+    my ($in, $out, $already, $upgraded) = @_;
+    my $more = read_exact($in, 24 - length($already));
+    if (!defined $more) { note('= curl hung up before the connection preface'); return; }
+    my $preface = $already . $more;
+    note('> PREFACE ' . escape($preface));
+    if ($config{omitsettings}) {
+        note('= no SETTINGS sent');
+    } else {
+        write_frame($out, 4, 0, 0, '');
+        note('< SETTINGS');
+    }
+    my ($headerBlock, $tunnel, $tunnelStream, $answered) = ('', '', 0, 0);
+    if ($upgraded) { $tunnelStream = 1; answer_connect($out, 1, 0); }
+    while (1) {
+        my $head = read_exact($in, 9);
+        if (!defined $head) { note('= curl closed the connection'); return; }
+        my ($high, $low, $type, $flags, $streamId) = unpack('CnCCN', $head);
+        my $length = ($high << 16) | $low;
+        $streamId &= 0x7fffffff;
+        my $payload = $length == 0 ? '' : read_exact($in, $length);
+        if (!defined $payload) { note('= curl closed the connection mid-frame'); return; }
+        my $frame = " stream $streamId flags 0x" . sprintf('%02x', $flags);
+        if ($type == 0) {
+            my ($start, $end) = (0, $length);
+            if ($flags & 0x8) { $start = 1; $end = $length - ord(substr($payload, 0, 1)); }
+            my $data = substr($payload, $start, $end - $start);
+            note("> DATA$frame " . ($end - $start) . ' bytes: ' . escape($data));
+            $tunnel .= $data;
+            if ($end > $start) {
+                write_frame($out, 8, 0, 0, pack('N', $length));
+                write_frame($out, 8, 0, $streamId, pack('N', $length));
+            }
+            if (!$answered && $streamId == $tunnelStream && int($config{status} / 100) == 2 && index($tunnel, "\r\n\r\n") >= 0) {
+                $answered = 1;
+                write_frame($out, 0, 1, $streamId, $config{tunnelResponse});
+                note("< DATA stream $streamId flags 0x01 " . length($config{tunnelResponse}) . ' bytes: ' . escape($config{tunnelResponse}));
+            }
+        } elsif ($type == 1 || $type == 9) {
+            my ($start, $end) = (0, $length);
+            if ($type == 1 && ($flags & 0x8)) { $start = 1; $end = $length - ord(substr($payload, 0, 1)); }
+            if ($type == 1 && ($flags & 0x20)) { $start += 5; }
+            note(($type == 1 ? '> HEADERS' : '> CONTINUATION') . $frame);
+            $headerBlock .= substr($payload, $start, $end - $start);
+            if ($flags & 0x4) {
+                my $connect = 0;
+                foreach my $field (decode_header_block($headerBlock)) {
+                    note(">   $field->[0]: $field->[1]");
+                    $connect = 1 if $field->[0] eq ':method' && $field->[1] eq 'CONNECT';
+                }
+                $headerBlock = '';
+                if ($tunnelStream == 0) { $tunnelStream = $streamId; answer_connect($out, $streamId, $connect); }
+            }
+        } elsif ($type == 2) {
+            note("> PRIORITY$frame");
+        } elsif ($type == 3) {
+            note("> RST_STREAM$frame error " . unpack('N', $payload));
+        } elsif ($type == 4) {
+            if ($flags & 0x1) { note('> SETTINGS ACK'); next; }
+            my $settings = '> SETTINGS';
+            for (my $i = 0; $i + 6 <= $length; $i += 6) {
+                my ($id, $value) = unpack('nN', substr($payload, $i, 6));
+                $settings .= " $id=$value";
+            }
+            note($settings);
+            write_frame($out, 4, 1, 0, '');
+            note('< SETTINGS ACK');
+        } elsif ($type == 6) {
+            note("> PING$frame");
+            if (!($flags & 0x1)) { write_frame($out, 6, 1, 0, $payload); note('< PING ACK'); }
+        } elsif ($type == 7) {
+            my ($last, $error) = unpack('NN', $payload);
+            note('> GOAWAY last stream ' . ($last & 0x7fffffff) . " error $error" . ($length > 8 ? ' debug ' . escape(substr($payload, 8)) : ''));
+            return;
+        } elsif ($type == 8) {
+            note("> WINDOW_UPDATE$frame increment " . (unpack('N', $payload) & 0x7fffffff));
+        } else {
+            note("> frame type $type$frame $length bytes");
+        }
+    }
+}
+
+# --- HTTP/1.1 -----------------------------------------------------------------------------
+
+# An HTTP/1.1 answer to a request already read: the first Response, then wait for the hang-up.
+sub serve_http11_origin {
+    my ($in, $out, $request) = @_;
+    if (!defined $request) { note('= curl hung up before its request ended'); return; }
+    note_lines('> ', $request);
+    write_all($out, $config{tunnelResponse});
+    note('< ' . escape($config{tunnelResponse}));
+    wait_for_hang_up($in);
+}
+
+# An origin on plain TCP: the first bytes tell prior knowledge (the HTTP/2 preface, which
+# starts "PRI ") from an HTTP/1.1 request. In h2c-upgrade mode a request asking for
+# "Upgrade: h2c" is answered 101; in every other mode it is answered as HTTP/1.1.
+sub serve_plain_origin {
+    my ($in, $out) = @_;
+    my $first = read_exact($in, 4);
+    if (!defined $first) { note('= curl hung up before sending anything'); return; }
+    if ($first eq 'PRI ') { note('= prior knowledge: curl opened with the HTTP/2 preface'); serve_http2($in, $out, $first, 0); return; }
+    my $rest = read_header_block($in);
+    if (!defined $rest) { note('= curl hung up before its request ended'); return; }
+    my $request = $first . $rest;
+    if ($config{origin} eq 'h2c-upgrade' && index(lc($request), "\r\nupgrade: h2c\r\n") >= 0) {
+        note_lines('> ', $request);
+        my $switching = "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n";
+        write_all($out, $switching);
+        note_lines('< ', $switching);
+        serve_http2($in, $out, '', 1);
+        return;
+    }
+    serve_http11_origin($in, $out, $request);
+}
+
+# The http/1.1 fallback: a CONNECT answered with a status line, then the tunnelled request.
+sub serve_http11 {
+    my ($in, $out) = @_;
+    my $connect = read_header_block($in);
+    if (!defined $connect) { note('= curl hung up before its CONNECT ended'); return; }
+    note_lines('> ', $connect);
+    my $status = $config{status};
+    my $refused = int($status / 100) != 2;
+    my $reason = $status == 200 ? 'Connection established' : $status == 407 ? 'Proxy Authentication Required' : 'Status';
+    my $reply = "HTTP/1.1 $status $reason\r\n" . ($refused ? "Content-Length: 0\r\n" : '') . "\r\n";
+    write_all($out, $reply);
+    note_lines('< ', $reply);
+    if ($refused) { wait_for_hang_up($in); return; }
+    my $request = read_header_block($in);
+    if (!defined $request) { note('= curl hung up before its tunnelled request ended'); return; }
+    note_lines('>   ', $request);
+    write_all($out, $config{tunnelResponse});
+    note('<   ' . escape($config{tunnelResponse}));
+    wait_for_hang_up($in);
+}
+
+# The protocol s_server negotiated, read from the ServerHello in its message file once both
+# Finished messages are in; undef when no handshake completes before the recorder stops.
+sub negotiated_protocol {
+    my ($in) = @_;
+    my $select = IO::Select->new($in);
+    my ($messages, $readable) = ('', 0);
+    while (1) {
+        if (open(my $file, '<', "$state/h2.msg")) { local $/; $messages = <$file>; close $file; }
+        last if $messages =~ /^<<< [^\n]*Finished/m && $messages =~ /^>>> [^\n]*Finished/m;
+        return undef if $stopping;
+        # Bytes or the end of the stream before a Finished: give the message file a second.
+        if ($select->can_read(0.02) && ++$readable > 50) { return undef; }
+    }
+    return 'none' unless $messages =~ /^>>> [^\n]*ServerHello[^\n]*\n((?:[ \t]+[0-9A-Fa-f ]+\n)+)/m;
+    my $hex = lc($1);
+    $hex =~ s/\s//g;
+    return 'h2' if index($hex, '001000050003026832') >= 0;
+    return 'http/1.1' if index($hex, '0010000b000908687474702f312e31') >= 0;
+    return 'none';
+}
+
+sub serve_client {
+    my ($in, $out) = @_;
+    if (length($config{origin}) > 0 && $config{origin} ne 'alpn') { serve_plain_origin($in, $out); return; }
+    my $negotiated = negotiated_protocol($in);
+    if (!defined $negotiated) { note('= curl opened no connection'); return; }
+    note('= TLS handshake completed, ALPN ' . $negotiated);
+    if ($negotiated eq 'h2') { serve_http2($in, $out, '', 0); }
+    elsif (length($config{origin}) > 0) { serve_http11_origin($in, $out, read_header_block($in)); }
+    else { serve_http11($in, $out); }
+}
+
+sub finish { open(my $done, '>', "$state/h2.done"); close $done; exit 0; }
+
+# --- Serving ------------------------------------------------------------------------------
+
+open(my $responseFile, '<:raw', "$state/response.0.bin") or die "response.0.bin: $!";
+{ local $/; $config{tunnelResponse} = <$responseFile>; }
+close $responseFile;
+$config{tunnelResponse} = '' unless defined $config{tunnelResponse};
+binmode STDIN;
+binmode STDOUT;
+
+if ($config{tls}) {
+    # s_server owns the port; the connection's plaintext is on stdin and stdout.
+    serve_client(\*STDIN, \*STDOUT);
+    finish();
+}
+
+my $listener = IO::Socket::IP->new(LocalAddr => $config{address}, LocalPort => $config{port}, Listen => 16, ReuseAddr => 1, Proto => 'tcp');
+if (!$listener) { open(my $failure, '>', "$state/h2.error"); print $failure "cannot listen on $config{address}:$config{port}: $@"; close $failure; exit 1; }
+open(my $ready, '>', "$state/h2.ready"); close $ready;
+my $select = IO::Select->new($listener);
+my @children;
+for (my $number = 1; ; $number++) {
+    my $client;
+    while (!$stopping && !$client) { $client = $listener->accept if $select->can_read(0.1); }
+    if (!$client) { note('= curl opened no connection') if $number == 1; last; }
+    binmode $client;
+    if ($config{reset} < 0) { serve_client($client, $client); close $client; last; }
+    note("= connection $number");
+    my $child = fork();
+    if (!$child) { $listener->close; serve_client($client, $client); POSIX::_exit(0); }
+    close $client;
+    push @children, $child;
+}
+# Each connection of a reset run is on a process of its own; give them a moment to end.
+for (my $waited = 0; @children && $waited < 300; $waited++) {
+    @children = grep { waitpid($_, POSIX::WNOHANG()) == 0 } @children;
+    select(undef, undef, undef, 0.02) if @children;
+}
+finish();
+RCE_H2_PERL
+    sed -i "s|@@HUFFMAN@@|$RCE_HPACK_HUFFMAN|" "$RCE_STATE/h2.pl"
+    {
+        printf 'address=%s\n' "$RCE_LISTEN_ADDRESS"
+        printf 'port=%s\n' "$RCE_PORT"
+        printf 'tls=%s\n' "$RCE_TLS"
+        printf 'origin=%s\n' "$RCE_HTTP2_ORIGIN"
+        printf 'status=%s\n' "$RCE_PROXY_STATUS"
+        printf 'reset=%s\n' "$RCE_HTTP2_RESET_CODE"
+        printf 'omitsettings=%s\n' "$RCE_HTTP2_NO_SETTINGS"
+        printf 'answer=%s\n' "$RCE_HTTP2_ANSWER"
+    } >"$RCE_STATE/h2.conf"
+    : >"$RCE_STATE/h2.log"
+    : >"$RCE_STATE/h2.received"
+    if [ $RCE_TLS = 1 ]; then
+        # socat has no ALPN option, so s_server takes the one connection and offers the
+        # protocol; perl serves its plaintext through two FIFOs, opened in the same order
+        # on both sides.
+        mkfifo "$RCE_STATE/h2.out" "$RCE_STATE/h2.in" || rce_die 'mkfifo failed'
+        case $RCE_LISTEN_ADDRESS in *:*) rce_accept="[$RCE_LISTEN_ADDRESS]:$RCE_PORT" ;; *) rce_accept="$RCE_LISTEN_ADDRESS:$RCE_PORT" ;; esac
+        rce_alpn=$RCE_PROXY_ALPN
+        "$RCE_OPENSSL" s_server -quiet -naccept 1 -tls1_2 -alpn "$rce_alpn" -accept "$rce_accept" \
+            -cert "$RCE_STATE/server.crt" -key "$RCE_STATE/server.key" -msg -msgfile "$RCE_STATE/h2.msg" \
+            >"$RCE_STATE/h2.out" <"$RCE_STATE/h2.in" 2>"$RCE_STATE/h2.tls.err" &
+        printf '%s\n' "$!" >"$RCE_STATE/tls-pid.h2"
+        perl "$RCE_STATE/h2.pl" "$RCE_STATE" <"$RCE_STATE/h2.out" >"$RCE_STATE/h2.in" 2>"$RCE_STATE/h2.err" &
+        RCE_H2_PID=$!
+        rce_wait_for_listening_port "$RCE_PORT" || rce_die "openssl s_server did not start listening on port $RCE_PORT: $(cat "$RCE_STATE/h2.tls.err" "$RCE_STATE/h2.err" 2>/dev/null)"
+    else
+        perl "$RCE_STATE/h2.pl" "$RCE_STATE" </dev/null >/dev/null 2>"$RCE_STATE/h2.err" &
+        RCE_H2_PID=$!
+        rce_polls=0
+        while [ ! -e "$RCE_STATE/h2.ready" ]; do
+            if ! kill -0 "$RCE_H2_PID" 2>/dev/null || [ $rce_polls -ge 250 ]; then
+                rce_die "the HTTP/2 server did not start: $(cat "$RCE_STATE/h2.error" "$RCE_STATE/h2.err" 2>/dev/null | head -n 3)"
+            fi
+            rce_polls=$((rce_polls + 1))
+            sleep 0.02
+        done
+    fi
+    printf '%s\n' "$RCE_H2_PID" >"$RCE_STATE/pid.h2"
+fi
+
 if [ $RCE_USE_SOCAT = 1 ]; then
     if [ -n "$RCE_UNIX_SOCKET" ]; then
         case $RCE_UNIX_SOCKET in /*) ;; *) RCE_UNIX_SOCKET="$(pwd)/$RCE_UNIX_SOCKET" ;; esac
@@ -2572,6 +3055,30 @@ if [ $RCE_TFTP = 1 ]; then
     kill "$RCE_TFTP_PID" 2>/dev/null
     wait "$RCE_TFTP_PID" 2>/dev/null
 fi
+if [ $RCE_HTTP2 = 1 ]; then
+    # Give the connection a moment to finish, then stop waiting for one, as the PowerShell
+    # script does (2 s, then up to 6 s for the server to end).
+    rce_polls=0
+    while [ ! -e "$RCE_STATE/h2.done" ] && kill -0 "$RCE_H2_PID" 2>/dev/null && [ $rce_polls -lt 100 ]; do
+        rce_polls=$((rce_polls + 1))
+        sleep 0.02
+    done
+    if [ ! -e "$RCE_STATE/h2.done" ]; then
+        kill -TERM "$RCE_H2_PID" 2>/dev/null
+        rce_polls=0
+        while kill -0 "$RCE_H2_PID" 2>/dev/null && [ $rce_polls -lt 300 ]; do
+            rce_polls=$((rce_polls + 1))
+            sleep 0.02
+        done
+    fi
+    kill -KILL "$RCE_H2_PID" 2>/dev/null
+    wait "$RCE_H2_PID" 2>/dev/null
+    RCE_H2_PID=''
+    if [ -s "$RCE_STATE/h2.err" ]; then
+        printf '%s: the server reported:\n' "$RCE_NAME" >&2
+        cat "$RCE_STATE/h2.err" >&2
+    fi
+fi
 
 # --- Stopping the server --------------------------------------------------------------
 
@@ -2630,6 +3137,10 @@ if [ $RCE_NO_SERVER = 0 ]; then
             rce_index=$((rce_index + 1))
         done
     } >"$RCE_OUT_DIRECTORY/request.bin"
+fi
+if [ $RCE_HTTP2 = 1 ]; then
+    cat "$RCE_STATE/h2.received" >"$RCE_OUT_DIRECTORY/request.bin"
+    cat "$RCE_STATE/h2.log" >"$RCE_OUT_DIRECTORY/transcript.txt"
 fi
 if [ $RCE_LINE_SESSION = 1 ]; then cat "$RCE_STATE/transcript.txt" >"$RCE_OUT_DIRECTORY/transcript.txt"; fi
 if [ $RCE_FTP = 1 ]; then cat "$RCE_STATE/upload.bin" >"$RCE_OUT_DIRECTORY/upload.bin"; fi
