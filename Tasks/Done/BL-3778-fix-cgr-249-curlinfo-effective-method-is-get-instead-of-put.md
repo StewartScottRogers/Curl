@@ -9,7 +9,7 @@ touches: [Libcurl.UnitTests/Cgr249Tests.cs, Libcurl/Info/Strings/EasyInfoReaders
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3778 — Fix CGR-249: CURLINFO_EFFECTIVE_METHOD is GET instead of PUT with FOLLOWLOCATION=CURLFOLLOW_FIRSTONLY and CUSTOMREQUEST
 
@@ -75,3 +75,4 @@ probe.exe repro
 - 2026-10-26: Created from CGR-249 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Cause: `ReadEffectiveMethod` answered the transfer's last-hop method (GET after the first-only redirect). libcurl's `getinfo_char` answers `CURLOPT_CUSTOMREQUEST` when set, so the reader now returns the option first (`options.Transfer.CustomRequest ?? info.EffectiveMethod`). Probe (P/Invoke against REF libcurl) not rebuilt; the REF answer is the issue's measured PUT. Unit tests in `Cgr249Tests.cs` (custom request set -> PUT; none -> transfer's method). Libcurl fast tests 1454 passed; Measure-CodeQuality Libcurl: 0 failing members. Linux/macOS CI: change is platform-neutral.
+- 2026-10-28: Doing -> Done. CURLINFO_EFFECTIVE_METHOD answers CUSTOMREQUEST; tests and quality gate green
