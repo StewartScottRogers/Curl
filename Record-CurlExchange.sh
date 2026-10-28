@@ -45,14 +45,32 @@
 #     A run with several connections (-Http2ResetCode) logs their frames in the order they arrive, which
 #     differs between runs here as in the PowerShell script.
 #
+# -SCRIPT (scripted binary sessions, LDAP and SMB)
+#     Served by a perl (core modules only) written to the state directory, which parses the steps
+#     file as the PowerShell script does (a bad line is refused at the start) and writes request.bin
+#     and transcript.txt in the same bytes. With -Tls, s_server takes the connection and perl serves
+#     its plaintext through two FIFOs as for -Http2; once the session is over s_server is stopped,
+#     a close without close_notify. Two differences, both off Windows only:
+#       - One connection is served. The PowerShell script accepts every connection curl opens and
+#         serves the first that writes, for the Windows build's WinLDAP, which opens a second
+#         connection of its own; no Unix curl does, so there is nothing to select and the
+#         "curl opened N connections" line of transcript.txt never appears.
+#       - A reset step over TLS closes the connection with a FIN, not a RST: s_server holds the
+#         socket. Over plain TCP it is a RST, as in the PowerShell script.
+#     Needs perl besides curl, and for -Tls openssl and mkfifo as -Tls does.
+#
+# -HALFCLOSEAFTERRESPONSE WITH -TLS
+#     The FIN reaches curl through a relay (perl, core modules only) in place of socat's, which a
+#     signal from the handler tells to shut down its send side once s_server has sent the
+#     response; s_server goes on reading, so with HoldOpenMilliseconds what curl still sends is
+#     recorded. Needs perl besides socat, openssl and mkfifo.
+#
 # NOT PORTED YET
-#     These modes of Record-CurlExchange.ps1 are not in this port. Each one stops at once,
+#     This mode of Record-CurlExchange.ps1 is not in this port. It stops at once,
 #     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
 #     Record-CurlExchange.ps1 under pwsh" to stderr, and exits 2:
 #
-#       -Script (scripted binary sessions, LDAP and SMB)
 #       -Http2ResetCode together with -Tls (s_server serves one connection)
-#       -HalfCloseAfterResponse together with -Tls
 #
 #     Their parameters (FtpReply, SmtpReply, ..., ProxyStatus) are still accepted, and
 #     ignored without their mode, as the PowerShell script ignores them.
@@ -144,7 +162,7 @@
 #     -HalfCloseAfterResponse
 #         After sending each response, shut down the send side (a FIN) and go on reading, so
 #         with HoldOpenMilliseconds anything curl still sends on the connection is recorded.
-#         Plain HTTP only in this port.
+#         With -Tls the FIN is sent by a perl relay; see -HALFCLOSEAFTERRESPONSE WITH -TLS above.
 #
 #     -HoldOpenMilliseconds <n>
 #         After sending each response, keep the connection open instead of closing it, until
@@ -575,8 +593,24 @@ rce_reset_relay() {
     fi
 }
 
-rce_serve_connection() {
-    local index=$1 answered=0
+# With -HalfCloseAfterResponse over TLS the relay (relay.pl) holds curl's socket, so it is told to
+# send the FIN: once s_server's msgfile shows records enough for every byte written, as
+# rce_finish_tls waits, so the FIN follows the response.
+rce_half_close_tls() {
+    local polls=0 bytes records
+    while kill -0 "$RCE_TLS_PID" 2>/dev/null && [ $polls -lt 150 ]; do
+        set -- $(rce_sent_application_records)
+        bytes=$1
+        records=$2
+        if [ $((bytes - 16 * records)) -ge "$RCE_TLS_WRITTEN" ]; then break; fi
+        polls=$((polls + 1))
+        sleep 0.02
+    done
+    sleep 0.1
+    kill -USR1 "$RCE_FRONT_PID" 2>/dev/null
+}
+
+rce_serve_connection() {    local index=$1 answered=0
     RCE_TLS_WRITTEN=0
     exec 6>"$RCE_STATE/request.$index.bin"
     if [ "$RCE_TLS" = 1 ] && ! rce_wait_for_handshake; then
@@ -599,7 +633,9 @@ rce_serve_connection() {
     fi
     # FIN, then keep reading. Bash has no shutdown(2), but socat has: at the end of
     # /dev/null it shuts down the send side of the socket on fd 1, which the handler shares.
-    if [ "$RCE_HALF_CLOSE" = 1 ]; then "$RCE_SOCAT" -u OPEN:/dev/null FD:1,shut-down; fi
+    if [ "$RCE_HALF_CLOSE" = 1 ]; then
+        if [ "$RCE_TLS" = 1 ]; then rce_half_close_tls; else "$RCE_SOCAT" -u OPEN:/dev/null FD:1,shut-down; fi
+    fi
     if [ "$RCE_HOLD_OPEN" -gt 0 ]; then
         # Held open: wait for curl to hang up, recording what it still sends and answering
         # up to RCE_ANSWER_HELD more requests with the responses after this one.
@@ -756,6 +792,7 @@ rce_connection_entry() {
             polls=$((polls + 1))
             sleep 0.02
         done
+        if [ "$RCE_HALF_CLOSE" = 1 ]; then exec perl "$RCE_STATE/relay.pl" "$socket"; fi
         exec "$RCE_SOCAT" -lf "$RCE_STATE/relay.$index.log" -t 0 STDIO "UNIX-CONNECT:$socket"
     fi
     trap '' PIPE
@@ -1625,6 +1662,7 @@ RCE_UNIX_SOCKET=''
 RCE_FTP_REPLIES=()
 RCE_FTP_DATA=''
 RCE_FTP_IDLE=5000
+RCE_SCRIPT_IDLE=5000 RCE_SCRIPT_GAP=250 RCE_SCRIPT_PID=''
 RCE_FTP_HOLD=0
 RCE_TFTP_DATA='hello\n' RCE_TFTP_REPLIES=() RCE_TFTP_NOOACK=0 RCE_TFTP_IDLE=15000 RCE_TFTP_PID=''
 RCE_SMTP_REPLIES=() RCE_IMAP_REPLIES=() RCE_POP3_REPLIES=()
@@ -1747,7 +1785,8 @@ while [ $# -gt 0 ]; do
         tftpdata) RCE_TFTP_DATA=$value ;;
         tftpreply) RCE_TFTP_REPLIES[${#RCE_TFTP_REPLIES[@]}]=$value ;;
         tftpidlemilliseconds) rce_integer TftpIdleMilliseconds "$value" 1 600000; RCE_TFTP_IDLE=$value ;;
-        scriptidlemilliseconds | scriptgapmilliseconds) ;;
+        scriptidlemilliseconds) rce_integer ScriptIdleMilliseconds "$value" 1 600000; RCE_SCRIPT_IDLE=$value ;;
+        scriptgapmilliseconds) rce_integer ScriptGapMilliseconds "$value" 1 600000; RCE_SCRIPT_GAP=$value ;;
         *) rce_die "unknown parameter '$1'; -help lists them." ;;
     esac
     shift 2
@@ -1778,11 +1817,11 @@ if [ $RCE_HTTP2 = 1 ] && { [ $rce_sessions -gt 0 ] || [ $RCE_NO_SERVER = 1 ] || 
 # The modes this port does not serve yet.
 # -Tftp starts no socat listener and no HTTP server: its own responder serves the UDP port.
 if [ $RCE_TFTP = 1 ]; then RCE_NO_SERVER=1; fi
-if [ -n "$RCE_SCRIPT" ]; then rce_not_ported -Script; fi
+# -Script runs its own perl server (script.pl), like -Http2; it needs a script file that parses.
+if [ -n "$RCE_SCRIPT" ]; then RCE_NO_SERVER=1; fi
 # -Http2 and -Http2Origin run their own perl server, not socat or the HTTP handlers; s_server serves a TLS connection one at a time.
 if [ $RCE_HTTP2 = 1 ] && [ $RCE_TLS = 1 ] && [ "$RCE_HTTP2_RESET_CODE" -ge 0 ]; then rce_not_ported '-Http2ResetCode with -Tls'; fi
 if [ $RCE_HTTP2 = 1 ]; then RCE_NO_SERVER=1; fi
-if [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; then rce_not_ported '-HalfCloseAfterResponse with -Tls'; fi
 
 # One connection per Response entry unless -Connections says otherwise, so a --retry
 # attempt after a 503 is answered with the next entry.
@@ -1808,7 +1847,7 @@ RCE_SOCAT=${SOCAT:-socat}
 # takes on the port itself.
 RCE_USE_SOCAT=0
 if [ $RCE_NO_SERVER = 0 ]; then
-    if [ $RCE_LINE_SESSION = 1 ] || [ $RCE_TLS = 0 ] || [ "$RCE_CONNECTIONS" -gt 1 ] || [ $RCE_RESET = 1 ] || [ $RCE_RESET_AFTER = 1 ]; then RCE_USE_SOCAT=1; fi
+    if [ $RCE_LINE_SESSION = 1 ] || [ $RCE_TLS = 0 ] || [ "$RCE_CONNECTIONS" -gt 1 ] || [ $RCE_RESET = 1 ] || [ $RCE_RESET_AFTER = 1 ] || [ $RCE_HALF_CLOSE = 1 ]; then RCE_USE_SOCAT=1; fi
 fi
 rce_missing=''
 for rce_tool in awk od mktemp sleep wc tr cat; do
@@ -1834,6 +1873,9 @@ if { [ $RCE_UDP_SINK = 1 ] || [ -n "$RCE_DNS_PORTS" ] || [ -n "$RCE_DOH_PORTS" ]
 fi
 if [ $RCE_HTTP2 = 1 ] && ! command -v perl >/dev/null 2>&1; then
     rce_missing="$rce_missing, perl (serves -Http2 and -Http2Origin: HTTP/2 framing and HPACK)"
+fi
+if { [ -n "$RCE_SCRIPT" ] || { [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; }; } && ! command -v perl >/dev/null 2>&1; then
+    rce_missing="$rce_missing, perl (serves -Script, and relays -HalfCloseAfterResponse with -Tls)"
 fi
 if [ $RCE_TFTP = 1 ] && ! command -v perl >/dev/null 2>&1; then
     rce_missing="$rce_missing, perl (serves -Tftp: a TFTP answer comes from a new UDP port, which bash cannot open)"
@@ -2508,6 +2550,348 @@ RCE_DNS_PERL
     done
 fi
 
+# --- -Script and the relay of -HalfCloseAfterResponse with -Tls ---------------------------
+if [ -n "$RCE_SCRIPT" ]; then
+    cat >"$RCE_STATE/script.pl" <<'RCE_SCRIPT_PERL'
+use strict;
+use warnings;
+use IO::Socket::IP;
+use Socket qw(SOL_SOCKET SO_LINGER);
+use Encode ();
+
+my ($state, $mode) = @ARGV;
+my %config;
+open(my $configFile, '<', "$state/script.conf") or die "script.conf: $!";
+while (my $line = <$configFile>) { chomp $line; my ($key, $value) = split(/=/, $line, 2); $config{$key} = $value; }
+close $configFile;
+
+# The text after a verb, as bytes: backslash escapes \r \n \t \0 \\ \" \' and \xHH, every character a Latin-1 byte.
+sub unescape_bytes {
+    my ($text) = @_;
+    my $bytes = '';
+    my $index = 0;
+    while ($index < length $text) {
+        my $character = substr($text, $index, 1);
+        if ($character ne '\\') {
+            die sprintf("Response character U+%04X is not Latin-1.\n", ord $character) if ord($character) > 255;
+            $bytes .= $character;
+            $index++;
+            next;
+        }
+        die "Response ends with a lone backslash.\n" if $index + 1 >= length $text;
+        my $escape = substr($text, $index + 1, 1);
+        my %simple = ('r' => "\r", 'n' => "\n", 't' => "\t", '0' => "\0", '\\' => '\\', '"' => '"', "'" => "'");
+        if (exists $simple{$escape}) { $bytes .= $simple{$escape}; $index += 2; next; }
+        die "Response has an unknown escape \\$escape at index $index.\n" if $escape ne 'x';
+        my $hex = $index + 4 <= length $text ? substr($text, $index + 2, 2) : '';
+        die "Response has a malformed \\x escape at index $index.\n" if $hex !~ /^[0-9A-Fa-f]{2}$/;
+        $bytes .= chr(hex $hex);
+        $index += 4;
+    }
+    return $bytes;
+}
+
+# The -Script file as a list of steps; see the PowerShell script's .PARAMETER Script.
+sub parse_steps {
+    my ($path) = @_;
+    open(my $file, '<:raw', $path) or die "cannot read script file $path: $!\n";
+    local $/;
+    my $content = Encode::decode('UTF-8', <$file>);
+    close $file;
+    $content =~ s/^\x{FEFF}//;
+    my @steps;
+    my $lineNumber = 0;
+    foreach my $line (split(/\r\n|\n|\r/, $content)) {
+        $lineNumber++;
+        (my $text = $line) =~ s/^\s+|\s+$//g;
+        next if $text eq '' || substr($text, 0, 1) eq '#';
+        my ($verb) = split(/\s+/, $text, 2);
+        my $argument = $text =~ /^\S+\s+(.*)$/ ? $1 : '';
+        if ($verb eq 'send') { push @steps, { kind => 'send', bytes => unescape_bytes($argument), text => $text }; }
+        elsif ($verb eq 'pause' && $argument =~ /^\d+$/) { push @steps, { kind => 'pause', milliseconds => $argument + 0, text => $text }; }
+        elsif ($verb eq 'close' && $argument eq '') { push @steps, { kind => 'close', text => $text }; }
+        elsif ($verb eq 'reset' && $argument eq '') { push @steps, { kind => 'reset', text => $text }; }
+        elsif ($verb eq 'read' && $argument eq '') { push @steps, { kind => 'read', framing => 'gap', text => $text }; }
+        elsif ($verb eq 'read' && $argument eq 'ber') { push @steps, { kind => 'read', framing => 'ber', text => $text }; }
+        elsif ($verb eq 'read' && $argument =~ /^\d+$/ && $argument > 0) { push @steps, { kind => 'read', framing => 'count', count => $argument + 0, text => $text }; }
+        else { die "Script line $lineNumber is not a step: $text\n"; }
+    }
+    return \@steps;
+}
+
+my $steps = eval { parse_steps($config{script}) };
+if (!$steps) { print STDERR $@; exit 1; }
+exit 0 if defined $mode && $mode eq 'check';
+
+$SIG{PIPE} = 'IGNORE';
+my $stopping = 0;
+$SIG{TERM} = sub { $stopping = 1 };
+my $idle = $config{idle} + 0;
+my $gap = $config{gap} + 0;
+my ($log, $received, $unconsumed, $written) = ('', '', '', 0);
+my ($listener, $connection, $input, $output);
+
+sub finish {
+    foreach my $pair (['script.received', $received], ['script.log', $log]) {
+        open(my $file, '>:raw', "$state/$pair->[0]") or next;
+        print $file $pair->[1];
+        close $file;
+    }
+    open(my $count, '>', "$state/script.written"); print $count $written; close $count;
+    close $connection if $connection;
+    close $listener if $listener;
+    close $output if $output && !$connection;
+    open(my $done, '>', "$state/script.done"); close $done;
+    exit 0;
+}
+sub note { $log .= "$_[0]\r\n"; }
+sub hex_pairs { return join(' ', unpack('(H2)*', $_[0])); }
+
+# Waits up to the given milliseconds for readable input; true when there is some (or end of file).
+sub wait_readable {
+    my ($handle, $milliseconds) = @_;
+    my $deadline = time + $milliseconds / 1000;
+    while (1) {
+        finish() if $stopping;
+        my $left = $deadline - time;
+        return 0 if $left <= 0;
+        my $bits = '';
+        vec($bits, fileno($handle), 1) = 1;
+        my $count = select(my $ready = $bits, undef, undef, $left > 0.1 ? 0.1 : $left);
+        return 1 if $count > 0;
+    }
+}
+
+# Bytes from curl, recorded and added to the unconsumed ones: how many arrived, 0 when curl
+# closed its end (or reset), -1 on timeout.
+sub receive_bytes {
+    my ($milliseconds) = @_;
+    return -1 unless wait_readable($input, $milliseconds);
+    my $count = sysread($input, my $chunk, 65536);
+    return 0 unless $count;
+    $received .= $chunk;
+    $unconsumed .= $chunk;
+    return $count;
+}
+
+# The length of the whole BER element at the start of the unconsumed bytes, or -1 while its
+# identifier and length octets have not all arrived (X.690 8.1).
+sub ber_element_length {
+    return -1 if length($unconsumed) < 1;
+    my @octets = unpack('C*', substr($unconsumed, 0, 16));
+    my $index = 1;
+    if (($octets[0] & 0x1F) == 0x1F) {
+        $index++ while $index < @octets && ($octets[$index] & 0x80) != 0;
+        $index++;
+    }
+    return -1 if @octets <= $index;
+    my $first = $octets[$index];
+    return $index + 1 + $first if $first < 0x80;
+    my $count = $first & 0x7F;
+    if ($count == 0) { note('= curl sent an indefinite length, which the read ber step does not support'); finish(); }
+    return -1 if @octets <= $index + $count;
+    my $length = 0;
+    $length = $length * 256 + $octets[$index + $_] for 1 .. $count;
+    return $index + 1 + $count + $length;
+}
+
+# Runs one read step; false when the session has ended.
+sub run_read {
+    my ($step) = @_;
+    my $wanted = -1;
+    while (1) {
+        $wanted = ber_element_length() if $step->{framing} eq 'ber';
+        $wanted = $step->{count} if $step->{framing} eq 'count';
+        my $timeout;
+        if ($step->{framing} eq 'gap') { $timeout = length($unconsumed) == 0 ? $idle : $gap; }
+        elsif ($wanted >= 0 && length($unconsumed) >= $wanted) { last; }
+        else { $timeout = $idle; }
+        my $arrived = receive_bytes($timeout);
+        next if $arrived > 0;
+        last if $step->{framing} eq 'gap' && $arrived < 0 && length($unconsumed) > 0;
+        note('> ' . hex_pairs($unconsumed)) if length $unconsumed;
+        my $expected = $wanted >= 0 ? " of the $wanted expected" : '';
+        if ($arrived < 0) { note("= $step->{text} timed out after $idle ms with " . length($unconsumed) . " bytes$expected; session ended"); }
+        else { note("= curl closed the connection during $step->{text} with " . length($unconsumed) . " bytes$expected; session ended"); }
+        return 0;
+    }
+    $wanted = length $unconsumed if $wanted < 0;
+    my $message = substr($unconsumed, 0, $wanted, '');
+    note('> ' . hex_pairs($message));
+    return 1;
+}
+
+sub pause_for {
+    my ($milliseconds) = @_;
+    my $deadline = time + $milliseconds / 1000;
+    while ((my $left = $deadline - time) > 0) { finish() if $stopping; select(undef, undef, undef, $left > 0.1 ? 0.1 : $left); }
+}
+
+sub send_bytes {
+    my ($bytes) = @_;
+    my $offset = 0;
+    while ($offset < length $bytes) {
+        my $count = syswrite($output, $bytes, length($bytes) - $offset, $offset);
+        return 0 unless defined $count;
+        $offset += $count;
+    }
+    return 1;
+}
+
+if ($config{tls}) {
+    # s_server holds the socket; its plaintext comes through the FIFOs on this process's input and output.
+    open($input, '<&=', 0) or die "stdin: $!";
+    open($output, '>&=', 1) or die "stdout: $!";
+    open(my $ready, '>', "$state/script.ready"); close $ready;
+} else {
+    $listener = IO::Socket::IP->new(LocalAddr => $config{address}, LocalPort => $config{port}, Proto => 'tcp', Listen => 5, ReuseAddr => 1);
+    if (!$listener) { open(my $failure, '>', "$state/script.error"); print $failure "cannot listen on $config{address}:$config{port}: $@"; close $failure; exit 1; }
+    open(my $ready, '>', "$state/script.ready"); close $ready;
+    while (!$connection) {
+        finish() if $stopping;
+        my $bits = '';
+        vec($bits, fileno($listener), 1) = 1;
+        if (select(my $ready = $bits, undef, undef, 0.1) > 0) { $connection = $listener->accept; }
+    }
+    $input = $output = $connection;
+}
+
+my $ended = 0;
+my $startsWithRead = @$steps && $steps->[0]{kind} eq 'read';
+if ($startsWithRead) {
+    # Waits for curl's first byte, as the PowerShell script does before it serves the session.
+    my $arrived = receive_bytes($idle);
+    if ($arrived <= 0) {
+        note("= $steps->[0]{text} timed out after $idle ms with 0 bytes; session ended");
+        finish();
+    }
+}
+note('= TLS handshake completed') if $config{tls};
+STEP: foreach my $step (@$steps) {
+    if ($step->{kind} eq 'read') {
+        if (!run_read($step)) { $ended = 1; last STEP; }
+    } elsif ($step->{kind} eq 'send') {
+        if (!send_bytes($step->{bytes})) { note('= curl closed the connection mid-send; session ended'); $ended = 1; last STEP; }
+        $written += length $step->{bytes};
+        note('< ' . hex_pairs($step->{bytes}));
+    } elsif ($step->{kind} eq 'pause') {
+        pause_for($step->{milliseconds});
+        note("= paused $step->{milliseconds} ms");
+    } elsif ($step->{kind} eq 'reset') {
+        # A zero linger time makes the close a RST. Over TLS s_server holds the socket and the run stops it, so curl sees a FIN.
+        setsockopt($connection, SOL_SOCKET, SO_LINGER, pack('ii', 1, 0)) if $connection;
+        note('= server reset the connection');
+        $ended = 1;
+        last STEP;
+    } else {
+        note('= server closed the connection');
+        $ended = 1;
+        last STEP;
+    }
+}
+note('= script ended; server closed the connection') if !$ended;
+finish();
+RCE_SCRIPT_PERL
+    {
+        printf 'address=%s\n' "$RCE_LISTEN_ADDRESS"
+        printf 'port=%s\n' "$RCE_PORT"
+        printf 'tls=%s\n' "$RCE_TLS"
+        printf 'script=%s\n' "$RCE_SCRIPT"
+        printf 'idle=%s\n' "$RCE_SCRIPT_IDLE"
+        printf 'gap=%s\n' "$RCE_SCRIPT_GAP"
+    } >"$RCE_STATE/script.conf"
+    rce_script_error=$(perl "$RCE_STATE/script.pl" "$RCE_STATE" check 2>&1) || rce_die "$rce_script_error"
+    : >"$RCE_STATE/script.log"
+    : >"$RCE_STATE/script.received"
+    if [ $RCE_TLS = 1 ]; then
+        # As for -Http2: s_server takes the one connection, and perl serves its plaintext through two
+        # FIFOs opened in the same order on both sides. -no_ign_eof is not given: the run stops s_server
+        # (rce_script_watch) once the session is over, a close without close_notify as the PowerShell script's.
+        mkfifo "$RCE_STATE/script.out" "$RCE_STATE/script.in" || rce_die 'mkfifo failed'
+        case $RCE_LISTEN_ADDRESS in *:*) rce_accept="[$RCE_LISTEN_ADDRESS]:$RCE_PORT" ;; *) rce_accept="$RCE_LISTEN_ADDRESS:$RCE_PORT" ;; esac
+        RCE_TLS_MSG="$RCE_STATE/script.msg"
+        "$RCE_OPENSSL" s_server -quiet -naccept 1 -tls1_2 -accept "$rce_accept" \
+            -cert "$RCE_STATE/server.crt" -key "$RCE_STATE/server.key" -msg -msgfile "$RCE_TLS_MSG" \
+            >"$RCE_STATE/script.out" <"$RCE_STATE/script.in" 2>"$RCE_STATE/script.tls.err" &
+        RCE_TLS_PID=$!
+        printf '%s\n' "$RCE_TLS_PID" >"$RCE_STATE/tls-pid.script"
+        perl "$RCE_STATE/script.pl" "$RCE_STATE" serve <"$RCE_STATE/script.out" >"$RCE_STATE/script.in" 2>"$RCE_STATE/script.err" &
+        RCE_SCRIPT_PID=$!
+        rce_wait_for_listening_port "$RCE_PORT" || rce_die "openssl s_server did not start listening on port $RCE_PORT: $(cat "$RCE_STATE/script.tls.err" "$RCE_STATE/script.err" 2>/dev/null)"
+        # Once the session is over, s_server is stopped when its msgfile shows records enough for every
+        # byte sent, as rce_finish_tls does, so curl sees the close.
+        (
+            rce_polls=0
+            while [ ! -e "$RCE_STATE/script.done" ] && kill -0 "$RCE_SCRIPT_PID" 2>/dev/null; do sleep 0.02; done
+            RCE_TLS_WRITTEN=$(cat "$RCE_STATE/script.written" 2>/dev/null)
+            while kill -0 "$RCE_TLS_PID" 2>/dev/null && [ $rce_polls -lt 150 ]; do
+                set -- $(rce_sent_application_records)
+                if [ $(($1 - 16 * $2)) -ge "${RCE_TLS_WRITTEN:-0}" ]; then break; fi
+                rce_polls=$((rce_polls + 1))
+                sleep 0.02
+            done
+            sleep 0.1
+            kill -KILL "$RCE_TLS_PID" 2>/dev/null
+        ) </dev/null >/dev/null 2>&1 &
+    else
+        perl "$RCE_STATE/script.pl" "$RCE_STATE" serve </dev/null >/dev/null 2>"$RCE_STATE/script.err" &
+        RCE_SCRIPT_PID=$!
+        rce_polls=0
+        while [ ! -e "$RCE_STATE/script.ready" ]; do
+            if ! kill -0 "$RCE_SCRIPT_PID" 2>/dev/null || [ $rce_polls -ge 250 ]; then
+                rce_die "the scripted server did not start: $(cat "$RCE_STATE/script.error" "$RCE_STATE/script.err" 2>/dev/null | head -n 3)"
+            fi
+            rce_polls=$((rce_polls + 1))
+            sleep 0.02
+        done
+    fi
+    printf '%s\n' "$RCE_SCRIPT_PID" >"$RCE_STATE/pid.script"
+fi
+
+if [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; then
+    cat >"$RCE_STATE/relay.pl" <<'RCE_RELAY_PERL'
+use strict;
+use warnings;
+use IO::Socket::UNIX;
+
+# Relays curl's connection (standard input and output) to s_server's Unix socket; SIGUSR1 sends
+# curl a FIN while s_server goes on reading (-HalfCloseAfterResponse with -Tls).
+$SIG{PIPE} = 'IGNORE';
+my $socket = IO::Socket::UNIX->new(Peer => $ARGV[0]) or exit 1;
+open(my $curl, '>&=', 1) or exit 1;
+$SIG{USR1} = sub { shutdown($curl, 1); };
+sub write_all {
+    my ($handle, $data) = @_;
+    my $offset = 0;
+    while ($offset < length $data) {
+        my $count = syswrite($handle, $data, length($data) - $offset, $offset);
+        return 0 unless defined $count;
+        $offset += $count;
+    }
+    return 1;
+}
+my $curlOpen = 1;
+my $socketFd = fileno($socket);
+while (1) {
+    my $bits = '';
+    vec($bits, $socketFd, 1) = 1;
+    vec($bits, 0, 1) = 1 if $curlOpen;
+    my $count = select(my $ready = $bits, undef, undef, undef);
+    next if $count < 0;
+    if ($curlOpen && vec($ready, 0, 1)) {
+        my $read = sysread(STDIN, my $chunk, 65536);
+        if ($read) { last unless write_all($socket, $chunk); }
+        else { $curlOpen = 0; shutdown($socket, 1); }
+    }
+    if (vec($ready, $socketFd, 1)) {
+        my $read = sysread($socket, my $chunk, 65536);
+        last unless $read;
+        last unless write_all($curl, $chunk);
+    }
+}
+RCE_RELAY_PERL
+fi
+
 # RFC 7541 appendix B, the Huffman codes of symbols 0 to 255 as hex code/bit length.
 RCE_HPACK_HUFFMAN='1ff8/13 7fffd8/23 fffffe2/28 fffffe3/28 fffffe4/28 fffffe5/28 fffffe6/28 fffffe7/28 fffffe8/28 ffffea/24 3ffffffc/30 fffffe9/28 fffffea/28 3ffffffd/30 fffffeb/28 fffffec/28 fffffed/28 fffffee/28 fffffef/28 ffffff0/28 ffffff1/28 ffffff2/28 3ffffffe/30 ffffff3/28 ffffff4/28 ffffff5/28 ffffff6/28 ffffff7/28 ffffff8/28 ffffff9/28 ffffffa/28 ffffffb/28 14/6 3f8/10 3f9/10 ffa/12 1ff9/13 15/6 f8/8 7fa/11 3fa/10 3fb/10 f9/8 7fb/11 fa/8 16/6 17/6 18/6 0/5 1/5 2/5 19/6 1a/6 1b/6 1c/6 1d/6 1e/6 1f/6 5c/7 fb/8 7ffc/15 20/6 ffb/12 3fc/10 1ffa/13 21/6 5d/7 5e/7 5f/7 60/7 61/7 62/7 63/7 64/7 65/7 66/7 67/7 68/7 69/7 6a/7 6b/7 6c/7 6d/7 6e/7 6f/7 70/7 71/7 72/7 fc/8 73/7 fd/8 1ffb/13 7fff0/19 1ffc/13 3ffc/14 22/6 7ffd/15 3/5 23/6 4/5 24/6 5/5 25/6 26/6 27/6 6/5 74/7 75/7 28/6 29/6 2a/6 7/5 2b/6 76/7 2c/6 8/5 9/5 2d/6 77/7 78/7 79/7 7a/7 7b/7 7ffe/15 7fc/11 3ffd/14 1ffd/13 ffffffc/28 fffe6/20 3fffd2/22 fffe7/20 fffe8/20 3fffd3/22 3fffd4/22 3fffd5/22 7fffd9/23 3fffd6/22 7fffda/23 7fffdb/23 7fffdc/23 7fffdd/23 7fffde/23 ffffeb/24 7fffdf/23 ffffec/24 ffffed/24 3fffd7/22 7fffe0/23 ffffee/24 7fffe1/23 7fffe2/23 7fffe3/23 7fffe4/23 1fffdc/21 3fffd8/22 7fffe5/23 3fffd9/22 7fffe6/23 7fffe7/23 ffffef/24 3fffda/22 1fffdd/21 fffe9/20 3fffdb/22 3fffdc/22 7fffe8/23 7fffe9/23 1fffde/21 7fffea/23 3fffdd/22 3fffde/22 fffff0/24 1fffdf/21 3fffdf/22 7fffeb/23 7fffec/23 1fffe0/21 1fffe1/21 3fffe0/22 1fffe2/21 7fffed/23 3fffe1/22 7fffee/23 7fffef/23 fffea/20 3fffe2/22 3fffe3/22 3fffe4/22 7ffff0/23 3fffe5/22 3fffe6/22 7ffff1/23 3ffffe0/26 3ffffe1/26 fffeb/20 7fff1/19 3fffe7/22 7ffff2/23 3fffe8/22 1ffffec/25 3ffffe2/26 3ffffe3/26 3ffffe4/26 7ffffde/27 7ffffdf/27 3ffffe5/26 fffff1/24 1ffffed/25 7fff2/19 1fffe3/21 3ffffe6/26 7ffffe0/27 7ffffe1/27 3ffffe7/26 7ffffe2/27 fffff2/24 1fffe4/21 1fffe5/21 3ffffe8/26 3ffffe9/26 ffffffd/28 7ffffe3/27 7ffffe4/27 7ffffe5/27 fffec/20 fffff3/24 fffed/20 1fffe6/21 3fffe9/22 1fffe7/21 1fffe8/21 7ffff3/23 3fffea/22 3fffeb/22 1ffffee/25 1ffffef/25 fffff4/24 fffff5/24 3ffffea/26 7ffff4/23 3ffffeb/26 7ffffe6/27 3ffffec/26 3ffffed/26 7ffffe7/27 7ffffe8/27 7ffffe9/27 7ffffea/27 7ffffeb/27 ffffffe/28 7ffffec/27 7ffffed/27 7ffffee/27 7ffffef/27 7fffff0/27 3ffffee/26'
 if [ $RCE_HTTP2 = 1 ]; then
@@ -3080,6 +3464,30 @@ if [ $RCE_HTTP2 = 1 ]; then
     fi
 fi
 
+if [ -n "$RCE_SCRIPT" ]; then
+    # Give the session a moment to finish, then stop waiting for one (2 s, then up to 6 s).
+    rce_polls=0
+    while [ ! -e "$RCE_STATE/script.done" ] && kill -0 "$RCE_SCRIPT_PID" 2>/dev/null && [ $rce_polls -lt 100 ]; do
+        rce_polls=$((rce_polls + 1))
+        sleep 0.02
+    done
+    if [ ! -e "$RCE_STATE/script.done" ]; then
+        kill -TERM "$RCE_SCRIPT_PID" 2>/dev/null
+        rce_polls=0
+        while kill -0 "$RCE_SCRIPT_PID" 2>/dev/null && [ $rce_polls -lt 300 ]; do
+            rce_polls=$((rce_polls + 1))
+            sleep 0.02
+        done
+    fi
+    kill -KILL "$RCE_SCRIPT_PID" 2>/dev/null
+    wait "$RCE_SCRIPT_PID" 2>/dev/null
+    RCE_SCRIPT_PID=''
+    if [ -s "$RCE_STATE/script.err" ]; then
+        printf '%s: the server reported:\n' "$RCE_NAME" >&2
+        cat "$RCE_STATE/script.err" >&2
+    fi
+fi
+
 # --- Stopping the server --------------------------------------------------------------
 
 if [ $RCE_NO_SERVER = 0 ]; then
@@ -3141,6 +3549,10 @@ fi
 if [ $RCE_HTTP2 = 1 ]; then
     cat "$RCE_STATE/h2.received" >"$RCE_OUT_DIRECTORY/request.bin"
     cat "$RCE_STATE/h2.log" >"$RCE_OUT_DIRECTORY/transcript.txt"
+fi
+if [ -n "$RCE_SCRIPT" ]; then
+    cat "$RCE_STATE/script.received" >"$RCE_OUT_DIRECTORY/request.bin"
+    cat "$RCE_STATE/script.log" >"$RCE_OUT_DIRECTORY/transcript.txt"
 fi
 if [ $RCE_LINE_SESSION = 1 ]; then cat "$RCE_STATE/transcript.txt" >"$RCE_OUT_DIRECTORY/transcript.txt"; fi
 if [ $RCE_FTP = 1 ]; then cat "$RCE_STATE/upload.bin" >"$RCE_OUT_DIRECTORY/upload.bin"; fi
