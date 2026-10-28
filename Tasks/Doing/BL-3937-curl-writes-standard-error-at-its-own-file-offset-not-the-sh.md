@@ -31,3 +31,4 @@ Found by BL-3824 on 2026-10-28 in WSL (Ubuntu): `{ echo before...; curl -sS http
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: a46c198d def504f7 779790c0.
