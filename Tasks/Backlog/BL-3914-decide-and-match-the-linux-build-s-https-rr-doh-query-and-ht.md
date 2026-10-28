@@ -4,8 +4,8 @@ title: Decide and match the Linux build's HTTPS-RR DoH query and HTTPSRR feature
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Conformance.UnitLibrary/UpstreamUnixFeatures.cs, Curl.Networking.UnitTests/Cgr157LinuxTests.cs]
+depends-on: [BL-3946]
+touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Cli.UnitLibrary/CurlVersionText.cs, Curl.Cli.UnitTests/CurlVersionTextTests.cs, Curl.Conformance.UnitLibrary/UpstreamUnixFeatures.cs, Curl.Networking.UnitTests/Cgr157LinuxTests.cs, Curl.Networking.UnitTests/Cgr157Tests.cs, Curl.Conformance.UnitTests/UpstreamCurlPlatformTests.cs, Curl.Conformance.UnitLibrary/UpstreamCurlVersionLineFeatures.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -30,8 +30,12 @@ BL-3686 (ADR-0856) fixed the Windows half of third-party gap report issue CGR-15
 ## Notes
 
 - Filed by BL-3686, which fixed only the Windows half.
+- 2026-10-28 (lane 7) measurement: WSL Ubuntu `curl -V` = curl 8.18.0 libcurl/8.18.0 OpenSSL/3.5.5 (8.18.0-1ubuntu2.8). Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL threadsafe TLS-SRP UnixSockets zstd - no HTTPSRR (and, outside this task, no SSLS-EXPORT). DoH queries for the CGR-157 repro: the gap report's own Linux measurement (CGR-157 "Expected", REF 8.18 Linux) sends only the A and AAAA POSTs. So the Linux reference has no HTTPSRR.
+- Decision to take (ADR amending ADR-0856): `TcpConnector.AsksHttpsRecords` defaults to false on every platform; drop `HTTPSRR` from `CurlVersionText.FeaturesLine` (and its test constant, doc comments), from `UpstreamUnixFeatures.Names`, from the `UpstreamCurlPlatformTests.Unix_...` superset list and the `UpstreamCurlVersionLineFeatures` doc; make `Cgr157Tests`' Windows-only test platform-neutral and replace its off-Windows test with `Cgr157LinuxTests` pinning no HTTPS-RR query off Windows. Tests that need the HTTPS-RR path already set `AsksHttpsRecords = true`.
+- Touches widened for `Cgr157Tests.cs` (its off-Windows test pins the old default), `UpstreamCurlPlatformTests.cs` (its Unix superset names HTTPSRR) and `UpstreamCurlVersionLineFeatures.cs` (doc names HTTPSRR as Linux-only). BL-3946 holds the whole of Curl.Conformance.UnitTests and UnitLibrary, so this task waits on it (rule 3); no code was edited in this run.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 90befad2 74ba9b3c 168cb378 779790c0.
+- 2026-10-28: Doing -> Backlog. Waits on BL-3946, which holds Curl.Conformance.UnitTests and Curl.Conformance.UnitLibrary (UpstreamCurlPlatformTests.cs, UpstreamUnixFeatures.cs); measurement and decision recorded in Notes
