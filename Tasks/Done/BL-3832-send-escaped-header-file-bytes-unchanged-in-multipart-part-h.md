@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Core.UnitLibrary/Multipart/MultipartBodySegments.cs, Curl.Core.UnitTests/Cgr020MultipartTests.cs, Curl.Networking.UnitLibrary/HttpProxyTunnel.cs, Curl.Networking.UnitTests/Cgr020TunnelTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3832 — Send escaped header-file bytes unchanged in multipart part headers and CONNECT proxy headers (CGR-020 follow-up)
 
@@ -26,9 +26,9 @@ Repro (Linux): `printf 'X-C: \xff\x80\xc3(\n' > h.txt; curl -s -F "a=b;headers=@
 
 ## Acceptance criteria
 
-- [ ] A multipart part header holding U+DC80-U+DCFF escapes is written as those bytes, with a unit test in `Curl.Core.UnitTests/Cgr020MultipartTests.cs`.
-- [ ] A CONNECT request's proxy header holding such escapes is written as those bytes, with a unit test in `Curl.Networking.UnitTests/Cgr020TunnelTests.cs`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A multipart part header holding U+DC80-U+DCFF escapes is written as those bytes, with a unit test in `Curl.Core.UnitTests/Cgr020MultipartTests.cs`.
+- [x] A CONNECT request's proxy header holding such escapes is written as those bytes, with a unit test in `Curl.Networking.UnitTests/Cgr020TunnelTests.cs`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -38,3 +38,4 @@ Repro (Linux): `printf 'X-C: \xff\x80\xc3(\n' > h.txt; curl -s -F "a=b;headers=@
 
 - 2026-10-26: Created by BL-3549.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 12b0f17a 32e4c64d 779790c0.
+- 2026-10-28: Doing -> Done. Escaped header-file bytes (U+DC80-DCFF) now sent unchanged in multipart part headers and CONNECT proxy headers; unit tests added; CI platform-neutral.
