@@ -308,7 +308,7 @@ public sealed class CurlCommandRunnerParallelTests
     [TestMethod]
     public async Task RunAsync_BadGlobAfterATransferOfTheFirstBatch_StartsNoTransferAndExitsWithTheGlobsCode()
     {
-        // curl 8.22.0 abandons the first batch at a bad glob, so /a never starts (CGR-170, ADR-0951).
+        // curl 8.22.0 abandons the first batch at a bad glob, so /a never starts (CGR-170, ADR-0954).
         HeldTransferHandler http = new();
 
         int exitCode = await RunAsync(http, ["-Z", "-s", A, "http://h/[1-"]);

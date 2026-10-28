@@ -1,4 +1,4 @@
-# ADR-0951: A `-Z` run's first batch is set up before any of its transfers starts
+# ADR-0954: A `-Z` run's first batch is set up before any of its transfers starts
 
 - **Status:** Accepted
 - **Date:** 2026-10-28
