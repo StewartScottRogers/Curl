@@ -94,7 +94,7 @@ if ($Restart) {
     $forward = @([regex]::Matches("$rest".Trim().TrimStart('"').Trim(), '"[^"]*"|\S+') | ForEach-Object { $_.Value })
     # Anything passed beside -Restart (e.g. -MaxLanes 12) replaces the old shift's value.
     $override = @{}
-    foreach ($name in $PSBoundParameters.Keys | Where-Object { $_ -notin 'Restart', 'NewTab' }) { $override[$name] = $PSBoundParameters[$name] }
+    foreach ($name in $FactoryParameters.Keys | Where-Object { $_ -notin 'Restart', 'NewTab' }) { $override[$name] = $FactoryParameters[$name] }
     $forward = Set-ForwardedArgument $forward $override
     $branchNow = "$(git -C $Root rev-parse --abbrev-ref HEAD)".Trim()
     if ($forward -notcontains '-ShiftBranch' -and $branchNow -notin 'master', 'main', 'HEAD') { $forward += @('-ShiftBranch', $branchNow) }
