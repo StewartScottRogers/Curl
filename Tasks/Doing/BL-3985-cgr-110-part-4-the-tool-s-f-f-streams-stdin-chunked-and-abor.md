@@ -40,3 +40,4 @@ Found by BL-3974 (CGR-110 part 3, Documentation/Reviews/Curl-Gap-Report-2026-10-
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 65e5ab67 4380765b e0cd4d6e c259902e.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs (held by BL-3728) and Curl.Protocol.Abstractions.UnitLibrary/RequestBodyReadFailedException.cs (held by BL-3983) to fail a body read with exit 42
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 65e5ab67 4380765b e0cd4d6e c259902e.
