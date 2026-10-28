@@ -1,5 +1,5 @@
 ---
-id: BL-3963
+id: BL-3966
 title: Measure Curl's sftp/scp -w timings against a WSL sshd the Windows SSH preset can exchange keys with
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3963 — Measure Curl's sftp/scp -w timings against a WSL sshd the Windows SSH preset can exchange keys with
+# BL-3966 — Measure Curl's sftp/scp -w timings against a WSL sshd the Windows SSH preset can exchange keys with
 
 ## Goal
 
