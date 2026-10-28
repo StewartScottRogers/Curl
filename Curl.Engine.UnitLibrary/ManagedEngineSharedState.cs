@@ -68,6 +68,7 @@ internal sealed class ManagedEngineSharedState
     /// <param name="dnsCache">The resolved names.</param>
     /// <param name="cookies">The cookies.</param>
     /// <param name="hsts">The HSTS cache.</param>
+    /// <param name="performer">The numbering of the new state's transfers, or <see langword="null" /> for <paramref name="engine" />'s.</param>
     /// <remarks>It dials as <paramref name="engine" /> dials (<see cref="Dialing" />).</remarks>
     internal ManagedEngineSharedState(
         ManagedEngineSharedState engine,
@@ -75,7 +76,8 @@ internal sealed class ManagedEngineSharedState
         TlsSessionCache tlsSessions,
         DnsCache dnsCache,
         CookieStore cookies,
-        HstsTransferPolicy hsts)
+        HstsTransferPolicy hsts,
+        TransferPerformer? performer = null)
     {
         TimeProvider = engine.TimeProvider;
         Connections = connections;
@@ -90,7 +92,7 @@ internal sealed class ManagedEngineSharedState
         ConnectionIdsByPoolNumber = engine.ConnectionIdsByPoolNumber;
         MultiOwners = engine.MultiOwners;
         SocketHandles = engine.SocketHandles;
-        Performer = engine.Performer;
+        Performer = performer ?? engine.Performer;
         ProxySelector = engine.ProxySelector;
         ReadEnvironmentVariable = engine.ReadEnvironmentVariable;
         Dialing = engine.Dialing;
@@ -116,7 +118,7 @@ internal sealed class ManagedEngineSharedState
     {
         ConnectionCache connections = new(TimeProvider);
         OwnConnectionCaches.Add(connections, connections);
-        return new(this, connections, new TlsSessionCache(TimeProvider), new DnsCache(), new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp));
+        return new(this, connections, new TlsSessionCache(TimeProvider), new DnsCache(), new CookieStore(), new HstsTransferPolicy(TimeProvider, learnsOverHttp: learnsHstsOverHttp), Performer.StartingAtZero());
     }
 
     /// <summary>

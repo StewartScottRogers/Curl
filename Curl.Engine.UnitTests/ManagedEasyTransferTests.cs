@@ -649,7 +649,7 @@ public sealed partial class ManagedEasyTransferTests
         Assert.HasCount(2, connector.Targets);
         Assert.DoesNotContain("Cookie:", Encoding.ASCII.GetString(connector.Written[written..]));
         Assert.AreEqual(0, first.Info.TransferId);
-        Assert.AreEqual(1, second.Info.TransferId);
+        Assert.AreEqual(0, second.Info.TransferId);
     }
 
     [TestMethod]

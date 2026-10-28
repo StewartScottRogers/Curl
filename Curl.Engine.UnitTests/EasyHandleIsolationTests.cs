@@ -181,7 +181,7 @@ public sealed class EasyHandleIsolationTests
     }
 
     [TestMethod]
-    public async Task WithOwnCaches_EngineState_GivesFreshCachesOverTheEnginesNumbering()
+    public async Task WithOwnCaches_EngineState_GivesFreshCachesAndItsOwnNumbering()
     {
         Dictionary<string, string> environment = new() { ["CURL_HSTS_HTTP"] = "yes" };
         await using ManagedCurlEngine engine = new(TimeProvider.System, null, readEnvironmentVariable: name => environment.GetValueOrDefault(name));
@@ -195,7 +195,7 @@ public sealed class EasyHandleIsolationTests
         Assert.AreNotSame(engine.Shared.Cookies, own.Cookies);
         Assert.AreNotSame(engine.Shared.Hsts, own.Hsts);
         Assert.AreSame(engine.Shared, own.EngineWide);
-        Assert.AreSame(engine.Shared.Performer, own.Performer);
+        Assert.AreNotSame(engine.Shared.Performer, own.Performer);
         Assert.IsTrue(stored);
         Assert.IsFalse(engine.Shared.Hsts.TrySwitchToHttps("http://hsts.example.com/", CurlUrl.Parse("http://hsts.example.com/"), out _));
     }
