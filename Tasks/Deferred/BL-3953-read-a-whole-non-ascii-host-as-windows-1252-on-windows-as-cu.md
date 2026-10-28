@@ -54,3 +54,4 @@ Linux (UTF-8 locale) is right today and must stay so: `Cgr059BidiTests` and `Cgr
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 37a11300 0ffe192b a91492c4 779790c0.
 - 2026-10-28: Doing -> Backlog. Budget spent mid-fix: Windows-1252 host reading works for the measured URLs, but Cgr019Tests, CurlUrlTests and upstream test1448 need per-source handling; next steps in Notes, code in the stash
+- 2026-10-28: Backlog -> Deferred. Split into BL-3957, BL-3958 and BL-3959 after hitting the cost cap
