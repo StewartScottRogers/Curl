@@ -39,3 +39,4 @@ Lanes test only on Windows, so reproduce with `gh run view 40724749646 --log-fai
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 1a4e3b30.
 - 2026-10-28: Doing -> Backlog. Waits on BL-3885, which holds Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs where the U+FFFD refusal lands
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 1a4e3b30.
+- 2026-10-28: Doing -> Blocked. Fix landed in d620937b7; waiting on the CI workflow to pass on Linux and macOS for it. The interactive session that made the fix moves it to Done when CI is green.
