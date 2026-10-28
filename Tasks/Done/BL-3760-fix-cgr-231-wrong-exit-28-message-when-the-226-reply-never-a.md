@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitLib
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3760 — Fix CGR-231: Wrong exit-28 message when the 226 reply never arrives
 
@@ -76,3 +76,4 @@ curl -sS -m 4 ftp://127.0.0.1:20960/file.txt
 
 - 2026-10-26: Created from CGR-231 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. End-of-transfer reply timeouts now say FTP response timeout; Cgr231Tests pin both paths.
