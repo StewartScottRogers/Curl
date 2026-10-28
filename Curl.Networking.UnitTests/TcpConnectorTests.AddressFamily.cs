@@ -86,7 +86,7 @@ public sealed partial class TcpConnectorTests
         // curl -6 -v http://127.0.0.1:47500/ -> *   Trying 127.0.0.1:47500... and exit 0.
         var literal = IPAddress.Parse(host);
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
-        var connector = CreateConnector(new FakeDnsResolver(literal), dialer, family);
+        var connector = CreateSchannelBuildConnector(new FakeDnsResolver(literal), dialer, family);
 
         var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 47500, UseTls: false));
 
@@ -173,7 +173,7 @@ public sealed partial class TcpConnectorTests
     {
         // curl -6 -v -x http://127.0.0.1:47500 http://example.com/ -> *   Trying 127.0.0.1:47500... and exit 0.
         var dialer = new FakeTcpDialer();
-        var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, AddressFamily.InterNetworkV6);
+        var connector = CreateSchannelBuildConnector(new FakeDnsResolver(Loopback), dialer, AddressFamily.InterNetworkV6);
         var target = new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 47500, null) };
 
         await ConnectLoggedAsync(connector, target);
@@ -184,4 +184,9 @@ public sealed partial class TcpConnectorTests
 
     private static TcpConnector CreateConnector(FakeDnsResolver resolver, FakeTcpDialer dialer, AddressFamily addressFamily) =>
         new(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(), addressFamily: addressFamily);
+
+    // The literal tests pin curl 8.21.0 with Schannel, which dials a literal of the other family as written;
+    // the OpenSSL build refuses it (CGR-186, pinned in Cgr186Tests), so they ask for the Windows build on every platform.
+    private static TcpConnector CreateSchannelBuildConnector(FakeDnsResolver resolver, FakeTcpDialer dialer, AddressFamily addressFamily) =>
+        new(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(), addressFamily: addressFamily) { FiltersAddressLiterals = false };
 }
