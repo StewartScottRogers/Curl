@@ -8,7 +8,7 @@ depends-on: [BL-3920]
 touches: [DarkFactory/HerdrTabs.ps1, DarkFactory/Restart.ps1, RunDarkFactory.sh]
 requirement: none
 created: 2026-10-27
-completed:
+completed: 2026-10-28
 ---
 # BL-3921 — Open dark factory shifts and lanes with pwsh on Linux and macOS
 
@@ -47,3 +47,4 @@ update its comments to match what now works.
 
 - 2026-10-27: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 8d66c20a 6fc0e2de fd6c9dc9 f62b312e d265299d.
+- 2026-10-28: Doing -> Done. Shifts and lanes open with pwsh off Windows; detached lanes log to the lane log; -Restart stops them
