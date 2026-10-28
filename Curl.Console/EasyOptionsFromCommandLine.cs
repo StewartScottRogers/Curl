@@ -250,7 +250,7 @@ internal static class EasyOptionsFromCommandLine
             TcpKeepAlive = options.TcpKeepAlive,
             TcpKeepIdle = keepAliveTimeGiven ? TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.TcpKeepAliveSeconds)) : network.TcpKeepIdle,
             TcpKeepInterval = keepAliveTimeGiven ? TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.TcpKeepAliveSeconds)) : network.TcpKeepInterval,
-            TcpKeepCount = options.TcpKeepAlive && options.TcpKeepAliveProbeCount > 0 ? (int)options.TcpKeepAliveProbeCount : network.TcpKeepCount,
+            TcpKeepCount = options.TcpKeepAlive && options.TcpKeepAliveProbeCount > 0 ? (int)Math.Min(options.TcpKeepAliveProbeCount, int.MaxValue) : network.TcpKeepCount,
         };
     }
 
