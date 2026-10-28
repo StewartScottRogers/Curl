@@ -9,7 +9,7 @@ touches: [Libcurl.UnitTests/Cgr244Tests.cs, Libcurl/Options/Transfer/EasyTransfe
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3773 — Fix CGR-244: curl_easy_setopt accepts out-of-range values that libcurl rejects with CURLE_BAD_FUNCTION_ARGUMENT (43)
 
@@ -79,3 +79,4 @@ probe.exe sweep
 - 2026-10-26: Created from CGR-244 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Decision: the report's 43 answers are implemented as listed (BUFFERSIZE, UPLOAD_BUFFERSIZE, TFTP_BLKSIZE negative; RTSP CSEQ negative, following 8.22 Windows, not 8.18; RTSP_REQUEST 0 or unknown; ALTSVC_CTRL 0; INTERFACE `if!`, `host!`, `ifhost!` with an empty name). Not re-measured against the report's probe (gone); values taken from the report's Expected. `touches` widened to the three other setter files the report names (no other Doing task holds them). The Linux/macOS criterion is met by platform-neutral tests. Two old tests that pinned clamping/None were updated. Measure-CodeQuality for Libcurl: 0 failing members.
+- 2026-10-28: Doing -> Done. setopt answers 43 for the out-of-range values CGR-244 lists
