@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// transfer waits writable (<see cref="TransferSocketWait.BeginConnect" />) on the socket the inner dialer publishes as it
 /// creates it (<see cref="TransferSocketWait.ConnectingOn" />, BL-3890), a dial that connects ends the connect
 /// (<see cref="TransferSocketWait.EndConnect" />) after the transfer takes its socket, an engine number for a connection with no
-/// operating system socket (<see cref="TransferSocketWait.TakeSocket" />, ADR-0951), and each dialed connection is wrapped, beneath TLS, in a
+/// operating system socket (<see cref="TransferSocketWait.TakeSocket" />, ADR-0955), and each dialed connection is wrapped, beneath TLS, in a
 /// <see cref="SocketActionGatedConnection" />, so its reads and writes wait for the multi handle's signal
 /// (ADR-0917, BL-3859). Every other member is the inner dialer's.
 /// </summary>

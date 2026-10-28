@@ -48,7 +48,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// in-memory one) starts from; the first such transfer is given <c>FirstEngineSocket + 1</c>, the next
     /// <c>FirstEngineSocket + 2</c> and so on. The range lies far above any descriptor or handle the operating
     /// system gives a process and apart from <see cref="ConnectOnlyConnection.FirstSocket" />'s and
-    /// <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers (ADR-0951).
+    /// <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers (ADR-0955).
     /// </summary>
     internal const long FirstEngineSocket = 0x5000_0000;
 
@@ -127,7 +127,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// Records the socket of the connection the transfer dialed, unless <see cref="Socket" /> is already known:
     /// <paramref name="socketHandle" /> when the connection has an operating system socket, otherwise the engine's
     /// next number from <see cref="FirstEngineSocket" />, so the application is told of a socket and an action
-    /// naming it wakes the transfer (<see cref="SignalOn" />, ADR-0951).
+    /// naming it wakes the transfer (<see cref="SignalOn" />, ADR-0955).
     /// </summary>
     /// <param name="socketHandle">The connection's operating system socket (<c>IConnection.SocketHandle</c>), or <see langword="null" /> when it has none.</param>
     internal void TakeSocket(nint? socketHandle) => Update(() => Socket ??= socketHandle ?? (nint)Interlocked.Increment(ref nextEngineSocket));

@@ -1,4 +1,4 @@
-# ADR-0951: A socket-action transfer with no operating system socket gets an engine socket number
+# ADR-0955: A socket-action transfer with no operating system socket gets an engine socket number
 
 - Status: Accepted
 - Date: 2026-10-28
