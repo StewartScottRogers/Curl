@@ -30,6 +30,8 @@ Curl writes `* Could not resolve host: foo.test` twice before `* Could not resol
 
 ## Notes
 
+- The doubled line is written by TcpConnector.ReportLookUpFailed (KindOfResolver is not DohDnsResolver), which Engine cannot influence; the fix lands in Curl.Networking.UnitLibrary/TcpConnector.cs (for example a marker so UnusableDohUrlResolver also writes the line once). BL-3914 holds TcpConnector.cs, so requeued behind it.
+
 ## Log
 
 - 2026-10-26: Created.
