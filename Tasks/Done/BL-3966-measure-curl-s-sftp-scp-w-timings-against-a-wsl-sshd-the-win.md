@@ -8,7 +8,7 @@ depends-on: []
 touches: [Record-CurlExchange.ps1]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3966 — Measure Curl's sftp/scp -w timings against a WSL sshd the Windows SSH preset can exchange keys with
 
@@ -22,11 +22,14 @@ BL-3957 ran a non-root OpenSSH 10.2 sshd in WSL on port 21957 (setup in its Note
 
 ## Acceptance criteria
 
-- [ ] BL-3957's Notes record Curl's exit code and -w output on Windows for the three SSH-08 repros against a local sshd, and the sshd_config lines that let the key exchange succeed.
+- [x] BL-3957's Notes record Curl's exit code and -w output on Windows for the three SSH-08 repros against a local sshd, and the sshd_config lines that let the key exchange succeed.
 
 ## Notes
+
+- Recorded in BL-3957's Notes. sshd run: sshd -D via a hidden Start-Process wsl, port 21966; stopped afterwards.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 886f5a2d.
+- 2026-10-28: Doing -> Done. Curl's Windows exit codes and -w timings for the three SSH-08 repros, and the sshd_config lines, recorded in BL-3957's Notes
