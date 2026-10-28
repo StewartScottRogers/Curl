@@ -34,3 +34,4 @@ Found by BL-3664 (CGR-135). Server (Record-CurlExchange.ps1 `-Http2Origin prior-
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d0af7d8d 0f3c171c 779790c0.
