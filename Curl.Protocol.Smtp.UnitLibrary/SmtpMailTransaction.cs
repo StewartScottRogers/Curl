@@ -31,7 +31,9 @@ namespace Curl.Protocol.Smtp;
 /// <item>The server closing before a reply is complete is exit 56, a reply line of 65536
 /// bytes exit 100 and a reply line holding a NUL byte exit 8, none with <c>QUIT</c>.</item>
 /// <item>Every result carries <see cref="TransferReport.UploadSize" />, the bytes sent after
-/// <c>DATA</c> with the stuffed dots and the end-of-data mark, and
+/// <c>DATA</c> with the stuffed dots and the end-of-data mark, the same count as
+/// <see cref="TransferReport.RequestSize" />, which is all curl 8.22.0's <c>%{size_request}</c>
+/// counts for SMTP: no command line (measured, BL-3958), and
 /// <see cref="TransferReport.ResponseCode" />, the last reply's code, which is 0 once the
 /// message is sent until its reply arrives. Progress reports the same count against the
 /// upload's length, or against nothing when the upload cannot seek.</item>
@@ -96,7 +98,7 @@ internal sealed class SmtpMailTransaction(
         return result with
         {
             BytesTransferred = uploaded,
-            Report = new TransferReport { ResponseCode = responseCode, UploadSize = uploaded },
+            Report = new TransferReport { ResponseCode = responseCode, UploadSize = uploaded, RequestSize = uploaded },
         };
     }
 
