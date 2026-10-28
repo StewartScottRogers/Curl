@@ -30,3 +30,4 @@ Found by BL-3621 (lane 7, 2026-10-26). In `dotnet test --filter "TestCategory!=I
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d362e868 779790c0.
