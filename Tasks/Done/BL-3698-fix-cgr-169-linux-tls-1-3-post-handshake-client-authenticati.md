@@ -74,7 +74,7 @@ curl -sS -k https://localhost:<p>/
   - PORT before: exit 0, stderr empty, body `reneg`. The server logs `SSL_verify_client_post_handshake:extension not received` and sends no CertificateRequest.
   - PORT after: exit 0, stderr empty, body `reneg`. The server logs CertificateRequest, `SSL_do_handshake -> 1`, then client `Certificate [length 0028]` and `Finished`, the same as REF.
   - The variants that already matched still match: with `-verify 1` the in-handshake CertificateRequest was answered with an empty Certificate by both before the fix. The `--cert` path is unchanged (same callback as before).
-  - One wire difference is left, and it was there before the fix and is outside CGR-169: REF sends `close_notify` at the end and PORT closes without one. Filed as BL-3982.
+  - One wire difference is left, and it was there before the fix and is outside CGR-169: REF sends `close_notify` at the end and PORT closes without one. Filed as BL-3984.
 - Focused test `Curl.Networking.UnitTests/Cgr169Tests.cs`: the OpenSSL build's handshake options carry a selection callback returning null without `--cert`. This fails before the fix, which gave none (`Assert.IsNotNull`). The Schannel build carries none. No `Curl.Tls.UnitTests/Cgr169Tests.cs`: nothing in Curl.Tls changed.
 - `dotnet build` clean. Fast tests: 46 test assemblies passed, 0 failed (Curl.Networking.UnitTests 3727 passed). Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 0 failing members.
 - Platform check: the tests use no path, OS error or certificate, and read only the options handed to the handshake seam, so they are platform-neutral.

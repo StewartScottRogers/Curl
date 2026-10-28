@@ -1,5 +1,5 @@
 ---
-id: BL-3982
+id: BL-3984
 title: Linux: an https transfer through SslStream closes without the close_notify curl's OpenSSL build sends
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3982 â€” Linux: an https transfer through SslStream closes without the close_notify curl's OpenSSL build sends
+# BL-3984 â€” Linux: an https transfer through SslStream closes without the close_notify curl's OpenSSL build sends
 
 ## Goal
 
