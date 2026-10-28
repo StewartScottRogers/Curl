@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-3892]
-touches: [Curl.Console.UnitTests/Cgr115Tests.cs, Curl.Console/TerminalColumns.cs, Curl.Console/NativeTerminalWindowSize.cs, Curl.Console/StandardOutputOpener.cs, Curl.Console/Program.cs]
+touches: [Curl.Console.UnitTests/Cgr115Tests.cs, Curl.Console/TerminalColumns.cs, Curl.Console/NativeTerminalWindowSize.cs, Curl.Console/StandardOutputOpener.cs, Curl.Console/Program.cs, Curl.Console/StandardErrorOpener.cs, Curl.Console.UnitTests/StandardOutputOpenerTests.cs, Curl.Console/CLAUDE.md]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3644 — Fix CGR-115: Linux: PORT writes ESC[?1h ESC= (application cursor/keypad mode) to the terminal on every run when a standard stream is a TTY, and never...
 
@@ -86,10 +86,10 @@ EV\verify\linux\vrun.sh
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -101,9 +101,19 @@ EV\verify\linux\vrun.sh
   2. `StandardOutputOpener`: off Windows, open stdout on a terminal as the same unbuffered `FileStream` over fd 1 as the redirected branch, not `Console.OpenStandardOutput()`.
   3. `Program.cs`: off Windows, open stderr as an unbuffered `FileStream` over fd 2 (still inside `WriteFailureIgnoringStream`), not `Console.OpenStandardError()`. `OpenStandardInput` is fine: reads do not initialise the console.
   Requeued behind BL-3892, which holds `Curl.Console/Program.cs` (in Doing on origin/work/dark-factory). Touches widened to the three files above for that reason. Write an ADR for the decision. The unit test goes in `Cgr115Tests.cs`: the width read picks the stdin-terminal reader off Windows and never calls the window-width reader, and the opener picks the handle stream for a terminal stdout off Windows.
+- 2026-10-28 (lane 9): fixed as planned above; ADR-0864. Off Windows `TerminalColumns.ReadConsoleColumns` reads `ioctl(STDIN_FILENO, TIOCGWINSZ)` through `NativeTerminalWindowSize` (runtime shim `SystemNative_GetWindowSize`), `StandardOutputOpener.OpensOverHandle` opens a terminal stdout over fd 1, and the new `StandardErrorOpener` opens stderr over fd 2; Windows unchanged. Touches widened to the new `Curl.Console/StandardErrorOpener.cs` (a type named for stderr rather than putting it in `StandardOutputOpener`), `Curl.Console.UnitTests/StandardOutputOpenerTests.cs` (two calls renamed the `isOutputRedirected:` argument to `opensOverHandle:`) and `Curl.Console/CLAUDE.md` (its stream and width paragraphs had to stay true); no task in Doing on origin/work/dark-factory names any of them.
+- Measured in WSL Ubuntu, `TERM=xterm`, under `script -qec`, REF = `/usr/bin/curl` 8.18.0 OpenSSL, PORT = this tree published `-r linux-x64 --self-contained -p:PublishAot=false`, server = `nc -l` returning `HTTP/1.1 200 OK`, `Content-Length: 5`, body `hello` (`/tmp/bl3644-repro.sh`, not committed):
+  - `curl -s http://127.0.0.1:21210/echo -o /dev/null -w ok` | od -c: REF `ok`, PORT `ok` (was `^[[?1h^[=ok`).
+  - `curl -sS http://127.0.0.1:21299/ > o.txt`: both print only `curl: (7) Failed to connect to 127.0.0.1 ...` with no control sequence, o.txt 0 bytes. (8.18.0 words it `port 21299 after 0 ms`, PORT `127.0.0.1:21299 after 95 ms`: the 8.22.0 wording and elapsed time, which the report's section 1 normalises.)
+  - `curl -s http://127.0.0.1:20450/basic_D` | od -c: both `h e l l o`, nothing else.
+  - `curl -s http://127.0.0.1:20451/basic_D > /tmp/o.txt; echo exit=$?`: both terminal output `exit=0`, /tmp/o.txt `hello`.
+  - `curl --version > /dev/null` | od -c: both empty.
+- Unit test (ADR-0482): `Cgr115Tests` pins that off Windows the width comes from the standard-input terminal reader and never the console-window reader, that only a Windows console stdout is opened as a console stream, and that stderr off Windows is fd 2 not the console stream. Before the fix the code had no such choice (the members did not exist; the old path always read `Console.WindowWidth` and the console streams), so the tests could not pass there.
+- `dotnet build` clean (0 warnings); fast tests 46 assemblies passed, 0 failed (Curl.Console.UnitTests 2976 passed, 29 skipped). `Measure-CodeQuality.ps1 -Library Curl.Console`: 0 failing members. The change is platform-neutral (the injected platform choice; the native adapter is excluded per ADR-0083 and only runs off Windows), so CI on Linux and macOS is covered by these runs.
 ## Log
 
 - 2026-10-26: Created from CGR-115 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Needs Curl.Console/Program.cs, held by BL-3892 (Doing); fix plan recorded in Notes
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Off Windows Curl no longer writes ESC[?1h ESC= to the terminal: width via TIOCGWINSZ on stdin, stdout/stderr over fds 1 and 2 (CGR-115)
