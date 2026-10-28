@@ -1,4 +1,4 @@
-# ADR-0865 — `-r` appends a dash after any leading number not before a dash, and SFTP reads the `-r` text
+# ADR-0867 — `-r` appends a dash after any leading number not before a dash, and SFTP reads the `-r` text
 
 - **Status:** Accepted
 - **Date:** 2026-10-28
