@@ -33,3 +33,4 @@ BL-3620 (ADR-0926) added `OpenSslPeerCertificateText`, the OpenSSL build's `ossl
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 68d6306a 55be06fb 20a1f7bc c25bccc9 779790c0.
