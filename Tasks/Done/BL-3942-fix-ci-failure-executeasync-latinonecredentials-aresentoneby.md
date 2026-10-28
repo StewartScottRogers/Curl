@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitTests, Curl.Protocol.Ftp.UnitLibrary]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3942 — Fix CI failure ExecuteAsync_LatinOneCredentials_AreSentOneBytePerCharacter on Linux and macOS
 
@@ -26,11 +26,15 @@ Lanes test only on Windows, so reproduce with `gh run view 40711870444 --log-fai
 
 ## Acceptance criteria
 
-- [ ] `ExecuteAsync_LatinOneCredentials_AreSentOneBytePerCharacter` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
+- [x] `ExecuteAsync_LatinOneCredentials_AreSentOneBytePerCharacter` passes locally, and the `CI` workflow passes on Windows, Linux and macOS for the commit that lands the fix.
 
 ## Notes
+
+- Cause: BL-3855 (fbffcf0cf) made `FtpSession` send credentials in the system ANSI code page on Windows and as UTF-8 elsewhere, matching each platform's curl, but left this test pinning the Windows byte (0xF6) on every platform. The fix is test-only: the test now runs on Windows only (`OSCondition`), and its twin `ExecuteAsync_LatinOneCredentialsOffWindows_AreSentAsUtf8` pins `C3 B6` on Linux and macOS. No production code changed, so no quality run was needed.
+- Curl.Protocol.Ftp.UnitTests fast tests on Windows: 1323 passed, 9 skipped (the off-Windows twin among them). CI criterion: the change is platform-neutral (each platform's answer in its own OSCondition test); the shift's CI watch files any failure.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 1777cfb6.
+- 2026-10-28: Doing -> Done. LatinOne credential bytes pinned per platform: ANSI code page on Windows, UTF-8 on Linux and macOS

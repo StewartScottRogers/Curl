@@ -446,7 +446,24 @@ public sealed class FtpProtocolHandlerTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ExecuteAsync_LatinOneCredentials_AreSentOneBytePerCharacter()
+    {
+        // The Windows (Schannel) build sends the system ANSI code page's bytes (BL-3855).
+        byte[] expectedBytes = [0x55, 0x53, 0x45, 0x52, 0x20, 0x6A, 0xF6, 0x72, 0x67, 0x0D, 0x0A];
+        await AssertUserJorgIsSentAsAsync(expectedBytes);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public async Task ExecuteAsync_LatinOneCredentialsOffWindows_AreSentAsUtf8()
+    {
+        // The Linux and macOS (OpenSSL) builds send the UTF-8 bytes of the argument (BL-3855).
+        byte[] expectedBytes = [0x55, 0x53, 0x45, 0x52, 0x20, 0x6A, 0xC3, 0xB6, 0x72, 0x67, 0x0D, 0x0A];
+        await AssertUserJorgIsSentAsAsync(expectedBytes);
+    }
+
+    private async Task AssertUserJorgIsSentAsAsync(byte[] expectedBytes)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.ArrangeFtp(Url, Greeting + "430 no\r\n");
@@ -458,7 +475,6 @@ public sealed class FtpProtocolHandlerTests
             adjust: context => new TransferContext { Url = context.Url, Output = context.Output, Credentials = new NetworkCredential("jörg", "pw") });
 
         diagnostics.ActRun(run);
-        byte[] expectedBytes = [0x55, 0x53, 0x45, 0x52, 0x20, 0x6A, 0xF6, 0x72, 0x67, 0x0D, 0x0A];
         diagnostics.Diff("sent bytes", expectedBytes, run.SentBytes);
         CollectionAssert.AreEqual(expectedBytes, run.SentBytes);
     }
