@@ -35,3 +35,4 @@ Split from BL-3957 (itself split from BL-3636, CGR-107, `Documentation/Reviews/C
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 4a57893f 9e833f73 779790c0 b16f5955.
