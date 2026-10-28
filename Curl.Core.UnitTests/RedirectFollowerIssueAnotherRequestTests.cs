@@ -68,7 +68,7 @@ public sealed class RedirectFollowerIssueAnotherRequestTests
     }
 
     [TestMethod]
-    public async Task FollowAsync_MaxRedirsRefusal_ReportsNoLine()
+    public async Task FollowAsync_MaxRedirsRefusal_ReportsNoIssueAnotherRequestLine()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         ScriptedHandler handler = new(Response(301, Target));
@@ -85,7 +85,7 @@ public sealed class RedirectFollowerIssueAnotherRequestTests
         diagnostics.Act("infos", string.Join(" | ", events.Infos));
         diagnostics.Assert("exit code", CurlExitCode.TooManyRedirects, result.ExitCode);
         Assert.AreEqual(CurlExitCode.TooManyRedirects, result.ExitCode);
-        Assert.IsEmpty(events.Infos);
+        CollectionAssert.AreEqual(new[] { "Maximum (0) redirects followed" }, events.Infos);
     }
 
     [TestMethod]

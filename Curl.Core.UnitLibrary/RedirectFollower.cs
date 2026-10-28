@@ -404,7 +404,9 @@ public sealed class RedirectFollower(
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
         {
-            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
+            var limitMessage = $"Maximum ({policy.MaxRedirects}) redirects followed";
+            first.Events.ReportInfo(limitMessage);
+            return (CurlExitCode.TooManyRedirects, limitMessage, true, false);
         }
 
         if (ParseRefusal(target, first.PathAsIs, out next) is { } parseRefusal)
