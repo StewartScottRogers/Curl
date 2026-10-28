@@ -106,6 +106,9 @@ public sealed class MultipartFormBodyBuilder(
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file that is a directory.</summary>
     public const string ReadFailedMessage = "read error getting mime data";
 
+    /// <summary>The message curl gives when the read of a closed standard input aborts the transfer, with exit 42.</summary>
+    public const string AbortedByCallbackMessage = "operation aborted by callback";
+
     /// <summary>The message curl 8.21.0 gives, with exit 43, for an <c>;encoder=</c> it does not know.</summary>
     public const string UnknownEncoderMessage = "A libcurl function was given a bad argument";
 
@@ -532,7 +535,12 @@ public sealed class MultipartFormBodyBuilder(
         }
     }
 
-    /// <summary>Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder.</summary>
+    /// <summary>
+    /// Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder;
+    /// a <see cref="ClosedStandardInputStream" /> instead adds the part's headers and then a read
+    /// that aborts the transfer, as curl 8.22.0's tool sends the part head chunked and ends with
+    /// exit 42 when its <c>fread</c> on a closed <c>stdin</c> fails (CGR-110, ADR-0964).
+    /// </summary>
     private async ValueTask<TransferResult?> AddStandardInputPartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
@@ -543,6 +551,14 @@ public sealed class MultipartFormBodyBuilder(
         Stream input,
         CancellationToken cancellationToken)
     {
+        string head = MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _);
+        if (input is ClosedStandardInputStream)
+        {
+            segments.AddText(head);
+            segments.AddCallbackStream(new AbortedReadStream(), null);
+            return null;
+        }
+
         using MemoryStream copy = new();
         try
         {
@@ -553,7 +569,7 @@ public sealed class MultipartFormBodyBuilder(
             return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
         }
 
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        segments.AddText(head);
         AddData(segments, copy.ToArray(), encoder, forMail);
         return null;
     }
@@ -641,5 +657,17 @@ public sealed class MultipartFormBodyBuilder(
 
         long? length = encoder.EncodedLength(data.Length);
         segments.AddStream(new MemoryStream(encoded, writable: false), length);
+    }
+
+    /// <summary>
+    /// The part data of a closed standard input: every read throws a
+    /// <see cref="RequestBodyReadFailedException" /> with exit 42,
+    /// <see cref="CurlExitCode.AbortedByCallback" />, and curl's message for it. It derives from
+    /// <see cref="MemoryStream" /> so every other read overload comes to this one.
+    /// </summary>
+    private sealed class AbortedReadStream : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new RequestBodyReadFailedException(CurlExitCode.AbortedByCallback, AbortedByCallbackMessage);
     }
 }
