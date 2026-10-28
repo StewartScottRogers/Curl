@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs, Curl.Protocol.Ssh.UnitTests/Cgr130Tests.cs]
+touches: [Curl.Protocol.Ssh.UnitLibrary/SshProtocolHandler.cs, Curl.Protocol.Ssh.UnitLibrary/SshKeptSession.cs, Curl.Protocol.Ssh.UnitLibrary/SshSessionConnection.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpSession.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpSessionSlot.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpFileDownload.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpFileUpload.cs, Curl.Protocol.Ssh.UnitLibrary/Sftp/SftpDirectoryListing.cs, Curl.Protocol.Ssh.UnitLibrary/CLAUDE.md, Curl.Protocol.Ssh.UnitTests/Cgr130Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3659 — Fix CGR-130: several sftp/scp URLs in one command never reuse the SSH connection
 
@@ -63,15 +63,22 @@ curl -sS AUTH -o NUL -o NUL -w "[%{num_connects} %{conn_id}]\n" U/hello.txt U/di
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr130Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-28 (lane 6): Added to touches the SSH files the fix needs (the kept session, its connection pass-through, the SFTP session slot and the three SFTP transfers that use it, and the library's CLAUDE.md). No task on origin/work/dark-factory's Doing named any of them.
+- Decision (ADR-0864; the earlier run cited ADR-0842, which another task had taken, so the citations were renumbered): after a successful transfer the SSH session stays on its connection (`IConnection.TryHoldSession`), and the pool reuses it for the next URL with the same user, password and key files. Over SFTP the session and home directory are kept as well, and the cache's close sends the channel close and `DISCONNECT` 11.
+- Measured 2026-10-28 against a throwaway non-root OpenSSH 10.2p1 sshd in WSL on 127.0.0.1:21623, public key login, with `KexAlgorithms +diffie-hellman-group14-sha256,...` because Curl's WinCNG offer has no curve25519. AUTH = `-k -u stewart_rogers: --key ckey --pubkey ckey.pub`.
+  - `curl -sS AUTH -o NUL -o NUL -w "[%{num_connects} %{conn_id}]\n" U/hello.txt U/digits.txt` (sftp and scp): REF (curl 8.18.0 Linux OpenSSL, and curl 8.18.0 Windows libssh2) printed `[1 0]` `[0 0]`, exit 0. Before the fix PORT printed `[0 0]` `[0 1]`. After it PORT prints `[1 0]` `[0 0]`, exit 0, and writes both files with the right bytes.
+  - `-v`: REF and PORT both show one `Trying`, then `Connection #0 ... left intact`, `Reusing existing ...: connection with host 127.0.0.1` and `Connection #0 ... left intact`. The scheme word is `SFTP` in 8.18.0's output and `sftp` in PORT's (the report gives 8.22.0's as `sftp`, so PORT is unchanged there).
+  - sshd log for each PORT command: one publickey login, one sftp subsystem (none for scp) and one `Received disconnect ...:11: Shutdown`, the same as REF.
+- Focused tests: `Cgr130Tests` (5 tests). Before the fix the first test saw two connections, two logins and two subsystems. Measure-CodeQuality for Curl.Protocol.Ssh.UnitLibrary: 100/100, 0 failing (ExecuteAsync split to stay at complexity 10 or less). The tests are platform-neutral (in-memory server, no paths), so CI on Linux and macOS is covered by the green fast tests here.
 
 ## Log
 
@@ -79,3 +86,4 @@ curl -sS AUTH -o NUL -o NUL -w "[%{num_connects} %{conn_id}]\n" U/hello.txt U/di
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3659-20261026-151632-L4.jsonl
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Several sftp/scp URLs of one login reuse one SSH connection and SFTP session, as curl does
