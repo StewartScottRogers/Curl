@@ -4,8 +4,8 @@ title: Windows Digest: count nc=00000002 in the first answer after a 401 that cl
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: []
-touches: [Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitTests/DigestSspiReconnectTests.cs]
+depends-on: [BL-3864]
+touches: [Curl.Authentication.UnitLibrary/DigestAuthenticator.cs, Curl.Authentication.UnitTests/DigestSspiReconnectTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpAuthRequest.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.DigestSspiReconnect.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -28,7 +28,10 @@ Found by BL-3606 (ADR-0924), measured 2026-10-26 with `Record-CurlExchange.ps1` 
 
 ## Notes
 
+- 2026-10-28: The handler (HttpProtocolHandler.RetryWithAuthorizationAsync, ~line 2860, builds the HttpAuthRequest for the 401 retry) knows whether the 401 closed the connection, so the fix is: add an init property to HttpAuthRequest (e.g. PreviousConnectionClosed), set it there on the retry, and have DigestAuthenticator use nc=2 when matchesSspiBuild and it is set. HttpProtocolHandler.cs is held by BL-3864 (Doing), so requeued with depends-on. No code was edited.
+
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 9f476610 d7461e94 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs and HttpAuthRequest.cs, held by BL-3864 (depends-on BL-3874 -> BL-3864).
