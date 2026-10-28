@@ -1,5 +1,5 @@
 ---
-id: BL-3984
+id: BL-3985
 title: CGR-110 part 4: the tool's -F f=@- streams stdin chunked and aborts with exit 42 when it is closed
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3984 — CGR-110 part 4: the tool's -F f=@- streams stdin chunked and aborts with exit 42 when it is closed
+# BL-3985 — CGR-110 part 4: the tool's -F f=@- streams stdin chunked and aborts with exit 42 when it is closed
 
 ## Goal
 
