@@ -44,7 +44,7 @@ internal static class StandardOutputOpener
         Open(
             OpensOverHandle(System.Console.IsOutputRedirected, OperatingSystem.IsWindows()),
             System.Console.OpenStandardOutput,
-            ReadStandardOutputHandleValue(OperatingSystem.IsWindows(), GetStandardOutputHandleOnWindows));
+            ReadStandardOutputHandleValue(OperatingSystem.IsWindows(), GetStandardOutputHandleOnWindows, NativeInheritedFileDescriptor.IsInherited));
 
     /// <summary>
     /// Tells whether standard output is opened over its handle rather than as a console
@@ -127,11 +127,23 @@ internal static class StandardOutputOpener
     /// </summary>
     /// <param name="isWindows">Whether the process runs on Windows.</param>
     /// <param name="getStandardOutputHandleOnWindows">Calls <c>GetStdHandle</c> for standard output.</param>
+    /// <param name="isInheritedDescriptor">Tells whether a descriptor is open and was inherited.</param>
     /// <returns>
-    /// The Windows handle, or <see cref="UnixStandardOutputFileDescriptor" /> elsewhere.
+    /// The Windows handle; elsewhere <see cref="UnixStandardOutputFileDescriptor" />, or <c>-1</c>
+    /// (closed) when descriptor 1 was not inherited, because the shell closed it (<c>1&gt;&amp;-</c>)
+    /// and the runtime may have taken the number for one of its own pipes. curl then writes to the
+    /// read-only <c>/dev/null</c> its <c>main_checkfds</c> opens there, so its write fails and it
+    /// exits 23 (BL-3936, ADR-0869).
     /// </returns>
-    internal static nint ReadStandardOutputHandleValue(bool isWindows, Func<nint> getStandardOutputHandleOnWindows) =>
-        isWindows ? getStandardOutputHandleOnWindows() : UnixStandardOutputFileDescriptor;
+    internal static nint ReadStandardOutputHandleValue(bool isWindows, Func<nint> getStandardOutputHandleOnWindows, Func<int, bool> isInheritedDescriptor)
+    {
+        if (isWindows)
+        {
+            return getStandardOutputHandleOnWindows();
+        }
+
+        return isInheritedDescriptor(UnixStandardOutputFileDescriptor) ? UnixStandardOutputFileDescriptor : -1;
+    }
 
     /// <summary>
     /// Calls <c>GetStdHandle(STD_OUTPUT_HANDLE)</c>.

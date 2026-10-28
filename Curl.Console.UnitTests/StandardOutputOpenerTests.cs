@@ -141,7 +141,10 @@ public sealed class StandardOutputOpenerTests
     public void ReadStandardOutputHandleValue_Windows_AsksWindowsForTheHandle()
     {
         Diagnostics.Arrange("is Windows / Windows answers", "True / 1234");
-        nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(isWindows: true, () => 1234);
+        nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(
+            isWindows: true,
+            () => 1234,
+            _ => throw new AssertFailedException("A descriptor was checked on Windows."));
         Diagnostics.Act("handle value", handleValue);
 
         Diagnostics.Assert("handle value", (nint)1234, handleValue);
@@ -149,16 +152,33 @@ public sealed class StandardOutputOpenerTests
     }
 
     [TestMethod]
-    public void ReadStandardOutputHandleValue_Elsewhere_IsFileDescriptorOne()
+    public void ReadStandardOutputHandleValue_ElsewhereInherited_IsFileDescriptorOne()
     {
-        Diagnostics.Arrange("is Windows", false);
+        Diagnostics.Arrange("is Windows / descriptor 1 inherited", "False / True");
         nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(
             isWindows: false,
-            () => throw new AssertFailedException("Windows was asked for a handle."));
+            () => throw new AssertFailedException("Windows was asked for a handle."),
+            descriptor => descriptor == StandardOutputOpener.UnixStandardOutputFileDescriptor);
         Diagnostics.Act("handle value", handleValue);
 
         Diagnostics.Assert("handle value", (nint)StandardOutputOpener.UnixStandardOutputFileDescriptor, handleValue);
         Assert.AreEqual((nint)StandardOutputOpener.UnixStandardOutputFileDescriptor, handleValue);
+    }
+
+    [TestMethod]
+    public void ReadStandardOutputHandleValue_ElsewhereNotInherited_OpensAStreamWhoseWritesFail()
+    {
+        Diagnostics.Arrange("is Windows / descriptor 1 inherited", "False / False (1>&-, the runtime took the number)");
+        nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(
+            isWindows: false,
+            () => throw new AssertFailedException("Windows was asked for a handle."),
+            _ => false);
+        using Stream opened = StandardOutputOpener.OpenHandle(handleValue);
+        Diagnostics.Act("handle value / opened", $"{handleValue} / {opened.GetType().Name}");
+
+        Diagnostics.Assert("handle value / opened", $"-1 / {nameof(ClosedStandardOutputStream)}", $"{handleValue} / {opened.GetType().Name}");
+        Assert.AreEqual((nint)(-1), handleValue);
+        Assert.IsInstanceOfType<ClosedStandardOutputStream>(opened);
     }
 
     [TestMethod]
