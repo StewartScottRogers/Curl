@@ -106,6 +106,28 @@ public sealed class MultiCallbackQueueTests
         Assert.AreEqual(1, runs);
     }
 
+    [TestMethod]
+    public async Task Run_CancelledByTheCallbackAfterThePerformTookIt_WaitsForThatRun()
+    {
+        MultiCallbackQueue queue = new();
+        using CancellationTokenSource cancellation = new();
+        int runs = 0;
+        Task<int> caller = Task.Run(() => queue.Run(
+            () =>
+            {
+                cancellation.Cancel();
+                return Interlocked.Increment(ref runs);
+            },
+            cancellation.Token));
+        await WaitUntilQueuedAsync(queue);
+
+        queue.RunQueued();
+        int result = await caller.WaitAsync(Limit);
+
+        Assert.AreEqual(1, result);
+        Assert.AreEqual(1, runs);
+    }
+
     private static async Task WaitUntilQueuedAsync(MultiCallbackQueue queue)
     {
         DateTime deadline = DateTime.UtcNow + Limit;
