@@ -1189,7 +1189,7 @@ public sealed class HttpProtocolHandler(
         ConnectTarget target = TargetOf(retry);
         ITransferEvents events = retry.Context.Events;
         events.ReportInfo(LeftIntactLine(target, connect));
-        events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(retry.Context.Url));
+        events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(retry.Context.Url, retry.Options.CommandLineTextEncoding));
         events.ReportConnectionReused(new ConnectionReusedEvent
         {
             Scheme = target.PoolScheme!,
@@ -1256,7 +1256,7 @@ public sealed class HttpProtocolHandler(
         context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
         if (outcome.Retry is not null)
         {
-            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url));
+            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url, OptionsOf(context).CommandLineTextEncoding));
         }
     }
 
@@ -1354,7 +1354,7 @@ public sealed class HttpProtocolHandler(
             actedOn = headReader.HeadActedOn(exchange.Head);
             body.HeadersStoredBefore = headReader.HeadersStoredWith(exchange.Head);
             exchangeLog.ReplyRead(actedOn);
-            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
+            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn, options.CommandLineTextEncoding);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
             ThrowIfClosedBeforeContentLength(plan, actedOn, headReader);

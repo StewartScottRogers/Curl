@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -242,7 +243,8 @@ internal static class HttpConnectionInfoLines
     /// Formats the line written before a request is sent again on a fresh connection.
     /// </summary>
     /// <param name="url">The URL the request is sent to.</param>
+    /// <param name="encoding">The command-line text encoding the URL was typed in.</param>
     /// <returns>The line, such as <c>Issue another request to this URL: 'http://127.0.0.1:18240/b'</c>.</returns>
-    internal static string IssueAnotherRequest(CurlUrl url) =>
-        $"Issue another request to this URL: '{HttpUrlText.Origin(url)}{HttpUrlText.Path(url)}{HttpUrlText.Query(url)}'";
+    internal static string IssueAnotherRequest(CurlUrl url, Encoding encoding) =>
+        $"Issue another request to this URL: '{HttpUrlText.Origin(url)}{HttpUrlText.Path(url, encoding)}{HttpUrlText.Query(url)}'";
 }

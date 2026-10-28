@@ -20,7 +20,7 @@ internal static class HttpUrlText
 {
     /// <summary>
     /// Gives the origin-form request target as the characters of a head written in Latin-1:
-    /// <see cref="Path(CurlUrl)" />, then <c>?</c> and the query when the URL has one, each of the
+    /// <see cref="Path(CurlUrl, Encoding)" />, then <c>?</c> and the query when the URL has one, each of the
     /// query's bytes (<see cref="UrlByteText.ToBytes" />: its UTF-8, an argument byte that was not
     /// valid UTF-8 itself) one character, so the head carries them unchanged.
     /// </summary>
@@ -61,9 +61,6 @@ internal static class HttpUrlText
         string target = UrlPathEscapes.WithUpperCaseHexDigits(path) + RequestTarget(url, encoding)[path.Length..];
         return rereadsUrl ? UrlPathEscapes.WithUpperCaseHexDigits(target) : target;
     }
-
-    /// <summary>Gives the path with each byte above <c>~</c> percent-encoded, <see cref="CurlUrl.RequestPath" />.</summary>
-    internal static string Path(CurlUrl url) => url.RequestPath;
 
     /// <summary>
     /// Gives the path as its bytes in <paramref name="encoding" />
