@@ -36,3 +36,4 @@ Split from BL-3699 (over its cost cap). The ADR-0866 fix (hold the first `--para
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 56dcf0ab 4c4fc916 779790c0.
