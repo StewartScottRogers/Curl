@@ -33,7 +33,7 @@ Found by BL-3698 (CGR-169, ADR-0956). In WSL, `openssl s_server -tls1_3 -accept 
 - After the fix a linux-x64 publish run in WSL: exit 0, body reneg, s_server logs <<< TLS 1.3, Alert [length 0002], warning close_notify and answers >>> ... close_notify - the same client alerts as real curl. (s_server's stdin must stay open longer than the 4 s first used: the self-contained build from /mnt/c starts slowly and the server closed first.)
 - SslStreamConnectionCloseNotifyTests.DisposeAsync_AfterATransfer_SendsCloseNotify (both builds) failed with the call removed and passes with it.
 - dotnet build clean; fast tests 44803 passed, 0 failed. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
-- Choice: the hand-built TLS client's HandBuiltTlsConnection is left as it is; checking it is filed as BL-3985.
+- Choice: the hand-built TLS client's HandBuiltTlsConnection is left as it is; checking it is filed as BL-3987.
 
 ## Log
 

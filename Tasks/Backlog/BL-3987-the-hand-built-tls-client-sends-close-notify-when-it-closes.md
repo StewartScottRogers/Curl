@@ -1,5 +1,5 @@
 ---
-id: BL-3985
+id: BL-3987
 title: The hand-built TLS client sends close_notify when it closes an https connection, as curl does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3985 — The hand-built TLS client sends close_notify when it closes an https connection, as curl does
+# BL-3987 — The hand-built TLS client sends close_notify when it closes an https connection, as curl does
 
 ## Goal
 
