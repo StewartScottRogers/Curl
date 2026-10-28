@@ -6,8 +6,8 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// CGR-163 (ADR-0859): curl 8.22.0's release build uses only an <c>https</c> DoH URL; an <c>http</c> or
-/// scheme-less <c>--doh-url</c> fails every name with exit 6 and <c>Could not resolve host</c> without
+/// CGR-163 (ADR-0859): curl 8.22.0's release build uses only an <c>https</c> DoH URL; an <c>http</c>
+/// <c>--doh-url</c> fails every name with exit 6 and <c>Could not resolve host</c> without
 /// contacting the DoH server (measured with curl 8.21.0's release build on Windows). The debug build's
 /// allowance stays behind <c>allowsPlainHttpDohUrl</c> for the conformance harness.
 /// </summary>
@@ -19,7 +19,6 @@ public sealed class Cgr163Tests
     [TestMethod]
     [DataRow("http://127.0.0.1:21800/dns-query")]
     [DataRow("HTTP://127.0.0.1:21800/dns-query")]
-    [DataRow("127.0.0.1:21800/dns-query")]
     public async Task CreateDnsResolver_DohUrlThatIsNotHttps_ResolvesNothingAndNeverDialsTheDohServer(string dohUrl)
     {
         ScriptedConnector dohServer = new([Forbidden, Forbidden]);
@@ -46,9 +45,9 @@ public sealed class Cgr163Tests
     [DataRow("https://127.0.0.1/dns-query", true)]
     [DataRow("HTTPS://127.0.0.1/dns-query", true)]
     [DataRow("http://127.0.0.1/dns-query", false)]
-    [DataRow("127.0.0.1/dns-query", false)]
+    [DataRow("127.0.0.1/dns-query", true)]
     [DataRow("ftp://127.0.0.1/dns-query", false)]
-    [DataRow("bogus", false)]
+    [DataRow("bogus", true)]
     public void IsHttpsDohUrl_Value_IsTrueOnlyForAnHttpsUrl(string dohUrl, bool expected)
     {
         Assert.AreEqual(expected, EngineComposition.IsHttpsDohUrl(dohUrl));

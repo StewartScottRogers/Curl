@@ -140,8 +140,8 @@ internal static partial class EngineComposition
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
-    /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
-    /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).
+    /// and with <c>https://</c> in front when it does not, as curl 8.22.0's DoH sub-transfer assumes
+    /// HTTPS (measured: a scheme-less DoH URL's server gets a TLS ClientHello; CGR-038, ADR-0956).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns>
@@ -150,7 +150,7 @@ internal static partial class EngineComposition
     /// </returns>
     internal static Uri? DohUrlOf(string dohUrl)
     {
-        string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "http://" + dohUrl;
+        string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "https://" + dohUrl;
         return Uri.TryCreate(withScheme, UriKind.Absolute, out Uri? url)
             && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
             ? url
@@ -159,8 +159,9 @@ internal static partial class EngineComposition
 
     /// <summary>
     /// Whether <see cref="DohUrlOf" /> makes an <c>https</c> URL of a <c>--doh-url</c> value, the only DoH URL curl
-    /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> or
-    /// scheme-less one fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0859).
+    /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> one
+    /// fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0859), while a scheme-less one
+    /// is <c>https</c> (CGR-038, ADR-0956).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns><see langword="true" /> for an <c>https</c> DoH URL.</returns>
