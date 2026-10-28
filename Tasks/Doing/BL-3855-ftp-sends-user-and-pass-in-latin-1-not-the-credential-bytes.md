@@ -31,3 +31,4 @@ Found in BL-3581 (CGR-052, ADR-0821). `FtpSession` writes `USER ` + `context.Cre
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: eb810d07 d9f084ee 779790c0.
