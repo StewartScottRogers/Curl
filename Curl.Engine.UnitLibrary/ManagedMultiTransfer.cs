@@ -1002,13 +1002,24 @@ internal sealed class ManagedMultiTransfer(
         {
             int ready = CountReady(extraSockets.Span);
             TimeSpan left = limit - timeProvider.GetElapsedTime(start);
-            if (ready > 0 || WaitEnds(left, extraSockets.Length, poll))
+            if (ReturnsNow(ready, left, extraSockets.Length, poll))
             {
                 return (CurlMultiCode.Ok, ready);
             }
 
             await WaitForEventAsync(left, extraSockets.Length > 0, poll, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Whether a wait or poll returns now. A poll takes a pending wakeup whenever it looks, transfer activity
+    /// or not, as libcurl's <c>multi_wait</c> drains its wakeup socket after every poll, so a wakeup made
+    /// before a poll that returned for a ready socket never ends a later poll (CGR-153).
+    /// </summary>
+    private bool ReturnsNow(int ready, TimeSpan left, int extraSocketCount, bool poll)
+    {
+        bool wokenUp = poll && TakeWakeup();
+        return ready > 0 || wokenUp || WaitEnds(left, extraSocketCount, poll);
     }
 
     /// <summary>
@@ -1076,7 +1087,7 @@ internal sealed class ManagedMultiTransfer(
     {
         if (poll)
         {
-            return TakeWakeup() || left <= TimeSpan.Zero;
+            return left <= TimeSpan.Zero;
         }
 
         // Every transfer that can start has (one that can makes the handle's timeout 0), and one held
