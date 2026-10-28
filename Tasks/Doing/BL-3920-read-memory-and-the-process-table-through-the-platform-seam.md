@@ -46,3 +46,4 @@ plus `/proc/<pid>/stat` (or `ps -axo pid=,ppid=,args=`); macOS uses `sysctl -n h
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: ea931375 9d75da91 70c1db98 96f55cf5 c112e270.
