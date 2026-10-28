@@ -4,8 +4,8 @@ title: CGR-110 part 4: the tool's -F f=@- streams stdin chunked and aborts with 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Core.UnitLibrary/ClosedStandardInputStream.cs, Curl.Cli.UnitLibrary/ClosedStandardInputStream.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitTests/Cgr110ClosedStandardInputStreamTests.cs, Curl.Cli.UnitTests/Cgr110DataOptionTests.cs, Curl.Console/Program.cs, Curl.Core.UnitTests/Cgr110FormTests.cs]
+depends-on: [BL-3728, BL-3983]
+touches: [Curl.Core.UnitLibrary/Multipart/MultipartFormBodyBuilder.cs, Curl.Core.UnitLibrary/ClosedStandardInputStream.cs, Curl.Cli.UnitLibrary/ClosedStandardInputStream.cs, Curl.Cli.UnitLibrary/CommandLineOptionTable.cs, Curl.Cli.UnitLibrary/CommandLineRefusal.cs, Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitTests/Cgr110ClosedStandardInputStreamTests.cs, Curl.Cli.UnitTests/Cgr110DataOptionTests.cs, Curl.Console/Program.cs, Curl.Core.UnitTests/Cgr110FormTests.cs, Curl.Protocol.Abstractions.UnitLibrary/RequestBodyReadFailedException.cs, Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs, Curl.Protocol.Http.UnitTests/Cgr110FormAbortTests.cs]
 requirement: none
 created: 2026-10-28
 completed:
@@ -33,7 +33,10 @@ Found by BL-3974 (CGR-110 part 3, Documentation/Reviews/Curl-Gap-Report-2026-10-
 
 ## Notes
 
+- 2026-10-28 (lane 5, before any code edit): exit 42 cannot come from Curl.Core alone. `HttpRequestBodyWriter.ReadAsync` maps every `RequestBodyReadFailedException` to exit 26 (`CurlExitCode.ReadError`), and the only exit-42 path is the trailer source. Plan: give `RequestBodyReadFailedException` an exit code (default `ReadError`) and have `HttpRequestBodyWriter` fail with it, so `MultipartFormBodyBuilder` can add the part head and then a callback segment that, on a `ClosedStandardInputStream`, throws it with `AbortedByCallback` and `operation aborted by callback`, with length unknown (chunked). The SMTP catcher in SmtpMailTransaction.cs keeps exit 26. Added RequestBodyReadFailedException.cs, HttpRequestBodyWriter.cs and an Http test file to touches. HttpRequestBodyWriter.cs is held by BL-3728 and Curl.Protocol.Abstractions.UnitLibrary by BL-3983 (both in Doing on origin/work/dark-factory), so this task now depends on them and goes back to Backlog. No other prerequisite was found: the chunked unknown-length body already comes from `MultipartBodySegments` (a null length), and the ClosedStandardInputStream move is mechanical.
+
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 65e5ab67 4380765b e0cd4d6e c259902e.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/HttpRequestBodyWriter.cs (held by BL-3728) and Curl.Protocol.Abstractions.UnitLibrary/RequestBodyReadFailedException.cs (held by BL-3983) to fail a body read with exit 42
