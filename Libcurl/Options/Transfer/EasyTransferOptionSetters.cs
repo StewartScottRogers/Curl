@@ -102,9 +102,8 @@ internal static class EasyTransferOptionSetters
 
     private static CurlCode SetCrlf(ref EasyOptions o, object? v) => Set(ref o, t => t with { Crlf = IsOn(v) });
 
-    /// <summary><c>CURLOPT_PROXY_TRANSFER_MODE</c>: 0 or 1 only; any other value is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
-    private static CurlCode SetProxyTransferMode(ref EasyOptions o, object? v) =>
-        SetInRange(ref o, v, 0, 1, (t, mode) => t with { ProxyTransferMode = mode == 1 });
+    /// <summary><c>CURLOPT_PROXY_TRANSFER_MODE</c>: a boolean, so any non-zero value turns it on.</summary>
+    private static CurlCode SetProxyTransferMode(ref EasyOptions o, object? v) => Set(ref o, t => t with { ProxyTransferMode = IsOn(v) });
 
     /// <summary><c>CURLOPT_TIMECONDITION</c>: <c>CURL_TIMECOND_NONE</c> to <c>_LASTMOD</c>; any other value is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetTimeCondition(ref EasyOptions o, object? v) =>
