@@ -40,3 +40,4 @@ Expected (real curl): host -ü.example: exit 3, `URL using bad/illegal format or
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 12e52b50 1b26f5a2 3be9ea7b 779790c0.
