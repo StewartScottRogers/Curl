@@ -15,8 +15,6 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <param name="transport">The transport, after the user is authenticated.</param>
 internal sealed class SftpDirectoryListing(SshTransport transport)
 {
-    private static readonly byte[] HomeDirectory = "."u8.ToArray();
-
     private static readonly byte[] LinkArrow = " -> "u8.ToArray();
 
     /// <summary>
@@ -26,6 +24,12 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
     /// <see cref="SshStateTrace.Off" /> when not given.
     /// </summary>
     internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
+    /// <summary>
+    /// Gets the connection's SFTP session and home directory, which a reused connection
+    /// already holds (CGR-130); a slot of the listing's own when not given.
+    /// </summary>
+    internal SftpSessionSlot Sessions { get; init; } = new();
 
     /// <summary>
     /// Lists the directory at <paramref name="urlPath" /> into <paramref name="output" />.
@@ -63,14 +67,11 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
         long? maxFileSize = null)
     {
         quotes ??= SftpQuoteCommands.None;
-        Trace.Enter("SSH_SFTP_INIT");
-        SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
+        SftpSession session = await Sessions.StartAsync(transport, Trace, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
-                Trace.Enter("SSH_SFTP_REALPATH");
-                byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-                    () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+                byte[] homeDirectory = await Sessions.HomeDirectoryAsync(session, Trace, cancellationToken).ConfigureAwait(false);
                 byte[] directory = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
                 Trace.EndSftpConnectPhase();
                 Trace.Enter("SSH_SFTP_QUOTE_INIT");

@@ -157,13 +157,21 @@ public sealed class SshProtocolHandler : IProtocolHandler
             ? await KnownHostsFile.LoadAsync(fileSystem, knownHostsPath, context.CancellationToken).ConfigureAwait(false)
             : null;
         SshSessionTarget target = new(url.IdnHost, port, options, knownHosts);
+        return await ConnectAndRunSessionAsync(context, target, connectPhase).ConfigureAwait(false);
+    }
+
+    // Connects, then runs the session the connection already holds, or a new one.
+    private async ValueTask<TransferResult> ConnectAndRunSessionAsync(ITransferContext context, SshSessionTarget target, SshConnectPhaseLimit connectPhase)
+    {
         var connectTarget = new ConnectTarget(target.Host, target.Port, UseTls: false)
         {
             Proxy = context.Proxy,
             Events = context.Events,
             DiagnosticLog = context.DiagnosticLog,
+            PoolScheme = context.Url.Scheme,
         };
-        ConnectResult connect = await connector.ConnectAsync(connectTarget, context.CancellationToken).ConfigureAwait(false);
+        string loginKey = SshKeptSession.LoginKeyOf(context);
+        ConnectResult connect = await ConnectServingAsync(connectTarget, loginKey, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
@@ -171,11 +179,20 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
         await using (connection.ConfigureAwait(false))
         {
-            return await RunSessionAsync(context, target, connection, connect.ConnectionNumber, connectPhase).ConfigureAwait(false);
+            return connect.IsReused && connection.Session is SshKeptSession kept
+                ? await RunKeptSessionAsync(context, target, connection, kept, connect.ConnectionNumber, connectPhase).ConfigureAwait(false)
+                : CountNewConnection(await RunNewSessionAsync(context, target, connection, connect.ConnectionNumber, connectPhase, loginKey).ConfigureAwait(false), connection);
         }
     }
 
-    private static async ValueTask DisconnectIgnoringFailureAsync(SshTransport transport, CancellationToken cancellationToken)
+    /// <summary>
+    /// Sends <c>SSH_MSG_DISCONNECT</c> 11 <c>Shutdown</c>, as curl ends every session; a server
+    /// already gone is ignored.
+    /// </summary>
+    /// <param name="transport">The session's transport.</param>
+    /// <param name="cancellationToken">Cancels the send.</param>
+    /// <returns>A task that completes once the message is sent or the server found gone.</returns>
+    internal static async ValueTask DisconnectIgnoringFailureAsync(SshTransport transport, CancellationToken cancellationToken)
     {
         SshWireWriter disconnect = new();
         disconnect.WriteByte(SshMessageNumber.Disconnect);
@@ -192,21 +209,88 @@ public sealed class SshProtocolHandler : IProtocolHandler
         }
     }
 
-    // The -v lines libssh2's session start writes, then the session. A failure before the
-    // transfer started, or one that ends the connection, closes it; a transfer's own
-    // outcome leaves it intact (ADR-0262). The handshake and the authentication are held to
-    // --connect-timeout (CGR-010, BL-3539).
-    private async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, long connectionNumber, SshConnectPhaseLimit connectPhase)
+    // The -v lines libssh2's session start writes, then the session.
+    private ValueTask<TransferResult> RunNewSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, long connectionNumber, SshConnectPhaseLimit connectPhase, string loginKey)
     {
-        ITransferEvents events = context.Events;
         ReportSessionStart(context);
-        SshStateTrace trace = new(events, TracesStateMachine);
+        SshStateTrace trace = new(context.Events, TracesStateMachine);
         trace.Enter("SSH_INIT");
         trace.Enter("SSH_S_STARTUP");
+        return RunSessionAsync(context, target, connectionNumber, connectPhase, trace, log => HandshakeAndTransferAsync(context, target, connection, log, trace, connectPhase.Token, loginKey));
+    }
+
+    // A connection a transfer opened and left for the connection cache counts in
+    // %{num_connects}; a reused one does not (CGR-130). A failure's count is left to the
+    // engine, as it was before connections were kept.
+    private static TransferResult CountNewConnection(TransferResult result, IConnection connection) =>
+        connection.Session is SshKeptSession ? result with { Report = (result.Report ?? new TransferReport()) with { ConnectionCount = 1 } } : result;
+
+    /// <summary>
+    /// Connects, and closes a reused connection whose session another login authenticated and
+    /// connects again, as curl reuses an SSH connection only for the same user, password and
+    /// key files (ADR-0864).
+    /// </summary>
+    private async ValueTask<ConnectResult> ConnectServingAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
+    {
+        ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        while (connected is { IsReused: true, Connection: { } connection } && !(connection.Session is SshKeptSession kept && kept.Serves(loginKey)))
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        }
+
+        return connected;
+    }
+
+    // A reused session's transfer: no handshake, no authentication and, over SFTP, the
+    // session and home directory the connection already holds, as curl 8.22.0 reuses it
+    // (CGR-130).
+    private ValueTask<TransferResult> RunKeptSessionAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshKeptSession kept, long connectionNumber, SshConnectPhaseLimit connectPhase)
+    {
+        kept.UseConnection(connection);
+        SshStateTrace trace = new(context.Events, TracesStateMachine);
+        return RunSessionAsync(context, target, connectionNumber, connectPhase, trace, _ => TransferAndKeepOrDisconnectAsync(context, connection, kept, () => TransferAsync(context, kept.Transport, context.Url.Scheme == ScpScheme, trace, kept.Sftp)));
+    }
+
+    // Runs the transfer, then leaves the session on the connection for the run's connection
+    // cache after a success, and otherwise closes the SFTP channel and ends the session with
+    // DISCONNECT, as it ends when the connection cannot be kept (ADR-0864).
+    // Not an await in a finally: the compiler's rethrow for one tests whether the captured
+    // object is an Exception, a branch no C# code can take the other way (BL-1357).
+    private static async ValueTask<TransferResult> TransferAndKeepOrDisconnectAsync(ITransferContext context, IConnection connection, SshKeptSession session, Func<ValueTask<TransferResult>> transfer)
+    {
+        TransferResult? result = null;
+        ExceptionDispatchInfo? failure = null;
+        try
+        {
+            result = await transfer().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failure = ExceptionDispatchInfo.Capture(exception);
+        }
+
+        if (result is { IsSuccess: true } && connection.TryHoldSession(session))
+        {
+            connection.MarkReusable();
+            return result;
+        }
+
+        await session.ShutDownAsync(context.CancellationToken).ConfigureAwait(false);
+        failure?.Throw();
+        return result!;
+    }
+
+    // A failure before the transfer started, or one that ends the connection, closes it; a
+    // transfer's own outcome leaves it intact (ADR-0262). The handshake and the
+    // authentication are held to --connect-timeout (CGR-010, BL-3539).
+    private static async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, long connectionNumber, SshConnectPhaseLimit connectPhase, SshStateTrace trace, Func<SshDiagnosticLog, ValueTask<TransferResult>> session)
+    {
+        ITransferEvents events = context.Events;
         SshDiagnosticLog log = new(context.DiagnosticLog);
         try
         {
-            TransferResult result = await HandshakeAndTransferAsync(context, target, connection, log, trace, connectPhase.Token).ConfigureAwait(false);
+            TransferResult result = await session(log).ConfigureAwait(false);
             events.ReportInfo(FailedWhileTransferring(result, ListsDirectory(context))
                 ? SshInfoLines.ClosingConnection(connectionNumber)
                 : SshInfoLines.ConnectionLeftIntact(connectionNumber, target.Host, target.Port));
@@ -269,29 +353,17 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static bool ListsDirectory(ITransferContext context) =>
         context.Url.Scheme != ScpScheme && context.Upload is null && SftpRemotePath.NamesDirectory(context.Url.AbsolutePath);
 
-    // The handshake, then the rest of the session, which always ends with DISCONNECT.
-    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log, SshStateTrace trace, CancellationToken connectPhase)
+    // The handshake, then the rest of the session, which is kept for the connection cache or
+    // ends with DISCONNECT.
+    private async ValueTask<TransferResult> HandshakeAndTransferAsync(ITransferContext context, SshSessionTarget target, IConnection connection, SshDiagnosticLog log, SshStateTrace trace, CancellationToken connectPhase, string loginKey)
     {
         SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(
             preferences.WithCompression(target.Options.Compression), target.Host, target.Port, target.Options, target.KnownHosts, context.Events);
-        SshTransport transport = new(connection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource, log);
+        SshSessionConnection sessionConnection = new(connection);
+        SshTransport transport = new(sessionConnection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource, log);
         SshKeyExchangeResult keys = await ExchangeKeysAsync(context, transport, log, connectPhase).ConfigureAwait(false);
-        // Not an await in a finally: the compiler's rethrow for one tests whether the captured
-        // object is an Exception, a branch no C# code can take the other way (BL-1357).
-        TransferResult? result = null;
-        ExceptionDispatchInfo? failure = null;
-        try
-        {
-            result = await AuthenticateAndTransferAsync(context, target, transport, keys.HostKey, trace, connectPhase).ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            failure = ExceptionDispatchInfo.Capture(exception);
-        }
-
-        await DisconnectIgnoringFailureAsync(transport, context.CancellationToken).ConfigureAwait(false);
-        failure?.Throw();
-        return result!;
+        SshKeptSession session = new(transport, sessionConnection, new SftpSessionSlot(keepsSession: true), loginKey);
+        return await TransferAndKeepOrDisconnectAsync(context, connection, session, () => AuthenticateAndTransferAsync(context, target, session, keys.HostKey, trace, connectPhase)).ConfigureAwait(false);
     }
 
     // The identification exchange and the key exchange. Cancelled once the server's
@@ -324,9 +396,10 @@ public sealed class SshProtocolHandler : IProtocolHandler
         return keys!;
     }
 
-    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshTransport transport, byte[] hostKey, SshStateTrace trace, CancellationToken connectPhase)
+    private async ValueTask<TransferResult> AuthenticateAndTransferAsync(ITransferContext context, SshSessionTarget target, SshKeptSession session, byte[] hostKey, SshStateTrace trace, CancellationToken connectPhase)
     {
         ITransferEvents events = context.Events;
+        SshTransport transport = session.Transport;
         SshUserKeySource userKeys = new(fileSystem, readEnvironmentVariable, target.Options, credentialEncoding);
         SshUserAuthentication authentication = new(transport, credentialEncoding, userKeys, events, agentConnector) { Trace = trace };
         await authentication.RequestServiceAsync(connectPhase).ConfigureAwait(false);
@@ -343,7 +416,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             trace.Rest();
         }
 
-        return await TransferAsync(context, transport, overScp, trace).ConfigureAwait(false);
+        return await TransferAsync(context, transport, overScp, trace, session.Sftp).ConfigureAwait(false);
     }
 
     // curl's SSH_HOSTKEY state, which with neither --hostpubsha256 nor --hostpubmd5 says it
@@ -367,7 +440,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
 
     // The transfer's failure message is a -v line too, as curl's failf writes it, unless
     // curl returns it without one.
-    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp, SshStateTrace trace)
+    private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp, SshStateTrace trace, SftpSessionSlot sftp)
     {
         TransferResult result;
         SshDiagnosticLog log = transport.DiagnosticLog;
@@ -378,7 +451,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             ReceivedDataReportingStream output = new(context.Output, context.Events);
             result = overScp
                 ? await TransferOverScpAsync(context, transport, output, trace).ConfigureAwait(false)
-                : await TransferOverSftpAsync(context, transport, output, trace).ConfigureAwait(false);
+                : await TransferOverSftpAsync(context, transport, output, trace, sftp).ConfigureAwait(false);
         }
         catch (SshTransferException exception) when (!exception.EndsConnection)
         {
@@ -426,18 +499,18 @@ public sealed class SshProtocolHandler : IProtocolHandler
     // An upload is sent (ADR-0244); otherwise a path ending with a slash is listed and any
     // other is downloaded (ADR-0241). Each runs the -Q commands around it (ADR-0247), with
     // Windows' 32-bit C long deciding how curl reads their numbers and dates.
-    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace)
+    private static async ValueTask<TransferResult> TransferOverSftpAsync(ITransferContext context, SshTransport transport, Stream output, SshStateTrace trace, SftpSessionSlot sftp)
     {
         string urlPath = context.Url.AbsolutePath;
         SftpQuoteCommands quotes = SftpQuoteCommands.From(context, OperatingSystem.IsWindows(), trace);
         if (context.Upload is { } upload)
         {
-            return await new SftpFileUpload(transport, context.Events) { Trace = trace }.UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
+            return await new SftpFileUpload(transport, context.Events) { Trace = trace, Sessions = sftp }.UploadAsync(urlPath, SftpUploadOptions.From(context), upload, context.Progress, context.CancellationToken, quotes).ConfigureAwait(false);
         }
 
         return SftpRemotePath.NamesDirectory(urlPath)
-            ? await new SftpDirectoryListing(transport) { Trace = trace }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes, context.MaxFileSize).ConfigureAwait(false)
-            : await new SftpFileDownload(transport) { Trace = trace, NoBody = context.NoBody }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize, context.RangeText).ConfigureAwait(false);
+            ? await new SftpDirectoryListing(transport) { Trace = trace, Sessions = sftp }.ListAsync(urlPath, context.ListOnly, context.NoBody, output, context.Progress, context.CancellationToken, quotes, context.MaxFileSize).ConfigureAwait(false)
+            : await new SftpFileDownload(transport) { Trace = trace, NoBody = context.NoBody, Sessions = sftp }.DownloadAsync(urlPath, context.CreateFileMode, output, context.Progress, context.CancellationToken, quotes, context.Range, context.ResumeFrom, context.MaxFileSize, context.RangeText).ConfigureAwait(false);
     }
 
     // What the host-key check and the key files need to know about the session.

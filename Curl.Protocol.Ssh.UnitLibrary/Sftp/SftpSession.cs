@@ -510,11 +510,35 @@ internal sealed class SftpSession
             }
 
             await afterClose().ConfigureAwait(false);
-            await ShutdownAsync(cancellationToken).ConfigureAwait(false);
+            await ShutdownUnlessDeferredAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (SshConnectionFailure.Is(exception))
         {
         }
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a transfer's end leaves the channel open for
+    /// the connection's next transfer, as curl closes the SFTP session only when it closes
+    /// the connection (CGR-130); <see cref="SftpSessionSlot" /> closes it then.
+    /// </summary>
+    internal bool DefersChannelClose { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the last transfer reached the point where it
+    /// would have closed the channel and left that to <see cref="SftpSessionSlot" />.
+    /// </summary>
+    internal bool HasDeferredChannelClose { get; set; }
+
+    private async ValueTask ShutdownUnlessDeferredAsync(CancellationToken cancellationToken)
+    {
+        if (DefersChannelClose)
+        {
+            HasDeferredChannelClose = true;
+            return;
+        }
+
+        await ShutdownAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
