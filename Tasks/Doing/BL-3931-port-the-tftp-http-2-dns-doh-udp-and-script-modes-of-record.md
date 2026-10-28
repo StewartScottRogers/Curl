@@ -42,3 +42,4 @@ Too big for one run (six modes, HTTP/2 framing alone is large): split into BL-39
 - 2026-10-27: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 30a358d0 6a7980b6 541414b4.
 - 2026-10-28: Doing -> Backlog. Split for size into BL-3938, BL-3939, BL-3940, BL-3941; waits for them
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 30a358d0 6a7980b6 541414b4.
