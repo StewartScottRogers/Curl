@@ -1,4 +1,4 @@
-# ADR-0949: Traditional encrypted PEM keys are decrypted by hand
+# ADR-0951: Traditional encrypted PEM keys are decrypted by hand
 
 - Status: Accepted
 - Date: 2026-10-28
