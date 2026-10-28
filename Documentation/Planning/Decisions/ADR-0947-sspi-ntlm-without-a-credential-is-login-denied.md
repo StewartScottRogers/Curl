@@ -1,4 +1,4 @@
-# ADR-0946: SSPI NTLM that cannot acquire the credential for Type 1 is exit 67, Login denied
+# ADR-0947: SSPI NTLM that cannot acquire the credential for Type 1 is exit 67, Login denied
 
 - Status: Accepted
 - Date: 2026-10-28
