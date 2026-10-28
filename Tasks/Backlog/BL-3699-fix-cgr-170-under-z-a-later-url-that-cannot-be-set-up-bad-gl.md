@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console.UnitTests/Cgr170Tests.cs, Curl.Console/CurlCommandRunner.cs]
+touches: [Curl.Console.UnitTests/Cgr170Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console/ParallelRun.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -74,8 +74,19 @@ curl -Z --parallel-max 1 -sS -w "%{urlnum} %{exitcode} %{url}\n" "http://127.0.0
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr170Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-28 (lane 6): `touches` gained `Curl.Console/ParallelRun.cs`: the held first batch lives in the run's state. No task in Doing on `origin/work/dark-factory` named it.
+- Measured curl 8.22.0 (`/ucrt64/bin/curl`, Schannel) and Curl, with `file://` URLs (`F`) and the closed port 22099 (`H`) in place of the report's server, so no request bytes can differ: in every abandoned case Curl now sends nothing, as curl.
+  - `-Z --parallel-immediate -sS -w "%{urlnum} %{exitcode} %{url}\n" H/ok1 H/ok2 "http://[::1"`: both exit 3, stdout `0 3 H/ok1\n1 3 H/ok2\n`, stderr the three glob lines then `curl: (3) URL using bad/illegal format or missing URL` twice. Before the fix Curl exited 7 with both transfers performed and the glob lines interleaved.
+  - `-Z --parallel-immediate -sS -w "%{urlnum} %{exitcode} %{http_code}\n" -T u1.txt H/a -T nope.txt H/b`: both exit 26, stdout `0 26 000\n1 26 000\n`, stderr `cannot open`, try-help, `(26) Failed to open/read local data from file/application` twice. Before: exit 7, `a` performed.
+  - `-Z --parallel-max 1 ... F?1 F?2 "http://[::1"`: both run 1 and 2, then `2 3 http://[::1` and `curl: (3) URL rejected: Bad IPv6 address` after the glob lines, exit 3. Before: no line for the bad URL.
+  - Variants: the first batch is `--parallel-max` plus one transfers (max 1: a bad glob at URL 2 abandons, at 3 not; max 2: at 3 abandons, at 4 not; max 3 and default 50 alike); past it a bad glob is taken as written and the run goes on (`F?{a` is read), exit 3 even after an earlier exit 7; a later unreadable `-T` reports `2 26`, starts nothing more, exit 26 after two exit-7 transfers. Curl now gives each of these.
+  - Serial runs take no changed path (the `-T` code change is guarded by `-Z`).
+- Decision (ADR-0866): hold the first `--parallel-max + 1` transfers in `ParallelRun`, opening each `-T` file as it is held, and start them once the batch is complete or the URLs run out; a setup failure while held abandons the batch, reporting each with the failure's code. A setup failure's code is the run's exit code. The held `-T` file is opened twice (check, then send): the simplest change that matches.
+- 2026-10-28 08:28, NOT FINISHED (lane 6, stashed code): every fast test project passed except `Curl.Console.UnitTests`, which hangs with the change. `dotnet test Curl.Console.UnitTests --filter "FullyQualifiedName~Parallel" --blame-hang-timeout 1m` hit the hang timeout after 95 tests (the 6 `Cgr170Tests` pass alone). Most likely cause: a `-Z` test whose transfers must run at once (a handler that waits for another transfer, `--parallel-max-host`, or a fake `TimeProvider` progress or `-m` test) now finds them held until the first batch (`--parallel-max` + 1) is complete or `EndParallelRunAsync` runs. Next step: list the `Parallel` tests that never finish (`--logger "console;verbosity=normal"`), fix the hold (perhaps hold only the setup checks, not the starts, or start held transfers when the URL loop next waits), then run the fast tests and `Measure-CodeQuality.ps1 -Library Curl.Console` (not yet run).
+- The focused tests in `Cgr170Tests.cs` pin the pre-fix differences measured above (the pre-fix runs of the same scenarios gave other output); the sandbox refused restoring the old code to run them against it.
 
 ## Log
 
 - 2026-10-26: Created from CGR-170 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Fix and ADR-0866 written and stashed, but the change makes a -Z test in Curl.Console.UnitTests hang; find and fix it (Notes)
