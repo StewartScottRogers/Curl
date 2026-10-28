@@ -3030,6 +3030,37 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Parses <paramref name="url" /> with any <c>-G</c> / <c>--url-query</c> query appended, or says why curl refuses it:
+    /// a URL curl cannot parse before the query goes on fails to set the query (CGR-190, BL-3719).
+    /// </summary>
+    private bool TryParseQueriedUrl(string url, CommandLineOptions options, UrlTransfer transfer, [NotNullWhen(true)] out CurlUrl? transferUrl, [NotNullWhen(false)] out TransferResult? failure)
+    {
+        string queriedUrl = QueryUrl.Append(url, options);
+        failure = null;
+        if (QueryRejected(url, queriedUrl))
+        {
+            transferUrl = null;
+            failure = TransferResult.Failure(CurlExitCode.UrlMalformat, "Could not parse the URL, failed to set query");
+            return false;
+        }
+
+        if (TransferPerformer.TryParseTransferUrl(queriedUrl, options.DisallowUsernameInUrl, QueryUrl.KeepsPathAsIs(options), out transferUrl, out CurlUrlRejection rejection))
+        {
+            return true;
+        }
+
+        failure = TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+        return false;
+    }
+
+    /// <summary>
+    /// Whether curl refuses the URL it was given when <c>-G</c> / <c>--url-query</c> has a query to append: its tool parses the URL
+    /// with the URL API first, which fails on one with a space in it or a port past 65535 (CGR-190, BL-3719).
+    /// </summary>
+    private static bool QueryRejected(string url, string queriedUrl) =>
+        queriedUrl != url && !CurlUrl.TryParse(url, pathAsIs: false, out _);
+
+    /// <summary>
     /// The URL a transfer of <paramref name="transferUrl" /> requests, which <c>%{url_effective}</c> prints when the
     /// report names no other and whose scheme <c>%{scheme}</c> prints: with any <c>-G</c> / <c>--url-query</c> query,
     /// normalized; a URL curl rejects prints as it was given, before its scheme was guessed (BL-3173), and an empty
@@ -3047,6 +3078,10 @@ internal sealed class CurlCommandRunner(
         }
 
         string url = QueryUrl.Append(transferUrl, options);
+        if (QueryRejected(transferUrl, url))
+        {
+            return string.Empty;
+        }
 
         return UrlEffective.Normalize(url, QueryUrl.Append(givenUrl, options), QueryUrl.KeepsPathAsIs(options));
     }
@@ -3745,9 +3780,9 @@ internal sealed class CurlCommandRunner(
             selectHopAltSvc: (hopUrl, hopHttp) => Running.AltSvc is { } altSvc ? altSvc.ApplyTo(hopUrl, hopHttp) : hopHttp,
             selectHopCredentials: CredentialLookup.ForRedirectHops(authentication));
 
-        if (!TransferPerformer.TryParseTransferUrl(QueryUrl.Append(url, options), options.DisallowUsernameInUrl, QueryUrl.KeepsPathAsIs(options), out CurlUrl? transferUrl, out CurlUrlRejection rejection))
+        if (!TryParseQueriedUrl(url, options, transfer, out CurlUrl? transferUrl, out TransferResult? urlFailure))
         {
-            return TransferPerformer.ReportUrlRejected(rejection, EventsBeforeConnecting(transfer));
+            return urlFailure;
         }
 
         if (TransferPerformer.ParsedUrlRefusal(transferUrl) is { } refusal)

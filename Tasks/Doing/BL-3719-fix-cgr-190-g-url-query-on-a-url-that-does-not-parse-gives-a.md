@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary/QueryUrl.cs, Curl.Cli.UnitTests/Cgr190Tests.cs]
+touches: [Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Cgr190Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -64,10 +64,10 @@ curl -sS -G -d a=b "http://127.0.0.1:99999/a" -w "[%{url_effective}]"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -78,3 +78,8 @@ curl -sS -G -d a=b "http://127.0.0.1:99999/a" -w "[%{url_effective}]"
 
 - 2026-10-26: Created from CGR-190 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes (BL-3719)
+
+- Measured curl 8.22.0 Schannel: `curl -sS --url-query a=b "http://127.0.0.1:1/a b" -w "[%{url_effective}]"` prints `curl: (3) Could not parse the URL, failed to set query` and `[]`, exit 3. A bad query on a good URL (`--url-query "a b=c" http://127.0.0.1:1/p`) still gives `URL rejected: Malformed input to a URL function` and `[http://127.0.0.1:1/p?a b=c]` (unchanged, FR-064 test still passes).
+- Curl now matches both repros (`/a b`, port 99999) in `Cgr190Tests`; nothing is sent. Fix is in `Curl.Console/CurlCommandRunner.cs` (`TryParseQueriedUrl`, `QueryRejected`, `WriteOutRequestUrl`), not `QueryUrl.cs`, so `touches` was changed; no other Doing task names that file. Measure-CodeQuality for Curl.Console: 0 failing. Linux/macOS: tests are platform-neutral.
