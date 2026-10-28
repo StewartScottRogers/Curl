@@ -1353,21 +1353,24 @@ public static partial class CommandLineOptionTable
             return CommandLineRefusal.BlankArgument(spelledOption);
         }
 
-        options.Range = char.IsAsciiDigit(value[0]) && !value.Contains('-', StringComparison.Ordinal)
-            ? AppendDashToLeadingNumber(options, value)
+        options.Range = TryReadLeadingNumberNotBeforeDash(value, out long firstBytePosition)
+            ? AppendDash(options, firstBytePosition)
             : WarnOfInvalidRangeCharacter(options, value);
         return null;
     }
 
-    private static string AppendDashToLeadingNumber(CommandLineOptions options, string value)
+    // curl 8.22.0: a leading number that fits a curl_off_t and is not followed by '-' gets a
+    // dash appended whatever follows it, so "0 - 9" and "0x10-0x20" read as "0-" (CGR-131).
+    private static bool TryReadLeadingNumberNotBeforeDash(string value, out long firstBytePosition)
     {
         int digitCount = value.AsSpan().IndexOfAnyExceptInRange('0', '9');
         ReadOnlySpan<char> digits = digitCount < 0 ? value : value.AsSpan(0, digitCount);
-        if (!long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out long firstBytePosition))
-        {
-            return value;
-        }
+        return long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out firstBytePosition)
+            && (digitCount < 0 || value[digitCount] != '-');
+    }
 
+    private static string AppendDash(CommandLineOptions options, long firstBytePosition)
+    {
         options.AddWarningLinesUnlessSilent(CommandLineWarning.RangeHasNoDash);
         return firstBytePosition.ToString(CultureInfo.InvariantCulture) + "-";
     }
