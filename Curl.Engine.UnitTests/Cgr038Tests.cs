@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Engine;
 
 /// <summary>
-/// CGR-038 (ADR-0956): curl 8.22.0 sends a <c>--doh-url</c> with no scheme as <c>https://</c>,
+/// CGR-038 (ADR-0961): curl 8.22.0 sends a <c>--doh-url</c> with no scheme as <c>https://</c>,
 /// measured on the Schannel build: <c>--doh-url 127.0.0.1:21840/dns-query</c> sent the listener a
 /// TLS ClientHello (first bytes <c>16 03 01</c>) and the plain-HTTP server case ended in exit 28.
 /// </summary>

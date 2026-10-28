@@ -141,7 +141,7 @@ internal static partial class EngineComposition
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
     /// and with <c>https://</c> in front when it does not, as curl 8.22.0's DoH sub-transfer assumes
-    /// HTTPS (measured: a scheme-less DoH URL's server gets a TLS ClientHello; CGR-038, ADR-0956).
+    /// HTTPS (measured: a scheme-less DoH URL's server gets a TLS ClientHello; CGR-038, ADR-0961).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns>
@@ -161,7 +161,7 @@ internal static partial class EngineComposition
     /// Whether <see cref="DohUrlOf" /> makes an <c>https</c> URL of a <c>--doh-url</c> value, the only DoH URL curl
     /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> one
     /// fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0859), while a scheme-less one
-    /// is <c>https</c> (CGR-038, ADR-0956).
+    /// is <c>https</c> (CGR-038, ADR-0961).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns><see langword="true" /> for an <c>https</c> DoH URL.</returns>

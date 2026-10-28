@@ -1,4 +1,4 @@
-# ADR-0956: A DoH URL with no scheme is https
+# ADR-0961: A DoH URL with no scheme is https
 
 - Status: Accepted
 - Date: 2026-10-28
