@@ -539,7 +539,7 @@ public sealed class MultipartFormBodyBuilder(
     /// Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder;
     /// a <see cref="ClosedStandardInputStream" /> instead adds the part's headers and then a read
     /// that aborts the transfer, as curl 8.22.0's tool sends the part head chunked and ends with
-    /// exit 42 when its <c>fread</c> on a closed <c>stdin</c> fails (CGR-110, ADR-0964).
+    /// exit 42 when its <c>fread</c> on a closed <c>stdin</c> fails (CGR-110, ADR-0967).
     /// </summary>
     private async ValueTask<TransferResult?> AddStandardInputPartAsync(
         MultipartBodySegments segments,

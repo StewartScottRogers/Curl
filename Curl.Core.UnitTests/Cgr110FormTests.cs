@@ -10,7 +10,7 @@ namespace Curl.Core;
 /// is a <see cref="ClosedStandardInputStream" />, against curl 8.22.0 (Schannel) measured on
 /// 2026-10-28 with <c>curl -sS -F f=@- http://127.0.0.1:18974/ &lt;&amp;-</c>: the body is sent
 /// chunked, its first chunk holds the part's head, and the read after it aborts the transfer with
-/// exit 42, <c>operation aborted by callback</c> (CGR-110, BL-3985, ADR-0964).
+/// exit 42, <c>operation aborted by callback</c> (CGR-110, BL-3985, ADR-0967).
 /// </summary>
 [TestClass]
 public sealed class Cgr110FormTests

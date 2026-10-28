@@ -1,4 +1,4 @@
-# ADR-0964: A `-F` part read from a closed standard input aborts the transfer with exit 42
+# ADR-0967: A `-F` part read from a closed standard input aborts the transfer with exit 42
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-3985, CGR-110).
 

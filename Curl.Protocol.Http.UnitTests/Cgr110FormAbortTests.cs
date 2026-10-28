@@ -9,7 +9,7 @@ namespace Curl.Protocol.Http;
 /// Pins <see cref="HttpRequestBodyWriter" /> to the exit code a
 /// <see cref="RequestBodyReadFailedException" /> carries: curl 8.22.0's <c>-F f=@-</c> with
 /// standard input closed sends the part head chunked and ends with exit 42,
-/// <c>operation aborted by callback</c>, not exit 26 (CGR-110, BL-3985, ADR-0964).
+/// <c>operation aborted by callback</c>, not exit 26 (CGR-110, BL-3985, ADR-0967).
 /// </summary>
 [TestClass]
 public sealed class Cgr110FormAbortTests
