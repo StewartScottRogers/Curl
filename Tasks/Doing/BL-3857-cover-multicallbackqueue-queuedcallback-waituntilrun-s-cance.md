@@ -31,3 +31,4 @@ BL-3583's quality run on 2026-10-26 (`Curl.Engine.UnitLibrary` at 99.97%) report
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: ed8828cc a526f176 779790c0.
