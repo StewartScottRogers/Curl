@@ -1,4 +1,4 @@
-# ADR-0957: A SOCKS4 host name left with no IPv4 address is unresolved, exit 6
+# ADR-0963: A SOCKS4 host name left with no IPv4 address is unresolved, exit 6
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-3739, CGR-210).
 
