@@ -30,3 +30,4 @@ BL-3564 (CGR-035) made `CallbackWriteStream.WriteAsync` wait on the handle's `Ea
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: f42267b0 779790c0.
