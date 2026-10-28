@@ -422,6 +422,24 @@ public sealed class CommandLineRefusal
     }
 
     /// <summary>
+    /// Refuses a <c>-d @file</c> / <c>--data @file</c> or <c>-w @file</c> whose file opens but cannot be
+    /// read, such as a directory on Linux and macOS, in curl's two lines:
+    /// <c>curl: option &lt;spelled&gt;: error encountered when reading a file</c> and the try-help line,
+    /// with exit code <see cref="CurlExitCode.ReadError"/> (26). curl prints its <c>Failed to open</c> line
+    /// only when <c>fopen</c> fails, so unlike <see cref="DataFileUnreadable"/> there is none (CGR-069).
+    /// </summary>
+    /// <remarks>Measured with curl 8.18.0 on Linux on 2026-10-28: <c>curl -sS -d @sub URL</c>, <c>sub</c> a directory.</remarks>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c> or <c>--data=@sub</c>.</param>
+    /// <returns>A refusal of two lines, exit 26.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal DataFileOpenedButUnreadable(string spelledOption)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+
+        return new CommandLineRefusal(CurlExitCode.ReadError, [], spelledOption, ReadErrorReason);
+    }
+
+    /// <summary>
     /// Refuses a <c>-K</c> / <c>--config</c> file that cannot be opened or read, in curl's three lines:
     /// <c>curl: cannot read config from '&lt;file&gt;'</c> (wrapped at <paramref name="terminalColumns"/> as curl wraps it,
     /// and hidden when <paramref name="errorsHidden"/>),

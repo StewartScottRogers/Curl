@@ -96,6 +96,13 @@ public sealed class DiskDataFileReader(Func<string, byte[]> readAllBytes, Func<S
 
     /// <inheritdoc/>
     /// <remarks>
+    /// <see langword="false"/> for curl's Windows build, which cannot open a directory; elsewhere
+    /// <see cref="Directory.Exists(string)"/>.
+    /// </remarks>
+    public bool OpensAsUnreadableDirectory(string path) => !reportsWindowsErrors && Directory.Exists(path);
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// The stream is left open for its owner to dispose: curl reads standard input once, and every
     /// later <c>@-</c>, <c>-K -</c> or <c>-T -</c> in the command line reads end of file, which is
     /// empty data, rather than failing on a closed stream (CGR-017).

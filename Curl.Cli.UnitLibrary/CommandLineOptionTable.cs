@@ -1101,7 +1101,9 @@ public static partial class CommandLineOptionTable
 
     /// <summary>
     /// Reads the file an <c>@file</c> value names, or standard input when <paramref name="file"/> is
-    /// <c>-</c>, and refuses a file that cannot be read with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// <c>-</c>, and refuses a file that cannot be read with <see cref="CommandLineRefusal.DataFileUnreadable"/>,
+    /// or with <see cref="CommandLineRefusal.DataFileOpenedButUnreadable"/> for a directory that curl's Linux and
+    /// macOS builds open but cannot read (<see cref="IDataFileReader.OpensAsUnreadableDirectory"/>, CGR-069).
     /// Standard input is read as curl's Windows build reads it in text mode when <paramref name="readsStandardInputAsText"/>
     /// and the build is Windows (<see cref="WindowsTextModeInput"/>), and unchanged otherwise.
     /// </summary>
@@ -1115,7 +1117,9 @@ public static partial class CommandLineOptionTable
 
         return dataFileReader.TryReadFile(file, out contents)
             ? null
-            : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
+            : dataFileReader.OpensAsUnreadableDirectory(file)
+                ? CommandLineRefusal.DataFileOpenedButUnreadable(spelledOption)
+                : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
     }
 
     /// <summary>

@@ -15,6 +15,16 @@ public interface IDataFileReader
     /// <returns><see langword="true"/> when the file was read; <see langword="false"/> when it cannot be opened or read.</returns>
     bool TryReadFile(string path, out byte[] contents);
 
+    /// <summary>
+    /// Whether <paramref name="path"/> is a directory that curl's build for this platform opens but
+    /// cannot read: on Linux and macOS <c>fopen</c> opens a directory and only the read fails, so curl
+    /// prints no <c>Failed to open</c> line for it (<see cref="CommandLineRefusal.DataFileOpenedButUnreadable"/>);
+    /// on Windows opening it fails (CGR-069).
+    /// </summary>
+    /// <param name="path">The path as typed after <c>@</c>, possibly empty.</param>
+    /// <returns><see langword="true"/> when the file opens as a directory; the default is <see langword="false"/>.</returns>
+    bool OpensAsUnreadableDirectory(string path) => false;
+
     /// <summary>Reads standard input to its end.</summary>
     /// <returns>Every byte read; empty when standard input is empty or absent.</returns>
     /// <exception cref="IOException">Standard input could not be read.</exception>
