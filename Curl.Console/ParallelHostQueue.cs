@@ -6,7 +6,7 @@ namespace Curl.Console;
 /// Holds back the transfers of a <c>-Z</c> run that would talk to a busy host (BL-520): while
 /// <c>--parallel-max-host</c> transfers to a host are running, and, without
 /// <c>--parallel-immediate</c>, while no <c>http://</c> transfer to it has ended yet and no transfer of the
-/// run has ended since it began to wait (CGR-172, ADR-0934), the next <c>http://</c> transfer to it waits. curl 8.21.0 waits there for the first connection to show whether
+/// run has ended since it began to wait (CGR-172, ADR-0937), the next <c>http://</c> transfer to it waits. curl 8.21.0 waits there for the first connection to show whether
 /// it can multiplex, which an HTTP/1.1 connection over plain TCP only shows once its transfer ends
 /// (measured 2026-09-28, BL-520 Notes). A waiting transfer keeps its <c>--parallel-max</c> slot, as it
 /// does in curl, and waiting transfers start in the order they began to wait, except that when a host's
@@ -98,7 +98,7 @@ internal sealed class ParallelHostQueue(int maxPerHost, bool parallelImmediate)
     /// Frees the transfers still waiting for another host's first transfer to end: curl 8.22.0 retries its
     /// pending transfers whenever any transfer ends, at any host or with a failed connect, and by then that
     /// host's first connection shows it does not multiplex, so the retried transfer opens a connection of its
-    /// own (CGR-172, ADR-0934). Each host's transfers are freed in the order they waited.
+    /// own (CGR-172, ADR-0937). Each host's transfers are freed in the order they waited.
     /// </summary>
     private void FreeWaitersForFirstToEnd()
     {

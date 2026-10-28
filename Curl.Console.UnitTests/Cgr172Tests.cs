@@ -3,7 +3,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins CGR-172 (BL-3701, ADR-0934): under <c>-Z</c> without <c>--parallel-immediate</c>, a transfer
+/// Pins CGR-172 (BL-3701, ADR-0937): under <c>-Z</c> without <c>--parallel-immediate</c>, a transfer
 /// waiting for its host's first transfer to end is freed when any transfer ends, at another host or
 /// after a failed connect, as curl 8.22.0 retries its pending transfers whenever one is done.
 /// </summary>

@@ -1,4 +1,4 @@
-# ADR-0934 — -Z frees a host's waiting transfers when any transfer ends
+# ADR-0937 — -Z frees a host's waiting transfers when any transfer ends
 
 - Status: Accepted
 - Date: 2026-10-28

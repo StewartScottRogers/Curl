@@ -5,7 +5,7 @@ using Curl.Testing;
 namespace Curl.Networking;
 
 /// <summary>
-/// CGR-172 (ADR-0934): under <c>-Z</c>, a transfer the host queue frees while the host's first
+/// CGR-172 (ADR-0937): under <c>-Z</c>, a transfer the host queue frees while the host's first
 /// plain TCP connection is still busy opens a connection of its own, as curl 8.22.0 does, when the
 /// option group speaks HTTP/1.x over cleartext (<see cref="PoolingConnector.PlainTcpMayMultiplex" />
 /// off); with HTTP/2 over cleartext it still waits for that connection's session.

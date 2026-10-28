@@ -95,7 +95,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// so that <see cref="WaitsForMultiplexing" /> waits for its session: <see langword="true" /> unless
     /// the option group speaks HTTP/1.x over cleartext, whose connection curl 8.22.0 knows carries one
     /// transfer at a time once it is open, so a transfer released while it is busy opens its own
-    /// (CGR-172, ADR-0934).
+    /// (CGR-172, ADR-0937).
     /// </summary>
     public bool PlainTcpMayMultiplex { get; init; } = true;
 

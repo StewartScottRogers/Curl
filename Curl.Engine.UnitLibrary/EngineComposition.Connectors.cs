@@ -15,7 +15,7 @@ internal static partial class EngineComposition
     /// <summary>
     /// Creates an option group's pooling connector over <paramref name="connector" />, waiting for
     /// multiplexing as <see cref="WaitsForMultiplexing" /> says, a plain TCP connection only when the group asks
-    /// for HTTP/2 over cleartext (<c>--http2</c>, <c>--http2-prior-knowledge</c>; CGR-172, ADR-0934): over the run's
+    /// for HTTP/2 over cleartext (<c>--http2</c>, <c>--http2-prior-knowledge</c>; CGR-172, ADR-0937): over the run's
     /// <paramref name="runConnections" /> with the group's <see cref="OptionGroupConnectionSettings" />,
     /// so a later group reuses an earlier group's connection when their settings are equal, as curl
     /// 8.21.0 does (ADR-0285, BL-754); or, without one, over a pool of its own.
