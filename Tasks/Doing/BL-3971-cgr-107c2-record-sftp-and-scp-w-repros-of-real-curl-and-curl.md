@@ -33,3 +33,4 @@ Split from BL-3957 (itself split from BL-3636, CGR-107). BL-3970 stamps the timi
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: a26cc745 f32f26ac 779790c0.
