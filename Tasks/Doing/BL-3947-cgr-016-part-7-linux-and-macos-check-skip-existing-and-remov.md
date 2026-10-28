@@ -34,3 +34,4 @@ Split from BL-3868 (CGR-016, ADR-0920, ADR-0943). `-o`, `-D` and `--create-dirs`
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d0d06f1b b140d9ba 1b81d9c1 92e2d50f 3ccadb6a 779790c0.
