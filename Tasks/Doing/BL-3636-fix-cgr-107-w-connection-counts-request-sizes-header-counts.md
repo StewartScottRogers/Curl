@@ -120,3 +120,4 @@ curl -sS ws://127.0.0.1:21802/x -w "%{num_connects}\n"
 ## Log
 
 - 2026-10-26: Created from CGR-107 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
