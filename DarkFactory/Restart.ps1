@@ -44,7 +44,12 @@ if ($TestRestart) {
     $ok4 = $endLine -match '^19:24:24 - +shift +end \(restarted' -and (Get-Content $scratch)[-1] -ceq $endLine
     Remove-Item $scratch -ErrorAction SilentlyContinue
     Write-Host "$(if ($ok4) { 'PASS' } else { 'FAIL' }) a restart ends the replaced shift's log with a shift end line: $endLine" -ForegroundColor $(if ($ok4) { 'Green' } else { 'Red' })
-    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4) { 0 } else { 1 })
+    $sleeper = if (Test-FactoryOnWindows) { Start-Process -FilePath 'powershell' -ArgumentList '-NoProfile', '-Command', 'Start-Sleep 60' -PassThru -WindowStyle Hidden } else { Start-Process -FilePath 'sleep' -ArgumentList '60' -PassThru }
+    Stop-FactoryProcessTree $sleeper.Id
+    $ok5 = $sleeper.WaitForExit(10000)
+    if (-not $ok5) { $sleeper.Kill() }
+    Write-Host "$(if ($ok5) { 'PASS' } else { 'FAIL' }) -Restart stops a process and its tree on this OS: $ok5" -ForegroundColor $(if ($ok5) { 'Green' } else { 'Red' })
+    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4 -and $ok5) { 0 } else { 1 })
 }
 
 if ($Restart) {
@@ -65,7 +70,7 @@ if ($Restart) {
     $lanesDir = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
     $stamp = if ($lanesDir) { $lanesDir.Name.Substring(6) } else { '' }
     Write-Host "Stopping the shift's coordinator (pid $($coordinator.ProcessId)) first, so it restarts no lane."
-    taskkill /PID $coordinator.ProcessId /T /F 2>&1 | Out-Null
+    Stop-FactoryProcessTree $coordinator.ProcessId
     while ($stamp) {
         $phases = @{}
         foreach ($n in 1..16) {
@@ -81,7 +86,7 @@ if ($Restart) {
             if (Test-Path $taskFile) { $ages[$n] = ((Get-Date) - (Get-Item $taskFile).LastWriteTime).TotalSeconds }
         }
         foreach ($n in Select-LanesToStop $phases $ages) {
-            taskkill /PID ([int](Get-LaneState $n 'pid' $stamp)) /T /F 2>&1 | Out-Null
+            Stop-FactoryProcessTree ([int](Get-LaneState $n 'pid' $stamp))
             Write-Host "$(Get-Date -Format 'HH:mm:ss') lane $n stopped ($(if ($phases[$n]) { $phases[$n] } else { 'no heartbeat' }); $(Get-LaneState $n 'task' $stamp))"
         }
         $waiting = @($phases.Keys | Where-Object { $phases[$_] -in 'claim', 'integrate' -or ($phases[$_] -eq 'run' -and $ages.ContainsKey($_) -and $ages[$_] -lt 120) })

@@ -32,13 +32,16 @@ update its comments to match what now works.
 
 ## Acceptance criteria
 
-- [ ] `DarkFactory/HerdrTabs.ps1` builds the herdr tab command line with the platform's PowerShell executable; on Windows the line is unchanged.
-- [ ] Off Windows and outside herdr, a lane starts as a detached `pwsh` process whose output goes to `<repo>.logs/DarkFactory-<stamp>-L<n>.log`, and `-Restart` finds and stops it (uses `Get-FactoryProcessTable` from BL-3920).
-- [ ] The existing HerdrTabs and restart self-tests gain cases for the non-Windows command lines and pass on Windows.
-- [ ] `RunDarkFactory.sh`'s header says what runs on Linux and macOS and that it needs PowerShell 7 and, for tabs, herdr.
-- [ ] `dotnet build` and the fast tests are green.
+- [x] `DarkFactory/HerdrTabs.ps1` builds the herdr tab command line with the platform's PowerShell executable; on Windows the line is unchanged.
+- [x] Off Windows and outside herdr, a lane starts as a detached `pwsh` process whose output goes to `<repo>.logs/DarkFactory-<stamp>-L<n>.log`, and `-Restart` finds and stops it (uses `Get-FactoryProcessTable` from BL-3920).
+- [x] The existing HerdrTabs and restart self-tests gain cases for the non-Windows command lines and pass on Windows.
+- [x] `RunDarkFactory.sh`'s header says what runs on Linux and macOS and that it needs PowerShell 7 and, for tabs, herdr.
+- [x] `dotnet build` and the fast tests are green.
 
 ## Notes
+
+- Off Windows without herdr a lane runs as `sh -c "exec nohup pwsh ... >> log 2>&1"` (append mode, so it shares the lane's own trace log safely); a shift launcher logs to `DarkFactory-<stamp>-start.log`. The line is traced when it starts. `Stop-FactoryProcessTree` replaces taskkill in -Restart (kill -9 of descendants, deepest first, off Windows).
+- Linux/macOS CI criterion met by keeping the change platform-neutral; self-tests pass on Windows.
 
 ## Log
 
