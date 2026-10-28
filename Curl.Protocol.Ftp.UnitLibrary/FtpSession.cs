@@ -1455,7 +1455,9 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Binds a port on the <c>-P</c> address and announces it: <c>EPRT</c> first, unless
-    /// <c>--disable-eprt</c> on IPv4, then on IPv4 a fresh port with <c>PORT</c> when
+    /// <c>--disable-eprt</c> or an earlier refusal with both the <c>-P</c> address and the
+    /// control connection on IPv4 (curl 8.22.0 enables <c>EPRT</c> again on an IPv6 control
+    /// connection, CGR-166), then on IPv4 a fresh port with <c>PORT</c> when
     /// <c>EPRT</c> was skipped or refused. IPv6 has no <c>PORT</c>, so a refused <c>EPRT</c>
     /// there is exit 30 after <c>QUIT</c>. A <c>-P</c> value that names a network interface
     /// is that interface's address, and exit 30 after <c>QUIT</c> when it has none of the
@@ -1483,7 +1485,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> AnnounceActivePortAsync(IPAddress address, FtpPortArgument argument)
     {
         bool ipv6 = address.AddressFamily == AddressFamily.InterNetworkV6;
-        if ((context.FtpUseEprt && !eprtRefused) || ipv6)
+        if ((context.FtpUseEprt && !eprtRefused) || ipv6 || ControlIsIpv6)
         {
             if (await ListenAsync(address, argument).ConfigureAwait(false) is { } failed)
             {
@@ -1571,6 +1573,12 @@ internal sealed class FtpSession(
     /// <see langword="null" /> when it is unknown.
     /// </summary>
     private IPAddress? ControlAddress => Unmapped((controlLocalEndPoint as IPEndPoint)?.Address);
+
+    /// <summary>
+    /// Whether the control connection is IPv6, curl's <c>conn-&gt;bits.ipv6</c>, on which
+    /// curl 8.22.0 sends <c>EPRT</c> despite <c>--disable-eprt</c> or an earlier refusal.
+    /// </summary>
+    private bool ControlIsIpv6 => ControlAddress?.AddressFamily == AddressFamily.InterNetworkV6;
 
     /// <summary>
     /// The address <paramref name="argument" /> names, an IPv4-mapped one as plain IPv4: the
