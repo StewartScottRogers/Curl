@@ -35,6 +35,8 @@ internal sealed class HandBuiltTlsConnection(
 {
     private int _ticketsReported;
 
+    private bool _tlsEnded;
+
     /// <summary>
     /// Gets where each TLS 1.3 <c>NewSessionTicket</c> a read takes in is reported, as a received
     /// <c>NewSessionTicket</c> <see cref="TlsMessageEvent" />, or <see langword="null" /> to report
@@ -89,6 +91,7 @@ internal sealed class HandBuiltTlsConnection(
     /// <inheritdoc />
     public async ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken)
     {
+        _tlsEnded = true;
         try
         {
             if (sendCloseNotifyFirst || !clearsTls)
@@ -108,15 +111,39 @@ internal sealed class HandBuiltTlsConnection(
     /// <remarks>Sends <c>close_notify</c>, then ends the TCP send side under it.</remarks>
     public async ValueTask ShutDownSendingAsync(CancellationToken cancellationToken)
     {
+        _tlsEnded = true;
         await ShutdownAsync(tlsStream, cancellationToken).ConfigureAwait(false);
         await plaintext.ShutDownSendingAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <remarks>
+    /// Sends <c>close_notify</c> first, as curl's OpenSSL and Schannel builds both do (BL-3987,
+    /// ADR-0959), unless <see cref="ClearTlsAsync" /> or <see cref="ShutDownSendingAsync" /> already ended TLS.
+    /// </remarks>
     public async ValueTask DisposeAsync()
     {
+        await SendCloseNotifyAsync().ConfigureAwait(false);
         await tlsStream.DisposeAsync().ConfigureAwait(false);
         await plaintext.DisposeAsync().ConfigureAwait(false);
         clientCertificate?.Dispose();
+    }
+
+    private async ValueTask SendCloseNotifyAsync()
+    {
+        if (_tlsEnded)
+        {
+            return;
+        }
+
+        _tlsEnded = true;
+        try
+        {
+            await ShutdownAsync(tlsStream, CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException)
+        {
+            // The transfer is over either way; curl ignores a close_notify it cannot send too.
+        }
     }
 
     // The server's close_notify reads as 0 and is recorded; data, or a bare end, is not. The
@@ -124,8 +151,13 @@ internal sealed class HandBuiltTlsConnection(
     private async ValueTask<bool> ReadsCloseNotifyAsync(CancellationToken cancellationToken) =>
         await tlsStream.ReadAsync(new byte[1], cancellationToken).ConfigureAwait(false) == 0 && CloseNotifyReceived(tlsStream);
 
-    private static Task ShutdownAsync(Stream tlsStream, CancellationToken cancellationToken) =>
-        tlsStream is Tls13ClientStream tls13 ? tls13.ShutdownAsync(cancellationToken) : ((Tls12ClientStream)tlsStream).ShutdownAsync(cancellationToken);
+    // A stream that is neither hand-built client (a test's plain stream) has no TLS to end.
+    private static Task ShutdownAsync(Stream tlsStream, CancellationToken cancellationToken) => tlsStream switch
+    {
+        Tls13ClientStream tls13 => tls13.ShutdownAsync(cancellationToken),
+        Tls12ClientStream tls12 => tls12.ShutdownAsync(cancellationToken),
+        _ => Task.CompletedTask,
+    };
 
     private static bool CloseNotifyReceived(Stream tlsStream) =>
         tlsStream is Tls13ClientStream tls13 ? tls13.CloseNotifyReceived : ((Tls12ClientStream)tlsStream).CloseNotifyReceived;
