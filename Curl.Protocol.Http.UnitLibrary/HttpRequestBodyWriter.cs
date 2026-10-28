@@ -377,7 +377,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
-        if (EarlyResponseWatch is null && !tracing)
+        if (EarlyResponseWatch is null && !tracing && !isChunked)
         {
             await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
             return;
