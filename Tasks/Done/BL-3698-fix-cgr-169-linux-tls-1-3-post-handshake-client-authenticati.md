@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitTests/Cgr169Tests.cs, Curl.Tls.UnitLibrary, Curl.Tls.UnitTests/Cgr169Tests.cs]
+touches: [Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr169Tests.cs, Curl.Tls.UnitLibrary, Curl.Tls.UnitTests/Cgr169Tests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3698 — Fix CGR-169: Linux: TLS 1.3 post-handshake client authentication without a client certificate fails on the server side for PORT
 
@@ -59,17 +59,28 @@ curl -sS -k https://localhost:<p>/
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr169Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Cause (measured): a plain `https://` transfer runs through `SslStream` (`TlsClientRouting` picks no hand-built row), not the hand-built client. On Linux `SslStream` offers `post_handshake_auth` only with a certificate selection callback, and `SslStreamTlsProvider` gave one only with `--cert` (BL-254). So PORT's ClientHello had no `post_handshake_auth`, and the server's `SSL_verify_client_post_handshake` failed with `extension not received`. The `--cert` control matched because it has a callback. Fix (ADR-0949): the OpenSSL build always gives a callback that chooses none without `--cert`. The Schannel build is unchanged. Added `Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs` to touches (no task in Doing on origin/work/dark-factory names it). The hand-built client's PHA answer (BL-880) needed no change.
+- Repro (WSL Ubuntu, REF = curl 8.18.0 OpenSSL 3.5.5, no 8.22.0 OpenSSL build available; PORT = `dotnet publish Curl.Console -c Release -r linux-x64 --self-contained -p:PublishAot=false` copied into WSL): `openssl s_server -accept <p> -cert c.pem -key k.pem -tls1_3 -ign_eof -msg`, with stdin sending `c` (post-handshake CertificateRequest) 3.5 s in, then `HTTP/1.0 200 OK`, `Content-Length: 5` and `reneg`. Client: `curl -sS -k https://localhost:<p>/ -o body`.
+  - REF: exit 0, stderr empty, body `reneg`. The server logs CertificateRequest, `SSL_do_handshake -> 1`, then client `Certificate [length 0028]` (empty) and `Finished`.
+  - PORT before: exit 0, stderr empty, body `reneg`. The server logs `SSL_verify_client_post_handshake:extension not received` and sends no CertificateRequest.
+  - PORT after: exit 0, stderr empty, body `reneg`. The server logs CertificateRequest, `SSL_do_handshake -> 1`, then client `Certificate [length 0028]` and `Finished`, the same as REF.
+  - The variants that already matched still match: with `-verify 1` the in-handshake CertificateRequest was answered with an empty Certificate by both before the fix. The `--cert` path is unchanged (same callback as before).
+  - One wire difference is left, and it was there before the fix and is outside CGR-169: REF sends `close_notify` at the end and PORT closes without one. Filed as BL-3982.
+- Focused test `Curl.Networking.UnitTests/Cgr169Tests.cs`: the OpenSSL build's handshake options carry a selection callback returning null without `--cert`. This fails before the fix, which gave none (`Assert.IsNotNull`). The Schannel build carries none. No `Curl.Tls.UnitTests/Cgr169Tests.cs`: nothing in Curl.Tls changed.
+- `dotnet build` clean. Fast tests: 46 test assemblies passed, 0 failed (Curl.Networking.UnitTests 3727 passed). Measure-CodeQuality.ps1 -Library Curl.Networking.UnitLibrary: 0 failing members.
+- Platform check: the tests use no path, OS error or certificate, and read only the options handed to the handshake seam, so they are platform-neutral.
 
 ## Log
 
 - 2026-10-26: Created from CGR-169 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Linux SslStream hello offers post_handshake_auth; a TLS 1.3 post-handshake CertificateRequest without --cert gets an empty Certificate and Finished, as curl's OpenSSL build
