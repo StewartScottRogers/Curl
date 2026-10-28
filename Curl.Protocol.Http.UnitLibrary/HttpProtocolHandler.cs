@@ -2533,7 +2533,7 @@ public sealed class HttpProtocolHandler(
     {
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
-        SetBodyLimitAndSinks(plan, body, discardsBody);
+        SetBodyLimitAndSinks(plan, body, discardsBody, ReportsIgnoredBodyProgress(plan, head));
         HttpTransferException? failedTransfer = null;
         try
         {
@@ -2599,14 +2599,22 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Decides whether a discarded body still counts in the progress meter: the body of a 3xx
+    /// that <c>-L</c> follows does, as curl 8.22.0's meter row for the hop reads the body's
+    /// length and bytes (measured, CGR-218); a body ignored for a retry does not.
+    /// </summary>
+    private static bool ReportsIgnoredBodyProgress(HttpRequestPlan plan, HttpResponseHead head) =>
+        plan.Options.FollowRedirects && head.StatusLine.StatusCode is >= 300 and < 400;
+
+    /// <summary>
     /// Sets where a body's bytes are held and reported: to the <c>--max-filesize</c> limit, the
     /// progress meter and the transfer's events, or, for a discarded body, to none of them -
     /// curl 8.21.0 reports no data for a body it ignores (measured, BL-407 Notes).
     /// </summary>
-    private static void SetBodyLimitAndSinks(HttpRequestPlan plan, HttpResponseBodyReader body, bool discardsBody)
+    private static void SetBodyLimitAndSinks(HttpRequestPlan plan, HttpResponseBodyReader body, bool discardsBody, bool reportsProgress)
     {
         body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize);
-        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        body.Progress = discardsBody && !reportsProgress ? HttpTransferProgress.Silent : plan.Progress;
         body.Events = discardsBody ? NoTransferEvents.Instance : plan.Context.Events;
     }
 
