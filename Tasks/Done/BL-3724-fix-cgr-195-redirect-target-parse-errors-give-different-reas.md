@@ -9,7 +9,7 @@ touches: [Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr195T
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3724 — Fix CGR-195: Redirect target parse errors give different reason texts (Bad hostname / port-number text instead of Unsupported number of slashes follow...
 
@@ -74,12 +74,14 @@ curl -s -S -L http://127.0.0.1:21358/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+- Measured curl 8.22.0 Schannel (`-sS -L`, Location target; PowerShell loopback server): `http:x`, `http:////` -> exit 3 `Unsupported number of slashes following scheme`; `//` (=`http://`) and `http://:80/` -> `No host present`; `file://localhost:1/y` -> `Bad file:// URL`; `http://h:99999/` -> port text. Curl now prints identical lines for all (verified with Curl.Console). Linux curl 8.18 says `No host part in the URL` for the empty host; the Windows text is pinned (decision: match the Schannel build measured here).
+- Fix in `RedirectFollower.UnparsableUrlReason` (split into `AuthorityReason`); test `Cgr195Tests` failed before (4 rows) and passes. Core fast tests 1930 pass; Measure-CodeQuality for Curl.Core.UnitLibrary: 0 failing members. CI Linux/macOS criterion met by platform-neutral tests.
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr195Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
@@ -88,3 +90,4 @@ curl -s -S -L http://127.0.0.1:21358/x
 
 - 2026-10-26: Created from CGR-195 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Redirect target parse errors give curl's slashes / no host / bad file reasons

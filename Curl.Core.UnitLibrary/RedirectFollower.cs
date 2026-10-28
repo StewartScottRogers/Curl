@@ -566,12 +566,23 @@ public sealed class RedirectFollower(
     /// </summary>
     private static string UnparsableUrlReason(string target)
     {
-        if (!target.AsSpan(target.IndexOf(':', StringComparison.Ordinal) + 1).StartsWith("/"))
+        ReadOnlySpan<char> afterScheme = target.AsSpan(target.IndexOf(':', StringComparison.Ordinal) + 1);
+        if (!afterScheme.StartsWith("/") || afterScheme.StartsWith("////"))
         {
             return ProxyUrlParser.SlashesReason;
         }
 
-        ReadOnlySpan<char> authority = target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2);
+        if (target.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Bad file:// URL";
+        }
+
+        return AuthorityReason(target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2));
+    }
+
+    /// <summary>Why curl 8.22.0 refuses the authority text <paramref name="authority" />, which may run on into the path.</summary>
+    private static string AuthorityReason(ReadOnlySpan<char> authority)
+    {
         authority = authority[..IndexOrLength(authority, authority.IndexOfAny('/', '?', '#'))];
         authority = authority[(authority.LastIndexOf('@') + 1)..];
         if (authority.StartsWith("["))
@@ -580,6 +591,11 @@ public sealed class RedirectFollower(
         }
 
         int colon = authority.IndexOf(':');
+        if (authority[..IndexOrLength(authority, colon)].IsEmpty)
+        {
+            return "No host present";
+        }
+
         return colon >= 0 && !IsPort(authority[(colon + 1)..])
             ? ProxyUrlParser.BadPortReason
             : ProxyUrlParser.BadHostnameReason;
