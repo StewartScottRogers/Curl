@@ -756,7 +756,6 @@ internal sealed class ImapSession(
     /// </summary>
     private async ValueTask<TransferResult> DownloadAsync(long size)
     {
-        context.Progress.ReportTransferStarted();
         Phase = ImapSessionPhase.Transferring;
         if (await CopyLiteralAsync(size, 0, reportsProgress: true).ConfigureAwait(false) is { } failure)
         {

@@ -202,6 +202,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             var channel = new SmtpControlChannel(

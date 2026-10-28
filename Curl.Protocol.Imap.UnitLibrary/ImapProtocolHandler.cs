@@ -152,6 +152,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
                 new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused }, null);
         }
 
+        context.Progress.ReportTransferStarted();
         return await OpenOnlyAsync(context, connectPhase, connection, target, connected.ConnectionNumber, connectEvents.Opened).ConfigureAwait(false);
     }
 
@@ -226,6 +227,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             ImapKeptConnection? reused = connected.IsReused ? connection.Session as ImapKeptConnection : null;

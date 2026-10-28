@@ -179,6 +179,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
             return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             return connect.IsReused && connection.Session is SshKeptSession kept
