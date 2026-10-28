@@ -19,7 +19,7 @@ namespace Curl.Console;
 /// <see cref="SharedOffsetHandleStream" /> over the process's own standard-output handle, with
 /// no buffer, which reports those failures as an <see cref="IOException" /> and writes at the
 /// handle's shared file offset, as curl's <c>fwrite</c> does, not at a position of its own as a
-/// <see cref="FileStream" /> would (BL-3937, ADR-0944); a closed one becomes a
+/// <see cref="FileStream" /> would (BL-3937, ADR-0945); a closed one becomes a
 /// <see cref="ClosedStandardOutputStream" />. On Windows a console is still opened with
 /// <see cref="System.Console.OpenStandardOutput()" />; elsewhere a terminal is opened over
 /// descriptor 1 too, because a write through .NET's console stream first writes terminfo's
@@ -119,7 +119,7 @@ internal static class StandardOutputOpener
     /// Opens <paramref name="handle" /> for writing with no buffer, at the handle's shared file
     /// offset, so each write reaches the handle before the call returns, a failed write throws
     /// at once, and a file shared with the shell or with standard error gets the bytes where
-    /// curl's would go (BL-3937, ADR-0944).
+    /// curl's would go (BL-3937, ADR-0945).
     /// </summary>
     /// <param name="handle">The standard-output handle.</param>
     /// <returns>The unbuffered stream.</returns>

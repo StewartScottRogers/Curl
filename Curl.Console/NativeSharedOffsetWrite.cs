@@ -7,14 +7,14 @@ namespace Curl.Console;
 /// Writes to a standard handle at its shared file offset: <c>WriteFile</c> with no
 /// <c>OVERLAPPED</c> on Windows, elsewhere <c>write(2)</c> through the runtime's own
 /// <c>SystemNative_Write</c> shim in <c>libSystem.Native</c>, which retries on <c>EINTR</c>
-/// (BL-3937, ADR-0944).
+/// (BL-3937, ADR-0945).
 /// </summary>
 /// <remarks>
 /// A thin adapter over the two calls; <see cref="SharedOffsetHandleStream" /> holds the logic.
 /// The Unix call cannot run on Windows, so per ADR-0083 the type is left out of the Windows
 /// coverage measure; <c>StandardOutputOpenerTests</c> drive it on every platform.
 /// </remarks>
-[ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0944: a thin WriteFile and write(2) adapter.")]
+[ExcludeFromCodeCoverage(Justification = "ADR-0083, ADR-0945: a thin WriteFile and write(2) adapter.")]
 internal static partial class NativeSharedOffsetWrite
 {
     /// <summary>

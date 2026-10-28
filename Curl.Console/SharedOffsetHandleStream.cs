@@ -4,7 +4,7 @@ namespace Curl.Console;
 /// Writes a standard handle's bytes at the handle's own, shared file offset, as curl's
 /// <c>fwrite</c> to <c>stdout</c> or <c>stderr</c> does, so a file the shell shares
 /// (<c>{ echo a; curl ...; echo b; } &gt; f 2&gt;&amp;1</c>) gets each writer's bytes in
-/// the order they were written (BL-3937, ADR-0944).
+/// the order they were written (BL-3937, ADR-0945).
 /// </summary>
 /// <remarks>
 /// A <see cref="FileStream" /> over a seekable handle keeps a position of its own and writes

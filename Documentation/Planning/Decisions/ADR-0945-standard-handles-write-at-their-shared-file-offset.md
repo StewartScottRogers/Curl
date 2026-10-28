@@ -1,4 +1,4 @@
-# ADR-0944: Standard output and standard error write at the handle's shared file offset
+# ADR-0945: Standard output and standard error write at the handle's shared file offset
 
 - Status: Accepted
 - Date: 2026-10-28
