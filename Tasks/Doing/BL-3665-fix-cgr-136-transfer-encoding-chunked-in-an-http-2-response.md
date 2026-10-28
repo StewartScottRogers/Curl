@@ -81,3 +81,4 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x
 - 2026-10-26: Created from CGR-136 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Waits on BL-3667, which holds Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs that the fix must change; REF measured and plan in Notes
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
