@@ -100,17 +100,20 @@ internal sealed class HttpStatusLine(Version version, int statusCode, string rea
         && HttpLine.IsBlank(line[10]);
 
     /// <summary>
-    /// Gives the failure curl's OpenSSL build reports for a status line over HTTP/1.x that
-    /// <see cref="NamesHttp2OrHttp3" />: exit 8, <c>Version mismatch (from HTTP/1 to HTTP/2)</c>,
-    /// for HTTP/2 (upstream test1704), and exit 1, <c>Unsupported HTTP version (3.0) in
-    /// response</c>, for HTTP/3 (measured, BL-2715 Notes).
+    /// Gives the failure curl reports for a status line over HTTP/1.x that
+    /// <see cref="NamesHttp2OrHttp3" />. A build with HTTP/2 (OpenSSL) exits 8, <c>Version mismatch
+    /// (from HTTP/1 to HTTP/2)</c>, for HTTP/2 (upstream test1704); a build without it (the Schannel
+    /// build on Windows, BL-3730 Notes) exits 1, <c>Unsupported HTTP version (2.0) in response</c>.
+    /// HTTP/3 is always exit 1, <c>Unsupported HTTP version (3.0) in response</c> (measured,
+    /// BL-2715 Notes).
     /// </summary>
     /// <param name="line">The line, without its terminator.</param>
+    /// <param name="withoutHttp2">Whether the curl being matched is built without HTTP/2.</param>
     /// <returns>The failure to throw.</returns>
-    internal static HttpTransferException RefusalOverHttp1(string line) =>
-        line[5] == '2'
+    internal static HttpTransferException RefusalOverHttp1(string line, bool withoutHttp2) =>
+        line[5] == '2' && !withoutHttp2
             ? new(CurlExitCode.WeirdServerReply, HttpTransferMessages.VersionMismatchFromHttp1ToHttp2)
-            : Unsupported(HttpTransferMessages.UnsupportedHttp3Version);
+            : Unsupported(line[5] == '2' ? HttpTransferMessages.UnsupportedHttp2Version : HttpTransferMessages.UnsupportedHttp3Version);
 
     /// <summary>
     /// Rejects bytes received so far that cannot begin a status line: they must match

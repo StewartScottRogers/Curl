@@ -1679,6 +1679,7 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = IsThroughHttpProxy(options),
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            HttpVersionSeenBefore = () => Http1VersionSeen.Of(connection) is not null,
             AsksH2cUpgrade = connection is HttpH2cUpgradeConnection,
             DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };

@@ -45,6 +45,12 @@ internal static class HttpTransferMessages
     internal const string UnsupportedHttp3Version = "Unsupported HTTP version (3.0) in response";
 
     /// <summary>
+    /// The exit 1 message for an <c>HTTP/2</c> status line over HTTP/1.x, as curl built without
+    /// HTTP/2 (Schannel on Windows) writes it (measured, BL-3730 Notes).
+    /// </summary>
+    internal const string UnsupportedHttp2Version = "Unsupported HTTP version (2.0) in response";
+
+    /// <summary>
     /// The exit 8 message for an <c>HTTP/2</c> status line over HTTP/1.x, as curl's OpenSSL
     /// build writes it (measured, upstream test1704, BL-2715 Notes).
     /// </summary>

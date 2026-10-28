@@ -56,6 +56,7 @@ internal sealed class HttpResponseHeadReader
     private static readonly Func<HttpStatusLine, HttpResponseHeader, bool> DefersNoHeader = static (_, _) => false;
 
     private readonly HttpLineReader lines;
+    private bool sawHttp1StatusLine;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpResponseHeadReader" /> class.
@@ -207,6 +208,12 @@ internal sealed class HttpResponseHeadReader
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
     /// </summary>
     internal Func<bool> IsSwitchedToHttp2 { get; init; } = NeverSwitched;
+
+    /// <summary>
+    /// Gets what tells whether an earlier response on the connection was HTTP/1.x
+    /// (<see cref="Http1VersionSeen" />), so an HTTP/2 status line now is a version mismatch.
+    /// </summary>
+    internal Func<bool> HttpVersionSeenBefore { get; init; } = NeverSwitched;
 
     /// <summary>
     /// Gets what decides, for each whole header of a final head that curl acts on, whether it
@@ -530,10 +537,22 @@ internal sealed class HttpResponseHeadReader
             return HttpStatusLine.Http200Alias();
         }
 
-        return HttpStatusLine.NamesHttp2OrHttp3(line)
-            ? throw HttpStatusLine.RefusalOverHttp1(line)
-            : HttpStatusLine.Parse(line);
+        if (HttpStatusLine.NamesHttp2OrHttp3(line))
+        {
+            throw HttpStatusLine.RefusalOverHttp1(line, IsWithoutHttp2());
+        }
+
+        sawHttp1StatusLine = true;
+        return HttpStatusLine.Parse(line);
     }
+
+    /// <summary>
+    /// Tells whether this first HTTP/2 status line over HTTP/1.x comes from a curl built without
+    /// HTTP/2 (Schannel on Windows): no h2c upgrade was asked and no HTTP/1.x response was seen on
+    /// the connection yet, since a later one is a version mismatch (exit 8) as upstream test471 says.
+    /// </summary>
+    private bool IsWithoutHttp2() =>
+        OperatingSystem.IsWindows() && !AsksH2cUpgrade && !sawHttp1StatusLine && !HttpVersionSeenBefore();
 
     /// <summary>
     /// Parses a status line as <see cref="ParseStatusLine" /> does, except that a status code

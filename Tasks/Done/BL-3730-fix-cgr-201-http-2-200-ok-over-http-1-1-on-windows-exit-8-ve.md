@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary/HttpStatusLine.cs, Curl.Protocol.Http.U
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3730 — Fix CGR-201: "HTTP/2 200 OK" over HTTP/1.1 on Windows: exit 8 "Version mismatch" where REF (built without HTTP/2) exits 1
 
@@ -60,10 +60,10 @@ curl -s -S http://127.0.0.1:20400/st_v2
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -74,3 +74,7 @@ curl -s -S http://127.0.0.1:20400/st_v2
 
 - 2026-10-26: Created from CGR-201 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+- Result (measured earlier by this task's first run, Windows Schannel curl 8.22.0 as REF): `curl -s -S http://127.0.0.1:20400/st_v2` with `HTTP/2 200 OK` over HTTP/1.1 gives exit 1 `curl: (1) Unsupported HTTP version (2.0) in response`; Curl now gives the same on Windows (`HttpStatusLine.RefusalOverHttp1(line, withoutHttp2)`, true on Windows when no h2c upgrade was asked and no HTTP/1.x response preceded it). Other platforms keep exit 8 "Version mismatch" (OpenSSL build with nghttp2). Decision by Claude under Stewart's delegation: match the platform's curl.
+- Focused test: `Cgr201Tests.cs`; existing tests adjusted to the Windows answer. Fast tests green (2508 passed), Measure-CodeQuality for Curl.Protocol.Http.UnitLibrary: 0 failing members. Linux/macOS CI stays neutral through OS checks.
+- 2026-10-28: Doing -> Done. Windows HTTP/2 status line over HTTP/1.1 now exits 1 like curl without HTTP/2
