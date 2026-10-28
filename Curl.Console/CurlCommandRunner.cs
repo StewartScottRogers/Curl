@@ -973,6 +973,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The process exit code.</returns>
     private async Task<int> RunParsedAsync(CommandLineParseResult parsed, IReadOnlyList<(string Path, bool WasRead)> filesTriedWhileParsing)
     {
+        await WriteConfigFileHelpPagesAsync(parsed.ConfigFileHelpSubjects).ConfigureAwait(false);
         if (!parsed.IsAccepted)
         {
             await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
@@ -5339,6 +5340,28 @@ internal sealed class CurlCommandRunner(
             CurlHelpText.Lines(subject, terminalColumns),
         _ => TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested),
     };
+
+    /// <summary>
+    /// Writes the page each <c>help</c> / <c>-h</c> line of a <c>-K</c> or default config file asked for,
+    /// in the order read and before anything else, as curl 8.21.0 prints each as it reads the line and
+    /// carries on: the usage page, a category or <c>all</c> on standard output, an option's manual section
+    /// through <see cref="WriteOptionManualSectionAsync" /> (CGR-049, BL-3578).
+    /// </summary>
+    /// <param name="subjects">The subjects; a <see langword="null" /> entry asks for the usage page.</param>
+    /// <returns>A task that completes when every page is flushed.</returns>
+    private async Task WriteConfigFileHelpPagesAsync(IReadOnlyList<string?> subjects)
+    {
+        foreach (string? subject in subjects)
+        {
+            if (CurlHelpText.IsOptionSubject(subject))
+            {
+                await WriteOptionManualSectionAsync(subject!).ConfigureAwait(false);
+                continue;
+            }
+
+            await WriteStandardOutputLinesAsync(CurlHelpText.Lines(subject, terminalColumns)).ConfigureAwait(false);
+        }
+    }
 
     /// <summary>
     /// Writes what <c>--help &lt;option&gt;</c> prints, as curl 8.21.0 does: the option's
