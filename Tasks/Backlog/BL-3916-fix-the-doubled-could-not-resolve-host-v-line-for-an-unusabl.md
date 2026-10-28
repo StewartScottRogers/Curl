@@ -4,8 +4,8 @@ title: Fix the doubled 'Could not resolve host' -v line for an unusable --doh-ur
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/UnusableDohUrlResolver.cs, Curl.Engine.UnitTests/UnusableDohUrlResolverVerboseTests.cs]
+depends-on: [BL-3914]
+touches: [Curl.Engine.UnitLibrary/UnusableDohUrlResolver.cs, Curl.Engine.UnitTests/UnusableDohUrlResolverVerboseTests.cs, Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/TcpConnectorUnusableDohTests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -34,3 +34,4 @@ Curl writes `* Could not resolve host: foo.test` twice before `* Could not resol
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: da7b5c6c d069bed7 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs TcpConnector.cs in Curl.Networking.UnitLibrary, held by BL-3914; depends-on BL-3914
