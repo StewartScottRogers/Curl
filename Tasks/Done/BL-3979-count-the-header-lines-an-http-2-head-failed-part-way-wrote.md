@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpResponseHeadReader.cs, Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/Cgr135NumHeadersTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3979 — Count the header lines an HTTP/2 head failed part way wrote in num_headers (CGR-135 cltwo)
 
@@ -37,3 +37,4 @@ Found by BL-3664 (CGR-135). Server (Record-CurlExchange.ps1 `-Http2Origin prior-
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: d0af7d8d 0f3c171c 779790c0.
+- 2026-10-28: Doing -> Done. Failed HTTP/2 head's header lines now counted in num_headers; test and quality green
