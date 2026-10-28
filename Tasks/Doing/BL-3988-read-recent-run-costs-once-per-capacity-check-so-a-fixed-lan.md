@@ -36,3 +36,4 @@ The 15:07 shift started 13 lanes, not 12, because lane 13 (a lane number left fr
 ## Log
 
 - 2026-10-28: Created after the 14:55 `-Lanes 12` start took 12 minutes.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: bcca3c2f f10fcfb7 1fd801c2 dd05e472.
