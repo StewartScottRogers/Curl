@@ -35,7 +35,10 @@ namespace Curl.Engine;
 /// </param>
 /// <param name="timeProvider">The clock the timeout and the waits are measured on.</param>
 /// <param name="socketPoller">Checks the extra sockets a wait or poll is given.</param>
-/// <param name="closeIdleConnections">Closes the engine's idle connections, for <see cref="CurlNetworkChange.ClearConnections" /> (<see cref="ConnectionCache.CloseIdleAsync" />).</param>
+/// <param name="closeIdleConnections">
+/// Closes the handle's idle connections, for <see cref="CurlNetworkChange.ClearConnections" /> and once every
+/// perform has ended in <see cref="DisposeAsync" /> (<see cref="ConnectionCache.CloseIdleAsync" />).
+/// </param>
 /// <param name="closeIdleConnectionsBeyond">
 /// Closes the engine's oldest idle connections beyond a count, after each transfer ends, for
 /// <see cref="MultiOptions.MaxConnects" /> (<see cref="ConnectionCache.CloseIdleBeyondAsync" />).
@@ -311,7 +314,8 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// <c>curl_multi_cleanup</c>: removes every transfer, cancelling the running ones, and waits for
-    /// their performs to end; later calls answer <see cref="CurlMultiCode.BadHandle" />. Called from inside
+    /// their performs to end, then closes the handle's idle connections, as libcurl 8.22.0's closes its
+    /// connection pool (CGR-149); later calls answer <see cref="CurlMultiCode.BadHandle" />. Called from inside
     /// one of its own transfers (<see cref="IsInTransferCallback" />) it does nothing, as libcurl refuses
     /// that call, since waiting for the perform it runs in would never end.
     /// </summary>
@@ -335,6 +339,7 @@ internal sealed class ManagedMultiTransfer(
         messages.Clear();
         await Task.WhenAll(performs).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         await idleConnectionsClosing.ConfigureAwait(false);
+        await closeIdleConnections().ConfigureAwait(false);
     }
 
     /// <summary>

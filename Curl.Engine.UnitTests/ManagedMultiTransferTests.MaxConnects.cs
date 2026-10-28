@@ -27,10 +27,11 @@ public sealed partial class ManagedMultiTransferTests
         first.Finish(CurlCode.Ok);
         second.Finish(CurlCode.Ok);
         await multi.PerformAsync(CancellationToken.None);
+        bool[] closed = [.. connections.Select(connection => connection.IsDisposed)];
         await multi.DisposeAsync();
 
-        Assert.IsTrue(connections[0].IsDisposed);
-        Assert.IsFalse(connections[1].IsDisposed);
+        Assert.IsTrue(closed[0]);
+        Assert.IsFalse(closed[1]);
     }
 
     [TestMethod]
@@ -51,10 +52,11 @@ public sealed partial class ManagedMultiTransferTests
 
         added[0].Finish(CurlCode.Ok);
         await multi.PerformAsync(CancellationToken.None);
+        bool[] closed = [.. connections.Select(connection => connection.IsDisposed)];
         await multi.DisposeAsync();
 
-        Assert.AreEqual(expectedClosed, connections.Count(connection => connection.IsDisposed));
-        Assert.AreEqual(expectedClosed == 1, connections[0].IsDisposed);
+        Assert.AreEqual(expectedClosed, closed.Count(isClosed => isClosed));
+        Assert.AreEqual(expectedClosed == 1, closed[0]);
     }
 
     [TestMethod]
@@ -67,9 +69,11 @@ public sealed partial class ManagedMultiTransferTests
         multi.Add(new ControlledEasyTransfer());
 
         await multi.PerformAsync(CancellationToken.None);
+        bool closed = connections[0].IsDisposed;
         await multi.DisposeAsync();
 
-        Assert.IsFalse(connections[0].IsDisposed);
+        Assert.IsFalse(closed);
+        Assert.IsTrue(connections[0].IsDisposed);
     }
 
     /// <summary>Opens <paramref name="count" /> connections through the multi handle's pool, one host each, and hands each back idle, oldest first.</summary>
