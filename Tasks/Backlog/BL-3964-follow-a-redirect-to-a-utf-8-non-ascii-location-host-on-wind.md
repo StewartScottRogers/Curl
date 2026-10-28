@@ -30,6 +30,7 @@ Second part of BL-3953 (CGR-059). After BL-3963 makes `CurlUrlHost` read a host 
 ## Notes
 
 - Split from BL-3953, which went over its cost cap.
+- BL-3963 took test1448 off `PassingUpstreamCases.txt` (it failed on Windows once a host is read as Windows-1252), so CI stays green until this task lands; put it back for the platforms the measurement says. Measured by BL-3963: real Windows curl 8.22.0 ignores `LC_ALL=C.UTF-8` (`%C3%BC` still gives `xn--14-ria7423a`), so the test's `<setenv>` does not make it read UTF-8.
 - Continues the stashed work of BL-3953.
 
 ## Log
