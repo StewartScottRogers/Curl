@@ -36,3 +36,4 @@ Real curl's second request carries `Authorization: Digest ... nc=00000002 ...`; 
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 0d2102fe ef8c4797 a0d6a6f1 779790c0.
