@@ -306,7 +306,7 @@ internal static class HttpRequestHeadFormatter
             return;
         }
 
-        AppendUnlessOverridden(head, customHeaders, TimeConditionHeaderName(timeCondition), HttpConditionDate.Format(timeCondition));
+        AppendUnlessOverridden(head, customHeaders, TimeConditionHeaderName(timeCondition), HttpConditionDate.Format(timeCondition, OperatingSystem.IsWindows()));
     }
 
     /// <summary>
