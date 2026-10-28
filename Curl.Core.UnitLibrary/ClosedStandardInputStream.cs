@@ -1,4 +1,4 @@
-namespace Curl.Cli;
+namespace Curl.Core;
 
 /// <summary>
 /// The stream standard input is when the process was started with it closed: it reads as end of

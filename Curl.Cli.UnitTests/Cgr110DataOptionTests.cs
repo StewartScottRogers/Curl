@@ -1,3 +1,4 @@
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;

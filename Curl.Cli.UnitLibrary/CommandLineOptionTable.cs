@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Authentication;
 using System.Text;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;

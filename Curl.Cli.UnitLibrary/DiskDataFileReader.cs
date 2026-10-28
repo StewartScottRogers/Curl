@@ -1,3 +1,5 @@
+using Curl.Core;
+
 namespace Curl.Cli;
 
 /// <summary>

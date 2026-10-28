@@ -16,7 +16,7 @@ internal static class Program
 
         using Stream standardOutput = StandardOutputOpener.Open();
         using Stream standardError = new WriteFailureIgnoringStream(StandardErrorOpener.Open());
-        using Stream standardInput = Curl.Cli.ClosedStandardInputStream.InPlaceOfNull(System.Console.OpenStandardInput());
+        using Stream standardInput = Curl.Core.ClosedStandardInputStream.InPlaceOfNull(System.Console.OpenStandardInput());
         bool standardOutputIsTerminal = !System.Console.IsOutputRedirected;
         using StandardOutputVirtualTerminal virtualTerminal = StandardOutputVirtualTerminal.ForWindowsConsole();
         bool terminalRendersStyles = StandardOutputVirtualTerminal.RendersStyles(
