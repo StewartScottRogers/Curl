@@ -1,4 +1,4 @@
-# ADR-0956: A `-F` form reading standard input is sent once per option group
+# ADR-0958: A `-F` form reading standard input is sent once per option group
 
 - Status: Accepted (amends ADR-0062: a second transfer no longer gets a consistent body with an empty part)
 - Date: 2026-10-28

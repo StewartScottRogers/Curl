@@ -7,7 +7,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins CGR-175 (BL-3704, ADR-0956): <c>-F f=@-</c> shared by two URLs. Serially the second transfer finds standard
+/// Pins CGR-175 (BL-3704, ADR-0958): <c>-F f=@-</c> shared by two URLs. Serially the second transfer finds standard
 /// input drained and fails with exit 26 before sending, as curl 8.22.0 does; under <c>-Z</c> only the option group's
 /// last URL sends the form and every earlier one an empty body.
 /// </summary>

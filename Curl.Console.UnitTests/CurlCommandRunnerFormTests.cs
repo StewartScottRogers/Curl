@@ -347,7 +347,7 @@ public sealed class CurlCommandRunnerFormTests
     /// <summary>
     /// curl 8.21.0 sends piped standard input to the first URL of <c>-F "a=&lt;-" URL1 URL2</c>
     /// and nothing to the second, which it declares with the first body's length and fails
-    /// with exit 26 before sending (BL-311 Context; ADR-0956, which amends ADR-0062).
+    /// with exit 26 before sending (BL-311 Context; ADR-0958, which amends ADR-0062).
     /// </summary>
     [TestMethod]
     public async Task RunAsync_FormContentFromStandardInputOnTwoUrls_SendsTheInputOnceThenFailsTheSecond()

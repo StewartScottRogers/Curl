@@ -4008,14 +4008,14 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// The body a <c>-Z</c> transfer sends when its option group's form went to a later transfer: no bytes and no
-    /// <c>Content-Type</c>, as curl 8.22.0 sends <c>POST</c> with <c>Content-Length: 0</c> (CGR-175, ADR-0956).
+    /// <c>Content-Type</c>, as curl 8.22.0 sends <c>POST</c> with <c>Content-Length: 0</c> (CGR-175, ADR-0958).
     /// </summary>
     private static readonly BytesBody EmptyFormBody = new(ReadOnlyMemory<byte>.Empty, string.Empty);
 
     /// <summary>
     /// Whether this <c>-Z</c> transfer sends no form because its option group's form goes to the group's last URL:
     /// curl 8.22.0 sets one <c>curl_mime</c> on every handle it sets up and <c>CURLOPT_MIMEPOST</c> moves it to the
-    /// newest, so only the last transfer set up sends it (CGR-175, ADR-0956).
+    /// newest, so only the last transfer set up sends it (CGR-175, ADR-0958).
     /// </summary>
     private bool SendsFormElsewhereInParallel(CommandLineOptions options, UrlTransfer transfer) =>
         parallelRun is not null && transfer.UrlIndex != options.Urls.Count - 1;
@@ -4030,7 +4030,7 @@ internal sealed class CurlCommandRunner(
     /// Fails a transfer whose <c>-F</c> body reads standard input after an earlier transfer of its option group drained
     /// it: curl 8.22.0 keeps the length its group's form first declared, so the shorter read fails before anything is
     /// sent with exit 26, <c>client mime read EOF fail, only &lt;read&gt;/&lt;needed&gt; of needed bytes read</c>, and
-    /// <c>%{size_upload}</c> the bytes read (CGR-175, ADR-0956).
+    /// <c>%{size_upload}</c> the bytes read (CGR-175, ADR-0958).
     /// </summary>
     /// <returns>The failure, or <see langword="null" /> to send the body.</returns>
     private TransferResult? StandardInputFormShortRead(CommandLineOptions options, EasyMimeBody mimePost, StreamBody body)
