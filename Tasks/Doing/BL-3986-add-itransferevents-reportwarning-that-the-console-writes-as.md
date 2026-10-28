@@ -31,3 +31,4 @@ Needed by BL-3714 (CGR-185): a refused `SO_PRIORITY` must print `Warning: VLAN p
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 4fb3633e c4add7fc d418a7e3.
