@@ -35,3 +35,4 @@ byte by byte where the `.ps1` does.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: dffab3ef bc812ec6 b55ab035.
