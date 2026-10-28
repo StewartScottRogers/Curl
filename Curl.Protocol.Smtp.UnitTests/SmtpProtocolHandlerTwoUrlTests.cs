@@ -39,26 +39,6 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_SecondUploadForAnotherUser_QuitsTheKeptConnectionAndGreetsOnANewOne()
-    {
-        var first = new PoolingConnection(
-            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("250 OK\r\n"), Read("250 OK\r\n"), Read("354 Go\r\n"), Read("250 OK\r\n"), Read("221 Bye\r\n"));
-        var second = new PoolingConnection(
-            Read("220 localhost ESMTP\r\n"), Read("250 localhost\r\n"), Read("250 OK\r\n"), Read("250 OK\r\n"), Read("354 Go\r\n"), Read("250 OK\r\n"));
-        var connector = new QueuedConnector(
-            ConnectResult.Connected(first, null), ConnectResult.Connected(first, null, isReused: true), ConnectResult.Connected(second, null, connectionNumber: 1));
-        var handler = new SmtpProtocolHandler(connector, new QueuedTlsProvider());
-
-        await handler.ExecuteAsync(Context("u"));
-        TransferResult result = await handler.ExecuteAsync(Context("v"));
-
-        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.IsTrue(first.IsClosed);
-        Assert.AreEqual(Envelope + "QUIT\r\n", first.SentText);
-        Assert.AreEqual(Envelope, second.SentText);
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_FirstUploadFails_QuitsAndKeepsNoConnection()
     {
         var connection = new PoolingConnection(
@@ -151,9 +131,9 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
     }
 
     /// <summary>One upload's commands after <c>EHLO</c>, to a server that advertises no <c>SIZE</c>.</summary>
-    private const string Envelope = "EHLO mail.txt\r\nMAIL FROM:<a@x>\r\nRCPT TO:<b@x>\r\nDATA\r\nx\r\n.\r\n";
+    internal const string Envelope = "EHLO mail.txt\r\nMAIL FROM:<a@x>\r\nRCPT TO:<b@x>\r\nDATA\r\nx\r\n.\r\n";
 
-    private static TransferContext Context(string? user = null) => new()
+    internal static TransferContext Context(string? user = null) => new()
     {
         Credentials = user is null ? null : new NetworkCredential(user, "p"),
         Url = CurlUrl.Parse("smtp://127.0.0.1:18118/mail.txt"),
@@ -162,13 +142,13 @@ public sealed class SmtpProtocolHandlerTwoUrlTests
         Mail = new MailRequestOptions { From = "a@x", Recipients = ["b@x"] },
     };
 
-    private static byte[] Read(string text) => Encoding.Latin1.GetBytes(text);
+    internal static byte[] Read(string text) => Encoding.Latin1.GetBytes(text);
 
     /// <summary>
     /// A scripted connection the run's connection cache would pool: it holds a session, and
     /// disposing it after <see cref="MarkReusable" /> keeps it open, as the cache does.
     /// </summary>
-    private sealed class PoolingConnection(params byte[][] reads) : IConnection
+    internal sealed class PoolingConnection(params byte[][] reads) : IConnection
     {
         private readonly ScriptedConnection inner = new(reads);
 
