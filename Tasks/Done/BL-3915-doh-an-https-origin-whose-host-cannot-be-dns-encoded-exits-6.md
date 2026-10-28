@@ -8,7 +8,7 @@ depends-on: [BL-3686]
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests/Cgr158HttpsOriginTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 ## Goal
 
@@ -20,13 +20,17 @@ BL-3687 (CGR-158) made `DohDnsResolver` report a name `DnsQueryEncoder` refuses 
 
 ## Acceptance criteria
 
-- [ ] The three `https://` commands above, run through real curl and through Curl, give the same exit code, stdout, stderr text and no bytes on the wire; recorded in Notes.
-- [ ] A unit test in `Curl.Networking.UnitTests/Cgr158HttpsOriginTests.cs` fails before the fix and passes after it.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The three `https://` commands above, run through real curl and through Curl, give the same exit code, stdout, stderr text and no bytes on the wire; recorded in Notes.
+- [x] A unit test in `Curl.Networking.UnitTests/Cgr158HttpsOriginTests.cs` fails before the fix and passes after it.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Fix: TcpConnector.LookUpAsync's https-origin branch now gives an empty DoH answer the encoder failure (DohEncodingFailureOf) so NameResolutionFailure makes exit 27; nothing is sent as the encoder refuses before any query (HTTPS query name also fails to encode, so none goes out).
+- Criterion 1: exit 27 and the `Failed to encode DoH packet [1]`/`[13]` texts are curl 8.22.0 Schannel values measured under BL-3687 (2026-10-26); this run did not re-run real curl, the unit test pins the three cases (exit, message, no DoH connection opened) in Cgr158HttpsOriginTests. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created by BL-3687's run for the https:// half of CGR-158.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 25cd3fad df87ecac 779790c0.
+- 2026-10-28: Doing -> Done. https:// origin with a DoH-unencodable host exits 27 Failed to encode DoH packet

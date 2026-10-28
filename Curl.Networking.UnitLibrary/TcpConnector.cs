@@ -1245,13 +1245,20 @@ public sealed partial class TcpConnector(
             var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
             _httpsRecordsResolved[DnsCacheKey(host, port)] = true;
             ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
-            return new DnsResolution(dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Shuffle(addresses) : addresses, DnsLookupFailure.None);
+            return new DnsResolution(dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Shuffle(addresses) : addresses, addresses.Count == 0 ? DohEncodingFailureOf(host) : DnsLookupFailure.None);
         }
 
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason
             ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
     }
+
+    // Why the DoH resolver found no address for host without sending anything: a name its A query cannot
+    // encode is curl 8.22.0's exit 27 (CGR-158, BL-3915); None for any other empty answer.
+    private DnsLookupFailure DohEncodingFailureOf(string host) =>
+        KindOfResolver is DohDnsResolver && DnsQueryEncoder.Encode(host, DnsRecordType.A).Failure is var failure && failure != DnsMessageFailure.None
+            ? failure == DnsMessageFailure.NameTooLong ? DnsLookupFailure.DohNameTooLong : DnsLookupFailure.DohBadLabel
+            : DnsLookupFailure.None;
 
     // The resolver the look-ups reach, seen through a DNS shuffle wrapper: the kind decides the DoH, DNS-server and HTTPS-RR behaviour.
     private IDnsResolver KindOfResolver => dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Inner : dnsResolver;
