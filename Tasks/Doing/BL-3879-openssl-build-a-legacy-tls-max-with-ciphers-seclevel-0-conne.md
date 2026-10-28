@@ -31,3 +31,4 @@ ADR-0364 (BL-1152) makes `HandBuiltTlsProvider` refuse a legacy ceiling before a
 ## Log
 
 - 2026-10-26: Created from BL-3623.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 8f93876d 6e1f7f05 779790c0.
