@@ -42,3 +42,4 @@ the AF-0178 ones (around line 945).
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: da156d0f 76061afb.
