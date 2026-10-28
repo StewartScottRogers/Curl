@@ -78,3 +78,4 @@ curl -sS AUTH -o NUL -o NUL -w "[%{num_connects} %{conn_id}]\n" U/hello.txt U/di
 - 2026-10-26: Created from CGR-130 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Dark factory stopped at its 80-turn cap, so the task is too big for one run: split it in the first turns of the next claim; see Z:\repos\Curl.logs\BL-3659-20261026-151632-L4.jsonl
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
