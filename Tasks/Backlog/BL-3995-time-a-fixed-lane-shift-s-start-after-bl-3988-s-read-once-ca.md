@@ -1,5 +1,5 @@
 ---
-id: BL-3991
+id: BL-3995
 title: Time a fixed-lane shift's start after BL-3988's read-once capacity check
 priority: Normal
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3991 — Time a fixed-lane shift's start after BL-3988's read-once capacity check
+# BL-3995 — Time a fixed-lane shift's start after BL-3988's read-once capacity check
 
 ## Goal
 

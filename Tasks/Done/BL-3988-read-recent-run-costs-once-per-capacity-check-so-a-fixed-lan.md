@@ -35,7 +35,7 @@ The 15:07 shift started 13 lanes, not 12, because lane 13 (a lane number left fr
 
 - Done by memoising, not by passing the cap: `Invoke-WithRecentRunCostsReadOnce` (`TaskBudget.ps1`) wraps the check, and `Get-RecentRunCosts` reuses one folder's costs inside it, so `Get-TaskNotClaimableWhy` and `Get-TaskCapSpentWhy` (`TaskIds.ps1`, outside this task's touches) keep their signatures. Outside the wrapper every call reads afresh, as before.
 - `-TestTaskBudget` cases: a check naming three ready tasks reads once (counter `RecentRunCostsReads`), each task still gets its answer, and outside a check each cap reads afresh. `-TestAutoLanes` passes. The cap text is untouched.
-- Measured on this machine (Windows PowerShell 5.1, `Z:\repos\Curl.logs` with 3,985 run logs, other lanes building): three ready tasks' cap checks took 88 s reading per task and 30 s reading once, so a 38-task check drops from about 18 minutes to about 30 s plus each task's own spend. A lane cannot launch a real `-Lanes 12` shift, so the launch itself is left to BL-3991 (interactive only); this criterion is ticked on the measured check.
+- Measured on this machine (Windows PowerShell 5.1, `Z:\repos\Curl.logs` with 3,985 run logs, other lanes building): three ready tasks' cap checks took 88 s reading per task and 30 s reading once, so a 38-task check drops from about 18 minutes to about 30 s plus each task's own spend. A lane cannot launch a real `-Lanes 12` shift, so the launch itself is left to BL-3995 (interactive only); this criterion is ticked on the measured check.
 - No .NET project changed, so `dotnet build` and the fast tests, and `Measure-CodeQuality.ps1`, have nothing of this change to check; the factory self-tests are its tests.
 
 ## Log
