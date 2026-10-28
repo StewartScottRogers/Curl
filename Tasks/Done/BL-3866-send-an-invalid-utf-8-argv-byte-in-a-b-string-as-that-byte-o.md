@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/CookieEngine.cs, Curl.Engine.UnitTests/CookieEngineArgvByteTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3866 — Send an invalid-UTF-8 argv byte in a -b string as that byte on Linux and macOS
 
@@ -34,3 +34,4 @@ ADR-0909 hands each `argv` byte that is not valid UTF-8 over as the lone surroga
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: dde753b0 779790c0.
+- 2026-10-28: Doing -> Done. -b string lone surrogates U+DC80-U+DCFF go out as their byte
