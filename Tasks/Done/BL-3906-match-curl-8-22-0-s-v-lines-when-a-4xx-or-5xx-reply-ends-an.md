@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitLibrary/FtpTransferMessages.cs, Curl.Protocol.Ftp.UnitTests/FtpActiveAcceptVerboseTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3906 — Match curl 8.22.0's -v lines when a 4xx or 5xx reply ends an active-mode accept wait
 
@@ -22,13 +22,18 @@ Found by BL-3628 (CGR-099), measured with `Record-CurlExchange.ps1 -Ftp -FtpRepl
 
 ## Acceptance criteria
 
-- [ ] With the size known and unknown, and the refusal buffered with the `150` or arriving a second later (`{PAUSE}`), Curl's `-v` stderr equals curl 8.22.0's (ports and timings normalised); the commands and both outputs are recorded in Notes.
-- [ ] A unit test in `Curl.Protocol.Ftp.UnitTests` pins those lines.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] With the size known and unknown, and the refusal buffered with the `150` or arriving a second later (`{PAUSE}`), Curl's `-v` stderr equals curl 8.22.0's (ports and timings normalised); the commands and both outputs are recorded in Notes.
+- [x] A unit test in `Curl.Protocol.Ftp.UnitTests` pins those lines.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+Measured with curl 8.22.0 (Schannel, debug build) via `Record-CurlExchange.ps1 -Ftp -Port 18921 -FtpReply 'RETR=150 Opening BINARY mode data connection\r\n[{PAUSE}\r\n]425 Cannot open data connection' [-FtpReply 'SIZE=213 18' | 'SIZE=500 Unknown command'] -CurlArgs -v,-P,localhost,ftp://127.0.0.1:18921/f`. All four exit 10. After "Data conn was not available immediately": a buffered refusal prints "Ctrl conn has data while waiting for data conn", "< 425", "FTP code: 425", `Remembering we are in directory ""`, then "Received only partial file: 0 bytes" only with the size known; a refusal one second later ({PAUSE}) prints the same without the "Ctrl conn" line. Neither prints "Ready to accept data connection from server"; a successful accept still does, so Curl now prints it just before "Connection accepted from server". Curl prints no line for the unknown-size failure text (it is only the exit 10 message).
+
+Pinned by `Curl.Protocol.Ftp.UnitTests/FtpActiveAcceptVerboseTests.cs`. Measure-CodeQuality.ps1 for Curl.Protocol.Ftp.UnitLibrary: 0 failing members. Linux/macOS CI: the change is platform-neutral.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: c063f202 aea6cad8 779790c0.
+- 2026-10-28: Doing -> Done. Active-mode accept-wait refusal -v lines match curl 8.22.0

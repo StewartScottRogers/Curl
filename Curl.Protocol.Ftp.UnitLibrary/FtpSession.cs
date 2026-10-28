@@ -1797,16 +1797,16 @@ internal sealed class FtpSession(
     /// after <c>QUIT</c> when it does not, and a failed accept's exit code after <c>QUIT</c>.
     /// A 4xx or 5xx reply already read behind the transfer command's <c>150</c> (a server's
     /// <c>425</c> or <c>421</c> for a data connection it could not open) is read and ends the
-    /// wait with exit 10 after <c>QUIT</c>, as curl 8.21.0 does (upstream tests 1206 and 1207, BL-1978),
+    /// wait with exit 10 after <c>QUIT</c>, as curl does (upstream tests 1206 and 1207, BL-1978),
     /// and so does one that arrives while the wait goes on (CGR-099).
     /// </summary>
     private async ValueTask<TransferResult?> AcceptDataConnectionAsync(IPendingConnection pending)
     {
         context.Events.ReportInfo(FtpTransferMessages.DataConnectionNotAvailable);
         trace.AcceptPending();
-        context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
         if (control.HasBufferedNegativeReply)
         {
+            context.Events.ReportInfo(FtpTransferMessages.ControlConnectionHasDataWhileAwaitingServerConnect);
             return await FailOnNegativeReplyAwaitingConnectAsync().ConfigureAwait(false);
         }
 
@@ -1836,6 +1836,7 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(accepted.ExitCode, accepted.ErrorMessage!).ConfigureAwait(false);
         }
 
+        context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
         ReportAccepted(dataConnection.RemoteEndPoint, (IPEndPoint)pending.LocalEndPoint);
         log.ActiveDataAccepted();
         return null;
@@ -1870,17 +1871,16 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> FailOnNegativeReplyAwaitingConnectAsync()
     {
-        context.Events.ReportInfo(FtpTransferMessages.NegativeReplyWhileAwaitingServerConnect);
         await ReadReplyIgnoringItsFailureAsync().ConfigureAwait(false);
+        ReportRememberedDirectory();
         if (expectedSize is { } expected && expected != bytesTransferred)
         {
-            ReportRememberedDirectory();
             string partial = FtpTransferMessages.ReceivedOnlyPartialFile(bytesTransferred);
             context.Events.ReportInfo(partial);
             return await QuitAndFailWithoutEchoAsync(CurlExitCode.FtpAcceptFailed, partial).ConfigureAwait(false);
         }
 
-        return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
+        return await QuitAndFailWithoutEchoAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
     }
 
     /// <summary>

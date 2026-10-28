@@ -167,11 +167,8 @@ internal static class FtpTransferMessages
     /// </summary>
     internal const string AcceptTimeout = "Accept timeout occurred while waiting server connect";
 
-    /// <summary>
-    /// The <c>-v</c> line curl 8.21.0's <c>ReceivedServerConnect</c> writes when a 4xx or 5xx
-    /// reply is already read while it waits for the server's data connection (BL-1978).
-    /// </summary>
-    internal const string NegativeReplyWhileAwaitingServerConnect = "There is negative response in cache while serv connect";
+    /// <summary>The <c>-v</c> line before reading a 4xx or 5xx reply already buffered behind the transfer command's <c>150</c> while awaiting the server's active-mode connection (BL-3906).</summary>
+    internal const string ControlConnectionHasDataWhileAwaitingServerConnect = "Ctrl conn has data while waiting for data conn";
 
     /// <summary>
     /// The exit 10 message, curl's <c>curl_easy_strerror</c> text for <c>CURLE_FTP_ACCEPT_FAILED</c>,
