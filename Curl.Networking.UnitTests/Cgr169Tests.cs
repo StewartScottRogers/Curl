@@ -13,7 +13,7 @@ namespace Curl.Networking;
 /// <c>post_handshake_auth</c> and answers a TLS 1.3 post-handshake CertificateRequest with an
 /// empty Certificate when it has no <c>--cert</c>. <c>SslStream</c> on Linux offers the
 /// extension only when it can choose a certificate, so the OpenSSL build always gives it a
-/// selection callback, which chooses none without <c>--cert</c> (ADR-0949). The Schannel
+/// selection callback, which chooses none without <c>--cert</c> (ADR-0956). The Schannel
 /// build gives none, as before (BL-254).
 /// </summary>
 [TestClass]

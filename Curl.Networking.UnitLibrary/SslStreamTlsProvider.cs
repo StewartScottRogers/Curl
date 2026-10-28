@@ -746,7 +746,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // whatever issuers it names, as curl sends --cert. The OpenSSL build passes a callback
     // even without --cert: SslStream on Linux offers post_handshake_auth only when it has a
     // way to choose a certificate, and curl's OpenSSL build always offers it and answers a
-    // TLS 1.3 post-handshake CertificateRequest with an empty Certificate (ADR-0949, CGR-169).
+    // TLS 1.3 post-handshake CertificateRequest with an empty Certificate (ADR-0956, CGR-169).
     private static LocalCertificateSelectionCallback? ToCertificateSelection(X509Certificate2? clientCertificate, bool matchesSchannelBuild) =>
         clientCertificate is not null ? (_, _, _, _, _) => clientCertificate
         : matchesSchannelBuild ? null

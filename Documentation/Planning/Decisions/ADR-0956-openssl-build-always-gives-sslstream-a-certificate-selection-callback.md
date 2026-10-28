@@ -1,4 +1,4 @@
-# ADR-0949: The OpenSSL build always gives SslStream a certificate selection callback
+# ADR-0956: The OpenSSL build always gives SslStream a certificate selection callback
 
 - Status: Accepted
 - Date: 2026-10-28
