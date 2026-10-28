@@ -33,3 +33,4 @@ In the same session, one `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibra
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: e5c455b0 59abc360 779790c0.
