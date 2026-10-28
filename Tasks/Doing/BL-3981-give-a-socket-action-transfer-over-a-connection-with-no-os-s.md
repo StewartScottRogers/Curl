@@ -34,3 +34,4 @@ Prerequisite of BL-3976 (CGR-034, ADR-0948). BL-3976's stash (kept by the shift;
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 3d275639 25a722b8 a00c97c3 779790c0.
