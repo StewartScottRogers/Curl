@@ -11,6 +11,12 @@ internal sealed partial class ConnectionEndPointRecorder
     // path starts with a NUL byte.
     private const int UnixSocketPathOffset = 2;
 
+    /// <summary>
+    /// The number of connections the transfer opened, every one the recording connectors
+    /// reported: for FTP the control connection and each data connection.
+    /// </summary>
+    private int connectionsOpened;
+
     /// <summary>Whether the transfer's first connection has been recorded.</summary>
     private bool connectionRecorded;
 
@@ -38,32 +44,39 @@ internal sealed partial class ConnectionEndPointRecorder
     /// other end point, or <see langword="null" />, records nothing, as a connection with no
     /// known peer has nothing to report.
     /// </param>
-    internal void Record(IPEndPoint? local, EndPoint? remote)
+    /// <param name="reused">
+    /// Whether the connection came from the pool rather than being opened, which curl does not
+    /// count in <c>%{num_connects}</c>.
+    /// </param>
+    internal void Record(IPEndPoint? local, EndPoint? remote, bool reused = false)
     {
-        if (connectionRecorded)
+        if (remote is not (IPEndPoint or UnixDomainSocketEndPoint))
         {
             return;
         }
 
-        switch (remote)
+        connectionsOpened += reused ? 0 : 1;
+        if (!connectionRecorded)
         {
-            case IPEndPoint ip:
-                remoteEndPoint = ip;
-                break;
-            case UnixDomainSocketEndPoint unixSocket:
-                unixSocketRemoteIp = RemoteIpOf(unixSocket);
-                break;
-            default:
-                return;
+            RecordFirstConnection(local, remote);
         }
+    }
 
+    /// <summary>Keeps the end points of the transfer's first connection.</summary>
+    /// <param name="local">The local end point the connection was made from.</param>
+    /// <param name="remote">The connection's peer: an IP end point or a Unix domain socket.</param>
+    private void RecordFirstConnection(IPEndPoint? local, EndPoint remote)
+    {
+        remoteEndPoint = remote as IPEndPoint;
+        unixSocketRemoteIp = remote is UnixDomainSocketEndPoint unixSocket ? RemoteIpOf(unixSocket) : null;
         localEndPoint = local;
         connectionRecorded = true;
     }
 
-    /// <summary>Forgets the first connection's end points.</summary>
+    /// <summary>Forgets the transfer's connections.</summary>
     private void ClearEndPoints()
     {
+        connectionsOpened = 0;
         connectionRecorded = false;
         localEndPoint = null;
         remoteEndPoint = null;
@@ -89,6 +102,19 @@ internal sealed partial class ConnectionEndPointRecorder
             Report = report with { LocalEndPoint = localEndPoint, RemoteEndPoint = remoteEndPoint, UnixSocketRemoteIp = unixSocketRemoteIp },
         };
     }
+
+    /// <summary>
+    /// Puts the number of connections the transfer opened on <paramref name="result" />'s report,
+    /// the source of <c>%{num_connects}</c>, when the handler counted none itself, as every handler
+    /// but HTTP's leaves it: curl 8.22.0 prints 1 for an smtp, dict, gopher, ws, rtsp or sftp
+    /// transfer, 2 for an ftp download and 1 after a refused ws upgrade (CGR-107, BL-3961).
+    /// </summary>
+    /// <param name="result">The result with the recorded end points on its report.</param>
+    /// <returns><paramref name="result" /> with the count on its report, or itself when nothing was recorded or the handler counted.</returns>
+    private TransferResult WithConnectionCount(TransferResult result) =>
+        connectionsOpened == 0 || result.Report!.ConnectionCount > 0
+            ? result
+            : result with { Report = result.Report with { ConnectionCount = connectionsOpened } };
 
     /// <summary>
     /// Returns the text curl 8.21.0 prints as <c>%{remote_ip}</c> for a connection through
