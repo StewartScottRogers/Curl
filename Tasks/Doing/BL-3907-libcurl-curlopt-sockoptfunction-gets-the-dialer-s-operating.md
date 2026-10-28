@@ -30,3 +30,4 @@ Left over from BL-3658 (CGR-129, LMC-15, ADR-0842 point 4). `SocketCallbackConne
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 6ec967ec 779790c0.
