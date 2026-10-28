@@ -30,3 +30,4 @@ Filed by BL-3984 (ADR-0959), which made `SslStreamConnection.DisposeAsync` send 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 97262355 779790c0.
