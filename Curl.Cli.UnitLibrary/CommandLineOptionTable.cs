@@ -1121,7 +1121,9 @@ public static partial class CommandLineOptionTable
     /// <summary>
     /// Records a <c>-w</c> / <c>--write-out</c> template: the value's own text, empty included, or, when
     /// it starts with <c>@</c>, the text of the file it names (standard input for <c>@-</c>) with every
-    /// carriage return, line feed and NUL removed, as curl 8.21.0 does. A file with no bytes at all
+    /// carriage return, line feed and NUL removed, as curl 8.21.0 does, spelled by
+    /// <see cref="WriteOutFileTemplate"/> so every byte is written unchanged, one that is not valid
+    /// UTF-8 included (BL-3862). A file with no bytes at all
     /// clears the template and adds <see cref="CommandLineWarning.FailedToRead(string)"/> unless
     /// <c>-s</c> / <c>--silent</c> has been read; one that cannot be read is refused with
     /// <see cref="CommandLineRefusal.DataFileUnreadable"/>.
@@ -1148,9 +1150,29 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        string template = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
-        options.WriteOut = options.ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(template, wireEncoding) : template;
+        options.WriteOut = WriteOutFileTemplate(RemoveLineBreaksAndNuls(contents), options.ConfigFileWireTextEncoding);
         return null;
+    }
+
+    /// <summary>
+    /// The text of a <c>-w @file</c> template whose bytes the write-out renderer gives back unchanged,
+    /// as curl writes the file's bytes raw (BL-3862): with a <paramref name="wireEncoding"/>, the bytes
+    /// spelled in it, one character per byte sequence, as <see cref="ConfigFileWireText.Respell"/> spells
+    /// UTF-8 text; otherwise, or when that encoding cannot carry them unaltered, the bytes read as UTF-8
+    /// with each byte that is not valid UTF-8 kept as its <see cref="InvalidUtf8ByteEscape"/> surrogate.
+    /// </summary>
+    /// <param name="templateBytes">The file's bytes, line breaks and NULs removed.</param>
+    /// <param name="wireEncoding">The encoding the renderer writes text in on Windows; <see langword="null"/> elsewhere.</param>
+    /// <returns>The template text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="templateBytes"/> is <see langword="null"/>.</exception>
+    public static string WriteOutFileTemplate(byte[] templateBytes, Encoding? wireEncoding)
+    {
+        ArgumentNullException.ThrowIfNull(templateBytes);
+
+        string? respelled = wireEncoding?.GetString(templateBytes);
+        return respelled is not null && wireEncoding!.GetBytes(respelled).AsSpan().SequenceEqual(templateBytes)
+            ? respelled
+            : InvalidUtf8ByteEscape.Decode(templateBytes);
     }
 
     private static byte[] RemoveLineBreaksAndNuls(byte[] contents) =>
