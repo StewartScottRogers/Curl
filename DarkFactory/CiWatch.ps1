@@ -11,7 +11,7 @@
 $CiWatchDir = Join-Path $LanesDir 'ci-watch'
 # Settled maps each pair to what became of it ("filed BL-###", "covered by a task"); Logged
 # holds the last line traced for each run, so a run is traced again only when that changes.
-$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
 # The shift's branch once the coordinator knows it, so a wait for tokens keeps watching CI.
 $script:CiWatchBranch = ''
 # How many finished runs the flaky and regression verdicts look back over, and how long a
@@ -313,13 +313,28 @@ function Send-CiWhisper {
     } catch { }
 }
 
+function Test-CiRunWithoutRunner {
+    # True when `gh run view <id> --json jobs` shows at least one job that did not succeed and
+    # every such job was cancelled with no step run (GitHub never gave it a runner, BL-3944).
+    param($JobsJson)
+    if (-not $JobsJson) { return $false }
+    try { $jobs = @(($JobsJson | ConvertFrom-Json).jobs) } catch { return $false }
+    $bad = @($jobs | Where-Object { $_.conclusion -notin 'success', 'skipped', 'neutral' })
+    if (-not $bad.Count) { return $false }
+    foreach ($job in $bad) {
+        if ($job.conclusion -ne 'cancelled') { return $false }
+        if (@($job.steps | Where-Object { $_.conclusion -and $_.conclusion -ne 'skipped' }).Count) { return $false }
+    }
+    return $true
+}
+
 function Get-CiRuns {
     # The newest finished CI runs on -Branch that passed or failed (cancelled ones prove
     # nothing), newest first, each with its failures; a failed run whose log names no
     # failure, or cannot be read, is left out and traced (Write-CiRunLine). $null when gh
     # cannot list them. -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first
     # returns `gh run list`'s JSON, the second a run's `--log-failed` lines, $null if unreadable.
-    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog)
+    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog, [scriptblock]$ReadJobs)
     # No --jq: Windows PowerShell strips the double quotes a jq filter needs from a native
     # command's arguments. Its ConvertFrom-Json turns "[]" into one empty element, hence the
     # databaseId filter.
@@ -337,6 +352,14 @@ function Get-CiRuns {
             $log = @(gh run view $Id --log-failed 2>$null | ForEach-Object { "$_" })
             if ($LASTEXITCODE -ne 0) { return $null }
             return , $log
+        }
+    }
+    if (-not $ReadJobs) {
+        $ReadJobs = {
+            param([string]$Id)
+            $json = (gh run view $Id --json jobs 2>$null) -join "`n"
+            if ($LASTEXITCODE -ne 0) { return $null }
+            return $json
         }
     }
     $json = & $ListRuns $Branch
@@ -358,7 +381,11 @@ function Get-CiRuns {
             if ($null -eq $log) { Write-CiRunLine -RunId $id -Line "failure on ${on}: cannot read its log with gh run view --log-failed; trying again next heartbeat"; continue }
             $named = @(Get-CiFailures $log)
             # A failed run whose --log-failed is empty is still red: file it by the run (AF-0178).
-            if (-not $named.Count) {
+            if (-not $named.Count -and (Test-CiRunWithoutRunner (& $ReadJobs $id))) {
+                $script:CiWatch.Capacity[$id] = $true
+                $named = @()
+            }
+            elseif (-not $named.Count) {
                 $named = @([pscustomobject]@{ Key = 'job unknown job step unknown step'; Kind = 'job'; Platforms = @('unknown job'); Project = ''; Message = 'the run failed and gh run view --log-failed printed no line' })
             }
             $script:CiWatch.Failures[$id] = $named
@@ -368,6 +395,10 @@ function Get-CiRuns {
         # with a single failing test looked like one with none and was dropped (BL-1031).
         $failures = @()
         if ($conclusion -eq 'failure') { $failures = @($script:CiWatch.Failures[$id]) }
+        if ($conclusion -eq 'failure' -and -not $failures.Count -and $script:CiWatch.Capacity[$id]) {
+            Write-CiRunLine -RunId $id -Line "failure on ${on}: runner capacity - every job that did not succeed was never given a runner; nothing to file"
+            continue
+        }
         if ($conclusion -eq 'failure' -and -not $failures.Count) {
             Write-CiRunLine -RunId $id -Line "failure on ${on}: its log names no failing test or build error; nothing to file"
             continue
@@ -880,7 +911,7 @@ if ($TestCiWatch) {
     # 36674691490 (two TcpDialerTests failures on Linux) and 36690174792 (one on macOS).
     $traced = New-Object Collections.Generic.List[string]
     function Write-Trace { param($Id, $Kind, $Text, $Color) $traced.Add($Text) }
-    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $ubuntu = "Build and test (ubuntu-latest)${t}Fast tests${t}"
     $macos = "Build and test (macos-latest)${t}UNKNOWN STEP${t}"
     $recorded = @{
@@ -940,10 +971,19 @@ if ($TestCiWatch) {
     & $check 'a failure whose job gh cannot name is still filed (AF-0178)' 'job unknown job step Measure code quality|job' `
         "$($unknownJob[0].Key)|$($unknownJob[0].Kind)"
     & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
-    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $emptyRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":901,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() })
     & $check 'a failed run with an empty log is filed by the run (AF-0178)' '1|job unknown job step unknown step' `
         "$($emptyRuns.Count)|$($emptyRuns[0].Failures[0].Key)"
+    $noRunner = '{"jobs":[{"name":"ok","conclusion":"success","steps":[{"conclusion":"success"}]},{"name":"Pack","conclusion":"cancelled","steps":[]}]}'
+    $ran = '{"jobs":[{"name":"Pack","conclusion":"cancelled","steps":[]},{"name":"T","conclusion":"failure","steps":[{"conclusion":"failure"}]}]}'
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $traced.Clear()
+    $capRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":902,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $noRunner })
+    & $check 'a failed run whose only bad job never got a runner files nothing and says runner capacity (BL-3944)' '0|run 902 failure on abcdef01: runner capacity - every job that did not succeed was never given a runner; nothing to file' "$(@($capRuns[0]).Count)|$($traced -join ';')"
+    $ranRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":903,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $ran })
+    & $check 'an empty log with a job that ran and failed is still filed (BL-3944)' '1|job unknown job step unknown step' "$($ranRuns.Count)|$($ranRuns[0].Failures[0].Key)"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $traced.Clear()
     $script:ciListJson = $null
     $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog

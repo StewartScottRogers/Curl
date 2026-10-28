@@ -34,10 +34,12 @@ the AF-0178 ones (around line 945).
 
 ## Acceptance criteria
 
-- [ ] When a failed run's only non-successful jobs were never given a runner, CiWatch files no task and writes a line naming runner capacity; a CiWatch self-check case covers this.
-- [ ] When a failed run has an empty `--log-failed` and a job that did run and fail, CiWatch still files it as before (AF-0178 self-checks still pass).
+- [x] When a failed run's only non-successful jobs were never given a runner, CiWatch files no task and writes a line naming runner capacity; a CiWatch self-check case covers this.
+- [x] When a failed run has an empty `--log-failed` and a job that did run and fail, CiWatch still files it as before (AF-0178 self-checks still pass).
 
 ## Notes
+
+Get-CiRuns now takes -ReadJobs (default: gh run view <id> --json jobs); with an empty --log-failed, a run whose every non-successful job was cancelled with no step run is traced as runner capacity and filed as nothing. Self-checks added beside the AF-0178 ones; -TestCiWatch has no failures.
 
 ## Log
 
