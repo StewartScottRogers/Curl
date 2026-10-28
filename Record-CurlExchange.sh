@@ -5,8 +5,9 @@
 #
 #     The Bash port, for Linux and macOS, of Record-CurlExchange.ps1. It writes the same
 #     files in the same formats, so a fixture recorded by either is read the same way.
-#     Ported so far: the HTTP and HTTPS (-Tls) server, -NoServer, -UnixSocket and -Ftp
-#     (passive and active mode, explicit and implicit FTPS, PROT, CCC; see FTP below).
+#     Ported so far: the HTTP and HTTPS (-Tls) server, -NoServer, -UnixSocket, -Ftp
+#     (passive and active mode, explicit and implicit FTPS, PROT, CCC; see FTP below) and
+#     -Smtp, -Imap and -Pop3 (plain, STARTTLS / STLS and implicit TLS with -Tls).
 #
 # DIFFERENCES FROM THE POWERSHELL SCRIPT (FTP)
 #     A data connection curl opens that no transfer uses (for example after an overridden
@@ -21,7 +22,6 @@
 #     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
 #     Record-CurlExchange.ps1 under pwsh" to stderr, and exits 2:
 #
-#       -Smtp   -Imap   -Pop3
 #       -Tftp            -Script (scripted binary sessions, LDAP and SMB)
 #       -Http2 and -Http2Origin (HTTP/2 proxy and origin framing, HPACK)
 #       -UdpSink         -DnsPort and -DohPort (the DNS and DNS-over-HTTPS responders)
@@ -702,6 +702,11 @@ rce_connection_entry() {
         while [ ! -e "$RCE_STATE/stop" ]; do sleep 0.1; done
         exit 0
     fi
+    if [ -n "$RCE_MAIL" ]; then
+        rce_mail_session
+        : >"$RCE_STATE/done.$index"
+        exit 0
+    fi
     if [ "$RCE_FTP" = 1 ]; then
         rce_ftp_session
         : >"$RCE_STATE/ftp-ended"
@@ -768,7 +773,7 @@ rce_wait_for_listening_port() {
 
 # Succeeds when VERB (capitals and digits only) has a FtpReply.
 rce_ftp_has_override() {
-    case $1 in '' | *[!A-Z0-9]*) return 1 ;; esac
+    case $1 in '' | *[!A-Z0-9_]*) return 1 ;; esac
     eval "[ \"\${RCE_FR_COUNT_$1:-0}\" -gt 0 ]"
 }
 
@@ -1079,13 +1084,403 @@ rce_ftp_session() {
         esac
     done
     exec 6>&-
-    # The pumps and s_server hold copies of curl's socket: stop them so it closes with us,
-    # a moment after the last reply has been encrypted and sent.
+    rce_ftp_stop_helpers
+}
+
+# The pumps and s_server hold copies of curl's socket: stop them so it closes with us,
+# a moment after the last reply has been encrypted and sent.
+rce_ftp_stop_helpers() {
     if [ "$RCE_FTP_TLS_ON" = 1 ]; then sleep 0.2; fi
     if [ -n "${RCE_FTP_UP_PID:-}" ] && command -v pkill >/dev/null 2>&1; then pkill -KILL -P "$RCE_FTP_UP_PID" 2>/dev/null; fi
     for rce_pid in "${RCE_FTP_UP_PID:-}" "${RCE_FTP_DOWN_PID:-}" "${RCE_FTP_TLS_PID:-}"; do
         if [ -n "$rce_pid" ]; then kill -KILL "$rce_pid" 2>/dev/null; fi
     done
+}
+
+# --- The SMTP, IMAP and POP3 sessions -------------------------------------------------
+# One connection, served a line at a time by the handler socat starts (rce_mail_session),
+# with the FTP control connection's TLS machinery (rce_ftp_enter_tls) for implicit TLS and
+# STARTTLS / STLS. The replies come from the same override table as FtpReply
+# (RCE_FR_<VERB>_<n>; an IMAP verb with a space, UID FETCH, is UID_FETCH there).
+
+# Sends Reply (one or more CRLF-separated lines) to curl, every line logged.
+rce_mail_send() {
+    local rest=$1
+    printf '%s\r\n' "$rest" >&"$RCE_FTP_WRITE" 2>/dev/null
+    while :; do
+        case $rest in
+            *$'\r\n'*) rce_ftp_log "< ${rest%%$'\r\n'*}"; rest=${rest#*$'\r\n'} ;;
+            *) rce_ftp_log "< $rest"; break ;;
+        esac
+    done
+}
+
+# Reads one line from curl into RCE_LINE (no line ending), records it and logs it. Returns
+# 1 once curl hangs up or stays silent for the idle time; what arrived is still recorded.
+rce_mail_read_line() {
+    local line='' ok=0
+    IFS= read -r -t "$RCE_MAIL_SECONDS" -u "$RCE_FTP_READ" line && ok=1
+    if [ $ok = 0 ]; then
+        if [ -n "$line" ]; then printf '%s' "$line" >&6; fi
+        return 1
+    fi
+    printf '%s\n' "$line" >&6
+    RCE_LINE=${line%$'\r'}
+    rce_ftp_log "> $RCE_LINE"
+}
+
+# Sets RCE_MAIL_COMMAND to the upper-case first word of Text, RCE_MAIL_REST to the rest.
+rce_mail_split_verb() {
+    RCE_MAIL_COMMAND=${1%% *}
+    RCE_MAIL_REST=''
+    case $1 in *' '*) RCE_MAIL_REST=${1#* } ;; esac
+    RCE_MAIL_COMMAND=$(printf '%s' "$RCE_MAIL_COMMAND" | tr '[:lower:]' '[:upper:]')
+}
+
+# Looks Verb up in the override table. Returns 0 with RCE_OVERRIDE set when there is one.
+rce_mail_has_override() {
+    local key=${1// /_}
+    rce_ftp_has_override "$key" || return 1
+    rce_ftp_override "$key"
+}
+
+rce_mail_start_tls() {
+    rce_ftp_enter_tls && rce_ftp_log '= TLS handshake completed on the control connection'
+    RCE_MAIL_SECURE=1
+}
+
+# Fills RCE_MAIL_CHALLENGES with the continuations a SASL mechanism needs before success.
+# Prefix is "334 " for SMTP and "+ " for IMAP and POP3; Argument is "MECHANISM [response]".
+rce_mail_challenges() {
+    local prefix=$1 argument=$2 mechanism initial=0 cram digest1 digest2
+    cram='PDE4OTYuNjk3MTcwOTUyQGxvY2FsaG9zdD4='
+    digest1='cmVhbG09ImxvY2FsaG9zdCIsbm9uY2U9Ik9BNk1HOXRFUUdtMmhoIixxb3A9ImF1dGgiLGFsZ29yaXRobT1tZDUtc2VzcyxjaGFyc2V0PXV0Zi04'
+    digest2='cnNwYXV0aD1lYTQwZjYwMzM1YzQyN2I1NTI3Yjg0ZGJhYmNkZmZmZA=='
+    RCE_MAIL_CHALLENGES=()
+    mechanism=${argument%% *}
+    mechanism=$(printf '%s' "$mechanism" | tr '[:lower:]' '[:upper:]')
+    case $argument in *' '*) initial=1 ;; esac
+    case $mechanism in
+        PLAIN) if [ $initial = 0 ]; then RCE_MAIL_CHALLENGES=("$prefix"); fi ;;
+        LOGIN)
+            if [ $initial = 1 ]; then RCE_MAIL_CHALLENGES=("${prefix}UGFzc3dvcmQ6")
+            else RCE_MAIL_CHALLENGES=("${prefix}VXNlcm5hbWU6" "${prefix}UGFzc3dvcmQ6"); fi
+            ;;
+        CRAM-MD5) if [ "$RCE_MAIL" = smtp ]; then RCE_MAIL_CHALLENGES=("${prefix}$cram"); fi ;;
+        DIGEST-MD5) if [ "$RCE_MAIL" = smtp ]; then RCE_MAIL_CHALLENGES=("${prefix}$digest1" "${prefix}$digest2"); fi ;;
+    esac
+}
+
+# Sends the challenges, reading curl's answer to each. Returns 1 once curl hangs up.
+rce_mail_run_challenges() {
+    local challenge
+    for challenge in ${RCE_MAIL_CHALLENGES[@]+"${RCE_MAIL_CHALLENGES[@]}"}; do
+        rce_mail_send "$challenge"
+        rce_mail_read_line || return 1
+    done
+    return 0
+}
+
+rce_smtp_ehlo_reply() {
+    RCE_MAIL_REPLY=$'250-localhost\r\n250-AUTH PLAIN LOGIN CRAM-MD5'
+    if [ $RCE_MAIL_SECURE = 0 ]; then RCE_MAIL_REPLY+=$'\r\n250-STARTTLS'; fi
+    RCE_MAIL_REPLY+=$'\r\n250-SIZE 1000000\r\n250-8BITMIME\r\n250 SMTPUTF8'
+}
+
+# The message after DATA's 354, up to its lone "." line, then the reply. 1 once curl hangs up.
+rce_smtp_receive_body() {
+    local done_reply
+    while :; do
+        rce_mail_read_line || return 1
+        if [ "$RCE_LINE" = . ]; then break; fi
+    done
+    if rce_mail_has_override DATADONE; then done_reply=$RCE_OVERRIDE; else done_reply='250 OK message accepted'; fi
+    rce_mail_send "$done_reply"
+}
+
+# Answers one SMTP command. Returns 1 to end the session.
+rce_smtp_command() {
+    local verb argument
+    rce_mail_split_verb "$1"
+    verb=$RCE_MAIL_COMMAND
+    argument=$RCE_MAIL_REST
+    if rce_mail_has_override "$verb"; then
+        if [ "$RCE_OVERRIDE" = CLOSE ]; then return 1; fi
+        rce_mail_send "$RCE_OVERRIDE"
+        if [ "$verb" = QUIT ]; then return 1; fi
+        case $verb in
+            DATA) case $RCE_OVERRIDE in 354*) rce_smtp_receive_body || return 1 ;; esac ;;
+            STARTTLS) case $RCE_OVERRIDE in 220*) rce_mail_start_tls ;; esac ;;
+        esac
+        return 0
+    fi
+    case $verb in
+        EHLO) rce_smtp_ehlo_reply; rce_mail_send "$RCE_MAIL_REPLY" ;;
+        HELO) rce_mail_send '250 localhost' ;;
+        STARTTLS) rce_mail_send '220 Ready to start TLS'; rce_mail_start_tls ;;
+        AUTH)
+            rce_mail_challenges '334 ' "$argument"
+            rce_mail_run_challenges || return 1
+            rce_mail_send '235 Authentication successful'
+            ;;
+        MAIL | RCPT | NOOP | RSET) rce_mail_send '250 OK' ;;
+        DATA)
+            rce_mail_send '354 End data with <CR><LF>.<CR><LF>'
+            rce_smtp_receive_body || return 1
+            ;;
+        VRFY | EXPN) rce_mail_send '250 Recorder <recorder@localhost>' ;;
+        HELP) rce_mail_send '214 EHLO HELO STARTTLS AUTH MAIL RCPT DATA VRFY EXPN HELP NOOP RSET QUIT' ;;
+        QUIT) rce_mail_send '221 Bye'; return 1 ;;
+        *) rce_mail_send '502 Command not implemented' ;;
+    esac
+    return 0
+}
+
+# Reads one IMAP command into RCE_LINE: a line and, while it ends in a literal {n}, the "+"
+# continuation (none for {n+}), the n literal bytes and the line that follows them.
+# RCE_LINE is the first line. Returns 1 once curl hangs up.
+rce_imap_read_command() {
+    local first line length plus literal text
+    rce_mail_read_line || return 1
+    first=$RCE_LINE
+    line=$first
+    while [[ $line =~ \{([0-9]+)(\+?)\}$ ]]; do
+        length=${BASH_REMATCH[1]}
+        plus=${BASH_REMATCH[2]}
+        if [ -z "$plus" ]; then rce_mail_send '+ Ready for literal data'; fi
+        literal=''
+        if [ "$length" -gt 0 ]; then
+            IFS= read -r -N "$length" -t "$RCE_MAIL_SECONDS" -u "$RCE_FTP_READ" literal
+            if [ ${#literal} -lt "$length" ]; then return 1; fi
+        fi
+        printf '%s' "$literal" >&6
+        text=$literal
+        case $text in *$'\r\n') text=${text%$'\r\n'} ;; esac
+        while :; do
+            case $text in
+                *$'\r\n'*) rce_ftp_log "> ${text%%$'\r\n'*}"; text=${text#*$'\r\n'} ;;
+                *) rce_ftp_log "> $text"; break ;;
+            esac
+        done
+        rce_mail_read_line || return 1
+        line=$RCE_LINE
+    done
+    RCE_LINE=$first
+}
+
+# Sends Reply for the command tagged Tag: the last line gets the tag in front.
+rce_imap_tagged() {
+    local tag=$1 reply=$2
+    case $reply in
+        *$'\r\n'*) reply="${reply%$'\r\n'*}"$'\r\n'"$tag ${reply##*$'\r\n'}" ;;
+        *) reply="$tag $reply" ;;
+    esac
+    rce_mail_send "$reply"
+}
+
+rce_imap_fetch() {
+    local tag=$1 verb=$2 argument=$3 sequence item uid=''
+    sequence=${argument%% *}
+    sequence=${sequence%%[:,]*}
+    case $sequence in '' | *[!0-9]*) sequence=1 ;; esac
+    item='BODY[]'
+    case $argument in
+        *' '*)
+            item=${argument#* }
+            item=${item#"${item%%[!()]*}"}
+            item=${item%"${item##*[!()]}"}
+            ;;
+    esac
+    if [ "$verb" = 'UID FETCH' ]; then uid="UID $sequence "; fi
+    rce_mail_send "* $sequence FETCH ($uid$item {$RCE_MAIL_MESSAGE_SIZE}"$'\r\n'"$RCE_MAIL_MESSAGE)"
+    rce_imap_tagged "$tag" 'OK FETCH completed'
+}
+
+# Sets RCE_MAIL_REPLY to SELECT's or EXAMINE's reply, ending in the line Completion.
+rce_imap_select_reply() {
+    local crlf=$'\r\n'
+    RCE_MAIL_REPLY="* FLAGS (\\Answered \\Flagged \\Deleted \\Seen \\Draft)$crlf* 2 EXISTS$crlf* 0 RECENT$crlf* OK [UIDVALIDITY 1] UIDs valid$crlf* OK [UIDNEXT 3] Predicted next UID$crlf$1"
+}
+
+# Answers one IMAP command. Returns 1 to end the session.
+rce_imap_command() {
+    local tag verb argument rest
+    tag=${1%% *}
+    rest=''
+    case $1 in *' '*) rest=${1#* } ;; esac
+    rce_mail_split_verb "$rest"
+    verb=$RCE_MAIL_COMMAND
+    argument=$RCE_MAIL_REST
+    if [ "$verb" = UID ] && [ -n "$argument" ]; then
+        rce_mail_split_verb "$argument"
+        verb="UID $RCE_MAIL_COMMAND"
+        argument=$RCE_MAIL_REST
+    fi
+    if rce_mail_has_override "$verb"; then
+        if [ "$RCE_OVERRIDE" = CLOSE ]; then return 1; fi
+        rce_imap_tagged "$tag" "$RCE_OVERRIDE"
+        if [ "$verb" = LOGOUT ]; then return 1; fi
+        if [ "$verb" = STARTTLS ]; then
+            case ${RCE_OVERRIDE##*$'\r\n'} in OK*) rce_mail_start_tls ;; esac
+        fi
+        return 0
+    fi
+    case $verb in
+        CAPABILITY)
+            if [ $RCE_MAIL_SECURE = 1 ]; then RCE_MAIL_REPLY='* CAPABILITY IMAP4rev1 AUTH=PLAIN AUTH=LOGIN'
+            else RCE_MAIL_REPLY='* CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN'; fi
+            rce_imap_tagged "$tag" "$RCE_MAIL_REPLY"$'\r\nOK CAPABILITY completed'
+            ;;
+        STARTTLS) rce_imap_tagged "$tag" 'OK Begin TLS negotiation now'; rce_mail_start_tls ;;
+        LOGIN) rce_imap_tagged "$tag" 'OK LOGIN completed' ;;
+        AUTHENTICATE)
+            rce_mail_challenges '+ ' "$argument"
+            rce_mail_run_challenges || return 1
+            rce_imap_tagged "$tag" 'OK Authenticated'
+            ;;
+        SELECT) rce_imap_select_reply 'OK [READ-WRITE] SELECT completed'; rce_imap_tagged "$tag" "$RCE_MAIL_REPLY" ;;
+        EXAMINE) rce_imap_select_reply 'OK [READ-ONLY] EXAMINE completed'; rce_imap_tagged "$tag" "$RCE_MAIL_REPLY" ;;
+        FETCH | 'UID FETCH') rce_imap_fetch "$tag" "$verb" "$argument" ;;
+        LIST) rce_imap_tagged "$tag" '* LIST (\HasNoChildren) "/" INBOX'$'\r\n''* LIST (\HasNoChildren) "/" Sent'$'\r\nOK LIST completed' ;;
+        SEARCH | 'UID SEARCH') rce_imap_tagged "$tag" $'* SEARCH 1 2\r\nOK SEARCH completed' ;;
+        APPEND) rce_imap_tagged "$tag" 'OK APPEND completed' ;;
+        NOOP) rce_imap_tagged "$tag" 'OK NOOP completed' ;;
+        LOGOUT) rce_imap_tagged "$tag" $'* BYE Logging out\r\nOK LOGOUT completed'; return 1 ;;
+        *) rce_imap_tagged "$tag" 'BAD Command not recognized' ;;
+    esac
+    return 0
+}
+
+# Sends a multi-line POP3 reply: Status, each other argument with a leading "." doubled, a lone ".".
+rce_pop3_multi() {
+    local out=$1 line
+    shift
+    for line in "$@"; do
+        case $line in .*) line=.$line ;; esac
+        out+=$'\r\n'$line
+    done
+    rce_mail_send "$out"$'\r\n.'
+}
+
+# Sets RCE_POP3_LINES to the message's lines, without the line ending of the last one.
+rce_pop3_message_lines() {
+    local text=$RCE_MAIL_MESSAGE
+    RCE_POP3_LINES=()
+    case $text in *$'\r\n') text=${text%$'\r\n'} ;; esac
+    if [ -z "$text" ]; then return 0; fi
+    while :; do
+        case $text in
+            *$'\r\n'*) RCE_POP3_LINES+=("${text%%$'\r\n'*}"); text=${text#*$'\r\n'} ;;
+            *) RCE_POP3_LINES+=("$text"); break ;;
+        esac
+    done
+}
+
+# Sets RCE_POP3_LINES to TOP's lines: the headers, the blank line and BodyLines body lines.
+rce_pop3_top_lines() {
+    local body=$1 blank=-1 index=0 last line
+    rce_pop3_message_lines
+    for line in ${RCE_POP3_LINES[@]+"${RCE_POP3_LINES[@]}"}; do
+        if [ -z "$line" ]; then blank=$index; break; fi
+        index=$((index + 1))
+    done
+    if [ $blank -lt 0 ]; then return 0; fi
+    last=$((blank + body))
+    if [ $last -gt $((${#RCE_POP3_LINES[@]} - 1)) ]; then last=$((${#RCE_POP3_LINES[@]} - 1)); fi
+    RCE_POP3_LINES=("${RCE_POP3_LINES[@]:0:$((last + 1))}")
+}
+
+# Answers one POP3 command. Returns 1 to end the session.
+rce_pop3_command() {
+    local verb argument size=$RCE_MAIL_MESSAGE_SIZE body=0
+    local -a arguments
+    rce_mail_split_verb "$1"
+    verb=$RCE_MAIL_COMMAND
+    argument=$RCE_MAIL_REST
+    arguments=()
+    read -r -a arguments <<<"$argument"
+    if rce_mail_has_override "$verb"; then
+        if [ "$RCE_OVERRIDE" = CLOSE ]; then return 1; fi
+        rce_mail_send "$RCE_OVERRIDE"
+        if [ "$verb" = QUIT ]; then return 1; fi
+        if [ "$verb" = STLS ]; then
+            case $RCE_OVERRIDE in '+OK'*) rce_mail_start_tls ;; esac
+        fi
+        return 0
+    fi
+    case $verb in
+        CAPA)
+            if [ $RCE_MAIL_SECURE = 1 ]; then rce_pop3_multi '+OK Capability list follows' USER 'SASL PLAIN LOGIN' TOP UIDL
+            else rce_pop3_multi '+OK Capability list follows' USER 'SASL PLAIN LOGIN' STLS TOP UIDL; fi
+            ;;
+        STLS) rce_mail_send '+OK Begin TLS negotiation'; rce_mail_start_tls ;;
+        USER) rce_mail_send '+OK User accepted' ;;
+        PASS | APOP) rce_mail_send '+OK Logged in' ;;
+        AUTH)
+            if [ ${#arguments[@]} -eq 0 ]; then
+                rce_pop3_multi '+OK SASL mechanisms follow' PLAIN LOGIN
+            else
+                rce_mail_challenges '+ ' "$argument"
+                rce_mail_run_challenges || return 1
+                rce_mail_send '+OK Authenticated'
+            fi
+            ;;
+        STAT) rce_mail_send "+OK 2 $((2 * size))" ;;
+        LIST)
+            if [ ${#arguments[@]} -gt 0 ]; then rce_mail_send "+OK ${arguments[0]} $size"
+            else rce_pop3_multi "+OK 2 messages ($((2 * size)) octets)" "1 $size" "2 $size"; fi
+            ;;
+        RETR) rce_pop3_message_lines; rce_pop3_multi "+OK $size octets" ${RCE_POP3_LINES[@]+"${RCE_POP3_LINES[@]}"} ;;
+        TOP)
+            if [ ${#arguments[@]} -gt 1 ]; then case ${arguments[1]} in '' | *[!0-9]*) ;; *) body=${arguments[1]} ;; esac; fi
+            rce_pop3_top_lines "$body"
+            rce_pop3_multi '+OK Top of message follows' ${RCE_POP3_LINES[@]+"${RCE_POP3_LINES[@]}"}
+            ;;
+        UIDL)
+            if [ ${#arguments[@]} -gt 0 ]; then rce_mail_send "+OK ${arguments[0]} uid-${arguments[0]}"
+            else rce_pop3_multi '+OK Unique-ID listing follows' 'uid-1' 'uid-2'; fi
+            ;;
+        DELE) rce_mail_send '+OK Message deleted' ;;
+        RSET | NOOP) rce_mail_send '+OK' ;;
+        QUIT) rce_mail_send '+OK Bye'; return 1 ;;
+        *) rce_mail_send '-ERR Command not recognized' ;;
+    esac
+    return 0
+}
+
+rce_mail_session() {
+    local greeting
+    LC_ALL=C
+    trap '' PIPE
+    exec 3<&0 4>&1 0</dev/null 1>/dev/null
+    exec 6>"$RCE_STATE/request.0.bin"
+    RCE_FTP_READ=3 RCE_FTP_WRITE=4 RCE_FTP_TLS_ON=0 RCE_FTP_TLS_COUNT=0 RCE_FTP_PENDING='' RCE_FTP_IDLE=$RCE_MAIL_IDLE
+    RCE_MAIL_SECURE=0
+    rce_seconds "$RCE_MAIL_IDLE"
+    RCE_MAIL_SECONDS=$RCE_SECONDS
+    RCE_MAIL_MESSAGE=$(cat "$RCE_STATE/mailmessage.bin"; printf x)
+    RCE_MAIL_MESSAGE=${RCE_MAIL_MESSAGE%x}
+    RCE_MAIL_MESSAGE_SIZE=$(wc -c <"$RCE_STATE/mailmessage.bin" | tr -d ' ')
+    if [ "$RCE_TLS" = 1 ]; then
+        rce_ftp_enter_tls || { printf '%s\n' 'could not start TLS on the control connection' >>"$RCE_STATE/handler.err"; exec 6>&-; return; }
+        RCE_MAIL_SECURE=1
+    fi
+    if rce_mail_has_override GREETING; then
+        greeting=$RCE_OVERRIDE
+    else
+        case $RCE_MAIL in
+            smtp) greeting='220 localhost ESMTP' ;;
+            imap) greeting='* OK [CAPABILITY IMAP4rev1 STARTTLS AUTH=PLAIN AUTH=LOGIN] ready' ;;
+            *) greeting='+OK POP3 ready <1896.697170952@localhost>' ;;
+        esac
+    fi
+    rce_mail_send "$greeting"
+    while :; do
+        if [ "$RCE_MAIL" = imap ]; then rce_imap_read_command || break; else rce_mail_read_line || break; fi
+        "rce_${RCE_MAIL}_command" "$RCE_LINE" || break
+    done
+    exec 6>&-
+    rce_ftp_stop_helpers
 }
 
 # A data connection: the accepted (or dialled) socket is on stdin and stdout. It waits for
@@ -1204,6 +1599,10 @@ RCE_FTP_REPLIES=()
 RCE_FTP_DATA=''
 RCE_FTP_IDLE=5000
 RCE_FTP_HOLD=0
+RCE_SMTP_REPLIES=() RCE_IMAP_REPLIES=() RCE_POP3_REPLIES=()
+RCE_SMTP_IDLE=5000 RCE_IMAP_IDLE=5000 RCE_POP3_IDLE=5000
+RCE_IMAP_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n'
+RCE_POP3_MESSAGE='From: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Recorded\r\n\r\nHello from the recorder.\r\n.A line that starts with a dot.\r\n'
 RCE_FTP=0 RCE_SMTP=0 RCE_IMAP=0 RCE_POP3=0 RCE_TFTP=0 RCE_SCRIPT='' RCE_HTTP2=0 RCE_HTTP2_ORIGIN=''
 RCE_HTTP2_ANSWER='' RCE_UDP_SINK=0 RCE_DNS_PORTS='' RCE_DNS_SILENT_PORTS='' RCE_DOH_PORTS=''
 
@@ -1290,9 +1689,15 @@ while [ $# -gt 0 ]; do
         ftpdata) RCE_FTP_DATA=$value ;;
         ftpidlemilliseconds) rce_integer FtpIdleMilliseconds "$value" 1 600000; RCE_FTP_IDLE=$value ;;
         ftpdataholdmilliseconds) rce_integer FtpDataHoldMilliseconds "$value" 0 600000; RCE_FTP_HOLD=$value ;;
-        smtpreply | smtpidlemilliseconds | \
-            imapreply | imapmessage | imapidlemilliseconds | pop3reply | pop3message | pop3idlemilliseconds | \
-            tftpdata | tftpreply | tftpidlemilliseconds | scriptidlemilliseconds | scriptgapmilliseconds | \
+        smtpreply) RCE_SMTP_REPLIES[${#RCE_SMTP_REPLIES[@]}]=$value ;;
+        imapreply) RCE_IMAP_REPLIES[${#RCE_IMAP_REPLIES[@]}]=$value ;;
+        pop3reply) RCE_POP3_REPLIES[${#RCE_POP3_REPLIES[@]}]=$value ;;
+        imapmessage) RCE_IMAP_MESSAGE=$value ;;
+        pop3message) RCE_POP3_MESSAGE=$value ;;
+        smtpidlemilliseconds) rce_integer SmtpIdleMilliseconds "$value" 1 600000; RCE_SMTP_IDLE=$value ;;
+        imapidlemilliseconds) rce_integer ImapIdleMilliseconds "$value" 1 600000; RCE_IMAP_IDLE=$value ;;
+        pop3idlemilliseconds) rce_integer Pop3IdleMilliseconds "$value" 1 600000; RCE_POP3_IDLE=$value ;;
+        tftpdata | tftpreply | tftpidlemilliseconds | scriptidlemilliseconds | scriptgapmilliseconds | \
             proxystatus | proxyalpn | http2resetcode | dnsansweraddress | dnsresponsecode | dnsechconfiglist) ;;
         *) rce_die "unknown parameter '$1'; -help lists them." ;;
     esac
@@ -1322,9 +1727,6 @@ if [ $RCE_HTTP2 = 1 ] && [ $RCE_TLS = 0 ] && [ -z "$RCE_HTTP2_ORIGIN" ]; then rc
 if [ $RCE_HTTP2 = 1 ] && { [ $rce_sessions -gt 0 ] || [ $RCE_NO_SERVER = 1 ] || [ -n "$RCE_UNIX_SOCKET" ] || [ $RCE_TFTP = 1 ]; }; then rce_die '-Http2 serves one HTTPS proxy connection, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp.'; fi
 
 # The modes this port does not serve yet.
-if [ $RCE_SMTP = 1 ]; then rce_not_ported -Smtp; fi
-if [ $RCE_IMAP = 1 ]; then rce_not_ported -Imap; fi
-if [ $RCE_POP3 = 1 ]; then rce_not_ported -Pop3; fi
 if [ $RCE_TFTP = 1 ]; then rce_not_ported -Tftp; fi
 if [ -n "$RCE_SCRIPT" ]; then rce_not_ported -Script; fi
 if [ -n "$RCE_HTTP2_ORIGIN" ]; then rce_not_ported -Http2Origin; fi
@@ -1339,7 +1741,15 @@ if [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; then rce_not_ported '-HalfCloseA
 if [ $RCE_CONNECTIONS_GIVEN = 0 ] && [ "$RCE_ANSWER_HELD" -eq 0 ]; then RCE_CONNECTIONS=${#RESPONSES[@]}; fi
 RCE_RESPONSE_COUNT=${#RESPONSES[@]}
 # An FTP session is one control connection.
-if [ $RCE_FTP = 1 ]; then RCE_CONNECTIONS=1; fi
+RCE_MAIL=''
+RCE_MAIL_IDLE=5000
+RCE_MAIL_MESSAGE_TEXT=''
+if [ $RCE_SMTP = 1 ]; then RCE_MAIL=smtp; RCE_MAIL_IDLE=$RCE_SMTP_IDLE; fi
+if [ $RCE_IMAP = 1 ]; then RCE_MAIL=imap; RCE_MAIL_IDLE=$RCE_IMAP_IDLE; RCE_MAIL_MESSAGE_TEXT=$RCE_IMAP_MESSAGE; fi
+if [ $RCE_POP3 = 1 ]; then RCE_MAIL=pop3; RCE_MAIL_IDLE=$RCE_POP3_IDLE; RCE_MAIL_MESSAGE_TEXT=$RCE_POP3_MESSAGE; fi
+# An FTP, SMTP, IMAP or POP3 session is one control connection, served a line at a time.
+RCE_LINE_SESSION=$((RCE_FTP + RCE_SMTP + RCE_IMAP + RCE_POP3))
+if [ $RCE_LINE_SESSION = 1 ]; then RCE_CONNECTIONS=1; fi
 
 # --- Tools ----------------------------------------------------------------------------
 
@@ -1350,7 +1760,7 @@ RCE_SOCAT=${SOCAT:-socat}
 # takes on the port itself.
 RCE_USE_SOCAT=0
 if [ $RCE_NO_SERVER = 0 ]; then
-    if [ $RCE_FTP = 1 ] || [ $RCE_TLS = 0 ] || [ "$RCE_CONNECTIONS" -gt 1 ] || [ $RCE_RESET = 1 ] || [ $RCE_RESET_AFTER = 1 ]; then RCE_USE_SOCAT=1; fi
+    if [ $RCE_LINE_SESSION = 1 ] || [ $RCE_TLS = 0 ] || [ "$RCE_CONNECTIONS" -gt 1 ] || [ $RCE_RESET = 1 ] || [ $RCE_RESET_AFTER = 1 ]; then RCE_USE_SOCAT=1; fi
 fi
 rce_missing=''
 for rce_tool in awk od mktemp sleep wc tr cat; do
@@ -1359,7 +1769,7 @@ done
 if [ $RCE_USE_SOCAT = 1 ] && ! command -v "$RCE_SOCAT" >/dev/null 2>&1; then
     rce_missing="$rce_missing, socat (the listener for plain HTTP, -UnixSocket, -Reset, -ResetAfterResponse and several -Tls connections; set SOCAT to name it)"
 fi
-if [ $RCE_TLS = 1 ] || [ $RCE_FTP = 1 ]; then
+if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ]; then
     command -v mkfifo >/dev/null 2>&1 || rce_missing="$rce_missing, mkfifo"
     if ! command -v "$RCE_OPENSSL" >/dev/null 2>&1; then
         rce_missing="$rce_missing, openssl (OpenSSL 1.1.1 or later, for -Tls; set OPENSSL to name it)"
@@ -1377,7 +1787,7 @@ case $(uname -s 2>/dev/null) in
     MINGW* | MSYS*)
         case $(command -v "$RCE_OPENSSL") in
             /mingw* | /ucrt64* | /clang* | /[a-zA-Z]/*)
-                if [ $RCE_TLS = 1 ] || [ $RCE_FTP = 1 ]; then rce_die "-Tls and -Ftp need a Unix openssl, and $(command -v "$RCE_OPENSSL") is a native Windows program, which cannot read this script's FIFOs; use Record-CurlExchange.ps1 on Windows."; fi
+                if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ]; then rce_die "-Tls, -Ftp, -Smtp, -Imap and -Pop3 need a Unix openssl, and $(command -v "$RCE_OPENSSL") is a native Windows program, which cannot read this script's FIFOs; use Record-CurlExchange.ps1 on Windows."; fi
                 ;;
         esac
         ;;
@@ -1485,7 +1895,7 @@ rce_make_tls_certificate() {
     if [ -n "$RCE_TLS_REVOKING_CRL" ]; then rce_write_crl "$RCE_TLS_REVOKING_CRL" "$serial"; fi
 }
 
-if [ $RCE_TLS = 1 ] || [ $RCE_FTP = 1 ]; then
+if [ $RCE_TLS = 1 ] || [ $RCE_LINE_SESSION = 1 ]; then
     rce_make_tls_certificate
     "$RCE_OPENSSL" x509 -in "$RCE_STATE/server.crt" -noout -pubkey >"$RCE_STATE/public.pem" || rce_die 'openssl x509 -pubkey failed'
     "$RCE_OPENSSL" pkey -pubin -in "$RCE_STATE/public.pem" -outform DER -out "$RCE_STATE/public.der" || rce_die 'openssl pkey failed'
@@ -1512,29 +1922,40 @@ done
 # What each connection handler reads: socat starts them as fresh processes.
 for rce_variable in RCE_STATE RCE_CONNECTIONS RCE_RESPONSE_COUNT RCE_RESPONSE_SIZES RCE_DELAY RCE_RESET RCE_RESET_AFTER \
     RCE_HALF_CLOSE RCE_HOLD_OPEN RCE_ANSWER_HELD RCE_EARLY_RESPONSE_BODY_BYTES RCE_REQUEST_READ RCE_TLS RCE_CLOSE_NOTIFY \
-    RCE_OPENSSL RCE_SOCAT RCE_FTP RCE_FTP_IDLE RCE_FTP_HOLD RCE_LISTEN_ADDRESS; do
+    RCE_OPENSSL RCE_SOCAT RCE_FTP RCE_MAIL RCE_MAIL_IDLE RCE_FTP_IDLE RCE_FTP_HOLD RCE_LISTEN_ADDRESS; do
     eval "printf '%s=%q\n' \"\$rce_variable\" \"\$$rce_variable\""
 done >"$RCE_STATE/config.sh"
 printf '#!%s\nexec %q %q --rce-connection %q\n' "$BASH" "$BASH" "$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" "$RCE_STATE" >"$RCE_STATE/connection"
 chmod +x "$RCE_STATE/connection"
 
-# -Ftp: FtpData, the FtpReply table (as variables the control handler reads: RCE_FR_COUNT_<VERB>
+# -Ftp, -Smtp, -Imap and -Pop3: the reply table and, for IMAP and POP3, the message. -Ftp: FtpData, the FtpReply table (as variables the control handler reads: RCE_FR_COUNT_<VERB>
 # and RCE_FR_<VERB>_<n>) and the passive data listener, whose port the handler reads.
-if [ $RCE_FTP = 1 ]; then
-    rce_decode_escaped "$RCE_FTP_DATA" "$RCE_STATE/ftpdata.bin"
+if [ $RCE_LINE_SESSION = 1 ]; then
     : >"$RCE_STATE/upload.bin"
     : >"$RCE_STATE/transcript.txt"
     : >"$RCE_STATE/ftp-config.sh"
-    for rce_entry in ${RCE_FTP_REPLIES[@]+"${RCE_FTP_REPLIES[@]}"}; do
-        case $rce_entry in *=*) ;; *) rce_die "FtpReply '$rce_entry' is not VERB=reply." ;; esac
+    rce_reply_parameter=FtpReply
+    rce_entries=(${RCE_FTP_REPLIES[@]+"${RCE_FTP_REPLIES[@]}"})
+    case $RCE_MAIL in
+        smtp) rce_reply_parameter=SmtpReply; rce_entries=(${RCE_SMTP_REPLIES[@]+"${RCE_SMTP_REPLIES[@]}"}) ;;
+        imap) rce_reply_parameter=ImapReply; rce_entries=(${RCE_IMAP_REPLIES[@]+"${RCE_IMAP_REPLIES[@]}"}) ;;
+        pop3) rce_reply_parameter=Pop3Reply; rce_entries=(${RCE_POP3_REPLIES[@]+"${RCE_POP3_REPLIES[@]}"}) ;;
+    esac
+    if [ -n "$RCE_MAIL" ]; then rce_decode_escaped "$RCE_MAIL_MESSAGE_TEXT" "$RCE_STATE/mailmessage.bin"; fi
+    for rce_entry in ${rce_entries[@]+"${rce_entries[@]}"}; do
+        case $rce_entry in *=*) ;; *) rce_die "$rce_reply_parameter '$rce_entry' is not VERB=reply." ;; esac
         rce_verb=$(printf '%s' "${rce_entry%%=*}" | tr '[:lower:]' '[:upper:]')
-        case $rce_verb in '' | *[!A-Z0-9]*) rce_die "FtpReply '$rce_entry': VERB is letters and digits." ;; esac
+        rce_verb=${rce_verb// /_}
+        case $rce_verb in '' | *[!A-Z0-9_]*) rce_die "$rce_reply_parameter '$rce_entry': VERB is letters and digits." ;; esac
         rce_decode_escaped "${rce_entry#*=}" "$RCE_STATE/ftp-reply.bin"
         rce_reply=$(cat "$RCE_STATE/ftp-reply.bin"; printf x)
         eval "rce_position=\${RCE_FR_COUNT_$rce_verb:-0}"
         eval "RCE_FR_COUNT_$rce_verb=$((rce_position + 1))"
         printf 'RCE_FR_COUNT_%s=%d\nRCE_FR_%s_%d=%q\n' "$rce_verb" $((rce_position + 1)) "$rce_verb" "$rce_position" "${rce_reply%x}" >>"$RCE_STATE/ftp-config.sh"
     done
+fi
+if [ $RCE_FTP = 1 ]; then
+    rce_decode_escaped "$RCE_FTP_DATA" "$RCE_STATE/ftpdata.bin"
     printf '#!%s\nexec %q %q --rce-ftp-data %q\n' "$BASH" "$BASH" "$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" "$RCE_STATE" >"$RCE_STATE/ftp-data"
     chmod +x "$RCE_STATE/ftp-data"
     case $RCE_LISTEN_ADDRESS in
@@ -1690,10 +2111,8 @@ if [ $RCE_NO_SERVER = 0 ]; then
         done
     } >"$RCE_OUT_DIRECTORY/request.bin"
 fi
-if [ $RCE_FTP = 1 ]; then
-    cat "$RCE_STATE/transcript.txt" >"$RCE_OUT_DIRECTORY/transcript.txt"
-    cat "$RCE_STATE/upload.bin" >"$RCE_OUT_DIRECTORY/upload.bin"
-fi
+if [ $RCE_LINE_SESSION = 1 ]; then cat "$RCE_STATE/transcript.txt" >"$RCE_OUT_DIRECTORY/transcript.txt"; fi
+if [ $RCE_FTP = 1 ]; then cat "$RCE_STATE/upload.bin" >"$RCE_OUT_DIRECTORY/upload.bin"; fi
 cat "$RCE_STATE/stdout.bin" >"$RCE_OUT_DIRECTORY/stdout.bin"
 cat "$RCE_STATE/stderr.txt" >"$RCE_OUT_DIRECTORY/stderr.txt"
 printf '%s' "$rce_exit_code" >"$RCE_OUT_DIRECTORY/exitcode.txt"
