@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/HttpProxyTunnel.cs, Curl.Protocol.Rtsp.UnitLibrary/RtspRequestFormatter.cs, Curl.Protocol.Ws.UnitLibrary/WsUpgradeRequestFormatter.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3860 — CGR-016 part 3: --proxy-header, RTSP and WebSocket headers give invalid UTF-8 argument bytes unchanged
 
@@ -22,14 +22,17 @@ Found by BL-3850 (CGR-016 part 2). The console hands an argument byte that is no
 
 ## Acceptance criteria
 
-- [ ] A CONNECT request's `--proxy-header`, an RTSP request's `-H` and a WebSocket upgrade's `-H` holding the surrogate U+DCFF send the byte FF, pinned by a focused unit test in each library's own `.UnitTests` project that runs on every platform.
-- [ ] Valid UTF-8 values and every value on Windows go out as before.
-- [ ] Each changed library stays within the coverage, complexity and CRAP gates (`Measure-CodeQuality.ps1 -Library <all changed libraries>`).
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A CONNECT request's `--proxy-header`, an RTSP request's `-H` and a WebSocket upgrade's `-H` holding the surrogate U+DCFF send the byte FF, pinned by a focused unit test in each library's own `.UnitTests` project that runs on every platform.
+- [x] Valid UTF-8 values and every value on Windows go out as before.
+- [x] Each changed library stays within the coverage, complexity and CRAP gates (`Measure-CodeQuality.ps1 -Library <all changed libraries>`).
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- HttpProxyTunnel.cs already gave escaped bytes unchanged (BL-3832, Cgr020TunnelTests pins U+DCFF); only RTSP and WebSocket changed here, each with its own WireText copy. Quality: both libraries 100% line and branch, no failing member.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 83fe42ce 5f97d26d 1fba41f5 779790c0.
+- 2026-10-28: Doing -> Done. RTSP and WebSocket -H values send argument bytes (U+DC80-DCFF escapes) unchanged; CONNECT already did

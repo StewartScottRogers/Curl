@@ -194,7 +194,25 @@ internal static class RtspRequestFormatter
 
     [return: NotNullIfNotNull(nameof(text))]
     private static string? HeadText(string? text, HttpRequestOptions options) =>
-        text is null ? null : Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
+        text is null ? null : WireText(text, options.CommandLineTextEncoding);
+
+    // Text as its bytes in encoding, one character per byte, with each lone surrogate from U+DC80
+    // to U+DCFF (an argument byte UTF-8 could not read, CGR-016) given as that byte.
+    private static string WireText(string text, Encoding encoding)
+    {
+        StringBuilder wire = new(text.Length);
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (text[index] is >= '\uDC80' and <= '\uDCFF' && !char.IsHighSurrogate(text[Math.Max(index - 1, 0)]))
+            {
+                wire.Append(Encoding.Latin1.GetString(encoding.GetBytes(text[runStart..index]))).Append((char)(text[index] - 0xDC00));
+                runStart = index + 1;
+            }
+        }
+
+        return wire.Append(Encoding.Latin1.GetString(encoding.GetBytes(text[runStart..]))).ToString();
+    }
 
     private static void AppendUnlessOverridden(StringBuilder head, RtspCustomHeader[] customHeaders, string name, string? value)
     {
