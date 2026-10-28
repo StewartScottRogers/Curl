@@ -4,8 +4,8 @@ title: Fix CGR-076: A redirect to another host with userinfo in the Location sen
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests/Cgr076Tests.cs]
+depends-on: [BL-3723]
+touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests/Cgr076Tests.cs, Curl.Protocol.Http.UnitTests/HttpProtocolHandlerTests.Cgr076.cs, Curl.Core.UnitLibrary/RedirectFollower.cs, Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs, Curl.Protocol.Abstractions.UnitLibrary/HttpRequestOptions.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -68,8 +68,10 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr076Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- 2026-10-28 (lane 4, resumed run): the fix needs the follower to tell the HTTP handler that it withheld an `-H Authorization` value, so it adds `HttpRequestOptions.AuthorizationHeaderWithheld` (Abstractions), sets it in `RedirectFollower.cs` (Core) and honours it in `HttpRequestHeadFormatter.AppendAuthorization` and `HttpProtocolHandler.ReportAuthorizationLines`; tests in `Cgr076Tests.cs`, `HttpProtocolHandlerTests.Cgr076.cs` and `Curl.Core.UnitTests/Cgr076RedirectFollowerTests.cs`. Those files were added to touches. `RedirectFollower.cs` is held by BL-3723 (Doing), so the task waits on it; the code is written but not yet built, tested or quality-measured, and is left uncommitted for the shift to stash. Next claim: apply the stash, build, run the fast tests, run Measure-CodeQuality.ps1 for Core, Abstractions and Http, measure real curl for the repro and record it here.
 
 ## Log
 
 - 2026-10-26: Created from CGR-076 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Waits on BL-3723, which holds Curl.Core.UnitLibrary/RedirectFollower.cs; the fix is written and left for the stash
