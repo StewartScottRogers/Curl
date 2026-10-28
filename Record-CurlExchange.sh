@@ -5,14 +5,23 @@
 #
 #     The Bash port, for Linux and macOS, of Record-CurlExchange.ps1. It writes the same
 #     files in the same formats, so a fixture recorded by either is read the same way.
-#     Phase 1 of the port: the HTTP and HTTPS (-Tls) server, -NoServer and -UnixSocket.
+#     Ported so far: the HTTP and HTTPS (-Tls) server, -NoServer, -UnixSocket and -Ftp
+#     (passive and active mode, explicit and implicit FTPS, PROT, CCC; see FTP below).
+#
+# DIFFERENCES FROM THE POWERSHELL SCRIPT (FTP)
+#     A data connection curl opens that no transfer uses (for example after an overridden
+#     RETR that sends only a 4xx) is closed with a FIN here; the PowerShell script's
+#     listener resets it, so curl reports exit 18 (transfer closed) here and exit 56
+#     (connection reset) there. Everything else measured is byte-identical (see the
+#     log of BL-3929): passive, active (EPRT), explicit and implicit FTPS, PROT P data,
+#     CCC in passive and active mode, a refused CCC, uploads, REST, FtpReply overrides.
 #
 # NOT PORTED YET
 #     These modes of Record-CurlExchange.ps1 are not in this port. Each one stops at once,
 #     printing "Record-CurlExchange.sh: mode <X> is not ported yet; use
 #     Record-CurlExchange.ps1 under pwsh" to stderr, and exits 2:
 #
-#       -Ftp (FTP and FTPS sessions, AUTH, PROT, CCC, active mode)  -Smtp   -Imap   -Pop3
+#       -Smtp   -Imap   -Pop3
 #       -Tftp            -Script (scripted binary sessions, LDAP and SMB)
 #       -Http2 and -Http2Origin (HTTP/2 proxy and origin framing, HPACK)
 #       -UdpSink         -DnsPort and -DohPort (the DNS and DNS-over-HTTPS responders)
@@ -171,6 +180,43 @@
 #         ".der" appended, before curl runs, so curl can be given --pinnedpubkey <path>. With
 #         -Tls, whether or not this is given, every "{TlsPublicKeySha256}" in CurlArgs is
 #         replaced by the base64 SHA-256 of that SubjectPublicKeyInfo.
+#
+#     -Ftp
+#         Serve one FTP session instead of HTTP responses, as Record-CurlExchange.ps1 -Ftp
+#         does: a greeting, then curl's commands one line at a time, each answered from a
+#         table of replies (the defaults are the PowerShell script's: 220, USER 331, PASS 230,
+#         PWD 257, EPSV 229, PASV 227, TYPE 200, SIZE 213 with FtpData's length, MDTM 213,
+#         CWD 250, REST 350, RETR/LIST/NLST 150 + FtpData + 226, STOR/APPE 150 + upload + 226,
+#         QUIT 221, anything else 502). Passive data connections are accepted on a port the
+#         script listens on from the start; EPRT and PORT switch to active mode, where the
+#         script dials curl's address. AUTH is answered 234 and the control connection then
+#         served over TLS (same throwaway certificate as -Tls; curl needs -k), PBSZ 200,
+#         PROT 200 (PROT P, or -Tls until a PROT C, makes data connections TLS), CCC 200 and
+#         TLS then cleared from the control connection: close_notify is sent, curl's
+#         close_notify read if that is what comes next, and the rest read in plain text.
+#         With -Tls, implicit FTPS: the control connection is TLS from its first byte.
+#         request.bin holds every command line curl sent on the control connection (the
+#         bytes after TLS decryption), transcript.txt both directions ("> " curl, "< " the
+#         server, "= " events), and upload.bin the bytes uploaded by STOR and APPE.
+#         Response, Connections, ResponseDelayMilliseconds and Reset are ignored.
+#         Needs socat, and for AUTH, PROT and -Tls openssl and mkfifo as -Tls does.
+#
+#     -FtpReply <VERB=reply>
+#         Reply overrides, one per use, with the PowerShell script's meaning: VERB is a
+#         command name in capitals, GREETING, RETROPEN, RETRDONE or STORDONE; the reply has
+#         Response's escapes; CLOSE hangs up and STALL answers nothing; several for one VERB
+#         are used in turn, the last repeating; {DATAPORT}, {DATAPORT_HI}, {DATAPORT_LO}
+#         and a {PAUSE} line work as there.
+#
+#     -FtpData <escaped>
+#         The file RETR serves, and the listing LIST and NLST serve. Default empty.
+#
+#     -FtpIdleMilliseconds <n>
+#         How long the server waits for curl's next command before it hangs up. Default 5000.
+#
+#     -FtpDataHoldMilliseconds <n>
+#         How long a RETR, LIST or NLST data connection is held open after FtpData is sent,
+#         before it is closed and the 226 sent. Default 0.
 #
 #     -Curl <path>
 #         The curl executable to run. Defaults to the curl on PATH, the platform's own build
@@ -656,6 +702,12 @@ rce_connection_entry() {
         while [ ! -e "$RCE_STATE/stop" ]; do sleep 0.1; done
         exit 0
     fi
+    if [ "$RCE_FTP" = 1 ]; then
+        rce_ftp_session
+        : >"$RCE_STATE/ftp-ended"
+        : >"$RCE_STATE/done.$index"
+        exit 0
+    fi
     if [ "$RCE_RESET" = 1 ]; then
         # Closed unread: under the listener's zero linger time the close is a RST.
         : >"$RCE_STATE/request.$index.bin"
@@ -680,10 +732,441 @@ rce_connection_entry() {
     exit 0
 }
 
+# --- The FTP session ------------------------------------------------------------------
+# One control connection is served by the handler socat starts (rce_ftp_session). Data
+# connections are served by fresh handlers (rce_ftp_data_entry): passive ones accepted by
+# a second socat listener on a port chosen at start, active ones dialled by socat to the
+# address curl announced. The control side hands each data connection a job file and
+# waits for its "done" file, so the 226 follows the data as in the PowerShell script.
+#
+# Control TLS (AUTH, or -Tls from the first byte) is s_server on a loopback port that the
+# session reaches through /dev/tcp, with its plaintext on two FIFOs. Two pumps join that
+# socket to curl's: one is cat (s_server to curl), the other (rce_ftp_up_pump) copies
+# curl's bytes TLS record by TLS record, so it knows where TLS ends. CCC then needs
+# nothing more than closing s_server's input (close_notify) and reading what the up pump
+# stopped at: the first byte that is not a TLS record header, which is plain text.
+
+# Waits up to five seconds for a TCP listener on Port: /proc/net/tcp on Linux, netstat
+# elsewhere, else one second blind.
+rce_wait_for_listening_port() {
+    local port=$1 hex polls=0
+    printf -v hex '%04X' "$port"
+    while [ $polls -lt 250 ]; do
+        if [ -r /proc/net/tcp ]; then
+            cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -Eq "^ *[0-9]+: [0-9A-F]+:$hex [0-9A-F]+:0000 0A" && return 0
+        elif command -v netstat >/dev/null 2>&1; then
+            netstat -an 2>/dev/null | grep -Eq "[.:]$port[[:space:]].*LISTEN" && return 0
+        else
+            sleep 1
+            return 0
+        fi
+        polls=$((polls + 1))
+        sleep 0.02
+    done
+    return 1
+}
+
+# Succeeds when VERB (capitals and digits only) has a FtpReply.
+rce_ftp_has_override() {
+    case $1 in '' | *[!A-Z0-9]*) return 1 ;; esac
+    eval "[ \"\${RCE_FR_COUNT_$1:-0}\" -gt 0 ]"
+}
+
+# Sets RCE_OVERRIDE to VERB's next reply: several are used in turn, the last repeating.
+rce_ftp_override() {
+    local count position
+    eval "count=\${RCE_FR_COUNT_$1:-0}; position=\${RCE_FR_POS_$1:-0}"
+    eval "RCE_OVERRIDE=\${RCE_FR_${1}_$position}"
+    if [ $((position + 1)) -lt "$count" ]; then eval "RCE_FR_POS_$1=$((position + 1))"; fi
+}
+
+rce_ftp_log() {
+    printf '%s\r\n' "$1" >>"$RCE_STATE/transcript.txt"
+}
+
+# Sends Reply on the control connection: {DATAPORT...} filled in, a {PAUSE} line waiting a
+# second between the lines before and after it, every line logged.
+rce_ftp_reply() {
+    local reply=$1 sep=$'\r\n{PAUSE}\r\n' part rest first=1 more=1 hi lo
+    hi='{DATAPORT_HI}' lo='{DATAPORT_LO}'
+    reply=${reply//"$hi"/$((RCE_FTP_DATA_PORT / 256))}
+    reply=${reply//"$lo"/$((RCE_FTP_DATA_PORT % 256))}
+    hi='{DATAPORT}'
+    reply=${reply//"$hi"/$RCE_FTP_DATA_PORT}
+    while [ $more = 1 ]; do
+        case $reply in
+            *"$sep"*) part=${reply%%"$sep"*}; reply=${reply#*"$sep"} ;;
+            *) part=$reply; more=0 ;;
+        esac
+        if [ $first = 0 ]; then
+            rce_sleep_ms 1000
+            rce_ftp_log '= paused 1000 ms'
+        fi
+        first=0
+        printf '%s\r\n' "$part" >&"$RCE_FTP_WRITE" 2>/dev/null
+        rest=$part
+        while :; do
+            case $rest in
+                *$'\r\n'*) rce_ftp_log "< ${rest%%$'\r\n'*}"; rest=${rest#*$'\r\n'} ;;
+                *) rce_ftp_log "< $rest"; break ;;
+            esac
+        done
+    done
+}
+
+# Prints a loopback port nothing listens on yet.
+rce_ftp_free_port() {
+    local port tries=0
+    while [ $tries -lt 50 ]; do
+        port=$((20000 + RANDOM % 30000))
+        if ! { cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -Eqi "^ *[0-9]+: [0-9A-F]+:$(printf '%04X' $port) "; }; then
+            printf '%s' "$port"
+            return 0
+        fi
+        tries=$((tries + 1))
+    done
+    return 1
+}
+
+# Copies curl's bytes (descriptor 3) to s_server's socket (descriptor 5) one TLS record at
+# a time: a record header starts 0x14 to 0x17 (20 to 23), the length in its fourth and
+# fifth bytes. The first byte that is not one is plain text: it is kept in ftp.pending
+# and the pump ends. A close_notify (an alert, 21) leaves ftp.alert behind.
+rce_ftp_up_pump() {
+    local rec="$RCE_STATE/ftp.up.rec" first length
+    trap '' PIPE
+    while :; do
+        dd bs=1 count=1 <&3 >"$rec" 2>/dev/null
+        if [ ! -s "$rec" ]; then return 0; fi
+        first=$(od -An -tu1 <"$rec" | tr -d ' \n')
+        case $first in
+            20 | 21 | 22 | 23) ;;
+            *) cp "$rec" "$RCE_STATE/ftp.pending"; return 0 ;;
+        esac
+        if [ "$first" = 21 ]; then : >"$RCE_STATE/ftp.alert"; fi
+        dd bs=1 count=4 <&3 >>"$rec" 2>/dev/null
+        set -- $(od -An -tu1 -j3 -N2 <"$rec")
+        length=$((${1:-0} * 256 + ${2:-0}))
+        dd bs=1 count="$length" <&3 >>"$rec" 2>/dev/null
+        cat "$rec" >&5 2>/dev/null
+    done
+}
+
+# Starts TLS on the control connection: s_server, its two FIFOs, the two pumps.
+rce_ftp_enter_tls() {
+    local port cin cout polls=0
+    RCE_FTP_TLS_COUNT=$((RCE_FTP_TLS_COUNT + 1))
+    cin="$RCE_STATE/ftp.cin.$RCE_FTP_TLS_COUNT"
+    cout="$RCE_STATE/ftp.cout.$RCE_FTP_TLS_COUNT"
+    mkfifo "$cin" "$cout" || return 1
+    port=$(rce_ftp_free_port) || return 1
+    "$RCE_OPENSSL" s_server -quiet -no_ign_eof -naccept 1 -tls1_2 -cert "$RCE_STATE/server.crt" -key "$RCE_STATE/server.key" \
+        -accept "127.0.0.1:$port" >"$cout" <"$cin" 2>>"$RCE_STATE/ftp-tls.err" 3<&- 4<&- 6>&- &
+    RCE_FTP_TLS_PID=$!
+    printf '%s\n' "$RCE_FTP_TLS_PID" >"$RCE_STATE/tls-pid.ftp$RCE_FTP_TLS_COUNT"
+    exec 7<"$cout" 8>"$cin"
+    rce_wait_for_listening_port "$port" || return 1
+    exec 5<>"/dev/tcp/127.0.0.1/$port" || return 1
+    cat <&5 >&4 5<&- 7<&- 8>&- 2>/dev/null &
+    RCE_FTP_DOWN_PID=$!
+    (rce_ftp_up_pump) 7<&- 8>&- &
+    RCE_FTP_UP_PID=$!
+    printf '%s\n%s\n' "$RCE_FTP_DOWN_PID" "$RCE_FTP_UP_PID" >"$RCE_STATE/tls-pid.ftpp$RCE_FTP_TLS_COUNT"
+    exec 5>&-
+    rm -f "$RCE_STATE/ftp.pending" "$RCE_STATE/ftp.alert"
+    RCE_FTP_READ=7
+    RCE_FTP_WRITE=8
+    RCE_FTP_TLS_ON=1
+}
+
+# CCC accepted: close_notify to curl, then plain text. s_server's input is closed (close_notify
+# and shutdown); the down pump ends once curl has it. Then the up pump is given the idle
+# time to reach curl's first plain byte, which it leaves in ftp.pending (BL-636).
+rce_ftp_clear_tls() {
+    local polls=0 limit suffix=" without curl's close_notify"
+    exec 8>&-
+    while kill -0 "$RCE_FTP_DOWN_PID" 2>/dev/null && [ $polls -lt 250 ]; do
+        polls=$((polls + 1))
+        sleep 0.02
+    done
+    polls=0
+    limit=$((RCE_FTP_IDLE / 20))
+    while [ ! -e "$RCE_STATE/ftp.pending" ] && kill -0 "$RCE_FTP_UP_PID" 2>/dev/null && [ $polls -lt $limit ]; do
+        polls=$((polls + 1))
+        sleep 0.02
+    done
+    if kill -0 "$RCE_FTP_UP_PID" 2>/dev/null; then
+        # Still waiting on curl: stop it, and the dd it is blocked in.
+        if command -v pkill >/dev/null 2>&1; then pkill -KILL -P "$RCE_FTP_UP_PID" 2>/dev/null; fi
+        kill -KILL "$RCE_FTP_UP_PID" 2>/dev/null
+        wait "$RCE_FTP_UP_PID" 2>/dev/null
+    fi
+    if [ -e "$RCE_STATE/ftp.alert" ]; then suffix=''; fi
+    if [ -s "$RCE_STATE/ftp.pending" ]; then
+        RCE_FTP_PENDING=$(cat "$RCE_STATE/ftp.pending")
+        rm -f "$RCE_STATE/ftp.pending"
+    fi
+    rce_ftp_log "= TLS cleared from the control connection$suffix"
+    exec 7<&-
+    kill -KILL "$RCE_FTP_TLS_PID" 2>/dev/null
+    RCE_FTP_READ=3
+    RCE_FTP_WRITE=4
+    RCE_FTP_TLS_ON=0
+}
+
+# Runs one data transfer (Verb RETR, LIST, NLST, STOR or APPE) over a data connection:
+# writes its job file, dials curl in active mode, waits for the connection to be taken
+# and for the job to finish. Returns 1 when no data connection came within five seconds.
+rce_ftp_transfer() {
+    local verb=$1 index=$RCE_FTP_JOB polls=0 limit
+    RCE_FTP_JOB=$((index + 1))
+    printf 'RCE_JOB_VERB=%s\nRCE_JOB_TLS=%s\nRCE_JOB_REST=%s\n' "$verb" "$RCE_FTP_PROTECT" "$RCE_FTP_REST" >"$RCE_STATE/job.$index.tmp"
+    mv "$RCE_STATE/job.$index.tmp" "$RCE_STATE/job.$index"
+    if [ -n "$RCE_FTP_ACTIVE_HOST" ]; then
+        case $RCE_FTP_ACTIVE_HOST in
+            *:*) rce_target="TCP6:[$RCE_FTP_ACTIVE_HOST]:$RCE_FTP_ACTIVE_PORT" ;;
+            *) rce_target="TCP4:$RCE_FTP_ACTIVE_HOST:$RCE_FTP_ACTIVE_PORT" ;;
+        esac
+        "$RCE_SOCAT" -lf "$RCE_STATE/ftp-active.$index.log" "$rce_target" "EXEC:$RCE_STATE/ftp-data,nofork" \
+            </dev/null >/dev/null 2>&1 3<&- 4<&- 6>&- 7<&- 8>&- &
+    fi
+    while [ ! -d "$RCE_STATE/dclaim.$index" ]; do
+        polls=$((polls + 1))
+        if [ $polls -ge 250 ]; then
+            printf '%s\n' "curl sent $verb but opened no data connection within five seconds." >>"$RCE_STATE/handler.err"
+            return 1
+        fi
+        sleep 0.02
+    done
+    polls=0
+    limit=$(((RCE_FTP_HOLD + 30000) / 20))
+    while [ ! -e "$RCE_STATE/jobdone.$index" ] && [ $polls -lt $limit ]; do
+        polls=$((polls + 1))
+        sleep 0.02
+    done
+    return 0
+}
+
+# Appends what STOR or APPE data connection Index received to upload.bin and the transcript.
+rce_ftp_note_upload() {
+    local file="$RCE_STATE/upload.$1" size=0
+    if [ -f "$file" ]; then size=$(wc -c <"$file" | tr -d ' '); cat "$file" >>"$RCE_STATE/upload.bin"; fi
+    {
+        printf '= %s bytes received on the data connection: ' "$size"
+        if [ -f "$file" ]; then cat "$file"; fi
+        printf '\r\n'
+    } >>"$RCE_STATE/transcript.txt"
+}
+
+# EPRT |1|127.0.0.1|5000| or PORT 127,0,0,1,19,136: sets the address curl listens on.
+rce_ftp_parse_active() {
+    local verb=$1 argument=$2 delimiter fields
+    if [ "$verb" = EPRT ]; then
+        delimiter=${argument:0:1}
+        IFS=$delimiter read -r -a fields <<<"$argument"
+        RCE_FTP_ACTIVE_HOST=${fields[2]:-}
+        RCE_FTP_ACTIVE_PORT=${fields[3]:-0}
+    else
+        IFS=, read -r -a fields <<<"$argument"
+        RCE_FTP_ACTIVE_HOST="${fields[0]:-0}.${fields[1]:-0}.${fields[2]:-0}.${fields[3]:-0}"
+        RCE_FTP_ACTIVE_PORT=$((${fields[4]:-0} * 256 + ${fields[5]:-0}))
+    fi
+}
+
+rce_ftp_session() {
+    local line command verb argument ok greeting reply done_reply idle_seconds listen_commas
+    trap '' PIPE
+    exec 3<&0 4>&1 0</dev/null 1>/dev/null
+    exec 6>"$RCE_STATE/request.0.bin"
+    RCE_FTP_READ=3 RCE_FTP_WRITE=4 RCE_FTP_TLS_ON=0 RCE_FTP_TLS_COUNT=0 RCE_FTP_PENDING='' RCE_FTP_JOB=0
+    RCE_FTP_REST=0 RCE_FTP_PROTECT=$RCE_TLS RCE_FTP_ACTIVE_HOST='' RCE_FTP_ACTIVE_PORT=0
+    RCE_FTP_DATA_PORT=$(cat "$RCE_STATE/dataport")
+    RCE_FTP_DATA_SIZE=$(wc -c <"$RCE_STATE/ftpdata.bin" | tr -d ' ')
+    listen_commas=${RCE_LISTEN_ADDRESS//./,}
+    rce_seconds "$RCE_FTP_IDLE"
+    idle_seconds=$RCE_SECONDS
+    if [ "$RCE_TLS" = 1 ]; then rce_ftp_enter_tls || { printf '%s\n' 'could not start TLS on the control connection' >>"$RCE_STATE/handler.err"; exec 6>&-; return; }; fi
+    if rce_ftp_has_override GREETING; then rce_ftp_override GREETING; greeting=$RCE_OVERRIDE; else greeting='220 Recorder ready'; fi
+    if [ "$greeting" != STALL ]; then rce_ftp_reply "$greeting"; fi
+    while :; do
+        line=''
+        ok=0
+        IFS= read -r -t "$idle_seconds" -u "$RCE_FTP_READ" line && ok=1
+        line=$RCE_FTP_PENDING$line
+        RCE_FTP_PENDING=''
+        if [ $ok = 0 ]; then
+            # Idle time without a newline, or curl hung up: what arrived is still recorded.
+            if [ -n "$line" ]; then printf '%s' "$line" >&6; fi
+            break
+        fi
+        printf '%s\n' "$line" >&6
+        command=${line%$'\r'}
+        rce_ftp_log "> $command"
+        verb=${command%% *}
+        verb=$(printf '%s' "$verb" | tr '[:lower:]' '[:upper:]')
+        argument=''
+        case $command in *' '*) argument=${command#* } ;; esac
+        if rce_ftp_has_override "$verb"; then
+            rce_ftp_override "$verb"
+            reply=$RCE_OVERRIDE
+            if [ "$reply" = CLOSE ]; then break; fi
+            if [ "$reply" = STALL ]; then continue; fi
+            rce_ftp_reply "$reply"
+            if [ "$verb" = QUIT ]; then break; fi
+            case $verb in
+                PROT) case $reply in 2*) if [ "$argument" = P ]; then RCE_FTP_PROTECT=1; else RCE_FTP_PROTECT=0; fi ;; *) RCE_FTP_PROTECT=0 ;; esac ;;
+                AUTH)
+                    case $reply in
+                        234*) rce_ftp_enter_tls && rce_ftp_log '= TLS handshake completed on the control connection' ;;
+                    esac
+                    ;;
+                CCC)
+                    case $reply in
+                        [1-4]*) if [ $RCE_FTP_TLS_ON = 1 ]; then rce_ftp_clear_tls; fi ;;
+                    esac
+                    ;;
+            esac
+            continue
+        fi
+        case $verb in
+            AUTH)
+                rce_ftp_reply '234 AUTH accepted'
+                rce_ftp_enter_tls && rce_ftp_log '= TLS handshake completed on the control connection'
+                ;;
+            PBSZ) rce_ftp_reply '200 PBSZ=0' ;;
+            CCC)
+                rce_ftp_reply '200 CCC command successful'
+                if [ $RCE_FTP_TLS_ON = 1 ]; then rce_ftp_clear_tls; fi
+                ;;
+            PROT)
+                if [ "$argument" = P ]; then RCE_FTP_PROTECT=1; else RCE_FTP_PROTECT=0; fi
+                rce_ftp_reply "200 Protection level set to $argument"
+                ;;
+            EPRT | PORT)
+                rce_ftp_parse_active "$verb" "$argument"
+                rce_ftp_reply "200 $verb command successful"
+                ;;
+            USER) rce_ftp_reply '331 Password required' ;;
+            PASS) rce_ftp_reply '230 Logged in' ;;
+            PWD) rce_ftp_reply '257 "/" is current directory' ;;
+            CWD) rce_ftp_reply '250 OK' ;;
+            TYPE) rce_ftp_reply '200 Type set' ;;
+            SIZE) rce_ftp_reply "213 $RCE_FTP_DATA_SIZE" ;;
+            MDTM) rce_ftp_reply '213 20260927123456' ;;
+            REST)
+                RCE_FTP_REST=${argument//[!0-9]/}
+                if [ -z "$RCE_FTP_REST" ]; then RCE_FTP_REST=0; fi
+                rce_ftp_reply "350 Restarting at $RCE_FTP_REST"
+                ;;
+            EPSV) rce_ftp_reply "229 Entering Extended Passive Mode (|||$RCE_FTP_DATA_PORT|)" ;;
+            PASV) rce_ftp_reply "227 Entering Passive Mode ($listen_commas,$((RCE_FTP_DATA_PORT / 256)),$((RCE_FTP_DATA_PORT % 256)))" ;;
+            RETR | LIST | NLST)
+                if rce_ftp_has_override RETROPEN; then rce_ftp_override RETROPEN; reply=$RCE_OVERRIDE; else reply='150 Opening BINARY mode data connection'; fi
+                rce_ftp_reply "$reply"
+                rce_ftp_transfer "$verb" || break
+                if rce_ftp_has_override RETRDONE; then rce_ftp_override RETRDONE; done_reply=$RCE_OVERRIDE; else done_reply='226 Transfer complete'; fi
+                rce_ftp_reply "$done_reply"
+                ;;
+            STOR | APPE)
+                rce_ftp_reply '150 Opening BINARY mode data connection'
+                rce_ftp_transfer "$verb" || break
+                rce_ftp_note_upload $((RCE_FTP_JOB - 1))
+                if rce_ftp_has_override STORDONE; then rce_ftp_override STORDONE; done_reply=$RCE_OVERRIDE; else done_reply='226 Transfer complete'; fi
+                rce_ftp_reply "$done_reply"
+                ;;
+            QUIT) rce_ftp_reply '221 Bye'; break ;;
+            *) rce_ftp_reply '502 Command not implemented' ;;
+        esac
+    done
+    exec 6>&-
+    # The pumps and s_server hold copies of curl's socket: stop them so it closes with us,
+    # a moment after the last reply has been encrypted and sent.
+    if [ "$RCE_FTP_TLS_ON" = 1 ]; then sleep 0.2; fi
+    if [ -n "${RCE_FTP_UP_PID:-}" ] && command -v pkill >/dev/null 2>&1; then pkill -KILL -P "$RCE_FTP_UP_PID" 2>/dev/null; fi
+    for rce_pid in "${RCE_FTP_UP_PID:-}" "${RCE_FTP_DOWN_PID:-}" "${RCE_FTP_TLS_PID:-}"; do
+        if [ -n "$rce_pid" ]; then kill -KILL "$rce_pid" 2>/dev/null; fi
+    done
+}
+
+# A data connection: the accepted (or dialled) socket is on stdin and stdout. It waits for
+# the job the control side writes for it, serves it, closes the socket and signals done.
+rce_ftp_data_entry() {
+    local index=0 polls=0 socket
+    exec 2>>"$RCE_STATE/handler.err"
+    trap '' TERM HUP PIPE
+    while ! mkdir "$RCE_STATE/dclaim.$index" 2>/dev/null; do index=$((index + 1)); done
+    printf '%s\n' "$$" >"$RCE_STATE/pid.fd$index"
+    while [ ! -f "$RCE_STATE/job.$index" ]; do
+        # No job is coming once the control session has ended: closing is all that is left.
+        if [ -e "$RCE_STATE/stop" ] || [ -e "$RCE_STATE/ftp-ended" ]; then exit 0; fi
+        sleep 0.02
+    done
+    . "$RCE_STATE/job.$index"
+    if [ "$RCE_JOB_TLS" = 1 ]; then
+        # Like HTTPS: this process becomes the relay to s_server's Unix socket while a
+        # sibling serves the plaintext through FIFOs and signals done.
+        socket="$RCE_STATE/ftp-data.$index.sock"
+        (rce_ftp_data_tls "$index" "$socket") </dev/null >/dev/null &
+        while [ ! -S "$socket" ] && [ $polls -lt 250 ]; do
+            polls=$((polls + 1))
+            sleep 0.02
+        done
+        exec "$RCE_SOCAT" -lf "$RCE_STATE/ftp-data.$index.relay.log" -t 0 STDIO "UNIX-CONNECT:$socket"
+    fi
+    case $RCE_JOB_VERB in
+        RETR | LIST | NLST)
+            tail -c +$((RCE_JOB_REST + 1)) "$RCE_STATE/ftpdata.bin" 2>/dev/null
+            if [ "$RCE_FTP_HOLD" -gt 0 ]; then rce_sleep_ms "$RCE_FTP_HOLD"; fi
+            ;;
+        *) cat >"$RCE_STATE/upload.$index" ;;
+    esac
+    exec 0<&- 1>&-
+    : >"$RCE_STATE/jobdone.$index"
+    exit 0
+}
+
+# The plaintext side of a TLS data connection, behind s_server on Socket.
+rce_ftp_data_tls() {
+    local index=$1 socket=$2 in out pid drain
+    in="$RCE_STATE/ftp-data.$index.in"
+    out="$RCE_STATE/ftp-data.$index.out"
+    mkfifo "$in" "$out" || return 1
+    "$RCE_OPENSSL" s_server -quiet -no_ign_eof -naccept 1 -tls1_2 -cert "$RCE_STATE/server.crt" -key "$RCE_STATE/server.key" \
+        -unix "$socket" >"$out" <"$in" 2>>"$RCE_STATE/ftp-tls.err" &
+    pid=$!
+    printf '%s\n' "$pid" >"$RCE_STATE/tls-pid.ftpd$index"
+    exec 8<"$out" 9>"$in"
+    case $RCE_JOB_VERB in
+        RETR | LIST | NLST)
+            cat <&8 >/dev/null 9>&- 2>/dev/null &
+            drain=$!
+            tail -c +$((RCE_JOB_REST + 1)) "$RCE_STATE/ftpdata.bin" >&9 2>/dev/null
+            if [ "$RCE_FTP_HOLD" -gt 0 ]; then rce_sleep_ms "$RCE_FTP_HOLD"; fi
+            # End of file on s_server's input: close_notify, then it closes and exits.
+            exec 9>&-
+            ;;
+        *)
+            cat <&8 >"$RCE_STATE/upload.$index" 9>&- 2>/dev/null &
+            drain=$!
+            ;;
+    esac
+    wait "$pid" 2>/dev/null
+    wait "$drain" 2>/dev/null
+    sleep 0.05
+    : >"$RCE_STATE/jobdone.$index"
+}
+
 if [ "${1:-}" = '--rce-connection' ]; then
     RCE_STATE=$2
     . "$RCE_STATE/config.sh"
+    if [ -f "$RCE_STATE/ftp-config.sh" ]; then . "$RCE_STATE/ftp-config.sh"; fi
     rce_connection_entry
+fi
+
+if [ "${1:-}" = '--rce-ftp-data' ]; then
+    RCE_STATE=$2
+    . "$RCE_STATE/config.sh"
+    rce_ftp_data_entry
 fi
 
 # --- Parameters -----------------------------------------------------------------------
@@ -717,6 +1200,10 @@ RCE_NO_SERVER=0
 RCE_UNIX_SOCKET=''
 # The unported modes' parameters, parsed so a command line written for the PowerShell
 # script reaches the not-ported message rather than an unknown-parameter error.
+RCE_FTP_REPLIES=()
+RCE_FTP_DATA=''
+RCE_FTP_IDLE=5000
+RCE_FTP_HOLD=0
 RCE_FTP=0 RCE_SMTP=0 RCE_IMAP=0 RCE_POP3=0 RCE_TFTP=0 RCE_SCRIPT='' RCE_HTTP2=0 RCE_HTTP2_ORIGIN=''
 RCE_HTTP2_ANSWER='' RCE_UDP_SINK=0 RCE_DNS_PORTS='' RCE_DNS_SILENT_PORTS='' RCE_DOH_PORTS=''
 
@@ -799,7 +1286,11 @@ while [ $# -gt 0 ]; do
         dnsport) RCE_DNS_PORTS="$RCE_DNS_PORTS $value" ;;
         dnssilentport) RCE_DNS_SILENT_PORTS="$RCE_DNS_SILENT_PORTS $value" ;;
         dohport) RCE_DOH_PORTS="$RCE_DOH_PORTS $value" ;;
-        ftpreply | ftpdata | ftpidlemilliseconds | ftpdataholdmilliseconds | smtpreply | smtpidlemilliseconds | \
+        ftpreply) RCE_FTP_REPLIES[${#RCE_FTP_REPLIES[@]}]=$value ;;
+        ftpdata) RCE_FTP_DATA=$value ;;
+        ftpidlemilliseconds) rce_integer FtpIdleMilliseconds "$value" 1 600000; RCE_FTP_IDLE=$value ;;
+        ftpdataholdmilliseconds) rce_integer FtpDataHoldMilliseconds "$value" 0 600000; RCE_FTP_HOLD=$value ;;
+        smtpreply | smtpidlemilliseconds | \
             imapreply | imapmessage | imapidlemilliseconds | pop3reply | pop3message | pop3idlemilliseconds | \
             tftpdata | tftpreply | tftpidlemilliseconds | scriptidlemilliseconds | scriptgapmilliseconds | \
             proxystatus | proxyalpn | http2resetcode | dnsansweraddress | dnsresponsecode | dnsechconfiglist) ;;
@@ -831,7 +1322,6 @@ if [ $RCE_HTTP2 = 1 ] && [ $RCE_TLS = 0 ] && [ -z "$RCE_HTTP2_ORIGIN" ]; then rc
 if [ $RCE_HTTP2 = 1 ] && { [ $rce_sessions -gt 0 ] || [ $RCE_NO_SERVER = 1 ] || [ -n "$RCE_UNIX_SOCKET" ] || [ $RCE_TFTP = 1 ]; }; then rce_die '-Http2 serves one HTTPS proxy connection, so it cannot be combined with -Ftp, -Smtp, -Imap, -Pop3, -Script, -NoServer, -UnixSocket or -Tftp.'; fi
 
 # The modes this port does not serve yet.
-if [ $RCE_FTP = 1 ]; then rce_not_ported -Ftp; fi
 if [ $RCE_SMTP = 1 ]; then rce_not_ported -Smtp; fi
 if [ $RCE_IMAP = 1 ]; then rce_not_ported -Imap; fi
 if [ $RCE_POP3 = 1 ]; then rce_not_ported -Pop3; fi
@@ -848,6 +1338,8 @@ if [ $RCE_HALF_CLOSE = 1 ] && [ $RCE_TLS = 1 ]; then rce_not_ported '-HalfCloseA
 # attempt after a 503 is answered with the next entry.
 if [ $RCE_CONNECTIONS_GIVEN = 0 ] && [ "$RCE_ANSWER_HELD" -eq 0 ]; then RCE_CONNECTIONS=${#RESPONSES[@]}; fi
 RCE_RESPONSE_COUNT=${#RESPONSES[@]}
+# An FTP session is one control connection.
+if [ $RCE_FTP = 1 ]; then RCE_CONNECTIONS=1; fi
 
 # --- Tools ----------------------------------------------------------------------------
 
@@ -858,7 +1350,7 @@ RCE_SOCAT=${SOCAT:-socat}
 # takes on the port itself.
 RCE_USE_SOCAT=0
 if [ $RCE_NO_SERVER = 0 ]; then
-    if [ $RCE_TLS = 0 ] || [ "$RCE_CONNECTIONS" -gt 1 ] || [ $RCE_RESET = 1 ] || [ $RCE_RESET_AFTER = 1 ]; then RCE_USE_SOCAT=1; fi
+    if [ $RCE_FTP = 1 ] || [ $RCE_TLS = 0 ] || [ "$RCE_CONNECTIONS" -gt 1 ] || [ $RCE_RESET = 1 ] || [ $RCE_RESET_AFTER = 1 ]; then RCE_USE_SOCAT=1; fi
 fi
 rce_missing=''
 for rce_tool in awk od mktemp sleep wc tr cat; do
@@ -867,7 +1359,7 @@ done
 if [ $RCE_USE_SOCAT = 1 ] && ! command -v "$RCE_SOCAT" >/dev/null 2>&1; then
     rce_missing="$rce_missing, socat (the listener for plain HTTP, -UnixSocket, -Reset, -ResetAfterResponse and several -Tls connections; set SOCAT to name it)"
 fi
-if [ $RCE_TLS = 1 ]; then
+if [ $RCE_TLS = 1 ] || [ $RCE_FTP = 1 ]; then
     command -v mkfifo >/dev/null 2>&1 || rce_missing="$rce_missing, mkfifo"
     if ! command -v "$RCE_OPENSSL" >/dev/null 2>&1; then
         rce_missing="$rce_missing, openssl (OpenSSL 1.1.1 or later, for -Tls; set OPENSSL to name it)"
@@ -885,7 +1377,7 @@ case $(uname -s 2>/dev/null) in
     MINGW* | MSYS*)
         case $(command -v "$RCE_OPENSSL") in
             /mingw* | /ucrt64* | /clang* | /[a-zA-Z]/*)
-                if [ $RCE_TLS = 1 ]; then rce_die "-Tls needs a Unix openssl, and $(command -v "$RCE_OPENSSL") is a native Windows program, which cannot read this script's FIFOs; use Record-CurlExchange.ps1 on Windows."; fi
+                if [ $RCE_TLS = 1 ] || [ $RCE_FTP = 1 ]; then rce_die "-Tls and -Ftp need a Unix openssl, and $(command -v "$RCE_OPENSSL") is a native Windows program, which cannot read this script's FIFOs; use Record-CurlExchange.ps1 on Windows."; fi
                 ;;
         esac
         ;;
@@ -899,10 +1391,12 @@ rce_temp=${TMPDIR:-/tmp}
 case $rce_temp in *[' :,']*) rce_temp=/tmp ;; esac
 RCE_STATE=$(mktemp -d "${rce_temp%/}/rce.XXXXXX") || rce_die 'mktemp failed'
 RCE_LISTENER_PID=''
+RCE_DATA_LISTENER_PID=''
 
 rce_cleanup() {
     : >"$RCE_STATE/stop" 2>/dev/null
     if [ -n "$RCE_LISTENER_PID" ]; then kill "$RCE_LISTENER_PID" 2>/dev/null; fi
+    if [ -n "${RCE_DATA_LISTENER_PID:-}" ]; then kill "$RCE_DATA_LISTENER_PID" 2>/dev/null; fi
     # Whatever is still serving a connection: handlers, held connections, s_servers.
     for rce_pid_file in "$RCE_STATE"/pid.* "$RCE_STATE"/tls-pid.*; do
         [ -f "$rce_pid_file" ] && kill -KILL "$(cat "$rce_pid_file")" 2>/dev/null
@@ -991,7 +1485,7 @@ rce_make_tls_certificate() {
     if [ -n "$RCE_TLS_REVOKING_CRL" ]; then rce_write_crl "$RCE_TLS_REVOKING_CRL" "$serial"; fi
 }
 
-if [ $RCE_TLS = 1 ]; then
+if [ $RCE_TLS = 1 ] || [ $RCE_FTP = 1 ]; then
     rce_make_tls_certificate
     "$RCE_OPENSSL" x509 -in "$RCE_STATE/server.crt" -noout -pubkey >"$RCE_STATE/public.pem" || rce_die 'openssl x509 -pubkey failed'
     "$RCE_OPENSSL" pkey -pubin -in "$RCE_STATE/public.pem" -outform DER -out "$RCE_STATE/public.der" || rce_die 'openssl pkey failed'
@@ -1018,31 +1512,48 @@ done
 # What each connection handler reads: socat starts them as fresh processes.
 for rce_variable in RCE_STATE RCE_CONNECTIONS RCE_RESPONSE_COUNT RCE_RESPONSE_SIZES RCE_DELAY RCE_RESET RCE_RESET_AFTER \
     RCE_HALF_CLOSE RCE_HOLD_OPEN RCE_ANSWER_HELD RCE_EARLY_RESPONSE_BODY_BYTES RCE_REQUEST_READ RCE_TLS RCE_CLOSE_NOTIFY \
-    RCE_OPENSSL RCE_SOCAT; do
+    RCE_OPENSSL RCE_SOCAT RCE_FTP RCE_FTP_IDLE RCE_FTP_HOLD RCE_LISTEN_ADDRESS; do
     eval "printf '%s=%q\n' \"\$rce_variable\" \"\$$rce_variable\""
 done >"$RCE_STATE/config.sh"
 printf '#!%s\nexec %q %q --rce-connection %q\n' "$BASH" "$BASH" "$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" "$RCE_STATE" >"$RCE_STATE/connection"
 chmod +x "$RCE_STATE/connection"
 
-# Waits up to five seconds for a TCP listener on Port: /proc/net/tcp on Linux, netstat
-# elsewhere, else one second blind.
-rce_wait_for_listening_port() {
-    local port=$1 hex polls=0
-    printf -v hex '%04X' "$port"
-    while [ $polls -lt 250 ]; do
-        if [ -r /proc/net/tcp ]; then
-            cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -Eq "^ *[0-9]+: [0-9A-F]+:$hex [0-9A-F]+:0000 0A" && return 0
-        elif command -v netstat >/dev/null 2>&1; then
-            netstat -an 2>/dev/null | grep -Eq "[.:]$port[[:space:]].*LISTEN" && return 0
-        else
-            sleep 1
-            return 0
+# -Ftp: FtpData, the FtpReply table (as variables the control handler reads: RCE_FR_COUNT_<VERB>
+# and RCE_FR_<VERB>_<n>) and the passive data listener, whose port the handler reads.
+if [ $RCE_FTP = 1 ]; then
+    rce_decode_escaped "$RCE_FTP_DATA" "$RCE_STATE/ftpdata.bin"
+    : >"$RCE_STATE/upload.bin"
+    : >"$RCE_STATE/transcript.txt"
+    : >"$RCE_STATE/ftp-config.sh"
+    for rce_entry in ${RCE_FTP_REPLIES[@]+"${RCE_FTP_REPLIES[@]}"}; do
+        case $rce_entry in *=*) ;; *) rce_die "FtpReply '$rce_entry' is not VERB=reply." ;; esac
+        rce_verb=$(printf '%s' "${rce_entry%%=*}" | tr '[:lower:]' '[:upper:]')
+        case $rce_verb in '' | *[!A-Z0-9]*) rce_die "FtpReply '$rce_entry': VERB is letters and digits." ;; esac
+        rce_decode_escaped "${rce_entry#*=}" "$RCE_STATE/ftp-reply.bin"
+        rce_reply=$(cat "$RCE_STATE/ftp-reply.bin"; printf x)
+        eval "rce_position=\${RCE_FR_COUNT_$rce_verb:-0}"
+        eval "RCE_FR_COUNT_$rce_verb=$((rce_position + 1))"
+        printf 'RCE_FR_COUNT_%s=%d\nRCE_FR_%s_%d=%q\n' "$rce_verb" $((rce_position + 1)) "$rce_verb" "$rce_position" "${rce_reply%x}" >>"$RCE_STATE/ftp-config.sh"
+    done
+    printf '#!%s\nexec %q %q --rce-ftp-data %q\n' "$BASH" "$BASH" "$(cd "$(dirname "$0")" && pwd)/$(basename "$0")" "$RCE_STATE" >"$RCE_STATE/ftp-data"
+    chmod +x "$RCE_STATE/ftp-data"
+    case $RCE_LISTEN_ADDRESS in
+        *:*) rce_data_listen="TCP6-LISTEN:0,bind=[$RCE_LISTEN_ADDRESS],reuseaddr,fork" ;;
+        *) rce_data_listen="TCP4-LISTEN:0,bind=$RCE_LISTEN_ADDRESS,reuseaddr,fork" ;;
+    esac
+    "$RCE_SOCAT" -d -d -lf "$RCE_STATE/data-socat.log" "$rce_data_listen" "EXEC:$RCE_STATE/ftp-data,nofork" </dev/null >/dev/null 2>&1 &
+    RCE_DATA_LISTENER_PID=$!
+    rce_polls=0
+    while ! grep -q 'listening on' "$RCE_STATE/data-socat.log" 2>/dev/null; do
+        if ! kill -0 "$RCE_DATA_LISTENER_PID" 2>/dev/null || [ $rce_polls -ge 250 ]; then
+            rce_die "socat did not start the FTP data listener: $(grep -E ' [EF] ' "$RCE_STATE/data-socat.log" 2>/dev/null | head -n 3)"
         fi
-        polls=$((polls + 1))
+        rce_polls=$((rce_polls + 1))
         sleep 0.02
     done
-    return 1
-}
+    rce_data_port=$(grep 'listening on' "$RCE_STATE/data-socat.log" | head -n 1)
+    printf '%s' "${rce_data_port##*:}" >"$RCE_STATE/dataport"
+fi
 
 if [ $RCE_USE_SOCAT = 1 ]; then
     if [ -n "$RCE_UNIX_SOCKET" ]; then
@@ -1142,6 +1653,7 @@ if [ $RCE_NO_SERVER = 0 ]; then
         kill "$RCE_LISTENER_PID" 2>/dev/null
         wait "$RCE_LISTENER_PID" 2>/dev/null
         RCE_LISTENER_PID=''
+RCE_DATA_LISTENER_PID=''
     fi
     : >"$RCE_STATE/stop"
     # Every connection accepted is served to its end, as the PowerShell script waits for
@@ -1177,6 +1689,10 @@ if [ $RCE_NO_SERVER = 0 ]; then
             rce_index=$((rce_index + 1))
         done
     } >"$RCE_OUT_DIRECTORY/request.bin"
+fi
+if [ $RCE_FTP = 1 ]; then
+    cat "$RCE_STATE/transcript.txt" >"$RCE_OUT_DIRECTORY/transcript.txt"
+    cat "$RCE_STATE/upload.bin" >"$RCE_OUT_DIRECTORY/upload.bin"
 fi
 cat "$RCE_STATE/stdout.bin" >"$RCE_OUT_DIRECTORY/stdout.bin"
 cat "$RCE_STATE/stderr.txt" >"$RCE_OUT_DIRECTORY/stderr.txt"
