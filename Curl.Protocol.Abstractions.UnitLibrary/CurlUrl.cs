@@ -317,7 +317,6 @@ public sealed record CurlUrl
             flags.DisallowUser,
             out rejection,
             flags.AllowEmptyHost,
-            keepFileBackslashes: true,
             fileSchemeWithoutSlash: !flags.GuessesScheme);
 
         return url is not null;
