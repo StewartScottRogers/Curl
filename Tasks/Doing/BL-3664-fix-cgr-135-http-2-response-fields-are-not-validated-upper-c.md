@@ -111,3 +111,4 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 - 2026-10-26: Created from CGR-135 of the third-party gap report.
 - 2026-10-26: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-26: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs (held by BL-3667) and Http2Session.cs (held by BL-3668); REF measured and plan recorded in Notes
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
