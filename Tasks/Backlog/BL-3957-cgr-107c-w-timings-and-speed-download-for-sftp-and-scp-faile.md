@@ -18,7 +18,7 @@ SFTP and SCP transfers fill `%{time_namelookup}`, `%{time_connect}`, `%{time_app
 
 ## Context
 
-Split from BL-3636 (third-party gap report issue CGR-107, `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`; read BL-3636's Context for the repro setups and commands). Measure real curl 8.22.0 with `Record-CurlExchange.ps1` or a C# file-based loopback server (no Python) before pinning a value. SSH-08: Curl prints zeros on every sftp/scp transfer; curl prints real values (`0.000059 0.000588 0.092217 0.116552 0.117091 0.140040 7488117`), and a failed transfer (missing file) still has `time_connect` and `time_total`. `SshProtocolHandler` and the Sftp/Scp transfer classes put no timings on the report. `%{num_connects}` is BL-3955's.
+Split from BL-3636 (third-party gap report issue CGR-107, `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`; read BL-3636's Context for the repro setups and commands). Measure real curl 8.22.0 with `Record-CurlExchange.ps1` or a C# file-based loopback server (no Python) before pinning a value. SSH-08: Curl prints zeros on every sftp/scp transfer; curl prints real values (`0.000059 0.000588 0.092217 0.116552 0.117091 0.140040 7488117`), and a failed transfer (missing file) still has `time_connect` and `time_total`. `SshProtocolHandler` and the Sftp/Scp transfer classes put no timings on the report. `%{num_connects}` is BL-3961's.
 
 ## Acceptance criteria
 

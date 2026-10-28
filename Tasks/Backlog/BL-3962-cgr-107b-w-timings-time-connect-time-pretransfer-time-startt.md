@@ -1,5 +1,5 @@
 ---
-id: BL-3956
+id: BL-3962
 title: CGR-107b: -w timings (time_connect, time_pretransfer, time_starttransfer, time_total) and upload size_request for FTP
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3956 — CGR-107b: -w timings (time_connect, time_pretransfer, time_starttransfer, time_total) and upload size_request for FTP
+# BL-3962 — CGR-107b: -w timings (time_connect, time_pretransfer, time_starttransfer, time_total) and upload size_request for FTP
 
 ## Goal
 

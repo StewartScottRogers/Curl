@@ -1,5 +1,5 @@
 ---
-id: BL-3955
+id: BL-3961
 title: CGR-107a: -w num_connects counts the connections a non-HTTP transfer opened (1 for SMTP/POP3/IMAP/DICT/GOPHER/TELNET/MQTT/WS/RTSP/LDAP/SFTP/SCP, 2 for FTP, 1 after a refused WebSocket upgrade)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-3955 — CGR-107a: -w num_connects counts the connections a non-HTTP transfer opened (1 for SMTP/POP3/IMAP/DICT/GOPHER/TELNET/MQTT/WS/RTSP/LDAP/SFTP/SCP, 2 for FTP, 1 after a refused WebSocket upgrade)
+# BL-3961 — CGR-107a: -w num_connects counts the connections a non-HTTP transfer opened (1 for SMTP/POP3/IMAP/DICT/GOPHER/TELNET/MQTT/WS/RTSP/LDAP/SFTP/SCP, 2 for FTP, 1 after a refused WebSocket upgrade)
 
 ## Goal
 
