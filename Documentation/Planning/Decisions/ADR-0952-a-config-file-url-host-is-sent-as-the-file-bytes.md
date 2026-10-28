@@ -1,4 +1,4 @@
-# ADR-0949: A config file URL's host is sent as the file's own bytes on Windows
+# ADR-0952: A config file URL's host is sent as the file's own bytes on Windows
 
 - Status: Accepted
 - Date: 2026-10-28
