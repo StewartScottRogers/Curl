@@ -41,3 +41,4 @@ case-sensitive file names (the board's folders are `Backlog`, `Doing`, … exact
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 45f8dc4b ed0cd9ed 90cedfcc e1b07e9b 677155f8.
