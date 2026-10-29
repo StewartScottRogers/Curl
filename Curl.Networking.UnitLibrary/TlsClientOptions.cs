@@ -198,7 +198,7 @@ namespace Curl.Networking;
 /// <see langword="true" /> when <c>-v</c> or <c>--trace</c> asks for the OpenSSL build's handshake
 /// message trace (<c>TLSv1.3 (OUT), TLS handshake, Client hello (1):</c>). <c>SslStream</c> shows none of
 /// those messages, so in the OpenSSL build <see cref="TlsClientRouting" /> sends such a connection to
-/// <see cref="HandBuiltTlsProvider" /> (ADR-0984, BL-4010); the Schannel build prints no such trace.
+/// <see cref="HandBuiltTlsProvider" /> (ADR-0985, BL-4010); the Schannel build prints no such trace.
 /// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,

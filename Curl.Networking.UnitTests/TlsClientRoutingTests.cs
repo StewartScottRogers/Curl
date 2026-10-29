@@ -304,7 +304,7 @@ public sealed class TlsClientRoutingTests
         Assert.IsNull(TlsClientRouting.Reason(options));
     }
 
-    // ADR-0984 (BL-4010): the OpenSSL build's traced handshake messages run on the hand-built
+    // ADR-0985 (BL-4010): the OpenSSL build's traced handshake messages run on the hand-built
     // client, which reports them; the Schannel build traces none, so its route stays SslStream.
     [TestMethod]
     [DataRow(false, true, "the OpenSSL build traces the handshake messages, which SslStream does not show")]

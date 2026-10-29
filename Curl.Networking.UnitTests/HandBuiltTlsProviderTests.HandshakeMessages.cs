@@ -58,7 +58,7 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsNotNull(events.Handshakes[0].PeerSignatureTypeName);
     }
 
-    // ADR-0984 (BL-4010): options no other row routes, which SslStream would run, go to the
+    // ADR-0985 (BL-4010): options no other row routes, which SslStream would run, go to the
     // hand-built client in the OpenSSL build once the handshake messages are traced, and the
     // trace begins with the ClientHello.
     [TestMethod]

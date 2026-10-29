@@ -18,7 +18,7 @@ Off Windows, `curl -v https://...` (and `--trace`, `--trace-ascii`) runs the ori
 
 ## Context
 
-BL-4010 (ADR-0984) added `TlsClientOptions.TracesHandshakeMessages` and the `TlsClientRouting` row that routes such a connection to `HandBuiltTlsProvider` in the OpenSSL build; nothing sets the option yet. `TlsClientOptionsMapping.Of` and `ProxyOf` build the options from `EasyTlsOptions`, called from `EngineComposition.Transports.cs` (line ~134) and `OptionGroupConnectionSettings.cs` (line ~49); find where the engine knows `-v`/`--trace` (`EngineToolOptions` or the trace components, `CURLOPT_VERBOSE`/debug callback for libcurl) and pass it in. Set it only when the trace would be printed, so a transfer without `-v` keeps `SslStream`.
+BL-4010 (ADR-0985) added `TlsClientOptions.TracesHandshakeMessages` and the `TlsClientRouting` row that routes such a connection to `HandBuiltTlsProvider` in the OpenSSL build; nothing sets the option yet. `TlsClientOptionsMapping.Of` and `ProxyOf` build the options from `EasyTlsOptions`, called from `EngineComposition.Transports.cs` (line ~134) and `OptionGroupConnectionSettings.cs` (line ~49); find where the engine knows `-v`/`--trace` (`EngineToolOptions` or the trace components, `CURLOPT_VERBOSE`/debug callback for libcurl) and pass it in. Set it only when the trace would be printed, so a transfer without `-v` keeps `SslStream`.
 
 ## Acceptance criteria
 

@@ -1,4 +1,4 @@
-# ADR-0984: The OpenSSL build's traced handshakes run on the hand-built client
+# ADR-0985: The OpenSSL build's traced handshakes run on the hand-built client
 
 - Status: Accepted
 - Date: 2026-10-28

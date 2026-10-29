@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// <c>SslStream</c> can neither stop the system's session cache nor the TLS 1.0 CBC split; <c>--cert-status</c>'s row is ADR-0191's and <c>--curves</c> and
 /// <c>--sigalgs</c>' is ADR-0151's (BL-709), and <c>--ssl-sessions</c>' is ADR-0319's (BL-710):
 /// <c>SslStream</c> can neither export nor import a session, and <c>--ech</c>'s is ADR-0327's (BL-711): <c>SslStream</c> offers no
-/// Encrypted Client Hello, and <c>--tls-earlydata</c>'s is BL-1105's: <c>SslStream</c> sends no 0-RTT early data, and a TLS 1.0 or 1.1 minimum's is ADR-0360's (BL-1143): an operating-system stack may refuse those versions, and <c>SSLKEYLOGFILE</c>'s is BL-2327's: <c>SslStream</c> cannot log its secrets, and the OpenSSL build's traced handshake messages' is ADR-0984's (BL-4010): <c>SslStream</c> shows none of them. QUIC is not routed here: it has no
+/// Encrypted Client Hello, and <c>--tls-earlydata</c>'s is BL-1105's: <c>SslStream</c> sends no 0-RTT early data, and a TLS 1.0 or 1.1 minimum's is ADR-0360's (BL-1143): an operating-system stack may refuse those versions, and <c>SSLKEYLOGFILE</c>'s is BL-2327's: <c>SslStream</c> cannot log its secrets, and the OpenSSL build's traced handshake messages' is ADR-0985's (BL-4010): <c>SslStream</c> shows none of them. QUIC is not routed here: it has no
 /// <c>SslStream</c> route at all.
 /// </remarks>
 public static class TlsClientRouting
@@ -71,7 +71,7 @@ public static class TlsClientRouting
 
     private const string HandshakeMessageTraceReason = "the OpenSSL build traces the handshake messages, which SslStream does not show";
 
-    // The handshake-message-trace row (ADR-0984, BL-4010, CGR-226): curl's OpenSSL build writes
+    // The handshake-message-trace row (ADR-0985, BL-4010, CGR-226): curl's OpenSSL build writes
     // one -v line per handshake message, which SslStream never shows, so a connection whose
     // messages are traced runs on the hand-built client, which reports them (ADR-0983).
     private static bool TracesHandshakeMessagesInOpenSslBuild(TlsClientOptions options, bool matchesSchannelBuild) =>

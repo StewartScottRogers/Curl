@@ -29,7 +29,7 @@ Split out of BL-3997. `SslStream` cannot report the encrypted TLS 1.3 handshake 
 ## Notes
 
 - Added `Curl.Networking.UnitLibrary/TlsClientOptions.cs` (the new `TracesHandshakeMessages` option the routing row reads) and `Curl.Networking.UnitTests/HandBuiltTlsProviderTests.HandshakeMessages.cs` (the provider test of the ClientHello event, beside BL-4009's) to `touches`; no task in Doing on origin/work/dark-factory names either.
-- Decision (ADR-0984): a routing row, not routing every OpenSSL-build connection to the hand-built client, which would change every transfer's TLS stack off Windows at once, unverifiable from a Windows lane. `SslStream`'s client-certificate store is Schannel-only and curl's OpenSSL build checks revocation only through `--crlfile`/`--cert-status`, which the hand-built client already honours, so the OpenSSL build loses nothing on the row. The Schannel build never takes it.
+- Decision (ADR-0985): a routing row, not routing every OpenSSL-build connection to the hand-built client, which would change every transfer's TLS stack off Windows at once, unverifiable from a Windows lane. `SslStream`'s client-certificate store is Schannel-only and curl's OpenSSL build checks revocation only through `--crlfile`/`--cert-status`, which the hand-built client already honours, so the OpenSSL build loses nothing on the row. The Schannel build never takes it.
 - Setting the option from `-v`/`--trace` in the engine is filed as BL-4047 (Curl.Engine files, outside this task's touches).
 - The full fast run had two `Cgr036Tests` failures in Curl.Engine.UnitTests that pass alone and that this change cannot reach (the option defaults to false); filed as BL-4048. Every other project green; Curl.Networking.UnitTests 3842 passed. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members.
 
@@ -37,4 +37,4 @@ Split out of BL-3997. `SslStream` cannot report the encrypted TLS 1.3 handshake 
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: ead23c02 e0fbbd90 3d836d5e.
-- 2026-10-28: Doing -> Done. In the OpenSSL build a connection whose handshake messages are traced routes to the hand-built client, which reports its ClientHello (ADR-0984)
+- 2026-10-28: Doing -> Done. In the OpenSSL build a connection whose handshake messages are traced routes to the hand-built client, which reports its ClientHello (ADR-0985)
