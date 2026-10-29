@@ -1,4 +1,4 @@
-# ADR-1066 — Curl.Api and Curl.Mcp transfers reach the extensions; Libcurl stays without them
+# ADR-1071 — Curl.Api and Curl.Mcp transfers reach the extensions; Libcurl stays without them
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -19,7 +19,7 @@ public sealed partial class CurlClient
     /// A client over a new <see cref="ManagedCurlEngine"/>, the managed engine, with
     /// <paramref name="options"/>. The client owns the engine and disposes it with itself. Its
     /// transfers reach Curl's extensions as the <c>curl</c> tool's do, unless the
-    /// <c>CURL_EXTENSIONS</c> environment variable is <c>0</c> (ADR-0999, ADR-1066).
+    /// <c>CURL_EXTENSIONS</c> environment variable is <c>0</c> (ADR-0999, ADR-1071).
     /// </summary>
     /// <param name="options">The defaults applied to every easy handle the client creates.</param>
     /// <returns>The new client.</returns>

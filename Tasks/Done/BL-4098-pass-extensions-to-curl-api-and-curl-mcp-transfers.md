@@ -37,7 +37,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - Measured 2026-10-29 09:14: build clean, fast tests green; Measure-CodeQuality.ps1 for Curl.Engine.UnitLibrary, Curl.Api, Curl.Mcp has 2 failing members, neither changed here: `EngineComposition.CreateProtocolHandlers` complexity 12 (BL-4083 covers it) and `CurlMcpHost.Build()` branch 50% (filed BL-4167). Requeued until both are Done; then reapply the stash, rerun the quality measurement, write the ADR, and finish.
 
 - 2026-10-29 (second claim): the quality run found `CurlMcpHost.Build()` at 50% branch again: the new `Environment.GetEnvironmentVariable` method group in the two-argument `CreateRegistry` shared the compiler's delegate cache with `Build()`, so tests that ran first set it. Fixed by removing that overload: `CreateHandlers` takes the host's injected reader and passes it to `CreateRegistry`. Touches widened to `Curl.Mcp.IntegrationTests/CurlTransferToolIntegrationTests.cs`, whose one call used the removed overload; no task in Doing on origin/work/dark-factory named it.
-- Measured: `Measure-CodeQuality.ps1` for Curl.Engine.UnitLibrary and Curl.Api 0 failing members, Curl.Mcp 0 after the fix. Build clean (its isolation check passes; Libcurl references no extension), fast tests green on Windows. The new tests use no path, file or OS text, so they are platform-neutral. Decision recorded in ADR-1066.
+- Measured: `Measure-CodeQuality.ps1` for Curl.Engine.UnitLibrary and Curl.Api 0 failing members, Curl.Mcp 0 after the fix. Build clean (its isolation check passes; Libcurl references no extension), fast tests green on Windows. The new tests use no path, file or OS text, so they are platform-neutral. Decision recorded in ADR-1071.
 
 ## Log
 

@@ -79,7 +79,7 @@ internal static class CurlMcpHost
     /// URL handles, and the <c>--ai-help</c> resources through <see cref="AiHelpMcpResourceProvider" /> (ADR-0589).
     /// The engine's transfers reach the handlers <paramref name="extensionHandlers" /> builds, as the <c>curl</c>
     /// tool's reach Curl's extensions, unless <paramref name="readEnvironmentVariable" /> sets
-    /// <c>CURL_EXTENSIONS</c> to <c>0</c> (ADR-0999, ADR-1066, BL-4098).
+    /// <c>CURL_EXTENSIONS</c> to <c>0</c> (ADR-0999, ADR-1071, BL-4098).
     /// </summary>
     /// <param name="root">The folder every file the <c>curl</c> tool touches must lie in.</param>
     /// <param name="cap">The most bytes a tool returns.</param>
