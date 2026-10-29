@@ -1,16 +1,16 @@
 ---
-id: BL-4273
+id: BL-4276
 title: Kafka extension: authenticate with SASL PLAIN from --user
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4272]
+depends-on: [BL-4275]
 touches: [Curl.Extension.Kafka.UnitLibrary/Client/KafkaProtocolHandler.cs, Curl.Extension.Kafka.UnitLibrary/Client/KafkaClientFlow.cs, Curl.Extension.Kafka.UnitLibrary/Wire/KafkaSasl, Curl.Extension.Kafka.UnitTests/Client/KafkaProtocolHandlerTests.cs, Curl.Extension.Kafka.UnitTests/Wire/KafkaSasl]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4273 — Kafka extension: authenticate with SASL PLAIN from --user
+# BL-4276 — Kafka extension: authenticate with SASL PLAIN from --user
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Follow-up of BL-4121 (ADR-1075): no SASL is offered, so a broker that demands it closes the connection. Kafka's SASL PLAIN is RFC 4616 inside SaslAuthenticate; `--user` maps onto it as STOMP's `--user` maps onto login and passcode. Depends on BL-4272 since both change the handler's connection flow.
+Follow-up of BL-4121 (ADR-1075): no SASL is offered, so a broker that demands it closes the connection. Kafka's SASL PLAIN is RFC 4616 inside SaslAuthenticate; `--user` maps onto it as STOMP's `--user` maps onto login and passcode. Depends on BL-4275 since both change the handler's connection flow.
 
 ## Acceptance criteria
 

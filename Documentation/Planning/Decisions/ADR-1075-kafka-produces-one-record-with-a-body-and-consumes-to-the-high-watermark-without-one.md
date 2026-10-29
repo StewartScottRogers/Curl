@@ -40,10 +40,10 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
 ## Left out, and why
 
 - Snappy, lz4 and zstd batches end with exit 8: the BCL has none of the three, and each is a decoder of its own to
-  write by hand, filed as BL-4274.
+  write by hand, filed as BL-4277.
 - Metadata and leader routing: the request goes to the URL's broker, which answers NOT_LEADER_OR_FOLLOWER when it does
-  not lead the partition; filed as BL-4272.
-- SASL authentication (`--user`): filed as BL-4273, after BL-4272 since both change the connection flow.
+  not lead the partition; filed as BL-4275.
+- SASL authentication (`--user`): filed as BL-4276, after BL-4275 since both change the connection flow.
 - Keys, headers, transactions, idempotent producing, consumer groups and offset commits: no curl option maps onto
   them without inventing new options. A later task can add options for them through the extension option catalogue.
 - Read committed isolation: it needs the aborted transactions list applied to the batches; read uncommitted is

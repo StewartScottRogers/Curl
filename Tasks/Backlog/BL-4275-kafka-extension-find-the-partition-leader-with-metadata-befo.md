@@ -1,5 +1,5 @@
 ---
-id: BL-4272
+id: BL-4275
 title: Kafka extension: find the partition leader with Metadata before produce and fetch
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4272 — Kafka extension: find the partition leader with Metadata before produce and fetch
+# BL-4275 — Kafka extension: find the partition leader with Metadata before produce and fetch
 
 ## Goal
 

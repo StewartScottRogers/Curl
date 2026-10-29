@@ -37,7 +37,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - Touches widened to `ExtensionDescriptionCatalogue.cs` (the description line `curl --extensions` reads) and `Curl.Console.UnitTests/CurlCompositionTests.cs` (its list of connecting handlers counts every handler); no task in Doing on origin/work/dark-factory names either.
 - Decisions in ADR-1075: `kafka`/`kafkas` on 9092/9093, `/topic[/partition][?offset=N]`, Produce v3 and Fetch v4 (the oldest Kafka 4.0 accepts, non-flexible), one record per produce, consume to the high watermark with a line feed after each value, gzip read, hand-written CRC-32C.
-- Left for follow-ups: BL-4274 (snappy, lz4, zstd), BL-4272 (Metadata leader routing), BL-4273 (SASL PLAIN, after BL-4272).
+- Left for follow-ups: BL-4277 (snappy, lz4, zstd), BL-4275 (Metadata leader routing), BL-4276 (SASL PLAIN, after BL-4275).
 - Measured: Measure-CodeQuality.ps1 gives Curl.Extension.Kafka.UnitLibrary 100% line and branch coverage, 78 members, none failing, worst CRAP 8; Curl.Extension.Composition.UnitLibrary 100/100, none failing. Full build clean, fast tests green. `curl --extensions` lists kafka, `--ai-help extensions` names it, and with `CURL_EXTENSIONS=0` `kafka://` gives `curl: (1) Protocol "kafka" not supported`.
 - CI on Linux and macOS: the tests use no paths, OS error text or certificates and start no concurrent work, so they are platform-neutral.
 

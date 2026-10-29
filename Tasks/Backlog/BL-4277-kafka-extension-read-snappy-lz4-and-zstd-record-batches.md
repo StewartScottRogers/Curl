@@ -1,5 +1,5 @@
 ---
-id: BL-4274
+id: BL-4277
 title: Kafka extension: read snappy, lz4 and zstd record batches
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4274 — Kafka extension: read snappy, lz4 and zstd record batches
+# BL-4277 — Kafka extension: read snappy, lz4 and zstd record batches
 
 ## Goal
 
