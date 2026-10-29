@@ -1062,3 +1062,4 @@ Each option and the specific reason it lost.
 | [1027](ADR-1027-the-mcp-client-wire-format-is-strict-json-rpc-over-system-text-json.md) | The MCP client's wire format is strict JSON-RPC 2.0 over System.Text.Json (BL-4214) | Accepted | 2026-10-29 |
 | [1028](ADR-1028-jsonrpc-sends-calls-named-in-one-option-value-and-pairs-replies-by-id.md) | --jsonrpc sends the calls named in one option value and pairs the replies by id (BL-4106) | Accepted | 2026-10-29 |
 | [1029](ADR-1029-encrypted-dns-doq-resolver-uses-one-stream-per-query-on-the-hand-built-quic-client.md) | The DNS-over-QUIC resolver uses one stream per query on the hand-built QUIC client (BL-4208) | Accepted | 2026-10-29 |
+| [1028](ADR-1028-the-oauth2-extension-posts-to-its-endpoints-with-its-own-small-http-1-1-client.md) | The OAuth2 extension posts to its endpoints with its own small HTTP/1.1 client (BL-4213) | Accepted | 2026-10-29 |
