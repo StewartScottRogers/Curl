@@ -1,5 +1,5 @@
 ---
-id: BL-4202
+id: BL-4204
 title: Let an extension transfer hook answer a transfer itself and replace curl's response
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4202 — Let an extension transfer hook answer a transfer itself and replace curl's response
+# BL-4204 — Let an extension transfer hook answer a transfer itself and replace curl's response
 
 ## Goal
 
