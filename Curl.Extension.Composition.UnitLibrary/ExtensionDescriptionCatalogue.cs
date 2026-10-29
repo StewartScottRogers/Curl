@@ -15,6 +15,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
+        HttpFile.HttpFileOptions.Description,
         SocketIo.SocketIoExtension.Description,
         Coap.Client.CoapExtension.Description,
         Stomp.Client.StompExtension.Description,

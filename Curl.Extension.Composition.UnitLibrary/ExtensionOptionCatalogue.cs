@@ -23,5 +23,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.HttpCache.HttpCacheExtension.Option,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverTlsOption,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverQuicOption,
+        HttpFile.HttpFileOptions.File,
+        HttpFile.HttpFileOptions.Environment,
     ];
 }

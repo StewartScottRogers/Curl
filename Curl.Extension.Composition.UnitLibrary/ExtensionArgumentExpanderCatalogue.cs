@@ -15,5 +15,6 @@ public static class ExtensionArgumentExpanderCatalogue
     /// <summary>Gets the expanders; no two expand the same option.</summary>
     public static IReadOnlyList<IArgumentExpander> Entries { get; } =
     [
+        new HttpFile.HttpFileArgumentExpander(),
     ];
 }
