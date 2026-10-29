@@ -74,6 +74,15 @@ public sealed record HttpRequestOptions
     public bool FollowedToAnotherHost { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether an <c>-H</c> value naming <c>Authorization</c> was left out
+    /// of this followed request because it goes to another host, port or scheme without
+    /// <c>--location-trusted</c>. curl 8.22.0's <c>output_auth_headers</c> still sees that value,
+    /// so it generates no Basic, Bearer or <c>--aws-sigv4</c> value from the Location's user
+    /// information either, and the request carries no <c>Authorization</c> (CGR-076, BL-3605).
+    /// </summary>
+    public bool AuthorizationHeaderWithheld { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether this request sends the <c>-b name=value</c> strings
     /// beside the stored cookies: <see langword="true" /> unless it is a followed redirect to
     /// another scheme, host or port without <c>--location-trusted</c>, where curl 8.21.0's

@@ -777,6 +777,7 @@ public sealed class RedirectFollower(
                 HttpSignature = null,
                 KeptDigestAuthorization = null,
                 Headers = [.. hopHttp.Headers.Where(header => !IsCredentialHeader(header))],
+                AuthorizationHeaderWithheld = hopHttp.Headers.Any(header => HeaderNameIs(header, "Authorization")),
                 SendsCookieStrings = false,
             };
     }
@@ -800,12 +801,18 @@ public sealed class RedirectFollower(
     /// blanks between the name and its colon ignored, as curl 8.22.0 drops
     /// <c>Authorization : s3cr3t</c> from a redirect to another host (upstream test2113, BL-2163).
     /// </summary>
-    private static bool IsCredentialHeader(string header)
+    private static bool IsCredentialHeader(string header) =>
+        HeaderNameIs(header, "Authorization") || HeaderNameIs(header, "Cookie");
+
+    /// <summary>
+    /// Tells whether an <c>-H</c> value's name, with any blanks before its colon ignored, is
+    /// <paramref name="name" /> in any case.
+    /// </summary>
+    private static bool HeaderNameIs(string header, string name)
     {
         int colon = header.IndexOf(':', StringComparison.Ordinal);
-        ReadOnlySpan<char> name = colon < 0 ? [] : header.AsSpan(0, colon).TrimEnd(" \t");
-        return name.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase);
+        ReadOnlySpan<char> headerName = colon < 0 ? [] : header.AsSpan(0, colon).TrimEnd(" \t");
+        return headerName.Equals(name, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
