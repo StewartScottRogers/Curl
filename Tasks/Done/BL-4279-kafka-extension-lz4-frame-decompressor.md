@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Lz4FrameDecompressor.cs, Curl.Extension.Kafka.UnitTests/Wire/Compression/Lz4FrameDecompressorTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4279 — Kafka extension: LZ4 frame decompressor
 
@@ -34,3 +34,4 @@ Split from BL-4277 (which wires the decoders into Curl.Extension.Kafka.UnitLibra
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: acacedcc 619e8ef8 dc514177.
+- 2026-10-29: Doing -> Done. Lz4FrameDecompressor with hand-assembled vector tests; quality gates pass
