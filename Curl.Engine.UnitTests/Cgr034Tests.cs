@@ -95,7 +95,9 @@ public sealed class Cgr034Tests
         easy.Options = new EasyOptions
         {
             Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" },
-            Transfer = new EasyTransferOptions { Timeout = TimeSpan.FromMilliseconds(1000) },
+            // Long enough that a loaded runner reaches the read wait well before the deadline (BL-4027): with 1 s, a
+            // Linux or macOS CI runner passed it on the way there, so the transfer ended without CURL_POLL_IN.
+            Transfer = new EasyTransferOptions { Timeout = TimeSpan.FromMilliseconds(4000) },
         };
 
         multi.Add(easy);
