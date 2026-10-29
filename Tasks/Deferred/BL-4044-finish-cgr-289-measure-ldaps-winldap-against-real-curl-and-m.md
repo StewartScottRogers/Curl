@@ -39,3 +39,4 @@ BL-3818 made LdapProtocolHandler open WinLDAP's second ldaps connection with Tls
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 8d4a1a39 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs BL-4046 (WinLDAP NTLM flags over ldaps://); the -k trust fix, ADR-0983 and the recorder's second-TLS-connection support are left for the stash
+- 2026-10-29: Backlog -> Deferred. Split into BL-4054, BL-4055, BL-4056 (cost cap)

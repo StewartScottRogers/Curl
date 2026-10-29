@@ -4,7 +4,7 @@ title: Fix CGR-289: Windows ldaps://: PORT uses one connection with SNI localhos
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4026, BL-4044]
+depends-on: [BL-4026, BL-4054, BL-4055]
 touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitLibrary/WinLdapResultText.cs, Curl.Protocol.Ldap.UnitTests/Cgr289Tests.cs]
 model: sonnet
 requirement: none
