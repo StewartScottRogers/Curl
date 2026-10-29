@@ -13,7 +13,9 @@ Tested against the AMQP 0-9-1 specification (2008-11-13) with RabbitMQ's errata 
   need), each writing its own arguments; `Amqp0MethodReader` reads a method frame into its record.
 - Every fault in the wire format, read or about to be written, raises `Amqp0WireFormatException` carrying the
   `Amqp0ReplyCode` (ADR-1056).
-- `Client/` is BL-4260's client flow. No option, handler or registration yet: BL-4117 adds them.
+- `Client/`: `Amqp0ProtocolHandler` for `amqp://` and `amqps://` over the `IConnector` it is given, the URL's
+  `/virtual-host/queue` (`Amqp0UrlQueue`), the publish or basic.get flow (`Amqp0ClientFlow`) over whole frames
+  (`Amqp0FrameChannel`), and its exit codes and messages (ADR-1057). No option or registration yet: BL-4117 adds them.
 
 References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`). Held to the four
 quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Amqp0.UnitTests`.
