@@ -47,3 +47,4 @@ On Linux, `-v` over the SslStream path prints `SSL connection using TLSv1.3 / TL
 ## Notes
 
 Filed by BL-3755, which depends on this.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
