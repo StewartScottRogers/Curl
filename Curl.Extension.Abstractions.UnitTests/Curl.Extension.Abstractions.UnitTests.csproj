@@ -6,6 +6,8 @@
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+    <Using Include="Curl.Protocol.Abstractions" />
+    <Using Include="Curl.Protocol.Abstractions.HttpRequestOptions" Alias="HttpRequestOptions" />
   </ItemGroup>
 
   <ItemGroup>

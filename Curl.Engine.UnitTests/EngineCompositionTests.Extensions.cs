@@ -53,6 +53,46 @@ public sealed partial class EngineCompositionTests
         StringAssert.Contains(failure.Message, "\"http\"");
     }
 
+    [TestMethod]
+    public void CreateProtocolHandlers_WithoutExtensionTransferHooks_RunsEveryHandlerWithoutAHook()
+    {
+        Diagnostics.Arrange("extension transfer hooks", "none");
+        IReadOnlyList<EndPointReportingProtocolHandler> handlers = [.. EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver()).Cast<EndPointReportingProtocolHandler>()];
+        Diagnostics.Act("handlers", handlers.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        Assert.IsFalse(handlers.Any(handler => handler.GivenHandler is HookedHandler));
+    }
+
+    [TestMethod]
+    public void CreateProtocolHandlers_WithExtensionTransferHooks_PutsEveryHandlerThroughThem()
+    {
+        Diagnostics.Arrange("extension transfer hooks", "one");
+        IReadOnlyList<EndPointReportingProtocolHandler> handlers = [.. EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            extensionHandlers: _ => [new ExtensionSchemeHandler("example-extension")],
+            extensionTransferHooks: handler => new HookedHandler(handler)).Cast<EndPointReportingProtocolHandler>()];
+        Diagnostics.Act("last handler's schemes", string.Join(",", handlers[^1].SupportedSchemes));
+
+        Assert.IsTrue(handlers.All(handler => handler.GivenHandler is HookedHandler { Inner: not HookedHandler }));
+        Assert.IsInstanceOfType<ExtensionSchemeHandler>(((HookedHandler)handlers[^1].GivenHandler).Inner);
+    }
+
+    private sealed class HookedHandler(IProtocolHandler inner) : IProtocolHandler
+    {
+        public IProtocolHandler Inner => inner;
+
+        public IReadOnlyCollection<string> SupportedSchemes => inner.SupportedSchemes;
+
+        public ValueTask<TransferResult> ExecuteAsync(ITransferContext context) => inner.ExecuteAsync(context);
+    }
+
     private sealed class ExtensionSchemeHandler(string scheme) : IProtocolHandler
     {
         public IReadOnlyCollection<string> SupportedSchemes { get; } = [scheme];
