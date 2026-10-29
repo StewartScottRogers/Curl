@@ -19,5 +19,6 @@ internal static class ExtensionDescriptionCatalogue
         Coap.Client.CoapExtension.Description,
         Stomp.Client.StompExtension.Description,
         Nats.NatsExtension.Description,
+        Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
     ];
 }

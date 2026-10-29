@@ -44,6 +44,22 @@ public sealed class EventStreamParser
         return events;
     }
 
+    /// <summary>
+    /// Ends the stream the parser has been reading, as a closed connection does: the pending line and event are
+    /// discarded (§9.2.6, "Once the end of the file is reached, any pending data must be discarded") and the next
+    /// chunk starts a new stream, its leading byte order mark dropped. <see cref="LastEventId"/>, the last event ID
+    /// buffer and <see cref="ReconnectionTimeMilliseconds"/> belong to the event source and are kept for the reconnection.
+    /// </summary>
+    public void EndStream()
+    {
+        _decoder.Reset();
+        _line.Clear();
+        _data.Clear();
+        _eventType = string.Empty;
+        _isAtStreamStart = true;
+        _isAfterCarriageReturn = false;
+    }
+
     private void ReadCharacter(char character, List<ServerSentEvent> events)
     {
         if (IsSkipped(character))

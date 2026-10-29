@@ -215,6 +215,21 @@ public sealed class EventStreamParserTests
         AssertEvents(line + "\n\n");
     }
 
+    [TestMethod]
+    public void EndStream_DiscardsThePendingEventAndKeepsTheEventSourceState()
+    {
+        // §9.2.6: at the end of the file pending data is discarded; the last event ID and reconnection time persist.
+        var parser = new EventStreamParser();
+        Assert.HasCount(1, parser.Parse("retry: 9\nid: 3\ndata: a\n\nevent: x\ndata: cut\r"u8));
+
+        parser.EndStream();
+        var events = parser.Parse([0xEF, 0xBB, 0xBF, .. "data: b\n\n"u8]);
+
+        Assert.HasCount(1, events);
+        Assert.AreEqual(new ServerSentEvent("message", "b", "3"), events[0]);
+        Assert.AreEqual(9L, parser.ReconnectionTimeMilliseconds);
+    }
+
     private static void AssertEvents(string stream, params ServerSentEvent[] expected)
     {
         var bytes = Encoding.UTF8.GetBytes(stream);

@@ -19,5 +19,6 @@ public static class ExtensionTransferHookCatalogue
         GraphQl.GraphQlTransferHook.ActivatedBy,
         Curl.Extension.JsonRpc.JsonRpcExtension.HookFor,
         Coap.Observe.CoapObserveTransferHook.ActivatedBy,
+        Curl.Extension.ServerSentEvents.ServerSentEventsExtension.HookFor,
     ];
 }
