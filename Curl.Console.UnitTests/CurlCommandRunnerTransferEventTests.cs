@@ -564,11 +564,11 @@ public sealed class CurlCommandRunnerTransferEventTests
     [TestMethod]
     public async Task RunAsync_TraceIdsWithResolveEntry_MarksTheLineBeforeTheConnectionWithAnX()
     {
-        // curl 8.21.0 wrote "[0-x] * Added a.test:1:127.0.0.1 to DNS cache", then [0-0] (measured 2026-09-29, BL-648 Notes).
+        // curl 8.21.0 wrote "[0-x] * [DNS] added a.test:1:127.0.0.1 to cache", then [0-0] (measured 2026-09-29, BL-648 Notes).
         RecordingProtocolHandler handler = MeasuredExchange(18441, 55116);
         string[] arguments = ["-s", "-v", "--trace-ids", "http://127.0.0.1:18441/f.txt", "-o", "o"];
         Diagnostics.Arrange("arguments", string.Join(' ', arguments));
-        Diagnostics.Arrange("resolve entries", "report \"Added a.test:1:127.0.0.1 to DNS cache\"");
+        Diagnostics.Arrange("resolve entries", "report \"[DNS] added a.test:1:127.0.0.1 to cache\"");
         int exitCode;
 
         using (Diagnostics.Phase("run"))
@@ -577,7 +577,7 @@ public sealed class CurlCommandRunnerTransferEventTests
                     _ => new TransferDispatch(
                         new ProtocolDispatcher([handler]),
                         [],
-                        loadResolveEntries: events => events.ReportInfo("Added a.test:1:127.0.0.1 to DNS cache")),
+                        loadResolveEntries: events => events.ReportInfo("[DNS] added a.test:1:127.0.0.1 to cache")),
                     files,
                     files,
                     standardOutput,
@@ -591,7 +591,7 @@ public sealed class CurlCommandRunnerTransferEventTests
 
         WriteRunResult(exitCode);
 
-        string expectedStart = "[0-x] * Added a.test:1:127.0.0.1 to DNS cache" + InfoEnd + "[0-0] *   Trying 127.0.0.1:18441..." + InfoEnd;
+        string expectedStart = "[0-x] * [DNS] added a.test:1:127.0.0.1 to cache" + InfoEnd + "[0-0] *   Trying 127.0.0.1:18441..." + InfoEnd;
         Diagnostics.Assert("stderr starts with the x-marked DNS cache line", true, StandardErrorText.StartsWith(expectedStart, StringComparison.Ordinal));
         StringAssert.StartsWith(
             StandardErrorText,

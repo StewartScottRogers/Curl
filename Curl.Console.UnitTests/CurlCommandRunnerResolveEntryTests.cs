@@ -38,15 +38,15 @@ public sealed class CurlCommandRunnerResolveEntryTests
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
         string secondTransfer = StandardErrorText[StandardErrorText.IndexOf("* shutting down connection #0" + InfoEnd, StringComparison.Ordinal)..];
-        Diagnostics.Assert("second transfer starts with the reload lines", true, secondTransfer.StartsWith("* shutting down connection #0" + InfoEnd + "* RESOLVE foo.example:18486 - old addresses discarded" + InfoEnd + "* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd + "* Hostname foo.example was found in DNS cache" + InfoEnd, StringComparison.Ordinal));
+        Diagnostics.Assert("second transfer starts with the reload lines", true, secondTransfer.StartsWith("* shutting down connection #0" + InfoEnd + "* RESOLVE foo.example:18486 - old addresses discarded" + InfoEnd + "* [DNS] added foo.example:18486:127.0.0.1 to cache" + InfoEnd + "* Hostname foo.example was found in DNS cache" + InfoEnd, StringComparison.Ordinal));
         StringAssert.StartsWith(
             secondTransfer,
             "* shutting down connection #0" + InfoEnd
             + "* RESOLVE foo.example:18486 - old addresses discarded" + InfoEnd
-            + "* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd
+            + "* [DNS] added foo.example:18486:127.0.0.1 to cache" + InfoEnd
             + "* Hostname foo.example was found in DNS cache" + InfoEnd);
-        Diagnostics.Assert("occurrences of " + "* Added foo.example:18486:127.0.0.1 to DNS cache", 2, Occurrences("* Added foo.example:18486:127.0.0.1 to DNS cache"));
-        Assert.AreEqual(2, Occurrences("* Added foo.example:18486:127.0.0.1 to DNS cache"));
+        Diagnostics.Assert("occurrences of " + "* [DNS] added foo.example:18486:127.0.0.1 to cache", 2, Occurrences("* [DNS] added foo.example:18486:127.0.0.1 to cache"));
+        Assert.AreEqual(2, Occurrences("* [DNS] added foo.example:18486:127.0.0.1 to cache"));
     }
 
     [TestMethod]
@@ -58,10 +58,10 @@ public sealed class CurlCommandRunnerResolveEntryTests
 
         Diagnostics.Assert("exit code", 0, exitCode);
         Assert.AreEqual(0, exitCode);
-        Diagnostics.Assert("stderr starts with the added line", true, StandardErrorText.StartsWith("* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd, StringComparison.Ordinal));
-        StringAssert.StartsWith(StandardErrorText, "* Added foo.example:18486:127.0.0.1 to DNS cache" + InfoEnd);
-        Diagnostics.Assert("occurrences of " + "Added foo.example", 1, Occurrences("Added foo.example"));
-        Assert.AreEqual(1, Occurrences("Added foo.example"));
+        Diagnostics.Assert("stderr starts with the added line", true, StandardErrorText.StartsWith("* [DNS] added foo.example:18486:127.0.0.1 to cache" + InfoEnd, StringComparison.Ordinal));
+        StringAssert.StartsWith(StandardErrorText, "* [DNS] added foo.example:18486:127.0.0.1 to cache" + InfoEnd);
+        Diagnostics.Assert("occurrences of " + "[DNS] added foo.example", 1, Occurrences("[DNS] added foo.example"));
+        Assert.AreEqual(1, Occurrences("[DNS] added foo.example"));
         Diagnostics.Assert("occurrences of " + "RESOLVE foo.example", 0, Occurrences("RESOLVE foo.example"));
         Assert.AreEqual(0, Occurrences("RESOLVE foo.example"));
         Diagnostics.Assert("occurrences of " + "* Hostname foo.example was found in DNS cache", 2, Occurrences("* Hostname foo.example was found in DNS cache"));

@@ -1088,7 +1088,7 @@ public sealed partial class TcpConnector(
             ? DnsAddressShuffle.Shuffle(entry.Addresses, ResolveEntryShuffleRandomBelow)
             : entry.Addresses;
         _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, addresses));
-        events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
+        events.ReportInfo($"[DNS] added {entry.Host}:{entry.Port}:{entry.AddressText} to cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
         if (entry.Host == AnyHost)
         {
             events.ReportInfo($"RESOLVE {AnyHost}:{entry.Port} using wildcard");
@@ -2312,6 +2312,14 @@ public sealed partial class TcpConnector(
         return opened;
     }
 
+    // curl 8.22.0 writes an IPv6 literal host bracketed in the Established connection line (CGR-221).
+    private static string BracketedIfIpv6Literal(string hostName, string? unixSocketRemoteIp)
+    {
+        return unixSocketRemoteIp is null && IPAddress.TryParse(hostName, out var address) && address.AddressFamily == AddressFamily.InterNetworkV6
+            ? $"[{hostName}]"
+            : hostName;
+    }
+
     /// <summary>
     /// Numbers a connection that is ready for the transfer, reports it opened as curl 8.21.0's
     /// <c>Established connection</c> line, after any tunnel and TLS handshake (BL-228), and
@@ -2329,7 +2337,7 @@ public sealed partial class TcpConnector(
         var connectionNumber = TakeConnectionNumber();
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {
-            HostName = dialed.HostName,
+            HostName = BracketedIfIpv6Literal(dialed.HostName, dialed.UnixSocketRemoteIp),
             RemoteEndPoint = dialed.RemoteEndPoint ?? UnspecifiedEndPoint,
             LocalEndPoint = dialed.LocalEndPoint ?? UnspecifiedEndPoint,
             UnixSocketRemoteIp = dialed.UnixSocketRemoteIp,

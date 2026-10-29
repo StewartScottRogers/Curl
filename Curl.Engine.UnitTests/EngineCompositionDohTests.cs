@@ -188,7 +188,7 @@ public sealed class EngineCompositionDohTests
     public async Task Connect_WithResolveForTheSameHost_DialsTheEntryWithoutAskingTheDohServer()
     {
         // curl -v --resolve example.test:48712:127.0.0.1 --doh-url ... --doh-insecure http://example.test:48712/
-        // -> "Added ... to DNS cache", "Hostname example.test was found in DNS cache", no byte to the DoH server.
+        // -> "[DNS] added ... to cache", "Hostname example.test was found in DNS cache", no byte to the DoH server.
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         ScriptedConnector webServer = new([]);
 

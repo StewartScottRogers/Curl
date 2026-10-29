@@ -25,7 +25,7 @@ public sealed class TcpConnectorResolveShuffleTests
         connector.LoadResolveEntries(events);
 
         CollectionAssert.AreEqual(new[] { Second, Third, First }, dnsCache.Find(CacheKey)!.Addresses.ToArray());
-        CollectionAssert.AreEqual(new[] { $"Added {Entry} to DNS cache" }, events.Info);
+        CollectionAssert.AreEqual(new[] { $"[DNS] added {Entry} to cache" }, events.Info);
     }
 
     [TestMethod]

@@ -149,7 +149,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         DiagnoseLines(
             "stderr lines",
             [
-                "* Added foo:47500:127.0.0.1 to DNS cache",
+                "* [DNS] added foo:47500:127.0.0.1 to cache",
                 "* [DNS] created DNS filter for foo:47500, transport=3, queries=2",
                 "* [DNS] added",
                 "* [DNS] cf_dns_start host foo:47500",
@@ -168,7 +168,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "* Added foo:47500:127.0.0.1 to DNS cache",
+                "* [DNS] added foo:47500:127.0.0.1 to cache",
                 "* [DNS] created DNS filter for foo:47500, transport=3, queries=2",
                 "* [DNS] added",
                 "* [DNS] cf_dns_start host foo:47500",
@@ -195,7 +195,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         DiagnoseLines(
             "stderr lines",
             [
-                "* Added foo:47500:127.0.0.1 to DNS cache",
+                "* [DNS] added foo:47500:127.0.0.1 to cache",
                 "* Negative DNS entry",
                 "* Could not resolve host: foo",
                 "* Could not resolve: foo:47500",
@@ -206,7 +206,7 @@ public sealed class CurlCommandRunnerDnsFilterRouteTraceTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "* Added foo:47500:127.0.0.1 to DNS cache",
+                "* [DNS] added foo:47500:127.0.0.1 to cache",
                 "* Negative DNS entry",
                 "* Could not resolve host: foo",
                 "* Could not resolve: foo:47500",

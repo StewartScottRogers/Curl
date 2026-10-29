@@ -211,7 +211,7 @@ public sealed class ResolveOverridesTests
     [TestMethod]
     public void Find_AcceptsPortZero()
     {
-        // curl --resolve a:0:127.0.0.1 ... -> Added a:0:127.0.0.1 to DNS cache
+        // curl --resolve a:0:127.0.0.1 ... -> [DNS] added a:0:127.0.0.1 to cache
         Diagnostics.Arrange("entries", "a:0:127.0.0.1");
 
         var overrides = ResolveOverrides.Parse(["a:0:127.0.0.1"]);

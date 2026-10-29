@@ -112,7 +112,7 @@ public sealed partial class TcpConnectorTests
             new[]
             {
                 "RESOLVE localhost:18531 - old addresses discarded",
-                "Added localhost:18531:127.0.0.1 to DNS cache",
+                "[DNS] added localhost:18531:127.0.0.1 to cache",
                 "Hostname localhost was found in DNS cache",
                 "Host localhost:18531 was resolved.",
                 "IPv6: (none)",

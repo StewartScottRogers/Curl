@@ -37,7 +37,7 @@ public sealed partial class TcpConnectorTests
     [TestMethod]
     public async Task ConnectAsync_ToAnOnionNameWithAResolveEntry_RefusesAfterAddingTheEntryAndDialsNothing()
     {
-        // curl -sv --resolve x.onion:80:127.0.0.1 http://x.onion:80/ -> Added ... to DNS cache, then the refusal; exit 6.
+        // curl -sv --resolve x.onion:80:127.0.0.1 http://x.onion:80/ -> [DNS] added ... to cache, then the refusal; exit 6.
         var resolver = new FakeDnsResolver(Loopback);
         var dialer = new FakeTcpDialer();
         var events = new RecordingTransferEvents();
@@ -48,7 +48,7 @@ public sealed partial class TcpConnectorTests
         Diagnostics.Assert("exit code", CurlExitCode.CouldntResolveHost, result.ExitCode);
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         CollectionAssert.AreEqual(
-            new[] { "Added x.onion:80:127.0.0.1 to DNS cache", "Not resolving .onion address (RFC 7686)", "Could not resolve: x.onion:80", "Could not resolve: x.onion" },
+            new[] { "[DNS] added x.onion:80:127.0.0.1 to cache", "Not resolving .onion address (RFC 7686)", "Could not resolve: x.onion:80", "Could not resolve: x.onion" },
             events.Info);
         Assert.IsEmpty(resolver.ResolvedHosts);
         Assert.IsEmpty(dialer.DialedEndPoints);

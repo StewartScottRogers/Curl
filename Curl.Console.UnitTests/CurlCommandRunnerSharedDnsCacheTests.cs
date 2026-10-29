@@ -82,7 +82,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
             "--resolve", "foo.example:18531:127.0.0.1", "http://foo.example:18531/a", "--next", "-s", "-v", "http://foo.example:18531/b");
 
         Diagnostics.Assert("exit code", 0, exitCode);
-        Diagnostics.Assert("added lines", 1, Occurrences("* Added foo.example:18531:127.0.0.1 to DNS cache" + InfoEnd));
+        Diagnostics.Assert("added lines", 1, Occurrences("* [DNS] added foo.example:18531:127.0.0.1 to cache" + InfoEnd));
         Diagnostics.Assert(
             "found-in-cache blocks",
             2,
@@ -93,7 +93,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
                 + "* IPv4: 127.0.0.1" + InfoEnd
                 + "*   Trying 127.0.0.1:18531..." + InfoEnd));
         Assert.AreEqual(0, exitCode);
-        Assert.AreEqual(1, Occurrences("* Added foo.example:18531:127.0.0.1 to DNS cache" + InfoEnd));
+        Assert.AreEqual(1, Occurrences("* [DNS] added foo.example:18531:127.0.0.1 to cache" + InfoEnd));
         Assert.AreEqual(
             2,
             Occurrences(
@@ -109,7 +109,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
     {
         // curl -sv http://localhost:18531/a --next -sv --resolve localhost:18531:127.0.0.1
         // http://localhost:18531/b -> group 2: * RESOLVE localhost:18531 - old addresses discarded /
-        // * Added localhost:18531:127.0.0.1 to DNS cache / * Hostname localhost was found in DNS cache
+        // * [DNS] added localhost:18531:127.0.0.1 to cache / * Hostname localhost was found in DNS cache
         int exitCode = await RunAsync(
             "http://localhost:18531/a", "--next", "-s", "-v", "--resolve", "localhost:18531:127.0.0.1", "http://localhost:18531/b");
 
@@ -119,7 +119,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
             1,
             Occurrences(
                 "* RESOLVE localhost:18531 - old addresses discarded" + InfoEnd
-                + "* Added localhost:18531:127.0.0.1 to DNS cache" + InfoEnd
+                + "* [DNS] added localhost:18531:127.0.0.1 to cache" + InfoEnd
                 + "* Hostname localhost was found in DNS cache" + InfoEnd
                 + "* Host localhost:18531 was resolved." + InfoEnd));
         Diagnostics.Assert("found-in-cache lines", 1, Occurrences("Hostname localhost was found in DNS cache"));
@@ -128,7 +128,7 @@ public sealed class CurlCommandRunnerSharedDnsCacheTests
             1,
             Occurrences(
                 "* RESOLVE localhost:18531 - old addresses discarded" + InfoEnd
-                + "* Added localhost:18531:127.0.0.1 to DNS cache" + InfoEnd
+                + "* [DNS] added localhost:18531:127.0.0.1 to cache" + InfoEnd
                 + "* Hostname localhost was found in DNS cache" + InfoEnd
                 + "* Host localhost:18531 was resolved." + InfoEnd));
         Assert.AreEqual(1, Occurrences("Hostname localhost was found in DNS cache"));

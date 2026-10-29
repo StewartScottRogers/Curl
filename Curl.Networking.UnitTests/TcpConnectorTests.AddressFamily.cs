@@ -99,7 +99,7 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_UnderIPv6WithAResolveEntryOfOnlyIPv4_ReportsANegativeDnsEntryAndFailsWithCouldntResolveHost()
     {
         // curl -6 -v --resolve foo:47500:127.0.0.1 http://foo:47500/ ->
-        // * Added foo:47500:127.0.0.1 to DNS cache / * Negative DNS entry / * Could not resolve host: foo /
+        // * [DNS] added foo:47500:127.0.0.1 to cache / * Negative DNS entry / * Could not resolve host: foo /
         // * Could not resolve: foo:47500 / * Could not resolve: foo (measured, BL-1181 Notes)
         var dialer = new FakeTcpDialer();
         var connector = new TcpConnector(
@@ -117,7 +117,7 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added foo:47500:127.0.0.1 to DNS cache",
+                "[DNS] added foo:47500:127.0.0.1 to cache",
                 "Negative DNS entry",
                 "Could not resolve host: foo",
                 "Could not resolve: foo:47500",
@@ -145,7 +145,7 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added foo:47500:127.0.0.1,[::1] to DNS cache", "Hostname foo was found in DNS cache", "Host foo:47500 was resolved.",
+                "[DNS] added foo:47500:127.0.0.1,[::1] to cache", "Hostname foo was found in DNS cache", "Host foo:47500 was resolved.",
                 "IPv6: ::1", "IPv4: 127.0.0.1", "  Trying [::1]:47500...",
             },
             events.Info.Take(6).ToArray());
