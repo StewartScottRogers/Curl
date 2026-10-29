@@ -32,3 +32,4 @@ BL-4216 added `Curl.Extension.McpClient.UnitLibrary/Stdio/McpServerProcessStarte
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 51d91422 aa7a011d 3abafd76 d855b535.
