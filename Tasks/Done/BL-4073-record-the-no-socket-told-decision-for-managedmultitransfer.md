@@ -8,7 +8,7 @@ depends-on: [BL-4072]
 touches: [Documentation/Planning/Decisions/README.md, Curl.Engine.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4073 — Record the no-socket-told decision for ManagedMultiTransfer and update the Engine CLAUDE.md
 
@@ -22,9 +22,9 @@ Documentation half of BL-4068 (CGR-034). Real libcurl has no such transfer, so t
 
 ## Acceptance criteria
 
-- [ ] A new ADR, marked "Decided by Claude under Stewart's delegation", states that a transfer with no socket the handle knows is told no socket and is left out of `GetWaitSockets`, and why; its row is in `Documentation/Planning/Decisions/README.md`.
-- [ ] The BL-2426/BL-2427 paragraphs in `Curl.Engine.UnitLibrary/CLAUDE.md` no longer mention `FirstTransferSocket` or synthetic socket numbers and keep the 10 ms interval for BL-4069.
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports no `Curl.Engine.UnitLibrary` member outside a gate, and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A new ADR, marked "Decided by Claude under Stewart's delegation", states that a transfer with no socket the handle knows is told no socket and is left out of `GetWaitSockets`, and why; its row is in `Documentation/Planning/Decisions/README.md`.
+- [x] The BL-2426/BL-2427 paragraphs in `Curl.Engine.UnitLibrary/CLAUDE.md` no longer mention `FirstTransferSocket` or synthetic socket numbers and keep the 10 ms interval for BL-4069.
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1` reports no `Curl.Engine.UnitLibrary` member outside a gate, and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -32,5 +32,8 @@ Documentation half of BL-4068 (CGR-034). Real libcurl has no such transfer, so t
 
 ## Log
 
+- Notes: ADR-0997 filed. Fast tests not rerun: this task changed only Markdown; BL-4072 (code) ran them. Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary: 0 failing members.
+
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 6b40543d 2201ed3c 23a3c95f.
+- 2026-10-29: Doing -> Done. ADR-0997 recorded and Engine CLAUDE.md matches the no-socket-told code
