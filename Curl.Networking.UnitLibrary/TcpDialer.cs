@@ -22,6 +22,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     private const int LinuxSoBindToDevice = 25;
 
     private Action<nint>? socketCreated;
+    private Func<CancellationToken, ValueTask>? failedSocketRelease;
 
     /// <summary>
     /// Creates a dialer with curl's default socket options: <c>TCP_NODELAY</c> and
@@ -44,7 +45,34 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     public ITcpDialer PublishingSocketsTo(Action<nint> socketCreated)
     {
         ArgumentNullException.ThrowIfNull(socketCreated);
-        return new TcpDialer(SocketOptions) { socketCreated = socketCreated };
+        return new TcpDialer(SocketOptions) { socketCreated = socketCreated, failedSocketRelease = failedSocketRelease };
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The dialer returned has this one's <see cref="SocketOptions" /> and publishing hook, and awaits
+    /// <paramref name="released" /> before closing a TCP socket whose dial failed (<see cref="CloseFailedSocketAsync" />).
+    /// </remarks>
+    public ITcpDialer HoldingFailedSocketsUntil(Func<CancellationToken, ValueTask> released)
+    {
+        ArgumentNullException.ThrowIfNull(released);
+        return new TcpDialer(SocketOptions) { socketCreated = socketCreated, failedSocketRelease = released };
+    }
+
+    /// <summary>
+    /// Closes a TCP socket whose dial failed, first awaiting the hook <see cref="HoldingFailedSocketsUntil" /> gave, if any.
+    /// </summary>
+    /// <param name="socket">The socket that failed to connect.</param>
+    /// <param name="cancellationToken">The dial's cancellation token, handed to the hook.</param>
+    /// <returns>A task that completes once the socket is closed.</returns>
+    internal async ValueTask CloseFailedSocketAsync(Socket socket, CancellationToken cancellationToken)
+    {
+        if (failedSocketRelease is not null)
+        {
+            await failedSocketRelease(cancellationToken).ConfigureAwait(false);
+        }
+
+        socket.Dispose();
     }
 
     /// <summary>
@@ -156,7 +184,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         }
         catch
         {
-            socket.Dispose();
+            await CloseFailedSocketAsync(socket, cancellationToken).ConfigureAwait(false);
             throw;
         }
 
@@ -220,7 +248,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         }
         catch
         {
-            socket.Dispose();
+            await CloseFailedSocketAsync(socket, cancellationToken).ConfigureAwait(false);
             throw;
         }
 

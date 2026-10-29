@@ -30,6 +30,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     private bool socketIsResolveWakeup;
     private IDisposable? resolveWakeup;
     private bool connectSignalled;
+    private TaskCompletionSource? failedConnectHold;
     private bool gatingStopped;
     private TimeSpan lowSpeedTime;
     private DateTimeOffset? connectDeadline;
@@ -233,15 +234,52 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
         bool readyOut = (events & (CurlSocketSelect.Out | CurlSocketSelect.Error)) != 0;
         TaskCompletionSource? readable;
         TaskCompletionSource? writable;
+        TaskCompletionSource? failedConnect;
         lock (sync)
         {
             readable = Release(ref readableWait, CurlSocketSelect.In, readyIn && !socketIsResolveWakeup);
             writable = Release(ref writableWait, CurlSocketSelect.Out, readyOut && !socketIsResolveWakeup);
             connectSignalled |= connecting && readyOut;
+            failedConnect = TakeFailedConnectHold(readyOut);
         }
 
         readable?.TrySetResult();
         writable?.TrySetResult();
+        failedConnect?.TrySetResult();
+    }
+
+    // Called under the lock: the failed connect's hold an Out or Error signal releases, taken so it is released once.
+    private TaskCompletionSource? TakeFailedConnectHold(bool readyOut)
+    {
+        TaskCompletionSource? held = readyOut ? failedConnectHold : null;
+        failedConnectHold = readyOut ? null : failedConnectHold;
+        return held;
+    }
+
+    /// <summary>
+    /// Holds a connect that failed, its socket still open, until the multi handle signals the socket writable or in
+    /// error (<see cref="Signal" />), gating stops (<see cref="StopGating" />) or <paramref name="cancellationToken" />
+    /// is cancelled: the dialer closes the socket once this ends, so the socket the socket callback was told stays a
+    /// real one the application polls until the action that reads the failure removes it, as libcurl's does
+    /// (CGR-034 C_65). A connect the multi handle signalled already, or gating stopped, is not held.
+    /// </summary>
+    /// <param name="cancellationToken">Ends the hold, as the transfer's end or its connect deadline does.</param>
+    /// <returns>A task that completes when the dialer may close the socket.</returns>
+    internal async ValueTask HoldFailedConnectAsync(CancellationToken cancellationToken)
+    {
+        Task noticed;
+        lock (sync)
+        {
+            if (gatingStopped || connectSignalled)
+            {
+                return;
+            }
+
+            failedConnectHold ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            noticed = failedConnectHold.Task;
+        }
+
+        await noticed.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
 
     /// <summary>
