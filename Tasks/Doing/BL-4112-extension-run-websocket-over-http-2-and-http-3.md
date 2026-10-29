@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 80dd9d14 7bdf3437 50d813ce e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4196 (shared WebSocket codec), BL-4194 (HTTP/3 client session in Curl.Http3) and BL-4195 (extension scheme hook)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 80dd9d14 7bdf3437 50d813ce e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
