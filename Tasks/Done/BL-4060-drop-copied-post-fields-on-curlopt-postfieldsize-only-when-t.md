@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl/Options/Http/EasyHttpOptionSetters.cs, Libcurl.UnitTests]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4060 — Drop copied post fields on CURLOPT_POSTFIELDSIZE only when the size grows
 
@@ -38,3 +38,4 @@ Quality run for Libcurl: no Libcurl member fails; the one failing member in the 
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: e87f17ca b19de3b5 bbe0e011.
+- 2026-10-29: Doing -> Done. SetPostFieldSize drops copied fields only when the size grows; tests added
