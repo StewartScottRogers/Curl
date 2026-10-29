@@ -3,7 +3,7 @@
 The CoAP extension (ADR-0999), tested against RFC 7252, RFC 7959, RFC 7641 and RFC 6347, not
 against curl. It references only `Curl.Extension.Abstractions` (and through it
 `Curl.Protocol.Abstractions`), the shared layer `Curl.Tls` (for `TlsContentType` and
-`HandshakeType`, ADR-1040) and the base class library. No handler and no catalogue line yet: BL-4246 registers it.
+`HandshakeType`, ADR-1042) and the base class library. No handler and no catalogue line yet: BL-4246 registers it.
 
 `Wire/` (namespace `Curl.Extension.Coap.Wire`) holds the message format:
 
@@ -21,7 +21,7 @@ against curl. It references only `Curl.Extension.Abstractions` (and through it
   Block1/Block2 value NUM, M and SZX (RFC 7959 section 2.2); `CoapObserveValue` the Observe value
   (RFC 7641 section 2).
 
-`Dtls/Wire/` (namespace `Curl.Extension.Coap.Dtls.Wire`) frames DTLS 1.2 (RFC 6347, ADR-1040):
+`Dtls/Wire/` (namespace `Curl.Extension.Coap.Dtls.Wire`) frames DTLS 1.2 (RFC 6347, ADR-1042):
 
 - `DtlsRecordHeader` is the 13-byte record header (section 4.1): content type, version, epoch,
   48-bit sequence number and length, and `AdditionalData` the AEAD additional data built from the

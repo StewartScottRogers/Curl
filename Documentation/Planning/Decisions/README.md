@@ -1074,4 +1074,4 @@ Each option and the specific reason it lost.
 | [1039](ADR-1039-a-transfer-hook-gets-curls-connector-and-a-loopback-listener-through-an-execute-overload.md) | A transfer hook gets curl's connector and a loopback listener through an ExecuteAsync overload (BL-4211) | Accepted | 2026-10-29 |
 | [1040](ADR-1040-an-extension-option-expands-into-curl-command-line-arguments.md) | An extension option expands into curl command-line arguments (BL-4205) | Accepted | 2026-10-29 |
 | [1041](ADR-1041-a-ws-upload-can-give-whole-messages-one-frame-each.md) | A ws upload can give whole messages, one frame each (BL-4253) | Accepted | 2026-10-29 |
-| [1040](ADR-1040-the-coap-extension-frames-dtls-1-2-itself-on-curl-tls-types.md) | The CoAP extension frames DTLS 1.2 itself, on Curl.Tls's types (BL-4250) | Accepted | 2026-10-29 |
+| [1042](ADR-1042-the-coap-extension-frames-dtls-1-2-itself-on-curl-tls-types.md) | The CoAP extension frames DTLS 1.2 itself, on Curl.Tls's types (BL-4250) | Accepted | 2026-10-29 |

@@ -1,4 +1,4 @@
-# ADR-1040 — The CoAP extension frames DTLS 1.2 itself, on Curl.Tls's types
+# ADR-1042 — The CoAP extension frames DTLS 1.2 itself, on Curl.Tls's types
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

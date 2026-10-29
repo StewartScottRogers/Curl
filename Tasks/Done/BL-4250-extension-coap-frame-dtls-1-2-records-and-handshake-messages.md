@@ -32,7 +32,7 @@ DTLS is written in the extension, under `Dtls/`, because no curl protocol shares
 
 ## Notes
 
-- Delivered directly (one small library, no seams to plan): `Dtls/Wire` holds `DtlsRecordHeader`, `DtlsReplayWindow`, `DtlsHandshakeHeader`, `DtlsHandshakeFragment`, `DtlsHandshakeReassembly` and `DtlsHelloVerifyRequest`; decisions in ADR-1040 (reference Curl.Tls for `TlsContentType`/`HandshakeType`, FormatException like the CoAP codec, 64-number replay window, byte-level reassembly rejecting disagreeing overlaps).
+- Delivered directly (one small library, no seams to plan): `Dtls/Wire` holds `DtlsRecordHeader`, `DtlsReplayWindow`, `DtlsHandshakeHeader`, `DtlsHandshakeFragment`, `DtlsHandshakeReassembly` and `DtlsHelloVerifyRequest`; decisions in ADR-1042 (reference Curl.Tls for `TlsContentType`/`HandshakeType`, FormatException like the CoAP codec, 64-number replay window, byte-level reassembly rejecting disagreeing overlaps).
 - Added `Curl.Extension.Coap.UnitLibrary/CLAUDE.md` to touches: it said the library references only Curl.Extension.Abstractions, untrue once it references Curl.Tls. No other Doing task names it (checked origin/work/dark-factory).
 - `Measure-CodeQuality.ps1 -Library Curl.Extension.Coap.UnitLibrary`: 0 failing members. Coap tests: 116 passed.
 - Tests are pure byte arithmetic, platform-neutral.
