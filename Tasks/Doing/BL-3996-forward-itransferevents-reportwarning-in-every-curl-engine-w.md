@@ -30,3 +30,4 @@ BL-3986 added `ITransferEvents.ReportWarning` (default no-op) and the console wr
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 39f1d285 a7ebedc8.
