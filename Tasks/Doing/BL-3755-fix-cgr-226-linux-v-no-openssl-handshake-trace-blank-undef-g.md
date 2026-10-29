@@ -76,3 +76,4 @@ curl -sS -v --cacert ca.crt https://localhost:<p>/index.txt
 - 2026-10-26: Created from CGR-226 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs BL-3997: Curl.Networking SslStreamTlsProvider must report group/signature and handshake trace; Output library already prints them
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
