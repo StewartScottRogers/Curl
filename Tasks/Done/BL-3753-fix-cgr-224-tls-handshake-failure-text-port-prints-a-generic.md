@@ -9,7 +9,7 @@ touches: [Curl.Networking.UnitLibrary/TlsFailureMessages.cs, Curl.Networking.Uni
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3753 — Fix CGR-224: TLS handshake failure text: PORT prints a generic failed to receive handshake (Windows) or a .NET frame-size message (Linux) instead of t...
 
@@ -92,3 +92,4 @@ curl -sS -m 5 https://127.0.0.1:20700/
 - 2026-10-26: Created from CGR-224 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28 (lane 12): Fixed WV-16 and TLS-12 (c): a reply that is no TLS record (.NET: Cannot determine the frame size...) is now Schannel SEC_E_INVALID_TOKEN and OpenSSL error:0A00010B wrong version number (TlsFailureMessages.IsMalformedFrame, Cgr224Tests). Texts taken from the report's Expected; real curl was not re-run (no openssl/Schannel server available in this lane). TLS-12 (a) and (b) (--tls-max 1.0 -> SEC_E_UNSUPPORTED_FUNCTION, --tlsv1.0 --tls-max 1.1 -> SEC_E_ILLEGAL_MESSAGE) are unmeasured as to what separates them, and a hand-built hello still goes on the wire for (a); filed as a follow-up task. Linux/macOS: change is platform-neutral, fast tests green.
+- 2026-10-28: Doing -> Done. non-TLS reply now SEC_E_INVALID_TOKEN / wrong version number
