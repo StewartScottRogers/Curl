@@ -1,5 +1,5 @@
 ---
-id: BL-4267
+id: BL-4269
 title: Extension: XMPP SCRAM-SHA-1 and SCRAM-SHA-256 authentication
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4267 — Extension: XMPP SCRAM-SHA-1 and SCRAM-SHA-256 authentication
+# BL-4269 — Extension: XMPP SCRAM-SHA-1 and SCRAM-SHA-256 authentication
 
 ## Goal
 
