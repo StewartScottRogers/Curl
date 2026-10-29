@@ -125,6 +125,38 @@ public sealed class Cgr289Tests
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Timeout"), result);
     }
 
+    [TestMethod]
+    public async Task ExecuteAsync_LdapsWinLdapHandshakeFails_FailsWithServerDown()
+    {
+        TransferResult result = await RunWithFailingSecondConnectAsync("ldaps://127.0.0.1:21900/dc=test");
+
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.LdapCannotBind, "LDAP local: bind via ldap_win_bind Server Down"), result);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LdapWinLdapConnectFails_FailsWithTheConnectFailure()
+    {
+        TransferResult result = await RunWithFailingSecondConnectAsync("ldap://127.0.0.1:21900/dc=test");
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("refused", result.ErrorMessage);
+    }
+
+    private static async Task<TransferResult> RunWithFailingSecondConnectAsync(string url)
+    {
+        var handler = new LdapProtocolHandler(new SecondConnectFails(new ScriptedConnection([])), LdapDialect.WinLdap, new FakeLogonTokenSource(2, "4e", "4e"));
+
+        return await handler.ExecuteAsync(new TransferContext { Url = CurlUrl.Parse(url), Output = new MemoryStream() });
+    }
+
+    private sealed class SecondConnectFails(ScriptedConnection connection) : IConnector
+    {
+        private int connects;
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(++connects == 1 ? ConnectResult.Connected(connection) : ConnectResult.Failed(CurlExitCode.CouldntConnect, "refused"));
+    }
+
     private sealed class RecordingTargets(ScriptedConnection connection) : IConnector
     {
         public List<ConnectTarget> Targets { get; } = [];

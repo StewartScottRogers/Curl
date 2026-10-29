@@ -186,9 +186,18 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
             ConnectResult winLdap = await connector.ConnectAsync(WinLdapTargetOf(target), context.CancellationToken).ConfigureAwait(false);
             return winLdap.Connection is { } connection
                 ? await SearchOnAsync(connection, context).ConfigureAwait(false)
-                : ConnectFailure(winLdap);
+                : WinLdapConnectFailure(winLdap, target);
         }
     }
+
+    /// <summary>
+    /// The failure WinLDAP's own connection ends the transfer with when it opens no connection: over
+    /// <c>ldaps</c> WinLDAP reports its failed handshake, such as a server the Windows store does not
+    /// trust whatever <c>--cacert</c> says, as the bind's <c>Server Down</c> (exit 38), as curl 8.22.0
+    /// does (CGR-289, BL-4056, ADR-0994); a plaintext connect failure is reported as curl's own.
+    /// </summary>
+    private static TransferResult WinLdapConnectFailure(ConnectResult connect, ConnectTarget target) =>
+        target.UseTls ? LdapBind.WinLdapBindFailed(WinLdapResultText.ServerDown) : ConnectFailure(connect);
 
     /// <summary>
     /// The target of WinLDAP's own connection: for <c>ldaps</c> the handshake sends the machine name
