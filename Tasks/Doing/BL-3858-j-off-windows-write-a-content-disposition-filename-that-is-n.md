@@ -32,3 +32,4 @@ Left over from BL-3580 (CGR-051, `Documentation/Reviews/Curl-Gap-Report-2026-10-
 ## Log
 
 - 2026-10-26: Created by BL-3580's run for the Linux half of CGR-051.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: e2d9f1a6 b2b7d797 d75021b2 779790c0.
