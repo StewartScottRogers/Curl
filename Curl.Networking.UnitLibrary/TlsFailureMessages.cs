@@ -393,7 +393,7 @@ internal static class TlsFailureMessages
         }
 
         var certificate = chain!.ChainElements[0].Certificate;
-        var shownHost = ToIpAddressFamily(targetHost) == AddressFamily.InterNetworkV6 ? $"[{targetHost}]" : targetHost;
+        var shownHost = IsBracketedByCurl(targetHost) ? $"[{targetHost}]" : targetHost;
         if (HasDnsOrIpAlternativeNames(certificate))
         {
             return $"SSL: no alternative certificate subject name matches target {DescribeTarget(targetHost)} '{shownHost}'";
@@ -890,6 +890,12 @@ internal static class TlsFailureMessages
             ? "certificate is not yet valid (9)"
             : "certificate has expired (10)";
     }
+
+    // curl's OpenSSL build shows an IPv6 target in brackets except an IPv4-mapped one (CGR-227).
+    private static bool IsBracketedByCurl(string host) =>
+        IPAddress.TryParse(host, out var address)
+        && address.AddressFamily == AddressFamily.InterNetworkV6
+        && !address.IsIPv4MappedToIPv6;
 
     private static AddressFamily? ToIpAddressFamily(string host) =>
         IPAddress.TryParse(host, out var address) ? address.AddressFamily : null;
