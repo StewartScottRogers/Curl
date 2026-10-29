@@ -1,5 +1,5 @@
 ---
-id: BL-4193
+id: BL-4200
 title: Pass the activated extension resolver hook from Curl.Console to the engine
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4193 — Pass the activated extension resolver hook from Curl.Console to the engine
+# BL-4200 — Pass the activated extension resolver hook from Curl.Console to the engine
 
 ## Goal
 

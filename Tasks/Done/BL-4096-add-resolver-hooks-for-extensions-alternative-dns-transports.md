@@ -31,7 +31,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 - Plan: mirror BL-4095. `IResolverHook` (option + `ResolverOver(curlResolver)`) and `ResolverHooks.ActivatedBy(values, activators, dohUrlGiven)` in `Resolution/`; the engine takes `extensionResolver` on `CreateProtocolHandlers` and applies it to `dnsResolver` before any handler is built (ADR-1011).
 - Decision: the `--doh-url` refusal lives in `ResolverHooks.ActivatedBy` (the engine never sees `--doh-url`), which takes whether it was given; `--doh-url` alone is unchanged. Refusing beats silently choosing one (ADR-1011).
-- Engine test: an extension scheme handler looks its URL host up through `ProtocolHandlerServices.DnsResolver`, answered by the extension resolver; the connectors' own look-ups and the Console wiring are BL-4193.
+- Engine test: an extension scheme handler looks its URL host up through `ProtocolHandlerServices.DnsResolver`, answered by the extension resolver; the connectors' own look-ups and the Console wiring are BL-4200.
 - Added `Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md` to touches to document the hook (no other task in this checkout names it).
 - Measured: Measure-CodeQuality for Curl.Extension.Abstractions.UnitLibrary and Curl.Engine.UnitLibrary, 0 failing members. Fast tests green (Engine 2925 passed, Extension.Abstractions 23 passed, no failures solution-wide).
 
