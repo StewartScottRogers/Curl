@@ -6,7 +6,7 @@ namespace Curl.Extension.Mqtt5.Client;
 /// <summary>
 /// curl's <c>mqtt://</c> flow in MQTT 5 over any byte transport: CONNECT and CONNACK, then with a body PUBLISH and
 /// DISCONNECT, otherwise SUBSCRIBE, SUBACK and each PUBLISH payload written to the output until the server sends
-/// DISCONNECT. A failure reason code ends the transfer as ADR-1046 maps it.
+/// DISCONNECT. A failure reason code ends the transfer as ADR-1049 maps it.
 /// </summary>
 internal sealed class Mqtt5ClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {

@@ -1,4 +1,4 @@
-# ADR-1046 — The MQTT 5 client follows curl's mqtt:// flow and ends a failure reason code as a weird server reply
+# ADR-1049 — The MQTT 5 client follows curl's mqtt:// flow and ends a failure reason code as a weird server reply
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

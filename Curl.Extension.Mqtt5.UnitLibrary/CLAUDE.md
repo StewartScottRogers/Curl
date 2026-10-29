@@ -14,7 +14,7 @@ The MQTT 5 client extension (ADR-0999), for `mqtt5://`, `mqtt5s://` and `mqtt5+w
   `Mqtt5Topics` holds the topic name, topic filter and shared subscription rules (sections 4.7 and 4.8.2).
 - Every fault in the wire format, read or about to be written, raises `Mqtt5MalformedPacketException` carrying the
   reason code.
-- `Client/`: `Mqtt5ProtocolHandler` serves `mqtt5://` and `mqtt5s://` with curl's `mqtt://` behaviour (ADR-1046);
+- `Client/`: `Mqtt5ProtocolHandler` serves `mqtt5://` and `mqtt5s://` with curl's `mqtt://` behaviour (ADR-1049);
   `Mqtt5ClientFlow` runs CONNECT, then PUBLISH or SUBSCRIBE, over any `IConnection` through `Mqtt5PacketChannel`.
   `WebSocket/` is BL-4244's transport. No option or registration yet:
   BL-4115 adds them.
