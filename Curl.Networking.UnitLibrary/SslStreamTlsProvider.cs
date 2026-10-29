@@ -56,6 +56,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private readonly bool _matchesSchannelBuild;
 
+    // The peers this provider has begun a handshake with: the Schannel build keeps one credential
+    // handle per peer and says so on the next handshake to it (CGR-290).
+    private readonly HashSet<string> _credentialHandlePeers = [];
+
     private readonly SslProtocols _offeredProtocols;
 
     // The highest version offered: the options' ceiling, or TLS 1.2 for the Schannel build
@@ -388,7 +392,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return clientCertificateFailure;
         }
 
-        events.ReportTlsTrust(DescribeTrust(_options, targetHost));
+        events.ReportTlsTrust(DescribeTrust(_options, targetHost) with { ReusesCredentialHandle = AcquiresCachedCredentialHandle(plaintext, targetHost, isProxy) });
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
         CertificateRevocationListFile? revocationLists;
@@ -727,6 +731,22 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     {
         var lowercased = targetHost.ToLowerInvariant();
         return lowercased.EndsWith('.') ? lowercased[..^1] : lowercased;
+    }
+
+    // True when the Schannel build already holds a credential handle for this peer, as curl's
+    // schannel_acquire_credential_handle finds it in its cache; the OpenSSL build has none.
+    private bool AcquiresCachedCredentialHandle(IConnection plaintext, string targetHost, bool isProxy)
+    {
+        if (!_matchesSchannelBuild)
+        {
+            return false;
+        }
+
+        var peer = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{isProxy}|{targetHost.ToLowerInvariant()}|{plaintext.RemoteEndPoint}");
+        lock (_credentialHandlePeers)
+        {
+            return !_credentialHandlePeers.Add(peer);
+        }
     }
 
     // ADR-0011, ADR-0896: the Schannel build reads --ciphers as ALG_IDs and ignores

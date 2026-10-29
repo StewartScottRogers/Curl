@@ -14,6 +14,11 @@ internal static class SchannelTrustText
     /// <returns>The lines, without the <c>* </c> prefix.</returns>
     internal static IReadOnlyList<string> Lines(TlsTrustEvent trust)
     {
+        if (trust.ReusesCredentialHandle)
+        {
+            return ["schannel: reusing existing credential handle", "schannel: incremented credential handle refcount = 2"];
+        }
+
         var clientCertificateLine = trust.UsesAutomaticClientCertificate
             ? "schannel: enabled automatic use of client certificate"
             : "schannel: disabled automatic use of client certificate";
