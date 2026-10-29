@@ -1,5 +1,5 @@
 ---
-id: BL-4270
+id: BL-4283
 title: Extension CoAP: offer TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 in DTLS 1.2
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4270 — Extension CoAP: offer TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 in DTLS 1.2
+# BL-4283 — Extension CoAP: offer TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 in DTLS 1.2
 
 ## Goal
 

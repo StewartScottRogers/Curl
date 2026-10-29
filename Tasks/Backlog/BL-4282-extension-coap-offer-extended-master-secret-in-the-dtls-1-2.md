@@ -1,5 +1,5 @@
 ---
-id: BL-4269
+id: BL-4282
 title: Extension CoAP: offer extended_master_secret in the DTLS 1.2 handshake
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4269 — Extension CoAP: offer extended_master_secret in the DTLS 1.2 handshake
+# BL-4282 — Extension CoAP: offer extended_master_secret in the DTLS 1.2 handshake
 
 ## Goal
 

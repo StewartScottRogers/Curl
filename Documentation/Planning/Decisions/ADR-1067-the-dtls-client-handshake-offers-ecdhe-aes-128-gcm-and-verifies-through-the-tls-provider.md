@@ -19,14 +19,14 @@ forbid changing `Curl.Tls` for an extension. Upstream curl has no CoAP, so no cu
   `Dtls/Retransmission`.
 - It offers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 for now, the suites
   the record layer (`Dtls/Record`, BL-4266) protects. RFC 7252 section 9.1.3.2 makes
-  TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 the CoAP baseline; BL-4270 adds it on the BCL's `AesCcm`. Group secp256r1;
+  TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 the CoAP baseline; BL-4283 adds it on the BCL's `AesCcm`. Group secp256r1;
   signature schemes ecdsa_secp256r1_sha256, rsa_pss_rsae_sha256 and rsa_pkcs1_sha256; server_name for a host name.
 - The chain goes to `ITlsProvider.VerifyServerCertificateChain` (ADR-1052), so `--cacert`, `--capath`, `-k` and
   `--pinnedpubkey` apply as for curl's TLS; a rejection ends with the verdict's exit code (60 for an untrusted
   chain). The ServerKeyExchange signature is checked against the leaf even under `-k`, as OpenSSL does.
 - Every other failure, the retransmission limit (ADR-1061) included, is exit 35 (`CURLE_SSL_CONNECT_ERROR`).
 - It does not offer extended_master_secret (RFC 7627) yet: the in-memory test server ignores it, so the extended
-  derivation could not be tested here. BL-4269 adds it with the test server's support.
+  derivation could not be tested here. BL-4282 adds it with the test server's support.
 - A flight is resent byte for byte, record sequence numbers included; the peer's replay window drops a repeated
   protected Finished and answers the repeated ClientKeyExchange with its own last flight.
 

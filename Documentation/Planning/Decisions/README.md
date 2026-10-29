@@ -1105,7 +1105,7 @@ Each option and the specific reason it lost.
 | [1069](ADR-1069-cache-dir-is-a-private-rfc-9111-cache-for-plain-http-get-in-a-transfer-hook.md) | `--cache-dir` is a private RFC 9111 cache for plain HTTP GET, in a transfer hook (BL-4133) | Accepted | 2026-10-29 |
 | [1070](ADR-1070-encrypted-dns-names-its-dot-or-doq-resolver-with-dns-over-tls-or-dns-over-quic.md) | The encrypted DNS extension names its DoT or DoQ resolver with --dns-over-tls or --dns-over-quic (BL-4148) | Accepted | 2026-10-29 |
 | [1071](ADR-1071-curl-api-and-curl-mcp-transfers-reach-the-extensions.md) | Curl.Api and Curl.Mcp transfers reach the extensions; Libcurl stays without them (BL-4098) | Accepted | 2026-10-29 |
-| [1072](ADR-1072-async-quic-tests-time-out-cooperatively.md) | Asynchronous QUIC tests time out cooperatively (BL-4269) | Accepted | 2026-10-29 |
+| [1072](ADR-1072-async-quic-tests-time-out-cooperatively.md) | Asynchronous QUIC tests time out cooperatively (BL-4282) | Accepted | 2026-10-29 |
 | [1073](ADR-1073-http-file-expands-a-dot-http-file-into-curl-arguments-with-http-env-choosing-the-environment.md) | --http-file expands a .http file into curl arguments, with --http-env choosing the environment (BL-4154) | Accepted | 2026-10-29 |
 | [1074](ADR-1074-mcp-urls-list-tools-without-data-and-call-one-with-a-json-data-body.md) | MCP URLs list tools without data and call one with a JSON data body (BL-4159) | Accepted | 2026-10-29 |
 | [1075](ADR-1075-oauth2-options-name-the-flow-by-its-token-endpoint-and-send-a-bearer-token.md) | The OAuth2 options name the flow by its token endpoint and send a Bearer token (BL-4161) | Accepted | 2026-10-29 |
