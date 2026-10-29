@@ -31,3 +31,4 @@ BL-4094 built the hooks (ADR-1007): `ITransferHook`, `TransferHooks.ActivatedBy(
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: fbe6bcf5 e4c824c2 c13bc3be.
