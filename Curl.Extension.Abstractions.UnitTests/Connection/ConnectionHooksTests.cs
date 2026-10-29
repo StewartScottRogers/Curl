@@ -59,6 +59,32 @@ public sealed class ConnectionHooksTests
         StringAssert.StartsWith(failure.Message, "the options --example-pipe and --example-tunnel each supply the connection a transfer runs over; give only one of them");
     }
 
+    [TestMethod]
+    public void ConnectorOver_WithCurlsTlsProvider_GivesTheHookItOrCurlsConnectorWithoutAHook()
+    {
+        NamedConnector curls = new();
+        NamedTlsProvider curlsTls = new();
+        TlsLayeringHook layering = new(Pipe);
+
+        ConnectionHooks hooks = ConnectionHooks.ActivatedBy(ValuesOf(Pipe), [_ => layering]);
+
+        Assert.AreSame(layering.Connector, hooks.ConnectorOver(curls, curlsTls));
+        Assert.AreSame(curlsTls, layering.GivenTlsProvider);
+        Assert.AreSame(curls, ConnectionHooks.None.ConnectorOver(curls, curlsTls));
+    }
+
+    [TestMethod]
+    public void ConnectorOver_WithCurlsTlsProviderAndAHookThatDoesNotLayerTls_GivesItsConnectorOverCurls()
+    {
+        NamedConnector curls = new();
+        ExampleHook hook = new(Pipe);
+
+        ConnectionHooks hooks = ConnectionHooks.ActivatedBy(ValuesOf(Pipe), [ExampleHook.ActivatedBy(Pipe, hook)]);
+
+        Assert.AreSame(hook.Connector, hooks.ConnectorOver(curls, new NamedTlsProvider()));
+        Assert.AreSame(curls, hook.GivenConnector);
+    }
+
     private static ExtensionOptionValues ValuesOf(params ExtensionOption[] options) =>
         new(options.ToDictionary(option => option.Name, _ => ""));
 
@@ -85,6 +111,23 @@ public sealed class ConnectionHooksTests
         public NamedDatagramConnector DatagramConnector { get; } = new();
 
         public IDatagramConnector DatagramConnectorOver(IDatagramConnector curlDatagramConnector) => DatagramConnector;
+    }
+
+    private sealed class TlsLayeringHook(ExtensionOption option) : ExampleHook(option), IConnectionHook
+    {
+        public ITlsProvider? GivenTlsProvider { get; private set; }
+
+        public IConnector ConnectorOver(IConnector curlConnector, ITlsProvider curlTlsProvider)
+        {
+            GivenTlsProvider = curlTlsProvider;
+            return Connector;
+        }
+    }
+
+    private sealed class NamedTlsProvider : ITlsProvider
+    {
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("never authenticates");
     }
 
     private sealed class NamedConnector : IConnector

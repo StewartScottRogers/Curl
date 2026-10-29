@@ -34,6 +34,21 @@ public sealed class NamedPipeExtensionTests
     }
 
     [TestMethod]
+    public async Task Activate_WithAPipeNameAndCurlsTlsProvider_GivesAHookWhoseConnectorRunsTlsOverThePipe()
+    {
+        FakeNamedPipeOpener opener = new() { ServerBytes = [0x16, 0x03, 0x03] };
+        RecordedHandshakeTlsProvider tls = new([0x16, 0x03, 0x01], 3);
+
+        IConnectionHook hook = NamedPipeExtension.Activate(ValuesOf(@"\\.\pipe\docker_engine"), opener)!;
+        ConnectResult result = await hook.ConnectorOver(CurlConnector, tls).ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true), CancellationToken.None);
+        await using IConnection connection = result.Connection!;
+
+        Assert.IsTrue(connection.IsSecure);
+        Assert.AreEqual("localhost", tls.TargetHost);
+        CollectionAssert.AreEqual(new byte[] { 0x16, 0x03, 0x01 }, opener.LastPipe!.Written.ToArray());
+    }
+
+    [TestMethod]
     public void Activate_InProduction_GivesAHookOverTheSystemOpener() =>
         Assert.IsInstanceOfType<NamedPipeConnectionHook>(NamedPipeExtension.Activate(ValuesOf(@"\\.\pipe\agent")));
 

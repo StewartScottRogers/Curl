@@ -17,4 +17,10 @@ internal sealed class NamedPipeConnectionHook(NamedPipeName name, INamedPipeOpen
 
     /// <inheritdoc />
     public IConnector ConnectorOver(IConnector curlConnector) => new NamedPipeConnector(name, opener);
+
+    /// <summary>Gives the connector that opens the pipe and runs curls TLS handshake over it for a TLS target (ADR-1049).</summary>
+    /// <param name="curlConnector">The connector curl would use; set aside.</param>
+    /// <param name="curlTlsProvider">The TLS provider curl built from the option groups TLS options.</param>
+    /// <returns>The pipes connector.</returns>
+    public IConnector ConnectorOver(IConnector curlConnector, ITlsProvider curlTlsProvider) => new NamedPipeConnector(name, opener, curlTlsProvider);
 }

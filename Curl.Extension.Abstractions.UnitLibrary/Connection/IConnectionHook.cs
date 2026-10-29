@@ -15,6 +15,16 @@ public interface IConnectionHook
     /// <returns>The extension's connector.</returns>
     IConnector ConnectorOver(IConnector curlConnector);
 
+    /// <summary>
+    /// Gives the connector a transfer's stream connections open through, with the TLS provider curl built from the
+    /// option group's TLS options (<c>-k</c>, <c>--cacert</c> and the rest), so a hook that supplies only the byte
+    /// stream can run curl's TLS handshake over it for an <c>https://</c> target (ADR-1049).
+    /// </summary>
+    /// <param name="curlConnector">The connector curl would use, for a hook that reaches its transport through it.</param>
+    /// <param name="curlTlsProvider">The TLS provider curl would layer over a connection it opened.</param>
+    /// <returns>The extension's connector: <see cref="ConnectorOver(IConnector)" />'s unless the hook layers TLS itself.</returns>
+    IConnector ConnectorOver(IConnector curlConnector, ITlsProvider curlTlsProvider) => ConnectorOver(curlConnector);
+
     /// <summary>Gives the connector a transfer's datagram sockets open through; curl's own unless an extension implements it.</summary>
     /// <param name="curlDatagramConnector">The datagram connector curl would use.</param>
     /// <returns>The extension's datagram connector, or <paramref name="curlDatagramConnector" />.</returns>

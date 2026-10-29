@@ -16,6 +16,8 @@ namespace Curl.Console;
 [TestClass]
 public sealed class ExtensionConnectionHookTests
 {
+    private static readonly ITlsProvider CurlTls = new UnusedTlsProvider();
+
     private static readonly ExtensionOption PipeOption = new("test-pipe", ExtensionOptionArgument.Value, "Test pipe");
     private static readonly ExtensionOption TunnelOption = new("test-tunnel", ExtensionOptionArgument.None, "Test tunnel");
 
@@ -69,9 +71,9 @@ public sealed class ExtensionConnectionHookTests
         ConnectionHooks hooks = CurlComposition.ExtensionConnectionHooksOf(new CommandLineOptions(), [ActivatedByPipe, ActivatedByTunnel]);
 
         Assert.IsNull(hooks.Hook);
-        Assert.IsNull(CurlComposition.ExtensionConnectorOf(hooks));
+        Assert.IsNull(CurlComposition.ExtensionConnectorOf(hooks, CurlTls));
         Assert.IsNull(CurlComposition.ExtensionDatagramConnectorOf(hooks));
-        Assert.IsNull(CurlComposition.ExtensionConnectorOf(null));
+        Assert.IsNull(CurlComposition.ExtensionConnectorOf(null, CurlTls));
         Assert.IsNull(CurlComposition.ExtensionDatagramConnectorOf(null));
         Assert.IsNull(CurlComposition.ExtensionConnectionHooksOf(new CommandLineOptions()).Hook);
     }
@@ -82,7 +84,19 @@ public sealed class ExtensionConnectionHookTests
         ConnectionHooks hooks = CurlComposition.ExtensionConnectionHooksOf(new CommandLineOptions(), [_ => new ConnectorReplacingHook(TunnelOption, hookServer)]);
 
         Assert.AreSame(curlDatagrams, CurlComposition.ExtensionDatagramConnectorOf(hooks)!(curlDatagrams));
-        Assert.AreSame(hookServer, CurlComposition.ExtensionConnectorOf(hooks)!(curlServer));
+        Assert.AreSame(hookServer, CurlComposition.ExtensionConnectorOf(hooks, CurlTls)!(curlServer));
+    }
+
+    [TestMethod]
+    public void ExtensionConnectorOf_HookActivated_HandsTheHookTheGroupsTlsProvider()
+    {
+        TlsProviderRecordingHook hook = new(TunnelOption, hookServer);
+        ConnectionHooks hooks = CurlComposition.ExtensionConnectionHooksOf(new CommandLineOptions(), [_ => hook]);
+
+        IConnector connector = CurlComposition.ExtensionConnectorOf(hooks, CurlTls)!(curlServer);
+
+        Assert.AreSame(hookServer, connector);
+        Assert.AreSame(CurlTls, hook.GivenTlsProvider);
     }
 
     private IConnectionHook? ActivatedByPipe(ExtensionOptionValues values) =>
@@ -107,5 +121,26 @@ public sealed class ExtensionConnectionHookTests
         public ExtensionOption Option => option;
 
         public IConnector ConnectorOver(IConnector curlConnector) => connector;
+    }
+
+    private sealed class TlsProviderRecordingHook(ExtensionOption option, IConnector connector) : IConnectionHook
+    {
+        public ExtensionOption Option => option;
+
+        public ITlsProvider? GivenTlsProvider { get; private set; }
+
+        public IConnector ConnectorOver(IConnector curlConnector) => connector;
+
+        public IConnector ConnectorOver(IConnector curlConnector, ITlsProvider curlTlsProvider)
+        {
+            GivenTlsProvider = curlTlsProvider;
+            return connector;
+        }
+    }
+
+    private sealed class UnusedTlsProvider : ITlsProvider
+    {
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("never authenticates");
     }
 }

@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Connection;
 
 /// <summary>
 /// The connection hook of the extension one option group activated (ADR-1010). A host builds it from the
-/// group's <see cref="ExtensionOptionValues" /> and passes <see cref="ConnectorOver" /> and
+/// group's <see cref="ExtensionOptionValues" /> and passes <see cref="ConnectorOver(IConnector, ITlsProvider)" /> and
 /// <see cref="DatagramConnectorOver" /> to the engine; with no extension option given it holds no hook and
 /// gives curl's connectors back unchanged.
 /// </summary>
@@ -34,6 +34,16 @@ public sealed class ConnectionHooks
     /// <returns><paramref name="curlConnector" /> itself without a hook, otherwise the hook's connector.</returns>
     public IConnector ConnectorOver(IConnector curlConnector) =>
         Hook is null ? curlConnector : Hook.ConnectorOver(curlConnector);
+
+    /// <summary>
+    /// Gives the connector a transfer's stream connections open through, handing the hook curl's TLS provider so a
+    /// hook that supplies only the byte stream can layer curl's TLS over it (ADR-1049).
+    /// </summary>
+    /// <param name="curlConnector">The connector curl would use.</param>
+    /// <param name="curlTlsProvider">The TLS provider curl built from the option group's TLS options.</param>
+    /// <returns><paramref name="curlConnector" /> itself without a hook, otherwise the hook's connector.</returns>
+    public IConnector ConnectorOver(IConnector curlConnector, ITlsProvider curlTlsProvider) =>
+        Hook is null ? curlConnector : Hook.ConnectorOver(curlConnector, curlTlsProvider);
 
     /// <summary>Gives the connector a transfer's datagram sockets open through.</summary>
     /// <param name="curlDatagramConnector">The datagram connector curl would use.</param>

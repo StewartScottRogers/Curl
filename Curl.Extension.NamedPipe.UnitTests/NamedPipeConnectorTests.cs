@@ -70,6 +70,67 @@ public sealed class NamedPipeConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_TlsTargetWithCurlsTlsProvider_RunsTheHandshakeOverThePipe()
+    {
+        byte[] clientHello = [0x16, 0x03, 0x01, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00];
+        byte[] serverHello = [0x16, 0x03, 0x03, 0x00, 0x04, 0x02, 0x00, 0x00, 0x00];
+        byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\n\r\n");
+        FakeNamedPipeOpener opener = new() { ServerBytes = [.. serverHello, .. response] };
+        RecordedHandshakeTlsProvider tls = new(clientHello, serverHello.Length);
+        DistinctTransferEvents events = new();
+
+        ConnectResult result = await new NamedPipeConnector(Pipe, opener, tls).ConnectAsync(new ConnectTarget("example.com", 443, UseTls: true) { Events = events }, CancellationToken.None);
+        await using IConnection connection = result.Connection!;
+        await connection.WriteAsync(Encoding.ASCII.GetBytes("GET /"), CancellationToken.None);
+        byte[] read = new byte[64];
+        int count = await connection.ReadAsync(read, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.IsTrue(connection.IsSecure);
+        Assert.AreEqual("example.com", tls.TargetHost);
+        Assert.AreSame(events, tls.Events);
+        CollectionAssert.AreEqual(serverHello, tls.ServerHello);
+        CollectionAssert.AreEqual((byte[])[.. clientHello, .. Encoding.ASCII.GetBytes("GET /")], opener.LastPipe!.Written.ToArray());
+        CollectionAssert.AreEqual(response, read[..count]);
+        CollectionAssert.AreEqual(new[] { Pipe }, opener.Opened);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TlsTargetNamingATlsServerName_VerifiesThatName()
+    {
+        RecordedHandshakeTlsProvider tls = new([0x16], 0);
+
+        ConnectResult result = await new NamedPipeConnector(Pipe, new FakeNamedPipeOpener(), tls).ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { TlsServerName = "docker.test" }, CancellationToken.None);
+        await result.Connection!.DisposeAsync();
+
+        Assert.AreEqual("docker.test", tls.TargetHost);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TlsHandshakeThatFails_GivesTheProvidersFailure()
+    {
+        FakeNamedPipeOpener opener = new() { ServerBytes = [0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x30] };
+        RecordedHandshakeTlsProvider tls = new([0x16, 0x03, 0x01], 7, ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "SSL certificate problem: unable to get local issuer certificate"));
+
+        ConnectResult result = await new NamedPipeConnector(Pipe, opener, tls).ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.AreEqual("SSL certificate problem: unable to get local issuer certificate", result.ErrorMessage);
+        Assert.IsTrue(opener.LastPipe!.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_TlsTargetWhosePipeCannotBeOpened_FailsAsCouldNotConnectBeforeAnyHandshake()
+    {
+        RecordedHandshakeTlsProvider tls = new([0x16], 0);
+
+        ConnectResult result = await new NamedPipeConnector(Pipe, new FakeNamedPipeOpener(new IOException("busy")), tls).ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true), CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsNull(tls.TargetHost);
+    }
+
+    [TestMethod]
     [DataRow(typeof(IOException), DisplayName = "not there or busy")]
     [DataRow(typeof(TimeoutException), DisplayName = "timed out")]
     [DataRow(typeof(UnauthorizedAccessException), DisplayName = "access denied")]
