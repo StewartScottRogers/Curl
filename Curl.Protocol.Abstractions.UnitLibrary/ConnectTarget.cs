@@ -169,7 +169,7 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// <remarks>
     /// The connector still resolves and dials <see cref="Host" />. The LDAP handler sets it for
     /// the second connection curl's WinLDAP opens to an <c>ldaps://</c> server, which names the
-    /// machine rather than the URL's host (CGR-289, ADR-0974).
+    /// machine rather than the URL's host (CGR-289, ADR-0979).
     /// </remarks>
     public string? TlsServerName { get; init; }
 
@@ -181,7 +181,7 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// <remarks>
     /// A TLS provider that cannot trust otherwise than its options say ignores it. Set for the
     /// same WinLDAP connection as <see cref="TlsServerName" />, which Windows verifies against its
-    /// own store whatever curl was told (CGR-289, ADR-0974).
+    /// own store whatever curl was told (CGR-289, ADR-0979).
     /// </remarks>
     public bool TrustsSystemStoreOnly { get; init; }
 

@@ -2406,7 +2406,7 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Returns the provider whose trust <paramref name="target" /> asks for: one trusting only the
     /// system store when <see cref="ConnectTarget.TrustsSystemStoreOnly" /> is set and the provider
-    /// can make one, otherwise <paramref name="provider" /> itself (CGR-289, ADR-0974).
+    /// can make one, otherwise <paramref name="provider" /> itself (CGR-289, ADR-0979).
     /// </summary>
     /// <param name="target">The target whose handshake is about to run.</param>
     /// <param name="provider">The provider the target's handshake would otherwise run through.</param>

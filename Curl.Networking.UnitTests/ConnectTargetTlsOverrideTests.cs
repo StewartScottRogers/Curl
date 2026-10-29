@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// Pins BL-4026 (ADR-0974): a <see cref="ConnectTarget" /> can name the host its TLS handshake sends
+/// Pins BL-4026 (ADR-0979): a <see cref="ConnectTarget" /> can name the host its TLS handshake sends
 /// as SNI and checks the certificate against (<see cref="ConnectTarget.TlsServerName" />), and ask for
 /// a handshake trusting only the system store (<see cref="ConnectTarget.TrustsSystemStoreOnly" />), as
 /// the second connection curl's WinLDAP opens to an <c>ldaps://</c> server needs (CGR-289).

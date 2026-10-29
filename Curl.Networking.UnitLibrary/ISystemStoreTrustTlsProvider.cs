@@ -5,7 +5,7 @@ namespace Curl.Networking;
 /// <summary>
 /// An <see cref="ITlsProvider" /> that can hand out a copy of itself trusting only the system
 /// certificate store, for a <see cref="ConnectTarget" /> whose
-/// <see cref="ConnectTarget.TrustsSystemStoreOnly" /> is set (CGR-289, ADR-0974).
+/// <see cref="ConnectTarget.TrustsSystemStoreOnly" /> is set (CGR-289, ADR-0979).
 /// </summary>
 internal interface ISystemStoreTrustTlsProvider : ITlsProvider
 {

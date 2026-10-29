@@ -1,4 +1,4 @@
-# ADR-0974: A connect target names its TLS server name and can ask for system-store-only trust
+# ADR-0979: A connect target names its TLS server name and can ask for system-store-only trust
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4026, for CGR-289).
 

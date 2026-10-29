@@ -18,7 +18,7 @@ A `ConnectTarget` can name the host its TLS handshake sends as SNI and checks th
 
 ## Context
 
-BL-3818 (CGR-289) needs the Windows ldaps:// path to open WinLDAP's second connection with the machine name as SNI and system-store trust. ADR-0974.
+BL-3818 (CGR-289) needs the Windows ldaps:// path to open WinLDAP's second connection with the machine name as SNI and system-store trust. ADR-0979.
 
 ## Acceptance criteria
 
@@ -26,7 +26,7 @@ BL-3818 (CGR-289) needs the Windows ldaps:// path to open WinLDAP's second conne
 
 ## Notes
 
-- 2026-10-28 lane 13, what was checked (the claim's criterion was the template placeholder, which the run keeps as written): `ConnectTarget.TlsServerName` (default `null`) is handed to the TLS provider in place of `Host` by `TcpConnector`, which still dials `Host`; `ConnectTarget.TrustsSystemStoreOnly` (default `false`) makes `TcpConnector.TrustedAs` run the handshake through `ISystemStoreTrustTlsProvider.WithSystemStoreOnlyTrust`, which `SslStreamTlsProvider` and `HandBuiltTlsProvider` implement by dropping `-k`, `--cacert`, `--capath` and the CA blob; `Curl.Networking.UnitTests/ConnectTargetTlsOverrideTests.cs` pins both for both builds of both providers; ADR-0974 records it.
+- 2026-10-28 lane 13, what was checked (the claim's criterion was the template placeholder, which the run keeps as written): `ConnectTarget.TlsServerName` (default `null`) is handed to the TLS provider in place of `Host` by `TcpConnector`, which still dials `Host`; `ConnectTarget.TrustsSystemStoreOnly` (default `false`) makes `TcpConnector.TrustedAs` run the handshake through `ISystemStoreTrustTlsProvider.WithSystemStoreOnlyTrust`, which `SslStreamTlsProvider` and `HandBuiltTlsProvider` implement by dropping `-k`, `--cacert`, `--capath` and the CA blob; `Curl.Networking.UnitTests/ConnectTargetTlsOverrideTests.cs` pins both for both builds of both providers; ADR-0979 records it.
 
 - 2026-10-28 lane 13: Added `Curl.Networking.UnitLibrary/TcpConnector.cs` (the connector is what hands the target's host to the provider) and the new `ISystemStoreTrustTlsProvider.cs` to touches; no task in Doing on origin/work/dark-factory names either.
 - Decision: the system-store copy keeps every other setting (`--pinnedpubkey`, `--crlfile`, ciphers, range) and is made per handshake, not cached; a provider without the interface (a fake) is used unchanged. HandBuiltTlsProvider derives the copy from its adjusted options (both adjustments are idempotent) rather than storing the given ones: a second `TlsClientOptions` field broke `EngineCompositionTests.CapturedDependency`, which finds the options by field type.
@@ -41,4 +41,4 @@ BL-3818 (CGR-289) needs the Windows ldaps:// path to open WinLDAP's second conne
 - `ConnectTarget` gains an optional `TlsServerName` (the SNI and certificate-name host when it differs from `Host`) and an optional switch that makes the TLS provider trust only the system store (ignoring `--cacert`, `--capath` and `-k`), both honoured by the Schannel-style provider and the hand-built one. Unit tests in Curl.Networking.UnitTests.
 - Why: BL-3818 (CGR-289) needs the Windows ldaps:// path to open WinLDAP's second connection with the machine name as SNI and system-store trust.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
-- 2026-10-28: Doing -> Done. ConnectTarget.TlsServerName and TrustsSystemStoreOnly reach both TLS providers through TcpConnector (ADR-0974)
+- 2026-10-28: Doing -> Done. ConnectTarget.TlsServerName and TrustsSystemStoreOnly reach both TLS providers through TcpConnector (ADR-0979)
