@@ -87,7 +87,7 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
 `TimeProvider`, stops when the peer's next flight starts, and throws `TimeoutException` after 12 resends
 (the handshake's caller turns it into exit 35).
 
-`Dtls/Handshake/` (namespace `Curl.Extension.Coap.Dtls.Handshake`, ADR-1067) runs the DTLS 1.2 client handshake
+`Dtls/Handshake/` (namespace `Curl.Extension.Coap.Dtls.Handshake`, ADR-1078) runs the DTLS 1.2 client handshake
 (RFC 6347 section 4.2, RFC 5246 section 7.3):
 
 - `DtlsClientHandshake` sends a `DtlsClientHello` (TLS_ECDHE_ECDSA and TLS_ECDHE_RSA with AES-128-GCM, secp256r1,

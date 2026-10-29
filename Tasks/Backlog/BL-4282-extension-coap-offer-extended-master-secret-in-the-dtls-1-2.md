@@ -18,12 +18,12 @@ The CoAP extension's DTLS 1.2 client offers extended_master_secret (RFC 7627) an
 
 ## Context
 
-ADR-1067 (BL-4251) left it out because `Dtls/TestServer/DtlsTestServer` ignores the extension, so the extended derivation could not be tested. Add `ExtendedMasterSecretExtension.Encode()` to `DtlsClientHello.ExtensionsFor`, read it from the ServerHello in `DtlsClientHandshake.ExchangeKeysAsync`, and use `TlsPrf.Sha256.ComputeExtendedMasterSecret` over SHA-256 of the transcript through ClientKeyExchange (RFC 7627 section 4). Give the test server an option to echo it.
+ADR-1078 (BL-4251) left it out because `Dtls/TestServer/DtlsTestServer` ignores the extension, so the extended derivation could not be tested. Add `ExtendedMasterSecretExtension.Encode()` to `DtlsClientHello.ExtensionsFor`, read it from the ServerHello in `DtlsClientHandshake.ExchangeKeysAsync`, and use `TlsPrf.Sha256.ComputeExtendedMasterSecret` over SHA-256 of the transcript through ClientKeyExchange (RFC 7627 section 4). Give the test server an option to echo it.
 
 ## Acceptance criteria
 
 - [ ] Unit tests run a full handshake against a test server that echoes extended_master_secret and one that does not, both completing.
-- [ ] ADR-1067's extended_master_secret line says what the code now does.
+- [ ] ADR-1078's extended_master_secret line says what the code now does.
 - [ ] Curl.Extension.Coap.UnitLibrary meets the four quality gates by `Measure-CodeQuality.ps1`.
 - [ ] `dotnet build` is clean and the fast tests pass.
 

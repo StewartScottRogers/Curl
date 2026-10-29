@@ -1,4 +1,4 @@
-# ADR-1067 — The DTLS client handshake offers ECDHE with AES-128-GCM and verifies through the TLS provider
+# ADR-1078 — The DTLS client handshake offers ECDHE with AES-128-GCM and verifies through the TLS provider
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

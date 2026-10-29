@@ -18,12 +18,12 @@ The CoAP extension's DTLS 1.2 client offers TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 (
 
 ## Context
 
-BL-4251 (ADR-1067) offers only the two AES-128-GCM suites, because `Dtls/Record` holds only AES-128-GCM protection. `System.Security.Cryptography.AesCcm` takes an 8-byte tag. Add CCM_8 record protection beside `DtlsAes128GcmRecordProtector` (RFC 6655 nonce: 4-byte salt, 8-byte explicit part), its key block (16-byte key, 4-byte IV), offer the suite in `DtlsClientHello`, and pick the record protection by the ServerHello's suite in `DtlsClientHandshake.FinishAsync`. The test server needs to negotiate it.
+BL-4251 (ADR-1078) offers only the two AES-128-GCM suites, because `Dtls/Record` holds only AES-128-GCM protection. `System.Security.Cryptography.AesCcm` takes an 8-byte tag. Add CCM_8 record protection beside `DtlsAes128GcmRecordProtector` (RFC 6655 nonce: 4-byte salt, 8-byte explicit part), its key block (16-byte key, 4-byte IV), offer the suite in `DtlsClientHello`, and pick the record protection by the ServerHello's suite in `DtlsClientHandshake.FinishAsync`. The test server needs to negotiate it.
 
 ## Acceptance criteria
 
 - [ ] Unit tests run a full handshake with the CCM_8 suite against the in-memory test server and round-trip application data.
-- [ ] ADR-1067 says the suite is offered.
+- [ ] ADR-1078 says the suite is offered.
 - [ ] Curl.Extension.Coap.UnitLibrary meets the four quality gates by `Measure-CodeQuality.ps1`.
 - [ ] `dotnet build` is clean and the fast tests pass.
 
