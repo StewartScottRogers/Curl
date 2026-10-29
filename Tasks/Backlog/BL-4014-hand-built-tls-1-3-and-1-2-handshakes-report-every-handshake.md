@@ -1,5 +1,5 @@
 ---
-id: BL-4012
+id: BL-4014
 title: Hand-built TLS 1.3 and 1.2 handshakes report every handshake message sent and received to an observer
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4012 — Hand-built TLS 1.3 and 1.2 handshakes report every handshake message sent and received to an observer
+# BL-4014 — Hand-built TLS 1.3 and 1.2 handshakes report every handshake message sent and received to an observer
 
 ## Goal
 

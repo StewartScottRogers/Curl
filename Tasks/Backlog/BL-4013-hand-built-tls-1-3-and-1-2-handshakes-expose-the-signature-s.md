@@ -4,7 +4,7 @@ title: Hand-built TLS 1.3 and 1.2 handshakes expose the signature scheme the ser
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4012]
+depends-on: [BL-4014]
 touches: [Curl.Tls.UnitLibrary/Tls13ClientHandshake.cs, Curl.Tls.UnitLibrary/Tls12ClientHandshake.cs, Curl.Tls.UnitTests/PeerSignatureSchemeTests.cs]
 requirement: none
 created: 2026-10-28
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split out of BL-4009, which sets `TlsHandshakeEvent.PeerSignatureTypeName` (`RSASSA-PSS`, `rsaEncryption`, `id-ecPublicKey`, `ED25519`) on the hand-built path. `NegotiatedGroup` is already exposed on both handshakes; the signature scheme is not. Depends on BL-4012 only because both edit the two handshake files.
+Split out of BL-4009, which sets `TlsHandshakeEvent.PeerSignatureTypeName` (`RSASSA-PSS`, `rsaEncryption`, `id-ecPublicKey`, `ED25519`) on the hand-built path. `NegotiatedGroup` is already exposed on both handshakes; the signature scheme is not. Depends on BL-4014 only because both edit the two handshake files.
 
 ## Acceptance criteria
 
