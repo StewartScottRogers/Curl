@@ -36,3 +36,4 @@ Split from BL-4118 (AMQP 1.0, extension 17 of 63) for size by its first pass. Bu
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a8fd9561 56abf02e c33067a4 7dadd554 5ef7c418 14de81cc.
