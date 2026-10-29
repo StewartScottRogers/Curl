@@ -9,7 +9,7 @@ The SignalR client extension (ADR-0999, ADR-1032). Namespace `Curl.Extension.Sig
 - `Negotiate/`: `NegotiateResponseReader` reads a negotiate response (version 0 or 1, redirect, error) into
   `NegotiateResponse`; `SignalRUrls` builds the negotiate URL and the WebSocket URL with its `id`.
 - `Json/`: `JsonFieldReading` and `JsonObjectFields` read JSON with `Utf8JsonReader`, keeping each value's text.
-- `Transport/`: the client flow over `IConnection` (ADR-1033). `SignalRNegotiator` posts the negotiate request,
+- `Transport/`: the client flow over `IConnection` (ADR-1038). `SignalRNegotiator` posts the negotiate request,
   follows one redirect and gives a `NegotiatedWebSocketEndpoint`; `SignalRWebSocketUpgrade` sends RFC 6455's client
   handshake and checks the `101`; `SignalRWebSocketSession` sends records as masked text frames and reads them back,
   answering Ping and Close. `HttpRequestWriter`, `HttpResponseReader` and `BufferedConnectionReader` are its own

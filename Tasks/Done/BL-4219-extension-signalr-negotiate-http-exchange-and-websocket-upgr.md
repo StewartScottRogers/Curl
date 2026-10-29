@@ -30,7 +30,7 @@ Split from BL-4108 for size. Builds on BL-4218's codec. Specification: dotnet/as
 
 ## Notes
 
-- Plan and decisions in ADR-1033.
+- Plan and decisions in ADR-1038.
   - `SignalRNegotiator` posts the negotiate request through an injected connection opener and follows one redirect
     with a bearer token.
   - `SignalRWebSocketUpgrade` sends RFC 6455 section 4.1's handshake and checks the `101`, `Upgrade`, `Connection`

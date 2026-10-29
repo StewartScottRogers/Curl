@@ -1070,4 +1070,4 @@ Each option and the specific reason it lost.
 | [1035](ADR-1035-socket-io-is-a-scheme-extension-over-the-websocket-transport.md) | Socket.IO is a scheme extension over the WebSocket transport (BL-4109) | Accepted | 2026-10-29 |
 | [1036](ADR-1036-the-curl-tool-carries-on-past-curle-not-built-in-for-crlfile-curves-sigalgs-and-tcp-fastopen.md) | The curl tool carries on past CURLE_NOT_BUILT_IN for CRL file, curves, signature algorithms and TCP Fast Open (BL-4182) | Accepted | 2026-10-29 |
 | [1037](ADR-1037-the-websocket-repl-sends-typed-lines-and-shows-messages-one-per-line.md) | The WebSocket REPL sends typed lines and shows messages one per line (BL-4221) | Accepted | 2026-10-29 |
-| [1033](ADR-1033-the-signalr-transport-speaks-its-own-http-1-1-and-websocket-handshake-over-iconnection.md) | The SignalR transport speaks its own HTTP/1.1 and WebSocket handshake over IConnection (BL-4219) | Accepted | 2026-10-29 |
+| [1038](ADR-1038-the-signalr-transport-speaks-its-own-http-1-1-and-websocket-handshake-over-iconnection.md) | The SignalR transport speaks its own HTTP/1.1 and WebSocket handshake over IConnection (BL-4219) | Accepted | 2026-10-29 |

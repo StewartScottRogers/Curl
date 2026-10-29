@@ -1,4 +1,4 @@
-# ADR-1033 — The SignalR transport speaks its own HTTP/1.1 and WebSocket handshake over IConnection
+# ADR-1038 — The SignalR transport speaks its own HTTP/1.1 and WebSocket handshake over IConnection
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
