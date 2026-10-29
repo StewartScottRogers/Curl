@@ -221,7 +221,7 @@ internal sealed class SmtpSession(
         }
 
         return context.SslLevel == TransportSecurityLevel.Required && !secure
-            ? TransferResult.Failure(CurlExitCode.RemoteAccessDenied, SmtpSessionMessages.RemoteAccessDenied(ehlo.Code))
+            ? RefusedWithCode(ehlo.Code)
             : await HeloAsync().ConfigureAwait(false);
     }
 
@@ -230,8 +230,14 @@ internal sealed class SmtpSession(
         SmtpReply helo = await ExchangeAsync("HELO " + domain, "HELO").ConfigureAwait(false);
         return helo.IsCompletion
             ? null
-            : TransferResult.Failure(CurlExitCode.RemoteAccessDenied, SmtpSessionMessages.RemoteAccessDenied(helo.Code));
+            : RefusedWithCode(helo.Code);
     }
+
+    /// <summary>The exit 9 for a refused greeting command, reporting the refusing reply's code (CGR-219).</summary>
+    private static TransferResult RefusedWithCode(int code) =>
+        TransferResult.Failure(CurlExitCode.RemoteAccessDenied, SmtpSessionMessages.RemoteAccessDenied(code))
+        with
+        { Report = new TransferReport { ResponseCode = code } };
 
     private async ValueTask<TransferResult?> SecureAsync(SmtpReply ehlo)
     {

@@ -2998,6 +2998,8 @@ internal sealed class FtpSession(
 
         if (reply is null)
         {
+            // No reply could be parsed, so curl has no code to report (CGR-219).
+            lastReplyCode = 0;
             throw Failed(CurlExitCode.RecvError, FtpTransferMessages.ResponseReadingFailed);
         }
 
