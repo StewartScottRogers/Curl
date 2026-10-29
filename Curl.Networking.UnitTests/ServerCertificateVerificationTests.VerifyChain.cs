@@ -12,7 +12,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// Pins <see cref="ITlsProvider.VerifyServerCertificateChain" /> in both engine providers
-/// (ADR-1044): a chain judged apart from any handshake with the transfer's trust settings,
+/// (ADR-1052): a chain judged apart from any handshake with the transfer's trust settings,
 /// <c>-k</c> accepting any chain, a chain the <c>--cacert</c> CA did not sign exit 60, a pin
 /// the key does not match exit 90, an unreadable <c>--cacert</c> exit 77 and a chain the CA
 /// signed for the host accepted.

@@ -103,7 +103,7 @@ internal sealed class ServerCertificateVerification(TlsClientOptions options, bo
             : (CurlExitCode.SslCacertBadfile, CaCertificateFileUnusable());
 
     /// <summary>
-    /// Verifies a chain apart from any handshake (ADR-1044): reads the trust anchors as a
+    /// Verifies a chain apart from any handshake (ADR-1052): reads the trust anchors as a
     /// handshake does and judges the chain with the <see cref="HandBuiltCertificateVerifier" />
     /// the hand-built client hands its chain to, so <c>-k</c>, <c>--cacert</c>, <c>--capath</c>,
     /// <c>--crlfile</c>, <c>--pinnedpubkey</c>, exit 60 and every message are the handshake's.

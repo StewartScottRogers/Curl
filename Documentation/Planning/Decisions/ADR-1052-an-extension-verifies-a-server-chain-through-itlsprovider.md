@@ -1,4 +1,4 @@
-# ADR-1044: An extension verifies a server chain through ITlsProvider
+# ADR-1052: An extension verifies a server chain through ITlsProvider
 
 - Status: Accepted
 - Date: 2026-10-29

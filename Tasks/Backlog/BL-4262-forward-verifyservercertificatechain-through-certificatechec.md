@@ -18,7 +18,7 @@ When certificate check hooks are active, an extension calling ITlsProvider.Verif
 
 ## Context
 
-Found by BL-4249 (ADR-1044): CertificateCheckingTlsProvider wraps the engine's provider when hooks are active but does not override the new default method, so it rejects every chain. Forward it to inner (and decide under ADR-1044 whether the hooks also judge the chain).
+Found by BL-4249 (ADR-1052): CertificateCheckingTlsProvider wraps the engine's provider when hooks are active but does not override the new default method, so it rejects every chain. Forward it to inner (and decide under ADR-1052 whether the hooks also judge the chain).
 
 ## Acceptance criteria
 

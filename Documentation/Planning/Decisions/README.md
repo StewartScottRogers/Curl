@@ -1084,4 +1084,4 @@ Each option and the specific reason it lost.
 | [1049](ADR-1049-the-mqtt5-client-follows-curls-mqtt-flow-and-ends-a-failure-reason-code-as-a-weird-server-reply.md) | The MQTT 5 client follows curl's mqtt:// flow and ends a failure reason code as a weird server reply (BL-4243) | Accepted | 2026-10-29 |
 | [1050](ADR-1050-the-socket-callback-quic-wrapper-always-carries-datagrams.md) | The socket-callback QUIC wrapper always carries datagrams (BL-4254) | Accepted | 2026-10-29 |
 | [1051](ADR-1051-an-argument-expander-takes-its-companion-options-and-claimed-positional-arguments.md) | An argument expander takes its companion options and claimed positional arguments (BL-4217) | Accepted | 2026-10-29 |
-| [1044](ADR-1044-an-extension-verifies-a-server-chain-through-itlsprovider.md) | An extension verifies a server chain through ITlsProvider (BL-4249) | Accepted | 2026-10-29 |
+| [1052](ADR-1052-an-extension-verifies-a-server-chain-through-itlsprovider.md) | An extension verifies a server chain through ITlsProvider (BL-4249) | Accepted | 2026-10-29 |

@@ -78,7 +78,7 @@ public interface ITlsProvider
     /// transfer's trust settings (<c>-k</c>, <c>--cacert</c>, <c>--capath</c>,
     /// <c>--crlfile</c>, <c>--pinnedpubkey</c>) without opening a TLS stream, so a protocol
     /// handler that runs its own handshake (DTLS for <c>coaps://</c>) judges the server's
-    /// certificates as curl's own TLS would (ADR-1044).
+    /// certificates as curl's own TLS would (ADR-1052).
     /// </summary>
     /// <remarks>
     /// By default the chain is rejected with <see cref="CurlExitCode.PeerFailedVerification" />

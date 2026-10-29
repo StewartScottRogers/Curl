@@ -3,7 +3,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// What <see cref="ITlsProvider.VerifyServerCertificateChain" /> decided about a server
 /// certificate chain: accepted, or rejected with the curl exit code and message curl's own TLS
-/// would give for it (ADR-1044).
+/// would give for it (ADR-1052).
 /// </summary>
 public sealed class ServerCertificateChainVerdict
 {
