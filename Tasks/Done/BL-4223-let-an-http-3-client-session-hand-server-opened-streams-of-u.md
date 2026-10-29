@@ -30,10 +30,10 @@ Found by BL-4113 (WebTransport extension, draft-ietf-webtrans-http3 sections 4.2
 ## Notes
 
 - Added `Curl.Http3.UnitLibrary/Http3UnknownPeerStream.cs` to `touches`: the record handed to the callback needs a file of its own (one public type per file). No task in Doing on `origin/work/dark-factory` names `Curl.Http3.UnitLibrary`.
-- Decision (ADR-1055): the callback is `Func<Http3UnknownPeerStream, bool>`; it returns whether it took the stream, and a declined stream is stopped with `H3_STREAM_CREATION_ERROR`, so RFC 9114 section 6.2's behaviour holds for whatever the caller does not use. Grease types are offered too; the caller declines them.
-- Decision (ADR-1055): the QUIC transport parameters stay curl's (`initial_max_streams_bidi` 262144) so the Initial stays byte for byte curl's; the opt-in is the session accepting peer bidirectional streams only when the callback is given and the connection implements `IPeerBidirectionalStreamAccepting`. `QuicStreamSet` needed no change (`AcceptBidirectional` already existed).
+- Decision (ADR-1063): the callback is `Func<Http3UnknownPeerStream, bool>`; it returns whether it took the stream, and a declined stream is stopped with `H3_STREAM_CREATION_ERROR`, so RFC 9114 section 6.2's behaviour holds for whatever the caller does not use. Grease types are offered too; the caller declines them.
+- Decision (ADR-1063): the QUIC transport parameters stay curl's (`initial_max_streams_bidi` 262144) so the Initial stays byte for byte curl's; the opt-in is the session accepting peer bidirectional streams only when the callback is given and the connection implements `IPeerBidirectionalStreamAccepting`. `QuicStreamSet` needed no change (`AcceptBidirectional` already existed).
 - `Http3PeerUnidirectionalStreams.ReadTypeAsync` added beside `AcceptAsync`, which keeps its contract for `Curl.Protocol.Http`'s `Http3Session`.
-- Not done here: `Curl.Engine`'s `SocketCallbackMultiplexedConnection` does not forward the new interface (ADR-1055, Consequences); BL-4113 forwards it if its path needs it.
+- Not done here: `Curl.Engine`'s `SocketCallbackMultiplexedConnection` does not forward the new interface (ADR-1063, Consequences); BL-4113 forwards it if its path needs it.
 - Measure-CodeQuality.ps1 -Library Curl.Http3.UnitLibrary,Curl.Quic.UnitLibrary: Quic 0 failing; Http3 had one uncovered branch from a nullable enum cast, fixed, rerun 0 failing (100/100, worst CRAP 10). `Curl.Protocol.Abstractions.UnitLibrary` gained only an interface with no executable lines, so it was not measured (it reaches nearly every test project).
 - CI on Linux and macOS: the new tests use in-memory streams and the in-memory QUIC server only, so they are platform-neutral.
 

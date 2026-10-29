@@ -1,4 +1,4 @@
-# ADR-1055 — An HTTP/3 client session offers server-opened streams of unknown types to an opt-in callback
+# ADR-1063 — An HTTP/3 client session offers server-opened streams of unknown types to an opt-in callback
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
