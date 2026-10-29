@@ -1,5 +1,5 @@
 ---
-id: BL-4224
+id: BL-4254
 title: Pass IDatagramCarryingConnection through SocketCallbackMultiplexedConnection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4224 — Pass IDatagramCarryingConnection through SocketCallbackMultiplexedConnection
+# BL-4254 — Pass IDatagramCarryingConnection through SocketCallbackMultiplexedConnection
 
 ## Goal
 
