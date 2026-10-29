@@ -34,3 +34,4 @@ Second part of BL-4161 (split for size). An extension may not reference `Curl.Pr
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 1cd6a8b9 2c9055fd 3180db99 3d836d5e.
