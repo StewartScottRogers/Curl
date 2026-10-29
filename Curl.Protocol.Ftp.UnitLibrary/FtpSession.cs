@@ -1963,7 +1963,7 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.ConnectionAccepted);
         if (remoteEndPoint is IPEndPoint remote)
         {
-            context.Events.ReportInfo(FtpTransferMessages.SecondConnectionEstablished(remote, listening));
+            context.Events.ReportInfo(FtpTransferMessages.SecondConnectionEstablished(context.Url.IdnHost, remote, listening));
         }
     }
 

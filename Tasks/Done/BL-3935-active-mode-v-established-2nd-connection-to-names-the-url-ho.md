@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Protocol.Ftp.UnitLibrary/FtpTransferMessages.cs, Curl.Protocol.Ftp.UnitTests/FtpActiveSecondConnectionLineTests.cs]
+touches: [Curl.Protocol.Ftp.UnitLibrary/FtpTransferMessages.cs, Curl.Protocol.Ftp.UnitLibrary/FtpSession.cs, Curl.Protocol.Ftp.UnitTests/FtpActiveSecondConnectionLineTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-3935 — Active-mode -v 'Established 2nd connection to' names the URL host ([::1]) as curl 8.22.0 does, not the server's data address
 
@@ -31,13 +31,16 @@ The host part is the URL host, not the server's data address. Curl builds the li
 
 ## Acceptance criteria
 
-- [ ] The command above gives the same `Established 2nd connection to` line through Curl as through curl 8.22.0 (ports aside), and the IPv4 variant (`ftp://127.0.0.1:<port>/`) still matches.
-- [ ] A unit test in `Curl.Protocol.Ftp.UnitTests` pins the line for an IPv6 URL host with an IPv4 data address.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The command above gives the same `Established 2nd connection to` line through Curl as through curl 8.22.0 (ports aside), and the IPv4 variant (`ftp://127.0.0.1:<port>/`) still matches.
+- [x] A unit test in `Curl.Protocol.Ftp.UnitTests` pins the line for an IPv6 URL host with an IPv4 data address.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Compared with curl 8.22.0 per the task Context; the IPv6 URL host is bracketed, an IPv4 or name host is not. CI platform neutrality: the tests build lines from fixed endpoints only.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 121f4756 92074e78 779790c0.
+- 2026-10-28: Doing -> Done. Active-mode -v 2nd connection line names the URL host, bracketed for IPv6; unit tests and quality run green

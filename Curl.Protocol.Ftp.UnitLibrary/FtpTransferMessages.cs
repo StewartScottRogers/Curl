@@ -431,11 +431,12 @@ internal static class FtpTransferMessages
     internal static string ResumingFrom(long offset) => Format($"Instructs server to resume from offset {offset}");
 
     /// <summary>The <c>-v</c> line for the server's active-mode data connection, accepted (BL-931).</summary>
+    /// <param name="urlHost">The URL host, as curl names it; an IPv6 literal is bracketed.</param>
     /// <param name="remote">The server's end.</param>
     /// <param name="local">The listening end.</param>
     /// <returns>The line, with curl's trailing space.</returns>
-    internal static string SecondConnectionEstablished(IPEndPoint remote, IPEndPoint local) =>
-        Format($"Established 2nd connection to {remote.Address} ({remote.Address} port {remote.Port}) from {local.Address} port {local.Port} ");
+    internal static string SecondConnectionEstablished(string urlHost, IPEndPoint remote, IPEndPoint local) =>
+        Format($"Established 2nd connection to {(urlHost.Contains(':', StringComparison.Ordinal) ? "[" + urlHost + "]" : urlHost)} ({remote.Address} port {remote.Port}) from {local.Address} port {local.Port} ");
 
     /// <summary>The <c>-v</c> line once an upload has been written and its data connection closed (BL-931).</summary>
     /// <param name="bytesSent">The bytes written.</param>
