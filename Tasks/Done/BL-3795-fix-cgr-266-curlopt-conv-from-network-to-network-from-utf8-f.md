@@ -9,7 +9,7 @@ touches: [Libcurl.UnitTests/Cgr266Tests.cs, Libcurl/Options/EasyOptionDispatch.c
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3795 — Fix CGR-266: CURLOPT_CONV_FROM_NETWORK / TO_NETWORK / FROM_UTF8_FUNCTION return CURLE_NOT_BUILT_IN (4); libcurl returns CURLE_UNKNOWN_OPTION (48)
 
@@ -77,3 +77,4 @@ probe.exe setopt
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 
 - 2026-10-28: Fixed: `EasyOptionDispatch.SetOption` answers UnknownOption (48) for options 20142-20144, as libcurl 8.22.0 does (the report's measured REF result); unit test Cgr266Tests pins it. Libcurl quality run: 0 failing members. Cross-platform: no platform-dependent behaviour.
+- 2026-10-28: Doing -> Done. CURLOPT_CONV_*_FUNCTION answer UnknownOption (48) as libcurl does; unit test added
