@@ -24,6 +24,12 @@ Namespace `Curl.Extension.Composition`.
   `CurlComposition.ExtensionConnectionHooksOf` passes them to `ConnectionHooks.ActivatedBy` for each option group
   and hands the engine its `ConnectorOver` and `DatagramConnectorOver`, or `null` for both without a hook; two
   hooks are curl's command-line error with exit 2 (ADR-1010, ADR-1014).
+- `ExtensionResolverHookCatalogue.Entries` holds each extension's resolver hook activator (its `IResolverHook`
+  when its option was given, else `null`), one line each, also `merge=union` and a shared list file.
+  `CurlComposition.ExtensionResolverHooksOf` passes them to `ResolverHooks.ActivatedBy` with whether the group gave
+  `--doh-url`, and hands `ResolverOver` to the engine twice: as `CreateTransports`' `wrapLookUps`, so the TCP and UDP
+  connectors look names up through it, and as `CreateProtocolHandlers`' `extensionResolver`. Two resolver claimants
+  (two hooks, or a hook and `--doh-url`) are curl's command-line error with exit 2 (ADR-1012).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

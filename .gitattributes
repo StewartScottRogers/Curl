@@ -87,3 +87,4 @@ Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs merge=union
 Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs merge=union
 Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs merge=union
 Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionResolverHookCatalogue.cs merge=union

@@ -14,6 +14,7 @@ using Curl.Core.FileSystem;
 using Curl.Engine;
 using Curl.Extension.Abstractions;
 using Curl.Extension.Abstractions.Connection;
+using Curl.Extension.Abstractions.Resolution;
 using Curl.Extension.Abstractions.Transfer;
 using Curl.Extension.Composition;
 using Curl.Kerberos;
@@ -97,7 +98,7 @@ internal static class CurlComposition
         LateBoundDiagnosticLog runLog = new();
         TransferPerformer performer = new(TimeProvider.System, EasyErrorText);
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), performer.TakeConnectionId), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), ExtensionTransferHooksOf(options), ExtensionConnectionHooksOf(options))),
+            SharingRunCookies((options, cookies) => CreateNetworkTransferDispatch(options, cookies, ExtensionResolverHooksOf(options), runConnections, tlsSessions, runLog, runDnsCache, performer)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -120,6 +121,25 @@ internal static class CurlComposition
             lateBoundDiagnosticLog: runLog,
             transferPerformer: performer,
             curlEngine: new ManagedCurlEngine(TimeProvider.System, null, EasyErrorText));
+    }
+
+    /// <summary>
+    /// Builds one option group's dispatch for the executable: its transports over the real network, the TCP and UDP
+    /// connectors looking names up through <paramref name="resolverHooks" /> as the handlers do (ADR-1012).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
+    /// <param name="resolverHooks">The resolver hook the group's extension options activated, or <see cref="ResolverHooks.None" />.</param>
+    /// <param name="runConnections">The run's connection cache.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache.</param>
+    /// <param name="runLog">The run's diagnostic log.</param>
+    /// <param name="runDnsCache">The run's DNS cache.</param>
+    /// <param name="performer">Takes the run's next <c>%{conn_id}</c> for each DoH connection.</param>
+    /// <returns>The dispatch.</returns>
+    private static TransferDispatch CreateNetworkTransferDispatch(CommandLineOptions options, CookieEngine? cookies, ResolverHooks resolverHooks, ConnectionCache runConnections, TlsSessionCache tlsSessions, IDiagnosticLog runLog, DnsCache runDnsCache, TransferPerformer performer)
+    {
+        CurlTransports transports = CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), resolverHooks.ResolverOver, takeDohConnectionId: performer.TakeConnectionId);
+        return CreateTransferDispatch(transports, cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), ExtensionTransferHooksOf(options), ExtensionConnectionHooksOf(options), resolverHooks);
     }
 
     /// <summary>
@@ -317,6 +337,8 @@ internal static class CurlComposition
     /// <see cref="System.Security.Cryptography.RandomNumberGenerator" />. The conformance harness passes the debug build's
     /// forced <c>CURL_ENTROPY</c> sequence (ADR-0751, BL-2834).
     /// </param>
+    /// <param name="extensionOptions">The extensions' long options the parser reads (ADR-1006); <see langword="null" /> for every registered extension's. Tests pass their own.</param>
+    /// <param name="extensionResolverHookActivators">The extensions' resolver hook activators (ADR-1012); <see langword="null" /> for <see cref="ExtensionResolverHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -346,14 +368,17 @@ internal static class CurlComposition
         EngineFeatureMask featureMask = EngineFeatureMask.None,
         bool standardOutputIsTerminal = false,
         Func<int, byte[]>? digestRandomBytes = null,
-        bool parsesAsEchBuild = false)
+        bool parsesAsEchBuild = false,
+        IReadOnlyList<ExtensionOption>? extensionOptions = null,
+        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>>? extensionResolverHookActivators = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
+        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> resolverActivators = extensionResolverHookActivators ?? ExtensionResolverHookCatalogue.Entries;
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector)), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector))), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes)),
             RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
@@ -378,7 +403,8 @@ internal static class CurlComposition
             parsesAsEchBuild: parsesAsEchBuild,
             transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
             extendedAttributeWriter: extendedAttributeWriter,
-            debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment));
+            debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment),
+            extensionOptions: extensionOptions);
     }
 
     /// <summary>The HSTS clock a <c>CURL_TIME</c> fixes (<see cref="HstsClockOf" />) when the seam is on; <see langword="null" />, for the real clock, when it is off.</summary>
@@ -411,7 +437,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -572,9 +598,10 @@ internal static class CurlComposition
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <param name="extensionTransferHooks">Puts each handler through the transfer hooks the option group's extension options activated (<see cref="ExtensionTransferHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none.</param>
     /// <param name="extensionConnectionHooks">The connection hook the option group's extension options activated (<see cref="ExtensionConnectionHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none.</param>
+    /// <param name="extensionResolverHooks">The resolver hook the option group's extension options activated (<see cref="ExtensionResolverHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none; it answers the handlers' look-ups, and the connectors' when <paramref name="transports" /> were built with its <see cref="ResolverHooks.ResolverOver" /> as their look-up wrapper.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null) =>
-        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions, extensionTransferHooks, extensionConnectionHooks);
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null, ResolverHooks? extensionResolverHooks = null) =>
+        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions, extensionTransferHooks, extensionConnectionHooks, extensionResolverHooks);
 
     /// <summary>
     /// Returns the lines curl 8.21.0 prints to standard error before each URL's transfer, unless
@@ -666,10 +693,50 @@ internal static class CurlComposition
         }
         catch (ArgumentException conflict)
         {
-            // ArgumentException.Message ends with " (Parameter 'values')", which curl's line does not carry.
-            throw new ExtensionOptionConflictException(conflict.Message.Replace($" (Parameter '{conflict.ParamName}')", string.Empty, StringComparison.Ordinal));
+            throw OptionConflictOf(conflict);
         }
     }
+
+    /// <summary>
+    /// Gives the resolver hook <see cref="ExtensionResolverHookCatalogue.Entries" /> activate for an option
+    /// group's extension options (ADR-1012).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The activated hook, or <see cref="ResolverHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options, or one and <c>--doh-url</c>, each claim the resolver.</exception>
+    internal static ResolverHooks ExtensionResolverHooksOf(CommandLineOptions options) =>
+        ExtensionResolverHooksOf(options, ExtensionResolverHookCatalogue.Entries);
+
+    /// <summary>
+    /// Gives the resolver hook <paramref name="activators" /> activate for an option group's extension options,
+    /// checked against the group's <c>--doh-url</c> (ADR-1012).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <returns>The activated hook, or <see cref="ResolverHooks.None" />.</returns>
+    /// <exception cref="ExtensionOptionConflictException">Two of the group's extension options, or one and <c>--doh-url</c>, each claim the resolver; the message names both.</exception>
+    internal static ResolverHooks ExtensionResolverHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, IResolverHook?>> activators)
+    {
+        try
+        {
+            return ResolverHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, options.DohUrl is not null);
+        }
+        catch (ArgumentException conflict)
+        {
+            throw OptionConflictOf(conflict);
+        }
+    }
+
+    /// <summary>Gives the engine's <c>extensionResolver</c> for an option group's resolver hook.</summary>
+    /// <param name="hooks">The group's resolver hook, or <see langword="null" /> for none.</param>
+    /// <returns><see cref="ResolverHooks.ResolverOver" />, or <see langword="null" /> without a hook, so the engine keeps curl's resolver.</returns>
+    internal static Func<IDnsResolver, IDnsResolver>? ExtensionResolverOf(ResolverHooks? hooks) =>
+        hooks is { Hook: not null } ? hooks.ResolverOver : null;
+
+    // An extension hook conflict as curl's command-line error. ArgumentException.Message ends with
+    // " (Parameter 'values')", which curl's line does not carry.
+    private static ExtensionOptionConflictException OptionConflictOf(ArgumentException conflict) =>
+        new(conflict.Message.Replace($" (Parameter '{conflict.ParamName}')", string.Empty, StringComparison.Ordinal));
 
     /// <summary>Gives the engine's <c>extensionConnector</c> for an option group's connection hook.</summary>
     /// <param name="hooks">The group's connection hook, or <see langword="null" /> for none.</param>
@@ -688,7 +755,7 @@ internal static class CurlComposition
         $"Warning: ignoring {option}, not supported by libcurl with Schannel";
 
     /// <summary>
-    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?, Func{IProtocolHandler, IProtocolHandler}?, ConnectionHooks?)" />
+    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?, Func{IProtocolHandler, IProtocolHandler}?, ConnectionHooks?, ResolverHooks?)" />
     /// does, warning as the named curl build does.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
@@ -697,12 +764,13 @@ internal static class CurlComposition
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
     /// <param name="extensionTransferHooks">Puts each handler through the transfer hooks the option group's extension options activated, or <see langword="null" /> for none.</param>
     /// <param name="extensionConnectionHooks">The connection hook the option group's extension options activated, or <see langword="null" /> for none.</param>
+    /// <param name="extensionResolverHooks">The resolver hook the option group's extension options activated, or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null)
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null, ResolverHooks? extensionResolverHooks = null)
     {
         Func<string, string?> readEnvironmentVariable = ProcessEnvironmentVariable;
         return new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: extensionTransferHooks, extensionConnector: ExtensionConnectorOf(extensionConnectionHooks), extensionDatagramConnector: ExtensionDatagramConnectorOf(extensionConnectionHooks))),
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: extensionTransferHooks, extensionConnector: ExtensionConnectorOf(extensionConnectionHooks), extensionDatagramConnector: ExtensionDatagramConnectorOf(extensionConnectionHooks), extensionResolver: ExtensionResolverOf(extensionResolverHooks))),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
             new ProxySelector(readEnvironmentVariable),
