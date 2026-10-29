@@ -77,6 +77,13 @@ internal sealed class DebugCallbackTransferEvents(DebugCallback debug, TlsBacken
     /// <inheritdoc />
     public void ReportTlsTrust(TlsTrustEvent trust) => ReportTextLines(TransferEventInfoText.TlsTrust(trust, tlsBackend));
 
+    /// <summary>
+    /// Hands <paramref name="text" /> to the callback as an info line (<see cref="CurlInfoType.Text" />), as libcurl's own
+    /// warnings reach <c>CURLOPT_DEBUGFUNCTION</c> through <c>Curl_infof</c> (ADR-0974).
+    /// </summary>
+    /// <param name="text">The warning, without the <c>Warning: </c> prefix and without a line end.</param>
+    public void ReportWarning(string text) => ReportText(text);
+
     /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => debug(CurlInfoType.HeaderOut, bytes);
 
