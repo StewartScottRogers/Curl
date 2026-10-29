@@ -4,7 +4,7 @@ title: Report the connecting socket and cover curl_multi_assign for CGR-034 (C_6
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-3990]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-4068, BL-4069]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.Perform.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitTests/Cgr034RefusedAssignTests.cs]
 requirement: none
 created: 2026-10-28

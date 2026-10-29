@@ -4,7 +4,7 @@ title: Give a socket-action transfer over a connection with no OS socket a socke
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4015, BL-4016, BL-4007, BL-3990]
+depends-on: [BL-4015, BL-4016, BL-4007, BL-4068, BL-4069]
 touches: [Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitTests/TransferSocketWaitTests.cs, Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs, Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs]
 requirement: none
 created: 2026-10-28
