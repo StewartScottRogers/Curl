@@ -60,7 +60,8 @@ internal static class TlsClientOptionsMapping
     /// <see langword="null" /> for the process's environment.
     /// </param>
     /// <returns>The target's TLS settings.</returns>
-    internal static TlsClientOptions Of(EasyTlsOptions tls, bool useAlpn, string? sslSessionsFile, Func<string, string?>? readEnvironmentVariable = null)
+    /// <param name="tracesHandshakeMessages">Whether <c>-v</c> or <c>--trace</c> prints the transfer, so the OpenSSL build traces its handshake messages (<see cref="TlsClientOptions.TracesHandshakeMessages" />, ADR-0985, BL-4047).</param>
+    internal static TlsClientOptions Of(EasyTlsOptions tls, bool useAlpn, string? sslSessionsFile, Func<string, string?>? readEnvironmentVariable = null, bool tracesHandshakeMessages = false)
     {
         TlsPeerOptions origin = tls.Origin;
         return new(
@@ -96,7 +97,8 @@ internal static class TlsClientOptionsMapping
             KeyLogFile(readEnvironmentVariable),
             ChecksHostNameWhenInsecure(origin),
             origin.CertificateAuthorityBlob,
-            TerminalPemPassPhrasePrompt.Instance);
+            TerminalPemPassPhrasePrompt.Instance,
+            tracesHandshakeMessages);
     }
 
     /// <summary>
@@ -117,7 +119,8 @@ internal static class TlsClientOptionsMapping
     /// <param name="useAlpn">Whether ALPN is offered: <see langword="false" /> under <c>--no-alpn</c>.</param>
     /// <param name="readEnvironmentVariable">Reads the run's environment for <c>SSLKEYLOGFILE</c>, as for <see cref="Of" />; <see langword="null" /> for the process's.</param>
     /// <returns>The HTTPS proxy's TLS settings.</returns>
-    internal static TlsClientOptions ProxyOf(EasyTlsOptions tls, bool useAlpn, Func<string, string?>? readEnvironmentVariable = null)
+    /// <param name="tracesHandshakeMessages">Whether <c>-v</c> or <c>--trace</c> prints the transfer, as for <see cref="Of" />.</param>
+    internal static TlsClientOptions ProxyOf(EasyTlsOptions tls, bool useAlpn, Func<string, string?>? readEnvironmentVariable = null, bool tracesHandshakeMessages = false)
     {
         TlsPeerOptions proxy = tls.Proxy;
         return new(
@@ -141,7 +144,8 @@ internal static class TlsClientOptionsMapping
             KeyLogFile: KeyLogFile(readEnvironmentVariable),
             ChecksHostNameWhenInsecure: ChecksHostNameWhenInsecure(proxy),
             CaCertificateBlob: proxy.CertificateAuthorityBlob,
-            PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance);
+            PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance,
+            TracesHandshakeMessages: tracesHandshakeMessages);
     }
 
     /// <summary>

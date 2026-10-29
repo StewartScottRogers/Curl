@@ -345,7 +345,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>The transports.</returns>
     internal static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
-        EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
+        EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null, TracesTransfer: options.Behaviour.Verbose);
         return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing, shared.SocketWait);
     }
 }

@@ -17,7 +17,8 @@ internal static partial class EngineComposition
     /// TLS provider <see cref="CreateTlsProvider" /> routes to, and a <see cref="UdpDatagramConnector" />. Both
     /// connectors and the TLS provider share the one resolver and <see cref="TimeProvider.System" />. TLS uses
     /// the <see cref="TlsClientOptions" /> mapped from <paramref name="tls" /> by
-    /// <see cref="TlsClientOptionsMapping.Of" /> from <paramref name="tls" />, one set shared by every URL on
+    /// <see cref="TlsClientOptionsMapping.Of" /> from <paramref name="tls" /> (asking for the OpenSSL build's handshake message
+    /// trace under <see cref="EngineToolOptions.TracesTransfer" />, ADR-0985), one set shared by every URL on
     /// the command line. The handshake to an HTTPS proxy runs through a second provider, routed
     /// the same way, on the same clock, with the <see cref="TlsClientOptions" />
     /// <see cref="TlsClientOptionsMapping.ProxyOf" /> maps from the proxy's
@@ -133,9 +134,9 @@ internal static partial class EngineComposition
             ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces)
             : DialingResolverOf(dialing, network, tls, timeProvider, resolverEvents, easyErrorText, traces);
         IDnsResolver lookUps = LookUpsOf(dnsResolver, network, resolver => wrapLookUps(SocketActionGatedResolver.Over(resolver, socketWait)));
-        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
+        TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile, tracesHandshakeMessages: tool.TracesTransfer);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
-        TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn);
+        TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn, tracesHandshakeMessages: tool.TracesTransfer);
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);

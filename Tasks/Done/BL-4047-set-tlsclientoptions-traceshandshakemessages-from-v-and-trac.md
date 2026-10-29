@@ -8,7 +8,7 @@ depends-on: [BL-4010, BL-3766]
 touches: [Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Engine.UnitLibrary/EngineToolOptions.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs, Curl.Engine.UnitLibrary/EngineComposition.Transports.cs, Curl.Engine.UnitLibrary/OptionGroupConnectionSettings.cs, Curl.Engine.UnitTests/TlsClientOptionsMappingTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4047 — Set TlsClientOptions.TracesHandshakeMessages from -v and --trace so the OpenSSL build prints the handshake message trace
 
@@ -22,12 +22,13 @@ BL-4010 (ADR-0985) added `TlsClientOptions.TracesHandshakeMessages` and the `Tls
 
 ## Acceptance criteria
 
-- [ ] With `-v` the origin's `TlsClientOptions` has `TracesHandshakeMessages` set, and without it does not, pinned by a unit test.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] With `-v` the origin's `TlsClientOptions` has `TracesHandshakeMessages` set, and without it does not, pinned by a unit test.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-10-28: -v and --trace are known only to Curl.Console (EasyOptionsFromCommandLine.ToolOptionsOf, a new EngineToolOptions member) and to ManagedCurlEngine.CreateTransports (options.Behaviour.Verbose for libcurl). BL-3766 holds the whole of Curl.Console in Doing, so added those files to touches and BL-3766 to depends-on; requeued before any edit.
+- 2026-10-28: Decided (sensible default): a new `EngineToolOptions.TracesTransfer` (default false) carries `-v`/`--trace`/`--trace-ascii` (`CommandLineOptions.Trace != None`) from Curl.Console and `CURLOPT_VERBOSE` (`EasyBehaviourOptions.Verbose`) from ManagedCurlEngine; `TlsClientOptionsMapping.Of`/`ProxyOf` take it as an optional `tracesHandshakeMessages`, so the target and HTTPS proxy both route to the hand-built client in the OpenSSL build only when the trace is printed, and the connection-cache key differs between traced and untraced groups, as their TLS stacks do. DoH keeps SslStream (its handshake is not the target's). The conformance harness's dialing path in Curl.Console/CurlComposition.cs (outside touches) still maps without it; it is not the production path. Pinned by TlsClientOptionsMappingTests.Of_VerboseOrTraceOnCommandLine_TracesHandshakeMessagesOfTargetAndProxy. Measure-CodeQuality: 0 failing members for Curl.Engine.UnitLibrary and Curl.Console. Change is platform-neutral; fast tests green on Windows.
 
 ## Log
 
@@ -35,3 +36,4 @@ BL-4010 (ADR-0985) added `TlsClientOptions.TracesHandshakeMessages` and the `Tls
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 5731c438 3d836d5e.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Console/EasyOptionsFromCommandLine.cs, held by BL-3766 (whole Curl.Console); depends-on BL-3766
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 5731c438 3d836d5e.
+- 2026-10-28: Doing -> Done. -v and --trace set TracesHandshakeMessages on the target's and HTTPS proxy's TLS options

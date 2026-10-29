@@ -83,7 +83,7 @@ internal static class EasyOptionsFromCommandLine
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tool options.</returns>
     internal static EngineToolOptions ToolOptionsOf(CommandLineOptions options) =>
-        new(options.Parallel, options.ParallelImmediate, options.SslSessionsFile, options.MaxTime);
+        new(options.Parallel, options.ParallelImmediate, options.SslSessionsFile, options.MaxTime, TracesTransfer: options.Trace != TraceKind.None);
 
     /// <summary>
     /// The curl tool's own settings one transfer's setup and context read, which libcurl's easy options have no

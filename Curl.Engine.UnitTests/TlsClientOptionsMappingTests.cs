@@ -603,6 +603,27 @@ public sealed class TlsClientOptionsMappingTests
         Assert.AreEqual(KeyLogFileOffWindows, mapped.KeyLogFile);
     }
 
+    // BL-4047: -v and --trace ask the target's and the HTTPS proxy's handshakes for the OpenSSL build's
+    // handshake message trace (ADR-0985); without them neither asks, so the connection keeps SslStream.
+    [TestMethod]
+    [DataRow("-v", true)]
+    [DataRow("--trace", true)]
+    [DataRow("--trace-ascii", true)]
+    [DataRow(null, false)]
+    public void Of_VerboseOrTraceOnCommandLine_TracesHandshakeMessagesOfTargetAndProxy(string? traceOption, bool expected)
+    {
+        string[] arguments = traceOption is null ? [Url] : traceOption == "-v" ? [traceOption, Url] : [traceOption, "trace.log", Url];
+        CommandLineOptions options = Parse(arguments);
+        Diagnostics.Arrange("command line", string.Join(' ', arguments));
+
+        OptionGroupConnectionSettings settings = OptionGroupConnectionSettings.Of(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options));
+        Diagnostics.Act("target, proxy traces handshake messages", $"{settings.Tls.TracesHandshakeMessages}, {settings.ProxyTls.TracesHandshakeMessages}");
+
+        Diagnostics.Assert("traces handshake messages", expected, settings.Tls.TracesHandshakeMessages);
+        Assert.AreEqual(expected, settings.Tls.TracesHandshakeMessages);
+        Assert.AreEqual(expected, settings.ProxyTls.TracesHandshakeMessages);
+    }
+
     private const string KeyLogPath = "log/2090.log.ssl";
 
     // The Schannel build Curl matches on Windows ignores SSLKEYLOGFILE; the OpenSSL build elsewhere reads it.
