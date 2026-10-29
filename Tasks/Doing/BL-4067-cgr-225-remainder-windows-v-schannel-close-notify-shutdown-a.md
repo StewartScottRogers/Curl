@@ -31,3 +31,4 @@ BL-3754 (CGR-225) added `schannel: added N certificate(s) from CA file` and `sch
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d1fb76cb b6c2f678 3d836d5e.
