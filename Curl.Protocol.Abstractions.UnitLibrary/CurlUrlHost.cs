@@ -309,7 +309,8 @@ internal static class CurlUrlHost
     /// (<c>aא</c> is <c>xn--a-0hc</c>); and a label with a lone surrogate (a byte that is not
     /// UTF-8), a control character (<c>U+0090</c>, upstream test 1034), the replacement character
     /// <c>U+FFFD</c>, which UTS #46 disallows (test 1034's bytes as a config file off Windows reads
-    /// them, BL-3946), or longer than 63 characters once converted (upstream test 1035) is refused.
+    /// them, BL-3946), or longer than 63 characters once converted (upstream test 1035) is refused,
+    /// as is an <c>xn--</c> label that does not decode (<see cref="KeepAsciiLabelUnlessUndecodable" />).
     /// </summary>
     /// <returns>The ASCII label, or <see langword="null" /> when it cannot be converted.</returns>
     private static string? ToAsciiLabel(string label)
@@ -319,10 +320,26 @@ internal static class CurlUrlHost
             return null;
         }
 
-        string? converted = Ascii.IsValid(label) ? label : EncodeLabel(label);
+        string? converted = Ascii.IsValid(label) ? KeepAsciiLabelUnlessUndecodable(label) : EncodeLabel(label);
 
         return converted?.Length > MaximumLabelLength ? null : converted;
     }
+
+    /// <summary>
+    /// Passes an ASCII label as written, but refuses an <c>xn--</c> label that libidn2 cannot decode
+    /// (BL-3945): one that is not punycode (<c>xn--zz</c>), decodes to no character outside ASCII
+    /// (<c>xn--</c>, <c>xn--abc-</c>), or decodes to a character IDNA refuses (<c>xn--a</c> is
+    /// <c>U+0080</c>, <c>xn--ib9b</c> a lone surrogate).
+    /// </summary>
+    private static string? KeepAsciiLabelUnlessUndecodable(string label) =>
+        !label.StartsWith("xn--", StringComparison.Ordinal) || IsDecodableLabel(CurlUrlPunycode.Decode(label[4..]))
+            ? label
+            : null;
+
+    private static bool IsDecodableLabel(List<int>? codePoints) =>
+        codePoints is not null
+        && codePoints.Exists(codePoint => codePoint >= 0x80)
+        && codePoints.TrueForAll(codePoint => Rune.IsValid(codePoint) && !IsRefusedInLabel(new Rune(codePoint)));
 
     private static bool HasMisplacedHyphen(string label) =>
         label.StartsWith('-')
