@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMapping.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMapping.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMappingTable.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs, Curl.Protocol.Abstractions.UnitTests/Cgr019Tests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -22,13 +22,15 @@ BL-3548 (CGR-019, ADR-0895) added `Curl.Protocol.Abstractions.UnitLibrary/CurlUr
 
 ## Acceptance criteria
 
-- [ ] For a sample of at least 30 hosts drawn from each mapping class above, Curl's `Host` header equals curl 8.22.0's (measured, recorded in Notes).
-- [ ] Focused tests in `CurlUrlHostNameMappingTests.cs` pin each mapping class.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Moved to BL-4025 (needs a Linux curl 8.22.0 with libidn2; lanes run on Windows): for a sample of at least 30 hosts drawn from each mapping class above, Curl's `Host` header equals curl 8.22.0's (measured, recorded in Notes).
+- [x] Focused tests in `CurlUrlHostNameMappingTests.cs` pin each mapping class.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Filed by BL-3548's run; validity differences (disallowed characters, ZWJ context rules) are BL-3588's, not this task's.
+- Resumed run: the earlier run had written the generated table, NFC and the tests but no ADR; this run added ADR-0972, the table and `Cgr019Tests.cs` (its pinned `｟` now maps to `⦅`) to touches, and the abstractions tests pass (1117 passed, 2 skipped).
+- Not measured here: Windows curl uses WinIDN and an ANSI argv, and no Linux curl was reachable (a WSL probe hung). The pinned hosts follow the Unicode 15.1 table and NFC; measuring them is BL-4025 (`lane: no`). Committing the generator app, which the earlier run did not keep, is BL-4026.
 
 ## Log
 
