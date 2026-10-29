@@ -81,6 +81,9 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// </summary>
     private HttpFrameLog connectionLog = HttpFrameLog.Silent;
 
+    /// <summary>Where the connection's <c>-v</c> lines go: the latest registered stream's, or <see langword="null" /> for none.</summary>
+    private HttpStreamOpenedLines? connectionInfoLines;
+
     /// <summary>Initializes a new instance of the <see cref="Http2Session" /> class.</summary>
     /// <param name="connection">The connection; the handler keeps ownership.</param>
     /// <param name="isPushEnabled">
@@ -400,6 +403,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     {
         openStreams[streamId] = receiver;
         connectionLog = receiver.FrameLog;
+        connectionInfoLines = receiver.OpenedLines;
         return streamId;
     }
 
@@ -567,6 +571,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         if (!wasGoAwayReceived && Frames.PeerGoAway is { } goAway)
         {
             connectionLog.GoAwayReceived(goAway);
+            connectionInfoLines?.GoAwayReceived(goAway);
         }
     }
 

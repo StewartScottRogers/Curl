@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Protocol.Http.UnitLibrary/HttpConnectionInfoLines.cs, Curl.Protocol.Http.UnitTests/Http2GoAwayInfoLineTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3839 — Print curl's -v line 'received GOAWAY, error=N, last_stream=N' when an HTTP/2 server sends GOAWAY
 
@@ -22,12 +22,15 @@ Found by BL-3560 (CGR-031). Measured with real curl 8.18.0 (WSL) against a serve
 
 ## Acceptance criteria
 
-- [ ] A unit test pins the `-v` line `received GOAWAY, error=0, last_stream=0` before `REFUSED_STREAM, retrying a fresh connect` for a GOAWAY that leaves stream 1 unprocessed.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A unit test pins the `-v` line `received GOAWAY, error=0, last_stream=0` before `REFUSED_STREAM, retrying a fresh connect` for a GOAWAY that leaves stream 1 unprocessed.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Text and conditions follow curl `http2.c` `on_frame_recv`: the line is printed for every GOAWAY whatever its error code, the code as a number. Wired through the stream's `HttpStreamOpenedLines` (always-on events, not the `--trace-config` events). No option changes, so `--ai-help` is unchanged. Quality run for Curl.Protocol.Http.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: ad00754d 779790c0.
+- 2026-10-28: Doing -> Done. -v prints received GOAWAY, error=N, last_stream=N; unit test pins it before the REFUSED_STREAM retry line

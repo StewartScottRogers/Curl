@@ -31,6 +31,14 @@ internal sealed class HttpStreamOpenedLines(ITransferEvents events, string url)
         "[HTTP/2] Warning: The cumulative length of all headers exceeds 60000 bytes and that could cause the stream to be rejected.";
 
     /// <summary>
+    /// Reports curl's <c>received GOAWAY, error=N, last_stream=N</c> line for a GOAWAY the server
+    /// sent, whatever its error code (<c>on_frame_recv</c> in <c>lib/http2.c</c>).
+    /// </summary>
+    /// <param name="goAway">The GOAWAY's payload.</param>
+    internal void GoAwayReceived(Http2GoAwayPayload goAway) =>
+        events.ReportInfo(HttpConnectionInfoLines.GoAwayReceived(goAway));
+
+    /// <summary>
     /// Reports the lines for the stream <paramref name="streamId" /> that sent
     /// <paramref name="fields" />.
     /// </summary>

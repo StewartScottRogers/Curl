@@ -96,6 +96,9 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// <summary>Gets what writes the <c>--trace-config http/2</c> lines for this stream's transfer, or <see langword="null" /> for none.</summary>
     internal Http2FrameTrace? FrameTrace => frameTrace;
 
+    /// <summary>Gets what reports this stream's transfer's <c>-v</c> lines, or <see langword="null" /> for none.</summary>
+    internal HttpStreamOpenedLines? OpenedLines => openedLines;
+
     /// <summary>
     /// Gets or sets who is offered the pushes the server promises on this stream (BL-2516), or
     /// <see langword="null" /> when its transfer takes none, so each is refused.
