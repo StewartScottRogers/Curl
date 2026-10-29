@@ -1,5 +1,5 @@
 ---
-id: BL-4017
+id: BL-4021
 title: Cover the missing branch of ManagedEasyTransfer.PerformBuildingMimePostAsync
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4017 — Cover the missing branch of ManagedEasyTransfer.PerformBuildingMimePostAsync
+# BL-4021 — Cover the missing branch of ManagedEasyTransfer.PerformBuildingMimePostAsync
 
 ## Goal
 
