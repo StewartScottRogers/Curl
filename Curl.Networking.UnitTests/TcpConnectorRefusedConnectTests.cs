@@ -11,7 +11,9 @@ namespace Curl.Networking;
 /// A refused loopback connect (<c>curl -sS http://127.0.0.1:9/</c>) fails on the first refused
 /// dial, with no wait of Curl's own: off Windows curl 8.22.0 fails it at once (measured on Linux
 /// and macOS, BL-3164 Notes), and on Windows the stack's own retry of a refused SYN is all the
-/// delay there is, so curl 8.21.0 Schannel and Curl both take about two seconds there.
+/// delay there is, so curl 8.21.0 Schannel and Curl both take about two seconds there. The real
+/// socket check times the fastest of several refusals, so a runner's scheduling stall does not
+/// fail it.
 /// </summary>
 public sealed partial class TcpConnectorTests
 {
@@ -41,18 +43,27 @@ public sealed partial class TcpConnectorTests
         var port = ClosedLoopbackPort();
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new TcpDialer(), new FakeTlsProvider(), TimeProvider.System);
 
-        // One untimed connect first, so the timed one measures the refusal, not the first use's
+        // One untimed connect first, so the timed ones measure the refusal, not the first use's
         // JIT and socket start-up on a busy runner (633 ms on macOS CI, BL-3845).
         await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", port, UseTls: false));
 
-        var stopwatch = Stopwatch.StartNew();
-        var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", port, UseTls: false));
-        stopwatch.Stop();
+        // The fastest of several refusals: a wait of Curl's own would slow every one of them,
+        // while a busy runner's scheduler stalls only some (a 2 ms refusal then a 568 ms one on
+        // macOS CI, BL-4006).
+        var fastestMilliseconds = long.MaxValue;
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", port, UseTls: false));
+            stopwatch.Stop();
 
-        Diagnostics.Assert("elapsed ms", "< 500", stopwatch.ElapsedMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
-        Assert.IsTrue(result.IsConnectionRefused);
-        Assert.IsLessThan(500L, stopwatch.ElapsedMilliseconds);
+            Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+            Assert.IsTrue(result.IsConnectionRefused);
+            fastestMilliseconds = Math.Min(fastestMilliseconds, stopwatch.ElapsedMilliseconds);
+        }
+
+        Diagnostics.Assert("fastest elapsed ms", "< 500", fastestMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.IsLessThan(500L, fastestMilliseconds);
     }
 
     [TestMethod]
