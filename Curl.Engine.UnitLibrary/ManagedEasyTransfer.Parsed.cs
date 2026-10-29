@@ -177,7 +177,7 @@ internal sealed partial class ManagedEasyTransfer
         ICollection<CallbackReadStream> mimeReads,
         CancellationToken cancellationToken) =>
         toolInputs is null
-            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary) { SevenBitRefusalWaitsForSend = true }, options.Http, url.Scheme, options.Callbacks.Read, mimeReads, PauseGateFor(url), Host.StandardInput, cancellationToken).ConfigureAwait(false)
+            ? await MimePostForm.BuildAsync(new MultipartFormBodyBuilder(Host.FileSystem, Encoding.UTF8, CreateFormBoundary) { SevenBitRefusalWaitsForSend = true, MissingFileWaitsForSend = true }, options.Http, url.Scheme, options.Callbacks.Read, mimeReads, PauseGateFor(url), Host.StandardInput, cancellationToken).ConfigureAwait(false)
             : null;
 
     /// <summary>The token the curl tool's runner aborts the transfer through, or none without <paramref name="toolProgress" />.</summary>

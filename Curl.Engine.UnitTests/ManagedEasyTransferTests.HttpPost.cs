@@ -49,6 +49,23 @@ public sealed partial class ManagedEasyTransferTests
         Assert.AreEqual(body, Dechunked(written[(written.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4)..]));
     }
 
+    [TestMethod]
+    public async Task PerformAsync_HttpPostOfAMissingFile_ConnectsAndSendsTheHeadThenFailsWithReadErrorAndNoText()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        ManagedCurlEngine engine = CreateEngine(connector);
+        ICurlFormBuilder form = engine.CreateForm();
+        string missing = Path.Combine(Path.GetTempPath(), "cgr262-missing-" + Guid.NewGuid().ToString("N"));
+        Assert.AreEqual(CurlFormAddCode.Ok, form.Add([new(CurlFormOption.CopyName, "f"), new(CurlFormOption.File, missing)]));
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+
+        CurlCode code = await PerformHttpPostAsync(easy, "http://h/form", form.Build(), ReaderOf(string.Empty));
+
+        Assert.AreEqual(CurlCode.ReadError, code);
+        Assert.AreEqual(string.Empty, easy.ErrorText);
+        StringAssert.StartsWith(Encoding.ASCII.GetString(connector.Written), "POST /form HTTP/1.1\r\n");
+    }
+
     private static async Task<CurlCode> PerformHttpPostAsync(ManagedEasyTransfer easy, string url, EasyMimeBody form, ReadCallback read)
     {
         easy.CreateFormBoundary = () => FormBoundary;

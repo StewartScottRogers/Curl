@@ -47,6 +47,19 @@ public sealed class MultipartFormBodyBuilderMissingFileTests
     }
 
     [TestMethod]
+    public async Task MissingFileThatWaitsForSend_IsBuiltAndItsReadFailsWithReadErrorAndNoMessage()
+    {
+        MultipartFormBodyBuilder builder = new(MissingFileSystem(), Encoding.UTF8, () => Boundary) { MissingFileWaitsForSend = true };
+
+        MultipartFormBuildResult result = await builder.BuildAsync([FilePart(sendsEmptyWhenMissing: false)], TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsBuilt);
+        RequestBodyReadFailedException failure = await Assert.ThrowsAsync<RequestBodyReadFailedException>(() => ReadAsync(result));
+        Assert.AreEqual(CurlExitCode.ReadError, failure.ExitCode);
+        Assert.AreEqual(string.Empty, failure.Message);
+    }
+
+    [TestMethod]
     public async Task MissingFileFromTheTool_FailsWithReadErrorBeforeSending()
     {
         MultipartFormBuildResult result = await BuildAsync(MissingFileSystem(), FilePart(sendsEmptyWhenMissing: false));
