@@ -31,3 +31,4 @@ BL-3588 (CGR-059, ADR-0942) converts a non-ASCII host label by label in `CurlUrl
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: b1fc2e57 205362f8 779790c0.
