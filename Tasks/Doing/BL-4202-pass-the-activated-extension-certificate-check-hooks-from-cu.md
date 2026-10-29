@@ -32,3 +32,4 @@ BL-4097 added `Curl.Extension.Abstractions.Certificates.CertificateCheckHooks` a
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 1dfd2cf2 54e224d7 478f867b 3d836d5e.
