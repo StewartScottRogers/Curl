@@ -35,3 +35,4 @@ If `merge=union` on the whole `Curl.slnx` is unsafe (a removal in one branch res
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 9a728cc4 35d05a05 cebd48ba 6ab83a52 3d836d5e.
