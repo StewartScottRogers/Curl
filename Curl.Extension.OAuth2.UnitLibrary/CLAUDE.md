@@ -23,5 +23,13 @@ device authorization flows:
   body that is not a JSON object, lacks a required member or has a member of the wrong type is a
   failure with its reason, never an exception. `OAuth2JsonBody` holds the shared reading.
 
+`Http/` sends those requests (ADR-1028): `OAuth2HttpClient.PostFormAsync` opens a connection through
+the injected `IConnector` (TLS for `https`), `OAuth2HttpRequestWriter` writes one HTTP/1.1 form POST
+with `Accept: application/json` and `Connection: close`, and `OAuth2HttpExchange` skips interim 1xx
+responses and reads the final one whole through `OAuth2HttpConnectionReader`,
+`OAuth2HttpResponseHead` and `OAuth2HttpBodyReader` (`Content-Length`, chunked or the close, at most
+1 MiB). Any status, a 400 or 401 included, is an `OAuth2HttpResponse` with its UTF-8 body; every
+failure is an `OAuth2HttpResult` with an `OAuth2HttpFailure` and curl's exit code for it.
+
 Tested against the RFCs, not against curl. Held to the four quality gates in the root `CLAUDE.md`.
 Its tests are in `Curl.Extension.OAuth2.UnitTests`.
