@@ -30,3 +30,4 @@ BL-3829 (ADR-0980) committed the generated table but not the C# file-based app t
 ## Log
 
 - 2026-10-28: Created by BL-3829's run.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: c47fee76 452eaeed.
