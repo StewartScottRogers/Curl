@@ -2,7 +2,7 @@
 
 The CoAP extension (ADR-0999), tested against RFC 7252, RFC 7959, RFC 7641 and RFC 6347, not
 against curl. It references only `Curl.Extension.Abstractions` (and through it
-`Curl.Protocol.Abstractions`), the shared layer `Curl.Tls` (for `TlsContentType` and
+`Curl.Protocol.Abstractions`), the shared layer `Curl.Tls` (for `TlsContentType`, `TlsPrf`, `Tls12KeyBlock` and
 `HandshakeType`, ADR-1042) and the base class library. `Client/` holds the `coap://` handler,
 registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDescriptionCatalogue.cs`.
 
@@ -57,5 +57,16 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 
 Each throws `FormatException` for bytes the RFC does not allow.
 
+`Dtls/Record/` (namespace `Curl.Extension.Coap.Dtls.Record`) protects DTLS 1.2 records with AES-128-GCM
+(RFC 5288, RFC 6347 section 4.1.2):
+
+- `DtlsAes128GcmKeyBlock` derives both sides' 16-byte keys and 4-byte write IVs with `TlsPrf.Sha256`.
+- `DtlsAes128GcmRecordNonce` is the nonce: the write IV, then the 8-byte explicit part, the epoch and
+  sequence number, sent before the ciphertext.
+- `DtlsAes128GcmRecordProtector` writes one epoch's records, numbered from 0, with the 16-byte tag over
+  `DtlsRecordHeader.AdditionalData`; `DtlsAes128GcmRecordUnprotector` reads them, passing an epoch-0
+  record through and dropping one that does not parse, is of another epoch, is a replay or fails its tag.
+
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`,
-`Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client` and `Curl.Extension.Coap.UnitTests/Dtls/Wire`.
+`Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client`, `Curl.Extension.Coap.UnitTests/Dtls/Wire` and
+`Curl.Extension.Coap.UnitTests/Dtls/Record`.
