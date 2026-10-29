@@ -32,3 +32,4 @@ Split out of BL-4009, which sets `TlsHandshakeEvent.PeerSignatureTypeName` (`RSA
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 6ef0dae1 8a05c78a a221f870 3d836d5e.
