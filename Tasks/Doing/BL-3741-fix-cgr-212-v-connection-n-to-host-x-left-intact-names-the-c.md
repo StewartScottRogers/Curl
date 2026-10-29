@@ -91,3 +91,4 @@ curl -v -sS --connect-to foo.test:21802:localhost:21802 http://foo.test:21802/x
 - 2026-10-26: Created from CGR-212 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Fix lives in Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, held by BL-3736; waits for BL-3736
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
