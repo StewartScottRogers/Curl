@@ -1,5 +1,5 @@
 ---
-id: BL-4263
+id: BL-4266
 title: Extension CoAP: protect DTLS 1.2 records with AES-128-GCM
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4263 — Extension CoAP: protect DTLS 1.2 records with AES-128-GCM
+# BL-4266 — Extension CoAP: protect DTLS 1.2 records with AES-128-GCM
 
 ## Goal
 

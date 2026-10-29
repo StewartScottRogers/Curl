@@ -4,7 +4,7 @@ title: Extension CoAP: in-memory DTLS 1.2 test server for the client handshake t
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4263]
+depends-on: [BL-4266]
 touches: [Curl.Extension.Coap.UnitTests/Dtls/TestServer]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4251 for size (extension 15 of 63, BL-4116). Test code only, for BL-4251's client handshake tests, which run against it. Use `Curl.Tls`'s public TLS 1.2 messages (`Tls12ServerKeyExchange`, `Tls12ClientKeyExchange`, `EcdhKeyShare`, `TlsPrf`, `Finished`), BL-4250's framing (`Curl.Extension.Coap.UnitLibrary/Dtls/Wire`) and BL-4263's record protection. Certificates are generated in memory (`System.Security.Cryptography.X509Certificates.CertificateRequest`), never files, so the tests stay platform-neutral. The transcript hashes the DTLS handshake headers (RFC 6347 4.2.6). The DTLS ClientHello carries a cookie between session_id and cipher_suites (RFC 6347 4.2.1), so `Curl.Tls`'s `ClientHello` cannot parse it as is.
+Split from BL-4251 for size (extension 15 of 63, BL-4116). Test code only, for BL-4251's client handshake tests, which run against it. Use `Curl.Tls`'s public TLS 1.2 messages (`Tls12ServerKeyExchange`, `Tls12ClientKeyExchange`, `EcdhKeyShare`, `TlsPrf`, `Finished`), BL-4250's framing (`Curl.Extension.Coap.UnitLibrary/Dtls/Wire`) and BL-4266's record protection. Certificates are generated in memory (`System.Security.Cryptography.X509Certificates.CertificateRequest`), never files, so the tests stay platform-neutral. The transcript hashes the DTLS handshake headers (RFC 6347 4.2.6). The DTLS ClientHello carries a cookie between session_id and cipher_suites (RFC 6347 4.2.1), so `Curl.Tls`'s `ClientHello` cannot parse it as is.
 
 ## Acceptance criteria
 

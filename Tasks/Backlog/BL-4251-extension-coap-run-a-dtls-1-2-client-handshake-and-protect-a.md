@@ -4,7 +4,7 @@ title: Extension CoAP: run a DTLS 1.2 client handshake and protect application d
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4250, BL-4249, BL-4263, BL-4264, BL-4265]
+depends-on: [BL-4250, BL-4249, BL-4266, BL-4264, BL-4265]
 touches: [Curl.Extension.Coap.UnitLibrary/Dtls/Handshake, Curl.Extension.Coap.UnitTests/Dtls/Handshake]
 requirement: none
 created: 2026-10-29
@@ -33,10 +33,10 @@ Builds on BL-4250's framing. Use `Curl.Tls.UnitLibrary`'s public TLS 1.2 pieces 
 
 ## Notes
 
-- 2026-10-29 (lane 1, sizing pass before any code): too big for one run - a hand-built DTLS 1.2 client, its record protection, its retransmission timer and an in-memory server, each held to 100% coverage. Split out BL-4263 (AES-128-GCM record protection, Dtls/Record), BL-4264 (flight retransmission timer, Dtls/Retransmission) and BL-4265 (in-memory test server, test project Dtls/TestServer, after BL-4263). This task keeps the handshake state machine in Dtls/Handshake and its tests. Hooks checked: ITlsProvider.VerifyServerCertificateChain (BL-4249), TlsPrf, AesGcmTlsAead, EcdhKeyShare, Tls12ServerKeyExchange, Tls12ClientKeyExchange, Finished and the Dtls/Wire framing all exist. The DTLS ClientHello carries a cookie, so it is encoded here rather than through Curl.Tls ClientHello. BL-4262 (CertificateCheckingTlsProvider forwarding the seam) matters only to BL-4252 wiring coaps://, not to these unit tests.
+- 2026-10-29 (lane 1, sizing pass before any code): too big for one run - a hand-built DTLS 1.2 client, its record protection, its retransmission timer and an in-memory server, each held to 100% coverage. Split out BL-4266 (AES-128-GCM record protection, Dtls/Record), BL-4264 (flight retransmission timer, Dtls/Retransmission) and BL-4265 (in-memory test server, test project Dtls/TestServer, after BL-4266). This task keeps the handshake state machine in Dtls/Handshake and its tests. Hooks checked: ITlsProvider.VerifyServerCertificateChain (BL-4249), TlsPrf, AesGcmTlsAead, EcdhKeyShare, Tls12ServerKeyExchange, Tls12ClientKeyExchange, Finished and the Dtls/Wire framing all exist. The DTLS ClientHello carries a cookie, so it is encoded here rather than through Curl.Tls ClientHello. BL-4262 (CertificateCheckingTlsProvider forwarding the seam) matters only to BL-4252 wiring coaps://, not to these unit tests.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b5945eb1 9c67082b 4ee129e3 a7e33c4b 54cafd17 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4263 (record protection), BL-4264 (retransmission timer) and BL-4265 (test server)
+- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4266 (record protection), BL-4264 (retransmission timer) and BL-4265 (test server)
