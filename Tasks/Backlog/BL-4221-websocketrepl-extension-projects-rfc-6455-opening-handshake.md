@@ -1,5 +1,5 @@
 ---
-id: BL-4220
+id: BL-4221
 title: WebSocketRepl extension: projects, RFC 6455 opening handshake and interactive session over IConnection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4220 — WebSocketRepl extension: projects, RFC 6455 opening handshake and interactive session over IConnection
+# BL-4221 — WebSocketRepl extension: projects, RFC 6455 opening handshake and interactive session over IConnection
 
 ## Goal
 
