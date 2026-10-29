@@ -1,4 +1,4 @@
-# ADR-0981: curl_multi_waitfds names each transfer's real socket, with or without a socket callback
+# ADR-0982: curl_multi_waitfds names each transfer's real socket, with or without a socket callback
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4037, for CGR-034).
 

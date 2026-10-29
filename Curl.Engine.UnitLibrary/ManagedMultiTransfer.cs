@@ -23,7 +23,7 @@ namespace Curl.Engine;
 /// <see cref="ManagedEasyTransfer" /> started while the socket callback is set runs on a
 /// <see cref="TransferSocketWait" />, its real socket told with <see cref="CurlPoll.Out" /> or
 /// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0973), and one started without it records
-/// its real socket on a <see cref="TransferSocketWait" /> that never gates its I/O (ADR-0981); any other running transfer is
+/// its real socket on a <see cref="TransferSocketWait" /> that never gates its I/O (ADR-0982); any other running transfer is
 /// one engine-numbered socket, and while one runs the timer asks to be called back every
 /// <see cref="RunningTransferCheckInterval" /> (ADR-0599). <see cref="GetHandles" />,
 /// <see cref="GetWaitSockets" />, <see cref="GetInfo" />, the notifications and
@@ -469,7 +469,7 @@ internal sealed class ManagedMultiTransfer(
     /// perform has started and whose message is not yet queued, in the order added (but none for one that
     /// waits for an earlier transfer's connection, <see cref="WaitsForEarlierConnection" />) - the transfer's real
     /// socket once its dial has one (its operating system socket, or ADR-0955's engine number for a connection with
-    /// none), with or without a socket callback (ADR-0981), and until then, or for a transfer that is not a
+    /// none), with or without a socket callback (ADR-0982), and until then, or for a transfer that is not a
     /// <see cref="ManagedEasyTransfer" />, the engine-numbered socket the socket callback is told of for it
     /// (<see cref="FirstTransferSocket" />) - then, while there is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
     /// </summary>
@@ -1135,7 +1135,7 @@ internal sealed class ManagedMultiTransfer(
     /// The socket wait a transfer of this engine runs on: while the application has a socket callback, the
     /// entry's <see cref="MultiEntry.SocketWait" />, so its I/O waits for the application's poll (ADR-0821,
     /// ADR-0973); without one, a wait whose gating is stopped from the start, so perform and wait drive the transfer
-    /// and the wait only records its socket for <see cref="GetWaitSockets" /> (ADR-0981).
+    /// and the wait only records its socket for <see cref="GetWaitSockets" /> (ADR-0982).
     /// </summary>
     private TransferSocketWait SocketWaitFor(MultiEntry entry)
     {
