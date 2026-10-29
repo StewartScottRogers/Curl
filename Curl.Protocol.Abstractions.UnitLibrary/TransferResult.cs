@@ -44,6 +44,13 @@ public sealed record TransferResult(
     }
 
     /// <summary>
+    /// Gets the text <c>%{errormsg}</c> prints when it differs from <see cref="ErrorMessage" />,
+    /// the line <c>curl: (N)</c> shows: <c>--fail-with-body</c> prints the generic text of exit 22
+    /// there (measured, CGR-214); <see langword="null" /> when both are the same.
+    /// </summary>
+    public string? WriteOutErrorMessage { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the transfer succeeded.
     /// </summary>
     public bool IsSuccess => ExitCode == CurlExitCode.Ok;

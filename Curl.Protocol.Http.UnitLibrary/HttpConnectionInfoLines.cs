@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text;
+using Curl.Http2;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Http;
@@ -25,6 +27,12 @@ internal static class HttpConnectionInfoLines
     /// response is sent again, or given up on (<c>Curl_retry_request</c>, ADR-0187).
     /// </summary>
     internal const string RefusedStreamRetrying = "REFUSED_STREAM, retrying a fresh connect";
+
+    /// <summary>Formats the line curl's nghttp2 layer writes when the server sends GOAWAY.</summary>
+    /// <param name="goAway">The GOAWAY's payload.</param>
+    /// <returns>The line.</returns>
+    internal static string GoAwayReceived(Http2GoAwayPayload goAway) =>
+        string.Create(CultureInfo.InvariantCulture, $"received GOAWAY, error={(uint)goAway.ErrorCode}, last_stream={goAway.LastStreamId}");
     /// <summary>
     /// The line written when the server resets an HTTP/2 stream with HTTP_1_1_REQUIRED and the
     /// request is sent again over HTTP/1.1 (<c>multi_runsingle</c>, CGR-032).
@@ -242,7 +250,8 @@ internal static class HttpConnectionInfoLines
     /// Formats the line written before a request is sent again on a fresh connection.
     /// </summary>
     /// <param name="url">The URL the request is sent to.</param>
+    /// <param name="encoding">The command-line text encoding the URL was typed in.</param>
     /// <returns>The line, such as <c>Issue another request to this URL: 'http://127.0.0.1:18240/b'</c>.</returns>
-    internal static string IssueAnotherRequest(CurlUrl url) =>
-        $"Issue another request to this URL: '{HttpUrlText.Origin(url)}{HttpUrlText.Path(url)}{HttpUrlText.Query(url)}'";
+    internal static string IssueAnotherRequest(CurlUrl url, Encoding encoding) =>
+        $"Issue another request to this URL: '{HttpUrlText.Origin(url)}{HttpUrlText.Path(url, encoding)}{HttpUrlText.Query(url)}'";
 }

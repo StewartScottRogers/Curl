@@ -148,7 +148,7 @@ public sealed class GopherProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_NonAsciiItemType_RemovesTwoCommandLineBytes()
     {
-        // "é" is one byte in the Windows ANSI code page and two in UTF-8 (ADR-0820), so on
+        // "é" is one byte in the Windows ANSI code page and two in UTF-8 (ADR-0907), so on
         // Windows "/é" goes whole and elsewhere only its last UTF-8 byte stays.
         ScriptedConnection connection = new();
         byte[] expected = [.. GopherCommandLineText.Platform.GetBytes("/é/x")[2..], 13, 10];
@@ -318,7 +318,7 @@ public sealed class GopherProtocolHandlerTests
         Diagnostics.Assert("result", TransferResult.Success(MeasuredReply.Length), result);
         Diagnostics.Diff("output", MeasuredReply, output.ToArray());
         Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
-        Assert.AreEqual(TransferResult.Success(MeasuredReply.Length), result);
+        Assert.AreEqual(TransferResult.Success(MeasuredReply.Length), result with { Report = null });
         CollectionAssert.AreEqual(MeasuredReply, output.ToArray());
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -339,7 +339,7 @@ public sealed class GopherProtocolHandlerTests
 
         Diagnostics.Assert("result", TransferResult.Success(0), result);
         Diagnostics.Assert("output length", 0, output.Length);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         Assert.AreEqual(0, output.Length);
     }
 
@@ -356,7 +356,7 @@ public sealed class GopherProtocolHandlerTests
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.CouldntConnect, 0, "Failed to connect to h port 70"), result);
         Diagnostics.Assert("output length", 0, output.Length);
         Diagnostics.Assert("connection refused", false, result.IsConnectionRefused);
-        Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, "Failed to connect to h port 70"), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.CouldntConnect, 0, "Failed to connect to h port 70"), result with { Report = null });
         Assert.AreEqual(0, output.Length);
         Assert.IsFalse(result.IsConnectionRefused);
     }
@@ -396,7 +396,7 @@ public sealed class GopherProtocolHandlerTests
         Diagnostics.Assert("connection disposed", true, connection.IsDisposed);
         Assert.AreEqual(
             TransferResult.Failure(CurlExitCode.UrlMalformat, "URL using bad/illegal format or missing URL"),
-            result);
+            result with { Report = null });
         Assert.HasCount(1, connector.Targets);
         Assert.IsEmpty(connection.Written);
         Assert.AreEqual(0, output.Length);
@@ -416,7 +416,7 @@ public sealed class GopherProtocolHandlerTests
 
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         Diagnostics.Assert("output length", 0, output.Length);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result with { Report = null });
         Assert.AreEqual(0, output.Length);
     }
 
@@ -436,7 +436,7 @@ public sealed class GopherProtocolHandlerTests
         Diagnostics.Diff("output", MeasuredReply[..5], output.ToArray());
         Assert.AreEqual(
             new TransferResult(CurlExitCode.RecvError, 5, "Failure when receiving data from the peer"),
-            result);
+            result with { Report = null });
         CollectionAssert.AreEqual(MeasuredReply[..5], output.ToArray());
     }
 
@@ -462,7 +462,7 @@ public sealed class GopherProtocolHandlerTests
                 CurlExitCode.WriteError,
                 0,
                 $"Failure writing output to destination, passed {MeasuredReply.Length} returned 0"),
-            result);
+            result with { Report = null });
     }
 
     // Measured 2026-09-26 against curl 8.21.0 (BL-117): a loopback server sent count lines
@@ -501,7 +501,7 @@ public sealed class GopherProtocolHandlerTests
                 CurlExitCode.WriteError,
                 (long)linesBuffered * size,
                 $"Failure writing output to destination, passed {size} returned {returned}"),
-            result);
+            result with { Report = null });
     }
 
     [TestMethod]
@@ -537,7 +537,7 @@ public sealed class GopherProtocolHandlerTests
 
         Diagnostics.Assert("result", TransferResult.Success(0), result);
         Diagnostics.Diff("selector sent", Encoding.ASCII.GetBytes(expectedBytes), connection.Written);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual(Encoding.ASCII.GetBytes(expectedBytes), connection.Written);
     }
 

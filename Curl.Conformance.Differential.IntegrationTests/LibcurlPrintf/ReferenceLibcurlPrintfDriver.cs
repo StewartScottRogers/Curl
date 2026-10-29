@@ -9,7 +9,7 @@ namespace Curl.Conformance.Differential.IntegrationTests.LibcurlPrintf;
 /// loaded with <see cref="NativeLibrary"/> and called through an unmanaged function pointer as in
 /// ADR-0792. On x64 Windows every variadic argument is one 8-byte slot and a <c>double</c> is read
 /// from that slot's bits, so each argument is passed as <see cref="LibcurlPrintfArgument.Slot"/>
-/// (a string as the address of its UTF-8 copy) and the unused slots as 0 (ADR-0794).
+/// (a string as the address of its UTF-8 copy) and the unused slots as 0 (ADR-0876).
 /// </summary>
 internal sealed unsafe class ReferenceLibcurlPrintfDriver : IDisposable
 {

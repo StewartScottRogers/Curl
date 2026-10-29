@@ -37,6 +37,7 @@ public sealed partial class ManagedEasyTransferTests
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
         (byte[] toolWritten, byte[] toolJar) = await PerformWithThePerformersCookieStepsAsync(options);
+        await easy.DisposeAsync();
 
         Assert.AreEqual(CurlCode.Ok, code);
         StringAssert.Contains(Encoding.ASCII.GetString(easyConnector.Written), "Cookie: sent=1\r\n");

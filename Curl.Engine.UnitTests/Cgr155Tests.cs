@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// CGR-155 (ADR-0852): a <c>--resolve</c> entry for the DoH server's host and port answers for it,
 /// as curl 8.22.0's DoH probes find the name in the DNS cache those entries were added to (measured
 /// with <c>Record-CurlExchange.ps1 -DohPort</c>: both queries reached the server named
-/// <c>dohsrv.test</c>), and loading them writes no <c>Added ... to DNS cache</c> line of its own.
+/// <c>dohsrv.test</c>), and loading them writes no <c>[DNS] added ... to cache</c> line of its own.
 /// </summary>
 [TestClass]
 public sealed class Cgr155Tests
@@ -42,7 +42,7 @@ public sealed class Cgr155Tests
         await connector.ConnectAsync(new ConnectTarget("dohsrv.test", 21800, false) { Events = events }, CancellationToken.None);
 
         Assert.AreEqual("192.0.2.7", dohServer.Targets.Single().Host);
-        Assert.IsFalse(events.Lines.Any(line => line.StartsWith("Added ", StringComparison.Ordinal)));
+        Assert.IsFalse(events.Lines.Any(line => line.StartsWith("[DNS] added ", StringComparison.Ordinal)));
     }
 
     private static CommandLineOptions Parse(params string[] arguments)

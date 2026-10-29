@@ -16,13 +16,17 @@ namespace Curl.Protocol.Ssh.Sftp;
 /// <param name="transport">The transport, after the user is authenticated.</param>
 internal sealed class SftpFileDownload(SshTransport transport)
 {
-    private static readonly byte[] HomeDirectory = "."u8.ToArray();
-
     /// <summary>
     /// Gets where the download's <c>--trace-config ssh</c> state changes go (BL-1166);
     /// <see cref="SshStateTrace.Off" /> when not given.
     /// </summary>
     internal SshStateTrace Trace { get; init; } = SshStateTrace.Off;
+
+    /// <summary>
+    /// Gets the connection's SFTP session and home directory, which a reused connection
+    /// already holds (CGR-130); a slot of the download's own when not given.
+    /// </summary>
+    internal SftpSessionSlot Sessions { get; init; } = new();
 
     /// <summary>
     /// Gets whether to stop before the first read, curl's <c>-I</c> (CGR-030): as measured,
@@ -73,14 +77,11 @@ internal sealed class SftpFileDownload(SshTransport transport)
         string? rangeText = null)
     {
         quotes ??= SftpQuoteCommands.None;
-        Trace.Enter("SSH_SFTP_INIT");
-        SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
+        SftpSession session = await Sessions.StartAsync(transport, Trace, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
-                Trace.Enter("SSH_SFTP_REALPATH");
-                byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-                    () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+                byte[] homeDirectory = await Sessions.HomeDirectoryAsync(session, Trace, cancellationToken).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
                 Trace.EndSftpConnectPhase();
                 Trace.Enter("SSH_SFTP_QUOTE_INIT");
@@ -91,7 +92,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 Trace.Enter("SSH_SFTP_DOWNLOAD_INIT");
                 if (await OpenUnlessTheConnectionEndsAsync(session, path, createFileMode, cancellationToken).ConfigureAwait(false) is not { } handle)
                 {
-                    return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
+                    return ReportingEntryPath(await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false), homeDirectory);
                 }
 
                 Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
@@ -101,11 +102,16 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 result = result with { SourceLastWriteUnixSeconds = modifyTime };
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                result = ReportingEntryPath(result, homeDirectory);
                 Trace.EndSftpDonePhase();
                 return result;
             },
             cancellationToken).ConfigureAwait(false);
     }
+
+    // curl reports the home directory REALPATH found as %{ftp_entry_path} (CGR-267).
+    internal static TransferResult ReportingEntryPath(TransferResult result, byte[] homeDirectory) =>
+        result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { FtpEntryPath = System.Text.Encoding.UTF8.GetString(homeDirectory) } };
 
     // Curl's -I asks for the file time, so libssh2 sends STAT for the path and curl ignores
     // the answer (CGR-030), as it does for a directory (BL-1207).

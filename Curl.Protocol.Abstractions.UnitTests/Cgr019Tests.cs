@@ -2,7 +2,8 @@ namespace Curl.Protocol.Abstractions.UnitTests;
 
 /// <summary>
 /// CGR-019: a host name that is not ASCII is mapped as UTS #46 does before punycode, so the
-/// host contacted is the one curl 8.22.0 (libidn2) contacts.
+/// host contacted is the one curl 8.22.0 (libidn2) contacts in a UTF-8 locale; Windows reads the
+/// name as Windows-1252 first (<see cref="Cgr059Windows1252HostTests" />).
 /// </summary>
 [TestClass]
 public sealed class Cgr019Tests
@@ -20,10 +21,21 @@ public sealed class Cgr019Tests
     [DataRow("straße", "xn--strae-oqa")]
     public void TryNormalize_HostThatIsNotAscii_ConvertsTheMappedName(string host, string expected)
     {
-        bool accepted = CurlUrlHost.TryNormalize(host, refuseUnconvertibleName: true, out string normalized, out string idnHost, out _, out _);
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out string normalized, out string idnHost, out _, out _);
 
         Assert.IsTrue(accepted);
         Assert.AreEqual(host, normalized);
+        Assert.AreEqual(expected, idnHost);
+    }
+
+    [TestMethod]
+    [DataRow("Ã¥Ã¤Ã¶.se", "xn--4cab6c.se")]
+    [DataRow("Ã¼.se", "xn--tda.se")]
+    public void TryNormalize_HostOfOneByteCharactersThatAreUtf8_ConvertsTheUtf8Name(string host, string expected)
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
+
+        Assert.IsTrue(accepted);
         Assert.AreEqual(expected, idnHost);
     }
 
@@ -32,7 +44,7 @@ public sealed class Cgr019Tests
     [DataRow("İ", "i̇")]
     [DataRow("Ａｚ０", "az0")]
     [DataRow("ﬀﬃﬆ", "ffffist")]
-    [DataRow("﫿﬇＀｟į", "﫿﬇＀｟į")]
+    [DataRow("﫿﬇＀｟į", "﫿﬇＀⦅į")]
     [DataRow("a­͏​‌‍⁠️﻿b", "ab")]
     [DataRow("é", "é")]
     [DataRow("ǖ", "ǖ")]

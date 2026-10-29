@@ -6,21 +6,21 @@ namespace Curl.Protocol.Ldap;
 
 /// <summary>
 /// Produces the logged-on user's tokens with the BCL's <see cref="NegotiateAuthentication" />
-/// and <see cref="CredentialCache.DefaultNetworkCredentials" />, asking for signing and
-/// sealing as WinLDAP does (its NTLM negotiate message carries both flags), and seals and
-/// unseals the session after the bind with its <see cref="NegotiateAuthentication.Wrap" /> and
+/// and <see cref="CredentialCache.DefaultNetworkCredentials" />, asking for the protection the
+/// bind names as WinLDAP does (signing and sealing on <c>ldap</c>, neither on <c>ldaps</c>), and
+/// seals and unseals a plaintext session after the bind with its <see cref="NegotiateAuthentication.Wrap" /> and
 /// <see cref="NegotiateAuthentication.Unwrap" />.
 /// </summary>
 public sealed class NegotiateLogonTokenSource : ILdapLogonTokenSource
 {
     /// <inheritdoc />
-    public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName) =>
+    public ILdapLogonAuthentication Start(LdapLogonPackage package, string targetName, ProtectionLevel protection) =>
         new NegotiateLogonAuthentication(new NegotiateAuthentication(new NegotiateAuthenticationClientOptions
         {
             Package = package == LdapLogonPackage.Ntlm ? "NTLM" : "Negotiate",
             Credential = CredentialCache.DefaultNetworkCredentials,
             TargetName = targetName,
-            RequiredProtectionLevel = ProtectionLevel.EncryptAndSign,
+            RequiredProtectionLevel = protection,
         }));
 
     /// <summary>One <see cref="NegotiateAuthentication" />'s tokens.</summary>

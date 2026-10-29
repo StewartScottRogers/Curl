@@ -86,7 +86,7 @@ public sealed partial class TcpConnectorTests
         // curl -6 -v http://127.0.0.1:47500/ -> *   Trying 127.0.0.1:47500... and exit 0.
         var literal = IPAddress.Parse(host);
         var dialer = new FakeTcpDialer { DialOutcome = _ => new FakeConnection() };
-        var connector = CreateConnector(new FakeDnsResolver(literal), dialer, family);
+        var connector = CreateSchannelBuildConnector(new FakeDnsResolver(literal), dialer, family);
 
         var result = await ConnectLoggedAsync(connector, new ConnectTarget(host, 47500, UseTls: false));
 
@@ -99,7 +99,7 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_UnderIPv6WithAResolveEntryOfOnlyIPv4_ReportsANegativeDnsEntryAndFailsWithCouldntResolveHost()
     {
         // curl -6 -v --resolve foo:47500:127.0.0.1 http://foo:47500/ ->
-        // * Added foo:47500:127.0.0.1 to DNS cache / * Negative DNS entry / * Could not resolve host: foo /
+        // * [DNS] added foo:47500:127.0.0.1 to cache / * Negative DNS entry / * Could not resolve host: foo /
         // * Could not resolve: foo:47500 / * Could not resolve: foo (measured, BL-1181 Notes)
         var dialer = new FakeTcpDialer();
         var connector = new TcpConnector(
@@ -117,7 +117,7 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added foo:47500:127.0.0.1 to DNS cache",
+                "[DNS] added foo:47500:127.0.0.1 to cache",
                 "Negative DNS entry",
                 "Could not resolve host: foo",
                 "Could not resolve: foo:47500",
@@ -145,7 +145,7 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added foo:47500:127.0.0.1,[::1] to DNS cache", "Hostname foo was found in DNS cache", "Host foo:47500 was resolved.",
+                "[DNS] added foo:47500:127.0.0.1,[::1] to cache", "Hostname foo was found in DNS cache", "Host foo:47500 was resolved.",
                 "IPv6: ::1", "IPv4: 127.0.0.1", "  Trying [::1]:47500...",
             },
             events.Info.Take(6).ToArray());
@@ -173,7 +173,7 @@ public sealed partial class TcpConnectorTests
     {
         // curl -6 -v -x http://127.0.0.1:47500 http://example.com/ -> *   Trying 127.0.0.1:47500... and exit 0.
         var dialer = new FakeTcpDialer();
-        var connector = CreateConnector(new FakeDnsResolver(Loopback), dialer, AddressFamily.InterNetworkV6);
+        var connector = CreateSchannelBuildConnector(new FakeDnsResolver(Loopback), dialer, AddressFamily.InterNetworkV6);
         var target = new ConnectTarget("example.com", 80, UseTls: false) { Proxy = new ProxyEndpoint(ProxyKind.Http, "127.0.0.1", 47500, null) };
 
         await ConnectLoggedAsync(connector, target);
@@ -184,4 +184,9 @@ public sealed partial class TcpConnectorTests
 
     private static TcpConnector CreateConnector(FakeDnsResolver resolver, FakeTcpDialer dialer, AddressFamily addressFamily) =>
         new(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(), addressFamily: addressFamily);
+
+    // The literal tests pin curl 8.21.0 with Schannel, which dials a literal of the other family as written;
+    // the OpenSSL build refuses it (CGR-186, pinned in Cgr186Tests), so they ask for the Windows build on every platform.
+    private static TcpConnector CreateSchannelBuildConnector(FakeDnsResolver resolver, FakeTcpDialer dialer, AddressFamily addressFamily) =>
+        new(resolver, dialer, new FakeTlsProvider(), new ManualTimeProvider(), addressFamily: addressFamily) { FiltersAddressLiterals = false };
 }

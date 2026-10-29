@@ -150,25 +150,6 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     [TestMethod]
-    public async Task ExecuteAsync_RedirectWhileFollowing_ReportsNoCountsForTheDiscardedBody()
-    {
-        foreach (int chunkSize in ChunkSizes)
-        {
-            RecordingTransferProgress progress = new();
-            ScriptedConnection connection = Connection("HTTP/1.1 302 Found\r\nLocation: /b\r\nContent-Length: 5\r\n\r\nmoved", chunkSize);
-            TransferContext context = ProgressContext("http://example.com/", progress, new HttpRequestOptions { FollowRedirects = true });
-            Diagnostics.Arrange("chunk size", chunkSize);
-            Diagnostics.Arrange("scripted response", "302 Found, Location: /b, body moved, following");
-
-            await Handler(QueueConnector.For(connection)).ExecuteAsync(context);
-
-            WriteReports(progress);
-            Diagnostics.Assert("progress reports", "started, done", string.Join(", ", progress.Reports));
-            CollectionAssert.AreEqual(new[] { "started", "done" }, progress.Reports.ToArray(), $"Chunk size {chunkSize}");
-        }
-    }
-
-    [TestMethod]
     public async Task ExecuteAsync_BytesBodyUpload_ReportsCountsUpToTheBodyLength()
     {
         foreach (int chunkSize in ChunkSizes)

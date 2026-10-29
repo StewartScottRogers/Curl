@@ -252,8 +252,20 @@ function Get-TaskCapSpentWhy {
 
 function Get-RecentRunCosts {
     # The cost (Get-RunLogCost: the result event's, else estimated from usage) of the newest task runs' logs in a log folder
-    # (BL-1377-20261003-145757-L1.jsonl and its -resumed run; resolver runs are not tasks).
+    # (BL-1377-20261003-145757-L1.jsonl and its -resumed run; resolver runs are not tasks). Inside
+    # Invoke-WithRecentRunCostsReadOnce a folder's logs are read once and the costs reused (BL-3988).
     param([string]$Dir, [int]$Count = 40)
+    $key = "$Dir|$Count"
+    if ($null -ne $script:RecentRunCostsMemo -and $script:RecentRunCostsMemo.ContainsKey($key)) { return $script:RecentRunCostsMemo[$key] }
+    $script:RecentRunCostsReads++
+    $costs = @(Read-RecentRunCosts $Dir $Count)
+    if ($null -ne $script:RecentRunCostsMemo) { $script:RecentRunCostsMemo[$key] = $costs }
+    return $costs
+}
+
+function Read-RecentRunCosts {
+    # Reads the costs Get-RecentRunCosts returns from the logs themselves.
+    param([string]$Dir, [int]$Count)
     if (-not (Test-Path $Dir)) { return @() }
     $logs = Get-ChildItem $Dir -Filter 'BL-*.jsonl' -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^BL-\d+-\d{8}-\d{6}(-L\d+)?(-resumed)?\.jsonl$' } |
@@ -262,6 +274,15 @@ function Get-RecentRunCosts {
         $cost = Get-RunLogCost $log.FullName
         if ($cost) { $cost.Usd }
     }
+}
+
+function Invoke-WithRecentRunCostsReadOnce {
+    # Runs -Script, a check that asks for many tasks' cost caps at once (a capacity check),
+    # with the recent run costs read once rather than once per task: reading the 40 newest logs
+    # takes about 19 s, and a fixed shift's start checked 38 ready tasks (BL-3988).
+    param([scriptblock]$Script)
+    $script:RecentRunCostsMemo = @{}
+    try { & $Script } finally { $script:RecentRunCostsMemo = $null }
 }
 
 if ($TestTaskBudget) {
@@ -283,6 +304,17 @@ if ($TestTaskBudget) {
     Set-Content (Join-Path $dir 'BL-3-20261003-100000-L3-resolve.jsonl') '{"type":"result","total_cost_usd":9}'
     Set-Content (Join-Path $dir 'BL-4-20261003-100000-L4.jsonl') '{"type":"assistant"}'
     $cases += ,@('costs read from task and resumed runs only', '1.25,2.5', ((@(Get-RecentRunCosts $dir) | Sort-Object) -join ','))
+    # A capacity check naming several ready tasks reads the recent run costs once (BL-3988).
+    $savedLogDir = $LogDir; $LogDir = $dir
+    $script:RecentRunCostsReads = 0
+    $whys = @(Invoke-WithRecentRunCostsReadOnce { foreach ($i in 'BL-1', 'BL-2', 'BL-4') { "[$(Get-TaskCapSpentWhy $i)]" } })
+    $cases += ,@('a capacity check naming three ready tasks reads the recent run costs once', '1', "$script:RecentRunCostsReads")
+    $cases += ,@('the check still answers every task', '[],[],[]', ($whys -join ','))
+    $cases += ,@('the read-once costs are the costs read from the logs', '1.25,2.5', ((@(Invoke-WithRecentRunCostsReadOnce { Get-RecentRunCosts $dir; Get-RecentRunCosts $dir }) | Select-Object -First 2 | Sort-Object) -join ','))
+    $script:RecentRunCostsReads = 0
+    foreach ($i in 'BL-1', 'BL-2') { $null = Get-TaskCapSpentWhy $i }
+    $cases += ,@('outside a check each cap reads the logs afresh', '2', "$script:RecentRunCostsReads")
+    $LogDir = $savedLogDir
     # A requeued task's next run gets the rest of one cap (AF-0095).
     Set-Content (Join-Path $dir 'BL-2-20261003-110000-L5.jsonl') '{"type":"factory","model":"sonnet"}', '{"type":"result","total_cost_usd":1}'
     Set-Content (Join-Path $dir 'BL-2-20261001-100000-L1.jsonl') '{"type":"result","total_cost_usd":7}'

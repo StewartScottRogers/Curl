@@ -64,6 +64,9 @@ internal sealed class StoreBoundEasyTransfer(IEasyTransfer inner, CurlStores sto
     /// <inheritdoc/>
     public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => inner.UpkeepAsync(cancellationToken);
 
+    /// <inheritdoc/>
+    public IEasyTransfer PerformingTransfer => inner.PerformingTransfer;
+
     /// <summary>Leaves the last perform's cookie list in the cookie store, then disposes the wrapped handle.</summary>
     /// <returns>A task that completes when the wrapped handle is disposed.</returns>
     public ValueTask DisposeAsync()

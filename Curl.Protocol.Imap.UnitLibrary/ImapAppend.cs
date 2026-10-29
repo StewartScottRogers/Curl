@@ -103,7 +103,6 @@ internal sealed class ImapAppend(ImapControlChannel channel, ITransferContext co
     /// </summary>
     private async ValueTask SendMessageAsync(Stream upload, long size)
     {
-        context.Progress.ReportTransferStarted();
         byte[] buffer = new byte[ReadBufferSize];
         int read;
         while ((read = await upload.ReadAsync(buffer, context.CancellationToken).ConfigureAwait(false)) > 0)

@@ -56,7 +56,7 @@ namespace Curl.Output;
 /// part. <c>header_json</c> prints the response headers as <see cref="WriteOutJson"/>
 /// describes. <c>content_type</c>, <c>header_json</c> and the <c>%header{…}</c> values
 /// are marked with <see cref="WriteOutTemplateRenderer.MarkHeaderBytes"/>, so they render as
-/// the raw header bytes (CGR-021, ADR-0816). Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
+/// the raw header bytes (CGR-021, ADR-0893). Measured on 2026-09-27 against curl 8.21.0 (mingw, Schannel); see ADR-0063
 /// and BL-227.
 /// </para>
 /// <para>
@@ -142,13 +142,13 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         ["size_upload"] = variables => WriteOutValue.FromNumber(variables.info.SizeUpload),
         ["num_connects"] = variables => WriteOutValue.FromNumber(variables.info.NumConnects),
         ["num_headers"] = variables => WriteOutValue.FromNumber(
-            variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
+            variables.report.TrailerCount > 0 ? variables.report.TrailerCount : variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
         ["local_ip"] = variables => WriteOutValue.FromText(variables.info.LocalIp),
         ["local_port"] = variables => WriteOutValue.FromNumber(FindLocalPort(variables.info)),
         ["remote_ip"] = variables => WriteOutValue.FromText(variables.info.PrimaryIp),
         ["remote_port"] = variables => WriteOutValue.FromNumber(FindRemotePort(variables.info)),
         ["exitcode"] = variables => WriteOutValue.FromNumber((int)variables.result.ExitCode),
-        ["errormsg"] = variables => WriteOutValue.FromText(variables.result.ErrorMessage),
+        ["errormsg"] = variables => WriteOutValue.FromText(variables.result.WriteOutErrorMessage ?? variables.result.ErrorMessage),
         ["url"] = variables => WriteOutValue.FromText(variables.url),
         ["urlnum"] = variables => WriteOutValue.FromNumber(variables.urlNumber),
         ["scheme"] = variables => WriteOutValue.FromText(variables.info.Scheme),

@@ -1,5 +1,5 @@
-using System.Buffers;
 using System.Text;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
 
@@ -10,9 +10,6 @@ namespace Curl.Cli;
 /// </summary>
 public static class HeaderFileText
 {
-    /// <summary>The first of the lone low surrogates U+DC80 to U+DCFF that each stand for one byte UTF-8 cannot read.</summary>
-    private const int EscapedByteBase = 0xDC00;
-
     /// <summary>
     /// Gives <paramref name="contents"/> as text: read in <paramref name="wireEncoding"/> when that
     /// encodes the text back into <paramref name="contents"/> (the Windows ANSI code page the request
@@ -30,30 +27,6 @@ public static class HeaderFileText
         string? respelled = wireEncoding?.GetString(contents);
         return respelled is not null && wireEncoding!.GetBytes(respelled).AsSpan().SequenceEqual(contents)
             ? respelled
-            : ReadUtf8EscapingUnreadableBytes(contents);
-    }
-
-    private static string ReadUtf8EscapingUnreadableBytes(ReadOnlySpan<byte> contents)
-    {
-        StringBuilder text = new(contents.Length);
-        while (!contents.IsEmpty)
-        {
-            OperationStatus status = Rune.DecodeFromUtf8(contents, out Rune rune, out int consumed);
-            if (status == OperationStatus.Done)
-            {
-                text.Append(rune.ToString());
-            }
-            else
-            {
-                foreach (byte unreadable in contents[..consumed])
-                {
-                    text.Append((char)(EscapedByteBase + unreadable));
-                }
-            }
-
-            contents = contents[consumed..];
-        }
-
-        return text.ToString();
+            : SurrogateEscapeUtf8.Decode(contents);
     }
 }

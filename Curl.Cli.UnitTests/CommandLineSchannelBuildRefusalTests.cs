@@ -7,7 +7,7 @@ namespace Curl.Cli;
 /// Pins the options curl's Windows Schannel build refuses because its libcurl was built without the
 /// feature (ADR-0397, audit finding AF-0022): <c>--http3</c>, <c>--http3-only</c> and <c>--ssl-sessions</c>
 /// (the TLS-SRP options only warn since curl 8.22.0, ADR-0480; the HTTP/2 options run on Windows since
-/// ADR-0786, see <see cref="Http2OnWindowsTests"/>). Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
+/// ADR-0871, see <see cref="Http2OnWindowsTests"/>). Every line was measured with curl 8.21.0 (x86_64-w64-mingw32) Schannel against
 /// <c>http://127.0.0.1:1/</c> on 2026-10-02 (BL-1278). Each test parses as the Windows build explicitly,
 /// so it runs on every platform.
 /// </summary>

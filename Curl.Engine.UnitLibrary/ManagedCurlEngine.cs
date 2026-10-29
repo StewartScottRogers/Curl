@@ -162,7 +162,10 @@ public sealed class ManagedCurlEngine : ICurlEngine
     public IMultiTransfer CreateMulti()
     {
         ManagedEngineSharedState caches = shared.WithOwnCaches();
-        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.Connections.CloseIdleAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear);
+        ManagedMultiTransfer multi = new(shared.MultiOwners, shared.TimeProvider, SocketWaitPoller.Instance, caches.Connections.CloseIdleAsync, caches.Connections.CloseIdleBeyondAsync, caches.DnsCache.Clear)
+        {
+            CloseIdleConnectionsToMakeRoom = caches.Connections.CloseIdleToMakeRoomAsync,
+        };
         shared.MultiCaches.Add(multi, caches);
         return multi;
     }
@@ -236,7 +239,8 @@ public sealed class ManagedCurlEngine : ICurlEngine
             webSocketPerformConnection: webSocketPerformConnection,
             http2PushSink: pushSink,
             webSocketRandomSource: shared.WebSocketRandomSource,
-            ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true));
+            ftpStopsBeforeEntryPath: shared.FtpPwdStop?.TryClaim() == true,
+            socketWait: shared.SocketWait));
     }
 
     /// <summary>
@@ -341,7 +345,7 @@ public sealed class ManagedCurlEngine : ICurlEngine
     /// <returns>The transports.</returns>
     internal static CurlTransports CreateTransports(EasyOptions options, ManagedEngineSharedState shared)
     {
-        EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null);
+        EngineToolOptions tool = new(Parallel: options.Http.PipeWait, ParallelImmediate: false, SslSessionsFile: null, MaxTime: options.Transfer.Timeout > TimeSpan.Zero ? options.Transfer.Timeout : null, TracesTransfer: options.Behaviour.Verbose);
         return EngineComposition.CreateTransports(tool, options.Network, options.Tls, options.Http, options.Proxy, options.Authentication, shared.TimeProvider, shared.Connections, shared.TlsSessions, diagnosticLog: null, shared.DnsCache, easyErrorText: null, traces: null, resolver => ResolverStartDnsResolver.Over(resolver, options.Callbacks.ResolverStart), shared.Dialing, shared.SocketWait);
     }
 }

@@ -174,8 +174,8 @@ public sealed class CurlCommandRunnerLibcurlTests
         await RunAsync(["-s", "--libcurl", "-", "-C", "-", "-o", "out.bin", Url]);
 
         string expectedResumeLine = "  curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, (curl_off_t)7);\n";
-        Diagnostics.Assert("stdout contains the resume line", true, StandardOutputText.Contains(expectedResumeLine, StringComparison.Ordinal));
-        Assert.Contains(expectedResumeLine, StandardOutputText);
+        Diagnostics.Assert("stdout contains the resume line", true, Lf(StandardOutputText).Contains(expectedResumeLine, StringComparison.Ordinal));
+        Assert.Contains(expectedResumeLine, Lf(StandardOutputText));
     }
 
     private static string Lf(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);

@@ -1,0 +1,38 @@
+---
+id: BL-3907
+title: libcurl: CURLOPT_SOCKOPTFUNCTION gets the dialer's operating system socket when no open-socket callback is set
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitLibrary/SocketCallbackConnector.cs, Curl.Networking.UnitLibrary/TcpDialer.cs, Curl.Protocol.Abstractions.UnitLibrary/ITcpSocketOpener.cs, Curl.Engine.UnitTests/SockoptRealSocketTests.cs, Curl.Networking.UnitTests/TcpDialerSockoptTests.cs]
+requirement: none
+created: 2026-10-26
+completed: 2026-10-28
+---
+# BL-3907 — libcurl: CURLOPT_SOCKOPTFUNCTION gets the dialer's operating system socket when no open-socket callback is set
+
+## Goal
+
+A libcurl handle that sets `CURLOPT_SOCKOPTFUNCTION` without `CURLOPT_OPENSOCKETFUNCTION` gets the operating system socket the dialer will connect, open and unconnected, as libcurl 8.22.0 does, so `getsockopt`/`setsockopt` on it work.
+
+## Context
+
+Left over from BL-3658 (CGR-129, LMC-15, ADR-0842 point 4). `SocketCallbackConnector.AttemptSocketOpener.Open` runs before `TcpDialer` creates its socket, so without an open-socket callback the socket-option callback gets a `CurlSocketHandles` number. Fix: let the dialer create the socket first and pass its handle to `ITcpSocketOpener` (for example an `Open(remoteEndPoint, nint? dialerSocket)` overload, default delegating to the old one), and have the opener hand it to the socket-option callback and keep it for the close-socket callback (which BL-3658 already gives the real handle after connect). Measure real libcurl first.
+
+## Acceptance criteria
+
+- [x] With only `CURLOPT_SOCKOPTFUNCTION` (and optionally `CURLOPT_CLOSESOCKETFUNCTION`) set, the socket-option callback's socket answers `getsockopt(SO_TYPE)` as `SOCK_STREAM`, and the close-socket callback gets the same handle; a unit test in `Curl.Engine.UnitTests` over a loopback listener pins it.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+
+## Notes
+
+- The behaviour this task asks for already landed with CGR-145 (ADR-0845, `Cgr145Tests`): without an open-socket callback, `SocketCallbackConnector.AttemptSocketOpener` opens the operating system TCP socket itself before the connect and hands it to the socket-option callback, the close-socket callback and the dialer as a supplied socket. So no `ITcpSocketOpener` overload or `TcpDialer` change was needed, and none of the production files in `touches` changed. ADR-0845 records the libcurl 8.22.0 measurement, so no new ADR and no re-measuring.
+- Added `Curl.Engine.UnitTests/SockoptRealSocketTests.cs`: over a loopback listener, the socket-option callback's socket answers `getsockopt(SO_TYPE)` as `SOCK_STREAM` (1) and the close-socket callback gets the same handle. It is test-only, so there was no Measure-CodeQuality run. The test reads `SO_TYPE` through `Socket.GetSocketOption`, which is platform-neutral.
+- Build clean, fast tests green on Windows (Curl.Engine.UnitTests 2705 passed).
+
+## Log
+
+- 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 6ec967ec 779790c0.
+- 2026-10-28: Doing -> Done. The socket-option callback's socket without an open-socket callback is pinned as a SOCK_STREAM socket whose handle the close-socket callback also gets

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Text;
 using Curl.Protocol.Abstractions;
 using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 
@@ -352,6 +353,7 @@ public sealed class WsProtocolHandler(
             Method = method,
             HeaderSize = lengths.AcceptedLength,
             RequestSize = request.Length,
+            PseudoHeaders = HeaderLines(response.Head[..lengths.AcceptedLength]),
         };
         if (response.StatusCode != SwitchingProtocols || lengths.FailureMessage is not null)
         {
@@ -361,6 +363,23 @@ public sealed class WsProtocolHandler(
         ReportHead(context.Events, response.Head, refusal: null, challengeLines: [], problemScheme: null, overflowLineStarts: []);
         log.UpgradeAccepted();
         return await AcceptAsync(connection, context, response.Remaining, report, connectionNumber, exchangesFrames).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Splits the reply head's header lines, after the status line and up to the blank line,
+    /// into name and value, for <c>%{num_headers}</c>. curl 8.22.0 counts them (3 for a 101
+    /// with <c>Upgrade</c>, <c>Connection</c> and <c>Sec-WebSocket-Accept</c>) but its
+    /// <c>%header{}</c> finds none of them, measured in BL-3960, so they are pseudo-headers.
+    /// </summary>
+    /// <param name="head">The reply head bytes accepted.</param>
+    /// <returns>Each header line's name and value, in the order received.</returns>
+    internal static KeyValuePair<string, string>[] HeaderLines(byte[] head) =>
+        [.. Encoding.Latin1.GetString(head).Split('\n').Skip(1).Select(line => line.TrimEnd('\r')).TakeWhile(line => line.Length > 0).Select(SplitHeaderLine)];
+
+    private static KeyValuePair<string, string> SplitHeaderLine(string line)
+    {
+        string name = line.Split(':', 2)[0];
+        return new(name, line[name.Length..].TrimStart(':').Trim());
     }
 
     /// <summary>

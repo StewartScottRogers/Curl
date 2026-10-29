@@ -9,12 +9,12 @@ namespace Libcurl.UnitTests.Options.Protocols;
 public sealed class EasyRtspWebSocketOptionSettersTests
 {
     [TestMethod]
-    public void SetOption_RtspRequest_TakesEachRequestAndMakesAnUnknownOneNone()
+    public void SetOption_RtspRequest_TakesEachRequestAndRefusesAnUnknownOne()
     {
         Assert.AreEqual(RtspRequest.Receive, SetOk(CurlOption.RtspRequest, 11L).Rtsp.Request);
         Assert.AreEqual(RtspRequest.Setup, SetOk(CurlOption.RtspRequest, RtspRequest.Setup).Rtsp.Request);
-        Assert.AreEqual(RtspRequest.None, SetOk(CurlOption.RtspRequest, 12L).Rtsp.Request);
-        Assert.AreEqual(RtspRequest.None, SetOk(CurlOption.RtspRequest, -1L).Rtsp.Request);
+        var options = new EasyOptions();
+        Assert.AreEqual(Curl.Api.Codes.CurlCode.BadFunctionArgument, EasyOptionDispatch.Default.SetOption(ref options, CurlOption.RtspRequest, -1L));
     }
 
     [TestMethod]

@@ -30,6 +30,12 @@ internal sealed partial class ManagedEasyTransfer
     private CallbackWriteStream? lastWriteCallbackOutput;
 
     /// <summary>
+    /// The header callback the last context built wrote the response head to, or <see langword="null" /> when none was set;
+    /// a callback that took nothing before it failed the transfer leaves no parsed head on the info (CGR-252).
+    /// </summary>
+    private CallbackWriteStream? lastHeaderCallbackOutput;
+
+    /// <summary>
     /// Builds the transfer's context with <paramref name="toolDispatch" />'s factory, or without one a
     /// factory with no standard input over the engine's clock, the caches' HSTS store and <see cref="Host" />'s
     /// diagnostic log, and keeps it as <see cref="LastContext" />.
@@ -57,6 +63,7 @@ internal sealed partial class ManagedEasyTransfer
     {
         EngineToolTransferOutputs outputs = ToolOutputs ?? OwnOutputsOf(options.Callbacks, PauseGateFor(url), RecordsHeaders(url) ? headers : null);
         lastWriteCallbackOutput = outputs.Output as CallbackWriteStream;
+        lastHeaderCallbackOutput = HeaderCallbackOf(outputs.HeaderOutput);
         TransferContextFactory factory = toolDispatch?.ContextFactory ?? new TransferContextFactory(Stream.Null, shared.TimeProvider) { ReadsTelnetStandardInputInTextMode = false, HstsStore = PerformShared.Hsts, DiagnosticLog = Host.DiagnosticLog, KeptDigestChallenges = OriginOf(url) == keptDigestOrigin ? keptDigestChallenges : [], KeptDigestStaysAvailable = KeptDigestStaysAvailableFor(url), KeptAuthSchemePicked = keptAuthSchemePicked };
         return LastContext = factory.Create(
             settings,
@@ -106,6 +113,12 @@ internal sealed partial class ManagedEasyTransfer
             callbacks.Write is { } write ? CallbackWriteStream.Of(write, pauseGate) : Stream.Null,
             HeaderOutput: headerStore is null ? headerCallback : new HeaderRecordingStream(headerStore, headerCallback));
     }
+
+    /// <summary>The header callback's stream behind <paramref name="headerOutput" />, or <see langword="null" /> when it is not one.</summary>
+    /// <param name="headerOutput">The header output of a context.</param>
+    /// <returns>The stream.</returns>
+    private static CallbackWriteStream? HeaderCallbackOf(Stream? headerOutput) =>
+        (headerOutput as HeaderRecordingStream)?.Callback;
 
     /// <summary>
     /// Whether a transfer of <paramref name="url" /> records its headers for the header API: only HTTP's and
@@ -196,13 +209,19 @@ internal sealed partial class ManagedEasyTransfer
             FtpSslControlOnly: false,
             SslRequired: false,
             ListOnly: options.Transfer.DirListOnly,
-            UploadFlags: [],
+            UploadFlags: UploadFlagNamesOf(options.Protocols.Smtp.UploadFlags),
             ProxyHeaders: options.Proxy.HeaderOption == HeaderOption.Unified ? [] : options.Proxy.ProxyHeaders,
             ProxyTunnel: options.Proxy.HttpProxyTunnel,
             OverUnixSocket: options.Network.UnixSocketPath is not null,
             HappyEyeballsTimeout: HttpRequestOptionsMapping.HappyEyeballsTimeoutOf(null),
             AppendUrlQuery: url => url,
             PostWithoutData: options.Http is { Post: true, PostFields: null } && IsMqttUrl(options));
+
+    // The IMAP APPEND flag names CURLOPT_UPLOAD_FLAGS' CURLULFLAG_* bits (1, 2, 4, 8, 16) name, in curl's fixed order.
+    private static readonly string[] UploadFlagNames = ["answered", "deleted", "draft", "flagged", "seen"];
+
+    private static string[] UploadFlagNamesOf(byte uploadFlags) =>
+        [.. UploadFlagNames.Where((_, bit) => (uploadFlags & (1 << bit)) != 0)];
 
     /// <summary>
     /// The <c>CURLOPT_POSTFIELDS</c> an MQTT transfer publishes, cut to <c>CURLOPT_POSTFIELDSIZE</c> when that is not

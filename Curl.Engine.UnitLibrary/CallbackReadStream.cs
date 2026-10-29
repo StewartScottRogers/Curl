@@ -135,6 +135,7 @@ internal class CallbackReadStream(ReadCallback callback, EasyPauseGate? pauseGat
     /// <returns>The byte count the callback filled.</returns>
     private async ValueTask<int> ReadFromCallbackAsync(Memory<byte> buffer, CancellationToken cancellationToken)
     {
+        await (pauseGate?.WhenResumedAsync(CurlPause.Send, cancellationToken) ?? Task.CompletedTask).ConfigureAwait(false);
         int unpauses = pauseGate?.Unpauses ?? 0;
         long read = callback(buffer.Span);
         while (read == ReadCallbackResult.Pause)

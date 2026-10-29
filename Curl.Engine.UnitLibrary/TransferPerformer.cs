@@ -49,6 +49,10 @@ internal sealed partial class TransferPerformer(TimeProvider timeProvider, Func<
     internal static TransferPerformer GivenOrOnClock(TransferPerformer? performer, TimeProvider? timeProvider, Func<CurlExitCode, string> easyErrorText) =>
         performer ?? new TransferPerformer(timeProvider ?? TimeProvider.System, easyErrorText);
 
+    /// <summary>Gives a performer on the same clock and error text whose <c>%{xfer_id}</c> and <c>%{conn_id}</c> count from 0, as a new libcurl easy or multi handle's do (CGR-247).</summary>
+    /// <returns>The new performer.</returns>
+    internal TransferPerformer StartingAtZero() => new(timeProvider, easyErrorText);
+
     /// <summary>Takes the next <c>%{xfer_id}</c>.</summary>
     /// <returns>The transfer's number.</returns>
     internal long TakeTransferId() => nextTransferId++;

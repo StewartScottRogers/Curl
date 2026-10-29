@@ -315,6 +315,10 @@ function Invoke-Claim {
     param([string[]]$Skip, [switch]$CiFixOnly)
     $splitDue = @()
     $lock = Enter-Lock
+    # Every task next offers is checked against its cost cap while this lane holds the lock
+    # every claim and integration waits on, and each check read the 40 newest run logs again
+    # (about 19 s): the costs are read once for the whole claim (BL-3988's read-once memo).
+    $script:RecentRunCostsMemo = @{}
     try {
         foreach ($attempt in 1..5) {
             if (-not (Wait-RemoteReachable)) { return @{ Wait = $true; Why = 'origin out of reach' } }
@@ -413,6 +417,7 @@ function Invoke-Claim {
         $why = if ($lostRace) { 'claim kept losing races' } else { 'claim kept being refused by the board or origin' }
         return @{ Wait = $true; Why = $why }
     } finally {
+        $script:RecentRunCostsMemo = $null
         $lock.Dispose()
         # A split run takes minutes, so it never holds the lock every lane's claim waits on;
         # Invoke-TaskSplit takes it again only to commit and push. At most once a day each.

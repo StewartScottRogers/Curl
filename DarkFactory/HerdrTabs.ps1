@@ -29,7 +29,7 @@ function Start-Detached {
         $pane = $created.result.root_pane.pane_id
         if ($pane) {
             & $herdr pane wait-output $pane --match '>' --timeout 15000 2>&1 | Out-Null
-            $line = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$script`" " + ($ScriptArgs -join ' ')
+            $line = Get-HerdrTabCommandLine -ScriptPath $script -ScriptArgs $ScriptArgs
             # Windows PowerShell passes a native argument's inner quotes through unescaped,
             # and herdr's argument parser would then strip them, splitting any path with a
             # space. \" survives as a literal quote.
@@ -43,8 +43,53 @@ function Start-Detached {
         }
         Write-Trace '-' 'herdr' 'could not create a herdr tab; using a console window' 'DarkYellow'
     }
-    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"") + $ScriptArgs
-    return @{ Process = (Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -WorkingDirectory $Dir -PassThru) }
+    $start = Get-DetachedStartCommand -ScriptPath $script -ScriptArgs $ScriptArgs -LogDir $LogDir -Stamp $Stamp
+    if ($start.LogPath) { Write-Trace '-' 'start' "no herdr: starting $Label detached with pwsh, output to $($start.LogPath)" 'Cyan' }
+    return @{ Process = (Start-Process -FilePath $start.FilePath -ArgumentList $start.ArgumentList -WorkingDirectory $Dir -PassThru) }
+}
+
+function Get-HerdrTabCommandLine {
+    # The line typed into a herdr tab's shell: the platform's PowerShell running the script.
+    param([string]$ScriptPath, [string[]]$ScriptArgs, [bool]$OnWindows = (Test-FactoryOnWindows))
+    $exe = if ($OnWindows) { 'powershell' } else { 'pwsh' }
+    return "$exe -NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" " + ($ScriptArgs -join ' ')
+}
+
+function Get-DetachedStartCommand {
+    # What Start-Detached runs when it has no herdr tab. On Windows: powershell.exe in its
+    # own console window (LogPath $null). Elsewhere there is no window to open, so sh starts
+    # pwsh detached from the terminal, appending its output to <repo>.logs/DarkFactory-<stamp>-L<n>.log
+    # (the lane's own trace log; a shift or launcher gets -start in place of -L<n>).
+    param([string]$ScriptPath, [string[]]$ScriptArgs, [string]$LogDir, [string]$Stamp, [bool]$OnWindows = (Test-FactoryOnWindows))
+    if ($OnWindows) {
+        return @{ FilePath = 'powershell.exe'; LogPath = $null
+            ArgumentList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$ScriptPath`"") + $ScriptArgs }
+    }
+    $laneAt = [array]::IndexOf(@($ScriptArgs), '-Lane')
+    $tag = if ($laneAt -ge 0 -and $laneAt + 1 -lt @($ScriptArgs).Count) { "-L$(@($ScriptArgs)[$laneAt + 1])" } else { '-start' }
+    $log = Join-Path $LogDir "DarkFactory-$Stamp$tag.log"
+    $quote = { param([string]$s) "'" + ($s -replace "'", "'\''") + "'" }
+    $words = @('pwsh', '-NoProfile', '-File', $ScriptPath) + @($ScriptArgs | ForEach-Object { "$_".Trim('"') })
+    $command = 'exec nohup ' + ((@($words) | ForEach-Object { & $quote $_ }) -join ' ') + ' >> ' + (& $quote $log) + ' 2>&1 < /dev/null'
+    return @{ FilePath = 'sh'; LogPath = $log; ArgumentList = @('-c', $command) }
+}
+
+function Stop-FactoryProcessTree {
+    # Stops process $ProcessId and everything under it: taskkill /T /F on Windows, else the
+    # descendants found through Get-FactoryProcessTable, deepest first, then the process.
+    param([int]$ProcessId)
+    if (Test-FactoryOnWindows) { & taskkill /PID $ProcessId /T /F 2>&1 | Out-Null; return }
+    $table = @(Get-FactoryProcessTable)
+    $order = [System.Collections.Generic.List[int]]::new()
+    $queue = [System.Collections.Generic.Queue[int]]::new()
+    $queue.Enqueue($ProcessId)
+    while ($queue.Count -gt 0) {
+        $parent = $queue.Dequeue()
+        $order.Add($parent)
+        foreach ($child in @($table | Where-Object { $_.ParentProcessId -eq $parent })) { $queue.Enqueue([int]$child.ProcessId) }
+    }
+    $order.Reverse()
+    foreach ($id in $order) { & kill -9 $id 2>&1 | Out-Null }
 }
 
 # Tab captions are all Stewart sees of a shift, so each says whose it is and whether it can
@@ -154,7 +199,7 @@ function Close-FinishedHerdrTabs {
     try {
         $tabs = @(((& $herdr tab list) -join "`n" | ConvertFrom-Json).result.tabs)
         $panes = @(((& $herdr pane list) -join "`n" | ConvertFrom-Json).result.panes)
-        $processes = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CommandLine)
+        $processes = @(Get-FactoryProcessTable)
         foreach ($tab in $tabs) {
             if ($env:HERDR_WORKSPACE_ID -and $tab.workspace_id -ne $env:HERDR_WORKSPACE_ID) { continue }
             if ($tab.tab_id -eq $env:HERDR_TAB_ID) { continue }
@@ -235,6 +280,11 @@ function New-ClaudeRunStartInfo {
 
 if ($TestLaneMarker) {
     $results = @(
+        @('a herdr tab on Windows runs powershell', (Get-HerdrTabCommandLine -ScriptPath 'C:\r\RunDarkFactory.ps1' -ScriptArgs @('-Lane', '2') -OnWindows $true), 'powershell -NoProfile -ExecutionPolicy Bypass -File "C:\r\RunDarkFactory.ps1" -Lane 2'),
+        @('a herdr tab off Windows runs pwsh', (Get-HerdrTabCommandLine -ScriptPath '/r/RunDarkFactory.ps1' -ScriptArgs @('-Lane', '2') -OnWindows $false), 'pwsh -NoProfile -ExecutionPolicy Bypass -File "/r/RunDarkFactory.ps1" -Lane 2'),
+        @('a Windows window start is powershell.exe with no log', ((Get-DetachedStartCommand -ScriptPath 'C:\r\x.ps1' -ScriptArgs @('-Lane', '2') -LogDir 'L' -Stamp 'S' -OnWindows $true) | ForEach-Object { "$($_.FilePath)|$($_.LogPath)|$($_.ArgumentList -join ' ')" }), 'powershell.exe||-NoProfile -ExecutionPolicy Bypass -File "C:\r\x.ps1" -Lane 2'),
+        @('a lane off Windows without herdr is a detached pwsh logging to its lane log', ((Get-DetachedStartCommand -ScriptPath '/r/x.ps1' -ScriptArgs @('-Lane', '2', '-LaneDir', '"/r/l 2"') -LogDir '/r.logs' -Stamp '20261028-0000' -OnWindows $false) | ForEach-Object { "$($_.FilePath)|$($_.LogPath)|$($_.ArgumentList -join ' ')" }), "sh|$(Join-Path '/r.logs' 'DarkFactory-20261028-0000-L2.log')|-c exec nohup 'pwsh' '-NoProfile' '-File' '/r/x.ps1' '-Lane' '2' '-LaneDir' '/r/l 2' >> '$(Join-Path '/r.logs' 'DarkFactory-20261028-0000-L2.log')' 2>&1 < /dev/null"),
+        @('a shift launcher off Windows logs to the -start log', ((Get-DetachedStartCommand -ScriptPath '/r/x.ps1' -ScriptArgs @() -LogDir '/l' -Stamp 'S' -OnWindows $false).LogPath), (Join-Path '/l' 'DarkFactory-S-start.log')),
         @('lane 3 is marked 3', (Get-LaneMarker -ForLane 3), '3'),
         @('a coordinator or single-lane shift is marked 0', (Get-LaneMarker -ForLane 0), '0'),
         @('a -NewTab or -Restart launcher is not marked', (Get-LaneMarker -ForLane 0 -Launcher), '')

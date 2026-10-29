@@ -67,8 +67,36 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
     /// Tells, at each write of a <c>--trace -</c> dump on Windows, whether a transfer has switched
     /// standard output to binary mode, where its line feeds stay bare (<see cref="TextModeUntilBinaryStream" />).
     /// </param>
-    /// <returns>The output; <see cref="None" /> when no trace option is in effect.</returns>
+    /// <returns>The output, which also writes each reported warning to <paramref name="standardError" /> unless <c>-s</c> is given (BL-3986); <see cref="None" /> with <c>-s</c> and no trace option.</returns>
     internal static async Task<TransferEventOutput> OpenAsync(
+        CommandLineOptions options,
+        IFileSystem fileSystem,
+        Stream standardOutput,
+        Stream standardError,
+        bool runsOnWindows,
+        bool standardOutputIsTerminal,
+        TimeProvider timeProvider,
+        Func<bool> standardOutputIsBinary)
+    {
+        TransferEventOutput traceOutput = await OpenTraceOutputAsync(
+            options, fileSystem, standardOutput, standardError, runsOnWindows, standardOutputIsTerminal, timeProvider, standardOutputIsBinary)
+            .ConfigureAwait(false);
+        return options.Silent ? traceOutput : traceOutput.WritingWarningsTo(TextMode(standardError, runsOnWindows));
+    }
+
+    /// <summary>
+    /// Opens the <c>-v</c>, <c>--trace</c> or <c>--trace-ascii</c> output <paramref name="options" /> ask for, for <see cref="OpenAsync" />.
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <param name="fileSystem">Opens the trace file.</param>
+    /// <param name="standardOutput">Where a <c>--trace -</c> dump goes.</param>
+    /// <param name="standardError">Where <c>-v</c> lines, a <c>--trace %</c> dump and a dump whose file cannot be opened go.</param>
+    /// <param name="runsOnWindows">Whether each line feed is written as CR LF.</param>
+    /// <param name="standardOutputIsTerminal">Whether standard output is a terminal.</param>
+    /// <param name="timeProvider">The clock a <c>--trace-time</c> stamp reads.</param>
+    /// <param name="standardOutputIsBinary">Tells whether a transfer has switched standard output to binary mode.</param>
+    /// <returns>The output; <see cref="None" /> when no trace option is in effect.</returns>
+    private static async Task<TransferEventOutput> OpenTraceOutputAsync(
         CommandLineOptions options,
         IFileSystem fileSystem,
         Stream standardOutput,
@@ -185,6 +213,14 @@ internal sealed class TransferEventOutput(ITransferEvents events, Stream? ownedT
         WriteFailureIgnoringStream traceStream = new(file);
         return (traceStream, traceStream);
     }
+
+    /// <summary>
+    /// This output with its <see cref="Events" /> also writing each reported warning to <paramref name="standardError" />.
+    /// </summary>
+    /// <param name="standardError">Standard error, in text mode.</param>
+    /// <returns>The output.</returns>
+    private TransferEventOutput WritingWarningsTo(Stream standardError) =>
+        new(new WarningWritingTransferEvents(Events, standardError), ownedTraceFile, traceIds);
 
     /// <summary>
     /// Wraps <paramref name="stream" /> so each line feed is written as CR LF on Windows.

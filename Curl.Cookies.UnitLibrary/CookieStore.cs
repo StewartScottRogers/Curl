@@ -263,11 +263,30 @@ public sealed class CookieStore : ICookieStore
     /// still loaded); otherwise <see langword="true"/>.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="reader"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
-    public bool LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events)
+    public bool LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events) =>
+        LoadCookieFile(reader, discardSessionCookies, now, events, dropsCookiesWithoutDomain: false);
+
+    /// <summary>
+    /// Adds one <c>CURLOPT_COOKIELIST</c> item that is a cookie line. As curl 8.22.0 does (CGR-259), a <c>Set-Cookie:</c>
+    /// line that names no <c>Domain</c> stores nothing, where the same line in a cookie file is kept for every host.
+    /// </summary>
+    /// <param name="line">The item: a Netscape line or a <c>Set-Cookie:</c> line.</param>
+    /// <param name="now">The time the item is added.</param>
+    /// <param name="events">Where a refused <c>Set-Cookie:</c> line is reported.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="line"/> or <paramref name="events"/> is <see langword="null"/>.</exception>
+    public void AddCookieListLine(string line, DateTimeOffset now, ITransferEvents events)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+
+        using StringReader reader = new(line);
+        LoadCookieFile(reader, discardSessionCookies: false, now, events, dropsCookiesWithoutDomain: true);
+    }
+
+    private bool LoadCookieFile(TextReader reader, bool discardSessionCookies, DateTimeOffset now, ITransferEvents events, bool dropsCookiesWithoutDomain)
     {
         List<Cookie> accepted = [];
         IReadOnlyList<Cookie> read = NetscapeCookieFile.Read(reader, now, events, out bool isLineTooLong);
-        foreach (Cookie cookie in read.Where(cookie => !discardSessionCookies || !cookie.IsSessionCookie))
+        foreach (Cookie cookie in read.Where(cookie => (!discardSessionCookies || !cookie.IsSessionCookie) && !(dropsCookiesWithoutDomain && string.IsNullOrEmpty(cookie.Domain))))
         {
             if (IsSetOnPublicSuffix(cookie))
             {

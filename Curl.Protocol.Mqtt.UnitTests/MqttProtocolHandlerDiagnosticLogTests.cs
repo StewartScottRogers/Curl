@@ -39,9 +39,9 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Connack, Suback, PublishHi, Disconnect), log);
 
-        Diagnostics.AssertResult(TransferResult.Success(5), result);
+        Diagnostics.AssertResult(TransferResult.Success(5), result with { Report = null });
         AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 250 ms"], log);
-        Assert.AreEqual(TransferResult.Success(5), result);
+        Assert.AreEqual(TransferResult.Success(5), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "CONNACK return code 0", "SUBSCRIBE t", "SUBSCRIBE done: SUBACK granted QoS 0", "transfer finished: 5 bytes in 250 ms" },
             log.At(DiagnosticLogLevel.Info));
@@ -56,9 +56,9 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Connack), log, "mqtt://h/a%2Fb", "hello"u8.ToArray());
 
-        Diagnostics.AssertResult(TransferResult.Success(0), result);
+        Diagnostics.AssertResult(TransferResult.Success(0), result with { Report = null });
         AssertLog(DiagnosticLogLevel.Info, ["CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 250 ms"], log);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "CONNACK return code 0", "PUBLISH a/b, 5 bytes", "PUBLISH done; DISCONNECT sent", "transfer finished: 0 bytes in 250 ms" },
             log.At(DiagnosticLogLevel.Info));
@@ -222,8 +222,8 @@ public sealed class MqttProtocolHandlerDiagnosticLogTests
 
         TransferResult result = await RunAsync(new ScriptedConnection(Hex("40 00"), Hex("20 02 41 42")), log);
 
-        Diagnostics.AssertResult(TransferResult.Success(0), result);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Diagnostics.AssertResult(TransferResult.Success(0), result with { Report = null });
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual(
             new[]
             {

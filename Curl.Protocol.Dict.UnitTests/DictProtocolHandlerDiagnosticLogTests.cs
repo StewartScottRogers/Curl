@@ -31,7 +31,7 @@ public sealed class DictProtocolHandlerDiagnosticLogTests
 
         Diagnostics.Assert("result", TransferResult.Success(Reply.Length), run.Result);
         Diagnostics.Assert("info lines", $"[sent DEFINE ! word, transfer finished: {Reply.Length} bytes in 250 ms]", "[" + string.Join(", ", log.At(DiagnosticLogLevel.Info)) + "]");
-        Assert.AreEqual(TransferResult.Success(Reply.Length), run.Result);
+        Assert.AreEqual(TransferResult.Success(Reply.Length), run.Result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "sent DEFINE ! word", $"transfer finished: {Reply.Length} bytes in 250 ms" },
             log.At(DiagnosticLogLevel.Info));

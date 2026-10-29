@@ -52,7 +52,7 @@ public sealed class FtpProtocolHandlerConnectOnlyTests
         Assert.IsNull(outcome.Connection);
         Assert.IsTrue(control.IsDisposed);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.LoginDenied, "Access denied: 530"), outcome.Result with { Report = null });
-        Assert.AreEqual(transfer, outcome.Result);
+        Assert.AreEqual(transfer with { Report = transfer.Report! with { Timings = null } }, outcome.Result);
         Assert.AreEqual("USER anonymous\r\n", Encoding.Latin1.GetString(control.Sent));
     }
 

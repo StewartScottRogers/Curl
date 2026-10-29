@@ -121,11 +121,13 @@ public sealed class ParallelRunTests
         ParallelRun run = new(2, 0, true);
 
         run.RecordEnd(Refused, endsTheRun: true, failEarly: true);
-        Diagnostics.Act("is aborted / abort requested / has ended", $"{run.IsAborted}/{run.AbortToken.IsCancellationRequested}/{run.HasEnded}");
+        Diagnostics.Act("has failed early / has ended", $"{run.HasFailedEarly}/{run.HasEnded}");
+        bool aborted = run.AbortToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(30));
 
-        Diagnostics.Assert("is aborted / abort requested / has ended", "True/True/False", $"{run.IsAborted}/{run.AbortToken.IsCancellationRequested}/{run.HasEnded}");
+        Diagnostics.Assert("has failed early / aborted after the delay / has ended", "True/True/False", $"{run.HasFailedEarly}/{aborted}/{run.HasEnded}");
+        Assert.IsTrue(run.HasFailedEarly);
+        Assert.IsTrue(aborted);
         Assert.IsTrue(run.IsAborted);
-        Assert.IsTrue(run.AbortToken.IsCancellationRequested);
         Assert.IsFalse(run.HasEnded);
     }
 

@@ -34,7 +34,7 @@ public sealed class Cgr030Tests
 
         (TransferResult result, byte[] output) = await RunAsync(server, "sftp://files.example/data/hello.txt", range);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         Assert.IsEmpty(output);
         CollectionAssert.AreEqual(
             new[] { "sftp 16 .", "sftp 17 /data/hello.txt", "sftp 3 /data/hello.txt", "sftp 17 /data/hello.txt", "sftp 4 /data/hello.txt" },
@@ -49,7 +49,7 @@ public sealed class Cgr030Tests
 
         (TransferResult result, byte[] output) = await RunAsync(server, "sftp://files.example/data/sub", null);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         Assert.IsEmpty(output);
         Assert.IsFalse(server.Events.Any(line => line.StartsWith("sftp 5 ", StringComparison.Ordinal)), "no READ was sent");
     }
@@ -62,7 +62,7 @@ public sealed class Cgr030Tests
 
         (TransferResult result, byte[] output) = await RunAsync(server, "scp://files.example/data/hello.txt", null);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         Assert.IsEmpty(output);
         CollectionAssert.Contains(server.Events.ToList(), "channel close");
     }

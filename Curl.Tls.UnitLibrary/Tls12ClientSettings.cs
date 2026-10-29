@@ -101,6 +101,12 @@ public sealed record Tls12ClientSettings
     /// <summary>Gets the clock a stapled OCSP response's <c>thisUpdate</c> and <c>nextUpdate</c> are judged against.</summary>
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
+    /// <summary>
+    /// Gets what a connection over these settings tells of each handshake message and
+    /// <c>change_cipher_spec</c> it sends or receives, or <see langword="null" /> to tell nothing.
+    /// </summary>
+    public TlsHandshakeMessageObserver? HandshakeMessageObserver { get; init; }
+
     /// <summary>Gets a value indicating whether the client offers <c>session_ticket</c> (RFC 5077).</summary>
     public bool OfferSessionTicket { get; init; } = true;
 

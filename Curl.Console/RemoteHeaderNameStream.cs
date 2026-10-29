@@ -1,4 +1,3 @@
-using Curl.Authentication;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
@@ -23,8 +22,9 @@ namespace Curl.Console;
 /// </param>
 /// <param name="fileNameEncoding">
 /// The encoding the <c>Content-Disposition</c> name's bytes are read in; <see langword="null" />
-/// for the platform's, as <c>CredentialEncoding.ForPlatform</c> gives it (the ANSI code page on
-/// Windows, UTF-8 elsewhere; ADR-0821).
+/// for the platform's, as <see cref="ContentDispositionFileName.EncodingFor" /> gives it (the ANSI
+/// code page on Windows; elsewhere UTF-8 that keeps each byte outside a valid sequence as that raw
+/// byte; ADR-0912, ADR-0977).
 /// </param>
 /// <remarks>
 /// <para>
@@ -208,7 +208,7 @@ internal sealed class RemoteHeaderNameStream(
     private string? ContentDispositionNameOf(byte[] line) =>
         output.NamedByContentDisposition || statusClass is not (2 or 3)
             ? null
-            : ContentDispositionFileName.Find(line, fileNameEncoding ?? CredentialEncoding.ForPlatform(OperatingSystem.IsWindows()));
+            : ContentDispositionFileName.Find(line, fileNameEncoding ?? ContentDispositionFileName.EncodingFor(OperatingSystem.IsWindows()));
 
     /// <summary>
     /// Under <c>-L</c>, renames the not yet opened output file after a 3xx response's

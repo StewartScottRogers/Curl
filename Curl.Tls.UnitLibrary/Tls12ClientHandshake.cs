@@ -92,6 +92,12 @@ public sealed class Tls12ClientHandshake
     /// <summary>Gets why the handshake failed, or <see langword="null" /> while it has not.</summary>
     public TlsHandshakeFailure? Failure { get; private set; }
 
+    /// <summary>
+    /// Gets or sets what is handed each whole handshake message received, header included,
+    /// before the handshake acts on it; a connection sets it to tell its <see cref="TlsHandshakeMessageObserver" />.
+    /// </summary>
+    internal Action<byte[]>? MessageReceived { get; set; }
+
     /// <summary>Gets the version the server chose, once its ServerHello has arrived.</summary>
     public TlsProtocolVersion? Version { get; private set; }
 
@@ -106,6 +112,12 @@ public sealed class Tls12ClientHandshake
 
     /// <summary>Gets the ECDHE group of the key exchange, or <see langword="null" /> for any other key exchange.</summary>
     public ushort? NegotiatedGroup { get; private set; }
+
+    /// <summary>Gets the signature scheme the server signed its ServerKeyExchange with, once that signature has verified; <see langword="null" /> for RSA and anonymous key exchange, a resumed handshake, and TLS 1.0 and 1.1, whose signatures name no scheme.</summary>
+    public ushort? PeerSignatureScheme { get; private set; }
+
+    /// <summary>Gets the algorithm OID of the server certificates public key that signed the ServerKeyExchange, once that signature has verified; <see langword="null" /> when no signed ServerKeyExchange was verified.</summary>
+    public string? PeerSignatureKeyAlgorithmOid { get; private set; }
 
     /// <summary>Gets the ALPN protocol the server chose, or <see langword="null" /> when it chose none.</summary>
     public string? ApplicationProtocol { get; private set; }
@@ -202,6 +214,7 @@ public sealed class Tls12ClientHandshake
             received.AddRange(bytes);
             while (state != State.Failed && TryReadMessage(out HandshakeMessage? message, out byte[] encoded))
             {
+                MessageReceived?.Invoke(encoded);
                 ReceiveMessage(message!, encoded, output);
             }
         }
@@ -647,7 +660,14 @@ public sealed class Tls12ClientHandshake
         TlsSignatureRule? rule = Version == TlsProtocolVersion.Tls12
             ? FindOfferedRule(message.SignatureAlgorithm!.Value)
             : TlsSignatureScheme.FindLegacyRule(serverKey!.AlgorithmOid);
-        return serverKey!.VerifySignature(rule, message.BuildSignedContent(clientHello!.Random, serverRandom), message.Signature!);
+        TlsAlertDescription? alert = serverKey!.VerifySignature(rule, message.BuildSignedContent(clientHello!.Random, serverRandom), message.Signature!);
+        if (alert is null)
+        {
+            PeerSignatureScheme = message.SignatureAlgorithm;
+            PeerSignatureKeyAlgorithmOid = serverKey.AlgorithmOid;
+        }
+
+        return alert;
     }
 
     private TlsSignatureRule? FindOfferedRule(ushort scheme) =>

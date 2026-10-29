@@ -90,18 +90,29 @@ internal static partial class EngineComposition
             ? NewDohResolver(connector, url, proxy, addressFamily, dohTrace, easyErrorText, traces)
             : new UnusableDohUrlResolver();
 
+    // curl writes the [DNS] filter lines under the dns component and the sub-transfers' own lines under doh (BL-3814); no components given writes both.
+    internal static DohSubTransferEvents DohSubTransferEventsOf(ITransferEvents dohTrace, EngineTraceComponents? traces)
+    {
+        var doh = traces is not null && TraceComponentIsOn(traces, "doh");
+        var dns = traces is not null && TraceComponentIsOn(traces, "dns");
+        return new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess, writesDnsFilterLines: dns || !doh, writesSubTransferLines: doh || !dns);
+    }
+
+    private static bool TraceComponentIsOn(EngineTraceComponents traces, string component) =>
+        traces.Components.Contains(component) || traces.Components.Contains("all") || traces.Components.Contains("network");
+
     // The DoH resolver CreateDohResolver makes of a usable DoH URL and the proxy chosen for it.
     private static DohDnsResolver NewDohResolver(IConnector connector, Uri url, ProxyEndpoint? proxy, AddressFamily addressFamily, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces) =>
         new(connector, url, dohTrace ?? NoTransferEvents.Instance, easyErrorText ?? NoEasyErrorText)
         {
             AddressFamily = addressFamily,
-            SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess),
+            SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : DohSubTransferEventsOf(dohTrace, traces),
             HttpsRecordTrace = HttpsRecordTraceOf(traces),
             Proxy = proxy,
         };
 
     /// <summary>
-    /// The proxy curl 8.22.0's DoH sub-transfers go through (CGR-037, ADR-0818): the one the proxy
+    /// The proxy curl 8.22.0's DoH sub-transfers go through (CGR-037, ADR-0904): the one the proxy
     /// environment variables (<c>http_proxy</c>, <c>https_proxy</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>)
     /// name for the DoH URL, as <see cref="ProxySelector" /> reads them; <c>-x</c> and
     /// <c>--noproxy</c> never apply, as <c>lib/doh.c</c> copies neither to the sub-transfer.
@@ -140,8 +151,8 @@ internal static partial class EngineComposition
 
     /// <summary>
     /// The DoH URL curl makes of a <c>--doh-url</c> value: the value as it is when it names a scheme,
-    /// and with <c>http://</c> in front when it does not, as curl guesses the scheme of any URL (a
-    /// scheme-less DoH URL was measured to reach its server as plain HTTP, BL-642).
+    /// and with <c>https://</c> in front when it does not, as curl 8.22.0's DoH sub-transfer assumes
+    /// HTTPS (measured: a scheme-less DoH URL's server gets a TLS ClientHello; CGR-038, ADR-0961).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns>
@@ -150,17 +161,28 @@ internal static partial class EngineComposition
     /// </returns>
     internal static Uri? DohUrlOf(string dohUrl)
     {
-        string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "http://" + dohUrl;
+        // curl's URL parser refuses a space or control character, so the lookup fails with exit 6 (CGR-283).
+        if (HasSpaceOrControlCharacter(dohUrl))
+        {
+            return null;
+        }
+
+        string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "https://" + dohUrl;
         return Uri.TryCreate(withScheme, UriKind.Absolute, out Uri? url)
             && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
             ? url
             : null;
     }
 
+    // Whether the --doh-url value holds a space, a TAB or another control character, which curl's URL parser refuses.
+    private static bool HasSpaceOrControlCharacter(string dohUrl) =>
+        dohUrl.Any(character => character <= ' ' || character == '\u007f');
+
     /// <summary>
     /// Whether <see cref="DohUrlOf" /> makes an <c>https</c> URL of a <c>--doh-url</c> value, the only DoH URL curl
-    /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> or
-    /// scheme-less one fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0859).
+    /// 8.22.0's release build uses: its DoH sub-transfer allows the <c>https</c> protocol alone, so an <c>http</c> one
+    /// fails every name with exit 6 and never reaches the server (measured, CGR-163, ADR-0859), while a scheme-less one
+    /// is <c>https</c> (CGR-038, ADR-0961).
     /// </summary>
     /// <param name="dohUrl">The <c>--doh-url</c> value.</param>
     /// <returns><see langword="true" /> for an <c>https</c> DoH URL.</returns>

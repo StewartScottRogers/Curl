@@ -25,9 +25,15 @@ internal static class HttpTimeConditionLimit
     internal static readonly DateTimeOffset LastWindowsTime = new(3001, 1, 1, 20, 59, 59, TimeSpan.Zero);
 
     /// <summary>
+    /// The first time the Windows C runtime's <c>gmtime</c> converts: 12 hours before 1970-01-01
+    /// (<c>_MIN_LOCAL_TIME</c>), Unix time -43200 (measured with curl 8.22.0 Schannel, BL-3735).
+    /// </summary>
+    internal static readonly DateTimeOffset FirstWindowsTime = new(1969, 12, 31, 12, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
     /// Decides whether <paramref name="timeCondition" /> fails the transfer: it is set, the
     /// platform's curl formats with the Windows C runtime, and its time is after
-    /// <see cref="LastWindowsTime" />.
+    /// <see cref="LastWindowsTime" /> or before <see cref="FirstWindowsTime" />.
     /// </summary>
     /// <param name="timeCondition">The transfer's <c>-z</c> condition, if any.</param>
     /// <param name="windowsRuntime">
@@ -35,5 +41,5 @@ internal static class HttpTimeConditionLimit
     /// Schannel build linked against the Windows C runtime.
     /// </param>
     internal static bool Refuses(TimeCondition? timeCondition, bool windowsRuntime) =>
-        windowsRuntime && timeCondition is not null && timeCondition.Value > LastWindowsTime;
+        windowsRuntime && timeCondition is not null && (timeCondition.Value > LastWindowsTime || timeCondition.Value < FirstWindowsTime);
 }

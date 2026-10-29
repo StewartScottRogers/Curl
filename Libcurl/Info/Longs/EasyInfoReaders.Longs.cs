@@ -72,7 +72,16 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadProxyAuthAvailable(TransferInfo info, EasyOptions options) => info.ProxyAuthAvailable;
 
-    private static object? ReadHttpAuthUsed(TransferInfo info, EasyOptions options) => info.HttpAuthUsed;
+    /// <summary>
+    /// <c>CURLINFO_HTTPAUTH_USED</c>: the engine's scheme bits, or, when it picked none for a request that was sent,
+    /// <c>CURLAUTH_AWS_SIGV4</c> (128) with <c>CURLOPT_AWS_SIGV4</c> set, else <c>CURLAUTH_BEARER</c> (64) with
+    /// <c>CURLOPT_XOAUTH2_BEARER</c> set, as libcurl 8.22.0 records the scheme it applied (CGR-248).
+    /// </summary>
+    private static object? ReadHttpAuthUsed(TransferInfo info, EasyOptions options) =>
+        info.HttpAuthUsed != 0 || info.RequestSize == 0 ? info.HttpAuthUsed
+        : options.Authentication.AwsSigV4 is not null ? 128L
+        : options.Authentication.XOAuth2Bearer is not null ? 64L
+        : 0L;
 
     private static object? ReadProxyAuthUsed(TransferInfo info, EasyOptions options) => info.ProxyAuthUsed;
 
@@ -82,7 +91,7 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadPrimaryPort(TransferInfo info, EasyOptions options) => info.PrimaryPort == 0 ? -1 : info.PrimaryPort;
 
-    private static object? ReadLocalPort(TransferInfo info, EasyOptions options) => info.LocalPort;
+    private static object? ReadLocalPort(TransferInfo info, EasyOptions options) => info.LocalPort == 0 ? -1 : info.LocalPort;
 
     private static object? ReadConditionUnmet(TransferInfo info, EasyOptions options) => info.ConditionUnmet;
 

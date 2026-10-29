@@ -162,10 +162,15 @@ internal static class EasyProtocolOptionSetters
     // setopt.c stores CURLOPT_UPLOAD_FLAGS as (unsigned char)arg and accepts every value.
     private static CurlCode SetUploadFlags(ref EasyOptions o, object? v) => Smtp(ref o, m => m with { UploadFlags = unchecked((byte)NumberOf(v)) });
 
-    /// <summary><c>CURLOPT_TFTP_BLKSIZE</c>: below 8 becomes 512 and above 65464 becomes 65464, as libcurl does.</summary>
+    /// <summary><c>CURLOPT_TFTP_BLKSIZE</c>: negative is <see cref="CurlCode.BadFunctionArgument"/>, else below 8 becomes 512 and above 65464 becomes 65464, as libcurl does.</summary>
     private static CurlCode SetTftpBlockSize(ref EasyOptions o, object? v)
     {
         var size = NumberOf(v);
+        if (size < 0)
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
         var blockSize = size < SmallestTftpBlockSize ? DefaultTftpBlockSize : (int)Math.Min(size, LargestTftpBlockSize);
         return Tftp(ref o, t => t with { BlockSize = blockSize });
     }
@@ -179,11 +184,11 @@ internal static class EasyProtocolOptionSetters
         return CurlCode.Ok;
     }
 
-    /// <summary><c>CURLOPT_RTSP_REQUEST</c>: an unknown value becomes <see cref="RtspRequest.None"/>, as libcurl's switch default does.</summary>
+    /// <summary><c>CURLOPT_RTSP_REQUEST</c>: 0 or an unknown value is <see cref="CurlCode.BadFunctionArgument"/>, as libcurl 8.22 answers.</summary>
     private static CurlCode SetRtspRequest(ref EasyOptions o, object? v)
     {
         var request = (RtspRequest)NumberOf(v);
-        return Rtsp(ref o, r => r with { Request = Enum.IsDefined(request) ? request : RtspRequest.None });
+        return request == RtspRequest.None || !Enum.IsDefined(request) ? CurlCode.BadFunctionArgument : Rtsp(ref o, r => r with { Request = request });
     }
 
     /// <summary><c>CURLOPT_RTSP_SESSION_ID</c>: every set is counted, so the engine hands on one that repeats the value before it (BL-2787).</summary>
@@ -195,9 +200,9 @@ internal static class EasyProtocolOptionSetters
 
     private static CurlCode SetRtspTransport(ref EasyOptions o, object? v) => Rtsp(ref o, r => r with { Transport = (string?)v });
 
-    private static CurlCode SetRtspClientCSeq(ref EasyOptions o, object? v) => Rtsp(ref o, r => r with { ClientCSeq = NumberOf(v) });
+    private static CurlCode SetRtspClientCSeq(ref EasyOptions o, object? v) => NumberOf(v) < 0 ? CurlCode.BadFunctionArgument : Rtsp(ref o, r => r with { ClientCSeq = NumberOf(v) });
 
-    private static CurlCode SetRtspServerCSeq(ref EasyOptions o, object? v) => Rtsp(ref o, r => r with { ServerCSeq = NumberOf(v) });
+    private static CurlCode SetRtspServerCSeq(ref EasyOptions o, object? v) => NumberOf(v) < 0 ? CurlCode.BadFunctionArgument : Rtsp(ref o, r => r with { ServerCSeq = NumberOf(v) });
 
     /// <summary><c>CURLOPT_WS_OPTIONS</c>: only the <c>CURLWS_RAW_MODE</c> and <c>CURLWS_NOAUTOPONG</c> bits are kept.</summary>
     private static CurlCode SetWebSocketOptions(ref EasyOptions o, object? v)

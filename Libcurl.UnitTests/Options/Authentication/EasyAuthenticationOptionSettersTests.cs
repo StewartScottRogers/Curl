@@ -5,9 +5,23 @@ using Libcurl.Options;
 
 namespace Libcurl.UnitTests.Options.Authentication;
 
+// Flips the process-wide EasyAuthenticationOptionSetters.SrpIsBuiltIn, so it must not run beside another test that reads it (BL-4020).
 [TestClass]
+[DoNotParallelize]
 public sealed class EasyAuthenticationOptionSettersTests
 {
+    private bool srpWasBuiltIn;
+
+    [TestInitialize]
+    public void MakeSrpBuiltIn()
+    {
+        srpWasBuiltIn = EasyAuthenticationOptionSetters.SrpIsBuiltIn;
+        EasyAuthenticationOptionSetters.SrpIsBuiltIn = true;
+    }
+
+    [TestCleanup]
+    public void RestoreSrp() => EasyAuthenticationOptionSetters.SrpIsBuiltIn = srpWasBuiltIn;
+
     [TestMethod]
     public void SetOption_Netrc_TakesZeroToTwoAndRefusesTheRest()
     {

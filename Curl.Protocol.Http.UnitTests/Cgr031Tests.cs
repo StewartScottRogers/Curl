@@ -81,7 +81,7 @@ public sealed class Cgr031Tests
         Diagnostics.Act("exit code, connects, message", string.Join(", ", result.ExitCode, connector.Targets.Count, result.ErrorMessage));
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(1, connector.Targets.Count);
-        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Assert.AreEqual("Recv failure: Connection reset by peer", result.ErrorMessage);
     }
 
     private static TransferContext Context(Stream output, ITransferEvents events) => new()

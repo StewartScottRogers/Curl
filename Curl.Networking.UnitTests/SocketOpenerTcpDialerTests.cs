@@ -8,7 +8,7 @@ namespace Curl.Networking;
 
 /// <summary>
 /// A connect's <see cref="ConnectTarget.SocketOpener" /> is asked before each TCP attempt, as curl 8.22.0's
-/// <c>cf_socket_open</c> calls <c>CURLOPT_OPENSOCKETFUNCTION</c> before the connect (ADR-0818, CGR-036). The
+/// <c>cf_socket_open</c> calls <c>CURLOPT_OPENSOCKETFUNCTION</c> before the connect (ADR-0903, CGR-036). The
 /// loopback listeners here are only connected to, never sent a byte.
 /// </summary>
 [TestClass]

@@ -27,13 +27,13 @@ public sealed class ImmediateTimerTimeProvider : TimeProvider
 
     /// <inheritdoc />
     /// <remarks>
-    /// A timer due before <see cref="NeverFiresFrom" /> moves the timestamp forward by
+    /// A one-shot timer (a repeating one, such as the progress meter's tick, never fires) due before <see cref="NeverFiresFrom" /> moves the timestamp forward by
     /// <paramref name="dueTime" />, then calls <paramref name="callback" /> once; a later one
     /// does nothing.
     /// </remarks>
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
-        if (dueTime < NeverFiresFrom)
+        if (dueTime < NeverFiresFrom && period == Timeout.InfiniteTimeSpan)
         {
             waits.Add(dueTime);
             elapsedMilliseconds += (long)dueTime.TotalMilliseconds;

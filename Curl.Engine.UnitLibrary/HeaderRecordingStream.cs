@@ -33,6 +33,9 @@ internal sealed class HeaderRecordingStream(TransferHeaderStore store, Stream? i
         set => throw new NotSupportedException();
     }
 
+    /// <summary>The header callback's stream, or <see langword="null" /> when none is set.</summary>
+    internal CallbackWriteStream? Callback => inner as CallbackWriteStream;
+
     /// <inheritdoc />
     public void MarkConnectReplyHead() => store.MarkConnectReplyHead();
 

@@ -177,7 +177,7 @@ internal sealed partial class ManagedEasyTransfer(
     /// <summary>
     /// Gets or sets what the handle's transfers wait for on their socket while a multi handle drives them by
     /// <c>curl_multi_socket_action</c>: each perform starts its clock (<see cref="TransferSocketWait.Start" />) and
-    /// dials through a <see cref="SocketActionGatedTcpDialer" /> over it (ADR-0822, BL-3859); <see langword="null" />,
+    /// dials through a <see cref="SocketActionGatedTcpDialer" /> over it (ADR-0917, BL-3859); <see langword="null" />,
     /// the default, outside socket-action mode, where nothing changes.
     /// </summary>
     internal TransferSocketWait? SocketWait { get; set; }
@@ -339,6 +339,9 @@ internal sealed partial class ManagedEasyTransfer(
 
     /// <summary>The alt-svc cache the handle's first perform opened, kept across performs and <see cref="Reset" /> and saved by <see cref="DisposeAsync" /> (BL-2671).</summary>
     private AltSvcTransferCache? handleAltSvc;
+
+    /// <summary>The cookies of the last HTTP perform that had a <c>CURLOPT_COOKIEJAR</c>, which <see cref="DisposeAsync" /> writes, as <c>curl_easy_cleanup</c> does (CGR-258, BL-3787); <see langword="null" /> before one.</summary>
+    private CookieEngine? handleCookieJar;
 
     /// <summary>
     /// The <c>host:port</c> of the last perform's URL (<see cref="OriginOf" />), to which alone

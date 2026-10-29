@@ -127,6 +127,8 @@ held to the same quality gates. Hand-writing it is the answer, never a package, 
 an ADR that decides a feature stays out.
 
 ## Dark factory
+On Linux and macOS a shift runs with `RunDarkFactory.sh` (PowerShell 7, `pwsh`, required), and
+`.github/workflows/dark-factory-unix.yml` runs the factory's `-Test*` self-tests under `pwsh` on both (BL-3923).
 `RunDarkFactory.cmd` works the board unattended: each ready task goes to a headless
 `/task-run`, and anything that needs Stewart ends in `Blocked` with an alarm at the end
 of the shift. Its code is `RunDarkFactory.ps1` (the help, the parameters and a loader) and

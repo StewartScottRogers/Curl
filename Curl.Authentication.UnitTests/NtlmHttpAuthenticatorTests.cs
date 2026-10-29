@@ -371,15 +371,15 @@ public sealed partial class NtlmHttpAuthenticatorTests
     }
 
     [TestMethod]
-    public async Task CreateAuthorizationAsync_NoType1BeforeAnyChallenge_SendsNothing()
+    public async Task CreateAuthorizationAsync_NoType1BeforeAnyChallengeForCurlsOwnNtlm_SendsNothing()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("credential", "u:p");
-        diagnostics.Arrange("matches SSPI build", true);
+        diagnostics.Arrange("matches SSPI build", false);
         diagnostics.Arrange("scripted status", SecurityContextStatus.NoCredentials);
         ScriptedSecurityContextFactory contexts = new(new ScriptedSecurityContext(new SecurityContextStep(SecurityContextStatus.NoCredentials, [])));
 
-        string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: true).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
+        string? value = await new NtlmHttpAuthenticator(contexts, matchesSspiBuild: false).CreateAuthorizationAsync(Request("u:p"), null, sentBeforeAnyChallenge: false, [], CancellationToken.None);
 
         diagnostics.Act("Authorization", value);
         diagnostics.Assert("Authorization", null, value);

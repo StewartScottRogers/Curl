@@ -101,7 +101,7 @@ public sealed class StreamConnection(Stream stream, EndPoint? remoteEndPoint, En
     /// write, as a proxy leaving bytes after its CONNECT reply and closing the tunnel (upstream
     /// test1802), keeps the abort, as curl's Schannel build prints it (ADR-0708); so does a peer
     /// whose FIN was unread at the write, as a server that closed a kept connection curl then reuses
-    /// (BL-3304, ADR-0796): Windows answers the reset of a connection it had a FIN on with
+    /// (BL-3304, ADR-0878): Windows answers the reset of a connection it had a FIN on with
     /// WSAECONNABORTED however soon the receive runs.
     /// </remarks>
     public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)

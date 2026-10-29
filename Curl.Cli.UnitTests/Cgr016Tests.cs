@@ -15,7 +15,7 @@ public sealed class Cgr016Tests
     {
         CommandLineOptions options = Parse(["-X", InvalidUtf8ByteEscape.Decode([0xFF]) + "T", Url]);
 
-        Assert.AreEqual("ÿT", options.RequestMethod);
+        Assert.AreEqual("\uDCFFT", options.RequestMethod);
     }
 
     [TestMethod]

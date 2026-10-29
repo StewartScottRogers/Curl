@@ -169,6 +169,29 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
+    public async Task PerformAsync_MimePostThatFailsToBuild_EndsWithTheBuildFailureAndSendsNothing()
+    {
+        ScriptedConnector connector = new([Encoding.ASCII.GetBytes(Response)]);
+        ManagedCurlEngine engine = CreateEngine(connector);
+        IMimeBuilder mime = engine.CreateMime();
+        IMimePartBuilder part = mime.AddPart();
+        part.SetName("a\nb");
+        part.SetData(Encoding.ASCII.GetBytes("v"));
+        await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
+        easy.Options = new EasyOptions
+        {
+            Network = new EasyNetworkOptions { Url = "http://h/form" },
+            Http = new EasyHttpOptions { MimePost = mime.Build(), MimeOptions = MimeOptions.FormEscape },
+        };
+
+        CurlCode code = await easy.PerformAsync(CancellationToken.None);
+
+        Assert.AreEqual(CurlCode.BadFunctionArgument, code);
+        Assert.AreEqual(MultipartFormBodyBuilder.LineBreakInNameMessage, easy.ErrorText);
+        Assert.IsEmpty(connector.Written);
+    }
+
+    [TestMethod]
     public async Task Duplicate_FixedFormBoundary_KeepsTheBoundary()
     {
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new ScriptedConnector([])).CreateEasy();

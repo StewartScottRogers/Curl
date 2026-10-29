@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace Curl.Conformance;
 
 /// <summary>
-/// Interprets the shell check lines case 1182 runs (BL-3412, ADR-0803): a precheck made only of <c>mkdir DIR</c>,
+/// Interprets the shell check lines case 1182 runs (BL-3412, ADR-0882): a precheck made only of <c>mkdir DIR</c>,
 /// <c>cp FILE DEST</c> and <c>echo 'TEXT' &gt; FILE</c> commands joined by <c>;</c>, and a postcheck
 /// <c>grep -q "TEXT" FILE</c>, without a shell.
 /// </summary>

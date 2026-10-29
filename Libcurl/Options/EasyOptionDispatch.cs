@@ -13,6 +13,14 @@ internal sealed class EasyOptionDispatch(IReadOnlyDictionary<CurlOption, EasyOpt
     /// <summary>Upstream's <c>CURL_MAX_INPUT_LENGTH</c>: the longest string option <c>Curl_setstropt</c> copies.</summary>
     internal const int MaximumInputLength = 8_000_000;
 
+    /// <summary>Options libcurl 8.22.0 still names in its header but whose <c>curl_easy_setopt</c> answers <see cref="CurlCode.UnknownOption"/> (the EBCDIC conversion callbacks, CGR-266).</summary>
+    private static readonly HashSet<CurlOption> RemovedOptions =
+    [
+        CurlOption.ConvFromNetworkFunction,
+        CurlOption.ConvToNetworkFunction,
+        CurlOption.ConvFromUtf8Function,
+    ];
+
     /// <summary>The dispatch over every setter the option groups have added (<see cref="EasyOptionSetters"/>).</summary>
     internal static EasyOptionDispatch Default { get; } = new(EasyOptionSetters.Create());
 
@@ -28,7 +36,7 @@ internal sealed class EasyOptionDispatch(IReadOnlyDictionary<CurlOption, EasyOpt
     internal CurlCode SetOption(ref EasyOptions options, CurlOption option, object? value)
     {
         var entry = CurlOptions.ById(option);
-        if (entry is null)
+        if (entry is null || RemovedOptions.Contains(option))
         {
             return CurlCode.UnknownOption;
         }

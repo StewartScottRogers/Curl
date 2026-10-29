@@ -154,7 +154,7 @@ internal static class CurlComposition
     /// </param>
     /// <param name="parsesAsEchBuild">
     /// Whether the runner reads the command line as a curl built with ECH does, accepting <c>--ech</c>; off by default, as
-    /// every reference build refuses it (ADR-0822). Tests and the conformance harness turn it on to reach the hand-built ECH.
+    /// every reference build refuses it (ADR-0918). Tests and the conformance harness turn it on to reach the hand-built ECH.
     /// </param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
@@ -257,7 +257,7 @@ internal static class CurlComposition
     /// </param>
     /// <param name="parsesAsEchBuild">
     /// Whether the runner reads the command line as a curl built with ECH does, accepting <c>--ech</c>; off by default, as
-    /// every reference build refuses it (ADR-0822). Tests and the conformance harness turn it on to reach the hand-built ECH.
+    /// every reference build refuses it (ADR-0918). Tests and the conformance harness turn it on to reach the hand-built ECH.
     /// </param>
     /// <param name="extendedAttributeWriter">
     /// Sets the <c>--xattr</c> attributes; <see langword="null" /> for a run that sets none. The conformance harness

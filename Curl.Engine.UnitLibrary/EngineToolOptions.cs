@@ -9,4 +9,9 @@ namespace Curl.Engine;
 /// <param name="ParallelImmediate"><c>--parallel-immediate</c>: a parallel transfer does not wait for a connection that may multiplex.</param>
 /// <param name="SslSessionsFile">The <c>--ssl-sessions</c> file, or <see langword="null" /> for none.</param>
 /// <param name="MaxTime">The <c>-m</c> limit the <c>--trace-config</c> timer lines report, or <see langword="null" /> for none.</param>
-public sealed record EngineToolOptions(bool Parallel, bool ParallelImmediate, string? SslSessionsFile, TimeSpan? MaxTime);
+/// <param name="TracesTransfer">
+/// <c>-v</c>, <c>--trace</c> or <c>--trace-ascii</c> (<c>CURLOPT_VERBOSE</c> for libcurl): the transfer's lines are
+/// printed, so the target's and an HTTPS proxy's handshakes ask for the OpenSSL build's handshake message trace
+/// (<see cref="Curl.Networking.TlsClientOptions.TracesHandshakeMessages" />, ADR-0985, BL-4047).
+/// </param>
+public sealed record EngineToolOptions(bool Parallel, bool ParallelImmediate, string? SslSessionsFile, TimeSpan? MaxTime, bool TracesTransfer = false);

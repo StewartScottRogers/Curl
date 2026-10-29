@@ -85,10 +85,19 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// being opened, or may yet multiplex, instead of opening one of its own: curl's
     /// <c>CURLOPT_PIPEWAIT</c>, which <c>-Z</c> sets unless <c>--parallel-immediate</c> is given
     /// (measured, BL-717 Notes). A connection may multiplex until its session is known when it
-    /// agreed <c>h2</c> with ALPN, or when it is plain TCP straight to the origin, which may
-    /// speak HTTP/2 with prior knowledge.
+    /// agreed <c>h2</c> with ALPN, or when it is plain TCP straight to the origin and
+    /// <see cref="PlainTcpMayMultiplex" /> says it may speak HTTP/2 with prior knowledge.
     /// </summary>
     public bool WaitsForMultiplexing { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a plain TCP connection straight to the origin may multiplex,
+    /// so that <see cref="WaitsForMultiplexing" /> waits for its session: <see langword="true" /> unless
+    /// the option group speaks HTTP/1.x over cleartext, whose connection curl 8.22.0 knows carries one
+    /// transfer at a time once it is open, so a transfer released while it is busy opens its own
+    /// (CGR-172, ADR-0937).
+    /// </summary>
+    public bool PlainTcpMayMultiplex { get; init; } = true;
 
     /// <summary>
     /// Gives a connector over the same <see cref="ConnectionCache" />, configuration and
@@ -100,7 +109,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// <param name="innerConnector">Opens a connection when the cache has none for the key.</param>
     /// <returns>The connector.</returns>
     public PoolingConnector Over(IConnector innerConnector) =>
-        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
+        new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, PlainTcpMayMultiplex = PlainTcpMayMultiplex, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
 
     /// <summary>
     /// Gets a value indicating whether this connector's transfers open a new connection although the pool holds an
@@ -184,7 +193,8 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
     /// and the reuse as above. One whose streams are all taken is reported as curl's
     /// <c>MAX_CONCURRENT_STREAMS reached, skip (N)</c>, N the transfers on it, and passed over.
     /// With <see cref="WaitsForMultiplexing" />, a connection with the key that is still being
-    /// opened, or that may multiplex and has no session yet, is waited for first (BL-717).
+    /// opened, or that may multiplex and has no session yet, is waited for first (BL-717), until
+    /// a connection with the key has held a session that carries one transfer at a time (CGR-171).
     /// </para>
     /// </remarks>
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -338,7 +348,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
 
     /// <summary>
     /// Records that a transfer handed <paramref name="entry" /> its session, which tells
-    /// whether it multiplexes, and wakes the transfers waiting to learn it.
+    /// whether it multiplexes, and wakes the transfers waiting to learn it. A session that carries
+    /// one transfer at a time (HTTP/1.x) marks the key as known not to multiplex, so later
+    /// transfers to it open their own connections without waiting (CGR-171, ADR-0933).
     /// </summary>
     /// <param name="entry">The connection now holding a session.</param>
     internal void SessionHeld(PoolEntry entry)
@@ -349,6 +361,10 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         {
             negotiation = entry.Negotiation;
             entry.Negotiation = null;
+            if (negotiation is not null && entry.Session!.ConcurrentTransferLimit is null)
+            {
+                _cache.KeysKnownNotToMultiplex.Add(negotiation.Key);
+            }
         }
 
         Decide(negotiation);
@@ -365,9 +381,9 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         }
     }
 
-    private static bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
+    private bool MayMultiplex(ConnectTarget target, ConnectResult connect) =>
         connect.ApplicationProtocol == "h2"
-            || (!target.IsForwardProxy && target.Proxy is null);
+            || (!target.IsForwardProxy && target.Proxy is null && (PlainTcpMayMultiplex || connect.ApplicationProtocol is not null || connect.PeerCertificates.Count > 0));
 
     private static int? ConcurrentTransferLimitOf(PoolEntry entry, ConnectionPoolKey key) =>
         key.Equals(entry.Key) && !entry.IsShareBarred && !entry.HasReadPeerClose
@@ -381,20 +397,28 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             return null;
         }
 
+        MultiplexingNegotiation? released = null;
         while (true)
         {
             var (shared, fullLeaseCount, negotiation) = FindShareable(key);
-            if (fullLeaseCount is { } leaseCount)
-            {
-                events.ReportInfo($"MAX_CONCURRENT_STREAMS reached, skip ({leaseCount})");
-            }
+            released?.ReleaseNext();
+            ReportFullLeases(fullLeaseCount, events);
 
             if (shared is not null || negotiation is null)
             {
                 return shared;
             }
 
-            await negotiation.Decided.WaitAsync(cancellationToken);
+            await negotiation.WaitAsync(cancellationToken);
+            released = negotiation;
+        }
+    }
+
+    private static void ReportFullLeases(int? fullLeaseCount, ITransferEvents events)
+    {
+        if (fullLeaseCount is { } leaseCount)
+        {
+            events.ReportInfo($"MAX_CONCURRENT_STREAMS reached, skip ({leaseCount})");
         }
     }
 
@@ -415,7 +439,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
                 fullLeaseCount = limit > 0 ? entry.LeaseCount : fullLeaseCount;
             }
 
-            var negotiation = WaitsForMultiplexing ? _cache.Negotiations.Find(pending => key.Equals(pending.Key)) : null;
+            var negotiation = WaitsForMultiplexing && !_cache.KeysKnownNotToMultiplex.Contains(key) ? _cache.Negotiations.Find(pending => key.Equals(pending.Key)) : null;
             return (null, fullLeaseCount, negotiation);
         }
     }

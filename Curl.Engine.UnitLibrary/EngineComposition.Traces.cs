@@ -1,9 +1,44 @@
+using Curl.Api.Options.Proxy;
+using Curl.Core;
+using Curl.Protocol.Abstractions;
 using HttpVersion = Curl.Api.Options.Http.HttpVersion;
 
 namespace Curl.Engine;
 
 internal static partial class EngineComposition
 {
+    /// <summary>
+    /// The <c>-v</c> info line curl writes when a proxy comes from the environment (BL-3740, CGR-211):
+    /// <c>Uses proxy env variable &lt;name&gt; == '&lt;value&gt;'</c>. Nothing when <c>-x</c> or
+    /// <c>--preproxy</c> was given, or the transfer goes direct.
+    /// </summary>
+    /// <param name="selector">The selector that read the environment.</param>
+    /// <param name="proxyOptions">The handle's proxy options.</param>
+    /// <param name="scheme">The transfer URL's scheme.</param>
+    /// <param name="chosen">The proxy the selection chose, or <see langword="null" /> for a direct connection.</param>
+    /// <param name="reportInfo">Writes one <c>-v</c> info line.</param>
+    internal static void ReportEnvironmentProxy(ProxySelector selector, EasyProxyOptions proxyOptions, string scheme, ProxyEndpoint? chosen, Action<string> reportInfo)
+    {
+        if (EnvironmentProxyInfoLine(selector, proxyOptions, scheme, chosen) is { } line)
+        {
+            reportInfo(line);
+        }
+    }
+
+    /// <summary>The line <see cref="ReportEnvironmentProxy" /> writes, or <see langword="null" /> when none is.</summary>
+    /// <param name="selector">The selector that read the environment.</param>
+    /// <param name="proxyOptions">The handle's proxy options.</param>
+    /// <param name="scheme">The transfer URL's scheme.</param>
+    /// <param name="chosen">The proxy the selection chose, or <see langword="null" /> for a direct connection.</param>
+    /// <returns>The line, or <see langword="null" />.</returns>
+    internal static string? EnvironmentProxyInfoLine(ProxySelector selector, EasyProxyOptions proxyOptions, string scheme, ProxyEndpoint? chosen) =>
+        chosen is not null
+        && proxyOptions.Proxy is null
+        && string.IsNullOrEmpty(proxyOptions.PreProxy)
+        && selector.TryFindProxyVariable(scheme, out string? name, out string? value)
+            ? $"Uses proxy env variable {name} == '{value}'"
+            : null;
+
     /// <summary>
     /// Whether <c>--trace-config</c> turned on curl 8.21.0's <c>[DNS]</c> lines: <c>dns</c>, <c>doh</c>,
     /// <c>network</c> (measured, BL-1103 Notes) and <c>all</c> each turn on the DNS filter's lines and the DoH resolver's alike (measured,

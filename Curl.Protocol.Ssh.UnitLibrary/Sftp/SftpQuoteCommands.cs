@@ -236,7 +236,7 @@ internal sealed class SftpQuoteCommands
     private ValueTask RunAsync(SftpQuoteCommand command, SftpSession session, byte[] workingPath, CancellationToken cancellationToken) =>
         command.Operation switch
         {
-            SftpQuoteOperation.PrintWorkingDirectory => WriteHeaderAsync([.. "257 \""u8, .. workingPath, .. "\" is current directory.\n"u8], cancellationToken),
+            SftpQuoteOperation.PrintWorkingDirectory => PrintWorkingDirectoryAsync(workingPath, cancellationToken),
             SftpQuoteOperation.MakeDirectory => RequireAsync(command, session.MakeDirectoryAsync(command.FirstPath, cancellationToken), $"mkdir \"{Show(command.FirstPath)}\" failed: "),
             SftpQuoteOperation.StatFileSystem => StatFileSystemAsync(command, session, cancellationToken),
             _ when PathRequests.TryGetValue(command.Operation, out (byte Type, string Name) request) => RequirePathsAsync(command, session, request, cancellationToken),
@@ -259,6 +259,16 @@ internal sealed class SftpQuoteCommands
 
     private static async ValueTask RequireAsync(SftpQuoteCommand command, ValueTask<uint> request, string failure) =>
         Require(command, await request.ConfigureAwait(false), failure);
+
+    // curl reports the command as a request header and the answer as a response header (-v
+    // shows "> PWD" and "< 257 ..."), and writes the answer to the header output as well.
+    private ValueTask PrintWorkingDirectoryAsync(byte[] workingPath, CancellationToken cancellationToken)
+    {
+        byte[] answer = [.. "257 \""u8, .. workingPath, .. "\" is current directory.\n"u8];
+        events.ReportRequestHeader("PWD\n"u8);
+        events.ReportResponseHeader(answer);
+        return WriteHeaderAsync(answer, cancellationToken);
+    }
 
     private async ValueTask WriteHeaderAsync(byte[] lines, CancellationToken cancellationToken)
     {

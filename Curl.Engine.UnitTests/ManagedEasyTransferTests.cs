@@ -365,14 +365,13 @@ public sealed partial class ManagedEasyTransferTests
     }
 
     [TestMethod]
-    public async Task Pause_GivenDirections_SucceedsAndRecordsThem()
+    public async Task Pause_NoPerformRunning_IsBadFunctionArgument()
     {
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)CreateEngine(new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure)).CreateEasy();
 
         CurlCode code = easy.Pause(CurlPause.Receive);
 
-        Assert.AreEqual(CurlCode.Ok, code);
-        Assert.AreEqual(CurlPause.Receive, easy.PausedDirections);
+        Assert.AreEqual(CurlCode.BadFunctionArgument, code);
     }
 
     [TestMethod]
@@ -650,7 +649,7 @@ public sealed partial class ManagedEasyTransferTests
         Assert.HasCount(2, connector.Targets);
         Assert.DoesNotContain("Cookie:", Encoding.ASCII.GetString(connector.Written[written..]));
         Assert.AreEqual(0, first.Info.TransferId);
-        Assert.AreEqual(1, second.Info.TransferId);
+        Assert.AreEqual(0, second.Info.TransferId);
     }
 
     [TestMethod]

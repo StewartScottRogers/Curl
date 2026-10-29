@@ -38,7 +38,7 @@ internal static class ConfigFileApplier
         if (path == StandardInputName)
         {
             shownName = "<stdin>";
-            contents = dataFileReader.ReadStandardInput();
+            contents = ReadStandardInputOrEmpty(dataFileReader);
         }
         else if (dataFileReader.TryReadFile(path, out contents))
         {
@@ -55,6 +55,22 @@ internal static class ConfigFileApplier
         CommandLineRefusal? refusal = ApplyLines(options, shownName, contents[..readableLength], spelledOption, pathExists, dataFileReader);
         options.OpenConfigFileCount--;
         return refusal ?? RefusalForUnreadableLine(options, path, spelledOption, readableLength < contents.Length);
+    }
+
+    /// <summary>
+    /// Reads standard input for <c>-K -</c>; curl 8.22.0 reads a closed standard input there as
+    /// an empty config file rather than failing (CGR-110, ADR-0949).
+    /// </summary>
+    private static byte[] ReadStandardInputOrEmpty(IDataFileReader dataFileReader)
+    {
+        try
+        {
+            return dataFileReader.ReadStandardInput();
+        }
+        catch (IOException)
+        {
+            return [];
+        }
     }
 
     /// <summary>

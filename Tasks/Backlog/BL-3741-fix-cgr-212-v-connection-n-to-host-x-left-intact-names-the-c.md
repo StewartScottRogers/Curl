@@ -4,8 +4,8 @@ title: Fix CGR-212: -v Connection #N to host X left intact names the --connect-t
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/Cgr212Tests.cs]
+depends-on: [BL-3736]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitLibrary/HttpConnectionInfoLines.cs, Curl.Protocol.Http.UnitTests/Cgr212Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -84,6 +84,10 @@ curl -v -sS --connect-to foo.test:21802:localhost:21802 http://foo.test:21802/x
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr212Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-28 (lane 1): touches changed from Engine trace files: those only detect the line. It is built by HttpProtocolHandler.LeftIntactLine (~line 1310), which names unix-socket path / --connect-to mapped host (HttpConnectionInfoLines.LeftIntactOverUnixSocket); curl 8.22.0 names the URL host:port. BL-3736 holds Curl.Protocol.Http.UnitLibrary, so depends-on BL-3736. Real curl 8.22.0 Schannel is at /ucrt64/bin/curl for measuring.
+
 ## Log
 
 - 2026-10-26: Created from CGR-212 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Fix lives in Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, held by BL-3736; waits for BL-3736

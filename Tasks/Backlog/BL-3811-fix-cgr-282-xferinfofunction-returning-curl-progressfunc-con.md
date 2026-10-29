@@ -4,7 +4,7 @@ title: Fix CGR-282: XFERINFOFUNCTION returning CURL_PROGRESSFUNC_CONTINUE does n
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-4012]
 touches: [Curl.Api.UnitLibrary/Callbacks/TransferInfoCallback.cs, Curl.Api.UnitTests/Cgr282Tests.cs, Libcurl.UnitTests/Cgr282Tests.cs, Libcurl/Callbacks/Progress/EasyProgressCallbackSetters.cs]
 model: sonnet
 requirement: none
@@ -78,3 +78,5 @@ probe.exe C_57 1 2> c57_PORT.err
 ## Log
 
 - 2026-10-26: Created from CGR-282 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs BL-4012: the progress meter lives only in Curl.Console and must move to a library the Engine can use

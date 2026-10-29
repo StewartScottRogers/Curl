@@ -109,7 +109,27 @@ internal static class HttpProxyTunnel
     // Command-line text as its bytes in the options' CommandLineTextEncoding, one character per
     // byte, so the request's closing Latin-1 step puts those bytes on the wire (ADR-0067).
     private static string RequestText(string text, HttpProxyTunnelOptions options) =>
-        Encoding.Latin1.GetString(options.CommandLineTextEncoding.GetBytes(text));
+        Encoding.Latin1.GetString(EncodeKeepingEscapedBytes(text, options.CommandLineTextEncoding));
+
+    // Text as bytes in encoding, with each lone surrogate from U+DC80 to U+DCFF (a header-file
+    // byte UTF-8 could not read, CGR-020) given as that byte; same rule as the HTTP head.
+    private static byte[] EncodeKeepingEscapedBytes(string text, Encoding encoding)
+    {
+        List<byte> bytes = [];
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (text[index] is >= '\uDC80' and <= '\uDCFF' && !char.IsHighSurrogate(text[Math.Max(index - 1, 0)]))
+            {
+                bytes.AddRange(encoding.GetBytes(text[runStart..index]));
+                bytes.Add((byte)(text[index] - 0xDC00));
+                runStart = index + 1;
+            }
+        }
+
+        bytes.AddRange(encoding.GetBytes(text[runStart..]));
+        return [.. bytes];
+    }
 
     /// <summary>
     /// The most bytes one line of the reply may hold, its CR and LF included, before curl

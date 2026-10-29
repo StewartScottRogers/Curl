@@ -7,7 +7,7 @@ namespace Curl.Conformance.Differential.IntegrationTests.LibcurlPrintf;
 /// Replays the tester's printf inputs (<c>LibcurlPrintf/ZeroPaddedNan.json</c>, its
 /// <c>t1.json</c>; <c>LibcurlPrintf/PrintfScenarios.json</c>, its <c>pf_in.json</c>) through
 /// Curl's <c>curl_msnprintf</c> and the reference libcurl 8.22.0's, and writes the
-/// <c>pf_report.txt</c> report (ADR-0794). Windows only: the reference call passes a
+/// <c>pf_report.txt</c> report (ADR-0876). Windows only: the reference call passes a
 /// <c>double</c> in an integer slot, as only the x64 Windows variadic convention reads it.
 /// Inconclusive unless <c>CURL_DIFFERENTIAL_REFERENCE_LIBRARY</c> names the reference shared
 /// library; the report goes to <c>CURL_DIFFERENTIAL_REPORT</c> when it names a file, else to a

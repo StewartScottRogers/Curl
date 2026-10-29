@@ -1,7 +1,7 @@
 using Curl.Cli;
 using Curl.Core;
-using Curl.Protocol.Abstractions;
 using Curl.Engine;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Console;
 
@@ -57,10 +57,23 @@ internal sealed class RunningTransferState(
     internal string? OutputFileName { get; set; }
 
     /// <summary>
+    /// Gets or sets whether <c>--skip-existing</c> skipped the transfer because its output file was
+    /// already there; under <c>-Z</c> its report then waits for the running transfers (CGR-293).
+    /// </summary>
+    internal bool SkippedExistingOutputFile { get; set; }
+
+    /// <summary>
     /// Gets or sets the output file the transfer opened, which <c>--remove-on-error</c> deletes when
     /// it fails; <see langword="null" /> while no file was opened.
     /// </summary>
     internal string? OpenedOutputFile { get; set; }
+
+    /// <summary>
+    /// Gets or sets, under <c>-w</c>, the code of the last response status line the transfer received
+    /// (<see cref="ResponseCodeRecordingTransferEvents" />), which a <c>-Z</c> transfer <c>--fail-early</c>
+    /// aborted prints as <c>%{http_code}</c>; <see langword="null" /> while none was received.
+    /// </summary>
+    internal int? ReceivedResponseCode { get; set; }
 
     /// <summary>
     /// Gets or sets what records whether the transfer's handler reported it past connect or open, and
@@ -115,6 +128,12 @@ internal sealed class RunningTransferState(
     /// or it was already printed.
     /// </summary>
     internal string? OutputFileOpenWarning { get; set; }
+
+    /// <summary>
+    /// Gets or sets the transfer's <c>-o</c> file, which <see cref="OutputFileOpenFailureTransferEvents" /> asks
+    /// whether it could be opened; <see langword="null" /> when the body goes elsewhere.
+    /// </summary>
+    internal DeferredOutputFileStream? OutputFile { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the handler's transfer succeeded and only creating

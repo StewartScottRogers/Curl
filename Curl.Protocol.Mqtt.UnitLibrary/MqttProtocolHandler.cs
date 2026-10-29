@@ -187,11 +187,11 @@ public sealed class MqttProtocolHandler : IProtocolHandler
                         context.PostData,
                         context.PostWithoutData)
                     .ConfigureAwait(false);
-                result = TransferResult.Success(session.BytesWritten);
+                result = WithRequestSize(TransferResult.Success(session.BytesWritten), session.BytesSent);
             }
             catch (MqttTransferException failure)
             {
-                result = new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message);
+                result = WithRequestSize(new TransferResult(failure.ExitCode, session.BytesWritten, failure.Message), session.BytesSent);
                 followingLine = failure.FollowingLine;
             }
         }
@@ -199,6 +199,13 @@ public sealed class MqttProtocolHandler : IProtocolHandler
         ReportConnectionEnd(context.Events, result, followingLine, connected.ConnectionNumber);
         return result;
     }
+
+    /// <summary>
+    /// <paramref name="result" /> with the <paramref name="bytesSent" /> packet bytes as its report's
+    /// <c>RequestSize</c>, which curl 8.22.0 prints as <c>%{size_request}</c> (CGR-107, BL-3959).
+    /// </summary>
+    private static TransferResult WithRequestSize(TransferResult result, long bytesSent) =>
+        result with { Report = new TransferReport { DownloadSize = result.BytesTransferred, RequestSize = bytesSent } };
 
     /// <summary>
     /// Reports how the transfer ended, as curl 8.21.0's <c>-v</c> does (measured, BL-935):

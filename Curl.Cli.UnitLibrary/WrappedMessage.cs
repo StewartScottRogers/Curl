@@ -16,6 +16,13 @@ public static class WrappedMessage
     public const int DefaultTerminalColumns = 79;
 
     /// <summary>
+    /// The most message bytes curl prints: <c>voutf</c> formats into a 1024-byte buffer, so a longer
+    /// message is cut at 1023 bytes. Measured with curl 8.22.0 (Windows, 2026-10-28): a 3000-byte
+    /// <c>--dump-header</c> name prints 1023 bytes of <c>Failed to open &lt;name&gt;</c> over 15 lines.
+    /// </summary>
+    public const int MaximumMessageBytes = 1023;
+
+    /// <summary>
     /// Splits <paramref name="message"/> into prefixed lines, without line terminators, at the width
     /// this process's <c>COLUMNS</c> environment variable gives (see <see cref="TerminalColumns"/>).
     /// Measured with curl 8.21.0 (Windows, 2026-10-08): <c>-K</c> naming a missing 73-byte path wraps
@@ -56,7 +63,8 @@ public static class WrappedMessage
     {
         int width = columns - prefix.Length;
         List<string> lines = [];
-        ReadOnlySpan<byte> rest = Encoding.UTF8.GetBytes(message);
+        byte[] bytes = Encoding.UTF8.GetBytes(message);
+        ReadOnlySpan<byte> rest = bytes.AsSpan(0, Math.Min(bytes.Length, MaximumMessageBytes));
         while (rest.Length > width)
         {
             int cut = LastBlankAtOrBefore(rest, width - 1);

@@ -4,8 +4,8 @@ title: Fix CGR-176: -s -T . prints no progress meter; REF prints it even with -s
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests/Cgr176Tests.cs]
+depends-on: [BL-3823]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests/Cgr176Tests.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests/Cgr176Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -95,3 +95,6 @@ echo a | curl -s -T . http://127.0.0.1:21200/echo
 ## Log
 
 - 2026-10-26: Created from CGR-176 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Found in the first pass: the meter is decided in `Curl.Console/CurlCommandRunner.cs` `ShowsProgress` (line ~4640, `!options.Silent && !options.ProgressMeterOff`), not in Curl.Cli.UnitLibrary. Real curl draws the meter under `-s` when `-T .` uploads stdin without blocking (`Running.UploadsFromStandardInputWithoutBlocking`, line ~3885). Fix: let that case ignore `Silent` in `ShowsProgress`, with a focused test in `Curl.Console.UnitTests/Cgr176Tests.cs`. BL-3823 (Doing) holds CurlCommandRunner.cs, so touches was extended and BL-3823 added to depends-on; requeued before any edit.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-3823; depends-on BL-3823

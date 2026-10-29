@@ -36,6 +36,12 @@ internal sealed class SslStreamConnection(
     string missingCloseNotifyMessage,
     bool clearsTls) : IConnection
 {
+    // Set once close_notify has been sent or TLS cleared, so disposing sends no second one.
+    private bool _tlsEnded;
+
+    /// <summary>Gets whether the curl build being matched is the Schannel one, which words a read cut by an alert its own way.</summary>
+    internal bool MatchesSchannelBuild { get; init; }
+
     /// <summary>
     /// Gets the detector that tells, at the first read returning plaintext, how many session
     /// ticket records came before it; <see langword="null" /> when none is watching (BL-1089).
@@ -79,6 +85,13 @@ internal sealed class SslStreamConnection(
         {
             throw new MissingCloseNotifyException(missingCloseNotifyMessage);
         }
+        catch (IOException failure) when (
+            TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null) is not null)
+        {
+            // MissingCloseNotifyException is the exception whose message the HTTP handler prints as it stands.
+            throw new MissingCloseNotifyException(
+                TlsFailureMessages.AlertReadFailure(failure, MatchesSchannelBuild, clientCertificate is not null)!);
+        }
 
         if (read == 0 && !buffer.IsEmpty && transport.TransportEnded)
         {
@@ -106,6 +119,7 @@ internal sealed class SslStreamConnection(
     /// </remarks>
     public async ValueTask<IConnection?> ClearTlsAsync(bool sendCloseNotifyFirst, CancellationToken cancellationToken)
     {
+        _tlsEnded = true;
         try
         {
             if (sendCloseNotifyFirst || !clearsTls)
@@ -125,16 +139,41 @@ internal sealed class SslStreamConnection(
     /// <remarks>Sends <c>close_notify</c>, then ends the TCP send side under it.</remarks>
     public async ValueTask ShutDownSendingAsync(CancellationToken cancellationToken)
     {
+        _tlsEnded = true;
         await sslStream.ShutdownAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         await plaintext.ShutDownSendingAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Sends <c>close_notify</c> first, as curl 8.18.0's OpenSSL build and curl 8.22.0's Schannel
+    /// build both do when they close a connection (BL-3984, ADR-0959), unless TLS has already
+    /// ended or the server has closed the transport; a failure to send it is ignored, as curl's is.
+    /// </remarks>
     public async ValueTask DisposeAsync()
     {
+        await SendCloseNotifyAsync().ConfigureAwait(false);
         await sslStream.DisposeAsync().ConfigureAwait(false);
         await plaintext.DisposeAsync().ConfigureAwait(false);
         clientCertificate?.Dispose();
+    }
+
+    private async ValueTask SendCloseNotifyAsync()
+    {
+        if (_tlsEnded || transport.TransportEnded)
+        {
+            return;
+        }
+
+        _tlsEnded = true;
+        try
+        {
+            await sslStream.ShutdownAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException)
+        {
+            // The transfer is over either way; curl ignores a close_notify it cannot send too.
+        }
     }
 
     // The server's close_notify reads as 0 with the transport still open; data or a bare end does not.

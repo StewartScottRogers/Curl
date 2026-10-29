@@ -7,7 +7,7 @@ namespace Curl.Core;
 /// Pins CGR-057 of the 2026-10-25 gap report: a bracketed IPv6 host whose zone id holds
 /// <c>%XX</c> or <c>:</c>, such as <c>http://[::1%25a%20b]:20200/a</c>, is literal text to
 /// <see cref="UrlGlob" />, as curl 8.22.0 takes it, where it used to be read as a range and
-/// fail with exit 3 (ADR-0822).
+/// fail with exit 3 (ADR-0915).
 /// </summary>
 [TestClass]
 public sealed class Cgr057Tests

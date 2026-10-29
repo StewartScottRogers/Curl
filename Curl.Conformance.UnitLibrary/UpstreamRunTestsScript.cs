@@ -7,7 +7,7 @@ namespace Curl.Conformance;
 /// Interprets upstream's <c>tests/runtests.pl</c> (curl 8.22.0) as case 1169 runs it,
 /// <c>%SRCDIR/runtests.pl -L %PWD/%LOGDIR/test%TESTNUMBER-library.pl</c>, to check that the runner accepts <c>-L</c> and
 /// exits with the code the library's <c>exit</c> statement gives, and as case 1182 runs it, <c>-E FILE 1</c>, to check that it
-/// skips the tests an exclude file names, without running Perl (BL-3410, BL-3412, ADR-0803).
+/// skips the tests an exclude file names, without running Perl (BL-3410, BL-3412, ADR-0882).
 /// </summary>
 /// <remarks>
 /// <c>runtests.pl</c> <c>require</c>s each <c>-L</c> file as it reads its options, so a library holding a line

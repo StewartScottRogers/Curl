@@ -119,10 +119,14 @@ internal static partial class EasyInfoReaders
     private static object? ReadSpeedDownloadT(TransferInfo info, EasyOptions options) => info.SpeedDownload;
 
     private static object? ReadContentLengthDownload(TransferInfo info, EasyOptions options) =>
-        (double)info.ContentLengthDownload;
+        (double)BodylessAwareContentLengthDownload(info);
 
     private static object? ReadContentLengthDownloadT(TransferInfo info, EasyOptions options) =>
-        info.ContentLengthDownload;
+        BodylessAwareContentLengthDownload(info);
+
+    /// <summary>libcurl sets the body size to 0 for a 204 or 304 response, so an unknown length reads 0, not -1.</summary>
+    private static long BodylessAwareContentLengthDownload(TransferInfo info) =>
+        info.ContentLengthDownload < 0 && info.ResponseCode is 204 or 304 ? 0 : info.ContentLengthDownload;
 
     private static object? ReadContentLengthUpload(TransferInfo info, EasyOptions options) =>
         (double)info.ContentLengthUpload;

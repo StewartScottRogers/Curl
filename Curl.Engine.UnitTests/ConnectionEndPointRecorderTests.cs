@@ -57,9 +57,9 @@ public sealed class ConnectionEndPointRecorderTests
         Diagnostics.Act("report", reported.Report);
         Diagnostics.Assert(
             "report",
-            new TransferReport { DownloadSize = 5, LocalEndPoint = Local, RemoteEndPoint = Remote },
+            new TransferReport { DownloadSize = 5, LocalEndPoint = Local, RemoteEndPoint = Remote, ConnectionCount = 1 },
             reported.Report);
-        Assert.AreEqual(new TransferReport { DownloadSize = 5, LocalEndPoint = Local, RemoteEndPoint = Remote }, reported.Report);
+        Assert.AreEqual(new TransferReport { DownloadSize = 5, LocalEndPoint = Local, RemoteEndPoint = Remote, ConnectionCount = 1 }, reported.Report);
     }
 
     [TestMethod]
@@ -75,9 +75,9 @@ public sealed class ConnectionEndPointRecorderTests
         Diagnostics.Act("report", reported.Report);
         Diagnostics.Assert(
             "report",
-            new TransferReport { ResponseCode = 226, LocalEndPoint = Local, RemoteEndPoint = Remote },
+            new TransferReport { ResponseCode = 226, LocalEndPoint = Local, RemoteEndPoint = Remote, ConnectionCount = 1 },
             reported.Report);
-        Assert.AreEqual(new TransferReport { ResponseCode = 226, LocalEndPoint = Local, RemoteEndPoint = Remote }, reported.Report);
+        Assert.AreEqual(new TransferReport { ResponseCode = 226, LocalEndPoint = Local, RemoteEndPoint = Remote, ConnectionCount = 1 }, reported.Report);
     }
 
     [TestMethod]
@@ -90,9 +90,9 @@ public sealed class ConnectionEndPointRecorderTests
 
         TransferResult reported = recorder.ReportOn(result);
 
-        Diagnostics.Act("same result returned", ReferenceEquals(result, reported));
-        Diagnostics.Assert("same result returned", true, ReferenceEquals(result, reported));
-        Assert.AreSame(result, reported);
+        Diagnostics.Act("reported connection count", reported.Report?.ConnectionCount ?? 0);
+        Diagnostics.Assert("handler's end points kept, connection counted", result.Report! with { ConnectionCount = 1 }, reported.Report);
+        Assert.AreEqual(result.Report! with { ConnectionCount = 1 }, reported.Report);
     }
 
     [TestMethod]
@@ -105,9 +105,9 @@ public sealed class ConnectionEndPointRecorderTests
 
         TransferResult reported = recorder.ReportOn(result);
 
-        Diagnostics.Act("same result returned", ReferenceEquals(result, reported));
-        Diagnostics.Assert("same result returned", true, ReferenceEquals(result, reported));
-        Assert.AreSame(result, reported);
+        Diagnostics.Act("reported connection count", reported.Report?.ConnectionCount ?? 0);
+        Diagnostics.Assert("handler's end points kept, connection counted", result.Report! with { ConnectionCount = 1 }, reported.Report);
+        Assert.AreEqual(result.Report! with { ConnectionCount = 1 }, reported.Report);
     }
 
     [TestMethod]
@@ -120,9 +120,9 @@ public sealed class ConnectionEndPointRecorderTests
 
         TransferResult reported = recorder.ReportOn(result);
 
-        Diagnostics.Act("same result returned", ReferenceEquals(result, reported));
-        Diagnostics.Assert("same result returned", true, ReferenceEquals(result, reported));
-        Assert.AreSame(result, reported);
+        Diagnostics.Act("reported connection count", reported.Report?.ConnectionCount ?? 0);
+        Diagnostics.Assert("handler's end points kept, connection counted", result.Report! with { ConnectionCount = 1 }, reported.Report);
+        Assert.AreEqual(result.Report! with { ConnectionCount = 1 }, reported.Report);
     }
 
     [TestMethod]
@@ -140,10 +140,10 @@ public sealed class ConnectionEndPointRecorderTests
         Diagnostics.Act("report", reported.Report);
         Diagnostics.Assert(
             "report",
-            new TransferReport { DownloadSize = 2, UnixSocketRemoteIp = "/tmp/a-socket-path-long-enough-to-be-cut-by-c" },
+            new TransferReport { DownloadSize = 2, UnixSocketRemoteIp = "/tmp/a-socket-path-long-enough-to-be-cut-by-c", ConnectionCount = 1 },
             reported.Report);
         Assert.AreEqual(
-            new TransferReport { DownloadSize = 2, UnixSocketRemoteIp = "/tmp/a-socket-path-long-enough-to-be-cut-by-c" },
+            new TransferReport { DownloadSize = 2, UnixSocketRemoteIp = "/tmp/a-socket-path-long-enough-to-be-cut-by-c", ConnectionCount = 1 },
             reported.Report);
     }
 

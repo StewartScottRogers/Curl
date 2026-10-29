@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 
+using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
 namespace Curl.Networking;
@@ -122,7 +123,7 @@ public sealed class QualityOfServiceSocketOptionsTests
 
         Diagnostics.Arrange("refused option", new RawSocketOption(0, 9999, 1));
 
-        QualityOfServiceSocketOptions.TrySet(socket, new RawSocketOption(0, 9999, 1));
+        QualityOfServiceSocketOptions.TrySet(socket, new RawSocketOption(0, 9999, 1), NoTransferEvents.Instance);
         socket.NoDelay = true;
 
         Diagnostics.Act("NoDelay after TrySet", socket.NoDelay);

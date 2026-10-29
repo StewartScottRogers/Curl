@@ -11,7 +11,7 @@
 $CiWatchDir = Join-Path $LanesDir 'ci-watch'
 # Settled maps each pair to what became of it ("filed BL-###", "covered by a task"); Logged
 # holds the last line traced for each run, so a run is traced again only when that changes.
-$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+$script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
 # The shift's branch once the coordinator knows it, so a wait for tokens keeps watching CI.
 $script:CiWatchBranch = ''
 # How many finished runs the flaky and regression verdicts look back over, and how long a
@@ -33,10 +33,27 @@ function Get-CiFailures {
     # <TestName> [..]") or, when the build broke, per compiler error ("error CS1002 in X.cs"),
     # with the platforms it failed on, its test project (or the project that did not build)
     # and the first line of its error message.
+    # A data row whose display name is not its method's ("Failed -4 http://[::1]:47500/ [1 ms]")
+    # is keyed by the method its test logger's START line names, with the row's display name in
+    # Rows, so every failing row of one method is one failure (BL-3998). An upstream case
+    # ("Failed test1034: ...") keeps its case number: that is the name its tasks use.
     param([string[]]$Log)
     $found = [ordered]@{}
     $current = @{}
     $awaitingMessage = @{}
+    # Each job's failing test waits in $current until its block ends, then joins $found.
+    $settle = {
+        param([string]$Job)
+        $pending = $current[$Job]
+        $current[$Job] = $null
+        if (-not $pending) { return }
+        if (-not $found.Contains($pending.Key)) { $found[$pending.Key] = $pending; return }
+        $entry = $found[$pending.Key]
+        foreach ($platform in $pending.Platforms) { if ($entry.Platforms -notcontains $platform) { $entry.Platforms += $platform } }
+        foreach ($row in $pending.Rows) { if ($entry.Rows -notcontains $row) { $entry.Rows += $row } }
+        if (-not $entry.Project) { $entry.Project = $pending.Project }
+        if (-not $entry.Message) { $entry.Message = $pending.Message }
+    }
     foreach ($raw in $Log) {
         $parts = "$raw" -split "`t", 3
         if ($parts.Count -lt 3) { continue }
@@ -45,7 +62,12 @@ function Get-CiFailures {
         $platform = Get-CiPlatform $job
         $item = $null
         if ($text -match '^\s+Failed\s+(\S+)\s') {
-            $item = [pscustomobject]@{ Key = $Matches[1]; Kind = 'test'; Platforms = @(); Project = ''; Message = '' }
+            $key = $Matches[1]
+            & $settle $job
+            $display = ($text.Trim() -replace '^Failed\s+', '') -replace '\s+\[[^\]]*\]$', ''
+            $current[$job] = [pscustomobject]@{ Key = $key; Kind = 'test'; Platforms = @($platform); Project = ''; Message = ''; Rows = @(); Display = $display }
+            $awaitingMessage[$job] = $false
+            continue
         } elseif ($text -match '(?:^|\s)(?:[^\s(]*[/\\])?([^\s/\\(]+)\(\d+,\d+\):\s+error\s+(\w+):\s*(.*?)(?:\s+\[(?:[^\]]*[/\\])?([^\]/\\]+)\.\w+proj\])?\s*$') {
             $item = [pscustomobject]@{ Key = "error $($Matches[2]) in $($Matches[1])"; Kind = 'build'; Platforms = @(); Project = "$($Matches[4])"; Message = $Matches[3] }
         } elseif ($text -match '^Audit guard: (\S+) changed on ') {
@@ -56,11 +78,15 @@ function Get-CiFailures {
             if (-not $found.Contains($item.Key)) { $found[$item.Key] = $item }
             $entry = $found[$item.Key]
             if ($entry.Platforms -notcontains $platform) { $entry.Platforms += $platform }
-            if ($item.Kind -eq 'test') { $current[$job] = $entry; $awaitingMessage[$job] = $false }
             continue
         }
         $entry = $current[$job]
         if (-not $entry) { continue }
+        if ($text -match '^\s*START\s+[\w.`+]*\.(\w+)\s+\((.+)\)\s*$' -and $Matches[2] -ceq $entry.Display -and $entry.Key -notmatch '^test\d+:$') {
+            $entry.Key = $Matches[1]
+            $entry.Rows = @($entry.Display)
+            continue
+        }
         if ($text -match '^\s+Error Message:') { $awaitingMessage[$job] = $true; continue }
         if ($awaitingMessage[$job] -and $text.Trim()) {
             if (-not $entry.Message) { $entry.Message = $text.Trim() }
@@ -71,9 +97,10 @@ function Get-CiFailures {
         if (-not $entry.Project -and $text -match '\sin\s.*?[/\\](Curl[\w.]*\.(?:UnitTests|IntegrationTests))[/\\]') { $entry.Project = $Matches[1] }
         if ($text -match '^Failed!\s.*-\s+([\w.]+)\.dll') {
             if (-not $entry.Project) { $entry.Project = $Matches[1] }
-            $current[$job] = $null
+            & $settle $job
         }
     }
+    foreach ($job in @($current.Keys)) { & $settle $job }
     # A run that failed with no test, compiler error or audit-guard line in its log (a crashed
     # test host, a timeout, a job step that broke) is still red: file it by the job and step
     # the log names, so the spell does not stay open unfiled (AF-0171). That holds for every
@@ -137,16 +164,20 @@ function Get-CiVerdicts {
         # A regression's first failing commit is the oldest run of its unbroken red streak.
         $first = 0
         $platforms = @($failure.Platforms)
+        $rows = @($failure.Rows)
         if ($verdict -eq 'regression') {
             while ($failing -contains ($first + 1)) {
                 $first++
-                $platforms += @(@($Runs[$first].Failures | Where-Object { $_.Key -ceq $key })[0].Platforms)
+                $earlier = @($Runs[$first].Failures | Where-Object { $_.Key -ceq $key })[0]
+                $platforms += @($earlier.Platforms)
+                $rows += @($earlier.Rows)
             }
         } else { $first = $at }
         $verdicts += [pscustomobject]@{
             Key = $key; Kind = $failure.Kind; Verdict = $verdict; RunId = $Runs[$at].Id; FirstSha = $Runs[$first].Sha
             Platforms = @($platforms | Select-Object -Unique | Sort-Object); Project = $failure.Project; Message = $failure.Message
             GateMembers = @($failure.GateMembers | Where-Object { $_ }); Files = @($failure.Files | Where-Object { $_ })
+            Rows = @($rows | Where-Object { $_ } | Select-Object -Unique)
         }
     }
     return $verdicts
@@ -239,11 +270,14 @@ function Set-CiTaskBody {
     } else { "$what passes on Windows, Linux and macOS, so the ``CI`` workflow on the shift's branch is green again." }
     $message = if ($Verdict.Message) { $Verdict.Message } else { '(no error message in the log)' }
     $first = if ($Verdict.FirstSha) { "First failing commit: $($Verdict.FirstSha.Substring(0, [math]::Min(8, $Verdict.FirstSha.Length)))." } else { 'First failing commit: not found.' }
+    # A data-row test's failing rows by display name (BL-3998).
+    $rows = @(@($Verdict.Rows | Where-Object { $_ }) | ForEach-Object { '`' + $_ + '`' })
     $context = @(
         "Filed by the dark factory's CI watch (BL-987). $what failed on $on in CI run $($Verdict.RunId) ($RunUrl). $first"
         ''
         "    $message"
         ''
+        if ($rows.Count) { "Failing data rows: $($rows -join ', ')."; '' }
         "Lanes test only on Windows, so reproduce with ``gh run view $($Verdict.RunId) --log-failed`` and fix it platform-neutrally (CLAUDE.md, ""Tests pass on Windows, Linux and macOS"")."
     ) -join "`n"
     $criteria = if ($Verdict.Verdict -eq 'flaky') {
@@ -308,9 +342,24 @@ function Send-CiWhisper {
         $stdinFile = Join-Path $LogDir "ci-whisper-$Stamp-$([guid]::NewGuid().ToString('N').Substring(0, 8)).json"
         $json = [pscustomobject]@{ cwd = $Root; tool_input = @{ command = 'task-board.ps1 new' }; tool_response = @{ stdout = $Line } } | ConvertTo-Json -Compress
         [IO.File]::WriteAllText($stdinFile, $json, (New-Object Text.UTF8Encoding $false))
-        Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$hook`"") `
+        Start-Process -FilePath (Get-FactoryPowerShellExe) -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$hook`"") `
             -RedirectStandardInput $stdinFile -WindowStyle Hidden | Out-Null
     } catch { }
+}
+
+function Test-CiRunWithoutRunner {
+    # True when `gh run view <id> --json jobs` shows at least one job that did not succeed and
+    # every such job was cancelled with no step run (GitHub never gave it a runner, BL-3944).
+    param($JobsJson)
+    if (-not $JobsJson) { return $false }
+    try { $jobs = @(($JobsJson | ConvertFrom-Json).jobs) } catch { return $false }
+    $bad = @($jobs | Where-Object { $_.conclusion -notin 'success', 'skipped', 'neutral' })
+    if (-not $bad.Count) { return $false }
+    foreach ($job in $bad) {
+        if ($job.conclusion -ne 'cancelled') { return $false }
+        if (@($job.steps | Where-Object { $_.conclusion -and $_.conclusion -ne 'skipped' }).Count) { return $false }
+    }
+    return $true
 }
 
 function Get-CiRuns {
@@ -319,7 +368,7 @@ function Get-CiRuns {
     # failure, or cannot be read, is left out and traced (Write-CiRunLine). $null when gh
     # cannot list them. -ListRuns and -ReadLog stand in for gh in -TestCiWatch: the first
     # returns `gh run list`'s JSON, the second a run's `--log-failed` lines, $null if unreadable.
-    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog)
+    param([string]$Branch, [scriptblock]$ListRuns, [scriptblock]$ReadLog, [scriptblock]$ReadJobs)
     # No --jq: Windows PowerShell strips the double quotes a jq filter needs from a native
     # command's arguments. Its ConvertFrom-Json turns "[]" into one empty element, hence the
     # databaseId filter.
@@ -337,6 +386,14 @@ function Get-CiRuns {
             $log = @(gh run view $Id --log-failed 2>$null | ForEach-Object { "$_" })
             if ($LASTEXITCODE -ne 0) { return $null }
             return , $log
+        }
+    }
+    if (-not $ReadJobs) {
+        $ReadJobs = {
+            param([string]$Id)
+            $json = (gh run view $Id --json jobs 2>$null) -join "`n"
+            if ($LASTEXITCODE -ne 0) { return $null }
+            return $json
         }
     }
     $json = & $ListRuns $Branch
@@ -358,7 +415,11 @@ function Get-CiRuns {
             if ($null -eq $log) { Write-CiRunLine -RunId $id -Line "failure on ${on}: cannot read its log with gh run view --log-failed; trying again next heartbeat"; continue }
             $named = @(Get-CiFailures $log)
             # A failed run whose --log-failed is empty is still red: file it by the run (AF-0178).
-            if (-not $named.Count) {
+            if (-not $named.Count -and (Test-CiRunWithoutRunner (& $ReadJobs $id))) {
+                $script:CiWatch.Capacity[$id] = $true
+                $named = @()
+            }
+            elseif (-not $named.Count) {
                 $named = @([pscustomobject]@{ Key = 'job unknown job step unknown step'; Kind = 'job'; Platforms = @('unknown job'); Project = ''; Message = 'the run failed and gh run view --log-failed printed no line' })
             }
             $script:CiWatch.Failures[$id] = $named
@@ -368,6 +429,10 @@ function Get-CiRuns {
         # with a single failing test looked like one with none and was dropped (BL-1031).
         $failures = @()
         if ($conclusion -eq 'failure') { $failures = @($script:CiWatch.Failures[$id]) }
+        if ($conclusion -eq 'failure' -and -not $failures.Count -and $script:CiWatch.Capacity[$id]) {
+            Write-CiRunLine -RunId $id -Line "failure on ${on}: runner capacity - every job that did not succeed was never given a runner; nothing to file"
+            continue
+        }
         if ($conclusion -eq 'failure' -and -not $failures.Count) {
             Write-CiRunLine -RunId $id -Line "failure on ${on}: its log names no failing test or build error; nothing to file"
             continue
@@ -583,7 +648,7 @@ function New-CiFailureTasks {
                 if (Test-CiFailureCovered -Key $verdict.Key -Sha $sha -Repo $CiWatchDir) { $script:CiWatch.Settled["$($verdict.Key)|$($verdict.RunId)"] = 'covered by a task'; continue }
                 $touches = if ($verdict.Kind -eq 'job') { @(Get-CiJobTouches -Verdict $verdict -Repo $CiWatchDir) } else { @(Get-CiTouches -Project $verdict.Project -Repo $CiWatchDir) }
                 $newArgs = Get-CiTaskNewArgs -Verdict $verdict -Touches $touches
-                $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+                $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
                 if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'ci' "cannot file $($verdict.Key): $(Get-Short $out 60)" 'DarkYellow'; continue }
                 $id = $Matches[1]; $line = $Matches[0]
                 $url = "https://github.com/$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null)/actions/runs/$($verdict.RunId)"
@@ -663,7 +728,7 @@ function Move-FixedCiTasksToDeferred {
             if (-not $ids.Count) { return }
             $env:CLAUDE_PROJECT_DIR = $CiWatchDir
             $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
-            foreach ($id in $ids) { & powershell -NoProfile -ExecutionPolicy Bypass -File $board move -Id $id -To Deferred -Reason "already fixed, CI green on $on" 2>&1 | Out-Null }
+            foreach ($id in $ids) { & (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board move -Id $id -To Deferred -Reason "already fixed, CI green on $on" 2>&1 | Out-Null }
             git -C $CiWatchDir add -A -- Tasks 2>&1 | Out-Null
             git -C $CiWatchDir commit -q -m "chore(tasks): defer $($ids -join ', '), already fixed, CI green on $on" -m "Moved by the dark factory's CI watch (BL-3028)." -m $SkipCiNote 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { return }
@@ -737,16 +802,16 @@ function Invoke-SplitHotspotFiling {
             if ($LASTEXITCODE -ne 0) { Write-Trace '-' 'split' "cannot check out origin/$Branch in $CiWatchDir" 'DarkYellow'; return }
             $env:CLAUDE_PROJECT_DIR = $CiWatchDir
             $board = Join-Path $CiWatchDir '.claude\skills\task-board\task-board.ps1'
-            $status = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board status 2>&1 | ForEach-Object { "$_" })
-            $capacityLine = (@(& powershell -NoProfile -ExecutionPolicy Bypass -File $board capacity 2>&1 | ForEach-Object { "$_" }) -join "`n")
+            $status = @(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board status 2>&1 | ForEach-Object { "$_" })
+            $capacityLine = (@(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board capacity 2>&1 | ForEach-Object { "$_" }) -join "`n")
             $waiting = Get-OverlapWaitingCount -StatusLines $status -CapacityLine $capacityLine
             if (-not (Test-SplitHotspotDue -CapacityStreak $script:Auto.CapacityStreak -Waiting $waiting)) { return }
-            $lines = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $board hotspots 2>&1 | ForEach-Object { "$_" })
+            $lines = @(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board hotspots 2>&1 | ForEach-Object { "$_" })
             $exit = $LASTEXITCODE
             $choice = Select-SplitHotspot -Lines $lines -ExitCode $exit -LiveTitles (Get-LiveTaskTitles $CiWatchDir) -Filed $script:Auto.SplitFiled
             if ($choice.Action -ne 'file') { Write-Trace '-' 'split' $choice.Reason 'DarkGray'; return }
             $newArgs = @('new', '-Title', (Get-SplitTaskTitle $choice.Path), '-Priority', 'High', '-Pipeline', 'feature', '-Touches', $choice.Path)
-            $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
+            $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $board @newArgs 2>&1 | ForEach-Object { "$_" }) -join "`n"
             if ($out -notmatch '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Write-Trace '-' 'split' "cannot file a split task for $($choice.Path): $(Get-Short $out 60)" 'DarkYellow'; return }
             $id = $Matches[1]; $line = $Matches[0]
             Set-SplitTaskBody -Path (Join-Path $CiWatchDir $Matches[2]) -Hotspot $choice -Waiting $waiting
@@ -847,6 +912,43 @@ if ($TestCiWatch) {
         "Build and test (ubuntu-latest)${t}Fast tests${t}2026-10-07T10:00:00.0000004Z Failed!  - Failed:     1, Passed:     3 - SomethingElse.dll (net10.0)")
     & $check 'integration test failure parsed' 'Connect_Loopback_Succeeds|Curl.Networking.IntegrationTests' `
         ((@(Get-CiFailures $integrationLog) | ForEach-Object { "$($_.Key)|$($_.Project)" }) -join ';')
+    # BL-3998: data rows with their own display names, recorded from run 40774593052, are one
+    # failure keyed by their method; an upstream case keeps its case number.
+    $rowLog = @()
+    foreach ($os in 'ubuntu', 'macos') {
+        $j = "Build and test ($os-latest)${t}Fast tests${t}2026-10-28T22:00:51.0000000Z "
+        $method = 'Curl.Networking.TcpConnectorTests.ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral'
+        foreach ($row in '-4 http://[::1]:47500/', '-4 bracketed', '-6 http://127.0.0.1:47500/') {
+            $rowLog += @(
+                "$j  Failed $row [1 ms]"
+                "$j  Error Message:"
+                "$j   Assertion failed. Expected value to not be null."
+                "$j  Stack Trace:"
+                "$j     at $method(String host, AddressFamily family) in /home/runner/work/Curl/Curl/Curl.Networking.UnitTests/TcpConnectorTests.AddressFamily.cs:line 120"
+                "$j  Standard Output Messages:"
+                "$j TestContext Messages:"
+                "$j START $method ($row)"
+                "$j END ${method}: Failed in 1 ms (arrange 1, act 2, assert 1)")
+        }
+        $rowLog += @(
+            "$j  Failed ConnectAsync_UnderIPv6ThroughAnIPv4ProxyLiteral_DialsTheProxy [1 ms]"
+            "$j START Curl.Networking.TcpConnectorTests.ConnectAsync_UnderIPv6ThroughAnIPv4ProxyLiteral_DialsTheProxy"
+            "${j}Failed!  - Failed:     4, Passed:  1666 - Curl.Networking.UnitTests.dll (net10.0)"
+            "$j  Failed test1034: HTTP over proxy with malformatted IDN host name [2 s]"
+            "$j START Curl.Conformance.UnitTests.UpstreamConformanceTests.UpstreamCase_RunThroughCurl_HoldsTheRatchet (test1034: HTTP over proxy with malformatted IDN host name)"
+            "${j}Failed!  - Failed:     1, Passed:  1000 - Curl.Conformance.UnitTests.dll (net10.0)")
+    }
+    $rowFailures = @(Get-CiFailures $rowLog)
+    & $check 'data rows keyed by their method' 'ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral|Linux,macOS|Curl.Networking.UnitTests|-4 http://[::1]:47500/,-4 bracketed,-6 http://127.0.0.1:47500/;ConnectAsync_UnderIPv6ThroughAnIPv4ProxyLiteral_DialsTheProxy|Linux,macOS|Curl.Networking.UnitTests|;test1034:|Linux,macOS|Curl.Conformance.UnitTests|' `
+        (($rowFailures | ForEach-Object { "$($_.Key)|$($_.Platforms -join ',')|$($_.Project)|$($_.Rows -join ',')" }) -join ';')
+    $rowVerdict = @(Get-CiVerdicts -Now $now -Runs @([pscustomobject]@{ Id = '40774593052'; Sha = 'sha1'; FinishedAt = $now; Failures = $rowFailures }))[0]
+    & $check 'data-row task title' 'Fix CI failure ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral on Linux and macOS' (Get-CiTaskTitle $rowVerdict)
+    $rowBody = Join-Path ([IO.Path]::GetTempPath()) "df-ci-rows-$PID.md"
+    Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $rowBody
+    Set-CiTaskBody -Path $rowBody -RunUrl 'https://github.com/o/r/actions/runs/40774593052' -Verdict $rowVerdict
+    $rowText = [IO.File]::ReadAllText($rowBody)
+    Remove-Item $rowBody -ErrorAction SilentlyContinue
+    & $check 'data-row task context' 'True True' "$($rowText.Contains('`ConnectAsync_UnderTheOtherFamilyToAnAddressLiteral_DialsTheLiteral` failed on Linux and macOS')) $($rowText.Contains('Failing data rows: `-4 http://[::1]:47500/`, `-4 bracketed`, `-6 http://127.0.0.1:47500/`.'))"
     $body = Join-Path ([IO.Path]::GetTempPath()) "df-ci-body-$PID.md"
     Copy-Item (Join-Path $Root '.claude\skills\task-board\TASK-TEMPLATE.md') $body
     Set-CiTaskBody -Path $body -RunUrl 'https://github.com/o/r/actions/runs/9' -Verdict ([pscustomobject]@{
@@ -880,7 +982,7 @@ if ($TestCiWatch) {
     # 36674691490 (two TcpDialerTests failures on Linux) and 36690174792 (one on macOS).
     $traced = New-Object Collections.Generic.List[string]
     function Write-Trace { param($Id, $Kind, $Text, $Color) $traced.Add($Text) }
-    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $ubuntu = "Build and test (ubuntu-latest)${t}Fast tests${t}"
     $macos = "Build and test (macos-latest)${t}UNKNOWN STEP${t}"
     $recorded = @{
@@ -940,10 +1042,19 @@ if ($TestCiWatch) {
     & $check 'a failure whose job gh cannot name is still filed (AF-0178)' 'job unknown job step Measure code quality|job' `
         "$($unknownJob[0].Key)|$($unknownJob[0].Kind)"
     & $check 'an empty log names no failure' '0' "$(@(Get-CiFailures @()).Count)"
-    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $emptyRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":901,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() })
     & $check 'a failed run with an empty log is filed by the run (AF-0178)' '1|job unknown job step unknown step' `
         "$($emptyRuns.Count)|$($emptyRuns[0].Failures[0].Key)"
+    $noRunner = '{"jobs":[{"name":"ok","conclusion":"success","steps":[{"conclusion":"success"}]},{"name":"Pack","conclusion":"cancelled","steps":[]}]}'
+    $ran = '{"jobs":[{"name":"Pack","conclusion":"cancelled","steps":[]},{"name":"T","conclusion":"failure","steps":[{"conclusion":"failure"}]}]}'
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
+    $traced.Clear()
+    $capRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":902,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $noRunner })
+    & $check 'a failed run whose only bad job never got a runner files nothing and says runner capacity (BL-3944)' '0|run 902 failure on abcdef01: runner capacity - every job that did not succeed was never given a runner; nothing to file' "$(@($capRuns[0]).Count)|$($traced -join ';')"
+    $ranRuns = @(Get-CiRuns -Branch 'b' -ListRuns { '[{"databaseId":903,"status":"completed","conclusion":"failure","headSha":"abcdef0123","updatedAt":"2026-10-11T23:15:00Z"}]' } -ReadLog { , @() } -ReadJobs { $ran })
+    & $check 'an empty log with a job that ran and failed is still filed (BL-3944)' '1|job unknown job step unknown step' "$($ranRuns.Count)|$($ranRuns[0].Failures[0].Key)"
+    $script:CiWatch = @{ CheckedAt = [datetime]::MinValue; Failures = @{}; Capacity = @{}; Settled = @{}; Logged = @{}; AuditTasks = @{}; Off = $false }
     $traced.Clear()
     $script:ciListJson = $null
     $first = Get-CiRuns -Branch 'work' -ListRuns $listed -ReadLog $readLog
@@ -982,7 +1093,7 @@ if ($TestCiWatch) {
         $env:CLAUDE_PROJECT_DIR = $board
         $env:CURL_DARK_FACTORY_LANE = '0'
         $boardScript = Join-Path $Root '.claude\skills\task-board\task-board.ps1'
-        $out = (& powershell -NoProfile -ExecutionPolicy Bypass -File $boardScript @(Get-CiTaskNewArgs -Verdict $auditVerdicts[0] -Touches @()) 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $out = (& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $boardScript @(Get-CiTaskNewArgs -Verdict $auditVerdicts[0] -Touches @()) 2>&1 | ForEach-Object { "$_" }) -join "`n"
         $filedPath = if ($out -match '(?m)^(BL-\d+)\s+(Tasks\S+\.md)') { Join-Path $board $Matches[2] } else { '' }
         & $check 'audit task filed with CURL_DARK_FACTORY_LANE=0' 'filed' $(if ($filedPath -and (Test-Path $filedPath)) { 'filed' } else { "not filed: $out" })
         if ($filedPath -and (Test-Path $filedPath)) {

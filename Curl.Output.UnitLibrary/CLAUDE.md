@@ -18,7 +18,7 @@ Keep it a port: change it only against that source or a measurement of real curl
 the Schannel build's layout; `PeerCertificateText.FormatFor` prints the OpenSSL build's
 instead for `TlsBackend.OpenSsl` (`OpenSslPeerCertificateText`, a port of `ossl_certchain`
 in `lib/vtls/openssl.c` and the OpenSSL printers it calls), and `TransferWriteOutVariables`
-picks the platform's (ADR-0825, CGR-091).
+picks the platform's (ADR-0926, CGR-091).
 
 `-w %time{format}` has one dialect per C runtime (`WriteOutTimeDialect`):
 `WindowsCRuntimeTimeFormat` (ADR-0038) and `GlibcTimeFormat`, a port of curl's `outtime`

@@ -376,7 +376,7 @@ public sealed class TransferInfoFromReportTests
         ReadOnlyMemory<byte>[] chain = [SelfSignedCertificate("CN=leaf"), SelfSignedCertificate("CN=root")];
 
         TransferInfo info = TransferInfoFromReport.Of(
-            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = chain } }, RequestUrl, false, new ManualTimeProvider(), certificateInfoRequested: true);
+            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = chain } }, RequestUrl, false, new ManualTimeProvider(), certificateInfoRequested: true, tlsBackend: TlsBackend.Schannel);
 
         Assert.HasCount(2, info.CertInfo);
         Assert.AreEqual("Subject:CN=leaf", info.CertInfo[0][0]);
@@ -393,12 +393,53 @@ public sealed class TransferInfoFromReportTests
     }
 
     [TestMethod]
+    public void Of_CertificateInfoRequestedWithOpenSsl_GivesTheOpenSslRecordsWithTheAuthorityKeyIdentifierInOneString()
+    {
+        TransferInfo info = TransferInfoFromReport.Of(
+            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = [Convert.FromBase64String(CaSignedLeaf)] } },
+            RequestUrl, false, new ManualTimeProvider(), certificateInfoRequested: true, tlsBackend: TlsBackend.OpenSsl);
+
+        IReadOnlyList<string> records = info.CertInfo[0];
+        Assert.HasCount(20, records);
+        Assert.AreEqual("Subject:CN = leaf.test, O = \"Acme, Inc\"", records[0]);
+        Assert.AreEqual(
+            "X509v3 Authority Key Identifier:keyid:56:A2:63:F8:2C:9F:0A:A6:C4:BD:9B:A7:EA:A4:42:9B:C7:40:A4:B5\nDirName:/C=US/O=Test CA/CN=Root\nserial:54:43:1D:E3:69:AF:65:45:03:37:33:6E:F3:81:75:A2:26:4B:59:D8",
+            records[7]);
+        Assert.AreEqual("X509v3 Subject Alternative Name:DNS:leaf.test, IP Address:0:0:0:0:0:0:0:1, email:a@b.test, URI:http://x.test/", records[8]);
+        StringAssert.StartsWith(records[^1], "Cert:-----BEGIN CERTIFICATE-----\n");
+    }
+
+    [TestMethod]
+    public void Of_CertificateInfoRequestedWithSchannel_GivesTheX509Asn1Records()
+    {
+        TransferInfo info = TransferInfoFromReport.Of(
+            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = [Convert.FromBase64String(CaSignedLeaf)] } },
+            RequestUrl, false, new ManualTimeProvider(), certificateInfoRequested: true, tlsBackend: TlsBackend.Schannel);
+
+        Assert.AreEqual("Subject:CN=leaf.test, O=Acme, Inc", info.CertInfo[0][0]);
+        StringAssert.StartsWith(info.CertInfo[0][^1], "Cert:-----BEGIN CERTIFICATE-----\n");
+    }
+
+    [TestMethod]
+    public void Of_CertificateInfoRequestedWithoutABackend_FollowsThePlatform()
+    {
+        TransferInfo info = TransferInfoFromReport.Of(
+            new TransferResult(CurlExitCode.Ok, 0) { Report = new TransferReport { PeerCertificates = [SelfSignedCertificate("CN=leaf")] } },
+            RequestUrl, false, new ManualTimeProvider(), certificateInfoRequested: true);
+
+        Assert.AreEqual(PlatformTlsBackend.ForProcess == TlsBackend.OpenSsl ? "Subject:CN = leaf" : "Subject:CN=leaf", info.CertInfo[0][0]);
+    }
+
+    private const string CaSignedLeaf =
+        "MIIECDCCAvCgAwIBAgICAIAwDQYJKoZIhvcNAQELBQAwLjELMAkGA1UEBhMCVVMxEDAOBgNVBAoMB1Rlc3QgQ0ExDTALBgNVBAMMBFJvb3QwHhcNMjYxMDI2MjAxOTI0WhcNMjYxMTI1MjAxOTI0WjAoMRIwEAYDVQQDDAlsZWFmLnRlc3QxEjAQBgNVBAoMCUFjbWUsIEluYzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAO+4X3MNI6hSDPt6Pl6mi8JfHuyG3yYtGhLPGkaPUgpUQeXOVNe7HotrYAUytCbqfPpjnaKr65SrD+BcSZIMgDIPk7NMPWAQYYzNb7cS1hD2M1HwP3fkLnsIoJQAjHXiX4HeA2dVqAF2bCCUoJezgsBFYvekmDMxBduUx4BLZdCJnkmxqrJX9+J95ykHpjfyolZYIHOA+wSVXXWrhksTKjNSjNDORCcGPdjuYpTAhArZ1PA52kuXh0qvE54nzyrO/EH6QmaaV5cW8+Lg6UcjRFf738Vz7ZHt8iZpWJRKxpk4aLM0EN9nAeaWwaBVYFsgVmQZaZaT9ocEKKg+AnHwb4UCAwEAAaOCATQwggEwMAkGA1UdEwQCMAAwaQYDVR0jBGIwYIAUVqJj+CyfCqbEvZun6qRCm8dApLWhMqQwMC4xCzAJBgNVBAYTAlVTMRAwDgYDVQQKDAdUZXN0IENBMQ0wCwYDVQQDDARSb290ghRUQx3jaa9lRQM3M27zgXWiJktZ2DBABgNVHREEOTA3gglsZWFmLnRlc3SHEAAAAAAAAAAAAAAAAAAAAAGBCGFAYi50ZXN0hg5odHRwOi8veC50ZXN0LzARBgMqAwQECgwIaGkgdGhlcmUwDAYDVR0PBAUDAwdfgDA2BgNVHSUELzAtBggrBgEFBQcDAwYIKwYBBQUHAwQGCCsGAQUFBwMIBggrBgEFBQcDCQYDKgMFMB0GA1UdDgQWBBQ6RyXqdqz4bE+Uzexy3feDTg1NczANBgkqhkiG9w0BAQsFAAOCAQEAb/o79SPjEi8tfra7qC1u46X4yJD71d7TNEMoYXqS7wtAnWvy84s5S5JfEsj76l3zSjKSqUYSVnbYNxX9374HArtI4slr6iUdmhxs7hQ54J3RUZcNrg4vGSIU+tCxXrXGem97ZycTne4fxFOaJWveJlamjnXf9Pumvgpnn/e+3eG7lNvlM0IbIRBD5nyzzjy45gO6Y2kOoMASQTyS88ZuwXF4oUvYOKi1r1zzbzt7ExJvQlmn7XSliQog4QBvZyUcw0MKwgjpUJVwa4ICMnd+Tb9aFqUvACUmgHtL+Q6SOJ0r9I9vzPHID/AsAQgj202oPtdQXLn0bX/V0ECtDPC4Yg==";
+
+    [TestMethod]
     public void CertInfoRecordsOf_CertificateText_GivesEachLineAndThePemAsCert()
     {
         string text = PeerCertificateText.Format(SelfSignedCertificate("CN=leaf"));
         int pemStart = text.IndexOf("-----BEGIN CERTIFICATE-----", StringComparison.Ordinal);
 
-        IReadOnlyList<string> records = TransferInfoFromReport.CertInfoRecordsOf(text);
+        IReadOnlyList<string> records = TransferInfoFromReport.CertInfoRecordsOf(text, TlsBackend.Schannel);
 
         Assert.AreEqual("Cert:" + text[pemStart..], records[^1]);
         Assert.AreEqual(text[..pemStart], string.Concat(records.Take(records.Count - 1).Select(record => record + "\n")));
@@ -406,7 +447,7 @@ public sealed class TransferInfoFromReportTests
 
     [TestMethod]
     public void CertInfoRecordsOf_UnreadableCertificate_GivesNoStrings() =>
-        Assert.IsEmpty(TransferInfoFromReport.CertInfoRecordsOf(PeerCertificateText.Format(new byte[] { 1, 2, 3 })));
+        Assert.IsEmpty(TransferInfoFromReport.CertInfoRecordsOf(PeerCertificateText.Format(new byte[] { 1, 2, 3 }), TlsBackend.Schannel));
 
     private static ReadOnlyMemory<byte> SelfSignedCertificate(string subject)
     {

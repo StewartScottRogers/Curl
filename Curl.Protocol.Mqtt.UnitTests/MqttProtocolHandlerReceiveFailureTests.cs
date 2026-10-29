@@ -28,8 +28,8 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
     {
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = Failing(SocketError.ConnectionAborted) });
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, "Recv failure: Connection was aborted"), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, "Recv failure: Connection was aborted"), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, "Recv failure: Connection was aborted"), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, "Recv failure: Connection was aborted"), run.Result with { Report = null });
         CollectionAssert.Contains(run.Transcript, "* Recv failure: Connection was aborted");
     }
 
@@ -42,8 +42,8 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = failure });
 
         string expected = "Recv failure: " + failure.InnerException!.Message;
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, expected), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, expected), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, expected), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, expected), run.Result with { Report = null });
         CollectionAssert.Contains(run.Transcript, "* " + expected);
     }
 
@@ -52,8 +52,8 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
     {
         Run run = await RunAsync(new ScriptedConnection([null]) { ReadFailure = new IOException("The read failed.") });
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result with { Report = null });
         CollectionAssert.DoesNotContain(run.Transcript, "* " + ReceiveFailed);
     }
 
@@ -62,8 +62,8 @@ public sealed class MqttProtocolHandlerReceiveFailureTests
     {
         Run run = await RunAsync(new ScriptedConnection([0x20, 0x02, 0x00]));
 
-        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result);
+        Diagnostics.AssertResult(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result with { Report = null });
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 0, ReceiveFailed), run.Result with { Report = null });
     }
 
     private static IOException Failing(SocketError error) =>

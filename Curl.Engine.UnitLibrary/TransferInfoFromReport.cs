@@ -25,8 +25,9 @@ internal static partial class TransferInfoFromReport
     /// <param name="certificateInfoRequested">Whether <c>CURLOPT_CERTINFO</c> asked for the peer certificates' records, without which libcurl's <c>CURLINFO_CERTINFO</c> is empty.</param>
     /// <param name="uploaded">Whether the transfer was a <c>CURLOPT_UPLOAD</c>, whose <c>file://</c> answer for the download length is -1 (libcurl's <c>file_upload</c> sets none).</param>
     /// <param name="contentLengthIgnored">Whether <c>CURLOPT_IGNORE_CONTENT_LENGTH</c> was set, under which libcurl answers -1 for the download length (BL-3323).</param>
+    /// <param name="tlsBackend">The TLS library whose curl build lays out <c>CURLINFO_CERTINFO</c>; the platform's when null.</param>
     /// <returns>The info.</returns>
-    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false, bool uploaded = false, bool contentLengthIgnored = false)
+    internal static TransferInfo Of(TransferResult result, string requestUrl, bool fileTimeRequested, TimeProvider timeProvider, bool certificateInfoRequested = false, bool uploaded = false, bool contentLengthIgnored = false, TlsBackend? tlsBackend = null)
     {
         TransferReport report = result.Report ?? new TransferReport();
         string effectiveUrl = report.EffectiveUrl ?? requestUrl;
@@ -38,7 +39,7 @@ internal static partial class TransferInfoFromReport
         return result.Report is null ? info : info with
         {
             RetryAfter = RetryAfterOf(report, timeProvider),
-            CertInfo = CertInfoOf(report, certificateInfoRequested),
+            CertInfo = CertInfoOf(report, certificateInfoRequested, tlsBackend),
         };
     }
 

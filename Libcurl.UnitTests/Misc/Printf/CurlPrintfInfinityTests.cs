@@ -61,20 +61,20 @@ public sealed class CurlPrintfInfinityTests
         Assert.AreEqual(expected, await FormatAsync(format, double.NegativeInfinity));
     }
 
-    // .NET's double.NaN has its sign bit set, which glibc prints as "-nan".
+    // .NET's double.NaN has its sign bit set; libcurl's own snprintf (CGR-260) prints it without a sign.
     [TestMethod]
     [Timeout(10_000, CooperativeCancellation = true)]
-    [DataRow("%f", "-nan")]
-    [DataRow("%.0f", "-nan")]
-    [DataRow("%.1f", "-nan")]
-    [DataRow("%.0F", "-NAN")]
-    [DataRow("%5.1F", " -NAN")]
-    [DataRow("%e", "-nan")]
-    [DataRow("%g", "-nan")]
-    [DataRow("%-6.2f|", "-nan  |")]
-    [DataRow("%08.1f", "    -nan")]
-    [DataRow("%#g", "-nan")]
-    public async Task MAPrintf_NaNWithItsSignBitSet_PrintsMinusNan(string format, string expected)
+    [DataRow("%f", "nan")]
+    [DataRow("%.0f", "nan")]
+    [DataRow("%.1f", "nan")]
+    [DataRow("%.0F", "NAN")]
+    [DataRow("%5.1F", "  NAN")]
+    [DataRow("%e", "nan")]
+    [DataRow("%g", "nan")]
+    [DataRow("%-6.2f|", "nan   |")]
+    [DataRow("%08.1f", "     nan")]
+    [DataRow("%#g", "nan")]
+    public async Task MAPrintf_NaNWithItsSignBitSet_PrintsNan(string format, string expected)
     {
         Assert.AreEqual(expected, await FormatAsync(format, double.NaN));
     }

@@ -25,10 +25,10 @@ internal static class ManagedCurlVersion
         "libz", "NTLM", "PSL", "SPNEGO", "SSL", "SSPI", "threadsafe", "UnixSockets", "zstd",
     ];
 
-    // The OpenSSL reference build's Features: line, which Curl's -V shows on Linux and macOS alike.
+    // The OpenSSL reference build's Features: line, which Curl's -V shows on Linux and macOS alike; no HTTPSRR (ADR-0957).
     private static readonly string[] Features =
     [
-        "alt-svc", "AsynchDNS", "brotli", "GSS-API", "HSTS", "HTTP2", "HTTPS-proxy", "HTTPSRR", "IDN", "IPv6",
+        "alt-svc", "AsynchDNS", "brotli", "GSS-API", "HSTS", "HTTP2", "HTTPS-proxy", "IDN", "IPv6",
         "Kerberos", "Largefile", "libz", "NTLM", "PSL", "SPNEGO", "SSL", "SSLS-EXPORT", "threadsafe",
         "UnixSockets", "zstd",
     ];

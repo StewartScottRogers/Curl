@@ -161,8 +161,8 @@ public sealed partial class CurlPrintfTests
     [DataRow("%lf %Lf", 1.0, "1.000000 1.000000")]
     [DataRow("%f", double.PositiveInfinity, "inf")]
     [DataRow("%F", double.NegativeInfinity, "-INF")]
-    [DataRow("%f", double.NaN, "-nan")]
-    [DataRow("%E", double.NaN, "-NAN")]
+    [DataRow("%f", double.NaN, "nan")]
+    [DataRow("%E", double.NaN, "NAN")]
     public void Render_Double_FormatsAsCPrintf(string format, double value, string expected)
     {
         object[] arguments = format.Contains(' ', StringComparison.Ordinal) && format != "% f" ? [value, value] : [value];

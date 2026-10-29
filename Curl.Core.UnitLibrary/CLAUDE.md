@@ -94,7 +94,8 @@ environment is always HTTP) and `socks://` is SOCKS4 (BL-269). `CurlComposition`
 `StreamBody` curl 8.21.0 sends for `-F`, byte for byte (ADR-0027): headers chosen as
 libcurl's `Curl_mime_prepare_headers` chooses them, files opened through `IFileSystem` while
 building so `Content-Length` is known, then streamed; an unopenable file is exit 26 before
-anything is sent. The text encoding and the boundary source are injected. A part's
+anything is sent, except a directory off Windows (`SendsDirectoryEmpty`), which goes as a part
+with its file name and no data, the body chunked, as curl's Linux build sends it (CGR-069, BL-3896). The text encoding and the boundary source are injected. A part's
 `Encoder` (`;encoder=`) goes through `MultipartPartEncoder`: every file part streams, and
 `base64`, `quoted-printable` and `7bit` files are encoded as they are sent by
 `EncodedReadStream`, never held whole; a seekable `7bit` file is read through once while

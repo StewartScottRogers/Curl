@@ -52,9 +52,10 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// hands its handle to the hook <see cref="PublishingSocketsTo" /> gave, if any.
     /// </summary>
     /// <param name="socket">A TCP socket not yet connected.</param>
-    internal void PrepareToConnect(Socket socket)
+    /// <param name="events">Where a refused <c>--vlan-priority</c> is warned of; none by default.</param>
+    internal void PrepareToConnect(Socket socket, ITransferEvents? events = null)
     {
-        ApplySocketOptions(socket);
+        ApplySocketOptions(socket, events);
         PublishCreated(socket);
     }
 
@@ -141,7 +142,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
-            PrepareToConnect(socket);
+            PrepareToConnect(socket, events);
             await BindDeviceOrLocalEndAsync(
                 deviceName,
                 bindsAddressAfterDevice,
@@ -209,7 +210,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
-            PrepareToConnect(socket);
+            PrepareToConnect(socket, events);
             if (bindTo is not null)
             {
                 BindLocalEnd(socket, bindTo, localPortCount, events);
@@ -234,14 +235,14 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private async ValueTask<Socket> ConnectFromBoundEndAsync(Socket socket, IPEndPoint endPoint, CancellationToken cancellationToken)
     {
-        var boundEnd = socket.LocalEndPoint as IPEndPoint;
         try
         {
             return await ConnectAsync(socket, endPoint, cancellationToken).ConfigureAwait(false);
         }
-        catch (SocketException exception) when (boundEnd is { Port: not 0 })
+        catch (SocketException exception) when (socket.LocalEndPoint is IPEndPoint { Port: not 0 })
         {
-            throw new BoundConnectFailedException(exception.SocketErrorCode, exception.Message, boundEnd);
+            // The system gives a failed connect an ephemeral local port too, and curl names it (CGR-220).
+            throw new BoundConnectFailedException(exception.SocketErrorCode, exception.Message, (IPEndPoint)socket.LocalEndPoint);
         }
     }
 
@@ -266,14 +267,24 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     }
 
     /// <summary>
-    /// On Windows, stops the SYN retransmissions of a connect to a loopback address (SIO_TCP_INITIAL_RTO with
+    /// Gets whether Windows answers a refused connect to <paramref name="address" /> at once: only <c>127.0.0.1</c>
+    /// and <c>::1</c> do. Any other address in <c>127.0.0.0/8</c> retransmits its SYN for about two seconds, as
+    /// curl 8.22.0 sees it, so a short <c>--connect-timeout</c> is exit 28 there (CGR-189, BL-3718).
+    /// </summary>
+    /// <param name="address">The address connected to.</param>
+    /// <returns><see langword="true" /> for <c>127.0.0.1</c> and <c>::1</c>.</returns>
+    internal static bool RefusesAtOnceOnWindows(IPAddress address) =>
+        address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.IPv6Loopback);
+
+    /// <summary>
+    /// On Windows, stops the SYN retransmissions of a connect to <c>127.0.0.1</c> or <c>::1</c> (SIO_TCP_INITIAL_RTO with
     /// no retransmissions), so a refused port fails at once with exit 7 as in curl 8.22.0 rather than after
     /// about two seconds, which a short <c>--connect-timeout</c> reports as exit 28 (BL-3182).
     /// </summary>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private static void FailRefusedLoopbackAtOnce(Socket socket, IPEndPoint endPoint)
     {
-        if (!OperatingSystem.IsWindows() || !IPAddress.IsLoopback(endPoint.Address))
+        if (!OperatingSystem.IsWindows() || !RefusesAtOnceOnWindows(endPoint.Address))
         {
             return;
         }
@@ -294,7 +305,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// Adopts the operating system socket <paramref name="handle" /> an application supplied
     /// (<see cref="TcpSocketOpenDecision.Supplied" />, libcurl's <c>CURLOPT_OPENSOCKETFUNCTION</c>) without
     /// taking ownership, so closing the connection never closes the handle, and connects it to
-    /// <paramref name="endPoint" /> unless <paramref name="alreadyConnected" /> (ADR-0818).
+    /// <paramref name="endPoint" /> unless <paramref name="alreadyConnected" /> (ADR-0903).
     /// </summary>
     /// <param name="handle">The socket handle.</param>
     /// <param name="alreadyConnected">Whether the socket is already connected.</param>
@@ -491,8 +502,10 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// time past 32767 seconds or more than 127 probes, and Windows more than 255 probes.
     /// </remarks>
     /// <param name="socket">A TCP socket not yet connected.</param>
-    internal void ApplySocketOptions(Socket socket)
+    /// <param name="events">Where a refused <c>--vlan-priority</c> is warned of; none by default.</param>
+    internal void ApplySocketOptions(Socket socket, ITransferEvents? events = null)
     {
+        events ??= NoTransferEvents.Instance;
         socket.NoDelay = SocketOptions.NoDelay;
         if (socket.AddressFamily == AddressFamily.InterNetworkV6)
         {
@@ -502,7 +515,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var platform = QualityOfServiceSocketOptions.CurrentPlatform;
         foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, platform).Concat(FastOpenSocketOption.For(SocketOptions, platform)))
         {
-            QualityOfServiceSocketOptions.TrySet(socket, option);
+            QualityOfServiceSocketOptions.TrySet(socket, option, events);
         }
 
         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, SocketOptions.KeepAlive);

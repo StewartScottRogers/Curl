@@ -119,6 +119,85 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsInstanceOfType<TlsTrustEvent>(events.TlsEvents.Single());
     }
 
+    // Measured 2026-10-28 with Ubuntu's curl 8.18.0 (OpenSSL 3.5.5), BL-3879: `curl -sS -k --tlsv1.0
+    // --tls-max 1.1 --ciphers DEFAULT@SECLEVEL=0` fetches the file from `openssl s_server -WWW -tls1_1`
+    // and from `-tls1`, and `--tls-max 1.0` from `-tls1`, exit 0 with nothing on stderr.
+    [TestMethod]
+    [DataRow(TlsVersion.Tls11, TlsProtocolVersion.Tls11)]
+    [DataRow(TlsVersion.Tls11, TlsProtocolVersion.Tls10)]
+    [DataRow(TlsVersion.Tls10, TlsProtocolVersion.Tls10)]
+    public async Task AuthenticateAsClientAsync_WithALegacyCeilingAndSecurityLevelZeroInTheOpenSslBuild_CompletesATransferWithAServerSpeakingOnlyIt(
+        TlsVersion ceiling,
+        TlsProtocolVersion serverVersion)
+    {
+        var options = new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls10, MaximumVersion: ceiling, Ciphers: "DEFAULT@SECLEVEL=0");
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", options);
+        Diagnostics.Arrange("server TLS protocol", serverVersion);
+        var request = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        var response = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+        using var rsaKey = s_serverCertificate.GetRSAPrivateKey()!;
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var testServer = new LegacyTlsTestServer(server, serverVersion, rsaKey, s_serverCertificate.RawData);
+        var serverTask = Task.Run(async () =>
+        {
+            await testServer.HandshakeAsync();
+            var received = await testServer.ReceiveApplicationDataAsync(request.Length);
+            await testServer.SendAsync(Curl.Tls.TlsContentType.ApplicationData, response);
+            return received;
+        });
+
+        var result = await Provider(options, OpenSslBuild).AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+
+        ActConnectResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        await using var connection = result.Connection!;
+        await connection.WriteAsync(request, CancellationToken.None);
+        await connection.FlushAsync(CancellationToken.None);
+        var answer = new byte[response.Length];
+        await ReadExactlyAsync(connection, answer);
+        var serverReceived = await serverTask;
+        Diagnostics.Diff("response the client read", response, answer);
+        CollectionAssert.AreEqual(request, serverReceived);
+        CollectionAssert.AreEqual(response, answer);
+    }
+
+    // Measured as above: `--tls-max 1.0` against `openssl s_server -tls1_1`, which answers the TLS 1.0
+    // hello with a protocol_version alert, is exit 35 with
+    // "curl: (35) TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version".
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_WithATls10CeilingAndSecurityLevelZeroInTheOpenSslBuild_SendsATls10HelloAndReportsTheServersAlert()
+    {
+        var options = new TlsClientOptions(Insecure: true, MinimumVersion: TlsVersion.Tls10, MaximumVersion: TlsVersion.Tls10, Ciphers: "DEFAULT@SECLEVEL=0");
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("options", options);
+        Diagnostics.Arrange("server", "openssl s_server -tls1_1's protocol_version alert to a TLS 1.0 hello");
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = Task.Run(async () =>
+        {
+            var header = new byte[5];
+            await server.ReadExactlyAsync(header);
+            var body = new byte[(header[3] << 8) | header[4]];
+            await server.ReadExactlyAsync(body);
+            await server.WriteAsync(new byte[] { 0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x46 });
+            return body;
+        });
+
+        var result = await Provider(options, OpenSslBuild).AuthenticateAsClientAsync(
+            new StreamConnection(client, ServerEndPoint), CertificateHost, CancellationToken.None);
+
+        ActConnectResult(result);
+        var hello = ClientHello.Decode((await serverTask)[4..]).Value;
+        Diagnostics.Act("hello version", hello.LegacyVersion);
+        Assert.AreEqual((ushort)0x0301, hello.LegacyVersion);
+        Diagnostics.Assert("exit code", CurlExitCode.SslConnectError, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.SslConnectError, result.ExitCode);
+        Diagnostics.Assert("error message", "TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version", result.ErrorMessage);
+        Assert.AreEqual("TLS connect error: error:0A00042E:SSL routines::tlsv1 alert protocol version", result.ErrorMessage);
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_WithALegacyCeilingAndAClientCertificateInTheOpenSslBuild_FailsWithNoProtocolsAvailable()
     {

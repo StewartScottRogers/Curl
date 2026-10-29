@@ -3,7 +3,7 @@ using Curl.Testing;
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Pins <see cref="CurlUrl.RequestPath" /> for CGR-016 part 3 (BL-3851, ADR-0823): on Linux an argument
+/// Pins <see cref="CurlUrl.RequestPath" /> for CGR-016 part 3 (BL-3851, ADR-0921): on Linux an argument
 /// byte that is not valid UTF-8 reaches the URL as the lone surrogate <c>U+DC00</c> plus the byte, and
 /// curl 8.18.0 sends <c>http://h/a</c> and the byte <c>0xFF</c> as <c>GET /a%FF</c>, measured in WSL on
 /// 2026-10-26; valid UTF-8 is still percent-encoded as its UTF-8.
@@ -34,7 +34,10 @@ public sealed class Cgr016UrlTests
         Assert.AreEqual(expected, path);
     }
 
+    // Off Windows only: Windows reads such a byte as Windows-1252, as the reference build's
+    // libidn2 does in the ANSI code page, so a%FF is accepted there (CGR-059, ADR-0942).
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public void TryParse_HostHoldingAnInvalidUtf8Byte_IsRefused()
     {
         string text = WithEscapedBytes("http://a^FF.example/");

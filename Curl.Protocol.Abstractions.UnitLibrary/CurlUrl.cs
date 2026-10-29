@@ -130,7 +130,7 @@ public sealed record CurlUrl
     /// above <c>~</c> as <c>%XX</c>, the bytes being <see cref="UrlByteText.ToBytes" />'s, so a
     /// character is its UTF-8 and an argument byte that was not valid UTF-8 (a lone
     /// <c>U+DC80</c> to <c>U+DCFF</c>) is itself: <c>/%FF</c>, as curl 8.18.0 sends
-    /// <c>http://h/</c> and the byte <c>0xFF</c> on Linux (CGR-016, BL-3851, ADR-0823).
+    /// <c>http://h/</c> and the byte <c>0xFF</c> on Linux (CGR-016, BL-3851, ADR-0921).
     /// </summary>
     public string RequestPath => PercentEncodedAboveTilde(AbsolutePath);
 
@@ -317,7 +317,6 @@ public sealed record CurlUrl
             flags.DisallowUser,
             out rejection,
             flags.AllowEmptyHost,
-            keepFileBackslashes: true,
             fileSchemeWithoutSlash: !flags.GuessesScheme);
 
         return url is not null;
@@ -365,6 +364,15 @@ public sealed record CurlUrl
 
         return url is not null;
     }
+
+    /// <summary>
+    /// Why libcurl's setopt refuses a transfer URL by its length alone, before parsing it: <see cref="CurlUrlRejection.UrlTooLong" />
+    /// above 8,000,000 bytes, <see cref="CurlUrlRejection.UrlAtLengthLimit" /> at exactly 8,000,000, else <see langword="null" />
+    /// (CGR-196). The URL API itself accepts 8,000,000 bytes, so <c>TryParse</c> does not apply this.
+    /// </summary>
+    /// <param name="text">The transfer's URL.</param>
+    /// <returns>The rejection, or <see langword="null" />.</returns>
+    public static CurlUrlRejection? TransferLengthRejection(string text) => CurlUrlParser.TransferLengthRejection(text);
 
     private static string PercentEncodedAboveTilde(string text)
     {

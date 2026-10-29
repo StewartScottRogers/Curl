@@ -96,6 +96,11 @@ public sealed record EasyHttpOptions
     public long PostFieldSize { get; init; } = -1;
 
     /// <summary>
+    /// Whether <see cref="PostFields"/> is the private copy <c>CURLOPT_COPYPOSTFIELDS</c> made; setting <c>CURLOPT_POSTFIELDSIZE</c> then discards it, as libcurl does. Default <see langword="false"/>.
+    /// </summary>
+    public bool PostFieldsAreCopy { get; init; }
+
+    /// <summary>
     /// <c>CURLOPT_HTTPGET</c>: whether the request is forced back to a <c>GET</c>. Default
     /// <see langword="false"/> (0).
     /// </summary>

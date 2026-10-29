@@ -57,11 +57,20 @@ public sealed class Cgr020Tests
     }
 
     [TestMethod]
-    public void Parse_ConfigFileCookieOfUtf8_CookieHoldsTheFileBytesOneCharacterEach()
+    public void Parse_ConfigFileCookieOfUtf8OffWindows_CookieHoldsTheFileText()
     {
         CommandLineOptions options = Parse(["-K", "k.txt", Url], false, ("k.txt", Encoding.UTF8.GetBytes("cookie = \"c=é\"\n")));
 
-        Assert.AreEqual("c=Ã©", options.Cookies.Single().Value);
+        Assert.AreEqual("c=é", options.Cookies.Single().Value);
+    }
+
+    [TestMethod]
+    public void Parse_ConfigFileCookieOfUtf8OffWindows_CookieEncodesOnceToTheFileBytes()
+    {
+        byte[] file = Encoding.UTF8.GetBytes("cookie = \"c=é\"\n");
+        CommandLineOptions options = Parse(["-K", "k.txt", Url], false, ("k.txt", file));
+
+        CollectionAssert.AreEqual(Encoding.UTF8.GetBytes("c=é"), InvalidUtf8ByteEscape.Encoding.GetBytes(options.Cookies.Single().Value));
     }
 
     [TestMethod]
@@ -89,7 +98,7 @@ public sealed class Cgr020Tests
     }
 
     [TestMethod]
-    public void Parse_CommandLineCookieAndRequest_KeepsTheValuesAsGiven()
+    public void Parse_CommandLineCookieAndRequest_KeepsTheCookieAndSendsTheMethodAsUtf8Bytes()
     {
         CommandLineOptions options = Parse(["-b", "c=é", "-X", "é", Url], false);
 

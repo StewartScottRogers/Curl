@@ -279,7 +279,8 @@ public sealed class TlsClientOptionsMappingTests
             EchPublicName: "example.com",
             EchConfigList: "AEX+DQ==",
             SslSessionsFile: "sess.bin",
-            Engine: "pkcs11");
+            Engine: "pkcs11",
+            PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance);
 
         TlsClientOptions mapped = Map(
             "--curves", "X25519", "--sigalgs", "rsa_pss_rsae_sha256", "--tls-earlydata", "--ech", "hard",
@@ -533,11 +534,11 @@ public sealed class TlsClientOptionsMappingTests
     private static TlsClientOptions MapProxyOf(CommandLineOptions options) =>
         TlsClientOptionsMapping.ProxyOf(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn);
 
-    /// <summary>Notes the options the next <see cref="Mapped" /> is expected to give, and returns them.</summary>
+    /// <summary>Notes the options the next <see cref="Mapped" /> is expected to give, with the terminal pass phrase prompt every mapping sets (ADR-0948), and returns them.</summary>
     private TlsClientOptions Expect(TlsClientOptions expected)
     {
-        _expected = expected;
-        return expected;
+        _expected = expected with { PemPassPhrasePrompt = TerminalPemPassPhrasePrompt.Instance };
+        return _expected;
     }
 
     /// <summary>Writes the command line and the options it mapped to, against the expected options if any were noted.</summary>
@@ -556,7 +557,7 @@ public sealed class TlsClientOptionsMappingTests
 
     private static CommandLineOptions Parse(string[] arguments)
     {
-        // As the OpenSSL build reads it, but built with ECH, so --ech is accepted rather than refused (ADR-0822).
+        // As the OpenSSL build reads it, but built with ECH, so --ech is accepted rather than refused (ADR-0918).
         CommandLineParseResult parsed = CommandLineParser.Parse(arguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: false, actsAsEchBuild: true);
         Assert.IsTrue(parsed.IsAccepted);
         return parsed.Options;
@@ -600,6 +601,27 @@ public sealed class TlsClientOptionsMappingTests
 
         Diagnostics.Assert("key log file", KeyLogFileOffWindows, mapped.KeyLogFile);
         Assert.AreEqual(KeyLogFileOffWindows, mapped.KeyLogFile);
+    }
+
+    // BL-4047: -v and --trace ask the target's and the HTTPS proxy's handshakes for the OpenSSL build's
+    // handshake message trace (ADR-0985); without them neither asks, so the connection keeps SslStream.
+    [TestMethod]
+    [DataRow("-v", true)]
+    [DataRow("--trace", true)]
+    [DataRow("--trace-ascii", true)]
+    [DataRow(null, false)]
+    public void Of_VerboseOrTraceOnCommandLine_TracesHandshakeMessagesOfTargetAndProxy(string? traceOption, bool expected)
+    {
+        string[] arguments = traceOption is null ? [Url] : traceOption == "-v" ? [traceOption, Url] : [traceOption, "trace.log", Url];
+        CommandLineOptions options = Parse(arguments);
+        Diagnostics.Arrange("command line", string.Join(' ', arguments));
+
+        OptionGroupConnectionSettings settings = OptionGroupConnectionSettings.Of(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options));
+        Diagnostics.Act("target, proxy traces handshake messages", $"{settings.Tls.TracesHandshakeMessages}, {settings.ProxyTls.TracesHandshakeMessages}");
+
+        Diagnostics.Assert("traces handshake messages", expected, settings.Tls.TracesHandshakeMessages);
+        Assert.AreEqual(expected, settings.Tls.TracesHandshakeMessages);
+        Assert.AreEqual(expected, settings.ProxyTls.TracesHandshakeMessages);
     }
 
     private const string KeyLogPath = "log/2090.log.ssl";

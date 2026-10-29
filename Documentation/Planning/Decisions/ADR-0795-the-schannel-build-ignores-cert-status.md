@@ -32,7 +32,7 @@ status, as curl 8.22.0 Schannel does. The command line still parses and records 
 `--libcurl` keeps writing `CURLOPT_SSL_VERIFYSTATUS`. The OpenSSL build keeps ADR-0191 unchanged.
 `--doh-cert-status` is not changed here, as it was not measured.
 
-The change sits in the engine mapping, not in `HandBuiltTlsProvider` (as ADR-0793 did for
+The change sits in the engine mapping, not in `HandBuiltTlsProvider` (as ADR-0874 did for
 `--curves`): ignoring the option before routing also keeps the transfer on `SslStream`, which is
 the Schannel route.
 

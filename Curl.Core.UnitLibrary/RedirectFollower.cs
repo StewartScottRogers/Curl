@@ -404,7 +404,9 @@ public sealed class RedirectFollower(
         next = null;
         if (policy.MaxRedirects >= 0 && followed >= policy.MaxRedirects)
         {
-            return (CurlExitCode.TooManyRedirects, $"Maximum ({policy.MaxRedirects}) redirects followed", true, false);
+            var limitMessage = $"Maximum ({policy.MaxRedirects}) redirects followed";
+            first.Events.ReportInfo(limitMessage);
+            return (CurlExitCode.TooManyRedirects, limitMessage, true, false);
         }
 
         if (ParseRefusal(target, first.PathAsIs, out next) is { } parseRefusal)
@@ -564,12 +566,23 @@ public sealed class RedirectFollower(
     /// </summary>
     private static string UnparsableUrlReason(string target)
     {
-        if (!target.AsSpan(target.IndexOf(':', StringComparison.Ordinal) + 1).StartsWith("/"))
+        ReadOnlySpan<char> afterScheme = target.AsSpan(target.IndexOf(':', StringComparison.Ordinal) + 1);
+        if (!afterScheme.StartsWith("/") || afterScheme.StartsWith("////"))
         {
             return ProxyUrlParser.SlashesReason;
         }
 
-        ReadOnlySpan<char> authority = target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2);
+        if (target.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Bad file:// URL";
+        }
+
+        return AuthorityReason(target.AsSpan(target.IndexOf("//", StringComparison.Ordinal) + 2));
+    }
+
+    /// <summary>Why curl 8.22.0 refuses the authority text <paramref name="authority" />, which may run on into the path.</summary>
+    private static string AuthorityReason(ReadOnlySpan<char> authority)
+    {
         authority = authority[..IndexOrLength(authority, authority.IndexOfAny('/', '?', '#'))];
         authority = authority[(authority.LastIndexOf('@') + 1)..];
         if (authority.StartsWith("["))
@@ -578,6 +591,11 @@ public sealed class RedirectFollower(
         }
 
         int colon = authority.IndexOf(':');
+        if (authority[..IndexOrLength(authority, colon)].IsEmpty)
+        {
+            return "No host present";
+        }
+
         return colon >= 0 && !IsPort(authority[(colon + 1)..])
             ? ProxyUrlParser.BadPortReason
             : ProxyUrlParser.BadHostnameReason;
@@ -759,6 +777,7 @@ public sealed class RedirectFollower(
                 HttpSignature = null,
                 KeptDigestAuthorization = null,
                 Headers = [.. hopHttp.Headers.Where(header => !IsCredentialHeader(header))],
+                AuthorizationHeaderWithheld = hopHttp.Headers.Any(header => HeaderNameIs(header, "Authorization")),
                 SendsCookieStrings = false,
             };
     }
@@ -782,12 +801,18 @@ public sealed class RedirectFollower(
     /// blanks between the name and its colon ignored, as curl 8.22.0 drops
     /// <c>Authorization : s3cr3t</c> from a redirect to another host (upstream test2113, BL-2163).
     /// </summary>
-    private static bool IsCredentialHeader(string header)
+    private static bool IsCredentialHeader(string header) =>
+        HeaderNameIs(header, "Authorization") || HeaderNameIs(header, "Cookie");
+
+    /// <summary>
+    /// Tells whether an <c>-H</c> value's name, with any blanks before its colon ignored, is
+    /// <paramref name="name" /> in any case.
+    /// </summary>
+    private static bool HeaderNameIs(string header, string name)
     {
         int colon = header.IndexOf(':', StringComparison.Ordinal);
-        ReadOnlySpan<char> name = colon < 0 ? [] : header.AsSpan(0, colon).TrimEnd(" \t");
-        return name.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
-            || name.Equals("Cookie", StringComparison.OrdinalIgnoreCase);
+        ReadOnlySpan<char> headerName = colon < 0 ? [] : header.AsSpan(0, colon).TrimEnd(" \t");
+        return headerName.Equals(name, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -947,7 +972,7 @@ public sealed class RedirectFollower(
         /// target with its header bytes unmarked (<see cref="HeaderByteText" />), for parsing and
         /// following. A target that held marked bytes came whole from an absolute <c>Location</c>,
         /// so the effective URL it becomes is marked again, and <c>%{url_effective}</c> writes
-        /// those bytes back as curl 8.22.0 does (CGR-062, ADR-0824).
+        /// those bytes back as curl 8.22.0 does (CGR-062, ADR-0923).
         /// </summary>
         public string Targeted(string redirectUrl)
         {

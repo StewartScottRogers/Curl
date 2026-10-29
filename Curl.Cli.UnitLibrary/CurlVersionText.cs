@@ -30,7 +30,7 @@ public static class CurlVersionText
     /// <summary>
     /// The fourth line: the curl features the code gives evidence for, in curl's order (alphabetical,
     /// ignoring case): the line for Linux and macOS, the OpenSSL reference build. <see cref="WindowsFeaturesLine"/>
-    /// is the Windows line, which drops <c>GSS-API</c>, <c>HTTP2</c>, <c>HTTPSRR</c> and <c>SSLS-EXPORT</c>
+    /// is the Windows line, which drops <c>GSS-API</c>, <c>HTTP2</c> and <c>SSLS-EXPORT</c>
     /// and adds <c>SSPI</c>. ADR-0021's four, plus <c>brotli</c> and <c>libz</c> now that the registered
     /// HTTP handler decodes <c>br</c>, <c>gzip</c> and <c>deflate</c> bodies, and <c>HTTP2</c> off Windows
     /// now that <c>--http2</c> is accepted (ADR-0141, Decision 5), and <c>GSS-API</c> off Windows, and
@@ -38,25 +38,25 @@ public static class CurlVersionText
     /// (ADR-0142, ADR-0176), <c>NTLM</c> on every platform now that <c>--ntlm</c> is (ADR-0181).
     /// No <c>HTTP3</c>: the OpenSSL reference build has no QUIC library, so it lists no <c>HTTP3</c> and refuses <c>--http3</c> and <c>--http3-only</c>, as Curl does unless the parse reads as a QUIC build (ADR-0144, ADR-0451, ADR-0521, ADR-0540, BL-2330, BL-2332).
     /// No <c>TLS-SRP</c>: curl 8.22.0 dropped TLS-SRP, so its <c>lib/version.c</c> lists it no more (ADR-0480, BL-2152).
-    /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>HTTPSRR</c>, <c>IDN</c>,
-    /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment).
-    /// No <c>ECH</c>: no reference build lists it, since curl builds ECH only on request, and <c>--ech</c> is refused as every reference build refuses it (ADR-0448, ADR-0520, ADR-0822).
+    /// BL-1417's audit added <c>alt-svc</c>, <c>HSTS</c>, <c>HTTPS-proxy</c>, <c>IDN</c>,
+    /// <c>PSL</c>, <c>UnixSockets</c> and <c>zstd</c>, each with evidence in the code (ADR-0021 amendment). No <c>HTTPSRR</c>: neither reference build lists it, though Curl's HTTPS records still work when asked for (ADR-0856, ADR-0957).
+    /// No <c>ECH</c>: no reference build lists it, since curl builds ECH only on request, and <c>--ech</c> is refused as every reference build refuses it (ADR-0448, ADR-0520, ADR-0918).
     /// <c>threadsafe</c> on every platform, after <c>SSL</c> (and <c>SSPI</c>) as both reference builds list it,
     /// because Curl's process-wide set-up is thread-safe (ADR-0444, BL-1828).
     /// <c>SSLS-EXPORT</c> off Windows, after <c>SSL</c>, as the OpenSSL reference build lists it, because
     /// <c>--ssl-sessions</c> loads and saves TLS session tickets there (ADR-0319, ADR-0519, BL-2331); the
     /// Schannel build refuses <c>--ssl-sessions</c> (ADR-0397), so <see cref="WindowsFeaturesLine"/> leaves it out.
     /// </summary>
-    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy HTTPSRR IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
+    public const string FeaturesLine = "Features: alt-svc AsynchDNS brotli GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz NTLM PSL SPNEGO SSL SSLS-EXPORT threadsafe UnixSockets zstd";
 
     /// <summary>
     /// The fourth line on Windows: <see cref="FeaturesLine"/> with <c>SSPI</c> after <c>SSL</c>, as the
     /// Schannel reference build lists it, because NTLM, Negotiate and Kerberos answer through SSPI on
     /// Windows (ADR-0142) and the features must say so (ADR-0439, BL-1796), and without <c>ECH</c>, which
-    /// the Schannel reference build does not list, refusing <c>--ech</c> as it does (ADR-0448, ADR-0822), and
+    /// the Schannel reference build does not list, refusing <c>--ech</c> as it does (ADR-0448, ADR-0918), and
     /// without <c>GSS-API</c>, which the Schannel reference build does not list because Negotiate and
-    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), without <c>HTTP2</c> or <c>HTTPSRR</c>, which the
-    /// Schannel reference build does not list, though Curl's own HTTP/2 and HTTPS records still work there (ADR-0808, BL-3359), and without
+    /// Kerberos answer through SSPI there (ADR-0449, BL-1823), without <c>HTTP2</c>, which the
+    /// Schannel reference build does not list, though Curl's own HTTP/2 still works there (ADR-0808, BL-3359), and without
     /// <c>HTTP3</c>, which the Schannel reference build does not list, though <c>--http3</c> still works
     /// (ADR-0451, BL-1825).
     /// </summary>

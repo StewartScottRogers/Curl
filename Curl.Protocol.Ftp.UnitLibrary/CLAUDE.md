@@ -14,7 +14,7 @@ part-way when the size is unknown (BL-638), `-z` and `-R` through `MDTM`
 (`FtpTimeCondition`, `FtpModificationTime`, ADR-0323's BL-637 addendum), and uploads `-T` with `STOR`, or `APPE`
 for `-C` or `-a` (ADR-0323's BL-439 addendum; `-a`, BL-633), converting LF to CRLF under `--crlf`, and for an ASCII upload off Windows
 (`FtpUploadLineEndings`, BL-1957), writes an ASCII download's (a listing, `-B`, `;type=a`)
-CRLF and lone CR as LF off Windows (`FtpDownloadLineEndings`, ADR-0818, BL-3553),
+CRLF and lone CR as LF off Windows (`FtpDownloadLineEndings`, ADR-0905, BL-3553),
 sends `TYPE A` under `-B` or a `;type=a` URL suffix (`FtpTypeCode`; an ASCII download sends no
 `SIZE` or `REST`, BL-633, and a download under `--ignore-content-length` no `SIZE`, BL-1982), and honours `--disable-epsv`,
 `--no-ftp-skip-pasv-ip`, `--ftp-method`, `--ftp-create-dirs`, `-l`, `-X` (sent in place of `LIST` or `NLST` for a

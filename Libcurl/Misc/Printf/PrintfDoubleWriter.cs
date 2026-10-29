@@ -35,7 +35,7 @@ internal static class PrintfDoubleWriter
     /// <returns>The formatted field.</returns>
     internal static string Format(double number, PrintfFlags flags, int width, int precision)
     {
-        string sign = double.IsNegative(number) ? "-"
+        string sign = double.IsNegative(number) && !double.IsNaN(number) ? "-"
             : (flags & PrintfFlags.ShowSign) != 0 ? "+"
             : (flags & PrintfFlags.Space) != 0 ? " "
             : string.Empty;

@@ -12,7 +12,7 @@ Windows) with a `CURLOPT_SOCKOPTFUNCTION` and no `CURLOPT_OPENSOCKETFUNCTION`: t
 real socket `cf_socket_open` made before the connect (`getsockopt(SO_TYPE)` works on it);
 `CURL_SOCKOPT_ERROR` makes no connection (exit 42); `CURL_SOCKOPT_ALREADY_CONNECTED` skips the connect,
 so the first send on the unconnected socket fails (exit 55) and the server sees no connection.
-Since ADR-0818 the callbacks run before each attempt dials, but without an open-socket callback the
+Since ADR-0903 the callbacks run before each attempt dials, but without an open-socket callback the
 socket-option callback got an engine number from `CurlSocketHandles` (`setsockopt` on it fails) and
 `AlreadyConnected` was ignored, the dialer connecting its own socket.
 

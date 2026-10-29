@@ -22,8 +22,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadCappedAsync(script, 3);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (3) with 3 bytes", 3)), outcome.Result);
         Diagnostics.AssertBytes("output", Bytes("hel"), outcome.Output);
         CollectionAssert.AreEqual(Bytes("hel"), outcome.Output);
         CollectionAssert.AreEqual(Requests(outcome)[^1], SftpServerScript.CloseRequest(4), "the handle is still closed");
@@ -38,8 +38,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadCappedAsync(script, 40000);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40000) with 40000 bytes", 40000), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40000) with 40000 bytes", 40000), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40000) with 40000 bytes", 40000)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.FilesizeExceeded, "Exceeded the maximum allowed file size (40000) with 40000 bytes", 40000)), outcome.Result);
         Diagnostics.AssertBytes("output", (byte[])[.. first, .. second[..10000]], outcome.Output);
         CollectionAssert.AreEqual((byte[])[.. first, .. second[..10000]], outcome.Output);
         Diagnostics.AssertProgress(new[] { (30000L, (long?)null), (40000L, (long?)null) }, outcome.Progress);
@@ -58,8 +58,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadCappedAsync(script, maxFileSize);
 
-        Diagnostics.AssertResult(TransferResult.Success(6), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(6), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Success(6)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(6)), outcome.Result);
         Diagnostics.AssertBytes("output", Bytes(HelloLine), outcome.Output);
         CollectionAssert.AreEqual(Bytes(HelloLine), outcome.Output);
     }

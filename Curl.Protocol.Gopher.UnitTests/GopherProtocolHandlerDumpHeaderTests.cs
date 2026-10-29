@@ -42,7 +42,7 @@ public sealed class GopherProtocolHandlerDumpHeaderTests
 
         Diagnostics.Assert("result", TransferResult.Success(MeasuredReply.Length), result);
         Diagnostics.Diff("writes", DiagnosticText.Lines(["dump:sel", "dump:\r\n", "output:" + MeasuredReply]), DiagnosticText.Lines(writes));
-        Assert.AreEqual(TransferResult.Success(MeasuredReply.Length), result);
+        Assert.AreEqual(TransferResult.Success(MeasuredReply.Length), result with { Report = null });
         CollectionAssert.AreEqual(new[] { "dump:sel", "dump:\r\n", "output:" + MeasuredReply }, writes);
     }
 

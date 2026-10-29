@@ -123,6 +123,32 @@ internal sealed class HttpLineReader(IConnection connection)
     }
 
     /// <summary>
+    /// Reads until a byte follows the first line feed, or the peer closes.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels every read.</param>
+    /// <returns><see langword="true" /> when a byte follows the first line feed.</returns>
+    /// <exception cref="HttpTransferException">
+    /// The bytes reached <see cref="MaximumLineLength" /> with no line feed (exit 100) or a read failed (exit 56).
+    /// </exception>
+    internal async ValueTask<bool> HasBytesAfterFirstLineAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            int lineFeed = Array.IndexOf(buffer, (byte)'\n', start, end - start);
+            if (lineFeed >= 0 && lineFeed + 1 < end)
+            {
+                return true;
+            }
+
+            RejectTooLong(end - start);
+            if (!await FillAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
     /// Takes every byte read past the last line returned.
     /// </summary>
     /// <returns>The bytes, possibly none.</returns>

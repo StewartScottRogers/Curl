@@ -5,7 +5,7 @@
 .DESCRIPTION
     Downloads the source archive of curl at -Tag from GitHub, then replaces every test* file
     in this folder with the test* files of tests/data at that tag as test*.curltest, every
-    file in certs\ with the files of tests/certs at that tag except its build files
+    file in certs/ with the files of tests/certs at that tag except its build files
     (Makefile.*, CMakeLists.txt) and dot files, and COPYING with curl's
     COPYING at that tag, plus the extra folders it names below (docs, include, src, and lib/libcurl.def, lib/optiontable.pl,
     lib/easyoptions.c and projects/OS400/ccsidcurl.c for the source-analysis cases, and configure.ac, m4, CMakeLists.txt, the lib and src C sources and every Markdown file for cases 1165 and 1275). Files are written byte for byte; the .gitattributes beside them marks
@@ -19,7 +19,7 @@
     The curl release tag, as named in https://github.com/curl/curl/tags, e.g. curl-8_22_0.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File Update-UpstreamTestData.ps1 -Tag curl-8_22_0
+    pwsh -NoProfile -File Update-UpstreamTestData.ps1 -Tag curl-8_22_0
 #>
 [CmdletBinding()]
 param(
@@ -40,9 +40,12 @@ try {
     Invoke-WebRequest -Uri "https://github.com/curl/curl/archive/refs/tags/$Tag.tar.gz" -OutFile $archive -UseBasicParsing
 
     $sourceRoot = "curl-$Tag"
-    # Windows' own bsdtar: a Git Bash GNU tar earlier on PATH reads "C:\..." as a remote host.
-    $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
-    if (-not (Test-Path -LiteralPath $tar)) { $tar = 'tar' }
+    # On Windows use its own bsdtar: a Git Bash GNU tar earlier on PATH reads "C:\..." as a remote host.
+    $tar = 'tar'
+    if ($IsWindows) {
+        $windowsTar = Join-Path $env:SystemRoot 'System32/tar.exe'
+        if (Test-Path -LiteralPath $windowsTar) { $tar = $windowsTar }
+    }
     & $tar -xzf $archive -C $workFolder "$sourceRoot/COPYING" "$sourceRoot/tests/data" "$sourceRoot/tests/certs" "$sourceRoot/docs/options-in-versions" "$sourceRoot/docs/VERSIONS.md" "$sourceRoot/docs/cmdline-opts" "$sourceRoot/src/tool_writeout.c" "$sourceRoot/src/tool_getparam.c" "$sourceRoot/src/tool_listhelp.c" "$sourceRoot/docs/libcurl" "$sourceRoot/include/curl" "$sourceRoot/lib/libcurl.def" "$sourceRoot/lib/optiontable.pl" "$sourceRoot/lib/easyoptions.c" "$sourceRoot/projects/OS400/ccsidcurl.c"
     if ($LASTEXITCODE -ne 0) { throw "tar could not extract $sourceRoot from $archive." }
 
@@ -63,10 +66,12 @@ try {
     Copy-Item -LiteralPath (Join-Path $workFolder "$sourceRoot/COPYING") -Destination (Join-Path $destination 'COPYING') -Force
 
     # The files test1165.pl and test1275.pl read (BL-3407): configure.ac, m4/*.m4, CMakeLists.txt, lib/curl_config-cmake.h.in,
+    # GNU tar (Linux) needs --wildcards to read member patterns as globs; bsdtar (Windows, macOS) always does.
+    $wildcardOption = @(if ((& $tar --version | Select-Object -First 1) -match 'GNU tar') { '--wildcards' })
     # the lib and src C sources (*.c, *.h) and every Markdown file of the tree, at the same relative paths.
-    & $tar -xzf $archive -C $workFolder --include "$sourceRoot/*.md" --include "$sourceRoot/lib/*" --include "$sourceRoot/src/*" --include "$sourceRoot/m4/*" --include "$sourceRoot/configure.ac" --include "$sourceRoot/CMakeLists.txt"
+    & $tar -xzf $archive -C $workFolder $wildcardOption "$sourceRoot/*.md" "$sourceRoot/lib/*" "$sourceRoot/src/*" "$sourceRoot/m4/*" "$sourceRoot/configure.ac" "$sourceRoot/CMakeLists.txt"
     if ($LASTEXITCODE -ne 0) { throw "tar could not extract the configure, C source and Markdown files from $archive." }
-    $sourceRootFull = (Join-Path $workFolder $sourceRoot).TrimEnd('\') + '\'
+    $sourceRootFull = (Join-Path $workFolder $sourceRoot).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
     $scanFiles = @(Get-ChildItem -LiteralPath (Join-Path $workFolder $sourceRoot) -File -Recurse | Where-Object {
         $relative = $_.FullName.Substring($sourceRootFull.Length).Replace('\', '/')
         $relative -eq 'configure.ac' -or $relative -eq 'CMakeLists.txt' -or $relative -eq 'lib/curl_config-cmake.h.in' -or
@@ -136,7 +141,7 @@ try {
 
     # The files the libcurl table check scripts test1119.pl, test1139.pl, test1175.pl, test1177.pl, test1222.pl,
     # test1477.pl and test1488.pl open (BL-2990): docs/libcurl (symbols-in-versions and the *.md pages, with
-    # opts\*.md) and include/curl/*.h, at the same relative paths. curl_version_info.3, which test1177.pl reads,
+    # opts/*.md) and include/curl/*.h, at the same relative paths. curl_version_info.3, which test1177.pl reads,
     # is generated from curl_version_info.md at upstream's build time and is not vendored; lib/version.c is
     # not vendored either, because Libcurl's tables stand for it.
     $libcurlDocsDestination = Join-Path $docsDestination 'libcurl'
@@ -154,7 +159,7 @@ try {
     foreach ($libcurlOptionDoc in $upstreamLibcurlOptionDocs) {
         Copy-Item -LiteralPath $libcurlOptionDoc.FullName -Destination (Join-Path $libcurlOptsDestination $libcurlOptionDoc.Name)
     }
-    $includeDestination = Join-Path $destination 'include\curl'
+    $includeDestination = Join-Path $destination 'include/curl'
     New-Item -ItemType Directory -Path $includeDestination -Force | Out-Null
     Get-ChildItem -LiteralPath $includeDestination -File | Remove-Item -Force
     $upstreamHeaders = @(Get-ChildItem -LiteralPath (Join-Path $workFolder "$sourceRoot/include/curl") -File -Filter '*.h')

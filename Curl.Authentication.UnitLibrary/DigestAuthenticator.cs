@@ -12,7 +12,7 @@ namespace Curl.Authentication;
 /// and SHA-512-256, their <c>-sess</c> variants, <c>qop=auth</c> and <c>auth-int</c>, and
 /// <c>userhash</c>. Matching the Schannel build, the challenge is read as SSPI reads it
 /// (<see cref="DigestSspiChallenge" />) and one SSPI refuses, such as a SHA-256 or SHA-512-256
-/// one, fails with exit 94 (ADR-0791, BL-3606).
+/// one, fails with exit 94 (ADR-0873, BL-3606).
 /// </summary>
 /// <param name="credentialEncoding">
 /// The encoding the user name and password are hashed and sent in; see
@@ -28,7 +28,7 @@ namespace Curl.Authentication;
 /// <see langword="null" />. It never answers before a challenge, as curl does not. Which
 /// scheme to answer when several are offered and allowed is decided by
 /// <see cref="RankedHttpAuthenticator" />. Keeping no
-/// state (ADR-0014), every answer to a challenge is the first for its nonce: <c>nc=00000001</c>.
+/// state (ADR-0014), every answer to a challenge is the first for its nonce: <c>nc=00000001</c>, except under <c>--anyauth</c> to the origin, where curl 8.22.0 has already made the Digest value once while picking the scheme and sends <c>nc=00000002</c> (BL-3897).
 /// An answer sent again on a request that keeps it (<see cref="RepeatAuthorization" />) is
 /// read back from the value as sent and counted on, as curl counts its kept nonce (BL-869).
 /// <c>auth-int</c> hashes an empty body, as curl does whatever the body. The algorithm and qop
@@ -49,13 +49,15 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
 
     private const uint FirstNonceCount = 1;
 
+    private const uint AnyAuthNonceCount = 2;
+
     private const string LoginDeniedMessage = "Login denied";
 
     /// <inheritdoc />
     /// <exception cref="HttpAuthenticationFailedException">
     /// <c>matchesSspiBuild</c> is set and SSPI refuses the challenge (<see cref="DigestSspiChallenge" />)
     /// or a user name with a control character: exit 94; or the user name is empty: exit 67,
-    /// "Login denied", as curl's Schannel build (ADR-0791, BL-3606).
+    /// "Login denied", as curl's Schannel build (ADR-0873, BL-3606).
     /// </exception>
     public string? CreateAuthorization(HttpAuthRequest request, IReadOnlyList<string> challenges)
     {
@@ -119,7 +121,7 @@ public sealed class DigestAuthenticator(Encoding credentialEncoding, Func<string
     private string CreateFirstAnswer(DigestChallenge challenge, string userName, string? realm, NetworkCredential credential, HttpAuthRequest request)
     {
         log.DigestParametersChosen(challenge.AlgorithmName, challenge.Qop);
-        return SchemeName + " " + CreateResponse(challenge, userName, realm, credential.Password, request, createClientNonce(), FirstNonceCount);
+        return SchemeName + " " + CreateResponse(challenge, userName, realm, credential.Password, request, createClientNonce(), request is { AllowedSchemes: HttpAuthSchemes.Any, IsProxy: false } ? AnyAuthNonceCount : FirstNonceCount);
     }
 
     /// <summary>

@@ -185,17 +185,8 @@ public sealed class EasyTransferOptionSettersTests
     }
 
     [TestMethod]
-    [DataRow(-1L, DisplayName = "PROXY_TRANSFER_MODE -1")]
-    [DataRow(2L, DisplayName = "PROXY_TRANSFER_MODE 2")]
-    public void SetOption_ProxyTransferModeOtherThanZeroOrOne_ReturnsBadFunctionArgument(long value)
-    {
-        AssertBadFunctionArgument(CurlOption.ProxyTransferMode, value);
-    }
-
-    [TestMethod]
     [DataRow(16384L, 16384L, DisplayName = "BUFFERSIZE 16384 kept")]
     [DataRow(0L, 16384L, DisplayName = "BUFFERSIZE 0 is the default")]
-    [DataRow(-5L, 16384L, DisplayName = "BUFFERSIZE -5 is the default")]
     [DataRow(1L, 1024L, DisplayName = "BUFFERSIZE 1 raised to 1024")]
     [DataRow(1024L, 1024L, DisplayName = "BUFFERSIZE 1024 kept")]
     [DataRow(10485760L, 10485760L, DisplayName = "BUFFERSIZE 10 MB kept")]

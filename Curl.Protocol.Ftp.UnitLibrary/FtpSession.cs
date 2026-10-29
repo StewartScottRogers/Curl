@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Protocol.Ftp;
@@ -276,6 +278,12 @@ internal sealed class FtpSession(
 
     private long bytesTransferred;
 
+    /// <summary>When the connect phase ended and the transfer's own commands began, curl's <c>TIMER_PRETRANSFER</c>.</summary>
+    private long? connectPhaseEnded;
+
+    /// <summary>When the first byte of a download arrived on the data connection, curl's <c>TIMER_STARTTRANSFER</c>.</summary>
+    private long? firstByteReceived;
+
     /// <summary>The bytes an upload of a known size has to send, or <see langword="null" /> for a download or an upload of unknown size.</summary>
     private long? uploadSize;
 
@@ -344,7 +352,7 @@ internal sealed class FtpSession(
         TransferResult result;
         try
         {
-            result = (reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection())
+            result = await RunConnectPhaseAsync().ConfigureAwait(false)
                 ?? await TransferPathAsync().ConfigureAwait(false);
         }
         catch (FtpControlConversationFailedException lost)
@@ -363,10 +371,36 @@ internal sealed class FtpSession(
                 FtpEntryPath = entryPath,
                 DownloadSize = uploaded ? 0 : result.BytesTransferred,
                 UploadSize = uploaded ? result.BytesTransferred : 0,
+                RequestSize = uploaded ? result.BytesTransferred : 0,
+                Timings = TimingsAt(context.TimeProvider.GetTimestamp()),
             },
             SourceLastWriteTimeUtc = result.IsSuccess && context.RemoteTime ? modifiedUtc : null,
         };
     }
+
+    /// <summary>
+    /// Runs curl's connect phase on a new control connection, or takes up a kept one, and
+    /// notes when it ended unless it failed.
+    /// </summary>
+    private async ValueTask<TransferResult?> RunConnectPhaseAsync()
+    {
+        TransferResult? failed = reused is null ? await ConnectAsync().ConfigureAwait(false) : ResumeKeptConnection();
+        if (failed is null)
+        {
+            connectPhaseEnded = context.TimeProvider.GetTimestamp();
+        }
+
+        return failed;
+    }
+
+    /// <summary>
+    /// The report's timings, as curl 8.22.0 was measured to fill them for FTP (BL-3962):
+    /// <c>%{time_pretransfer}</c> when the connect phase ended, <c>%{time_starttransfer}</c>
+    /// when a download's first byte arrived, or for an upload or an empty download when the
+    /// transfer <paramref name="completed" />, and neither when the connect phase failed.
+    /// </summary>
+    private TransferTimings TimingsAt(long completed) =>
+        new(TransferStarted, ControlConnectTimings, connectPhaseEnded, null, connectPhaseEnded is null ? null : firstByteReceived ?? completed, completed);
 
     /// <summary>
     /// Runs only curl's connect phase - the greeting, <c>AUTH</c>, the login, <c>PBSZ</c>,
@@ -531,6 +565,18 @@ internal sealed class FtpSession(
     internal bool StopsBeforeEntryPath { get; init; }
 
     /// <summary>
+    /// Gets the moment the transfer began, before the control connection was opened: the
+    /// report's <see cref="TransferTimings.Started" />, the zero of every <c>%{time_*}</c>.
+    /// </summary>
+    internal long TransferStarted { get; init; }
+
+    /// <summary>
+    /// Gets the control connection's name resolution and connect times, the source of
+    /// <c>%{time_namelookup}</c>, <c>%{time_connect}</c> and <c>%{time_appconnect}</c>.
+    /// </summary>
+    internal ConnectTimings? ControlConnectTimings { get; init; }
+
+    /// <summary>
     /// Under <see cref="StopsBeforeEntryPath" />, waits without sending <c>PWD</c> until the transfer is
     /// cancelled or the connect phase times out, as upstream's <c>ftp_state_pwd</c> leaves the state machine
     /// where it is; otherwise carries straight on.
@@ -602,7 +648,7 @@ internal sealed class FtpSession(
         {
             230 when !authStillRequired => LoggedIn(),
             220 or 230 => await SecureControlAsync().ConfigureAwait(false) ?? await LogInAsync().ConfigureAwait(false),
-            _ => TransferResult.Failure(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
+            _ => FailClosingAfterTraceEnds(CurlExitCode.WeirdServerReply, FtpTransferMessages.UnexpectedGreeting(greeting.Code)),
         };
     }
 
@@ -759,7 +805,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult?> LogInAsync()
     {
-        FtpReply user = await ExchangeAsync("USER " + (context.Credentials?.UserName ?? AnonymousUser)).ConfigureAwait(false);
+        FtpReply user = await ExchangeAsync("USER " + CommandTextOfCredential(context.Credentials?.UserName ?? AnonymousUser)).ConfigureAwait(false);
         return await AnswerLoginReplyAsync(user, passwordSent: false).ConfigureAwait(false);
     }
 
@@ -788,7 +834,7 @@ internal sealed class FtpSession(
 
     private async ValueTask<TransferResult?> SendPasswordAsync()
     {
-        FtpReply pass = await ExchangeAsync("PASS " + (context.Credentials?.Password ?? AnonymousPassword)).ConfigureAwait(false);
+        FtpReply pass = await ExchangeAsync("PASS " + CommandTextOfCredential(context.Credentials?.Password ?? AnonymousPassword)).ConfigureAwait(false);
         return await AnswerLoginReplyAsync(pass, passwordSent: true).ConfigureAwait(false);
     }
 
@@ -841,6 +887,75 @@ internal sealed class FtpSession(
     /// second command follow it (BL-2162).
     /// </summary>
     private static bool HasControlByte(string? value) => value is not null && value.Any(character => character < ' ');
+
+    /// <summary>The code page of Windows-1252, the ANSI code page of an English Windows system.</summary>
+    private const int Windows1252CodePage = 1252;
+
+    /// <summary>The first surrogate that stands for one byte of a credential, U+DC00 + 0x80 (CGR-053).</summary>
+    private const char FirstEscapedByte = '\uDC80';
+
+    /// <summary>The last surrogate that stands for one byte of a credential, U+DC00 + 0xFF.</summary>
+    private const char LastEscapedByte = '\uDCFF';
+
+    /// <summary>This host's system ANSI code page, or <see langword="null" /> on Linux and macOS.</summary>
+    private static readonly Encoding? SystemAnsiCodePage = ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0));
+
+    /// <summary>
+    /// Turns a user name or password into the text <see cref="FtpControlChannel" /> sends, whose
+    /// Latin-1 bytes are the bytes this platform's curl sends (BL-3855).
+    /// </summary>
+    private static string CommandTextOfCredential(string credential) =>
+        CommandTextOfCredential(credential, OperatingSystem.IsWindows(), SystemAnsiCodePage);
+
+    /// <summary>
+    /// Reads the host's system ANSI code page, asking a second time when the first answer is
+    /// <see langword="null" />: Windows fails one of several first calls made at once (BL-1200).
+    /// </summary>
+    /// <param name="readCodePageZero">Asks the code page provider for code page 0.</param>
+    /// <returns>The system ANSI code page, or <see langword="null" /> when the host has none.</returns>
+    internal static Encoding? ReadSystemAnsiCodePage(Func<Encoding?> readCodePageZero) =>
+        readCodePageZero() ?? readCodePageZero();
+
+    /// <summary>
+    /// Turns a user name or password, held as the engine holds credentials (ADR-0022), into
+    /// the text whose Latin-1 bytes are the bytes the platform's curl sends in <c>USER</c> and
+    /// <c>PASS</c>: the system ANSI code page on Windows (Windows-1252 when there is none),
+    /// and UTF-8 elsewhere, each surrogate U+DC80 to U+DCFF giving back the one byte it stands
+    /// for (CGR-053). Measured with curl 8.22.0 on Windows: <c>ftp://u%C3%A9:p%E2%82%AC%FF@host/</c>
+    /// sends <c>75 C3 A9</c> and <c>70 E2 82 AC FF</c>, and <c>-u ué:p€</c> sends <c>75 E9</c> and
+    /// <c>70 80</c> (BL-3855).
+    /// </summary>
+    /// <param name="credential">The user name or password.</param>
+    /// <param name="isWindows"><see langword="true" /> for the Windows (Schannel) build's bytes.</param>
+    /// <param name="systemAnsiCodePage">The host's system ANSI code page, or <see langword="null" /> when it has none.</param>
+    /// <returns>One character per byte sent, each below U+0100.</returns>
+    internal static string CommandTextOfCredential(string credential, bool isWindows, Encoding? systemAnsiCodePage) =>
+        Encoding.Latin1.GetString(isWindows
+            ? (systemAnsiCodePage ?? CodePagesEncodingProvider.Instance.GetEncoding(Windows1252CodePage)!).GetBytes(credential)
+            : Utf8KeepingEscapedBytes(credential));
+
+    /// <summary>Encodes <paramref name="text" /> as UTF-8, giving each escaping surrogate back its byte.</summary>
+    private static byte[] Utf8KeepingEscapedBytes(ReadOnlySpan<char> text)
+    {
+        ArrayBufferWriter<byte> bytes = new(text.Length + 1);
+        Span<byte> utf8 = stackalloc byte[4];
+        while (!text.IsEmpty)
+        {
+            Rune.DecodeFromUtf16(text, out Rune rune, out int consumed);
+            if (text[0] is >= FirstEscapedByte and <= LastEscapedByte)
+            {
+                bytes.Write([(byte)(text[0] - 0xDC00)]);
+            }
+            else
+            {
+                bytes.Write(utf8[..rune.EncodeToUtf8(utf8)]);
+            }
+
+            text = text[consumed..];
+        }
+
+        return bytes.WrittenSpan.ToArray();
+    }
 
     /// <summary>Logs the login complete and goes on.</summary>
     private TransferResult? LoggedIn()
@@ -1214,7 +1329,7 @@ internal sealed class FtpSession(
     /// whatever the server still sends - a TLS 1.3 session ticket, its own <c>close_notify</c> -
     /// until it closes its side, for at most curl 8.22.0's two-second shutdown timeout. A socket
     /// closed with unread bytes is reset on Windows, and the reset throws away the upload the
-    /// server has not read yet (CGR-006, ADR-0816).
+    /// server has not read yet (CGR-006, ADR-0891).
     /// </summary>
     private async ValueTask CloseUploadDataConnectionAsync(IConnection data)
     {
@@ -1362,8 +1477,19 @@ internal sealed class FtpSession(
     {
         FtpReply rest = await ExchangeAsync("REST 0").ConfigureAwait(false);
         return await WriteHeaderAsync(rest.Code == 350 ? FtpHeadHeaderLines.AcceptRanges : null).ConfigureAwait(false)
-            ?? await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
-            ?? await QuitAndSucceedAsync().ConfigureAwait(false);
+            ?? await EndHeadAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends a file's <c>-I</c> answer as curl 8.22.0's <c>ftp_done</c> does: the <c>-v</c> line
+    /// naming the remembered directory, the quotes, <c>QUIT</c>, then the line saying the
+    /// connection is left intact (CGR-232).
+    /// </summary>
+    private async ValueTask<TransferResult> EndHeadAsync()
+    {
+        ReportRememberedDirectory();
+        return await SendQuotesAsync(quotes.BeforeTransfer, FtpQuoteStage.BeforeTransfer).ConfigureAwait(false)
+            ?? await QuitAndKeepConnectionAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1455,7 +1581,9 @@ internal sealed class FtpSession(
 
     /// <summary>
     /// Binds a port on the <c>-P</c> address and announces it: <c>EPRT</c> first, unless
-    /// <c>--disable-eprt</c> on IPv4, then on IPv4 a fresh port with <c>PORT</c> when
+    /// <c>--disable-eprt</c> or an earlier refusal with both the <c>-P</c> address and the
+    /// control connection on IPv4 (curl 8.22.0 enables <c>EPRT</c> again on an IPv6 control
+    /// connection, CGR-166), then on IPv4 a fresh port with <c>PORT</c> when
     /// <c>EPRT</c> was skipped or refused. IPv6 has no <c>PORT</c>, so a refused <c>EPRT</c>
     /// there is exit 30 after <c>QUIT</c>. A <c>-P</c> value that names a network interface
     /// is that interface's address, and exit 30 after <c>QUIT</c> when it has none of the
@@ -1483,7 +1611,7 @@ internal sealed class FtpSession(
     private async ValueTask<TransferResult?> AnnounceActivePortAsync(IPAddress address, FtpPortArgument argument)
     {
         bool ipv6 = address.AddressFamily == AddressFamily.InterNetworkV6;
-        if ((context.FtpUseEprt && !eprtRefused) || ipv6)
+        if ((context.FtpUseEprt && !eprtRefused) || ipv6 || ControlIsIpv6)
         {
             if (await ListenAsync(address, argument).ConfigureAwait(false) is { } failed)
             {
@@ -1571,6 +1699,12 @@ internal sealed class FtpSession(
     /// <see langword="null" /> when it is unknown.
     /// </summary>
     private IPAddress? ControlAddress => Unmapped((controlLocalEndPoint as IPEndPoint)?.Address);
+
+    /// <summary>
+    /// Whether the control connection is IPv6, curl's <c>conn-&gt;bits.ipv6</c>, on which
+    /// curl 8.22.0 sends <c>EPRT</c> despite <c>--disable-eprt</c> or an earlier refusal.
+    /// </summary>
+    private bool ControlIsIpv6 => ControlAddress?.AddressFamily == AddressFamily.InterNetworkV6;
 
     /// <summary>
     /// The address <paramref name="argument" /> names, an IPv4-mapped one as plain IPv4: the
@@ -1718,16 +1852,16 @@ internal sealed class FtpSession(
     /// after <c>QUIT</c> when it does not, and a failed accept's exit code after <c>QUIT</c>.
     /// A 4xx or 5xx reply already read behind the transfer command's <c>150</c> (a server's
     /// <c>425</c> or <c>421</c> for a data connection it could not open) is read and ends the
-    /// wait with exit 10 after <c>QUIT</c>, as curl 8.21.0 does (upstream tests 1206 and 1207, BL-1978),
+    /// wait with exit 10 after <c>QUIT</c>, as curl does (upstream tests 1206 and 1207, BL-1978),
     /// and so does one that arrives while the wait goes on (CGR-099).
     /// </summary>
     private async ValueTask<TransferResult?> AcceptDataConnectionAsync(IPendingConnection pending)
     {
         context.Events.ReportInfo(FtpTransferMessages.DataConnectionNotAvailable);
         trace.AcceptPending();
-        context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
         if (control.HasBufferedNegativeReply)
         {
+            context.Events.ReportInfo(FtpTransferMessages.ControlConnectionHasDataWhileAwaitingServerConnect);
             return await FailOnNegativeReplyAwaitingConnectAsync().ConfigureAwait(false);
         }
 
@@ -1757,6 +1891,7 @@ internal sealed class FtpSession(
             return await QuitAndFailAsync(accepted.ExitCode, accepted.ErrorMessage!).ConfigureAwait(false);
         }
 
+        context.Events.ReportInfo(FtpTransferMessages.ReadyToAccept);
         ReportAccepted(dataConnection.RemoteEndPoint, (IPEndPoint)pending.LocalEndPoint);
         log.ActiveDataAccepted();
         return null;
@@ -1791,17 +1926,16 @@ internal sealed class FtpSession(
     /// </summary>
     private async ValueTask<TransferResult> FailOnNegativeReplyAwaitingConnectAsync()
     {
-        context.Events.ReportInfo(FtpTransferMessages.NegativeReplyWhileAwaitingServerConnect);
         await ReadReplyIgnoringItsFailureAsync().ConfigureAwait(false);
+        ReportRememberedDirectory();
         if (expectedSize is { } expected && expected != bytesTransferred)
         {
-            ReportRememberedDirectory();
             string partial = FtpTransferMessages.ReceivedOnlyPartialFile(bytesTransferred);
             context.Events.ReportInfo(partial);
             return await QuitAndFailWithoutEchoAsync(CurlExitCode.FtpAcceptFailed, partial).ConfigureAwait(false);
         }
 
-        return await QuitAndFailAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
+        return await QuitAndFailWithoutEchoAsync(CurlExitCode.FtpAcceptFailed, FtpTransferMessages.ServerFailedToConnectToDataPort).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1829,7 +1963,7 @@ internal sealed class FtpSession(
         context.Events.ReportInfo(FtpTransferMessages.ConnectionAccepted);
         if (remoteEndPoint is IPEndPoint remote)
         {
-            context.Events.ReportInfo(FtpTransferMessages.SecondConnectionEstablished(remote, listening));
+            context.Events.ReportInfo(FtpTransferMessages.SecondConnectionEstablished(context.Url.IdnHost, remote, listening));
         }
     }
 
@@ -2170,7 +2304,7 @@ internal sealed class FtpSession(
     {
         context.Events.ReportInfo(FtpTransferMessages.ResumingFrom(offset));
         FtpReply rest = await ExchangeAsync("REST " + offset.ToString(System.Globalization.CultureInfo.InvariantCulture)).ConfigureAwait(false);
-        return rest.Code == 350 ? null : TransferResult.Failure(CurlExitCode.FtpCouldntUseRest, FtpTransferMessages.CouldNotUseRest);
+        return rest.Code == 350 ? null : FailShuttingDown(CurlExitCode.FtpCouldntUseRest, FtpTransferMessages.CouldNotUseRest);
     }
 
     /// <summary>
@@ -2230,6 +2364,24 @@ internal sealed class FtpSession(
         return await QuitAndFailAsync(exitCode, FtpTransferMessages.RetrieveRefused(code)).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes bytes read from the data connection to the output, noting when the first of them
+    /// arrived (<c>%{time_starttransfer}</c>, BL-3962) and reporting the progress, or returns the
+    /// failed write's result.
+    /// </summary>
+    private async ValueTask<TransferResult?> WriteReceivedAsync(ReadOnlyMemory<byte> received)
+    {
+        firstByteReceived ??= context.TimeProvider.GetTimestamp();
+        if (await WriteOutputAsync(lineEndings.Convert(received)).ConfigureAwait(false) is { } writeFailed)
+        {
+            return writeFailed;
+        }
+
+        bytesTransferred += received.Length;
+        context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
+        return null;
+    }
+
     private async ValueTask<TransferResult?> CopyDataAsync()
     {
         IConnection data = dataConnection!;
@@ -2254,13 +2406,11 @@ internal sealed class FtpSession(
                 return null;
             }
 
-            if (await WriteOutputAsync(lineEndings.Convert(buffer.AsMemory(0, allowed))).ConfigureAwait(false) is { } writeFailed)
+            if (await WriteReceivedAsync(buffer.AsMemory(0, allowed)).ConfigureAwait(false) is { } writeFailed)
             {
                 return writeFailed;
             }
 
-            bytesTransferred += allowed;
-            context.Progress.ReportDownloaded(bytesTransferred, expectedSize);
             if (allowed < wanted)
             {
                 return TransferResult.Failure(CurlExitCode.FilesizeExceeded, FtpTransferMessages.MaxFileSizeExceededWhileReading(maxFileSize!.Value, bytesTransferred), bytesTransferred);
@@ -2414,7 +2564,17 @@ internal sealed class FtpSession(
         ReportRememberedDirectory();
         trace.ClosingDataConnection();
         await CloseDataConnectionAsync().ConfigureAwait(false);
-        FtpReply complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead).ConfigureAwait(false);
+        FtpReply complete;
+        try
+        {
+            complete = await ReadReplyAsync(FtpTransferMessages.ControlConnectionLooksDead, FtpTransferMessages.FtpResponseTimeout).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        {
+            // The overall time limit ran out while the end-of-transfer reply was awaited; curl 8.22.0 names the reply (CGR-231).
+            return TransferResult.Failure(CurlExitCode.OperationTimedOut, FtpTransferMessages.FtpResponseTimeout, bytesTransferred);
+        }
+
         trace.TransferReplyRead(complete);
         if (expectedSize is { } expected && bytesTransferred < expected)
         {
@@ -2657,6 +2817,19 @@ internal sealed class FtpSession(
     }
 
     /// <summary>
+    /// Fails as <see cref="FailClosing" /> does, with the state trace's <c>done</c> line between
+    /// the failure's text and <c>closing connection #N</c>, as curl 8.22.0 writes them for a
+    /// greeting other than <c>220</c> (measured with <c>--trace-config ftp</c>, BL-3949).
+    /// </summary>
+    private TransferResult FailClosingAfterTraceEnds(CurlExitCode exitCode, string message)
+    {
+        context.Events.ReportInfo(message);
+        trace.Ended(exitCode);
+        context.Events.ReportInfo(FtpTransferMessages.ClosingConnection(controlName.Number));
+        return TransferResult.Failure(exitCode, message);
+    }
+
+    /// <summary>
     /// Sends each of <paramref name="commands" /> in turn, stopping at the first answered
     /// with 400 or more whose failure is not ignored.
     /// </summary>
@@ -2796,8 +2969,8 @@ internal sealed class FtpSession(
     /// <paramref name="closingMessage" /> and no <c>QUIT</c>, or for no reply within
     /// <see cref="ITransferContext.FtpServerResponseTimeout" /> (exit 28, no <c>QUIT</c>).
     /// </summary>
-    private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached) =>
-        await CheckReplyAsync(ReadReplyWithinServerResponseTimeoutAsync(), closingMessage).ConfigureAwait(false);
+    private async ValueTask<FtpReply> ReadReplyAsync(string closingMessage = FtpTransferMessages.TimeoutReached, string timeoutMessage = FtpTransferMessages.ServerResponseTimeout) =>
+        await CheckReplyAsync(ReadReplyWithinServerResponseTimeoutAsync(timeoutMessage), closingMessage).ConfigureAwait(false);
 
     /// <summary>
     /// Awaits <paramref name="reading" /> and ends the conversation as
@@ -2825,6 +2998,8 @@ internal sealed class FtpSession(
 
         if (reply is null)
         {
+            // No reply could be parsed, so curl has no code to report (CGR-219).
+            lastReplyCode = 0;
             throw Failed(CurlExitCode.RecvError, FtpTransferMessages.ResponseReadingFailed);
         }
 
@@ -2846,12 +3021,12 @@ internal sealed class FtpSession(
     /// is lost; a timer that fires early is waited out, and the control channel's own token
     /// still ends the read.
     /// </summary>
-    private async ValueTask<FtpReply?> ReadReplyWithinServerResponseTimeoutAsync()
+    private async ValueTask<FtpReply?> ReadReplyWithinServerResponseTimeoutAsync(string timeoutMessage)
     {
         Task<FtpReply?> read = control.ReadReplyAsync().AsTask();
         return await CompletesWithinAsync(read, context.FtpServerResponseTimeout).ConfigureAwait(false)
             ? await read.ConfigureAwait(false)
-            : throw Failed(CurlExitCode.OperationTimedOut, FtpTransferMessages.ServerResponseTimeout);
+            : throw Failed(CurlExitCode.OperationTimedOut, timeoutMessage);
     }
 
     /// <summary>

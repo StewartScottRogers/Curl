@@ -83,7 +83,7 @@ internal static class EasyOptionsFromCommandLine
     /// <param name="options">The parsed command line.</param>
     /// <returns>The tool options.</returns>
     internal static EngineToolOptions ToolOptionsOf(CommandLineOptions options) =>
-        new(options.Parallel, options.ParallelImmediate, options.SslSessionsFile, options.MaxTime);
+        new(options.Parallel, options.ParallelImmediate, options.SslSessionsFile, options.MaxTime, TracesTransfer: options.Trace != TraceKind.None);
 
     /// <summary>
     /// The curl tool's own settings one transfer's setup and context read, which libcurl's easy options have no
@@ -250,7 +250,7 @@ internal static class EasyOptionsFromCommandLine
             TcpKeepAlive = options.TcpKeepAlive,
             TcpKeepIdle = keepAliveTimeGiven ? TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.TcpKeepAliveSeconds)) : network.TcpKeepIdle,
             TcpKeepInterval = keepAliveTimeGiven ? TimeSpan.FromSeconds(AtMostTimeSpanSeconds(options.TcpKeepAliveSeconds)) : network.TcpKeepInterval,
-            TcpKeepCount = options.TcpKeepAlive && options.TcpKeepAliveProbeCount > 0 ? (int)options.TcpKeepAliveProbeCount : network.TcpKeepCount,
+            TcpKeepCount = options.TcpKeepAlive && options.TcpKeepAliveProbeCount > 0 ? (int)Math.Min(options.TcpKeepAliveProbeCount, int.MaxValue) : network.TcpKeepCount,
         };
     }
 

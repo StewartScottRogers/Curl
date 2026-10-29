@@ -115,6 +115,10 @@ internal static class HttpRequestHeadFormatter
     /// The transfer's user and password, or <see langword="null" /> for none: the absolute form
     /// of an <c>ftp</c> URL sent to a forward proxy carries them (<see cref="FtpUserInformation" />).
     /// </param>
+    /// <param name="rereadsUrl">
+    /// <see langword="true" /> for the request curl builds by re-reading the URL after a 401: its
+    /// target has the query's escapes in upper case (<see cref="HttpUrlText.OriginTarget(CurlUrl, Encoding, bool)" />).
+    /// </param>
     /// <returns>The head's bytes, ending in the empty line.</returns>
     internal static byte[] Format(
         CurlUrl url,
@@ -128,18 +132,19 @@ internal static class HttpRequestHeadFormatter
         TimeCondition? timeCondition = null,
         HttpRequestFraming? framing = null,
         bool upgradesToH2c = false,
-        NetworkCredential? credentials = null)
+        NetworkCredential? credentials = null,
+        bool rereadsUrl = false)
     {
         options ??= new HttpRequestOptions();
         HttpCustomHeader[] customHeaders = CustomHeadersOf(options.Headers, options);
         HttpCustomHeader[] proxyHeaders = forwardProxy ? CustomHeadersOf(options.ProxyHeaders, options) : [];
         framing = FramingOf(framing, options, customHeaders, noBody);
         StringBuilder head = new();
-        AppendRequestLine(head, framing.Method, url, forwardProxy ? credentials ?? NoCredentials : null, options);
+        AppendRequestLine(head, framing.Method, url, forwardProxy ? credentials ?? NoCredentials : null, options, rereadsUrl);
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
         AppendUnlessOverridden(head, proxyHeaders, "Proxy-Authorization", proxyAuthorization);
-        AppendAuthorization(head, customHeaders, authorization, options.HttpSignature is not null);
+        AppendAuthorization(head, customHeaders, authorization, options);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
@@ -243,8 +248,8 @@ internal static class HttpRequestHeadFormatter
     /// curl copies <c>-X</c> from its <c>argv</c> (CGR-065), the target (<see cref="TargetOf" />)
     /// and the version.
     /// </summary>
-    private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options) =>
-        head.Append(HeadText(method, options)).Append(' ').Append(TargetOf(url, proxiedCredentials, options)).Append(VersionOf(options)).Append("\r\n");
+    private static void AppendRequestLine(StringBuilder head, string method, CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options, bool rereadsUrl) =>
+        head.Append(HeadText(method, options)).Append(' ').Append(TargetOf(url, proxiedCredentials, options, rereadsUrl)).Append(VersionOf(options)).Append("\r\n");
 
     /// <summary>
     /// Gives the request line's target: <see cref="HttpRequestOptions.RequestTarget" />
@@ -256,7 +261,7 @@ internal static class HttpRequestHeadFormatter
     /// measured (BL-186 Notes) sending <c>--request-target</c> in place of both forms, and 8.22.0
     /// on Windows sending <c>--request-target /é</c> as <c>/</c> and the cp1252 byte <c>0xE9</c> (BL-3840).
     /// </summary>
-    private static string TargetOf(CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options)
+    private static string TargetOf(CurlUrl url, NetworkCredential? proxiedCredentials, HttpRequestOptions options, bool rereadsUrl)
     {
         if (options.RequestTarget is { } target)
         {
@@ -264,7 +269,7 @@ internal static class HttpRequestHeadFormatter
         }
 
         return proxiedCredentials is null
-            ? HttpUrlText.OriginTarget(url, options.CommandLineTextEncoding)
+            ? HttpUrlText.OriginTarget(url, options.CommandLineTextEncoding, rereadsUrl)
             : AbsoluteForm(url, proxiedCredentials, options.ProxyTransferType, options.CommandLineTextEncoding);
     }
 
@@ -301,7 +306,7 @@ internal static class HttpRequestHeadFormatter
             return;
         }
 
-        AppendUnlessOverridden(head, customHeaders, TimeConditionHeaderName(timeCondition), HttpConditionDate.Format(timeCondition));
+        AppendUnlessOverridden(head, customHeaders, TimeConditionHeaderName(timeCondition), HttpConditionDate.Format(timeCondition, OperatingSystem.IsWindows()));
     }
 
     /// <summary>
@@ -416,11 +421,13 @@ internal static class HttpRequestHeadFormatter
     /// libcurl's <c>output_auth_headers</c> checks the custom headers for Basic and Bearer alone
     /// (measured, BL-986 Notes). An <c>--httpsig-*</c> request's value is whole header lines,
     /// <c>Signature-Input</c> then <c>Signature</c>, written in the same slot whatever the
-    /// <c>-H</c> values are, as curl 8.22.0's <c>output_auth_headers</c> does (BL-2182).
+    /// <c>-H</c> values are, as curl 8.22.0's <c>output_auth_headers</c> does (BL-2182). An
+    /// <c>-H</c> <c>Authorization</c> value withheld from a redirect to another host still
+    /// counts (<see cref="HttpRequestOptions.AuthorizationHeaderWithheld" />, CGR-076).
     /// </summary>
-    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization, bool isHttpSignature)
+    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization, HttpRequestOptions options)
     {
-        if (isHttpSignature)
+        if (options.HttpSignature is not null)
         {
             AppendLines(head, authorization);
         }
@@ -428,7 +435,7 @@ internal static class HttpRequestHeadFormatter
         {
             AppendAlways(head, "Authorization", authorization);
         }
-        else
+        else if (!options.AuthorizationHeaderWithheld)
         {
             AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
         }

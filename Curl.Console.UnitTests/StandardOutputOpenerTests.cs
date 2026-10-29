@@ -23,7 +23,7 @@ public sealed class StandardOutputOpenerTests
         using MemoryStream console = new();
         Diagnostics.Arrange("output redirected / handle", "False / 0");
 
-        Stream opened = StandardOutputOpener.Open(isOutputRedirected: false, () => console, standardOutputHandleValue: 0);
+        Stream opened = StandardOutputOpener.Open(opensOverHandle: false, () => console, standardOutputHandleValue: 0);
         Diagnostics.Act("opened the console stream", ReferenceEquals(console, opened));
 
         Diagnostics.Assert("opened the console stream", true, ReferenceEquals(console, opened));
@@ -36,7 +36,7 @@ public sealed class StandardOutputOpenerTests
     public void Open_RedirectedToAClosedHandle_OpensAStreamWhoseWritesFail(int handleValue)
     {
         Diagnostics.Arrange("output redirected / handle", $"True / {handleValue}");
-        using Stream opened = StandardOutputOpener.Open(isOutputRedirected: true, () => new MemoryStream(), handleValue);
+        using Stream opened = StandardOutputOpener.Open(opensOverHandle: true, () => new MemoryStream(), handleValue);
         Diagnostics.Act("opened", opened.GetType().Name);
 
         Diagnostics.Assert("opened", nameof(ClosedStandardOutputStream), opened.GetType().Name);
@@ -64,6 +64,36 @@ public sealed class StandardOutputOpenerTests
             Diagnostics.Assert("length after first / second write", "3 / 4", $"{lengthAfterFirstWrite} / {lengthAfterSecondWrite}");
             Assert.AreEqual(3, lengthAfterFirstWrite);
             Assert.AreEqual(4, RandomAccess.GetLength(file));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public void OpenHandle_TwoStreamsOverOneFile_WritesEachAfterTheOther()
+    {
+        string path = Path.Combine(TestContext.TestRunResultsDirectory ?? Path.GetTempPath(), $"{Guid.NewGuid():N}.out");
+        Diagnostics.Arrange("handle", "a new file in the test results directory, opened twice as 1>f 2>&1 shares it");
+        Diagnostics.Arrange("writes", "'out' through the first, then 'err' through the second");
+
+        try
+        {
+            using (SafeFileHandle file = File.OpenHandle(path, FileMode.CreateNew, FileAccess.Write))
+            {
+                using Stream standardOutput = StandardOutputOpener.OpenHandle(file.DangerousGetHandle());
+                using Stream standardError = StandardOutputOpener.OpenHandle(file.DangerousGetHandle());
+
+                standardOutput.Write("out"u8);
+                standardError.Write("err"u8);
+            }
+
+            string written = File.ReadAllText(path);
+            Diagnostics.Act("file", written);
+
+            Diagnostics.Assert("file", "outerr", written);
+            Assert.AreEqual("outerr", written);
         }
         finally
         {
@@ -141,7 +171,10 @@ public sealed class StandardOutputOpenerTests
     public void ReadStandardOutputHandleValue_Windows_AsksWindowsForTheHandle()
     {
         Diagnostics.Arrange("is Windows / Windows answers", "True / 1234");
-        nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(isWindows: true, () => 1234);
+        nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(
+            isWindows: true,
+            () => 1234,
+            _ => throw new AssertFailedException("A descriptor was checked on Windows."));
         Diagnostics.Act("handle value", handleValue);
 
         Diagnostics.Assert("handle value", (nint)1234, handleValue);
@@ -149,16 +182,33 @@ public sealed class StandardOutputOpenerTests
     }
 
     [TestMethod]
-    public void ReadStandardOutputHandleValue_Elsewhere_IsFileDescriptorOne()
+    public void ReadStandardOutputHandleValue_ElsewhereInherited_IsFileDescriptorOne()
     {
-        Diagnostics.Arrange("is Windows", false);
+        Diagnostics.Arrange("is Windows / descriptor 1 inherited", "False / True");
         nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(
             isWindows: false,
-            () => throw new AssertFailedException("Windows was asked for a handle."));
+            () => throw new AssertFailedException("Windows was asked for a handle."),
+            descriptor => descriptor == StandardOutputOpener.UnixStandardOutputFileDescriptor);
         Diagnostics.Act("handle value", handleValue);
 
         Diagnostics.Assert("handle value", (nint)StandardOutputOpener.UnixStandardOutputFileDescriptor, handleValue);
         Assert.AreEqual((nint)StandardOutputOpener.UnixStandardOutputFileDescriptor, handleValue);
+    }
+
+    [TestMethod]
+    public void ReadStandardOutputHandleValue_ElsewhereNotInherited_OpensAStreamWhoseWritesFail()
+    {
+        Diagnostics.Arrange("is Windows / descriptor 1 inherited", "False / False (1>&-, the runtime took the number)");
+        nint handleValue = StandardOutputOpener.ReadStandardOutputHandleValue(
+            isWindows: false,
+            () => throw new AssertFailedException("Windows was asked for a handle."),
+            _ => false);
+        using Stream opened = StandardOutputOpener.OpenHandle(handleValue);
+        Diagnostics.Act("handle value / opened", $"{handleValue} / {opened.GetType().Name}");
+
+        Diagnostics.Assert("handle value / opened", $"-1 / {nameof(ClosedStandardOutputStream)}", $"{handleValue} / {opened.GetType().Name}");
+        Assert.AreEqual((nint)(-1), handleValue);
+        Assert.IsInstanceOfType<ClosedStandardOutputStream>(opened);
     }
 
     [TestMethod]

@@ -76,8 +76,9 @@ public sealed class Cgr036Tests
         using Socket target = Listen();
         using Socket other = Listen();
         using Socket supplied = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        Task<Socket> accepting = other.AcceptAsync();
         await supplied.ConnectAsync(other.LocalEndPoint!);
-        using Socket accepted = await other.AcceptAsync();
+        using Socket accepted = await accepting.WaitAsync(TimeSpan.FromSeconds(30));
         List<string> calls = [];
         SocketCallbackConnector connector = Create(new EasyCallbackOptions
         {
@@ -267,12 +268,41 @@ public sealed class Cgr036Tests
         return listener;
     }
 
-    /// <summary>A loopback port nothing listens on: one the system just handed a socket, now closed.</summary>
+    /// <summary>
+    /// A loopback port nothing listens on: one the system just handed a socket, now closed. It is not held by a bound,
+    /// non-listening socket, because macOS refuses no connect to such a port and the attempt times out (BL-3954).
+    /// </summary>
     private static int ClosedLoopbackPort()
     {
-        using Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return ((IPEndPoint)socket.LocalEndPoint!).Port;
+        while (true)
+        {
+            int port;
+            using (Socket socket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+            {
+                socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+                port = ((IPEndPoint)socket.LocalEndPoint!).Port;
+            }
+
+            if (!IsListening(port))
+            {
+                return port;
+            }
+        }
+    }
+
+    /// <summary>Whether something else on this busy machine took <paramref name="port" /> and now accepts connections on it.</summary>
+    private static bool IsListening(int port)
+    {
+        using Socket probe = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            probe.Connect(new IPEndPoint(IPAddress.Loopback, port));
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
     }
 
     private sealed class LoopbackResolver : IDnsResolver

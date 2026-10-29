@@ -6,7 +6,7 @@ using Curl.Testing;
 namespace Curl.Authentication;
 
 /// <summary>
-/// Pins CGR-103 (BL-3632, ADR-0826): curl 8.22.0 sends SASL LOGIN's empty password as an empty
+/// Pins CGR-103 (BL-3632, ADR-0928): curl 8.22.0 sends SASL LOGIN's empty password as an empty
 /// line, not <c>=</c>, over SMTP, POP3 and IMAP alike (measured with
 /// <c>Record-CurlExchange.ps1</c>: <c>AUTH LOGIN</c>, <c>dXNlcg==</c>, then an empty line).
 /// </summary>

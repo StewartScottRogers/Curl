@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// and a netrc file's bytes, as they are: <c>curl -sS "http://%C3%A9:%E2%82%AC@127.0.0.1:20581/a"</c>
 /// sends <c>Authorization: Basic w6k64oKs</c> (C3 A9 3A E2 82 AC), not the ANSI code page's
 /// <c>Basic 6TqA</c>, while a raw <c>é</c> on the command line still goes as the ANSI byte E9
-/// (<c>Basic 6To=</c>), as the arguments reach curl in that code page (measured, ADR-0821).
+/// (<c>Basic 6To=</c>), as the arguments reach curl in that code page (measured, ADR-0910).
 /// </summary>
 [TestClass]
 public sealed class Cgr052Tests

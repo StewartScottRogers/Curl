@@ -10,7 +10,7 @@ namespace Curl.Networking;
 /// CGR-046 of the third-party gap report (BL-3575): curl 8.21.0's Schannel build resolves no IPv4
 /// address in shorthand (<c>0</c>, <c>127.1</c>, <c>2130706433</c>, <c>127.0.0.01</c>,
 /// <c>0x7f.0.0.1</c>), so <c>--connect-to</c> to one is exit 6 and <c>--interface</c> one exit 45,
-/// while the OpenSSL build on Linux reads them as the system resolver does (ADR-0820, measured).
+/// while the OpenSSL build on Linux reads them as the system resolver does (ADR-0908, measured).
 /// </summary>
 [TestClass]
 public sealed class Cgr046Tests

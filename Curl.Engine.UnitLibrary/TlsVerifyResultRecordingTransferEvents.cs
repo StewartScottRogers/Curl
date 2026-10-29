@@ -78,6 +78,9 @@ internal sealed class TlsVerifyResultRecordingTransferEvents(ITransferEvents inn
     public void ReportTlsTrust(TlsTrustEvent trust) => inner.ReportTlsTrust(trust);
 
     /// <inheritdoc />
+    public void ReportWarning(string text) => inner.ReportWarning(text);
+
+    /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);
 
     /// <inheritdoc />

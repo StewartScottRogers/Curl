@@ -277,6 +277,21 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     public bool TracesClientReaders { get; init; }
 
+    /// <summary>
+    /// Gets or sets what is told, with the wait's length, when a request starts waiting for <c>100 Continue</c>
+    /// (<see cref="HttpContinueWaitConnection.WaitBegins" />), so a transfer driven by
+    /// <c>curl_multi_socket_action</c> can hold the expect-100 deadline (BL-3864); <see langword="null" />, the
+    /// default, for nothing.
+    /// </summary>
+    public Action<TimeSpan>? ContinueWaitBegins { get; init; }
+
+    /// <summary>
+    /// Gets or sets what is told when a request's wait for <c>100 Continue</c> ends, the answer come or the wait
+    /// run out (<see cref="HttpContinueWaitConnection.WaitEnds" />, BL-3864); <see langword="null" />, the
+    /// default, for nothing.
+    /// </summary>
+    public Action? ContinueWaitEnds { get; init; }
+
     /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
     /// <exception cref="OperationCanceledException">
@@ -753,6 +768,12 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await ConnectAsync(plan, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
+            if (connect.ProxyConnectResponseCode != 0)
+            {
+                // The proxy answered the CONNECT, so curl is past connect and still draws the meter (CGR-242).
+                ReportRequestStarted(plan, earlier, resentAfterConnectionDied);
+            }
+
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(connect.ConnectionNumber));
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
             {
@@ -778,9 +799,19 @@ public sealed class HttpProtocolHandler(
 
         ReportConnectionEnd(plan.Context, target, connect, outcome);
         return outcome.Retry is { } reconnect
-            ? await ConnectAndExchangeAsync(reconnect, outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
+            ? await ConnectAndExchangeAsync(CountedOnIfResent(reconnect, outcome.DiedBeforeResponse), outcome.Result.Report, outcome.DiedBeforeResponse).ConfigureAwait(false)
             : outcome.Result;
     }
+
+    /// <summary>
+    /// Gives a request sent again on a fresh connection because its reused one died before the
+    /// response (<paramref name="resentAfterConnectionDied" />) its <c>Authorization</c> value as
+    /// <see cref="IHttpAuthenticator.RepeatAuthorization" /> sends it again, so a Digest answer
+    /// counts its nonce on (the same <c>cnonce</c>, <c>nc=00000002</c>), as curl 8.22.0 makes the
+    /// answer again for the resend (measured, BL-3874, ADR-0950); <paramref name="retry" /> itself otherwise.
+    /// </summary>
+    private HttpRequestPlan CountedOnIfResent(HttpRequestPlan retry, bool resentAfterConnectionDied) =>
+        resentAfterConnectionDied ? retry.WithAuthorizationSentAgain(RepeatAuthorization(retry)) : retry;
 
     /// <summary>
     /// Reports the progress of a request now connected: the transfer started for the first, a
@@ -1062,6 +1093,7 @@ public sealed class HttpProtocolHandler(
         Http2Session? unheldSession = UnheldHttp2Session(streams, connection);
         (HttpAttemptOutcome outcome, Http2Session? upgradedSession) = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
         unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
+        SkipClosingGoAwayWhenGivenUp(outcome, streams ?? upgradedSession);
         SettleConnection(plan, connection, streams ?? upgradedSession, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
         return outcome;
@@ -1089,6 +1121,15 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static Http2Session? UnheldHttp2Session(IHttpStreamSession? streams, IConnection connection) =>
         streams is Http2Session http2 && !connection.TryHoldSession(http2) ? http2 : null;
+
+    /// <summary>Has an HTTP/2 session on a connection given up after five refused streams close without its GOAWAY (BL-3838).</summary>
+    private static void SkipClosingGoAwayWhenGivenUp(HttpAttemptOutcome outcome, IHttpStreamSession? session)
+    {
+        if (outcome.GaveUpOnRefusedStream && session is Http2Session http2)
+        {
+            http2.SkipClosingGoAway();
+        }
+    }
 
     /// <summary>Sends the closing GOAWAY of a session no connection holds, if there is one.</summary>
     private static ValueTask ShutDownAsync(Http2Session? unheldSession) =>
@@ -1174,7 +1215,7 @@ public sealed class HttpProtocolHandler(
         ConnectTarget target = TargetOf(retry);
         ITransferEvents events = retry.Context.Events;
         events.ReportInfo(LeftIntactLine(target, connect));
-        events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(retry.Context.Url));
+        events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(retry.Context.Url, retry.Options.CommandLineTextEncoding));
         events.ReportConnectionReused(new ConnectionReusedEvent
         {
             Scheme = target.PoolScheme!,
@@ -1241,7 +1282,7 @@ public sealed class HttpProtocolHandler(
         context.Events.ReportInfo(ConnectionEndLine(target, connect, outcome));
         if (outcome.Retry is not null)
         {
-            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url));
+            context.Events.ReportInfo(HttpConnectionInfoLines.IssueAnotherRequest(context.Url, OptionsOf(context).CommandLineTextEncoding));
         }
     }
 
@@ -1339,7 +1380,7 @@ public sealed class HttpProtocolHandler(
             actedOn = headReader.HeadActedOn(exchange.Head);
             body.HeadersStoredBefore = headReader.HeadersStoredWith(exchange.Head);
             exchangeLog.ReplyRead(actedOn);
-            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn);
+            exchange.RedirectUrl = HttpRedirectLocation.Find(context.Url, actedOn, options.CommandLineTextEncoding);
             await WriteHeadersAsync(context.HeaderOutput, exchange.Head.HeadBytes, cancellationToken).ConfigureAwait(false);
             ThrowIfHeaderRefused(refusal);
             ThrowIfClosedBeforeContentLength(plan, actedOn, headReader);
@@ -1367,7 +1408,9 @@ public sealed class HttpProtocolHandler(
         }
         catch (HttpTransferException failure)
         {
-            return OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
+            HttpAttemptOutcome failedOutcome = OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
+            failedOutcome.UpgradedSession = UpgradedSessionOf(connection);
+            return failedOutcome;
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
@@ -1401,24 +1444,65 @@ public sealed class HttpProtocolHandler(
         ReportReturnedError(plan.Context.Events, failure);
         headReader.ReportHeldLines();
         ReportReceiveFailure(plan.Context.Events, failure);
+        ReportBodyFailure(plan.Context.Events, failure);
         exchangeLog.Failed(failure.ExitCode, failure);
         TransferResult failed = TransferResult.Failure(failure.ExitCode, failure.Message, body.BytesWritten)
             with
-        { Report = WithHeadBeforeFailure(exchange.Report(body), failure) };
+        {
+            Report = WithHeadBeforeFailure(exchange.Report(body), failure),
+            WriteOutErrorMessage = failure.ExitCode == CurlExitCode.HttpReturnedError && plan.Options.Fail == HttpFailMode.FailWithBody
+                ? HttpTransferMessages.HttpResponseCodeSaidError
+                : null,
+        };
         HttpAttemptOutcome outcome = FailedOutcome(plan, reusedConnection, upload, headReader, failure, failed);
         ReportEmptyReply(plan.Context.Events, failure, outcome);
         return outcome;
     }
 
     /// <summary>
-    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c> as a <c>-v</c> line, as
+    /// Echoes <c>-f</c>'s <c>The requested URL returned error: N</c>, <c>--max-redirs</c>'s and <c>--max-filesize</c>'s messages as a <c>-v</c> line, as
     /// curl 8.22.0's <c>failf</c> does, before the head's held empty line (measured, BL-3617).
     /// </summary>
     private static void ReportReturnedError(ITransferEvents events, HttpTransferException failure)
     {
-        if (failure.ExitCode == CurlExitCode.HttpReturnedError)
+        if (failure.ExitCode is CurlExitCode.HttpReturnedError or CurlExitCode.TooManyRedirects or CurlExitCode.FilesizeExceeded)
         {
             events.ReportInfo(failure.Message);
+        }
+    }
+
+    /// <summary>
+    /// Echoes the failf line of a body that failed as a <c>-v</c> line, as curl 8.22.0 does: a bad
+    /// gzip or deflate stream, a bad chunk (its line and the one naming the chunk-decoder error),
+    /// and a body the peer left short or a chunked body it cut off (measured, BL-3952).
+    /// </summary>
+    private static void ReportBodyFailure(ITransferEvents events, HttpTransferException failure)
+    {
+        string message = failure.Message;
+        if (failure.ExitCode == CurlExitCode.RecvError)
+        {
+            ReportChunkFailure(events, message);
+        }
+        else if (failure.ExitCode == CurlExitCode.BadContentEncoding
+            ? HttpTransferMessages.IsContentUnencodingError(message)
+            : failure.ExitCode == CurlExitCode.PartialFile
+                && (message == HttpTransferMessages.ChunkedBodyIncomplete || HttpTransferMessages.IsBodyBytesMissing(message)))
+        {
+            events.ReportInfo(message);
+        }
+    }
+
+    private static void ReportChunkFailure(ITransferEvents events, string message)
+    {
+        string? followUp = HttpTransferMessages.ChunkSizeFollowUpLine(message);
+        if (followUp is not null)
+        {
+            events.ReportInfo(message);
+            events.ReportInfo(followUp);
+        }
+        else if (message == HttpTransferMessages.MalformedChunkedEncoding)
+        {
+            events.ReportInfo(message);
         }
     }
 
@@ -1448,8 +1532,28 @@ public sealed class HttpProtocolHandler(
                 ResponseCode = statusLine.StatusCode,
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
+                ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
+                ResponseHeaders = HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
+
+    /// <summary>
+    /// Gives the whole header lines a failure let through before it cut the head short, from the
+    /// head's bytes after its status line: curl stores each header line as it writes it, so
+    /// <c>%{num_headers}</c> counts them (CGR-135 <c>cltwo</c>, curl 8.18.0 with nghttp2 1.68
+    /// measured, BL-4005 Notes). A line cut off before its end is not one of them.
+    /// </summary>
+    private static KeyValuePair<string, string>[] HeadersBeforeFailure(byte[] headBytes) =>
+        [.. System.Text.Encoding.Latin1.GetString(headBytes).Split('\n').Skip(1).SkipLast(1)
+            .Select(line => line.TrimEnd('\r'))
+            .Where(line => line.Length > 0)
+            .Select(HeaderOfLine)];
+
+    private static KeyValuePair<string, string> HeaderOfLine(string line)
+    {
+        string name = line.Split(':')[0];
+        return KeyValuePair.Create(name, line[Math.Min(name.Length + 1, line.Length)..].Trim());
+    }
 
     /// <summary>
     /// Puts the socket error number of a failed receive on <paramref name="report" /> as its
@@ -1474,6 +1578,7 @@ public sealed class HttpProtocolHandler(
         headReader.ReportHeldLines();
         exchangeLog.Failed(CurlExitCode.OperationTimedOut, canceled);
         string message = HttpTransferMessages.OperationTimedOut(plan.Deadline.OperationElapsedMilliseconds, body.BytesWritten, body.ExpectedLength);
+        plan.Context.Events.ReportInfo(message);
         TransferResult timedOut = TransferResult.Failure(CurlExitCode.OperationTimedOut, message, body.BytesWritten)
             with
         { Report = exchange.Report(body) };
@@ -1486,10 +1591,10 @@ public sealed class HttpProtocolHandler(
     /// while a read of the body stays pending (<see cref="HttpEarlyResponseConnection" />, BL-2729); and
     /// else <paramref name="timedConnection" /> itself.
     /// </summary>
-    private static IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
+    private IConnection ResponseConnectionOf(HttpRequestPlan plan, IHttpStreamConnection? requestStream, IConnection timedConnection) =>
         (plan.Framing.AwaitsContinue, plan.Framing.Body is StreamBody && requestStream is null) switch
         {
-            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait },
+            (true, _) => new HttpContinueWaitConnection(timedConnection) { ContinueWait = plan.Options.ContinueWait, WaitBegins = ContinueWaitBegins, WaitEnds = ContinueWaitEnds },
             (false, true) => new HttpEarlyResponseConnection(timedConnection),
             _ => timedConnection,
         };
@@ -1511,6 +1616,7 @@ public sealed class HttpProtocolHandler(
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
             HeldHead = request,
             IsUpload = framing.IsUpload,
+            IsReadFunctionBody = framing.Body is StreamBody { ContentType: var bodyType } && !bodyType.StartsWith("multipart/", StringComparison.Ordinal),
             Progress = plan.Progress,
             Events = plan.Context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,
@@ -1611,6 +1717,7 @@ public sealed class HttpProtocolHandler(
             IgnoresContentLength = options.IgnoreContentLength,
             IsThroughHttpProxy = IsThroughHttpProxy(options),
             IsSwitchedToHttp2 = () => IsSwitchedToHttp2(connection),
+            HttpVersionSeenBefore = () => Http1VersionSeen.Of(connection) is not null,
             AsksH2cUpgrade = connection is HttpH2cUpgradeConnection,
             DefersFrom = (statusLine, header) => plan.Framing.Body is not StreamBody && IsAuthChallenge(plan, statusLine, header),
         };
@@ -1879,7 +1986,8 @@ public sealed class HttpProtocolHandler(
             context.TimeCondition,
             plan.Framing,
             upgradesToH2c,
-            context.Credentials);
+            context.Credentials,
+            plan.RereadsUrl);
         return streams is null ? head : Http2RequestHeaders.WithRequestLineVersion(head, streams.VersionName);
     }
 
@@ -1931,7 +2039,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportAuthorizationLines(HttpRequestPlan plan)
     {
-        bool headerNamesAuthorization = HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
+        bool headerNamesAuthorization = plan.Options.AuthorizationHeaderWithheld || HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
             ReportInfoLines(plan.Context.Events, plan.ProxyAuthorizationInfoLines);
@@ -2142,13 +2250,13 @@ public sealed class HttpProtocolHandler(
     {
         if (responseBegan)
         {
-            return new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
+            return new HttpAttemptOutcome(refused.ErrorMessage == HttpTransferMessages.Http2GoAwayReceiveFailure ? refused : refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
         }
 
         plan.Context.Events.ReportInfo(HttpConnectionInfoLines.RefusedStreamRetrying);
         return plan.StreamRefusedRetries < MaximumStreamRefusedRetries
             ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(RewindUploadFailure(plan.Framing.Body, upload)), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
-            : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false);
+            : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false) { GaveUpOnRefusedStream = true };
     }
 
     /// <summary>
@@ -2197,7 +2305,7 @@ public sealed class HttpProtocolHandler(
     /// <summary>
     /// Builds the outcome of an exchange whose HTTP/2 stream the server reset with
     /// <c>HTTP_1_1_REQUIRED</c>, as curl 8.18.0's <c>multi_runsingle</c> does for
-    /// <c>Curl_h2_http_1_1_error</c> (CGR-032, ADR-0819): <c>-v</c> says <c>Downgrades to HTTP/1.1</c>,
+    /// <c>Curl_h2_http_1_1_error</c> (CGR-032, ADR-0906): <c>-v</c> says <c>Downgrades to HTTP/1.1</c>,
     /// the HTTP/2 connection is closed and the request is sent again, once, over HTTP/1.1 on a
     /// new connection, its body rewound as for a refused stream.
     /// </summary>
@@ -2258,8 +2366,20 @@ public sealed class HttpProtocolHandler(
     /// reports it dead before any reuse (ADR-0112).
     /// </summary>
     private static bool LeftIntactAfterServerClosed(HttpRequestPlan plan, HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
-        DeliveredWhole(head, upload, headReader, delivery)
-            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding);
+        (DeliveredWhole(head, upload, headReader, delivery)
+            && HttpConnectionPersistence.KeepsHttp10AliveUntilServerCloses(head, plan.Context.NoBody, plan.Options.PassesTransferCoding, plan.Options.IgnoreContentLength, plan.Options.TransferEncoding))
+        || EndedAtUnsolicitedSwitchingProtocols(head, upload, headReader, delivery);
+
+    /// <summary>
+    /// Decides whether the response was a final unsolicited <c>101</c> whose body ran to the close,
+    /// which curl 8.22.0 reports left intact and pools, the pool then finding it dead (measured, BL-3870, ADR-0939).
+    /// </summary>
+    private static bool EndedAtUnsolicitedSwitchingProtocols(HttpResponseHead head, HttpRequestBodyWriter upload, HttpResponseHeadReader headReader, HttpBodyDelivery delivery) =>
+        !upload.CutShort
+            && delivery == HttpBodyDelivery.Deliver
+            && headReader.SwitchedProtocols
+            && !headReader.IsSwitchedToHttp2()
+            && head.StatusLine.StatusCode == 101;
 
     /// <summary>
     /// Decides whether the exchange ran whole: its request body was not cut short, its
@@ -2452,28 +2572,30 @@ public sealed class HttpProtocolHandler(
     {
         ITransferContext context = plan.Context;
         Stream bodyOutput = discardsBody ? Stream.Null : context.Output;
-        SetBodyLimitAndSinks(plan, body, discardsBody);
-        HttpTransferException? tooManyTrailers = null;
+        SetBodyLimitAndSinks(plan, body, discardsBody, ReportsIgnoredBodyProgress(plan, head));
+        HttpTransferException? failedTransfer = null;
         try
         {
             await body.CopyAsync(head, context.NoBody, bodyOutput, DecodesContent(plan.Options, discardsBody), plan.Options.TransferEncoding && !discardsBody, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (HttpTransferException failure) when (failure.Message == HttpTransferMessages.TooManyResponseHeaders)
+        catch (HttpTransferException failure)
         {
-            tooManyTrailers = failure;
+            failedTransfer = failure;
         }
 
-        if (tooManyTrailers is not null)
+        if (failedTransfer is not null)
         {
-            // curl 8.21.0 writes the trailers it stored before the one past the limit (measured, BL-1448 Notes).
+            // curl writes the trailers it stored before the one that failed: the one past the limit
+            // (8.21.0, BL-1448 Notes) or a malformed one (8.22.0, CGR-202).
             await WriteHeadersAsync(context.HeaderOutput, body.TrailerBytes, cancellationToken).ConfigureAwait(false);
-            throw tooManyTrailers;
+            throw failedTransfer;
         }
 
         ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, requestStream, cancellationToken).ConfigureAwait(false);
         int storedLength = StoredLengthOf(trailers.Span, requestStream is null ? int.MaxValue : HttpResponseHeadReader.MaximumHeaderCount - body.HeadersStored);
         await WriteHeadersAsync(context.HeaderOutput, trailers[..storedLength], cancellationToken).ConfigureAwait(false);
+        ReportStreamTrailers(body, requestStream, context.Events, trailers.Span[..storedLength]);
         if (storedLength < trailers.Length)
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
@@ -2481,6 +2603,29 @@ public sealed class HttpProtocolHandler(
                 InfoLines = [HttpTransferMessages.TooManyResponseHeaders],
             };
         }
+    }
+
+    /// <summary>
+    /// Reports each line of an HTTP/2 or HTTP/3 stream's stored trailers as a received header, as curl does for
+    /// the headers its HTTP/2 layer hands on (CGR-273), and keeps them as header pairs for <c>%{num_headers}</c>;
+    /// does nothing for a body that is not a stream's.
+    /// </summary>
+    private static void ReportStreamTrailers(HttpResponseBodyReader body, IHttpStreamConnection? requestStream, ITransferEvents events, ReadOnlySpan<byte> trailers)
+    {
+        if (requestStream is null)
+        {
+            return;
+        }
+
+        List<KeyValuePair<string, string>> pairs = [];
+        foreach (string line in System.Text.Encoding.Latin1.GetString(trailers).Split("\r\n", StringSplitOptions.RemoveEmptyEntries))
+        {
+            events.ReportResponseHeader(System.Text.Encoding.Latin1.GetBytes(line + "\r\n"));
+            int colon = line.IndexOf(": ", StringComparison.Ordinal);
+            pairs.Add(KeyValuePair.Create(line[..colon], line[(colon + 2)..]));
+        }
+
+        body.StreamTrailers = pairs;
     }
 
     /// <summary>
@@ -2517,14 +2662,22 @@ public sealed class HttpProtocolHandler(
     }
 
     /// <summary>
+    /// Decides whether a discarded body still counts in the progress meter: the body of a 3xx
+    /// that <c>-L</c> follows does, as curl 8.22.0's meter row for the hop reads the body's
+    /// length and bytes (measured, CGR-218); a body ignored for a retry does not.
+    /// </summary>
+    private static bool ReportsIgnoredBodyProgress(HttpRequestPlan plan, HttpResponseHead head) =>
+        plan.Options.FollowRedirects && head.StatusLine.StatusCode is >= 300 and < 400;
+
+    /// <summary>
     /// Sets where a body's bytes are held and reported: to the <c>--max-filesize</c> limit, the
     /// progress meter and the transfer's events, or, for a discarded body, to none of them -
     /// curl 8.21.0 reports no data for a body it ignores (measured, BL-407 Notes).
     /// </summary>
-    private static void SetBodyLimitAndSinks(HttpRequestPlan plan, HttpResponseBodyReader body, bool discardsBody)
+    private static void SetBodyLimitAndSinks(HttpRequestPlan plan, HttpResponseBodyReader body, bool discardsBody, bool reportsProgress)
     {
         body.MaximumBodySize = discardsBody ? null : HttpDownloadConditions.LimitOf(plan.Context.MaxFileSize);
-        body.Progress = discardsBody ? HttpTransferProgress.Silent : plan.Progress;
+        body.Progress = discardsBody && !reportsProgress ? HttpTransferProgress.Silent : plan.Progress;
         body.Events = discardsBody ? NoTransferEvents.Instance : plan.Context.Events;
     }
 
@@ -2851,6 +3004,11 @@ public sealed class HttpProtocolHandler(
         HttpInfoLineRecorder retryLines = new();
         bool picksNegotiate = HttpNegotiateInfoLines.PicksNegotiate(plan.AuthRequest, plan.Authorization, plan.AuthorizationAnswersChallenge);
         HttpAuthRequest request = picksNegotiate ? plan.AuthRequest : plan.AuthRequest with { Events = retryLines };
+        if (plan.Options.RequestTarget is null)
+        {
+            request = request with { RequestTarget = UrlPathEscapes.WithUpperCaseHexDigits(request.RequestTarget) };
+        }
+
         string? authorization;
         try
         {
@@ -2867,7 +3025,9 @@ public sealed class HttpProtocolHandler(
             return null;
         }
 
-        return plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan)).HoldingDigestNonceAfter(head);
+        HttpRequestPlan retry = plan.WithAuthorization(authorization, retryLines.Lines, RepeatProxyAuthorization(plan)).HoldingDigestNonceAfter(head);
+        retry.RereadsUrl = true;
+        return retry;
     }
 
     /// <summary>
@@ -3357,7 +3517,7 @@ public sealed class HttpProtocolHandler(
         /// <summary>
         /// Builds the report: what the connect and request told, their timings with the
         /// transfer's end taken now, and what the final head told once it was read. The request
-        /// size counts the body bytes sent, chunk framing included, as well as the head, as curl 8.21.0's
+        /// size counts the body bytes sent, chunk framing included, as well as the head once the request was ready to send (a request refused before it, as an HTTP/1.0 upload of unknown size is, counts none: CGR-263), as curl 8.21.0's
         /// <c>%{size_request}</c> does (BL-175 Notes); the upload size counts the chunk framing too, as
         /// libcurl 8.22.0's <c>CURLINFO_SIZE_UPLOAD_T</c> does (BL-3320).
         /// </summary>
@@ -3371,7 +3531,7 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = RequestSizeSoFar() + headSize + upload.BytesSent,
+                RequestSize = RequestSizeSoFar() + HeadSizeSent() + upload.BytesSent,
                 UploadSize = upload.BytesSent,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
@@ -3392,10 +3552,12 @@ public sealed class HttpProtocolHandler(
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = TimingsNow(),
             };
-            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
+            return Head is null ? report : WithHead(report, Head, body.StreamTrailers) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
         }
 
         private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
+
+        private int HeadSizeSent() => RequestReady is null ? 0 : headSize;
 
         private int ConnectionCountSoFar() => earlier?.ConnectionCount ?? 0;
 
@@ -3408,12 +3570,13 @@ public sealed class HttpProtocolHandler(
                 ResponseConnection.FirstByteReceived,
                 TimeProvider.GetTimestamp());
 
-        private static TransferReport WithHead(TransferReport report, HttpResponseHead head) =>
+        private static TransferReport WithHead(TransferReport report, HttpResponseHead head, IReadOnlyList<KeyValuePair<string, string>> streamTrailers) =>
             report with
             {
                 ResponseCode = head.StatusLine.StatusCode,
                 HttpVersion = head.StatusLine.Version,
-                ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value))],
+                ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value)), .. streamTrailers],
+                TrailerCount = streamTrailers.Count,
                 ContentType = head.Headers.LastOrDefault(IsContentType)?.Value,
                 HeaderSize = report.HeaderSize + head.HeadBytes.Length,
             };
@@ -3577,6 +3740,13 @@ public sealed class HttpProtocolHandler(
         public bool HoldsDigestNonce { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the request is one curl builds by re-reading the
+        /// URL after a 401, whose target has the query's escapes in upper case
+        /// (<see cref="HttpUrlText.OriginTarget(CurlUrl, System.Text.Encoding, bool)" />, BL-3856).
+        /// </summary>
+        public bool RereadsUrl { get; set; }
+
+        /// <summary>
         /// Marks this retry as holding a Digest nonce (<see cref="HoldsDigestNonce" />) when
         /// <paramref name="head" />, the 401 it answers, offers Digest.
         /// </summary>
@@ -3721,6 +3891,15 @@ public sealed class HttpProtocolHandler(
         /// </summary>
         /// <returns>The resent request's plan.</returns>
         public HttpRequestPlan OnFreshConnection() => With(Framing, Authorization, sentOnFreshConnection: true, RedirectsFollowed, AuthorizationAnswersChallenge);
+
+        /// <summary>
+        /// Makes the same request with <paramref name="authorization" /> as its <c>Authorization</c>
+        /// value, its <see cref="UploadRewindFailure" /> kept; this plan when the value is unchanged.
+        /// </summary>
+        /// <param name="authorization">The value to send; <see langword="null" /> for none.</param>
+        /// <returns>The request's plan with that value.</returns>
+        public HttpRequestPlan WithAuthorizationSentAgain(string? authorization) =>
+            authorization == Authorization ? this : With(Framing, authorization).FailingUploadRewind(UploadRewindFailure);
 
         /// <summary>
         /// Makes the same request, sent again over HTTP/1.1 on a new connection because the server
@@ -3868,6 +4047,7 @@ public sealed class HttpProtocolHandler(
                 StreamRefusedRetries = StreamRefusedRetries,
                 DowngradedToHttp11 = DowngradedToHttp11,
                 HoldsDigestNonce = HoldsDigestNonce,
+                RereadsUrl = RereadsUrl,
                 AuthSchemesOffered = AuthSchemesOffered,
                 ProxyAuthSchemesOffered = ProxyAuthSchemesOffered,
             };
@@ -3893,6 +4073,11 @@ public sealed class HttpProtocolHandler(
         public bool DiedBeforeResponse { get; init; }
 
         /// <summary>
+        /// Gets a value indicating whether the exchange is the sixth refused one, given up on, whose HTTP/2 connection curl closes without a GOAWAY.
+        /// </summary>
+        public bool GaveUpOnRefusedStream { get; init; }
+
+        /// <summary>
         /// Gets the transfer's retries on a fresh connection so far, this one included, as
         /// <c>-v</c> counts them when <see cref="DiedBeforeResponse" />.
         /// </summary>
@@ -3909,7 +4094,7 @@ public sealed class HttpProtocolHandler(
         /// Gets the HTTP/2 session the exchange's connection switched to after an h2c upgrade's
         /// <c>101</c> (BL-866), or <see langword="null" /> when it did not switch.
         /// </summary>
-        public Http2Session? UpgradedSession { get; init; }
+        public Http2Session? UpgradedSession { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact: it

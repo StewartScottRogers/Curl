@@ -22,7 +22,7 @@ public sealed class CertificateStatusFailureMessagesTests
     [DataRow(OcspStapleStatus.Malformed, 0, "Invalid OCSP response")]
     [DataRow(OcspStapleStatus.Unsuccessful, 3, "Invalid OCSP response status: trylater (3)")]
     [DataRow(OcspStapleStatus.Unsuccessful, 4, "Invalid OCSP response status: (UNKNOWN) (4)")]
-    [DataRow(OcspStapleStatus.IssuerNotFound, 0, "Error finding issuer certificate")]
+    [DataRow(OcspStapleStatus.IssuerNotFound, 0, "Error computing OCSP ID")]
     [DataRow(OcspStapleStatus.SignatureInvalid, 0, "OCSP response verification failed")]
     [DataRow(OcspStapleStatus.ResponderNotAuthorised, 0, "OCSP response verification failed")]
     [DataRow(OcspStapleStatus.CertificateNotFound, 0, "Could not find certificate ID in OCSP response")]

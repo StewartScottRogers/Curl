@@ -35,6 +35,7 @@
     never touched. The file is checked at each sound, so creating or deleting it reaches a
     shift that is already running, and -QuietAlarm is then not needed (BL-1456).
     -TestAudioOff proves it without playing a sound.
+    -TestPlatform proves the PowerShell executable and data folder the factory picks for this OS (BL-3919).
 
     KEEPING THE BOARD MOVING
 
@@ -159,7 +160,9 @@
     lanes, then each lane as soon as that lane is neither claiming nor integrating nor
     within two minutes of taking its task (AF-0129), and
     starts a new shift with the old one's arguments, which adopts the stopped lanes and
-    their tasks (BL-895). Only this checkout's shift is touched.
+    their tasks (BL-895). A parameter passed beside -Restart replaces the old one's value,
+    so `RunDarkFactory.cmd -Restart -MaxLanes 12` restarts with a new lane maximum. Only
+    this checkout's shift is touched.
 
     A shift keeps this checkout on its branch: if something switched it (Visual Studio did,
     once), the coordinator switches it back before its shift-end pull, and -Continuous
@@ -433,6 +436,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestTaskReadiness
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestIntegrateLock
     powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestLaneFlags
+    powershell -NoProfile -ExecutionPolicy Bypass -File RunDarkFactory.ps1 -TestPlatform
 #>
 [CmdletBinding()]
 param(
@@ -508,6 +512,7 @@ param(
     [switch]$TestAuditCadence,
     # Prove the audio-off file silences the alarm, chimes and spoken notices, and that they
     # sound as before without it, playing nothing (BL-1456), and exit.
+    [switch]$TestPlatform,
     [switch]$TestAudioOff,
     # Prove the CURL_DARK_FACTORY_LANE marker's value for a lane, a coordinator and a
     # launcher, and that a claude -p run inherits it, and exit.
@@ -611,6 +616,7 @@ $FactoryScript = $PSCommandPath
 $FactoryScriptDir = $PSScriptRoot
 $FactoryParameters = $PSBoundParameters
 foreach ($AreaFile in @(
+        'Platform',
         'Setup',
         'Heartbeat',
         'HerdrTabs',

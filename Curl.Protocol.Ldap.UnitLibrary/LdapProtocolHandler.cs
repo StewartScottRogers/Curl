@@ -151,15 +151,52 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            return ConnectFailure(connect);
         }
 
         context.Progress.ReportTransferStarted();
-        TransferResult result = await SearchOnAsync(connection, context).ConfigureAwait(false);
+        TransferResult result = await SearchAsync(connection, target, context).ConfigureAwait(false);
         ReportConnectionEnd(context.Events, result, target, connect.ConnectionNumber);
         return result;
     }
 
+    /// <summary>
+    /// Binds and searches on <paramref name="connection" />, curl's own connection, or, for the WinLDAP
+    /// dialect's bind as the logged-on user, on a second connection WinLDAP opens beside it.
+    /// </summary>
+    private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
+        dialect == LdapDialect.WinLdap && context.Credentials is null
+            ? SearchBesideEmptyConnectionAsync(connection, target, context)
+            : SearchOnAsync(connection, context);
+
+    /// <summary>The failure a connect that opened no connection ends the transfer with.</summary>
+    private static TransferResult ConnectFailure(ConnectResult connect) =>
+        new(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+
+    /// <summary>
+    /// The WinLDAP dialect's bind as the logged-on user: curl's own connection,
+    /// <paramref name="curlConnection" />, stays open and carries no bytes while WinLDAP opens a
+    /// second connection to <paramref name="target" /> for the binds and the search, as curl
+    /// 8.22.0's Schannel build does without <c>-u</c> (CGR-234, BL-3999, ADR-0978).
+    /// </summary>
+    private async ValueTask<TransferResult> SearchBesideEmptyConnectionAsync(IConnection curlConnection, ConnectTarget target, ITransferContext context)
+    {
+        await using (curlConnection.ConfigureAwait(false))
+        {
+            ConnectResult winLdap = await connector.ConnectAsync(WinLdapTargetOf(target), context.CancellationToken).ConfigureAwait(false);
+            return winLdap.Connection is { } connection
+                ? await SearchOnAsync(connection, context).ConfigureAwait(false)
+                : ConnectFailure(winLdap);
+        }
+    }
+
+    /// <summary>
+    /// The target of WinLDAP's own connection: for <c>ldaps</c> the handshake sends the machine name
+    /// as its server name and trusts only the Windows certificate store, whatever <c>--cacert</c>
+    /// or <c>-k</c> say (CGR-289, ADR-0979); a plaintext target is unchanged.
+    /// </summary>
+    private static ConnectTarget WinLdapTargetOf(ConnectTarget target) =>
+        target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target;
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
     /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
@@ -267,7 +304,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         }
 
         return bindsAsLogonUser
-            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
+            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false)
             : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
     }
 

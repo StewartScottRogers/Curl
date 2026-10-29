@@ -8,7 +8,9 @@ namespace Curl.Protocol.File;
 /// Adversarial black-box tests of <see cref="FileUrlPath" /> (BL-1507), by the method in
 /// <c>Documentation/Wiki/Adversarial-Testing.md</c>: escapes at and past the end of the
 /// path, malformed and invalid UTF-8 escapes, schemes that are almost <c>file</c>, very
-/// long and non-ASCII names, and repeated and concurrent parses. The oracle is
+/// long and non-ASCII names, and repeated and concurrent parses. Escapes are read with the
+/// raw-byte reading of Linux and macOS (ADR-0864) unless a test calls the public
+/// <see cref="FileUrlPath.TryParse(CurlUrl, out FileUrlPath)" />. The oracle is
 /// <see cref="FileUrlPath" />'s documented contract and, where the path reaches the exit 37
 /// message, curl 8.21.0 (Schannel build), which quoted <c>d/%%41</c>, <c>d/a%4</c> and
 /// <c>d/%FF%FE</c> exactly as written. Every URL is drive-less, so every test runs on every
@@ -77,9 +79,8 @@ public sealed class FileUrlPathAdversarialTests
 
     [TestMethod]
     [DataRow("file:///d/%7f", "/d/%7F", "/d/\u007F")]
-    [DataRow("file:///d/%80", "/d/%80", "/d/�")]
     [DataRow("file:///d/%01", "/d/%01", "/d/\u0001")]
-    public void TryParse_EscapeAtTheEdgeOfAscii_DecodesAsUtf8(
+    public void TryParse_EscapeAtTheEdgeOfAscii_DecodesAsRawBytes(
         string url,
         string expectedUrlPath,
         string expectedOsPath)
@@ -89,6 +90,17 @@ public sealed class FileUrlPathAdversarialTests
         Diagnostics.Assert("url path", expectedUrlPath, path.UrlPath);
         Assert.AreEqual(expectedUrlPath, path.UrlPath);
         Assert.AreEqual(NativePath(expectedOsPath), path.OsPath);
+    }
+
+    // A lone surrogate does not survive a DataRow, so %80 has its own test.
+    [TestMethod]
+    public void TryParse_FirstEscapePastAscii_DecodesToItsRawByteSurrogate()
+    {
+        FileUrlPath path = Parsed("file:///d/%80");
+
+        Diagnostics.Assert("url path", "/d/%80", path.UrlPath);
+        Assert.AreEqual("/d/%80", path.UrlPath);
+        Assert.AreEqual(NativePath("/d/\uDC80"), path.OsPath);
     }
 
     // Malformed input.
@@ -119,23 +131,23 @@ public sealed class FileUrlPathAdversarialTests
     }
 
     [TestMethod]
-    public void TryParse_EscapesThatAreNotUtf8_DecodeToReplacementCharacters()
+    public void TryParse_EscapesThatAreNotUtf8_KeepEachByteAsItsRawByteSurrogate()
     {
         FileUrlPath path = Parsed("file:///d/%FF%FE");
 
         Diagnostics.Assert("url path", "/d/%FF%FE", path.UrlPath);
         Assert.AreEqual("/d/%FF%FE", path.UrlPath);
-        Assert.AreEqual(NativePath("/d/��"), path.OsPath);
+        Assert.AreEqual(NativePath("/d/\uDCFF\uDCFE"), path.OsPath);
     }
 
     [TestMethod]
-    public void TryParse_Utf8SequenceCutByALiteralCharacter_DecodesEachHalfOnItsOwn()
+    public void TryParse_Utf8SequenceCutByALiteralCharacter_KeepsEachHalfAsRawBytes()
     {
         FileUrlPath path = Parsed("file:///d/%C3x%A9");
 
         Diagnostics.Act("os path", Slashed(path.OsPath));
         Assert.AreEqual("/d/%C3x%A9", path.UrlPath);
-        Assert.AreEqual(NativePath("/d/�x�"), path.OsPath);
+        Assert.AreEqual(NativePath("/d/\uDCC3x\uDCA9"), path.OsPath);
     }
 
     [TestMethod]
@@ -145,7 +157,7 @@ public sealed class FileUrlPathAdversarialTests
         FileUrlPath split = Parsed("file:///d/%C3/%A9");
 
         Assert.AreEqual(NativePath("/d/é"), joined.OsPath);
-        Assert.AreEqual(NativePath("/d/�/�"), split.OsPath);
+        Assert.AreEqual(NativePath("/d/\uDCC3/\uDCA9"), split.OsPath);
     }
 
     [TestMethod]
@@ -303,9 +315,13 @@ public sealed class FileUrlPathAdversarialTests
 
     private static FileUrlPath Parsed(string url)
     {
-        Assert.IsTrue(FileUrlPath.TryParse(CurlUrl.Parse(url), out var path), url);
+        Assert.IsTrue(FileUrlPath.TryParse(CurlUrl.Parse(url), false, RawBytes, out var path), url);
         return path;
     }
+
+    // The escape reading of Linux and macOS (CGR-114, ADR-0864), so each byte that is not
+    // UTF-8 is pinned as its raw-byte surrogate on every platform.
+    private static readonly Func<byte[], string> RawBytes = FileUrlPath.EscapedBytesReaderFor(false, null);
 
     private static string NativePath(string slashedPath) =>
         slashedPath.Replace('/', Path.DirectorySeparatorChar);

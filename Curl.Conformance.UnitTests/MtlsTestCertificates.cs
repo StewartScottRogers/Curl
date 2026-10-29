@@ -1,12 +1,12 @@
 namespace Curl.Conformance;
 
 // The test CA, test-localhost and test-client-eku-only, generated once per process from the vendored .prm files
-// into a folder beside the tests, for the https-mtls stand-in's tests (BL-2859).
+// into a folder of its own beside the tests (so no other test host shares or holds its files), for the https-mtls stand-in's tests (BL-2859).
 internal static class MtlsTestCertificates
 {
     private static readonly Lazy<string> Generated = new(() =>
     {
-        string root = Path.Combine(AppContext.BaseDirectory, "MtlsCertificates");
+        string root = Path.Combine(AppContext.BaseDirectory, "MtlsCertificates", $"process-{Environment.ProcessId}-{Guid.NewGuid():N}");
         string source = Directory.CreateDirectory(Path.Combine(root, "source")).FullName;
         foreach (string parameters in new[] { "test-ca.prm", "test-localhost.prm", "test-client-eku-only.prm" })
         {

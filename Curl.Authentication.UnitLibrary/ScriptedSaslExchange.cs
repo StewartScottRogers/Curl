@@ -26,7 +26,7 @@ internal sealed class ScriptedSaslExchange(string mechanism, byte[] initialRespo
     /// <inheritdoc />
     /// <remarks>
     /// Always <see langword="true" />: the only empty answer a scripted exchange gives is LOGIN's
-    /// empty password, which curl 8.22.0 sends as an empty line, not <c>=</c> (CGR-103, ADR-0826).
+    /// empty password, which curl 8.22.0 sends as an empty line, not <c>=</c> (CGR-103, ADR-0928).
     /// </remarks>
     public bool SendsLastAnswerAsEmptyLine => true;
 

@@ -232,7 +232,7 @@ internal sealed class UrlGlobParser(string url)
     /// Gets whether the text after an IPv6 literal's <c>%</c> is a zone id curl 8.22.0 takes:
     /// a leading <c>25</c> is the encoded percent sign and is skipped; any other two hexadecimal
     /// digits there are a percent-encoding it refuses; the rest is 1 to 15 characters with none of
-    /// <see cref="ZoneRejectedCharacters" /> (CGR-057, ADR-0822).
+    /// <see cref="ZoneRejectedCharacters" /> (CGR-057, ADR-0915).
     /// </summary>
     private static bool IsZone(ReadOnlySpan<char> zone)
     {

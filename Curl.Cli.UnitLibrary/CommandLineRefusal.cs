@@ -1,3 +1,4 @@
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
@@ -165,6 +166,17 @@ public sealed class CommandLineRefusal
 
         return new CommandLineRefusal(CurlExitCode.ReadError, [], spelledOption, ReadErrorReason);
     }
+
+    /// <summary>
+    /// Refuses an <c>@-</c> value (<c>-d @-</c>, <c>--data-binary @-</c>, <c>--json @-</c>,
+    /// <c>--data-urlencode</c>, <c>--url-query</c>, <c>--variable</c>, <c>-w</c>) when the process was started with
+    /// standard input closed (<see cref="ClosedStandardInputStream"/>): curl 8.22.0's <c>fread</c> fails there
+    /// and it stops with exit 26 and no <c>Failed to open</c> line (CGR-110, ADR-0949).
+    /// </summary>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c>.</param>
+    /// <returns>A refusal reading <c>error encountered when reading a file</c>, exit 26.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal StandardInputUnreadable(string spelledOption) => UrlFileUnreadable(spelledOption);
 
     /// <summary>Refuses a numeric option value that is not a well-formed number.</summary>
     /// <param name="spelledOption">The whole argument as typed.</param>
@@ -419,6 +431,24 @@ public sealed class CommandLineRefusal
             WrappedErrorLines(errorsHidden, $"Failed to open {file}", terminalColumns),
             spelledOption,
             ReadErrorReason);
+    }
+
+    /// <summary>
+    /// Refuses a <c>-d @file</c> / <c>--data @file</c> or <c>-w @file</c> whose file opens but cannot be
+    /// read, such as a directory on Linux and macOS, in curl's two lines:
+    /// <c>curl: option &lt;spelled&gt;: error encountered when reading a file</c> and the try-help line,
+    /// with exit code <see cref="CurlExitCode.ReadError"/> (26). curl prints its <c>Failed to open</c> line
+    /// only when <c>fopen</c> fails, so unlike <see cref="DataFileUnreadable"/> there is none (CGR-069).
+    /// </summary>
+    /// <remarks>Measured with curl 8.18.0 on Linux on 2026-10-28: <c>curl -sS -d @sub URL</c>, <c>sub</c> a directory.</remarks>
+    /// <param name="spelledOption">The whole argument as typed, such as <c>-d</c> or <c>--data=@sub</c>.</param>
+    /// <returns>A refusal of two lines, exit 26.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="spelledOption"/> is <see langword="null"/>.</exception>
+    public static CommandLineRefusal DataFileOpenedButUnreadable(string spelledOption)
+    {
+        ArgumentNullException.ThrowIfNull(spelledOption);
+
+        return new CommandLineRefusal(CurlExitCode.ReadError, [], spelledOption, ReadErrorReason);
     }
 
     /// <summary>

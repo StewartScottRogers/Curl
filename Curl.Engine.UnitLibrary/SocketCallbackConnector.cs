@@ -12,7 +12,7 @@ namespace Curl.Engine;
 /// managed engine's sockets live inside <c>Curl.Networking</c> and are never handed out, so a socket the callbacks
 /// see is an opaque <see cref="CurlSocket" /> over the <see cref="IConnection" />: the open-socket callback's, or
 /// the engine's next <see cref="CurlSocketHandles" /> number without one. A TCP connect asks the callbacks before each
-/// attempt dials, through the <see cref="AttemptSocketOpener" /> it puts on the target (CGR-036, ADR-0818): the
+/// attempt dials, through the <see cref="AttemptSocketOpener" /> it puts on the target (CGR-036, ADR-0903): the
 /// open-socket callback's <see cref="CurlSocket.Bad" /> opens no connection and fails the connect with
 /// <see cref="CurlExitCode.CouldntConnect" />, the socket it returns is the one connected (as it is, under the
 /// socket-option callback's <see cref="SocketOptionResult.AlreadyConnected" />), and the socket-option callback's
@@ -69,7 +69,7 @@ internal sealed class SocketCallbackConnector(IConnector inner, EasyCallbackOpti
     /// <summary>
     /// Connects through the inner connector with an <see cref="AttemptSocketOpener" /> on the target, so the
     /// open-socket and socket-option callbacks run before each TCP attempt dials, as curl 8.22.0's
-    /// <c>cf_socket_open</c> calls them (CGR-036, ADR-0818): a refusal opens no connection, a socket the open-socket
+    /// <c>cf_socket_open</c> calls them (CGR-036, ADR-0903): a refusal opens no connection, a socket the open-socket
     /// callback returns is the one connected (used as it is under <see cref="SocketOptionResult.AlreadyConnected" />),
     /// and a failed attempt's socket goes to the close-socket callback. A connector that never asks the opener (a Unix
     /// socket, a test fake) gets the callbacks once it has connected, for the connection's peer.

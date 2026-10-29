@@ -106,6 +106,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool IsUpload { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the body is a non-multipart stream (a <c>CURLOPT_READFUNCTION</c> POST), whose
+    /// short read curl reports as <c>client read function EOF fail</c> like a <c>-T</c> upload (CGR-261).
+    /// </summary>
+    internal bool IsReadFunctionBody { get; init; }
+
+    /// <summary>
     /// Gets where the body bytes sent so far (<see cref="BytesSent" />, chunk framing included) are
     /// reported, with the body's length when it is known: after each piece and the closing chunk, and
     /// once before the first byte unless the head waited for <c>100 Continue</c>, after which curl
@@ -232,7 +238,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// <returns>A task that completes when the body has been written.</returns>
     /// <exception cref="HttpTransferException">
     /// A stream of known length failed a read or ended before its length was read (exit 26),
-    /// a read threw <see cref="RequestBodyReadFailedException" /> (exit 26), or the connection
+    /// a read threw <see cref="RequestBodyReadFailedException" /> (its exit code), or the connection
     /// failed a write (exit 55).
     /// </exception>
     internal async ValueTask WriteAsync(HttpRequestBody body, bool isChunked, CancellationToken cancellationToken)
@@ -377,7 +383,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
             return;
         }
 
-        if (EarlyResponseWatch is null && !tracing)
+        if (EarlyResponseWatch is null && !tracing && !isChunked)
         {
             await WritePieceAsync(content, isChunked, cancellationToken).ConfigureAwait(false);
             return;
@@ -683,7 +689,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     /// <summary>
     /// Reads from the body stream, taking a failed read as the end of the stream, as curl
     /// does, except a <see cref="RequestBodyReadFailedException" />, which fails the transfer
-    /// with exit 26 and its message, as curl fails a multipart part its encoder refuses
+    /// with its exit code (26 unless aborted) and its message, as curl fails a multipart part its encoder refuses
     /// (measured, BL-385 Notes); before failing, it writes what <see cref="heldBack" /> holds, so
     /// the chunks read before the failure still reach the server.
     /// </summary>
@@ -698,7 +704,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
         {
             await ReleaseHeldBackAsync(cancellationToken).ConfigureAwait(false);
             await SendWatchedHeldPieceAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
-            throw new HttpTransferException(CurlExitCode.ReadError, failed.Message);
+            throw new HttpTransferException(failed.ExitCode, failed.Message);
         }
         catch (IOException)
         {
@@ -783,7 +789,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         if (length is { } needed)
         {
-            string message = IsUpload
+            string message = IsUpload || IsReadFunctionBody
                 ? HttpTransferMessages.UploadEndedEarly(BytesWritten, needed)
                 : HttpTransferMessages.BodyStreamEndedEarly(BytesWritten, needed);
             throw new HttpTransferException(CurlExitCode.ReadError, message);

@@ -15,7 +15,10 @@ namespace Curl.Cli;
 /// Measured with the local curl 8.21.0 on 2026-09-27 (through <c>--expand-data</c> against a loopback
 /// server, from PowerShell, since Git Bash rewrites some arguments) and checked against <c>src/var.c</c>
 /// at tag <c>curl-8_21_0</c>. The environment is the one <see cref="CommandLineOptions.ReadEnvironmentVariable"/>
-/// reads: this process's, unless the parse was given the run's own reader (BL-1943); see ADR-0064.
+/// reads: this process's, unless the parse was given the run's own reader (BL-1943); see ADR-0064. Typed
+/// <c>=content</c> is held as the bytes the argument goes out as (<see cref="CommandLineOptions.CommandLineTextBytes"/>)
+/// and an imported value in the ANSI code page on Windows, as curl 8.21.0's Windows build holds both (BL-3848);
+/// a file's bytes are held unchanged.
 /// </remarks>
 internal static class VariableDefinition
 {
@@ -86,7 +89,7 @@ internal static class VariableDefinition
         }
 
         return imported is not null
-            ? Set(options, name, Encoding.UTF8.GetBytes(imported))
+            ? Set(options, name, (options.ConfigFileWireTextEncoding ?? Encoding.UTF8).GetBytes(imported))
             : ApplyContent(options, name, rest, range, source);
     }
 
@@ -100,7 +103,7 @@ internal static class VariableDefinition
 
         if (rest.StartsWith('='))
         {
-            return Set(options, name, range.Cut(Encoding.UTF8.GetBytes(rest[1..])));
+            return Set(options, name, range.Cut(options.CommandLineTextBytes(rest[1..])));
         }
 
         options.AddWarningLinesUnlessSilent(WrappedMessage.Lines("Warning: ", $"Bad --variable syntax, skipping: {source.Value}"));
@@ -111,13 +114,32 @@ internal static class VariableDefinition
     {
         if (file == StandardInputName)
         {
-            // curl's Windows build reads it in text mode (WindowsTextModeInput, CGR-112).
-            return Set(options, name, range.Cut(WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), options.ActsAsWindowsSchannelBuild)));
+            return ReadStandardInput(options, name, range, spelledOption, dataFileReader);
         }
 
         return dataFileReader.TryReadFile(file, out byte[] contents)
             ? Set(options, name, range.Cut(contents))
             : CommandLineRefusal.VariableFileUnreadable(spelledOption, file, OpenFailureReason(file, pathExists), options.ErrorsHidden);
+    }
+
+    /// <summary>
+    /// Sets a <c>--variable name@-</c> from standard input, read in text mode by curl's Windows build
+    /// (<see cref="WindowsTextModeInput"/>, CGR-112); a closed standard input is refused with
+    /// <see cref="CommandLineRefusal.StandardInputUnreadable"/>, as curl 8.22.0 refuses it (CGR-110).
+    /// </summary>
+    private static CommandLineRefusal? ReadStandardInput(CommandLineOptions options, string name, VariableByteRange range, string spelledOption, IDataFileReader dataFileReader)
+    {
+        byte[] contents;
+        try
+        {
+            contents = dataFileReader.ReadStandardInput();
+        }
+        catch (IOException)
+        {
+            return CommandLineRefusal.StandardInputUnreadable(spelledOption);
+        }
+
+        return Set(options, name, range.Cut(WindowsTextModeInput.Contents(contents, options.ActsAsWindowsSchannelBuild)));
     }
 
     /// <summary>

@@ -177,7 +177,7 @@ public sealed partial class TcpConnector(
         ? new LocalBindingTcpDialer(tcpDialer, addressChooser, events)
         : tcpDialer;
 
-    // The race's dialer: BindingDialer's, asking the target's socket opener before each attempt when it has one (ADR-0818).
+    // The race's dialer: BindingDialer's, asking the target's socket opener before each attempt when it has one (ADR-0903).
     private ITcpDialer AttemptDialer(ConnectTarget target) => target.SocketOpener is { } opener
         ? new SocketOpenerTcpDialer(BindingDialer(target.Events), opener)
         : BindingDialer(target.Events);
@@ -232,11 +232,18 @@ public sealed partial class TcpConnector(
     /// <summary>
     /// Gets a value indicating whether a direct connect's <c>https://</c> origin is resolved through
     /// <see cref="IHttpsOriginDnsResolver.ResolveHttpsOriginAsync" />, asking its HTTPS record first,
-    /// as curl 8.22.0's HTTPSRR build does (ADR-0727). The default is the platform build's: off on
-    /// Windows, where the Schannel build has no <c>HTTPSRR</c> and sends only the A and AAAA DoH
-    /// queries, on elsewhere (ADR-0856, CGR-157).
+    /// as curl 8.22.0's HTTPSRR build does (ADR-0727). The default is off on every platform, as neither
+    /// reference build (Schannel on Windows, OpenSSL elsewhere) has <c>HTTPSRR</c>: each sends only the A and AAAA DoH
+    /// queries (ADR-0856, ADR-0957, CGR-157).
     /// </summary>
-    public bool AsksHttpsRecords { get; init; } = !OperatingSystem.IsWindows();
+    public bool AsksHttpsRecords { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether <c>-4</c> or <c>-6</c> also filters an IP address literal host, so
+    /// <c>-6 http://127.0.0.1/</c> has nothing to dial and fails with exit 7, as curl 8.18.0 on Linux does
+    /// (CGR-186). The default is the platform build's: off on Windows, where the literal is dialled as written.
+    /// </summary>
+    public bool FiltersAddressLiterals { get; init; } = !OperatingSystem.IsWindows();
 
     // Gives a random index below its argument for ShufflesResolveEntryAddresses; tests pin it.
     internal Func<int, int> ResolveEntryShuffleRandomBelow { get; init; } = DnsAddressShuffle.CryptographicRandomBelow;
@@ -717,6 +724,21 @@ public sealed partial class TcpConnector(
     }
 
     /// <summary>
+    /// Gets the shortest connect limit a loopback destination is held to, 100 ms. curl's non-blocking
+    /// connect to loopback completes before its timer is first checked, so <c>--connect-timeout 0.01</c>
+    /// connects; here the runtime's own overhead can pass 10 ms first (CGR-187, BL-3716).
+    /// </summary>
+    public static TimeSpan MinimumLoopbackConnectTimeout { get; } = TimeSpan.FromMilliseconds(100);
+
+    private TimeSpan LimitForDestination(ConnectTarget target, ConnectDestination destination, TimeSpan connectLimit) =>
+        UnixSocket is null && TunnelProxyOf(target) is null && IsLoopbackDestination(destination.Host) && connectLimit < MinimumLoopbackConnectTimeout
+            ? MinimumLoopbackConnectTimeout
+            : connectLimit;
+
+    private static bool IsLoopbackDestination(string host) =>
+        IsLocalhost(host) || (IPAddress.TryParse(host.Trim('[', ']'), out var address) && IPAddress.IsLoopback(address));
+
+    /// <summary>
     /// Runs the resolve, dials, any tunnel and any TLS handshake under <paramref name="connectLimit" />
     /// on the injected <see cref="TimeProvider" />, counted from <paramref name="started" /> (ADR-0117).
     /// A cancellation that arrives once the limit has passed on the clock, whoever cancelled, is
@@ -731,6 +753,7 @@ public sealed partial class TcpConnector(
         TimeSpan connectLimit,
         CancellationToken cancellationToken)
     {
+        connectLimit = LimitForDestination(target, destination, connectLimit);
         using var timeout = new CancellationTokenSource(connectLimit, timeProvider);
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         try
@@ -747,6 +770,13 @@ public sealed partial class TcpConnector(
         catch (OperationCanceledException) when (timeProvider.GetElapsedTime(started) >= connectLimit)
         {
             var message = $"Connection timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
+            target.Events.ReportInfo(message);
+            return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
+        }
+        catch (CanceledWhileResolvingException) when (cancellationToken.IsCancellationRequested)
+        {
+            // curl names the phase the --max-time limit ended: a resolve still running says "Resolving" (CGR-284).
+            var message = $"Resolving timed out after {(long)timeProvider.GetElapsedTime(started).TotalMilliseconds} milliseconds";
             target.Events.ReportInfo(message);
             return ConnectResult.Failed(CurlExitCode.OperationTimedOut, message);
         }
@@ -931,7 +961,7 @@ public sealed partial class TcpConnector(
         var ((addresses, failure), fromCache) = await ResolveNotingCacheAsync(destination.Host, destination.Port, target, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            return HostNotResolved(target, destination, failure, fromCache);
+            return NothingToDial(target, destination, failure, fromCache);
         }
 
         var nameResolved = timeProvider.GetTimestamp();
@@ -1074,7 +1104,7 @@ public sealed partial class TcpConnector(
             ? DnsAddressShuffle.Shuffle(entry.Addresses, ResolveEntryShuffleRandomBelow)
             : entry.Addresses;
         _dnsCache.Store(cacheKey, new DnsCacheEntry(entry.Host, entry.Port, addresses));
-        events.ReportInfo($"Added {entry.Host}:{entry.Port}:{entry.AddressText} to DNS cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
+        events.ReportInfo($"[DNS] added {entry.Host}:{entry.Port}:{entry.AddressText} to cache{(entry.IsPermanent ? string.Empty : " (non-permanent)")}");
         if (entry.Host == AnyHost)
         {
             events.ReportInfo($"RESOLVE {AnyHost}:{entry.Port} using wildcard");
@@ -1102,11 +1132,15 @@ public sealed partial class TcpConnector(
     private async ValueTask<DnsResolution> ResolveWithFailureReasonAsync(string host, int port, ConnectTarget target, CancellationToken cancellationToken) =>
         (await ResolveNotingCacheAsync(host, port, target, cancellationToken).ConfigureAwait(false)).Resolution;
 
+    /// <summary>Marks a cancellation that arrived while a host name was being resolved (CGR-284).</summary>
+    private sealed class CanceledWhileResolvingException(CancellationToken cancellationToken) : OperationCanceledException(cancellationToken);
+
     /// <summary>
     /// Fails a connect whose host did not resolve with exit 6 (or 43), first writing, unless the DNS
     /// cache answered, the <c>-v</c> lines curl 8.21.0 writes once its resolver answered nothing for a host
     /// (measured, BL-1157 Notes): <c>Could not resolve host: &lt;host&gt;</c>, twice from the
-    /// system's threaded resolver and so from every resolver but DoH, which writes it once (ADR-0366), then
+    /// system's threaded resolver and so from every resolver but DoH and an <see cref="IDohUrlDnsResolver" />,
+    /// which write it once (ADR-0366, BL-3916), then
     /// <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>, around which a
     /// <see cref="DnsFilterTraceEvents" /> writes its own. A negative DNS cache entry writes
     /// <c>Could not resolve host: &lt;host&gt;</c> once, <c>Could not resolve: &lt;host&gt;:&lt;port&gt;</c>
@@ -1115,6 +1149,15 @@ public sealed partial class TcpConnector(
     /// <c>Could not resolve proxy: &lt;proxy&gt;</c>, as curl 8.22.0 reports <c>-x</c>, <c>--proxy1.0</c> and an
     /// <c>https://</c> proxy (measured, BL-3168).
     /// </summary>
+    /// <summary>
+    /// Reports an empty answer: exit 7 for an IP address literal that <c>-4</c> or <c>-6</c> leaves nothing to dial off
+    /// Windows (curl 8.18.0 on Linux, CGR-186), otherwise <see cref="HostNotResolved" />.
+    /// </summary>
+    private ConnectResult NothingToDial(ConnectTarget target, ConnectDestination destination, DnsLookupFailure failure, bool fromCache) =>
+        AddressFamilyFilter.IsRefusedLiteral(destination.Host, addressFamily, !FiltersAddressLiterals)
+            ? ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {HostWithoutZoneId(target.Host)}:{target.Port} after 0 ms: Could not connect to server")
+            : HostNotResolved(target, destination, failure, fromCache);
+
     private ConnectResult HostNotResolved(ConnectTarget target, ConnectDestination destination, DnsLookupFailure failure, bool fromCache)
     {
         var events = target.Events;
@@ -1155,7 +1198,7 @@ public sealed partial class TcpConnector(
     private void ReportLookUpFailed(ITransferEvents events, ConnectDestination destination, string message)
     {
         events.ReportInfo(message);
-        if (KindOfResolver is not DohDnsResolver)
+        if (KindOfResolver is not (DohDnsResolver or IDohUrlDnsResolver))
         {
             events.ReportInfo(message);
         }
@@ -1177,10 +1220,20 @@ public sealed partial class TcpConnector(
             return (new DnsResolution(fromCache, DnsLookupFailure.None), true);
         }
 
-        var (addresses, failure) = await LookUpAsync(host, port, target, cancellationToken).ConfigureAwait(false);
-        var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily);
+        DnsResolution lookedUp;
+        try
+        {
+            lookedUp = await LookUpAsync(host, port, target, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException canceled)
+        {
+            throw new CanceledWhileResolvingException(canceled.CancellationToken);
+        }
+
+        var (addresses, failure) = lookedUp;
+        var answered = IsLocalhost(host) ? addresses : AddressFamilyFilter.Dialable(host, addresses, addressFamily, !FiltersAddressLiterals);
         CacheLookUp(new DnsCacheEntry(host, port, answered), cacheKey, failure, target.Events);
-        var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily);
+        var dialable = AddressFamilyFilter.Dialable(host, answered, addressFamily, !FiltersAddressLiterals);
         LogResolution(log, host, port, dialable, fromCache: false, resolveStarted);
         return (new DnsResolution(dialable, failure), false);
     }
@@ -1245,13 +1298,20 @@ public sealed partial class TcpConnector(
             var addresses = await httpsOriginResolver.ResolveHttpsOriginAsync(host, port, cancellationToken).ConfigureAwait(false);
             _httpsRecordsResolved[DnsCacheKey(host, port)] = true;
             ReportHttpsRecord(host, port, httpsOriginResolver.HttpsRecordFor(host, port), target.Events);
-            return new DnsResolution(dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Shuffle(addresses) : addresses, DnsLookupFailure.None);
+            return new DnsResolution(dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Shuffle(addresses) : addresses, addresses.Count == 0 ? DohEncodingFailureOf(host) : DnsLookupFailure.None);
         }
 
         return dnsResolver is IDnsResolverWithFailureReason withFailureReason
             ? await withFailureReason.ResolveWithFailureReasonAsync(host, cancellationToken).ConfigureAwait(false)
             : new DnsResolution(await dnsResolver.ResolveAsync(host, cancellationToken).ConfigureAwait(false), DnsLookupFailure.None);
     }
+
+    // Why the DoH resolver found no address for host without sending anything: a name its A query cannot
+    // encode is curl 8.22.0's exit 27 (CGR-158, BL-3915); None for any other empty answer.
+    private DnsLookupFailure DohEncodingFailureOf(string host) =>
+        KindOfResolver is DohDnsResolver && DnsQueryEncoder.Encode(host, DnsRecordType.A).Failure is var failure && failure != DnsMessageFailure.None
+            ? failure == DnsMessageFailure.NameTooLong ? DnsLookupFailure.DohNameTooLong : DnsLookupFailure.DohBadLabel
+            : DnsLookupFailure.None;
 
     // The resolver the look-ups reach, seen through a DNS shuffle wrapper: the kind decides the DoH, DNS-server and HTTPS-RR behaviour.
     private IDnsResolver KindOfResolver => dnsResolver is ShufflingDnsResolver shuffling ? shuffling.Inner : dnsResolver;
@@ -1286,7 +1346,7 @@ public sealed partial class TcpConnector(
 
     private IReadOnlyList<IPAddress> AnswerFromCache(string host, DnsCacheEntry cached, ITransferEvents events)
     {
-        var dialable = AddressFamilyFilter.Dialable(host, cached.Addresses, addressFamily);
+        var dialable = AddressFamilyFilter.Dialable(host, cached.Addresses, addressFamily, !FiltersAddressLiterals);
         if (dialable.Count == 0)
         {
             events.ReportInfo("Negative DNS entry");
@@ -2268,6 +2328,14 @@ public sealed partial class TcpConnector(
         return opened;
     }
 
+    // curl 8.22.0 writes an IPv6 literal host bracketed in the Established connection line (CGR-221).
+    private static string BracketedIfIpv6Literal(string hostName, string? unixSocketRemoteIp)
+    {
+        return unixSocketRemoteIp is null && IPAddress.TryParse(hostName, out var address) && address.AddressFamily == AddressFamily.InterNetworkV6
+            ? $"[{hostName}]"
+            : hostName;
+    }
+
     /// <summary>
     /// Numbers a connection that is ready for the transfer, reports it opened as curl 8.21.0's
     /// <c>Established connection</c> line, after any tunnel and TLS handshake (BL-228), and
@@ -2285,7 +2353,7 @@ public sealed partial class TcpConnector(
         var connectionNumber = TakeConnectionNumber();
         events.ReportConnectionOpened(new ConnectionOpenedEvent
         {
-            HostName = dialed.HostName,
+            HostName = BracketedIfIpv6Literal(dialed.HostName, dialed.UnixSocketRemoteIp),
             RemoteEndPoint = dialed.RemoteEndPoint ?? UnspecifiedEndPoint,
             LocalEndPoint = dialed.LocalEndPoint ?? UnspecifiedEndPoint,
             UnixSocketRemoteIp = dialed.UnixSocketRemoteIp,
@@ -2343,13 +2411,26 @@ public sealed partial class TcpConnector(
         ConnectTarget target,
         CancellationToken cancellationToken) =>
         AuthenticateAsync(
-            target.IsForwardProxy ? _proxyTlsProvider : tlsProvider,
+            TrustedAs(target, target.IsForwardProxy ? _proxyTlsProvider : tlsProvider),
             plaintext,
-            target.Host,
+            target.TlsServerName ?? target.Host,
             target,
             target.IsForwardProxy,
             ApplicationProtocolsFor(target, HttpOverTlsApplicationProtocols),
             cancellationToken);
+
+    /// <summary>
+    /// Returns the provider whose trust <paramref name="target" /> asks for: one trusting only the
+    /// system store when <see cref="ConnectTarget.TrustsSystemStoreOnly" /> is set and the provider
+    /// can make one, otherwise <paramref name="provider" /> itself (CGR-289, ADR-0979).
+    /// </summary>
+    /// <param name="target">The target whose handshake is about to run.</param>
+    /// <param name="provider">The provider the target's handshake would otherwise run through.</param>
+    /// <returns>The provider to run the handshake through.</returns>
+    internal static ITlsProvider TrustedAs(ConnectTarget target, ITlsProvider provider) =>
+        target.TrustsSystemStoreOnly && provider is ISystemStoreTrustTlsProvider systemStoreTrust
+            ? systemStoreTrust.WithSystemStoreOnlyTrust()
+            : provider;
 
     /// <summary>
     /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:

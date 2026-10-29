@@ -70,6 +70,16 @@ internal static class TlsFailureMessages
 
     // What the OpenSSL build reports when it refuses the version a ServerHello picked and sends
     // protocol_version itself (measured with curl 8.21.0 on OpenSSL 4.0.0, BL-1950).
+    // What OpenSSL 3 reports when the server answers the ClientHello with bytes that are no TLS record.
+    private const string OpenSslWrongVersionNumber = "error:0A00010B:SSL routines::wrong version number";
+
+    // What curl 8.22.0 Schannel reports for the same bytes (CGR-224).
+    private const string SchannelInvalidToken =
+        "schannel: next InitializeSecurityContext failed: SEC_E_INVALID_TOKEN (0x80090308) - The token supplied to the function is invalid";
+
+    // How SslStream words a first record that is no TLS record, in the message of the exception chain.
+    private const string MalformedFrameNamed = "Cannot determine the frame size or a corrupted frame was received.";
+
     private const string OpenSslUnsupportedProtocol = "error:0A000102:SSL routines::unsupported protocol";
 
     /// <summary>
@@ -81,11 +91,11 @@ internal static class TlsFailureMessages
     /// <summary>
     /// The OpenSSL build's exit 56 message for a read that finds the connection ended
     /// without <c>close_notify</c>: <c>SSL_read</c>'s error string, which curl prefixes
-    /// with the OpenSSL version of the reference build, <c>curlimages/curl:8.21.0</c>
+    /// with the OpenSSL version of the Linux reference build, 3.5.5 (CGR-292)
     /// (BL-819; ADR-0221).
     /// </summary>
     internal const string OpenSslMissingCloseNotify =
-        "OpenSSL SSL_read: OpenSSL/3.5.7: " + OpenSslUnexpectedEof + ", errno 0";
+        "OpenSSL SSL_read: OpenSSL/3.5.5: " + OpenSslUnexpectedEof + ", errno 0";
 
     /// <summary>
     /// The exit 56 message of the build being matched for a read that finds the connection
@@ -96,6 +106,48 @@ internal static class TlsFailureMessages
     internal static string MissingCloseNotify(bool matchesSchannelBuild) =>
         matchesSchannelBuild ? SchannelMissingCloseNotify : OpenSslMissingCloseNotify;
 
+    // The text of a read that a fatal alert after the handshake ended (CGR-223): the Schannel
+    // build names the security status, the OpenSSL build the alert, which SslStream does not
+    // say, so the two a server sends after the handshake are told by the client certificate:
+    // none presented is certificate_required, one presented is unknown_ca (the measured pair).
+    private const string OpenSslCertificateRequiredAlert = "error:0A00045C:SSL routines::tlsv13 alert certificate required";
+
+    // SslStream reports the alert record a server sends after the handshake as either status.
+    private const int SecEDecryptFailure = unchecked((int)0x80090330);
+
+    private const string OpenSslUnknownCaAlert = "error:0A000418:SSL routines::tlsv1 alert unknown ca";
+
+    /// <summary>
+    /// The exit 56 message for a read that failed because the server sent a fatal alert after
+    /// the handshake, or <see langword="null" /> when the failure shows none.
+    /// </summary>
+    /// <param name="failure">What the read threw.</param>
+    /// <param name="matchesSchannelBuild"><see langword="true" /> for curl's Schannel build.</param>
+    /// <param name="presentedClientCertificate"><see langword="true" /> when <c>--cert</c> was presented.</param>
+    /// <returns>The message curl prints, or <see langword="null" />.</returns>
+    internal static string? AlertReadFailure(IOException failure, bool matchesSchannelBuild, bool presentedClientCertificate) =>
+        matchesSchannelBuild
+            ? SchannelAlertReadFailure(failure)
+            : OpenSslAlertReadFailure(failure, presentedClientCertificate);
+
+    private static string? SchannelAlertReadFailure(IOException failure)
+    {
+        var code = FindInnerException<Win32Exception>(failure)?.NativeErrorCode;
+        return code == SecEIllegalMessage || code == SecEDecryptFailure
+            ? SchannelFatalAlertReceived.Replace("next InitializeSecurityContext failed", "failed to read data from server", StringComparison.Ordinal)
+            : null;
+    }
+
+    private static string? OpenSslAlertReadFailure(IOException failure, bool presentedClientCertificate)
+    {
+        if (failure.InnerException is null || FindInnerException<SocketException>(failure) is not null)
+        {
+            return null;
+        }
+
+        var alert = presentedClientCertificate ? OpenSslUnknownCaAlert : OpenSslCertificateRequiredAlert;
+        return $"OpenSSL SSL_read: OpenSSL/3.5.5: {alert}, errno 0";
+    }
     // The SEC_E_* names curl's Schannel build prints for a security status; any other is
     // "Unknown error", as curl's own table falls back to.
     private static readonly FrozenDictionary<int, string> SecurityStatusNames = new Dictionary<int, string>
@@ -198,18 +250,37 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The Schannel build's message for exit 35 when the hand-built client's handshake fails
-    /// for a reason other than verification (ADR-0140, "Failures and text"): the server
-    /// closing, or any range of only TLS 1.0 and 1.1 (as <see cref="SchannelSslConnectError(Exception, bool)" />
-    /// reports it), is <c>failed to receive handshake</c>; an alert either side sent is the
-    /// line Schannel's curl prints for a fatal alert.
+    /// for a reason other than verification (ADR-0140, "Failures and text"; ADR-0987): the
+    /// server closing, or an alert the client sent under a ceiling of TLS 1.0 or 1.1, is
+    /// <c>failed to receive handshake</c>; an alert received under that ceiling is
+    /// <c>SEC_E_ILLEGAL_MESSAGE</c>'s line when the range offered both TLS 1.0 and TLS 1.1
+    /// and <c>SEC_E_UNSUPPORTED_FUNCTION</c>'s when it offered one of them (measured against
+    /// curl 8.22.0 and <c>openssl s_server</c>); any other alert is the line Schannel's curl
+    /// prints for a fatal alert.
     /// </summary>
     /// <param name="failure">Why the hand-built handshake failed.</param>
-    /// <param name="offersOnlyVersionsBelowTls12"><see langword="true" /> when the ceiling was TLS 1.0 or TLS 1.1.</param>
+    /// <param name="minimumVersion">The lowest version the range offered (<c>--tlsv1.x</c>).</param>
+    /// <param name="maximumVersion">The highest version the range offered (<c>--tls-max</c>).</param>
     /// <returns>The message curl prints.</returns>
-    public static string SchannelHandBuiltHandshakeFailure(TlsHandshakeFailure failure, bool offersOnlyVersionsBelowTls12) =>
-        failure.Origin == TlsHandshakeFailureOrigin.TransportClosed || offersOnlyVersionsBelowTls12
-            ? SchannelHandshakeNotReceived
+    public static string SchannelHandBuiltHandshakeFailure(TlsHandshakeFailure failure, TlsVersion minimumVersion, TlsVersion maximumVersion)
+    {
+        if (failure.Origin == TlsHandshakeFailureOrigin.TransportClosed)
+        {
+            return SchannelHandshakeNotReceived;
+        }
+
+        return maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
+            ? SchannelAlertBelowTls12(failure.Origin, minimumVersion, maximumVersion)
             : SchannelFatalAlertReceived;
+    }
+
+    // An alert under a TLS 1.0 or 1.1 ceiling (ADR-0987): the client's own keeps BL-502's line,
+    // a received one is SEC_E_ILLEGAL_MESSAGE for TLS 1.0 to 1.1 and SEC_E_UNSUPPORTED_FUNCTION
+    // for any other range.
+    private static string SchannelAlertBelowTls12(TlsHandshakeFailureOrigin origin, TlsVersion minimumVersion, TlsVersion maximumVersion) =>
+        origin == TlsHandshakeFailureOrigin.AlertSent ? SchannelHandshakeNotReceived
+        : minimumVersion == TlsVersion.Tls10 && maximumVersion == TlsVersion.Tls11 ? SchannelFatalAlertReceived
+        : SchannelUnsupportedFunction;
 
     /// <summary>
     /// The message for exit 101 when the server did not accept the hand-built client's ECH
@@ -341,7 +412,7 @@ internal static class TlsFailureMessages
         }
 
         var certificate = chain!.ChainElements[0].Certificate;
-        var shownHost = ToIpAddressFamily(targetHost) == AddressFamily.InterNetworkV6 ? $"[{targetHost}]" : targetHost;
+        var shownHost = IsBracketedByCurl(targetHost) ? $"[{targetHost}]" : targetHost;
         if (HasDnsOrIpAlternativeNames(certificate))
         {
             return $"SSL: no alternative certificate subject name matches target {DescribeTarget(targetHost)} '{shownHost}'";
@@ -382,6 +453,11 @@ internal static class TlsFailureMessages
         if (RecvFailure(exception, SchannelSocketErrorTexts) is { } recvFailure)
         {
             return recvFailure;
+        }
+
+        if (IsMalformedFrame(exception))
+        {
+            return SchannelInvalidToken;
         }
 
         var securityStatus = FindInnerException<Win32Exception>(exception);
@@ -440,6 +516,11 @@ internal static class TlsFailureMessages
         if (RecvFailure(exception, OpenSslSocketErrorTexts) is { } recvFailure)
         {
             return recvFailure;
+        }
+
+        if (IsMalformedFrame(exception))
+        {
+            return $"TLS connect error: {OpenSslWrongVersionNumber}";
         }
 
         var innermost = exception;
@@ -743,13 +824,13 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The Schannel build's message for exit 59: a <c>--ciphers</c> entry names no ALG_ID
-    /// (ADR-0011, ADR-0816).
+    /// (ADR-0011, ADR-0896).
     /// </summary>
     public const string SchannelCipherListRefused = "schannel: Failed setting algorithm cipher list";
 
     /// <summary>
     /// The Schannel build's message for exit 35 when AcquireCredentialsHandle accepts none of
-    /// the <c>--ciphers</c> algorithms (ADR-0816, measured with curl 8.22.0).
+    /// the <c>--ciphers</c> algorithms (ADR-0896, measured with curl 8.22.0).
     /// </summary>
     public const string SchannelAlgorithmMismatch =
         "schannel: AcquireCredentialsHandle failed: SEC_E_ALGORITHM_MISMATCH (0x80090331) - The client and server cannot communicate, because they do not possess a common algorithm.";
@@ -785,12 +866,19 @@ internal static class TlsFailureMessages
 
     // curl's Schannel build checks the chain's trust errors in this order. An untrusted root
     // is also what anything else, or no chain at all, is reported as.
-    private static string SchannelCaCertificateFileChainError(X509Chain? chain)
+    private static string SchannelCaCertificateFileChainError(X509Chain? chain) =>
+        SchannelCaCertificateFileChainError(ChainStatus(chain));
+
+    internal static string SchannelCaCertificateFileChainError(X509ChainStatusFlags status)
     {
-        var status = ChainStatus(chain);
         if (status.HasFlag(X509ChainStatusFlags.NotTimeValid))
         {
             return SchannelChainNotTimeValid;
+        }
+
+        if (status.HasFlag(X509ChainStatusFlags.Revoked))
+        {
+            return SchannelChainRevoked;
         }
 
         if (status.HasFlag(X509ChainStatusFlags.PartialChain))
@@ -829,6 +917,12 @@ internal static class TlsFailureMessages
             : "certificate has expired (10)";
     }
 
+    // curl's OpenSSL build shows an IPv6 target in brackets except an IPv4-mapped one (CGR-227).
+    private static bool IsBracketedByCurl(string host) =>
+        IPAddress.TryParse(host, out var address)
+        && address.AddressFamily == AddressFamily.InterNetworkV6
+        && !address.IsIPv4MappedToIPv6;
+
     private static AddressFamily? ToIpAddressFamily(string host) =>
         IPAddress.TryParse(host, out var address) ? address.AddressFamily : null;
 
@@ -858,6 +952,10 @@ internal static class TlsFailureMessages
             ? null
             : $"Recv failure: {socketErrorTexts.GetValueOrDefault(socketError.SocketErrorCode, socketError.Message)}";
     }
+
+    private static bool IsMalformedFrame(Exception exception) =>
+        exception.Message.Contains(MalformedFrameNamed, StringComparison.Ordinal)
+        || (exception.InnerException is { } inner && IsMalformedFrame(inner));
 
     private static T? FindInnerException<T>(Exception exception)
         where T : Exception

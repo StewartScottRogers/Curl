@@ -461,8 +461,10 @@ public sealed class UdpDatagramConnectorTests
         // curl -6 -v tftp://127.0.0.1:47501/x -> *   Trying 127.0.0.1:47501... (curl 8.21.0, BL-500).
         Diagnostics.Arrange("host", "127.0.0.1:47501");
         Diagnostics.Arrange("address family", AddressFamily.InterNetworkV6);
+        Diagnostics.Arrange("filters address literals", false);
         var opened = new List<IPEndPoint>();
-        var connector = CreateConnector(new FakeDnsResolver(IPAddress.Loopback), OpenFake(opened), addressFamily: AddressFamily.InterNetworkV6);
+        var connector = CreateConnector(
+            new FakeDnsResolver(IPAddress.Loopback), OpenFake(opened), addressFamily: AddressFamily.InterNetworkV6, filtersAddressLiterals: false);
 
         var result = await connector.OpenAsync("127.0.0.1", 47501, CancellationToken.None);
 
@@ -470,6 +472,28 @@ public sealed class UdpDatagramConnectorTests
         Diagnostics.Assert("opened", "127.0.0.1:47501", string.Join(", ", opened));
         Assert.IsNotNull(result.Channel);
         CollectionAssert.AreEqual(new[] { new IPEndPoint(IPAddress.Loopback, 47501) }, opened);
+    }
+
+    [TestMethod]
+    public async Task OpenAsync_UnderIPv6ToAnIPv4LiteralWhenFilteringLiterals_FailsWithCouldntConnectAndOpensNothing()
+    {
+        // The OpenSSL build off Windows: -6 http://127.0.0.1/ is exit 7 (curl 8.18.0 on Linux, CGR-186);
+        // TFTP's UDP channel fails the same way (ADR-0968).
+        Diagnostics.Arrange("host", "127.0.0.1:47501");
+        Diagnostics.Arrange("address family", AddressFamily.InterNetworkV6);
+        Diagnostics.Arrange("filters address literals", true);
+        var opened = new List<IPEndPoint>();
+        var connector = CreateConnector(
+            new FakeDnsResolver(IPAddress.Loopback), OpenFake(opened), addressFamily: AddressFamily.InterNetworkV6, filtersAddressLiterals: true);
+
+        var result = await connector.OpenAsync("127.0.0.1", 47501, CancellationToken.None);
+
+        ActResult(result, opened);
+        Diagnostics.Assert("exit code", CurlExitCode.CouldntConnect, result.ExitCode);
+        Diagnostics.Assert("error message", "Failed to connect to 127.0.0.1:47501 after 0 ms: Could not connect to server", result.ErrorMessage);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("Failed to connect to 127.0.0.1:47501 after 0 ms: Could not connect to server", result.ErrorMessage);
+        Assert.IsEmpty(opened);
     }
 
     [TestMethod]
@@ -556,8 +580,12 @@ public sealed class UdpDatagramConnectorTests
         Func<IPEndPoint, IDatagramChannel> openChannel,
         ResolveOverrides? resolveOverrides = null,
         ConnectToMappings? connectToMappings = null,
-        AddressFamily addressFamily = AddressFamily.Unspecified) =>
-        new(resolver, new ManualTimeProvider(), openChannel, resolveOverrides, connectToMappings, addressFamily);
+        AddressFamily addressFamily = AddressFamily.Unspecified,
+        bool filtersAddressLiterals = false) =>
+        new(resolver, new ManualTimeProvider(), openChannel, resolveOverrides, connectToMappings, addressFamily)
+        {
+            FiltersAddressLiterals = filtersAddressLiterals,
+        };
 
     private static Func<IPEndPoint, IDatagramChannel> OpenFake(List<IPEndPoint> opened) =>
         endPoint =>

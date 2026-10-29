@@ -115,7 +115,7 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
 
     /// <summary>
     /// Gets the proxy the DoH requests go through, as curl 8.22.0's DoH sub-transfers take the
-    /// proxy environment variables (CGR-037, ADR-0818): an <c>http://</c> DoH URL through an HTTP or
+    /// proxy environment variables (CGR-037, ADR-0904): an <c>http://</c> DoH URL through an HTTP or
     /// HTTPS proxy is POSTed to the proxy in absolute form with <c>Proxy-Connection: Keep-Alive</c>;
     /// an <c>https://</c> one, or any through a SOCKS proxy, is tunnelled. <see langword="null" />,
     /// the default, connects to the DoH server directly.

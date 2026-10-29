@@ -75,7 +75,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
         Diagnostics.Assert("result", TransferResult.Success(length), result);
-        Assert.AreEqual(TransferResult.Success(length), result);
+        Assert.AreEqual(TransferResult.Success(length), result with { Report = null });
         CollectionAssert.AreEqual(reply, output.ToArray());
     }
 
@@ -226,7 +226,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
         Diagnostics.Assert("result", TransferResult.Success(reply.Length), result);
-        Assert.AreEqual(TransferResult.Success(reply.Length), result);
+        Assert.AreEqual(TransferResult.Success(reply.Length), result with { Report = null });
         CollectionAssert.AreEqual(reply, output.ToArray());
     }
 
@@ -274,7 +274,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
         Diagnostics.Assert("tls", useTls, connector.Targets.Single().UseTls);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         Assert.AreEqual(useTls, connector.Targets.Single().UseTls);
         Assert.AreEqual(70, connector.Targets.Single().Port);
         CollectionAssert.AreEqual("abc\r\n"u8.ToArray(), connection.Written);
@@ -296,7 +296,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("transcript", DiagnosticText.Lines(events.Transcript));
 
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.SslConnectError, 0, Message), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.SslConnectError, 0, Message), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.SslConnectError, 0, Message), result with { Report = null });
         Assert.IsTrue(connector.Targets.Single().UseTls);
         Assert.IsEmpty(events.Transcript);
         Assert.IsEmpty(progress.Reports);
@@ -318,7 +318,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 7, Message), result);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 7, Message), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 7, Message), result with { Report = null });
         CollectionAssert.AreEqual("partial"u8.ToArray(), output.ToArray());
         Assert.IsTrue(connection.IsDisposed);
     }
@@ -339,7 +339,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
         Diagnostics.Assert("result", TransferResult.Success(reply.Length), result);
-        Assert.AreEqual(TransferResult.Success(reply.Length), result);
+        Assert.AreEqual(TransferResult.Success(reply.Length), result with { Report = null });
         CollectionAssert.AreEqual(reply, output.ToArray());
         Assert.HasCount(reply.Length + 1, progress.Reports);
         Assert.AreEqual($"downloaded {reply.Length}", progress.Reports[^1]);
@@ -356,7 +356,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
         Diagnostics.Assert("result", TransferResult.Success(2), result);
-        Assert.AreEqual(TransferResult.Success(2), result);
+        Assert.AreEqual(TransferResult.Success(2), result with { Report = null });
         CollectionAssert.AreEqual("ab"u8.ToArray(), output.ToArray());
         Assert.AreEqual(2, connection.ReadCount);
     }
@@ -396,7 +396,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         await cancellation.CancelAsync();
         Diagnostics.Act("result", DiagnosticText.Result(result));
 
-        Assert.AreEqual(TransferResult.Success(4), result);
+        Assert.AreEqual(TransferResult.Success(4), result with { Report = null });
         CollectionAssert.AreEqual("done"u8.ToArray(), output.ToArray());
     }
 
@@ -413,7 +413,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         Diagnostics.Act("results", DiagnosticText.Result(refused) + " | " + DiagnosticText.Result(served));
 
         Assert.AreEqual(CurlExitCode.UrlMalformat, refused.ExitCode);
-        Assert.AreEqual(TransferResult.Success(2), served);
+        Assert.AreEqual(TransferResult.Success(2), served with { Report = null });
         Assert.IsEmpty(connector.Connections[0].Written);
         CollectionAssert.AreEqual("next\r\n"u8.ToArray(), connector.Connections[1].Written);
         CollectionAssert.AreEqual("ok"u8.ToArray(), output.ToArray());
@@ -436,7 +436,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
         string[] expectedSelectors = [.. Enumerable.Range(0, Count).Select(index => $"sel{index}\r\n").Order(StringComparer.Ordinal)];
         string[] sentSelectors = [.. connector.Connections.Select(connection => Encoding.ASCII.GetString(connection.Written)).Order(StringComparer.Ordinal)];
         Diagnostics.Assert("connections", Count, connector.Connections.Count);
-        Assert.IsTrue(results.All(result => result == TransferResult.Success(reply.Length)));
+        Assert.IsTrue(results.All(result => result with { Report = null } == TransferResult.Success(reply.Length)));
         CollectionAssert.AreEqual(expectedSelectors, sentSelectors);
         Assert.IsTrue(outputs.All(output => output.ToArray().AsSpan().SequenceEqual(reply)));
         Assert.IsTrue(connector.Connections.All(connection => connection.IsDisposed));
@@ -460,7 +460,7 @@ public sealed class GopherProtocolHandlerAdversarialTests
 
         Diagnostics.Assert("result", TransferResult.Success(0), result);
         Diagnostics.Diff("selector sent", expected, connection.Written);
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(TransferResult.Success(0), result with { Report = null });
         CollectionAssert.AreEqual(expected, connection.Written);
     }
 

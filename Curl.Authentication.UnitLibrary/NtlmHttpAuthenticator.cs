@@ -52,6 +52,12 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// </summary>
     public const string ResponsesTooLargeMessage = "incoming NTLM message too big";
 
+    /// <summary>
+    /// The message curl's SSPI build fails with (exit 67) when SSPI will not acquire the
+    /// credential for the Type 1 message, as for a user name SSPI holds too long (CGR-120).
+    /// </summary>
+    public const string LoginDeniedMessage = "Login denied";
+
     private const string SchemePrefix = "NTLM ";
 
     private const byte AuthenticateMessageType = 3;
@@ -79,7 +85,8 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
     /// <exception cref="HttpAuthenticationFailedException">
     /// The context cannot answer the Type 2 message and <c>matchesSspiBuild</c> is set and the
     /// context is not the hand-built one (exit 94), or otherwise the context refuses the answer because the Type 3 message
-    /// would not fit curl's buffer (exit 100).
+    /// would not fit curl's buffer (exit 100), or, where <c>matchesSspiBuild</c> is set, the
+    /// context has no credential for the Type 1 message (exit 67).
     /// </exception>
     public async ValueTask<string?> CreateAuthorizationAsync(HttpAuthRequest request, string? sentAuthorization, bool sentBeforeAnyChallenge, IReadOnlyList<string> challenges, CancellationToken cancellationToken)
     {
@@ -183,6 +190,11 @@ public sealed class NtlmHttpAuthenticator(ISecurityContextFactory securityContex
         SecurityContextStep negotiate = await context.NextTokenAsync(ReadOnlyMemory<byte>.Empty, cancellationToken).ConfigureAwait(false);
         string? header = HeaderOf(negotiate);
         LogRound(header, "type 1 sent", negotiate.Status);
+        if (negotiate.Status == SecurityContextStatus.NoCredentials && matchesSspiBuild)
+        {
+            throw Failed(CurlExitCode.LoginDenied, LoginDeniedMessage);
+        }
+
         return header;
     }
 

@@ -15,6 +15,8 @@ internal static class HttpConditionDate
 {
     private const long SecondsPerDay = 86400;
 
+    private const string WindowsNegativeTimeWeekday = "Thu";
+
     private static readonly long LastUnixSecondsInRange = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
 
     private static readonly string[] DayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -27,11 +29,18 @@ internal static class HttpConditionDate
     /// in the same form with the whole year when it is past 9999-12-31 23:59:59 UTC.
     /// </summary>
     /// <param name="timeCondition">The transfer's <c>-z</c> condition.</param>
+    /// <param name="windowsRuntime">
+    /// <see langword="true" /> when running on Windows, whose C runtime <c>gmtime</c> names every time
+    /// before 1970 a <c>Thu</c> (measured with curl 8.22.0 Schannel, BL-3735).
+    /// </param>
     /// <returns>The header value, for example <c>Sat, 01 Jan 40000 00:00:00 GMT</c>.</returns>
-    internal static string Format(TimeCondition timeCondition) =>
-        timeCondition.ValueUnixSeconds > LastUnixSecondsInRange
+    internal static string Format(TimeCondition timeCondition, bool windowsRuntime = false)
+    {
+        string formatted = timeCondition.ValueUnixSeconds > LastUnixSecondsInRange
             ? FormatPastYear9999(timeCondition.ValueUnixSeconds)
             : timeCondition.Value.UtcDateTime.ToString("r", CultureInfo.InvariantCulture);
+        return windowsRuntime && timeCondition.ValueUnixSeconds < 0 ? WindowsNegativeTimeWeekday + formatted[3..] : formatted;
+    }
 
     /// <summary>
     /// Formats Unix seconds after 9999-12-31 23:59:59 UTC in the proleptic Gregorian calendar,

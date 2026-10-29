@@ -96,7 +96,7 @@ public interface ISaslExchange
     /// message at all is sent as an empty line, and one that sets a message of zero bytes as
     /// <c>=</c>. DIGEST-MD5 answers the server's <c>rspauth</c> with no message (upstream test823
     /// and test869); curl 8.22.0 sends <c>LOGIN</c>'s empty password as an empty line too
-    /// (ADR-0826). Read only after
+    /// (ADR-0928). Read only after
     /// <see cref="RespondAsync" /> returned an empty array. An implementation that does not
     /// override it reports <see langword="false" />.
     /// </remarks>

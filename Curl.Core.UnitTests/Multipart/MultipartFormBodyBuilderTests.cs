@@ -512,6 +512,7 @@ public sealed class MultipartFormBodyBuilderTests
     }
 
     [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
     public async Task ADirectoryIsReadErrorWithCurlsReadMessage()
     {
         // Measured: -F f=@<a directory> exits 26 with "curl: (26) read error getting mime data".

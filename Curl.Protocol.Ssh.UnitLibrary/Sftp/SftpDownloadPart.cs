@@ -24,9 +24,10 @@ internal sealed record SftpDownloadPart(long Offset, long? Length)
     /// <param name="resumeFrom">The <c>-C</c> offset, or <see langword="null" />; 0 is no resume, as in curl.</param>
     /// <param name="size">The size <c>STAT</c> gave, or <see langword="null" /> when unknown.</param>
     /// <param name="rangeText">
-    /// The <c>-r</c> text, read only when <paramref name="range" /> is <see langword="null" />:
-    /// the command line could not read it as a range, so it is read here as
-    /// <c>Curl_ssh_range</c> reads it (BL-1396).
+    /// The <c>-r</c> text, or <see langword="null" />. When given it is read as
+    /// <c>Curl_ssh_range</c> reads it, in place of <paramref name="range" />, so text after the
+    /// first range (<c>0-1,5-6</c>, <c>0-9x</c>, <c>1-2-3</c>) is exit 33 as in curl 8.22.0
+    /// (BL-1396, CGR-131).
     /// </param>
     /// <returns>The part to read.</returns>
     /// <exception cref="SshTransferException">
@@ -72,15 +73,15 @@ internal sealed record SftpDownloadPart(long Offset, long? Length)
         }
     }
 
-    // The -r range when the command line read it, else its text, else the whole file.
+    // The -r text read as Curl_ssh_range reads it, else the range, else the whole file.
     private static SftpDownloadPart Asked(ByteRange? range, string? rangeText, long size)
     {
-        if (range is not null)
+        if (rangeText is not null)
         {
-            return Within(range, size);
+            return WithinText(rangeText, size);
         }
 
-        return rangeText is null ? new SftpDownloadPart(0, size) : WithinText(rangeText, size);
+        return range is null ? new SftpDownloadPart(0, size) : Within(range, size);
     }
 
     // Curl_ssh_range: a suffix longer than the file is the whole file, a last position past

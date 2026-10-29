@@ -554,6 +554,18 @@ internal sealed class SshUserAuthentication(
             return reading.DenialReason ?? await UnderivablePublicKeyReasonAsync(files, cancellationToken).ConfigureAwait(false);
         }
 
+        return await DenyReadPublicKeyAsync(user, publicKey, files, cancellationToken).ConfigureAwait(false);
+    }
+
+    // libssh2 refuses a key blob under four bytes before it sends anything, as a PEM
+    // private key named by --pubkey decodes to one.
+    private async ValueTask<string?> DenyReadPublicKeyAsync(byte[] user, SshPublicKey publicKey, SshUserKeyFiles files, CancellationToken cancellationToken)
+    {
+        if (publicKey.Blob.Length < 4)
+        {
+            return SshInfoLines.PublicKeyFileTooShort;
+        }
+
         string? algorithm = ChooseSignatureAlgorithm(publicKey.KeyType);
         return algorithm is null
             ? SshInfoLines.NoSigningSignatureMatched

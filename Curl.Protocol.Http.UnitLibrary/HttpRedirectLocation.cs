@@ -16,7 +16,7 @@ namespace Curl.Protocol.Http;
 /// sent, with its scheme lowercased and, when it names an authority, its dot segments
 /// removed and an empty path made <c>/</c>; one that is not a valid URL is kept whole. Its bytes from
 /// 0x80 are marked (<see cref="HeaderByteText" />), so <c>%{redirect_url}</c> and, once followed,
-/// <c>%{url_effective}</c> write each back as that one byte, as curl 8.22.0 does (CGR-062, ADR-0824).
+/// <c>%{url_effective}</c> write each back as that one byte, as curl 8.22.0 does (CGR-062, ADR-0923).
 /// </para>
 /// <para>
 /// Any other value is a reference resolved by RFC 3986 section 5.2: scheme-relative
@@ -45,10 +45,41 @@ internal static class HttpRedirectLocation
     /// value. Any status counts: curl 8.22.0 writes <c>%{redirect_url}</c> for a <c>Location</c>
     /// on a 200, 201 or 404 too, with or without <c>-L</c>, and follows only a 3xx (BL-2212).
     /// </returns>
-    internal static string? Find(CurlUrl requestUrl, HttpResponseHead head)
+    internal static string? Find(CurlUrl requestUrl, HttpResponseHead head) => Find(requestUrl, head, Encoding.Latin1);
+
+    /// <summary>
+    /// Finds where a response redirects to, a relative target keeping the request URL's path as its
+    /// bytes in <paramref name="encoding" />.
+    /// </summary>
+    /// <param name="requestUrl">The URL the request was sent to.</param>
+    /// <param name="head">The final response's head.</param>
+    /// <param name="encoding">The command-line text encoding the request URL was typed in.</param>
+    /// <returns>The resolved target, or <see langword="null" /> when no <c>Location</c> header has a value.</returns>
+    internal static string? Find(CurlUrl requestUrl, HttpResponseHead head, Encoding encoding)
     {
-        HttpResponseHeader? location = head.Headers.FirstOrDefault(IsNonEmptyLocation);
-        return location is null ? null : Resolve(requestUrl, location.Value);
+        string? location = head.Headers.FirstOrDefault(IsNonEmptyLocation)?.Value ?? InterimLocation(head);
+        return location is null ? null : Resolve(requestUrl, location, encoding, OperatingSystem.IsWindows());
+    }
+
+    /// <summary>
+    /// Finds the last non-empty <c>Location</c> value among the heads read, which the final head
+    /// leaves in place when it has none: curl 8.22.0 reports a <c>Location</c> from a 1xx head in
+    /// <c>%{redirect_url}</c> (CGR-208).
+    /// </summary>
+    private static string? InterimLocation(HttpResponseHead head)
+    {
+        string? found = null;
+        foreach (string line in Encoding.Latin1.GetString(head.HeadBytes.Span).Split('\n'))
+        {
+            int colon = line.IndexOf(':', StringComparison.Ordinal);
+            if (colon > 0 && string.Equals(line[..colon], HeaderName, StringComparison.OrdinalIgnoreCase))
+            {
+                string value = line[(colon + 1)..].Trim(' ', '\t', '\r');
+                found = value.Length > 0 ? value : found;
+            }
+        }
+
+        return found;
     }
 
     /// <summary>
@@ -57,7 +88,7 @@ internal static class HttpRedirectLocation
     /// <param name="requestUrl">The URL the request was sent to.</param>
     /// <param name="location">The non-empty <c>Location</c> value, without surrounding blanks.</param>
     /// <returns>The target URL as curl reports it.</returns>
-    internal static string Resolve(CurlUrl requestUrl, string location) => Resolve(requestUrl, location, OperatingSystem.IsWindows());
+    internal static string Resolve(CurlUrl requestUrl, string location) => Resolve(requestUrl, location, Encoding.Latin1, OperatingSystem.IsWindows());
 
     /// <summary>
     /// Resolves a <c>Location</c> value against the request URL with the drive-letter rules of
@@ -67,7 +98,18 @@ internal static class HttpRedirectLocation
     /// <param name="location">The non-empty <c>Location</c> value, without surrounding blanks.</param>
     /// <param name="driveLetters">Whether a <c>file</c> path may start with a drive letter, as on Windows.</param>
     /// <returns>The target URL as curl reports it.</returns>
-    internal static string Resolve(CurlUrl requestUrl, string location, bool driveLetters)
+    internal static string Resolve(CurlUrl requestUrl, string location, bool driveLetters) => Resolve(requestUrl, location, Encoding.Latin1, driveLetters);
+
+    /// <summary>
+    /// Resolves a <c>Location</c> value against the request URL, a relative one keeping the request
+    /// URL's path as its bytes in <paramref name="encoding" /> (<c>/é/</c> in cp1252 is <c>/%E9/</c>).
+    /// </summary>
+    /// <param name="requestUrl">The URL the request was sent to.</param>
+    /// <param name="location">The non-empty <c>Location</c> value, without surrounding blanks.</param>
+    /// <param name="encoding">The command-line text encoding the request URL was typed in.</param>
+    /// <param name="driveLetters">Whether a <c>file</c> path may start with a drive letter, as on Windows.</param>
+    /// <returns>The target URL as curl reports it.</returns>
+    internal static string Resolve(CurlUrl requestUrl, string location, Encoding encoding, bool driveLetters)
     {
         if (HasScheme(location))
         {
@@ -81,7 +123,7 @@ internal static class HttpRedirectLocation
         }
 
         (string path, string query, string fragment) = Split(reference);
-        return HttpUrlText.Origin(requestUrl) + TargetPath(HttpUrlText.Path(requestUrl), path) + TargetQuery(HttpUrlText.Query(requestUrl), path, query) + fragment;
+        return HttpUrlText.Origin(requestUrl) + TargetPath(HttpUrlText.Path(requestUrl, encoding), path) + TargetQuery(HttpUrlText.Query(requestUrl), path, query) + fragment;
     }
 
     private static bool IsNonEmptyLocation(HttpResponseHeader header) =>

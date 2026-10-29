@@ -61,7 +61,7 @@ namespace Curl.Engine;
 /// <see cref="CredentialEncoding.ForPlatform" /> on this host, as the engine composes them. The
 /// URL's percent-decoded bytes and the netrc file's bytes are read back through it, so they reach
 /// the wire unchanged, as curl sends them: <c>http://%C3%A9:%E2%82%AC@host/</c> sends
-/// <c>Basic w6k64oKs</c> on Windows too (measured with curl 8.22.0 Schannel, CGR-052, ADR-0821).
+/// <c>Basic w6k64oKs</c> on Windows too (measured with curl 8.22.0 Schannel, CGR-052, ADR-0910).
 /// </param>
 internal sealed class TransferCredentialLookup(
     Func<string, byte[]?> readFile,

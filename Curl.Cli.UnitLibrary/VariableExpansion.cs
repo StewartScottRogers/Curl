@@ -13,9 +13,10 @@ namespace Curl.Cli;
 /// </summary>
 /// <remarks>
 /// Measured with the local curl 8.21.0 on 2026-09-27 through <c>--expand-data</c> against a loopback
-/// server, and checked against <c>src/var.c</c> at tag <c>curl-8_21_0</c>. The value is expanded as
-/// UTF-8 bytes and the result read back as UTF-8, so bytes that are not UTF-8 (from a file, or from
-/// <c>64dec</c>) become U+FFFD; see ADR-0064.
+/// server, and checked against <c>src/var.c</c> at tag <c>curl-8_21_0</c>. The value's typed text is
+/// expanded as the bytes it goes out as (<see cref="CommandLineOptions.CommandLineTextBytes"/>: the ANSI code
+/// page on Windows) and the result read back with <see cref="CommandLineOptions.CommandLineText"/>, so every
+/// byte, typed or from a variable, goes out unchanged, as curl sends it (BL-3848); see ADR-0064.
 /// </remarks>
 internal static class VariableExpansion
 {
@@ -53,8 +54,8 @@ internal static class VariableExpansion
 
         if (replaced)
         {
-            Append(output, template[position..]);
-            expanded = Encoding.UTF8.GetString([.. output]);
+            Append(options, output, template[position..]);
+            expanded = options.CommandLineText([.. output]);
         }
 
         return null;
@@ -71,7 +72,7 @@ internal static class VariableExpansion
         finished = closing < 0;
         if (opening > position && template[opening - 1] == '\\')
         {
-            Append(output, template[position..(opening - 1)] + Opening);
+            Append(options, output, template[position..(opening - 1)] + Opening);
             position = opening + Opening.Length;
             finished = false;
             return null;
@@ -107,18 +108,18 @@ internal static class VariableExpansion
         int colon = template.IndexOf(':', nameStart, closing - nameStart);
         string name = template[nameStart..(colon < 0 ? closing : colon)];
         int nameLength = Encoding.UTF8.GetByteCount(name);
-        Append(output, template[position..opening]);
+        Append(options, output, template[position..opening]);
         if (nameLength == 0 || nameLength >= MaximumNameLength)
         {
             options.AddWarningLinesUnlessSilent(WrappedMessage.Lines("Warning: ", $"bad variable name length '{template}'"));
-            Append(output, template[opening..(closing + Closing.Length)]);
+            Append(options, output, template[opening..(closing + Closing.Length)]);
             return null;
         }
 
         if (!VariableDefinition.IsName(name))
         {
             options.AddWarningLinesUnlessSilent(WrappedMessage.Lines("Warning: ", $"bad variable name: {name}"));
-            Append(output, template[opening..(closing + Closing.Length)]);
+            Append(options, output, template[opening..(closing + Closing.Length)]);
             return null;
         }
 
@@ -144,5 +145,5 @@ internal static class VariableExpansion
         return null;
     }
 
-    private static void Append(List<byte> output, string text) => output.AddRange(Encoding.UTF8.GetBytes(text));
+    private static void Append(CommandLineOptions options, List<byte> output, string text) => output.AddRange(options.CommandLineTextBytes(text));
 }

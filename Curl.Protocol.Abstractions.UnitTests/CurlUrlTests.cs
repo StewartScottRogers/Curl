@@ -175,7 +175,7 @@ public sealed class CurlUrlTests
     [DataRow("http://example.com:8080", "http", "example.com", "example.com", 8080, false, "/")]
     [DataRow("http://example.com:080/", "http", "example.com", "example.com", 80, true, "/")]
     [DataRow("https://example.com", "https", "example.com", "example.com", 443, true, "/")]
-    [DataRow("https://ex%C3%A5mple.com:8443/", "https", "ex\u00e5mple.com", "xn--exmple-jua.com", 8443, false, "/")]
+    [DataRow("https://exåmple.com:8443/", "https", "ex\u00e5mple.com", "xn--exmple-jua.com", 8443, false, "/")]
     [DataRow("dict://example.com/d", "dict", "example.com", "example.com", 2628, true, "/d")]
     [DataRow("dict://h:2629/d", "dict", "h", "h", 2629, false, "/d")]
     [DataRow("gopher://example.com", "gopher", "example.com", "example.com", 70, true, "/")]
@@ -458,7 +458,7 @@ public sealed class CurlUrlTests
     }
 
     [TestMethod]
-    [DataRow("http://a%80b/")]
+    [DataRow("http://a%81b/")]
     [DataRow("http://invalid-utf8-%e2%90.local/page/1034")]
     [DataRow("http://too-long-IDN-name-c%c3%bcrl-r%c3%bcle%c3%9f-la-la-la-dee-da-flooby-nooby.local/page/1035")]
     public void TryParse_WithAHostIdnMappingRefuses_ReturnsFalse(string text)
@@ -472,15 +472,15 @@ public sealed class CurlUrlTests
     public void TryParseForUrlApi_WithAHostIdnMappingRefuses_KeepsTheHostAsWritten()
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
-        diagnostics.Arrange("url", "http://a%80b/");
+        diagnostics.Arrange("url", "http://a%81b/");
 
-        bool parsed = CurlUrl.TryParseForUrlApi("http://a%80b/", pathAsIs: false, default, out CurlUrl? url, out _);
+        bool parsed = CurlUrl.TryParseForUrlApi("http://a%81b/", pathAsIs: false, default, out CurlUrl? url, out _);
 
         diagnostics.Act("idn host", url?.IdnHost);
-        diagnostics.Assert("idn host", "a\udc80b", url?.IdnHost);
+        diagnostics.Assert("idn host", "a\udc81b", url?.IdnHost);
         Assert.IsTrue(parsed);
-        Assert.AreEqual("a\udc80b", url!.Host);
-        Assert.AreEqual("a\udc80b", url.IdnHost);
+        Assert.AreEqual("a\udc81b", url!.Host);
+        Assert.AreEqual("a\udc81b", url.IdnHost);
     }
 
     [TestMethod]
@@ -778,6 +778,45 @@ public sealed class CurlUrlTests
         Assert.IsTrue(parsed, text);
 
         return url!;
+    }
+
+    // A Location header's bytes reach CurlUrl one Latin-1 character per byte, so the UTF-8 host
+    // åäö (C3 A5 C3 A4 C3 B6, upstream test1448) arrives as Ã¥Ã¤Ã¶. Windows curl 8.22.0 reads
+    // those bytes as Windows-1252 and follows to xn--bbab6cyjbb.se (exit 6 when it does not
+    // resolve); curl off Windows reads them as UTF-8 and follows to xn--4cab6c.se (BL-3964).
+    [TestMethod]
+    [OSCondition(OperatingSystems.Windows)]
+    public void Parse_LocationHostOfUtf8Bytes_ReadsTheBytesAsWindows1252OnWindows()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        CurlUrl url = ParseLocationHostOfUtf8Bytes(diagnostics);
+
+        diagnostics.Assert("idn host", "xn--bbab6cyjbb.se", url.IdnHost);
+        Assert.AreEqual("xn--bbab6cyjbb.se", url.IdnHost);
+    }
+
+    [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
+    public void Parse_LocationHostOfUtf8Bytes_ReadsTheBytesAsUtf8OffWindows()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+
+        CurlUrl url = ParseLocationHostOfUtf8Bytes(diagnostics);
+
+        diagnostics.Assert("idn host", "xn--4cab6c.se", url.IdnHost);
+        Assert.AreEqual("xn--4cab6c.se", url.IdnHost);
+    }
+
+    private static CurlUrl ParseLocationHostOfUtf8Bytes(TestDiagnostics diagnostics)
+    {
+        string location = System.Text.Encoding.Latin1.GetString([.. "http://"u8, 0xC3, 0xA5, 0xC3, 0xA4, 0xC3, 0xB6, .. ".se:8990/14480001"u8]);
+        diagnostics.Arrange("location", location);
+
+        CurlUrl url = CurlUrl.Parse(location);
+
+        diagnostics.Act("idn host", url.IdnHost);
+        return url;
     }
 
     private static void AssertRejected(TestDiagnostics diagnostics, string text, string? description = null)

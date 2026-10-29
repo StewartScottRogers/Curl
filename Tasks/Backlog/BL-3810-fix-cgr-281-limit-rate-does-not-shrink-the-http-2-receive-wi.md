@@ -4,7 +4,7 @@ title: Fix CGR-281: --limit-rate does not shrink the HTTP/2 receive window; REF 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-4045]
 touches: [Curl.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Protocol.Http.UnitTests/Cgr281Tests.cs]
 model: sonnet
 requirement: none
@@ -70,6 +70,10 @@ curl -sS --http2-prior-knowledge --limit-rate 400k http://127.0.0.1:P/x -o out.b
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr281Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Requeued: HttpRequestOptions has no receive-speed (MaxReceiveSpeed stops in Curl.Api.UnitLibrary); BL-4045 plumbs it. Remaining after it: Http2Session/Http2StreamConnection size the window from it; the expected 139265 x2, 204800 x4, 65534 pattern is from REF-LINUX 8.18.0 (needs WSL nghttp2 curl measurement; Windows curl 8.22.0 Schannel here).
+
 ## Log
 
 - 2026-10-26: Created from CGR-281 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs BL-4045 (receive speed plumbed to HTTP handler) first

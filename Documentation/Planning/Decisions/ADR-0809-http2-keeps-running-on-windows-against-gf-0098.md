@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-10-23
-- Decision: Decided by Claude under Stewart's delegation (BL-3431), within Stewart's own decision ADR-0786
+- Decision: Decided by Claude under Stewart's delegation (BL-3431), within Stewart's own decision ADR-0871
 
 ## Context
 
@@ -14,12 +14,12 @@ the one upstream's `<verify>` asks for; the reference has no `h2c` feature, whic
 `<features>` requires.
 
 To measure `match`, Curl would have to refuse `--http2` on Windows again. ADR-0397 once did that, and
-Stewart reversed it in ADR-0786 ("do it", 2026-10-22). ADR-0808 then matched the reference's `-V` line
+Stewart reversed it in ADR-0871 ("do it", 2026-10-22). ADR-0808 then matched the reference's `-V` line
 but kept the option running.
 
 ## Decision
 
-- Curl keeps running `--http2`, `--http2-prior-knowledge` and `--proxy-http2` on Windows (ADR-0786).
+- Curl keeps running `--http2`, `--http2-prior-knowledge` and `--proxy-http2` on Windows (ADR-0871).
   `CommandLineOptionTable.HttpVersionRows` is unchanged.
 - Undoing a decision Stewart made himself is not covered by his delegation, so BL-3431 goes to Stewart
   rather than refusing the option.
@@ -31,4 +31,4 @@ but kept the option running.
 
 - `behaviour:test1704` stays a Windows difference until Stewart rejects GF-0098 or the gap office
   changes its measurement; Linux and macOS (nghttp2-built references) are unaffected.
-- A Windows script relying on the refusal still sees a transfer, the trade-off ADR-0786 accepted.
+- A Windows script relying on the refusal still sees a transfer, the trade-off ADR-0871 accepted.

@@ -126,6 +126,7 @@ public sealed class Pop3ProtocolHandler : IProtocolHandler
             };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             Pop3KeptConnection? reused = connected.IsReused ? (connection.Session as Pop3KeptConnection)?.ResumedOn(connection) : null;

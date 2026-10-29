@@ -159,7 +159,7 @@ against curl 8.21.0 (`/mingw64/bin/curl`, the Windows reference, ADR-0018) with
 - **Unknown schemes parse.** `foo://h/` is a `CurlUrl`; curl ends it with exit 1, not 3,
   so refusing it stays the dispatcher's job.
 - **Backslashes.** A `file` URL's backslashes stay as typed, and are no separator for
-  dot segments (ADR-0822 replaced this bullet's earlier rule, that they became `/` after
+  dot segments (ADR-0919 replaced this bullet's earlier rule, that they became `/` after
   `//`, when curl 8.21.0 and 8.18.0 were measured to keep them).
 - **Drive letters follow the platform.** `CurlUrl.TryParse` applies curl's Windows rules
   (`file:///C:/x` has the path `C:/x`) on Windows and rejects a `file` drive letter

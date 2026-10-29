@@ -17,7 +17,7 @@ the try-help line and exit 2, sending nothing. Measured again here on 2026-10-26
 Schannel: the same for all four options, for a blank value and for a missing one (the URL taken as the
 value); `--no-dns-servers x` stays refused as not reversible. Curl accepted all four and ran the transfer.
 
-This is ADR-0540's and ADR-0822's case again: a feature Curl has hand-built that no reference build has.
+This is ADR-0540's and ADR-0918's case again: a feature Curl has hand-built that no reference build has.
 
 ## Decision
 
@@ -30,7 +30,7 @@ This is ADR-0540's and ADR-0822's case again: a feature Curl has hand-built that
    executable never turns it on; tests of the options and of the resolver they drive (`CAresBuildParser`
    in `Curl.Cli.UnitTests`, the Engine and Console mapping tests) do.
 3. `curl --ai-help` says each of the four is refused on every platform for want of c-ares.
-4. This supersedes ADR-0454 decision 2 for the four DNS options; `--ech` is ADR-0822's.
+4. This supersedes ADR-0454 decision 2 for the four DNS options; `--ech` is ADR-0918's.
 
 ## Consequences
 

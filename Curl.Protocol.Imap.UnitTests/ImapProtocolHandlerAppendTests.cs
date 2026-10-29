@@ -198,7 +198,7 @@ public sealed class ImapProtocolHandlerAppendTests
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.UploadFailed, UploadFailed), run.Result);
         Assert.AreEqual("A001 CAPABILITY\r\nA002 APPEND INBOX (\\Seen) {21}\r\nA003 LOGOUT\r\n", run.Sent);
         Assert.AreEqual(TransferResult.Failure(CurlExitCode.UploadFailed, UploadFailed), run.Result);
-        Assert.IsEmpty(run.Progress.Reports);
+        CollectionAssert.AreEqual(new[] { "started" }, run.Progress.Reports);
     }
 
     [TestMethod]

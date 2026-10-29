@@ -91,11 +91,38 @@ public sealed class MultipartFormBodyBuilder(
     /// </summary>
     public bool SevenBitRefusalWaitsForSend { get; init; }
 
+    /// <summary>
+    /// Gets a value indicating whether a file part whose file does not open fails when the send reaches it, with
+    /// exit 26 and no message, after the connection is made and the bytes before it are sent, as libcurl 8.22.0
+    /// reads a missing <c>curl_formadd</c> <c>CURLFORM_FILE</c> (CGR-262), instead of failing the build before
+    /// connecting as the curl tool does.
+    /// </summary>
+    public bool MissingFileWaitsForSend { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a directory part that is not sent empty (<see cref="SendsDirectoryEmpty" /> off, as on
+    /// Windows) fails when the send reaches it, after the head and the part's headers are sent, with exit 26 and
+    /// <see cref="ReadFailedMessage" />, as curl 8.22.0 sends it (CGR-198), instead of failing the build before connecting.
+    /// </summary>
+    public bool DirectoryReadFailsAtSend { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether a file part naming a directory is sent as a part with its
+    /// file name and no data, the body's length unknown (chunked), as curl 8.18.0 on Linux sends
+    /// <c>-F f=@dir</c> and exits 0 (measured, CGR-069, BL-3896), instead of failing with exit 26,
+    /// <see cref="ReadFailedMessage" />, as curl's Windows build does. Defaults to the platform
+    /// curl's: <see langword="true" /> off Windows.
+    /// </summary>
+    public bool SendsDirectoryEmpty { get; init; } = !OperatingSystem.IsWindows();
+
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file it cannot open.</summary>
     public const string OpenFailedMessage = "Failed to open/read local data from file/application";
 
     /// <summary>The message curl 8.21.0 gives, with exit 26, for a form file that is a directory.</summary>
     public const string ReadFailedMessage = "read error getting mime data";
+
+    /// <summary>The message curl gives when the read of a closed standard input aborts the transfer, with exit 42.</summary>
+    public const string AbortedByCallbackMessage = "operation aborted by callback";
 
     /// <summary>The message curl 8.21.0 gives, with exit 43, for an <c>;encoder=</c> it does not know.</summary>
     public const string UnknownEncoderMessage = "A libcurl function was given a bad argument";
@@ -396,7 +423,8 @@ public sealed class MultipartFormBodyBuilder(
         FileOpenResult opened = await fileSystem.OpenForReadAsync(part.Content, cancellationToken).ConfigureAwait(false);
         if (!opened.IsOpen)
         {
-            return OpenFailure(segments, part, opened.Status, disposition, nameEscaping, forMail, encoder);
+            return await AddUnopenedFilePartAsync(segments, part, opened.Status, disposition, nameEscaping, forMail, encoder, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         Stream content = opened.Content!;
@@ -404,6 +432,30 @@ public sealed class MultipartFormBodyBuilder(
         long? length = content.CanSeek ? seekableFileLength(part.Content, opened.Length) : unseekableFileLength(part.Content);
         return await AddFileDataAsync(segments, content, length, encoder, forMail, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Handles a file that did not open: a directory under <see cref="SendsDirectoryEmpty" /> is sent with its file
+    /// name and no data, its length unknown, as <c>fopen</c> opens a directory off Windows and its first read gives
+    /// nothing (CGR-069); any other file is left to <see cref="OpenFailure" />.
+    /// </summary>
+    private ValueTask<TransferResult?> AddUnopenedFilePartAsync(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        FileAccessStatus status,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder,
+        CancellationToken cancellationToken)
+    {
+        if (status != FileAccessStatus.IsDirectory || !SendsDirectoryEmpty)
+        {
+            return ValueTask.FromResult(OpenFailure(segments, part, status, disposition, nameEscaping, forMail, encoder));
+        }
+
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        return AddFileDataAsync(segments, Stream.Null, null, encoder, forMail, cancellationToken);
     }
 
     /// <summary>
@@ -422,18 +474,48 @@ public sealed class MultipartFormBodyBuilder(
     {
         if (status == FileAccessStatus.IsDirectory)
         {
-            return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+            if (!DirectoryReadFailsAtSend)
+            {
+                return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+            }
+
+            segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+            segments.AddStream(new FailingReadStream(), null);
+            return null;
         }
 
         if (!part.SendsEmptyWhenMissing)
         {
-            return TransferResult.Failure(CurlExitCode.ReadError, OpenFailedMessage);
+            return MissingFileFailure(segments, part, disposition, nameEscaping, forMail, encoder);
         }
 
         segments.AddText(MultipartPartHeaders.Format(part with { Kind = MultipartFormPartKind.Text, FileName = null }, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
         AddData(segments, [], encoder, forMail);
         return null;
     }
+
+    /// <summary>
+    /// A missing file that may not be sent empty: exit 26 before anything is sent, or under
+    /// <see cref="MissingFileWaitsForSend" /> the part's head followed by a read that fails with exit 26 and no message.
+    /// </summary>
+    private TransferResult? MissingFileFailure(
+        MultipartBodySegments segments,
+        MultipartFormPart part,
+        string? disposition,
+        MultipartNameEscaping nameEscaping,
+        bool forMail,
+        MultipartPartEncoder? encoder)
+    {
+        if (!MissingFileWaitsForSend)
+        {
+            return TransferResult.Failure(CurlExitCode.ReadError, OpenFailedMessage);
+        }
+
+        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        segments.AddStream(new UnreadableFileStream(), null);
+        return null;
+    }
+
     /// <summary>
     /// Streams <paramref name="content" />, encoded as it is sent when its encoder encodes; a
     /// <c>7bit</c> file that can seek back is checked first, and one that cannot is refused
@@ -498,7 +580,12 @@ public sealed class MultipartFormBodyBuilder(
         }
     }
 
-    /// <summary>Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder.</summary>
+    /// <summary>
+    /// Reads <paramref name="input" /> whole and adds it, encoded when the part names an encoder;
+    /// a <see cref="ClosedStandardInputStream" /> instead adds the part's headers and then a read
+    /// that aborts the transfer, as curl 8.22.0's tool sends the part head chunked and ends with
+    /// exit 42 when its <c>fread</c> on a closed <c>stdin</c> fails (CGR-110, ADR-0967).
+    /// </summary>
     private async ValueTask<TransferResult?> AddStandardInputPartAsync(
         MultipartBodySegments segments,
         MultipartFormPart part,
@@ -509,6 +596,14 @@ public sealed class MultipartFormBodyBuilder(
         Stream input,
         CancellationToken cancellationToken)
     {
+        string head = MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _);
+        if (input is ClosedStandardInputStream)
+        {
+            segments.AddText(head);
+            segments.AddCallbackStream(new AbortedReadStream(), null);
+            return null;
+        }
+
         using MemoryStream copy = new();
         try
         {
@@ -519,7 +614,7 @@ public sealed class MultipartFormBodyBuilder(
             return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
         }
 
-        segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+        segments.AddText(head);
         AddData(segments, copy.ToArray(), encoder, forMail);
         return null;
     }
@@ -607,5 +702,29 @@ public sealed class MultipartFormBodyBuilder(
 
         long? length = encoder.EncodedLength(data.Length);
         segments.AddStream(new MemoryStream(encoded, writable: false), length);
+    }
+
+    /// <summary>
+    /// The part data of a closed standard input: every read throws a
+    /// <see cref="RequestBodyReadFailedException" /> with exit 42,
+    /// <see cref="CurlExitCode.AbortedByCallback" />, and curl's message for it. It derives from
+    /// <see cref="MemoryStream" /> so every other read overload comes to this one.
+    /// </summary>
+    private sealed class UnreadableFileStream : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new RequestBodyReadFailedException(string.Empty);
+    }
+
+    private sealed class FailingReadStream : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new RequestBodyReadFailedException(ReadFailedMessage);
+    }
+
+    private sealed class AbortedReadStream : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new RequestBodyReadFailedException(CurlExitCode.AbortedByCallback, AbortedByCallbackMessage);
     }
 }

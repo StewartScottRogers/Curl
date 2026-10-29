@@ -60,4 +60,11 @@ public sealed record TlsTrustEvent
     /// <c>schannel: using IP address, SNI is not supported by OS.</c>
     /// </summary>
     public bool TargetsIpAddress { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether an earlier handshake of the run to the same peer already
+    /// acquired the credential handle this one shares, which curl's Schannel build words as
+    /// <c>schannel: reusing existing credential handle</c> (CGR-290).
+    /// </summary>
+    public bool ReusesCredentialHandle { get; init; }
 }

@@ -37,7 +37,7 @@ public sealed partial class SshProtocolHandlerTests
         Outcome outcome = await RunAsync(server, $"sftp://{Host}/data/large.bin", options: Compressed, preferences: preferences);
 
         Diagnostics.AssertResult(TransferResult.Success(large.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result, $"{platform} {compression}");
+        Assert.AreEqual(TransferResult.Success(large.Length), outcome.Result with { Report = null }, $"{platform} {compression}");
         CollectionAssert.AreEqual(large, outcome.Output);
         Assert.AreEqual("disconnect 11 Shutdown", server.Events[^1]);
     }

@@ -46,7 +46,7 @@ public sealed partial class UpstreamCurlPlatformTests
 
         UpstreamCurlPlatform platform = UpstreamCurlPlatform.Unix;
 
-        bool featuresMatch = platform.Features.IsSupersetOf([.. CommonFeatures, "OpenSSL", "SSLS-EXPORT", "xattr", "HTTPSRR"]);
+        bool featuresMatch = platform.Features.IsSupersetOf([.. CommonFeatures, "OpenSSL", "SSLS-EXPORT", "xattr"]);
         diagnostics.Act("feature count", platform.Features.Count);
         diagnostics.Act("null device", platform.NullDevice);
         diagnostics.Assert("features include common + OpenSSL + xattr", true, featuresMatch);

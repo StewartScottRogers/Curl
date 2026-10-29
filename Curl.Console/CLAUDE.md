@@ -64,7 +64,8 @@ prints `Note: Read config file from '<path>'`, wrapped as a warning is and hidde
 parser's warning lines are written to standard error before anything else.
 Every `Warning: ` line is wrapped by `WarningLineWrapper` as curl's `warnf` wraps it, at the
 width `TerminalColumns` resolves (`COLUMNS` from 21 to 10000, else the standard-error
-console, else 79).
+console on Windows or the standard-input terminal elsewhere, `ioctl(TIOCGWINSZ)` through
+`NativeTerminalWindowSize`, else 79).
 On Windows each `-o` name is first rewritten by `Curl.Core`'s `WindowsOutputFileNameSanitizer`
 (`"*<>?|` and control characters become `_`, as curl 8.21.0 does; not under `-g`, see below),
 and that name is the one opened, sized for `-C -` and named in every message.
@@ -134,7 +135,9 @@ way before `--proto-redir` checks it. Measured on curl 8.21.0 (ADR-0218, BL-621 
 
 Each URL's output comes from `CommandLineOptions.UrlOutputs`: an `-o` name, or for `-O` /
 `--remote-name-all` the name `RemoteFileName` takes from the URL path (last non-empty
-segment, still percent-encoded; none gives `curl_response` and curl's
+segment, still percent-encoded, after the `.` and `..` segments `--path-as-is` leaves are
+resolved, `%2e` counted as a dot, as curl's `dedotdotify` does (CGR-063, BL-3592), and then
+the part after its last backslash, so `/a\b.txt` names `b.txt` (CGR-064, BL-3593); none gives `curl_response` and curl's
 `Warning: No remote filename` line unless `-s`). On Windows a remote name also goes through
 `WindowsOutputFileNameSanitizer.SanitizeRemoteName` (`:` becomes `_`, DOS device names are
 renamed). `--output-dir` is put in front of either with `/`, as typed. `--create-dirs` makes
@@ -248,7 +251,11 @@ holds the exit code - the first failure's in completion order, not the last's - 
 started and ends with the first failure's code and `CurlEasyErrorText`'s text, and both are reported
 in command-line order after the run's other transfers. A result that ends a serial run without
 `--fail-early` (a bad glob, a `-T` or `-D` file that cannot be opened) stops further starts and lets
-the running transfers finish. Each transfer also writes standard output through a
+the running transfers finish. As curl 8.22.0 sets up `--parallel-max` plus one transfers before it
+performs any, `ParallelRun` holds that first batch unstarted, opening each `-T` file as it is held; a
+setup failure among them abandons the batch, nothing starts and each held transfer is reported with
+the failure's code, while a URL past it that is not a well-formed glob is taken as written and the run
+carries on with the glob's exit code (CGR-170, ADR-0954). Each transfer also writes standard output through a
 `StandardOutputFailureDeferringStream` of its own (`RunningTransferState.StandardOutput`), so a write
 failure ends only the transfer whose write failed with exit 23, and the others' bodies and `-w` text
 still reach standard output (BL-773). Without `-Z` nothing changes: every transfer shares the run's one.
@@ -528,10 +535,13 @@ handler's own `(23)` write failure once it would not.
 `Program.Main` opens standard output with `StandardOutputOpener`, not
 `System.Console.OpenStandardOutput()`, because the latter hides both failures that
 stream models: it returns `Stream.Null` for a closed standard output and reports a write
-to a pipe whose reader has gone as a success. A console is still opened the .NET way; a
-redirected standard output becomes an unbuffered `FileStream` over the process's own
-handle (`GetStdHandle` on Windows, descriptor 1 elsewhere), and a closed one a
-`ClosedStandardOutputStream` whose writes throw.
+to a pipe whose reader has gone as a success. A Windows console is still opened the .NET
+way; a redirected standard output, and off Windows a terminal too, becomes an unbuffered
+`SharedOffsetHandleStream` over the process's own handle (`GetStdHandle` on Windows, descriptor 1
+elsewhere), writing at the handle's shared file offset as curl's `fwrite` does, so a file shared with the shell or between standard output and standard error (`> f 2>&1`) gets each write in order (`NativeSharedOffsetWrite`, ADR-0945, BL-3937), and a closed one a `ClosedStandardOutputStream` whose writes throw. Off Windows `StandardErrorOpener` opens
+standard error over descriptor 2 the same way: there a write through .NET's console streams,
+or a read of `Console.WindowWidth`, writes terminfo's `keypad_xmit` (`ESC[?1h ESC=`) to the
+terminal, which curl never writes (CGR-115, ADR-0866).
 
 Standard error is wrapped in `WriteFailureIgnoringStream`, which ignores an
 `IOException` from any write, flush or close, as curl ignores a failed `fputs` to `stderr`: with
@@ -540,7 +550,7 @@ Standard error is wrapped in `WriteFailureIgnoringStream`, which ignores an
 `WriteFailureIgnoringWriteOutFileOpener`), and a `-D` file's close: on `/dev/full` the first three
 leave the exit code alone, and `-D` ends with its `Failed writing headers` line and the handler's
 exit 23 rather than the close's exception; a `-c` jar whose close fails is a jar not written
-(ADR-0818, CGR-026, BL-3830).
+(ADR-0902, CGR-026, BL-3830).
 
 Under `-N` / `--no-buffer` the runner wraps a transfer's body output, standard output or an
 `-o` file, in a `FlushEachWriteStream`, which flushes after every write as curl 8.21.0 does;

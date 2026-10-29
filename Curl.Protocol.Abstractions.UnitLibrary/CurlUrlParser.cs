@@ -31,9 +31,7 @@ internal static class CurlUrlParser
     /// user information in the authority is rejected before its host and port are checked. With
     /// <paramref name="allowEmptyHost" />, as libcurl's <c>CURLU_NO_AUTHORITY</c>, at most two
     /// slashes follow the scheme and an empty authority is an empty host. With
-    /// <paramref name="keepFileBackslashes" /> nothing changes: a <c>file</c> URL's backslashes stay as typed
-    /// either way, as both libcurl's <c>parse_file</c> and the curl tool keep them (BL-3589); BL-3862 removes it.
-    /// With <paramref name="fileSchemeWithoutSlash" />, as <c>Curl_is_absolute_url</c> when it does not guess
+    /// <paramref name="fileSchemeWithoutSlash" />, as <c>Curl_is_absolute_url</c> when it does not guess
     /// schemes, text starting <c>file:</c> is a <c>file</c> URL even with no <c>/</c> after the colon.
     /// With <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a host name that
     /// cannot be converted to punycode is <see cref="CurlUrlRejection.BadHostname" /> (ADR-0734).
@@ -45,7 +43,6 @@ internal static class CurlUrlParser
         bool disallowUser,
         out CurlUrlRejection rejection,
         bool allowEmptyHost = false,
-        bool keepFileBackslashes = false,
         bool fileSchemeWithoutSlash = false,
         bool refuseUnconvertibleName = false)
     {
@@ -62,11 +59,26 @@ internal static class CurlUrlParser
             return ParseWithAuthority(text, scheme, new AuthorityRules(pathAsIs, disallowUser, allowEmptyHost, refuseUnconvertibleName), out rejection);
         }
 
-        _ = keepFileBackslashes;
         CurlUrl? url = ParseFile(text, pathAsIs, driveLetters);
         rejection = url is null ? CurlUrlRejection.BadFileUrl : CurlUrlRejection.None;
 
         return url;
+    }
+
+    /// <summary>
+    /// Why libcurl's setopt refuses a transfer URL by its length alone: <see cref="CurlUrlRejection.UrlTooLong" /> above
+    /// <see cref="MaximumLength" /> bytes, <see cref="CurlUrlRejection.UrlAtLengthLimit" /> at exactly that many, else
+    /// <see langword="null" /> (CGR-196).
+    /// </summary>
+    public static CurlUrlRejection? TransferLengthRejection(string text)
+    {
+        int length = Encoding.UTF8.GetByteCount(text);
+        if (length == MaximumLength)
+        {
+            return CurlUrlRejection.UrlAtLengthLimit;
+        }
+
+        return length > MaximumLength ? CurlUrlRejection.UrlTooLong : null;
     }
 
     /// <summary>

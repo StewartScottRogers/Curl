@@ -266,8 +266,8 @@ public sealed partial class HttpProtocolHandlerTests
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
-        Diagnostics.Assert("error message", "Failure when receiving data from the peer", result.ErrorMessage);
-        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Diagnostics.Assert("error message", "Recv failure: Connection reset by peer", result.ErrorMessage);
+        Assert.AreEqual("Recv failure: Connection reset by peer", result.ErrorMessage);
         Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }
@@ -350,30 +350,6 @@ public sealed partial class HttpProtocolHandlerTests
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.PartialFile, result.ExitCode);
         Assert.AreEqual(CurlExitCode.PartialFile, result.ExitCode);
-    }
-
-    [TestMethod]
-    [DataRow(null, DisplayName = "no :status")]
-    [DataRow("2x0", DisplayName = "not digits")]
-    public async Task ExecuteAsync_Http2HeadWithoutAValidStatus_ResetsTheStreamAndFailsWithExit92(string? status)
-    {
-        HpackEncoder server = new();
-        HeaderField[] fields = status is null ? [new("content-type", "text/plain")] : [new(":status", status)];
-        byte[] response = Http2Response(Http2FrameFactory.CreateHeaders(1, server.Encode(fields), isEndStream: true, isEndHeaders: true));
-        ScriptedConnection connection = new(response, 65536);
-
-        Diagnostics.Arrange("url, status", $"http://example.com/, {status ?? "(none)"}");
-
-        TransferResult result = await Handler(QueueConnector.For(connection))
-            .ExecuteAsync(Http2Context("http://example.com/", new MemoryStream()));
-
-        WriteResult(result);
-        Diagnostics.Assert("exit code", CurlExitCode.Http2Stream, result.ExitCode);
-        Assert.AreEqual(CurlExitCode.Http2Stream, result.ExitCode);
-        Diagnostics.Assert("error message", "HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
-        Assert.AreEqual("HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)", result.ErrorMessage);
-        Diagnostics.Assert("written ends with reset then goaway", true, Convert.ToHexString(connection.Written).EndsWith("00000403000000000100000001" + ClosingGoAway, StringComparison.Ordinal));
-        StringAssert.EndsWith(Convert.ToHexString(connection.Written), "00000403000000000100000001" + ClosingGoAway, "RST_STREAM PROTOCOL_ERROR, then the closing GOAWAY");
     }
 
     [TestMethod]

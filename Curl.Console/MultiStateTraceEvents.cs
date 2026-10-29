@@ -220,6 +220,9 @@ internal sealed class MultiStateTraceEvents : ITransferEvents
     public void ReportTlsTrust(TlsTrustEvent trust) => inner.ReportTlsTrust(trust);
 
     /// <inheritdoc />
+    public void ReportWarning(string text) => inner.ReportWarning(text);
+
+    /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) =>
         inner.ReportCertificateVerifyResult(verifyResult, isProxy);
 

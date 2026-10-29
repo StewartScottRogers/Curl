@@ -90,6 +90,12 @@ public sealed class Tls13ClientHandshake : IDisposable
         this.verifier = verifier;
     }
 
+    /// <summary>
+    /// Gets or sets what is handed each whole handshake message received, header included,
+    /// before the handshake acts on it; a connection sets it to tell its <see cref="TlsHandshakeMessageObserver" />.
+    /// </summary>
+    internal Action<byte[]>? MessageReceived { get; set; }
+
     /// <summary>Gets a value indicating whether the handshake has completed.</summary>
     public bool IsComplete => state == State.Connected;
 
@@ -101,6 +107,12 @@ public sealed class Tls13ClientHandshake : IDisposable
 
     /// <summary>Gets the group of the key exchange, once the ServerHello has arrived.</summary>
     public ushort? NegotiatedGroup { get; private set; }
+
+    /// <summary>Gets the signature scheme the server signed its CertificateVerify with, once that signature has verified; <see langword="null" /> on a resumed handshake.</summary>
+    public ushort? PeerSignatureScheme { get; private set; }
+
+    /// <summary>Gets the algorithm OID of the server certificates public key behind <see cref="PeerSignatureScheme" />, once the CertificateVerify signature has verified.</summary>
+    public string? PeerSignatureKeyAlgorithmOid { get; private set; }
 
     /// <summary>Gets the ALPN protocol the server chose, or <see langword="null" /> when it chose none.</summary>
     public string? ApplicationProtocol { get; private set; }
@@ -321,6 +333,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         received.AddRange(bytes);
         while (state != State.Failed && TryReadMessage(out HandshakeMessage? message, out byte[] encoded))
         {
+            MessageReceived?.Invoke(encoded);
             ReceiveMessage(level, message!, encoded, output);
         }
     }
@@ -935,6 +948,8 @@ public sealed class Tls13ClientHandshake : IDisposable
             return alert;
         }
 
+        PeerSignatureScheme = decoded.Value.Algorithm;
+        PeerSignatureKeyAlgorithmOid = serverKey.AlgorithmOid;
         Transcript.Append(encoded);
         state = State.WaitFinished;
         return null;

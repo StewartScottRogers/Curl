@@ -1,0 +1,39 @@
+---
+id: BL-3972
+title: CGR-110 part 1: add ClosedStandardInputStream and make the data file reader throw for it
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: [BL-3570, BL-3893]
+touches: [Curl.Cli.UnitLibrary/DiskDataFileReader.cs, Curl.Cli.UnitLibrary/ClosedStandardInputStream.cs, Curl.Cli.UnitLibrary/ConfigFileApplier.cs, Curl.Cli.UnitTests/Cgr110ClosedStandardInputStreamTests.cs]
+requirement: none
+created: 2026-10-28
+completed: 2026-10-28
+---
+# BL-3972 — CGR-110 part 1: add ClosedStandardInputStream and make the data file reader throw for it
+
+## Goal
+
+A closed standard input is represented by a new public Curl.Cli.ClosedStandardInputStream, and DiskDataFileReader.ReadStandardInput throws IOException for it, with no change to what any command line does yet.
+
+## Context
+
+Split from BL-3639 (CGR-110, Documentation/Reviews/Curl-Gap-Report-2026-10-25.md: closed stdin with @- is read as empty and the request is sent; real curl 8.22.0 exits 26 for -d/--data-binary/--json and 42 for -F). Read BL-3639's Notes for the measurements and the decided plan.
+
+## Acceptance criteria
+
+- [x] A unit test in Curl.Cli.UnitTests/Cgr110ClosedStandardInputStreamTests.cs shows ClosedStandardInputStream reads as end of file and DiskDataFileReader.ReadStandardInput throws IOException for it, and still reads a normal stream and Stream.Null as empty.
+- [x] ConfigFileApplier (-K -) reads a ClosedStandardInputStream as empty, pinned by a unit test.
+- [x] dotnet build is clean and dotnet test --filter "TestCategory!=Integration" passes, with the touched library at 100% line and branch coverage.
+
+## Notes
+
+- Split from BL-3639. Continues the stashed work of BL-3639.
+- Program.cs is NOT changed here (BL-3973 swaps Stream.Null for the new stream), so nothing observable changes until that task lands. Record the ADR (Decided by Claude under Stewart's delegation) for the whole CGR-110 plan here.
+- 2026-10-28 (lane 9): carried over the stashed ClosedStandardInputStream (moved from Curl.Core to Curl.Cli as this task names, kept `InPlaceOfNull` for BL-3973, dropped the redundant `Read(Span)` override) and the DiskDataFileReader throw. The stash's `-K -` change called a helper in CommandLineOptionTable.cs, outside `touches`, so ConfigFileApplier got its own private `ReadStandardInputOrEmpty`. ADR-0864 was taken; the plan is ADR-0949. Measure-CodeQuality for Curl.Cli.UnitLibrary: 0 failing members. Full build clean, fast tests green; change is platform-neutral (streams only, no paths).
+
+## Log
+
+- 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 3b7d81e9 20e1fbb4 dae853c9.
+- 2026-10-28: Doing -> Done. ClosedStandardInputStream added; ReadStandardInput throws for it; -K - reads it as empty; ADR-0949

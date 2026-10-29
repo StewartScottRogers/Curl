@@ -48,6 +48,6 @@ internal sealed partial class ConnectionEndPointRecorder
     internal TransferResult ReportOn(TransferResult result)
     {
         RememberResponseCode(result);
-        return WithEarlierHop(WithEndPoints(WithConnectFailure(result)));
+        return WithEarlierHop(WithConnectionCount(WithEndPoints(WithConnectFailure(result))));
     }
 }

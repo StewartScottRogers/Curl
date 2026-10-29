@@ -75,6 +75,9 @@ internal static class SshInfoLines
     /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's key data is not base64.</summary>
     internal const string PublicKeyFileNotBase64 = "Invalid key data, not base64 encoded";
 
+    /// <summary>The <c>publickey</c> denial reason when the <c>--pubkey</c> file's decoded key data is under four bytes, as a PEM private key's first line decodes.</summary>
+    internal const string PublicKeyFileTooShort = "Invalid public key, too short";
+
     /// <summary>
     /// The <c>publickey</c> denial reason when the server's <c>server-sig-algs</c> names none of
     /// the RSA signature algorithms an <c>ssh-rsa</c> key could use, on both backends (ADR-0230).

@@ -4,7 +4,7 @@ using Curl.Testing;
 namespace Curl.Cli;
 
 /// <summary>
-/// Pins <c>--ech</c> as every reference build answers it (third-party gap report issue CGR-042, ADR-0822): curl
+/// Pins <c>--ech</c> as every reference build answers it (third-party gap report issue CGR-042, ADR-0918): curl
 /// 8.22.0's Schannel build, measured on 2026-10-26 (BL-3571), and the OpenSSL build from the release tarball, built
 /// without ECH, refuse it with exit 2 and <c>curl: option --ech: the installed libcurl version does not support
 /// this</c>, whatever its value, so Curl refuses it on every platform unless the parse reads as an ECH build

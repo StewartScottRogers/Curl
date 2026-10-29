@@ -15,6 +15,7 @@ public sealed class Tls12ClientConnection
     private readonly Tls12ClientHandshake handshake;
     private readonly Tls12RecordLayer layer;
     private bool clientHelloSent;
+    private ushort receivedRecordVersion;
 
     private Tls12ClientConnection(Tls12ClientSettings settings, ITlsRandomSource random, Tls12ClientHandshake handshake, Stream transport)
     {
@@ -22,6 +23,7 @@ public sealed class Tls12ClientConnection
         this.random = random;
         this.handshake = handshake;
         layer = new Tls12RecordLayer(transport, settings.ClientHelloRecordVersion);
+        handshake.MessageReceived = message => Observe(TlsTrafficDirection.Read, TlsContentType.Handshake, receivedRecordVersion, message);
     }
 
     /// <summary>
@@ -131,11 +133,13 @@ public sealed class Tls12ClientConnection
 
     private Tls12HandshakeOutput Receive(Tls12RecordContent record)
     {
+        receivedRecordVersion = record.RecordVersion;
         switch (record.Type)
         {
             case TlsContentType.Handshake:
                 return handshake.ReceiveHandshake(record.Content);
             case TlsContentType.ChangeCipherSpec:
+                Observe(TlsTrafficDirection.Read, TlsContentType.ChangeCipherSpec, receivedRecordVersion, record.Content);
                 return ReceiveChangeCipherSpec(record.Content);
             case TlsContentType.Alert:
                 throw new TlsAlertException(TlsAlertRecord.Decode(record.Content), true);
@@ -159,6 +163,7 @@ public sealed class Tls12ClientConnection
     {
         foreach (Tls12OutgoingMessage message in output.MessagesToSend)
         {
+            Observe(TlsTrafficDirection.Write, message.ContentType, (ushort)(handshake.Version ?? settings.ClientHelloRecordVersion), message.Bytes);
             await layer.SendAsync(message.ContentType, message.Bytes, cancellationToken).ConfigureAwait(false);
             if (message.ContentType == TlsContentType.ChangeCipherSpec)
             {
@@ -166,4 +171,7 @@ public sealed class Tls12ClientConnection
             }
         }
     }
+
+    private void Observe(TlsTrafficDirection direction, TlsContentType contentType, ushort recordVersion, ReadOnlySpan<byte> message) =>
+        settings.HandshakeMessageObserver?.Invoke(direction, contentType, recordVersion, message);
 }

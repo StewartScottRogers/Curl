@@ -32,7 +32,7 @@ namespace Curl.Output;
 /// renderer was given (UTF-8, or on Windows the ANSI code page curl's arguments arrive in,
 /// CGR-015, ADR-0830), except header
 /// bytes marked by <see cref="MarkHeaderBytes"/>, which are written as the raw bytes they
-/// were (CGR-021, ADR-0816), and lone surrogates U+DC80 to U+DCFF, which stand for argument
+/// were (CGR-021, ADR-0893), and lone surrogates U+DC80 to U+DCFF, which stand for argument
 /// bytes that were not valid UTF-8 (CGR-016, ADR-0822), which are written as those bytes, as
 /// curl writes its arguments unchanged.
 /// </para>

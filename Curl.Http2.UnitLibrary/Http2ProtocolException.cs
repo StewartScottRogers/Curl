@@ -20,4 +20,13 @@ public sealed class Http2ProtocolException : Exception
 
     /// <summary>Gets the error code the violation calls for.</summary>
     public Http2ErrorCode ErrorCode { get; }
+
+    /// <summary>Gets the opaque debug data the GOAWAY sent for the violation carries; empty for most.</summary>
+    public ReadOnlyMemory<byte> GoAwayDebugData { get; init; }
+
+    /// <summary>
+    /// Gets the frame nghttp2 reports as an invalid frame received - a PUSH_PROMISE on a
+    /// connection with push disabled - or <see langword="null" /> for any other violation.
+    /// </summary>
+    public Http2Frame? InvalidFrame { get; init; }
 }

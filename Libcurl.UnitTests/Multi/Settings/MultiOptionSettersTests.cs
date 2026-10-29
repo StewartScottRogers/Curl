@@ -186,7 +186,7 @@ public sealed class MultiOptionSettersTests
     [TestMethod]
     [DataRow(0)]
     [DataRow(1)]
-    [DataRow(20)]
+    [DataRow(22)]
     [DataRow(10020)]
     public void SetOption_AnOptionMultiHLacks_AnswersUnknownOption(int option)
     {

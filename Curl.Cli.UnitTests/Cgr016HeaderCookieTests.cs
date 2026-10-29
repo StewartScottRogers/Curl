@@ -27,7 +27,41 @@ public sealed class Cgr016HeaderCookieTests
     {
         CommandLineOptions options = Parse(["-X", "G" + EscapedFF + "T", Url]);
 
-        Assert.AreEqual("GÿT", options.RequestMethod);
+        Assert.AreEqual("G\uDCFFT", options.RequestMethod);
+    }
+
+    [TestMethod]
+    public void Parse_MethodOfNonAsciiOffWindows_SendsItsUtf8Bytes()
+    {
+        CommandLineOptions options = Parse(["-X", "GÉT", Url]);
+
+        Assert.AreEqual("GÉT", options.RequestMethod);
+    }
+
+    [TestMethod]
+    public void Parse_MethodOfNonAsciiOnWindows_SendsTheCharacterAsItsLatin1Byte()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-X", "GÉT", Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), true);
+
+        Assert.AreEqual("GÉT", result.Options!.RequestMethod);
+    }
+
+    [TestMethod]
+    [DataRow("G􏳿T", "G􏳿T")]
+    [DataRow("G𐃿", "G𐃿")]
+    public void Parse_MethodWithPairOnWindows_KeepsThePair(string method, string expected)
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-X", method, Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), true);
+
+        Assert.AreEqual(expected, result.Options!.RequestMethod);
+    }
+
+    [TestMethod]
+    public void Parse_MethodWithEscapesOnWindows_GivesEachEscapeAsItsByteCharacter()
+    {
+        CommandLineParseResult result = CommandLineParser.Parse(["-X", EscapedFF + "G" + EscapedFF, Url], _ => true, ConsolePasswordPrompt.ForProcessConsole, new RecordingDataFileReader(), true);
+
+        Assert.AreEqual("ÿGÿ", result.Options!.RequestMethod);
     }
 
     [TestMethod]

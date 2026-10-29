@@ -5,7 +5,7 @@ namespace Curl.Core;
 
 /// <summary>
 /// Pins CGR-062 part 2 (BL-3867): a redirect target whose header bytes the HTTP handler marked
-/// (<see cref="HeaderByteText" />, ADR-0824) is followed as its Latin-1 text, and the effective
+/// (<see cref="HeaderByteText" />, ADR-0923) is followed as its Latin-1 text, and the effective
 /// URL it becomes stays marked, so <c>%{url_effective}</c> writes those bytes back as curl 8.22.0
 /// Schannel does.
 /// </summary>

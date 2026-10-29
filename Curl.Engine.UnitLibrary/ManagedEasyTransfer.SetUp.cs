@@ -75,8 +75,9 @@ internal sealed partial class ManagedEasyTransfer
     {
         if (toolInputs is null)
         {
+            handleCookieJar = cookies is not null && IsHttpUrl(settings.AppendUrlQuery(transferUrl)) ? cookies : handleCookieJar;
             await shared.Performer.WriteCookieJarAltSvcAndHstsFilesAsync(
-                cookies, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows, writesAltSvc: false).ConfigureAwait(false);
+                null, settings, options.Http, transferUrl, Host.JarPrintTarget, state, PerformShared.Hsts, Host.FileSystem, Host.RunsOnWindows, writesAltSvc: false).ConfigureAwait(false);
         }
     }
 

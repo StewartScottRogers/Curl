@@ -14,7 +14,8 @@ internal static class UrlRelativeReference
 
     /// <summary>
     /// Whether <paramref name="text" /> starts with a scheme and <c>:</c>, as <c>Curl_is_absolute_url</c>
-    /// says: under <c>CURLU_GUESS_SCHEME</c> or <c>CURLU_DEFAULT_SCHEME</c> the colon must be followed by <c>/</c>.
+    /// says: under <c>CURLU_GUESS_SCHEME</c> or <c>CURLU_DEFAULT_SCHEME</c> the colon must be followed by <c>/</c>,
+    /// and on Windows a one-letter scheme is a drive letter, so no scheme at all (CGR-255).
     /// </summary>
     /// <param name="text">The URL set.</param>
     /// <param name="flags">The set's flags.</param>
@@ -29,8 +30,10 @@ internal static class UrlRelativeReference
 
         bool guessing = (flags & (CurlUrlFlags.GuessScheme | CurlUrlFlags.DefaultScheme)) != 0;
 
-        return !guessing || text.AsSpan(length + 1).StartsWith("/", StringComparison.Ordinal);
+        return !guessing || (!IsWindowsDriveLetter(length) && text.AsSpan(length + 1).StartsWith("/", StringComparison.Ordinal));
     }
+
+    private static bool IsWindowsDriveLetter(int schemeLength) => schemeLength == 1 && OperatingSystem.IsWindows();
 
     /// <summary>
     /// The URL <paramref name="relative" /> names from <paramref name="current" />, as upstream's

@@ -221,12 +221,29 @@ internal sealed partial class ManagedEasyTransfer
             ContentLengthUpload = ContentLengthUploadOf(options, result.Report, requestUrl),
         };
         info = info with { SizeDelivered = lastWriteCallbackOutput?.BytesDelivered ?? info.SizeDownload };
+        info = WithoutHeadWhenHeaderCallbackRefusedIt(info, result);
         info = info with { PrimaryPort = PrimaryPortOf(info, result), Referer = info.Referer ?? options.Http.Referer, ResponseCode = ResponseCodeOf(info, result) };
         info = info with { NumConnects = NumConnectsOf(info, result, options, requestUrl), HttpVersion = HttpVersionOf(info.HttpVersion, result, headers.HttpVersion) };
         return toolState is null
             ? info with { EffectiveUrl = UrlEffective.WithoutPortOverride(UrlEffective.Normalize(info.EffectiveUrl, options.Network.PathAsIs), transferUrl, Options.Network) }
             : WithToolAnswers(info, result, options, toolState, requestUrl);
     }
+
+    /// <summary>
+    /// Whether the transfer failed with <c>CURLE_WRITE_ERROR</c> because the header callback refused the status line: libcurl
+    /// counts and parses a head only once the callback has taken its lines, so getinfo then reports no head (CGR-252).
+    /// </summary>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns><see langword="true" /> when the callback took no byte.</returns>
+    private bool HeaderCallbackTookNothing(TransferResult result) =>
+        result.ExitCode.ToCurlCode() == CurlCode.WriteError && lastHeaderCallbackOutput is { BytesDelivered: 0 };
+
+    /// <summary><paramref name="info" /> with the head dropped when <see cref="HeaderCallbackTookNothing" /> (CGR-252).</summary>
+    /// <param name="info">The info from the report.</param>
+    /// <param name="result">The transfer's result.</param>
+    /// <returns>The info.</returns>
+    private TransferInfo WithoutHeadWhenHeaderCallbackRefusedIt(TransferInfo info, TransferResult result) =>
+        HeaderCallbackTookNothing(result) ? info with { HeaderSize = 0, ContentType = null, ContentLengthDownload = -1 } : info;
 
     /// <summary>
     /// The <c>CURLINFO_RESPONSE_CODE</c> of a performed transfer: the report's, else - for a transfer a watchdog cut off

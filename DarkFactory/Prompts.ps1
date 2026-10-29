@@ -458,7 +458,7 @@ Split it into smaller tasks, each sized for one run, exactly as an interactive s
 1. Read Tasks/*/{ID}-*.md and .claude/skills/task-board/SKILL.md. Decide the smaller tasks
    that together meet every acceptance criterion of {ID}, each with its own criteria and
    file-level touches taken from {ID}'s touches.
-2. File each one with `powershell -NoProfile -ExecutionPolicy Bypass -File
+2. File each one with `powershell` (`pwsh` on Linux and macOS) `-NoProfile -ExecutionPolicy Bypass -File
    .claude/skills/task-board/task-board.ps1 new` (its depends-on carries {ID}'s, plus the
    earlier subtasks it needs), and say under its Notes that it was split from {ID}.
 3. For each new task that continues the stashed work, add the line "Continues the stashed work

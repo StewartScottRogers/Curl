@@ -124,6 +124,12 @@ internal sealed class MqttSession(
     internal long BytesWritten { get; private set; }
 
     /// <summary>
+    /// Gets the number of packet bytes sent to the server so far, which curl 8.22.0 reports as
+    /// <c>%{size_request}</c> (34 for a subscribe to a one-character topic; CGR-107, BL-3959).
+    /// </summary>
+    internal long BytesSent { get; private set; }
+
+    /// <summary>
     /// Runs the session to its end.
     /// </summary>
     /// <param name="url">The transfer's URL, whose path names the topic.</param>
@@ -537,6 +543,7 @@ internal sealed class MqttSession(
         {
             await connection.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
             await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+            BytesSent += packet.Length;
         }
         catch (IOException failure)
         {

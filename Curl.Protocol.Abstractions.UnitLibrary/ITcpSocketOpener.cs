@@ -5,7 +5,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// Decides, before each TCP connect attempt of a connect, how its socket is opened: libcurl's
 /// <c>CURLOPT_OPENSOCKETFUNCTION</c>, which curl 8.22.0's <c>cf_socket_open</c> calls before the
-/// connect, and <c>CURLOPT_CLOSESOCKETFUNCTION</c> for an attempt whose connect fails (ADR-0818).
+/// connect, and <c>CURLOPT_CLOSESOCKETFUNCTION</c> for an attempt whose connect fails (ADR-0903).
 /// </summary>
 /// <remarks>
 /// Set on <see cref="ConnectTarget.SocketOpener" />; the connector asks it for every address its

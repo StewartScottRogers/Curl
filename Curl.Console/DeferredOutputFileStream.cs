@@ -22,6 +22,11 @@ namespace Curl.Console;
 /// <c>-J</c> name; <see langword="null" />, the default, overwrites an <c>-o</c> or <c>-O</c> file
 /// and not a <c>-J</c> one.
 /// </param>
+/// <param name="openUnderRawBytes">
+/// Opens a name holding an argument byte that is not valid UTF-8 under its raw bytes
+/// (<see cref="IOutputPaths.OpenUnderRawBytes" />); <see langword="null" />, the default, opens every
+/// name through <paramref name="fileSystem" />.
+/// </param>
 /// <remarks>
 /// <para>
 /// Opening late is what gives curl's messages: when the file cannot be created, the
@@ -51,7 +56,7 @@ namespace Curl.Console;
 /// curl's <c>fwrite</c> does (BL-1675).
 /// </para>
 /// </remarks>
-internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode, bool? clobber = null) : Stream
+internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode, bool? clobber = null, Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? openUnderRawBytes = null) : Stream
 {
     /// <summary>
     /// The mode a newly created <c>-o</c> file receives on a POSIX system, before the umask:
@@ -137,6 +142,25 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// open of the file has failed, or <see langword="null" /> while none has.
     /// </summary>
     internal string? OpenFailureWarning { get; private set; }
+
+    /// <summary>
+    /// Gets the size of the write (or of the <c>Content-Disposition</c> line) that failed because the
+    /// file could not be opened, or <see langword="null" /> while none has.
+    /// </summary>
+    internal long? FailedWriteLength => failedWriteLength;
+
+    /// <summary>
+    /// Hands over <see cref="OpenFailureWarning" /> to be printed where the failure is reported, and clears it
+    /// so the end of the transfer does not print it again.
+    /// </summary>
+    /// <returns>The warning, or <see langword="null" /> when none is pending.</returns>
+    internal string? TakeOpenFailureWarning()
+    {
+        string? warning = OpenFailureWarning;
+        OpenFailureWarning = null;
+
+        return warning;
+    }
 
     /// <summary>
     /// Gets a value indicating whether a <c>Content-Disposition</c> header has named the file
@@ -227,11 +251,29 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         try
         {
             open.Write(buffer.Span);
+            FlushIgnoringFailure(open);
             return ValueTask.CompletedTask;
         }
         catch (IOException exception)
         {
             return ValueTask.FromException(exception);
+        }
+    }
+
+    /// <summary>
+    /// Pushes what the file stream buffers out to the file, so a process killed mid-transfer leaves
+    /// the bytes received so far, as curl 8.22.0 does on Windows (CGR-237). A failure is left for
+    /// <see cref="CompleteAsync" />'s flush to report, as curl reports it at <c>fclose</c> (CGR-026).
+    /// </summary>
+    /// <param name="open">The open file.</param>
+    private static void FlushIgnoringFailure(Stream open)
+    {
+        try
+        {
+            open.Flush();
+        }
+        catch (IOException)
+        {
         }
     }
 
@@ -253,6 +295,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         }
 
         await target.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+        FlushIgnoringFailure(target);
     }
 
     /// <summary>
@@ -570,7 +613,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>The open's answer.</returns>
     private ValueTask<FileOpenResult> OpenAsync(FileWriteMode mode, CancellationToken cancellationToken) =>
-        RawByteFileName.OpenForWriteAsync(fileSystem, Path, mode, CreateMode, cancellationToken);
+        RawByteFileName.OpenForWriteAsync(fileSystem, Path, mode, CreateMode, openUnderRawBytes, cancellationToken);
 
     /// <summary>
     /// Creates <c>&lt;path&gt;.1</c>, then <c>.2</c>, and so on while each is already taken, up to

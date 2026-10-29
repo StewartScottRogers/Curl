@@ -68,8 +68,10 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     private uint peerHeaderTableSize = HpackEncoder.DefaultMaximumTableSize;
 
     private bool isPrefaceSent;
+    private bool isClosingGoAwaySkipped;
 
     private bool isUpgradeSettingsDue;
+    private bool isUpgradedStreamOpened;
 
     private ExceptionDispatchInfo? connectionFailure;
 
@@ -78,6 +80,9 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// stream on the session, which a pooled session hands on to each transfer it carries (ADR-0345).
     /// </summary>
     private HttpFrameLog connectionLog = HttpFrameLog.Silent;
+
+    /// <summary>Where the connection's <c>-v</c> lines go: the latest registered stream's, or <see langword="null" /> for none.</summary>
+    private HttpStreamOpenedLines? connectionInfoLines;
 
     /// <summary>Initializes a new instance of the <see cref="Http2Session" /> class.</summary>
     /// <param name="connection">The connection; the handler keeps ownership.</param>
@@ -150,9 +155,14 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName), traceEvents is null ? null : new Http2FrameTrace(traceEvents));
 
     /// <summary>
+    /// Makes <see cref="ShutDownAsync" /> send nothing, as curl closes a connection it gave up on after five refused streams without a GOAWAY (BL-3838).
+    /// </summary>
+    public void SkipClosingGoAway() => isClosingGoAwaySkipped = true;
+
+    /// <summary>
     /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
     /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 Notes); nothing
-    /// when no preface went out, when a GOAWAY already has, or when the peer closed the
+    /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, or when the peer closed the
     /// connection. A connection that fails the write is closing anyway, so that is not an error.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
@@ -162,7 +172,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (!isPrefaceSent || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
+            if (!isPrefaceSent || isClosingGoAwaySkipped || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
             {
                 return;
             }
@@ -239,6 +249,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             isUpgradeSettingsDue = true;
             int streamId = Register(Frames.OpenUpgradedStream(), receiver);
             await SendStreamWindowUpdatesAsync(streamId, cancellationToken).ConfigureAwait(false);
+            isUpgradedStreamOpened = true;
             return streamId;
         }
         finally
@@ -252,7 +263,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// window to <see cref="StreamReceiveWindowSize" /> from the initial size in force: the
     /// default 65535 until the peer acknowledges this client's SETTINGS, 65536 after, as
     /// nghttp2 counts it - 10420225 on the first stream of a prior-knowledge connection,
-    /// 10420224 on the next (measured, BL-817 Notes).
+    /// 10420224 on the next (measured, BL-817 Notes). After an h2c upgrade the settings count as acknowledged once stream 1 is open, so later streams get 10420224 (CGR-277).
     /// </summary>
     /// <param name="streamId">The stream whose window grows.</param>
     /// <param name="cancellationToken">Cancels the writes.</param>
@@ -272,7 +283,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     private async ValueTask SendStreamWindowUpdatesAsync(int streamId, CancellationToken cancellationToken)
     {
-        int initialWindowSize = Frames.IsClientSettingsAcknowledged ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
+        int initialWindowSize = Frames.IsClientSettingsAcknowledged || isUpgradedStreamOpened ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
         for (int sent = 0; sent < StreamWindowUpdateCount; sent++)
         {
             await Frames.IncreaseStreamReceiveWindowAsync(streamId, StreamReceiveWindowSize - initialWindowSize, cancellationToken).ConfigureAwait(false);
@@ -392,6 +403,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     {
         openStreams[streamId] = receiver;
         connectionLog = receiver.FrameLog;
+        connectionInfoLines = receiver.OpenedLines;
         return streamId;
     }
 
@@ -444,13 +456,47 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             return;
         }
 
+        IReadOnlyList<HeaderField>? fields = await DecodeHeaderBlockAsync(frame, cancellationToken).ConfigureAwait(false);
         if (frame.Type == Http2FrameType.PushPromise)
         {
-            await OfferPushAsync(frame, Decode(frame.Content), cancellationToken).ConfigureAwait(false);
+            await OfferPushAsync(frame, fields!, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        Route(frame);
+        Route(frame, fields);
+    }
+
+    /// <summary>
+    /// Decodes the header block of a HEADERS or PUSH_PROMISE frame, or gives <see langword="null" /> for any
+    /// other frame. A block that does not decode closes the connection with GOAWAY COMPRESSION_ERROR and no
+    /// debug data, as nghttp2 does after a failed inflate (CGR-280), and fails the transfer with exit 16.
+    /// </summary>
+    private async ValueTask<IReadOnlyList<HeaderField>?> DecodeHeaderBlockAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
+    {
+        if (frame.Type is not (Http2FrameType.Headers or Http2FrameType.PushPromise))
+        {
+            return null;
+        }
+
+        try
+        {
+            return decoder.Decode(frame.Content.Span);
+        }
+        catch (HpackDecodingException)
+        {
+            HttpTransferException failure = new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.CompressionError));
+            connectionFailure = ExceptionDispatchInfo.Capture(failure);
+            try
+            {
+                await Frames.SendGoAwayAsync(Http2ErrorCode.CompressionError, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                // The transport is already gone; the compression error is still what the transfer reports.
+            }
+
+            throw failure;
+        }
     }
 
     /// <summary>
@@ -525,12 +571,12 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         if (!wasGoAwayReceived && Frames.PeerGoAway is { } goAway)
         {
             connectionLog.GoAwayReceived(goAway);
+            connectionInfoLines?.GoAwayReceived(goAway);
         }
     }
 
-    private void Route(Http2StreamFrame frame)
+    private void Route(Http2StreamFrame frame, IReadOnlyList<HeaderField>? fields)
     {
-        IReadOnlyList<HeaderField>? fields = frame.Type == Http2FrameType.Headers ? Decode(frame.Content) : null;
         if (!openStreams.TryGetValue(frame.StreamId, out Http2StreamConnection? owner))
         {
             return;
@@ -542,24 +588,6 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         {
             _ = openStreams.Remove(frame.StreamId);
             owner.FrameTrace?.StreamClosed(frame.StreamId);
-        }
-    }
-
-    /// <summary>
-    /// Decodes a header block; one that does not decode fails the connection with exit 16, as
-    /// curl reports nghttp2's COMPRESSION_ERROR.
-    /// </summary>
-    private IReadOnlyList<HeaderField> Decode(ReadOnlyMemory<byte> block)
-    {
-        try
-        {
-            return decoder.Decode(block.Span);
-        }
-        catch (HpackDecodingException)
-        {
-            HttpTransferException failure = new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.CompressionError));
-            connectionFailure = ExceptionDispatchInfo.Capture(failure);
-            throw failure;
         }
     }
 

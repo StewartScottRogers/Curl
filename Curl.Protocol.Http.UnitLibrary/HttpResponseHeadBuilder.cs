@@ -46,6 +46,11 @@ internal sealed class HttpResponseHeadBuilder
     internal HttpResponseHeader PendingHeader => ToHeader(pendingHeader.ToString());
 
     /// <summary>
+    /// Gets how many headers of the current head have been read, counting a pending one: libcurl stores a header line as it reads it.
+    /// </summary>
+    internal int HeaderCountWithPending => headers.Count + (hasPendingHeader ? 1 : 0);
+
+    /// <summary>
     /// Starts the next response's head with its status line, dropping the previous head's
     /// headers but keeping its bytes.
     /// </summary>
@@ -206,8 +211,8 @@ internal sealed class HttpResponseHeadBuilder
 
         string header = pendingHeader.ToString();
         headers.Add(ToHeader(header));
-        Append(header, pendingTerminator);
         hasPendingHeader = false;
+        Append(header, pendingTerminator);
     }
 
     private HttpResponseHeader ToHeader(string header)

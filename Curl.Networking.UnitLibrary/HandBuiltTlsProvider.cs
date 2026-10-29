@@ -44,7 +44,7 @@ namespace Curl.Networking;
 /// <see cref="CertificateStatusFailureMessages" /> gives (ADR-0191).
 /// </para>
 /// </remarks>
-public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
+public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings, ISystemStoreTrustTlsProvider
 {
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.HandBuilt;
@@ -142,6 +142,23 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
 
+    /// <summary>
+    /// Gets the settings its handshakes run with, once the build's range and security level
+    /// have adjusted them; adjusting them again changes nothing.
+    /// </summary>
+    internal TlsClientOptions Options => _options;
+
+    /// <inheritdoc />
+    public ITlsProvider WithSystemStoreOnlyTrust() =>
+        new HandBuiltTlsProvider(
+            ISystemStoreTrustTlsProvider.SystemStoreOnly(_options),
+            _matchesSchannelBuild,
+            _timeProvider,
+            _certificateStore,
+            _random,
+            _sessions,
+            _echConfigs);
+
     // A range that reaches TLS 1.3 offers it, and one whose minimum is below TLS 1.3 offers
     // TLS 1.2 and below; a range doing both offers them in one ClientHello (ADR-0162, ADR-0205).
     private bool OffersTls13 => _options.MaximumVersion is TlsVersion.SystemDefault or TlsVersion.Tls13;
@@ -154,8 +171,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     private bool OffersOnlyVersionsBelowTls12 => _options.MaximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11;
 
     // OpenSSL 3's default security level allows no version below TLS 1.2, so the OpenSSL
-    // build has nothing to offer under a lower ceiling (measured, BL-1152, ADR-0364).
-    private bool RefusesItsVersionRange => !_matchesSchannelBuild && OffersOnlyVersionsBelowTls12;
+    // build has nothing to offer under a lower ceiling (measured, BL-1152, ADR-0364), unless
+    // --ciphers ends at @SECLEVEL=0 (measured against curl 8.18.0 OpenSSL 3.5.5, BL-3879, ADR-0364).
+    private bool RefusesItsVersionRange =>
+        !_matchesSchannelBuild && OffersOnlyVersionsBelowTls12 && !LowersSecurityLevelToZero(_options.Ciphers);
 
     // Under a TLS 1.2 or later ceiling, the same security level raises a --tlsv1.0 or
     // --tlsv1.1 minimum to TLS 1.2 in the OpenSSL build, unless --ciphers ends at
@@ -239,9 +258,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
         var session = OfferedSession(peerKey);
         ReportReusedSession(events, session);
-        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session } };
+        var messageTrace = _matchesSchannelBuild ? null : new HandBuiltHandshakeMessageTrace(events, OfferedWireVersion);
+        TlsHandshakeMessageObserver? observer = messageTrace is null ? null : (direction, contentType, _, message) => messageTrace.Observe(direction, contentType, message);
+        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session, HandshakeMessageObserver = observer } };
         var handshakeStarted = _timeProvider.GetTimestamp();
-        var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey);
+        var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey) { MessageTrace = messageTrace };
         if (EarlyDataApplicationProtocol(session, offeredApplicationProtocols) is { } earlyDataProtocol)
         {
             return DeferHandshake(handshakeRun, session!, earlyDataProtocol, handshakeStarted);
@@ -264,6 +285,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CancellationToken cancellationToken)
     {
         var (handshake, thrown) = await TryHandshakeAsync(run.Plaintext, run.Prepared, earlyData, cancellationToken).ConfigureAwait(false);
+        run.MessageTrace?.ReportHeld(Completed(handshake) ? handshake.ProtocolVersion : HandBuiltHandshake.NegotiatedBy(run.Prepared.Verifier.Presented).ProtocolVersion);
         run.Prepared.Verifier.Observed.ReportVerifyResult(run.Events, run.IsProxy, _matchesSchannelBuild);
         if (!Completed(handshake))
         {
@@ -384,7 +406,15 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         bool IsProxy,
         PreparedHandshake Prepared,
         IReadOnlyList<string> OfferedApplicationProtocols,
-        string? PeerKey);
+        string? PeerKey)
+    {
+        // The OpenSSL build's handshake message trace; the Schannel build reports none (BL-4009).
+        internal HandBuiltHandshakeMessageTrace? MessageTrace { get; init; }
+    }
+
+    // The ClientHello's highest version, which OpenSSL's message callback names until the
+    // server answers (ADR-0983).
+    private int OfferedWireVersion => OffersTls13 ? 0x0304 : (int)ClientSettings.Tls12Maximum(_options);
 
     private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>
         _options.UseAlpn ? applicationProtocols : [];
@@ -497,6 +527,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             CertificateVerifyResult = verifier.Observed.VerifyResult,
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
             PinnedPublicKeyHash = verifier.Observed.PinnedPublicKeyHash,
+            NegotiatedGroupName = OpenSslHandshakeNames.GroupName(handshake.NegotiatedGroup),
+            PeerSignatureTypeName = OpenSslHandshakeNames.SignatureTypeName(handshake.PeerSignatureScheme, handshake.PeerSignatureKeyAlgorithmOid),
         };
 
     /// <summary>
@@ -742,7 +774,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return tls12.Stream is { } tls12Stream ? HandBuiltHandshake.Completed(tls12Stream) : HandBuiltHandshake.Failed(tls12.Failure!);
     }
 
-    // ADR-0011 and ADR-0816 as SslStreamTlsProvider applies them: the Schannel build reads
+    // ADR-0011 and ADR-0896 as SslStreamTlsProvider applies them: the Schannel build reads
     // --ciphers as ALG_IDs and ignores --tls13-ciphers; the OpenSSL build offers what they
     // name that the client can run, and a list naming none of those is exit 59.
     private (IReadOnlyList<ushort>? Suites, ConnectResult? Failure) SelectCipherSuites() =>
@@ -772,10 +804,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         ? TlsFailureMessages.SchannelSslConnectError(failure, OffersOnlyVersionsBelowTls12)
         : TlsFailureMessages.OpenSslSslConnectError(failure);
 
-    // The Schannel build ignores --sigalgs and --curves (ADR-0793), so its failed handshake
+    // The Schannel build ignores --sigalgs and --curves (ADR-0874), so its failed handshake
     // prints Schannel's text whether or not either is given.
     private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
-        _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12)
+        _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, _options.MinimumVersion, _options.MaximumVersion)
         : TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure);
 
     // What a handshake was prepared with: the ClientHello's settings, the --cert certificate
@@ -814,6 +846,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // SSLKEYLOGFILE: where the TLS 1.3 and TLS 1.2 handshakes log their secrets (BL-2327, BL-2339).
         internal ITlsKeyLog? KeyLog { get; init; }
 
+        // The OpenSSL build's -v: told each handshake message the TLS 1.3 or TLS 1.2 client sees (BL-4009).
+        internal TlsHandshakeMessageObserver? HandshakeMessageObserver { get; init; }
+
         private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
 
         internal static ClientSettings Of(
@@ -847,6 +882,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             EncryptedClientHelloConfigs = EchConfigs,
             SendEncryptedClientHelloGrease = SendEchGrease,
             KeyLog = KeyLog,
+            HandshakeMessageObserver = HandshakeMessageObserver,
         };
 
         // padding follows the measured extensions and early_data, where OpenSSL sends it (BL-1048).
@@ -887,6 +923,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
             InsertEmptyFragment = InsertsEmptyFragment(options),
             KeyLog = KeyLog,
+            HandshakeMessageObserver = HandshakeMessageObserver,
         };
 
         // Schannel's hello below a TLS 1.3 ceiling is in a record of that ceiling; a TLS 1.2
@@ -901,7 +938,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 ? TlsProtocolVersion.Tls12
                 : ToTlsProtocolVersion(options.MinimumVersion);
 
-        private static TlsProtocolVersion Tls12Maximum(TlsClientOptions options) =>
+        internal static TlsProtocolVersion Tls12Maximum(TlsClientOptions options) =>
             ReachesTls13(options) ? TlsProtocolVersion.Tls12 : ToTlsProtocolVersion(options.MaximumVersion);
 
         // Below a TLS 1.2 ceiling an unset minimum is TLS 1.0, as TlsVersionRange offers it.

@@ -386,6 +386,12 @@ public sealed class HttpResponseHeadReaderTests
     [DataRow("HTTP/3 100 x\r\n\r\nHTTP/1.0 200 OK\r\n\r\n", CurlExitCode.UnsupportedProtocol, "Unsupported HTTP version (3.0) in response", DisplayName = "HTTP/3 100 then HTTP/1.0 200")]
     public async Task ReadAsync_Http2OrHttp3StatusLineOverHttp1_FailsAsCurlsHttp2Build(string response, CurlExitCode exitCode, string message)
     {
+        if (OperatingSystem.IsWindows() && response.StartsWith("HTTP/2 ", StringComparison.Ordinal))
+        {
+            // Windows curl is built without HTTP/2 (CGR-201, BL-3730).
+            (exitCode, message) = (CurlExitCode.UnsupportedProtocol, "Unsupported HTTP version (2.0) in response");
+        }
+
         Diagnostics.Arrange("scripted response", response);
         ScriptedConnection connection = new(Encoding.Latin1.GetBytes(response), 65536);
 
@@ -418,7 +424,7 @@ public sealed class HttpResponseHeadReaderTests
     public async Task ReadAsync_Http09AnswerToHeadRequest_ReturnsWeirdServerReply()
     {
         Diagnostics.Arrange("scripted response", "body only, HTTP/0.9 accepted, HEAD request");
-        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("just a body\n"), 65536);
+        ScriptedConnection connection = new(Encoding.Latin1.GetBytes("just a body\nand more\n"), 65536);
 
         HttpTransferException thrown = await Assert.ThrowsExactlyAsync<HttpTransferException>(
             async () => await new HttpResponseHeadReader(connection) { AcceptsHttp09 = true, IsHeadRequest = true }.ReadAsync(CancellationToken.None));

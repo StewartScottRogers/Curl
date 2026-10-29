@@ -48,6 +48,7 @@ function Show-Banner {
 $script:AudioReady = $false
 function Initialize-Audio {
     if ($script:AudioReady) { return $true }
+    if (-not (Test-FactoryOnWindows)) { return $false }
     try {
         Add-Type -ErrorAction Stop -TypeDefinition @'
 using System;
@@ -95,8 +96,28 @@ public static class Audio {
 }
 
 $script:Voice = $null
+
+# Off Windows the voice is the first of say (macOS), spd-say or espeak (Linux) found on PATH,
+# behind the same members as the System.Speech synthesizer; $null when none is installed, so
+# the alarm only prints. The system volume is never touched.
+function Get-CommandLineVoice {
+    $tool = @('say', 'spd-say', 'espeak') | Where-Object { Get-Command $_ -CommandType Application -ErrorAction SilentlyContinue } | Select-Object -First 1
+    if (-not $tool) { return $null }
+    $v = [pscustomobject]@{ Volume = 100; Rate = 0; Tool = $tool; Process = $null }
+    $v | Add-Member ScriptMethod SpeakAsyncCancelAll {
+        if ($this.Process -and -not $this.Process.HasExited) { try { $this.Process.Kill() } catch { } }
+        $this.Process = $null
+    }
+    $v | Add-Member ScriptMethod SpeakAsync {
+        param($Text)
+        try { $this.Process = Start-Process -FilePath $this.Tool -ArgumentList @($Text) -PassThru -RedirectStandardOutput (Join-Path ([IO.Path]::GetTempPath()) 'curl-factory-voice.out') -RedirectStandardError (Join-Path ([IO.Path]::GetTempPath()) 'curl-factory-voice.err') } catch { }
+    }
+    return $v
+}
+
 function Get-Voice {
     if ($script:Voice) { return $script:Voice }
+    if (-not (Test-FactoryOnWindows)) { $script:Voice = Get-CommandLineVoice; return $script:Voice }
     try {
         Add-Type -AssemblyName System.Speech -ErrorAction Stop
         $v = New-Object System.Speech.Synthesis.SpeechSynthesizer
@@ -165,7 +186,7 @@ function Restore-AlarmVolume {
 # Stewart's audio switch (BL-1317, BL-1456): while this file exists every sound Curl makes is
 # off - the whisper hook's and the factory's alarm, chimes, speech and volume changes. Read
 # at each sound, so creating or deleting it reaches a shift that is already running.
-$script:AudioOffFile = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Curl\audio-off' } else { $null }
+$script:AudioOffFile = Join-Path (Get-FactoryDataDir) 'audio-off'
 function Test-AudioOff { return [bool]($script:AudioOffFile -and (Test-Path -LiteralPath $script:AudioOffFile)) }
 
 # True when the factory must stay silent: -QuietAlarm, or the audio-off file. The banner

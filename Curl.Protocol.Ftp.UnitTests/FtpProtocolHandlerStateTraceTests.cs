@@ -273,7 +273,9 @@ public sealed class FtpProtocolHandlerStateTraceTests
             "* [FTP] [STOP] setup connection -> 0",
             "* [FTP] [STOP] -> [WAIT220]",
             "< 500 Go away",
+            "* Got a 500 ftp-server response when 220 was expected",
             "* [FTP] [WAIT220] done, result=8",
+            "* closing connection #0",
         ];
         diagnostics.Diff("transcript", string.Join('\n', expected), string.Join('\n', events.Transcript));
         CollectionAssert.AreEqual(expected, events.Transcript);

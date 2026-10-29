@@ -10,9 +10,10 @@ namespace Curl.Engine;
 /// The dialer of a transfer in a multi handle driven by <c>curl_multi_socket_action</c>: while a dial runs the
 /// transfer waits writable (<see cref="TransferSocketWait.BeginConnect" />) on the socket the inner dialer publishes as it
 /// creates it (<see cref="TransferSocketWait.ConnectingOn" />, BL-3890), a dial that connects ends the connect
-/// (<see cref="TransferSocketWait.EndConnect" />), and each dialed connection is wrapped, beneath TLS, in a
+/// (<see cref="TransferSocketWait.EndConnect" />) after the transfer takes its socket, an engine number for a connection with no
+/// operating system socket (<see cref="TransferSocketWait.TakeSocket" />, ADR-0955), and each dialed connection is wrapped, beneath TLS, in a
 /// <see cref="SocketActionGatedConnection" />, so its reads and writes wait for the multi handle's signal
-/// (ADR-0822, BL-3859). Every other member is the inner dialer's.
+/// (ADR-0917, BL-3859). Every other member is the inner dialer's.
 /// </summary>
 /// <remarks>
 /// A dial that fails leaves the transfer connecting, as libcurl's does while it tries the next address; the
@@ -63,6 +64,7 @@ internal sealed class SocketActionGatedTcpDialer(ITcpDialer inner, TransferSocke
     {
         wait.BeginConnect();
         IConnection connection = await dialer.DialUnixSocketAsync(address, cancellationToken).ConfigureAwait(false);
+        wait.TakeSocket(connection.SocketHandle);
         wait.EndConnect();
         return new SocketActionGatedConnection(connection, wait);
     }
@@ -74,6 +76,7 @@ internal sealed class SocketActionGatedTcpDialer(ITcpDialer inner, TransferSocke
     {
         wait.BeginConnect();
         DialedTcpConnection dialed = await dialAsync().ConfigureAwait(false);
+        wait.TakeSocket(dialed.Connection.SocketHandle);
         wait.EndConnect();
         return new DialedTcpConnection(new SocketActionGatedConnection(dialed.Connection, wait), dialed.LocalEndPoint);
     }

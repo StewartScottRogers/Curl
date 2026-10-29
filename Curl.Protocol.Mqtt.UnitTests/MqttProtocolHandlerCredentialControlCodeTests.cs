@@ -21,7 +21,7 @@ public sealed class MqttProtocolHandlerCredentialControlCodeTests
 
         TransferResult result = await new MqttProtocolHandler(connector).ExecuteAsync(Context(user, password));
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "control code detected in credentials"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadFunctionArgument, "control code detected in credentials"), result with { Report = null });
         Assert.AreEqual(0, connector.Calls);
     }
 

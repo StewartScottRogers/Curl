@@ -228,6 +228,7 @@ internal sealed partial class ManagedEasyTransfer
         LastResult = null;
         LastContext = null;
         lastWriteCallbackOutput = null;
+        lastHeaderCallbackOutput = null;
         StartSocketWait(options);
         if (options.Network.Url is not { } urlText)
         {
@@ -236,7 +237,7 @@ internal sealed partial class ManagedEasyTransfer
 
         if (TransferUrlOf(urlText, options, out CurlUrlRejection rejection) is not { } url)
         {
-            return Finish(CurlCode.UrlMalformat, TransferPerformer.UrlRejectedPrefix + rejection.ToCurlMessage(), new TransferInfo { EffectiveUrl = urlText });
+            return Finish(CurlCode.UrlMalformat, TransferPerformer.UrlRejectionText(rejection), new TransferInfo { EffectiveUrl = urlText });
         }
 
         EngineTransferSettings settings = ToolSettings ?? TransferSettingsOf(options);

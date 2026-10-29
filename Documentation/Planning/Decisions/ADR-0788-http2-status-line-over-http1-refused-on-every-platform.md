@@ -10,7 +10,7 @@
 
 ADR-0679 refused an `HTTP/2 ddd` or `HTTP/3 ddd` status line over HTTP/1.x off Windows only,
 because the Windows reference then was System32's Schannel build, which has no HTTP/2 and takes
-the line as an assumed `HTTP/1.0 200`. ADR-0786 turned HTTP/2 on for Windows and BL-3268 ran the
+the line as an assumed `HTTP/1.0 200`. ADR-0871 turned HTTP/2 on for Windows and BL-3268 ran the
 upstream HTTP/2 cases there, so test1704 now runs on Windows and expected exit 8 where Curl exited 0.
 
 Measured on Windows with an HTTP/2-built curl (curl 8.18.0, LibreSSL, nghttp2 1.68.0, from WinGet)

@@ -50,7 +50,7 @@ public sealed class CurlUrlHandle : IDisposable
     /// <summary>
     /// <c>curl_url_get</c> as the C ABI returns it: one part of the URL as the bytes of its
     /// <c>char *</c>, so a byte <c>CURLU_URLDECODE</c> decodes that is not UTF-8 (<c>%FF</c>) is that
-    /// byte, as libcurl 8.22.0 gives it, not U+FFFD (ADR-0796).
+    /// byte, as libcurl 8.22.0 gives it, not U+FFFD (ADR-0877).
     /// </summary>
     /// <param name="part"><c>what</c>: the part to get.</param>
     /// <param name="flags"><c>flags</c>: how to return it.</param>

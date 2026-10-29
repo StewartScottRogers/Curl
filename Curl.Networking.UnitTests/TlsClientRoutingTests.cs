@@ -304,6 +304,26 @@ public sealed class TlsClientRoutingTests
         Assert.IsNull(TlsClientRouting.Reason(options));
     }
 
+    // ADR-0985 (BL-4010): the OpenSSL build's traced handshake messages run on the hand-built
+    // client, which reports them; the Schannel build traces none, so its route stays SslStream.
+    [TestMethod]
+    [DataRow(false, true, "the OpenSSL build traces the handshake messages, which SslStream does not show")]
+    [DataRow(true, true, null)]
+    [DataRow(false, false, null)]
+    public void ReasonInBuild_WhenTheHandshakeMessagesAreTraced_NamesTheTraceInTheOpenSslBuildOnly(bool matchesSchannelBuild, bool tracesHandshakeMessages, string? expected)
+    {
+        var options = new TlsClientOptions(TracesHandshakeMessages: tracesHandshakeMessages);
+        Diagnostics.Arrange("Schannel build", matchesSchannelBuild);
+        Diagnostics.Arrange("traces handshake messages", tracesHandshakeMessages);
+
+        var actual = TlsClientRouting.ReasonInBuild(options, matchesSchannelBuild);
+
+        Diagnostics.Act("reason", actual ?? "null");
+        Diagnostics.Assert("reason", expected ?? "null", actual ?? "null");
+
+        Assert.AreEqual(expected, actual);
+    }
+
     [TestMethod]
     public void Reason_WithNullOptions_ThrowsArgumentNullException()
     {

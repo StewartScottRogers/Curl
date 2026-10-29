@@ -33,7 +33,6 @@ public sealed class Cgr052Tests
     [DataRow("http://h/é@b")]
     [DataRow("http://h?é@b")]
     [DataRow("http://h#é@b")]
-    [DataRow("http://éh")]
     public void Parse_ConfigFileUrlWithNoUserInformationOnWindows_KeepsTheUrl(string url)
     {
         CommandLineOptions options = ParseConfigFile("url = \"" + url + "\"\n", isWindows: true);

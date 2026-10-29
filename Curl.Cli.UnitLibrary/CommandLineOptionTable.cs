@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Security.Authentication;
 using System.Text;
+using Curl.Core;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Cli;
@@ -295,7 +296,7 @@ public static partial class CommandLineOptionTable
         CommandLineOption.Value("proxy-header", null, AddProxyHeaders),
         CommandLineOption.Value("user-agent", 'A', AcceptingEmpty((options, userAgent) => options.UserAgent = options.AsWireText(userAgent))),
         CommandLineOption.Value("referer", 'e', AcceptingEmpty((options, referer) => SetReferer(options, options.AsWireText(referer)))),
-        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') && options.ReadingConfigFile ? AsRawWireText(options, cookie) : cookie))),
+        CommandLineOption.Value("cookie", 'b', AcceptingEmpty((options, cookie) => options.AddCookie(cookie.Contains('=') && options.ReadingConfigFile && !(options.ReadsArgumentsAsUtf8 && options.ReadingUtf8ConfigFile) ? AsRawWireText(options, cookie) : cookie))),
         CommandLineOption.Text("cookie-jar", 'c', (options, file) => options.CookieJar = file),
         CommandLineOption.NegatableFlag("junk-session-cookies", 'j', (options, on) => options.JunkSessionCookies = on),
         CommandLineOption.NegatableFlag("follow", null, SetFollow),
@@ -713,7 +714,7 @@ public static partial class CommandLineOptionTable
         byte[] contents;
         if (file == "-")
         {
-            contents = dataFileReader.ReadStandardInput();
+            contents = ReadStandardInputOrEmpty(dataFileReader);
         }
         else if (!dataFileReader.TryReadFile(file, out contents))
         {
@@ -799,7 +800,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, false, out byte[] contents);
         if (refusal is null)
         {
             options.AppendPostData(RemoveLineBreaksAndNuls(contents));
@@ -839,7 +840,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, readsStandardInputAsText, false, out byte[] contents);
         if (refusal is null)
         {
             append(contents);
@@ -872,24 +873,25 @@ public static partial class CommandLineOptionTable
             ? CommandLineRefusal.BlankArgument(spelledOption)
             : value[0] == '@'
                 ? AddUrlsFromFile(options, value[1..], spelledOption, dataFileReader)
-                : options.AddUrl(WithUserInformationAsWireText(options, value), spelledOption);
+                : options.AddUrl(WithAuthorityAsWireText(options, value), spelledOption);
 
     /// <summary>
-    /// <paramref name="url"/> with the user information before its host re-spelled by
-    /// <see cref="CommandLineOptions.AsWireText"/>, so a user name or password written raw in a UTF-8
-    /// <c>-K</c> file goes out as the file's own bytes, as curl 8.22.0's Windows build sends them
-    /// (CGR-052, ADR-0821); the host, path and the rest are left as they are.
+    /// <paramref name="url"/> with its authority (user information, host and port) re-spelled by
+    /// <see cref="CommandLineOptions.AsWireText"/>, so a user name, password or host written raw in a
+    /// UTF-8 <c>-K</c> file goes out as the file's own bytes, as curl 8.22.0's Windows build sends them:
+    /// <c>Basic w6k64oKs</c> for <c>é:€@</c> (CGR-052, ADR-0910) and <c>xn--14-ria7423a</c> for the
+    /// host <c>ü</c>, its UTF-8 bytes read as Windows-1252 (CGR-059, BL-3956); the path and the rest are
+    /// left as they are.
     /// </summary>
     /// <param name="options">The options, which say whether a UTF-8 config file is being read.</param>
     /// <param name="url">The <c>--url</c> value.</param>
     /// <returns>The URL to add.</returns>
-    private static string WithUserInformationAsWireText(CommandLineOptions options, string url)
+    private static string WithAuthorityAsWireText(CommandLineOptions options, string url)
     {
         int schemeEnd = url.IndexOf("://", StringComparison.Ordinal);
         int authorityStart = schemeEnd < 0 ? 0 : schemeEnd + 3;
         int authorityLength = url.AsSpan(authorityStart).IndexOfAny('/', '?', '#') is var end and >= 0 ? end : url.Length - authorityStart;
-        int at = url.AsSpan(authorityStart, authorityLength).LastIndexOf('@');
-        return at < 0 ? url : url[..authorityStart] + options.AsWireText(url.Substring(authorityStart, at)) + url[(authorityStart + at)..];
+        return url[..authorityStart] + options.AsWireText(url.Substring(authorityStart, authorityLength)) + url[(authorityStart + authorityLength)..];
     }
 
     /// <summary>
@@ -904,7 +906,7 @@ public static partial class CommandLineOptionTable
         byte[] contents;
         if (file == "-")
         {
-            contents = dataFileReader.ReadStandardInput();
+            contents = ReadStandardInputOrEmpty(dataFileReader);
         }
         else if (!dataFileReader.TryReadFile(file, out contents))
         {
@@ -1000,7 +1002,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, false, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[(split + 1)..], spelledOption, dataFileReader, false, false, out byte[] contents);
         encoded = contents.Length == 0 ? string.Empty : NameAndEscapedContent(name, contents);
         return refusal;
     }
@@ -1029,16 +1031,18 @@ public static partial class CommandLineOptionTable
     /// <paramref name="value"/> as the request side must hold a <c>-b</c> cookie string or <c>-X</c> method
     /// to send it as curl 8.22.0 does: while a config file is read, re-spelled one character per byte of
     /// the file's own bytes, since the request side writes those values one character per byte
-    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise with each
-    /// byte of an argument that was not valid UTF-8 (<see cref="InvalidUtf8ByteEscape"/>) given as that
-    /// byte's one character, so <c>-b $'a=\xff'</c> sends the byte FF as curl 8.18.0 does on Linux
-    /// (CGR-016, BL-3850), and every other character unchanged. A command-line <c>-b</c> string is not passed here:
-    /// it keeps the escape, which the console's cookie string encoding gives back as its byte (BL-3545).
+    /// (Latin-1) and curl sends a config file's bytes unchanged (CGR-020, BL-3549); otherwise, on Windows, with each
+    /// escaped byte given as that byte's one character, and elsewhere unchanged: the escape
+    /// (<see cref="InvalidUtf8ByteEscape"/>) is kept for the request head's encoding of command-line text, which
+    /// gives it back as its byte, so <c>-X $'G\xffT'</c> sends the byte FF as curl 8.18.0 does on Linux
+    /// (CGR-016, BL-3902). A command-line <c>-b</c> string is not passed here and keeps the escape likewise (BL-3545).
     /// </summary>
     private static string AsRawWireText(CommandLineOptions options, string value) =>
         options.ReadingConfigFile
             ? Encoding.Latin1.GetString((options.ReadingConfigFileAsWireText ? options.ConfigFileWireTextEncoding! : Encoding.UTF8).GetBytes(value))
-            : WithEscapedBytesAsCharacters(value);
+            : options.ReadsArgumentsAsUtf8
+                ? value
+                : WithEscapedBytesAsCharacters(value);
 
     /// <summary>
     /// <paramref name="value"/> with each lone surrogate U+DC80 to U+DCFF, an argument byte that was not
@@ -1085,7 +1089,7 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, value[1..], spelledOption, dataFileReader, true, true, out byte[] contents);
         if (refusal is null)
         {
             foreach (string line in HeaderFileText.Read(contents, options.ConfigFileWireTextEncoding).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
@@ -1099,27 +1103,65 @@ public static partial class CommandLineOptionTable
 
     /// <summary>
     /// Reads the file an <c>@file</c> value names, or standard input when <paramref name="file"/> is
-    /// <c>-</c>, and refuses a file that cannot be read with <see cref="CommandLineRefusal.DataFileUnreadable"/>.
+    /// <c>-</c>, and refuses a file that cannot be read with <see cref="CommandLineRefusal.DataFileUnreadable"/>,
+    /// or with <see cref="CommandLineRefusal.DataFileOpenedButUnreadable"/> for a directory that curl's Linux and
+    /// macOS builds open but cannot read (<see cref="IDataFileReader.OpensAsUnreadableDirectory"/>, CGR-069).
     /// Standard input is read as curl's Windows build reads it in text mode when <paramref name="readsStandardInputAsText"/>
-    /// and the build is Windows (<see cref="WindowsTextModeInput"/>), and unchanged otherwise.
+    /// and the build is Windows (<see cref="WindowsTextModeInput"/>), and unchanged otherwise. A closed standard input
+    /// (<see cref="ClosedStandardInputStream"/>) reads as empty when <paramref name="readsClosedStandardInputAsEmpty"/>, as
+    /// curl 8.22.0's <c>fgets</c>-based reader for <c>-H @-</c> reads it, and is refused with
+    /// <see cref="CommandLineRefusal.StandardInputUnreadable"/> otherwise, as its <c>fread</c>-based <c>file2memory</c> refuses it (CGR-110).
     /// </summary>
-    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, out byte[] contents)
+    private static CommandLineRefusal? ReadAtFile(CommandLineOptions options, string file, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, bool readsClosedStandardInputAsEmpty, out byte[] contents)
     {
         if (file == "-")
         {
-            contents = WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), readsStandardInputAsText && options.ActsAsWindowsSchannelBuild);
-            return null;
+            return ReadStandardInputAtFile(options, spelledOption, dataFileReader, readsStandardInputAsText, readsClosedStandardInputAsEmpty, out contents);
         }
 
         return dataFileReader.TryReadFile(file, out contents)
             ? null
-            : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
+            : dataFileReader.OpensAsUnreadableDirectory(file)
+                ? CommandLineRefusal.DataFileOpenedButUnreadable(spelledOption)
+                : CommandLineRefusal.DataFileUnreadable(spelledOption, file, options.ErrorsHidden, WrappedMessage.TerminalColumns(options.ReadEnvironmentVariable("COLUMNS")));
+    }
+
+    private static CommandLineRefusal? ReadStandardInputAtFile(CommandLineOptions options, string spelledOption, IDataFileReader dataFileReader, bool readsStandardInputAsText, bool readsClosedStandardInputAsEmpty, out byte[] contents)
+    {
+        try
+        {
+            contents = WindowsTextModeInput.Contents(dataFileReader.ReadStandardInput(), readsStandardInputAsText && options.ActsAsWindowsSchannelBuild);
+            return null;
+        }
+        catch (IOException)
+        {
+            contents = [];
+            return readsClosedStandardInputAsEmpty ? null : CommandLineRefusal.StandardInputUnreadable(spelledOption);
+        }
+    }
+
+    /// <summary>
+    /// Reads standard input for an <c>@-</c> value curl 8.22.0 reads with <c>fgets</c>-style readers
+    /// (<c>--url @-</c>, <c>--ech ecl:@-</c>), which read a closed standard input as empty (CGR-110, ADR-0949).
+    /// </summary>
+    private static byte[] ReadStandardInputOrEmpty(IDataFileReader dataFileReader)
+    {
+        try
+        {
+            return dataFileReader.ReadStandardInput();
+        }
+        catch (IOException)
+        {
+            return [];
+        }
     }
 
     /// <summary>
     /// Records a <c>-w</c> / <c>--write-out</c> template: the value's own text, empty included, or, when
     /// it starts with <c>@</c>, the text of the file it names (standard input for <c>@-</c>) with every
-    /// carriage return, line feed and NUL removed, as curl 8.21.0 does. A file with no bytes at all
+    /// carriage return, line feed and NUL removed, as curl 8.21.0 does, spelled by
+    /// <see cref="WriteOutFileTemplate"/> so every byte is written unchanged, one that is not valid
+    /// UTF-8 included (BL-3862). A file with no bytes at all
     /// clears the template and adds <see cref="CommandLineWarning.FailedToRead(string)"/> unless
     /// <c>-s</c> / <c>--silent</c> has been read; one that cannot be read is refused with
     /// <see cref="CommandLineRefusal.DataFileUnreadable"/>.
@@ -1133,7 +1175,7 @@ public static partial class CommandLineOptionTable
         }
 
         string file = value[1..];
-        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, true, out byte[] contents);
+        CommandLineRefusal? refusal = ReadAtFile(options, file, spelledOption, dataFileReader, true, false, out byte[] contents);
         if (refusal is not null)
         {
             return refusal;
@@ -1146,9 +1188,29 @@ public static partial class CommandLineOptionTable
             return null;
         }
 
-        string template = Encoding.UTF8.GetString(RemoveLineBreaksAndNuls(contents));
-        options.WriteOut = options.ConfigFileWireTextEncoding is { } wireEncoding ? ConfigFileWireText.Respell(template, wireEncoding) : template;
+        options.WriteOut = WriteOutFileTemplate(RemoveLineBreaksAndNuls(contents), options.ConfigFileWireTextEncoding);
         return null;
+    }
+
+    /// <summary>
+    /// The text of a <c>-w @file</c> template whose bytes the write-out renderer gives back unchanged,
+    /// as curl writes the file's bytes raw (BL-3862): with a <paramref name="wireEncoding"/>, the bytes
+    /// spelled in it, one character per byte sequence, as <see cref="ConfigFileWireText.Respell"/> spells
+    /// UTF-8 text; otherwise, or when that encoding cannot carry them unaltered, the bytes read as UTF-8
+    /// with each byte that is not valid UTF-8 kept as its <see cref="InvalidUtf8ByteEscape"/> surrogate.
+    /// </summary>
+    /// <param name="templateBytes">The file's bytes, line breaks and NULs removed.</param>
+    /// <param name="wireEncoding">The encoding the renderer writes text in on Windows; <see langword="null"/> elsewhere.</param>
+    /// <returns>The template text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="templateBytes"/> is <see langword="null"/>.</exception>
+    public static string WriteOutFileTemplate(byte[] templateBytes, Encoding? wireEncoding)
+    {
+        ArgumentNullException.ThrowIfNull(templateBytes);
+
+        string? respelled = wireEncoding?.GetString(templateBytes);
+        return respelled is not null && wireEncoding!.GetBytes(respelled).AsSpan().SequenceEqual(templateBytes)
+            ? respelled
+            : InvalidUtf8ByteEscape.Decode(templateBytes);
     }
 
     private static byte[] RemoveLineBreaksAndNuls(byte[] contents) =>
@@ -1353,21 +1415,24 @@ public static partial class CommandLineOptionTable
             return CommandLineRefusal.BlankArgument(spelledOption);
         }
 
-        options.Range = char.IsAsciiDigit(value[0]) && !value.Contains('-', StringComparison.Ordinal)
-            ? AppendDashToLeadingNumber(options, value)
+        options.Range = TryReadLeadingNumberNotBeforeDash(value, out long firstBytePosition)
+            ? AppendDash(options, firstBytePosition)
             : WarnOfInvalidRangeCharacter(options, value);
         return null;
     }
 
-    private static string AppendDashToLeadingNumber(CommandLineOptions options, string value)
+    // curl 8.22.0: a leading number that fits a curl_off_t and is not followed by '-' gets a
+    // dash appended whatever follows it, so "0 - 9" and "0x10-0x20" read as "0-" (CGR-131).
+    private static bool TryReadLeadingNumberNotBeforeDash(string value, out long firstBytePosition)
     {
         int digitCount = value.AsSpan().IndexOfAnyExceptInRange('0', '9');
         ReadOnlySpan<char> digits = digitCount < 0 ? value : value.AsSpan(0, digitCount);
-        if (!long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out long firstBytePosition))
-        {
-            return value;
-        }
+        return long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out firstBytePosition)
+            && (digitCount < 0 || value[digitCount] != '-');
+    }
 
+    private static string AppendDash(CommandLineOptions options, long firstBytePosition)
+    {
         options.AddWarningLinesUnlessSilent(CommandLineWarning.RangeHasNoDash);
         return firstBytePosition.ToString(CultureInfo.InvariantCulture) + "-";
     }

@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// <c>curl -sS "http://user:pa%FFss@127.0.0.1:20582/a"</c> sends
 /// <c>Authorization: Basic dXNlcjpwYf9zcw==</c> (<c>user:pa\xFFss</c>) on curl 8.22.0 Schannel
 /// (measured 2026-10-26) and curl 8.18.0 OpenSSL on Linux (the gap report), where Curl sent
-/// U+FFFD's bytes off Windows (ADR-0822).
+/// U+FFFD's bytes off Windows (ADR-0920).
 /// </summary>
 [TestClass]
 public sealed class Cgr053Tests

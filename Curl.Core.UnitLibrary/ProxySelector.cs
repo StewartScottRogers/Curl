@@ -166,28 +166,62 @@ public sealed class ProxySelector(Func<string, string?> readEnvironmentVariable)
 
     private string? ReadNoProxy() => Read("no_proxy") ?? Read("NO_PROXY");
 
-    private string? ReadProxyFor(string scheme)
+    /// <summary>
+    /// Finds the environment variable that gives the proxy for a URL of <paramref name="scheme" /> when
+    /// no <c>-x</c> was given, which curl's <c>-v</c> names in <c>Uses proxy env variable</c> (BL-3740).
+    /// </summary>
+    /// <param name="scheme">The URL's scheme.</param>
+    /// <param name="name">The name of the first non-empty variable curl reads, as spelt there.</param>
+    /// <param name="value">That variable's value.</param>
+    /// <returns><see langword="true" /> when a variable gives proxy text.</returns>
+    public bool TryFindProxyVariable(string scheme, [NotNullWhen(true)] out string? name, [NotNullWhen(true)] out string? value)
     {
-        string lowerName = scheme + "_proxy";
-        string? proxyText = Read(lowerName);
-        if (proxyText is null && scheme != "http")
+        foreach (string candidate in ProxyVariableNames(scheme))
         {
-            proxyText = Read(lowerName.ToUpperInvariant());
+            if (Read(candidate) is { } found)
+            {
+                name = candidate;
+                value = found;
+                return true;
+            }
         }
 
-        return proxyText ?? ReadWebSocketFallback(scheme) ?? Read("all_proxy") ?? Read("ALL_PROXY");
+        name = null;
+        value = null;
+        return false;
     }
 
+    private string? ReadProxyFor(string scheme) =>
+        TryFindProxyVariable(scheme, out _, out string? proxyText) ? proxyText : null;
+
     /// <summary>
-    /// Reads the HTTP proxy variable curl falls back to for a WebSocket URL: <c>http_proxy</c>
-    /// for <c>ws</c>, <c>https_proxy</c> then <c>HTTPS_PROXY</c> for <c>wss</c>.
+    /// The variables curl reads for <paramref name="scheme" />, in order: <c>&lt;scheme&gt;_proxy</c>, its upper
+    /// case form (not for <c>http</c>), the HTTP proxy variable curl falls back to for a WebSocket URL
+    /// (<c>http_proxy</c> for <c>ws</c>, <c>https_proxy</c> then <c>HTTPS_PROXY</c> for <c>wss</c>), then
+    /// <c>all_proxy</c> and <c>ALL_PROXY</c>.
     /// </summary>
-    private string? ReadWebSocketFallback(string scheme) => scheme switch
+    private static IEnumerable<string> ProxyVariableNames(string scheme)
     {
-        "ws" => Read("http_proxy"),
-        "wss" => Read("https_proxy") ?? Read("HTTPS_PROXY"),
-        _ => null,
-    };
+        string lowerName = scheme + "_proxy";
+        yield return lowerName;
+        if (scheme != "http")
+        {
+            yield return lowerName.ToUpperInvariant();
+        }
+
+        if (scheme == "ws")
+        {
+            yield return "http_proxy";
+        }
+        else if (scheme == "wss")
+        {
+            yield return "https_proxy";
+            yield return "HTTPS_PROXY";
+        }
+
+        yield return "all_proxy";
+        yield return "ALL_PROXY";
+    }
 
     private string? Read(string name)
     {

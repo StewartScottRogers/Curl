@@ -43,17 +43,17 @@ No change to Curl's HTTP/2 Upgrade handling: Curl.Protocol.Http.UnitLibrary alre
 ## Notes
 
 - 2026-10-23 (lane 4): To meet criterion 1, Curl would have to refuse `--http2` on Windows. Stewart decided
-  the opposite himself in ADR-0786, and ADR-0808 kept it. Reversing his own decision is outside the
+  the opposite himself in ADR-0871, and ADR-0808 kept it. Reversing his own decision is outside the
   delegation, so no code was changed. ADR-0809 records this and recommends the gap office's fix: rule 4 of
   ConvertTo-BehaviourMeasurement.ps1 should also exclude cases the harness ran whose `<features>` (h2c)
   the reference's `-V` lacks. Curl already answers upstream's `<verify>` (exit 8, ADR-0788).
-  Remove the block once Stewart rejects GF-0098 (then close as won't-change) or reverses ADR-0786.
+  Remove the block once Stewart rejects GF-0098 (then close as won't-change) or reverses ADR-0871.
 
-- 2026-10-24 (interactive): Stewart decided 'Keep HTTP/2 on' (2026-10-23, about 23:30 Arizona): ADR-0786 stands, so the refuse-on-Windows fix this task asks for is not wanted and no code changes. Done for it: AF-0381 closed by Stewart (closed-how: stewart, citing ADR-0786) on the audit branch, PR #221; on the gap branch (PR #217, commits 7c68dc274 and ea55d6f6b) Gap/Baselines/platform-exclusions.json has Measure-GapAreas.ps1 measure options:--http2, --http2-prior-knowledge, --proxy-http2, --proxy-http2:no-form and behaviour:test1704 as excluded with reason decided:ADR-0786 on Windows only, and GF-0098 and GF-0099 log the decision; they close on the next gap run that measures those items excluded. Its criteria (test1704 measuring match) cannot be met without undoing ADR-0786, so it is deferred rather than ticked; GF-0098 closes on the exclusion instead.
+- 2026-10-24 (interactive): Stewart decided 'Keep HTTP/2 on' (2026-10-23, about 23:30 Arizona): ADR-0871 stands, so the refuse-on-Windows fix this task asks for is not wanted and no code changes. Done for it: AF-0381 closed by Stewart (closed-how: stewart, citing ADR-0871) on the audit branch, PR #221; on the gap branch (PR #217, commits 7c68dc274 and ea55d6f6b) Gap/Baselines/platform-exclusions.json has Measure-GapAreas.ps1 measure options:--http2, --http2-prior-knowledge, --proxy-http2, --proxy-http2:no-form and behaviour:test1704 as excluded with reason decided:ADR-0871 on Windows only, and GF-0098 and GF-0099 log the decision; they close on the next gap run that measures those items excluded. Its criteria (test1704 measuring match) cannot be met without undoing ADR-0871, so it is deferred rather than ticked; GF-0098 closes on the exclusion instead.
 
 ## Log
 
 - 2026-10-23: Created.
 - 2026-10-23: Backlog -> Doing. Criteria at claim: bbcffc50 1fd5de8c 28346828.
-- 2026-10-23: Doing -> Blocked. Stewart: GF-0098 needs --http2 refused on Windows, reversing your ADR-0786; reject the finding (and fix the gap measurement's rule 4, ADR-0809) or reverse ADR-0786?
-- 2026-10-24: Blocked -> Deferred. Stewart decided 'Keep HTTP/2 on' (2026-10-23): ADR-0786 stands, so refusing HTTP/2 on Windows is not wanted; no code change. Revisit only if Stewart reverses ADR-0786.
+- 2026-10-23: Doing -> Blocked. Stewart: GF-0098 needs --http2 refused on Windows, reversing your ADR-0871; reject the finding (and fix the gap measurement's rule 4, ADR-0809) or reverse ADR-0871?
+- 2026-10-24: Blocked -> Deferred. Stewart decided 'Keep HTTP/2 on' (2026-10-23): ADR-0871 stands, so refusing HTTP/2 on Windows is not wanted; no code change. Revisit only if Stewart reverses ADR-0871.

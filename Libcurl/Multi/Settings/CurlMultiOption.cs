@@ -64,4 +64,10 @@ public enum CurlMultiOption
 
     /// <summary><c>CURLMOPT_NOTIFYDATA</c> (10019): the notification callback's user data; its closure carries it.</summary>
     NotifyData = 10019,
+
+    /// <summary><c>CURLMOPT_RESOLVE_THREADS_MAX</c> (20): the most resolver threads; Curl resolves without a thread pool, so it takes the value and changes nothing.</summary>
+    ResolveThreadsMax = 20,
+
+    /// <summary><c>CURLMOPT_QUICK_EXIT</c> (21): skip cleanup work at exit; it takes the value and changes nothing.</summary>
+    QuickExit = 21,
 }

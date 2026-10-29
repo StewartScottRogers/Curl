@@ -6,7 +6,7 @@ namespace Curl.Networking;
 /// CGR-022 of the third-party gap report (BL-3551): curl 8.22.0's Schannel build reads
 /// <c>--ciphers</c> as ALG_IDs (<c>CALG_*</c> names, decimal values, <c>USE_STRONG_CRYPTO</c>),
 /// fails a list whose algorithms AcquireCredentialsHandle accepts none of with exit 35, refuses
-/// an entry naming nothing with exit 59, and stops at TLS 1.2 (ADR-0816, measured).
+/// an entry naming nothing with exit 59, and stops at TLS 1.2 (ADR-0896, measured).
 /// </summary>
 [TestClass]
 public sealed class Cgr022Tests

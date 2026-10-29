@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 using Curl.Http2;
 
 namespace Curl.Protocol.Http;
@@ -17,6 +18,9 @@ internal static class Http2RequestHeaders
 {
     private static readonly string[] ConnectionSpecificNames =
         ["host", "connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade"];
+
+    /// <summary>nghttp2's <c>NGHTTP2_HD_MAX_NV</c>: a header whose name and value together pass it is refused, so curl fails the send (exit 55).</summary>
+    private const int MaxNameAndValueLength = 65536;
 
     private static readonly byte[] Http11LineEnd = " HTTP/1.1\r\n"u8.ToArray();
 
@@ -44,8 +48,13 @@ internal static class Http2RequestHeaders
 
         fields.Add(new(":path", methodAndTarget[(targetStart + 1)..]));
         fields.AddRange(headers.Select(Permitted).OfType<HeaderField>());
-        return fields;
+        return RefuseOversizedFields(fields);
     }
+
+    private static List<HeaderField> RefuseOversizedFields(List<HeaderField> fields) =>
+        fields.Any(field => field.Name.Length + field.Value.Length > MaxNameAndValueLength)
+            ? throw new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.SendFailed)
+            : fields;
 
     /// <summary>
     /// Gives <paramref name="head" /> with its request line's <c>HTTP/1.1</c> made
@@ -58,13 +67,15 @@ internal static class Http2RequestHeaders
     internal static byte[] WithRequestLineVersion(byte[] head, string versionName)
     {
         int lineEnd = head.AsSpan().IndexOf(Http11LineEnd);
-        return [.. head.AsSpan(0, lineEnd), .. Encoding.Latin1.GetBytes($" {versionName}\r\n"), .. head.AsSpan(lineEnd + Http11LineEnd.Length)];
+        string[] lines = Encoding.Latin1.GetString(head, lineEnd + Http11LineEnd.Length, head.Length - lineEnd - Http11LineEnd.Length).Split("\r\n");
+        string kept = string.Join("\r\n", lines.Where(line => !line.StartsWith("transfer-encoding:", StringComparison.OrdinalIgnoreCase)));
+        return [.. head.AsSpan(0, lineEnd), .. Encoding.Latin1.GetBytes($" {versionName}\r\n{kept}")];
     }
 
     private static (string Name, string Value) Split(string line)
     {
         int colon = line.IndexOf(':', StringComparison.Ordinal);
-        return (line[..colon].ToLowerInvariant(), line[(colon + 1)..].Trim(' ', '\t'));
+        return (line[..colon].ToLowerInvariant(), line[(colon + 1)..].TrimStart(' ', '\t'));
     }
 
     private static HeaderField? Permitted((string Name, string Value) header)

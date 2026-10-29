@@ -12,7 +12,7 @@ namespace Curl.Networking;
 /// CGR-093 of the third-party gap report (BL-3622): curl sends the URL host as SNI lowercased
 /// and without a trailing dot (RFC 6066 section 3), so <c>https://LOCALHOST:p/</c>,
 /// <c>https://LocalHost:p/</c> and <c>https://localhost.:p/</c> all send <c>localhost</c>
-/// (ADR-0825).
+/// (ADR-0925).
 /// </summary>
 [TestClass]
 public sealed class Cgr093Tests

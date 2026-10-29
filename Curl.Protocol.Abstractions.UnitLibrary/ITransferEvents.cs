@@ -20,6 +20,16 @@ public interface ITransferEvents
     void ReportInfo(string text);
 
     /// <summary>
+    /// Reports one of curl's warnings, which the tool prints as <c>Warning: &lt;text&gt;</c> on
+    /// standard error with or without <c>-v</c>, unless <c>-s</c> is given (BL-3986).
+    /// </summary>
+    /// <param name="text">The warning, without the <c>Warning: </c> prefix and without a line end.</param>
+    /// <remarks>Does nothing by default.</remarks>
+    void ReportWarning(string text)
+    {
+    }
+
+    /// <summary>
     /// Reports that a new connection was established.
     /// </summary>
     /// <param name="opened">The facts about the connection.</param>

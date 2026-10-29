@@ -126,8 +126,39 @@ internal sealed class ManagedEasyWebSocket(Func<bool> isConnectOnly, Func<WebSoc
             usable = await ReadMoreAsync(live!).ConfigureAwait(false);
         }
 
-        return usable == CurlCode.Ok ? Deliver(buffer.Span) : new CurlWebSocketReceiveResult(usable, 0, default);
+        return usable == CurlCode.Ok ? await DeliverWholeFrameAsync(live!, buffer).ConfigureAwait(false) : new CurlWebSocketReceiveResult(usable, 0, default);
     }
+
+    /// <summary>
+    /// Hands over the first waiting run as <see cref="Deliver" /> does, then keeps handing over the runs that continue
+    /// its frame, as many as are already received and <paramref name="buffer" /> holds, so a buffer that holds a
+    /// whole frame gets it in one call as libcurl's <c>curl_ws_recv</c> gives it (CGR-253).
+    /// </summary>
+    /// <param name="live">The upgraded connection.</param>
+    /// <param name="buffer">Where the bytes go.</param>
+    /// <returns>The receive's result, its frame spanning every run handed over.</returns>
+    private async ValueTask<CurlWebSocketReceiveResult> DeliverWholeFrameAsync(IConnection live, Memory<byte> buffer)
+    {
+        CurlWebSocketReceiveResult first = Deliver(buffer.Span);
+        int total = first.BytesReceived;
+        long bytesLeft = first.Frame.BytesLeft;
+        while (bytesLeft > 0 && total < buffer.Length && await ContinuesFrameAsync(live).ConfigureAwait(false))
+        {
+            CurlWebSocketReceiveResult next = Deliver(buffer.Span[total..]);
+            total += next.BytesReceived;
+            bytesLeft = next.Frame.BytesLeft;
+        }
+
+        CurlWebSocketFrame frame = first.Frame with { BytesLeft = bytesLeft, Length = total };
+        receivedFrame = frame;
+        return new CurlWebSocketReceiveResult(CurlCode.Ok, total, frame);
+    }
+
+    /// <summary>Whether a run of the current frame is waiting, taking a read that has already completed to find out.</summary>
+    /// <param name="live">The upgraded connection.</param>
+    /// <returns><see langword="true" /> when a run is waiting.</returns>
+    private async ValueTask<bool> ContinuesFrameAsync(IConnection live) =>
+        runs.Count > 0 || await ReadMoreAsync(live).ConfigureAwait(false) == CurlCode.Ok;
 
     /// <inheritdoc />
     /// <remarks>

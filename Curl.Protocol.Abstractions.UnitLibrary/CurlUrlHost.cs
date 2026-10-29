@@ -30,18 +30,53 @@ internal static class CurlUrlHost
 
     private const string IPv6Characters = "0123456789abcdefABCDEF:.";
 
-    private static readonly IdnMapping Idn = new();
+    /// <summary>The longest label, in characters once converted, IDNA accepts.</summary>
+    private const int MaximumLabelLength = 63;
+
+    /// <summary>
+    /// The characters Windows-1252 gives the bytes <c>0x80</c> to <c>0x9F</c>, <c>U+FFFF</c>
+    /// for the five it leaves undefined (<c>0x81</c>, <c>0x8D</c>, <c>0x8F</c>, <c>0x90</c>, <c>0x9D</c>).
+    /// </summary>
+    private const string Windows1252Characters80To9F =
+        "€￿‚ƒ„…†‡ˆ‰Š‹Œ￿Ž￿"
+        + "￿‘’“”•–—˜™š›œ￿žŸ";
+
+    /// <summary>The characters IDNA reads as a label separator: the dot and the ideographic and full-width ones.</summary>
+    private static readonly char[] LabelSeparators = ['.', '。', '．', '｡'];
+
+    /// <summary>
+    /// Whether a host name that is not ASCII is converted from its bytes read as Windows-1252, every
+    /// byte and not only those that are not UTF-8, as the Windows curl 8.22.0 build's
+    /// <c>idn2_lookup_ul</c> reads the name in the ANSI code page (CGR-059, ADR-0939).
+    /// </summary>
+    private static readonly bool HostAsWindows1252 = OperatingSystem.IsWindows();
 
     /// <summary>
     /// Normalises <paramref name="host" />, or returns <see langword="false" /> when curl
     /// rejects it, with <paramref name="rejection" /> saying why. With
     /// <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a name
-    /// <see cref="IdnMapping" /> cannot convert is <see cref="CurlUrlRejection.BadHostname" />;
+    /// IDNA cannot convert is <see cref="CurlUrlRejection.IdnConversionFailed" />;
     /// without it the name is kept as decoded and resolved as written.
     /// </summary>
     public static bool TryNormalize(
         string host,
         bool refuseUnconvertibleName,
+        out string normalized,
+        out string idnHost,
+        out string? zoneId,
+        out CurlUrlRejection rejection) =>
+        TryNormalizeReadingHost(host, refuseUnconvertibleName, HostAsWindows1252, out normalized, out idnHost, out zoneId, out rejection);
+
+    /// <summary>
+    /// Normalises <paramref name="host" /> as <see cref="TryNormalize(string, bool, out string, out string, out string?, out CurlUrlRejection)" />
+    /// does, converting a name that is not ASCII from its bytes read as Windows-1252 when
+    /// <paramref name="hostAsWindows1252" /> is set (<see cref="ReadHostAsWindows1252" />) and from
+    /// its UTF-8 otherwise, so both platforms' rules can be tested on either.
+    /// </summary>
+    internal static bool TryNormalizeReadingHost(
+        string host,
+        bool refuseUnconvertibleName,
+        bool hostAsWindows1252,
         out string normalized,
         out string idnHost,
         out string? zoneId,
@@ -64,10 +99,10 @@ internal static class CurlUrlHost
             return rejection == CurlUrlRejection.None;
         }
 
-        bool accepted = TryNormalizeAddressOrName(decoded, refuseUnconvertibleName, out normalized, out idnHost);
-        rejection = accepted ? CurlUrlRejection.None : CurlUrlRejection.BadHostname;
+        string nameToConvert = hostAsWindows1252 ? ReadHostAsWindows1252(host) : ReadLatin1BytesAsUtf8(decoded);
+        rejection = NormalizeAddressOrName(decoded, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
 
-        return accepted;
+        return rejection == CurlUrlRejection.None;
     }
 
     /// <summary>
@@ -76,43 +111,61 @@ internal static class CurlUrlHost
     /// or two trailing dots are not. curl 8.22.0's <c>parse_authority</c> decodes the host
     /// before <c>ipv4_normalize</c>, so <c>127.0.0.%31.</c> is <c>127.0.0.1</c> (lib1560).
     /// </summary>
-    private static bool TryNormalizeAddressOrName(string host, bool refuseUnconvertibleName, out string normalized, out string idnHost)
+    /// <returns>Why curl rejects the host, or <see cref="CurlUrlRejection.None" />.</returns>
+    private static CurlUrlRejection NormalizeAddressOrName(
+        string host,
+        string nameToConvert,
+        bool refuseUnconvertibleName,
+        out string normalized,
+        out string idnHost)
     {
         idnHost = normalized = string.Empty;
         string withoutTrailingDot = host.EndsWith('.') ? host[..^1] : host;
         if (withoutTrailingDot.Length == 0 || withoutTrailingDot.EndsWith('.'))
         {
-            return false;
+            return CurlUrlRejection.BadHostname;
         }
 
         if (CurlUrlIPv4Address.TryNormalize(withoutTrailingDot, out string address))
         {
             idnHost = normalized = address;
 
-            return true;
+            return CurlUrlRejection.None;
         }
 
-        return TryNormalizeName(host, refuseUnconvertibleName, out normalized, out idnHost);
+        return NormalizeName(host, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
     }
 
-    private static bool TryNormalizeName(string decoded, bool refuseUnconvertibleName, out string normalized, out string idnHost)
+    /// <summary>
+    /// Checks a name and converts <paramref name="nameToConvert" />, the name as the platform's curl
+    /// reads it for IDNA, to punycode. A name IDNA cannot convert is
+    /// <see cref="CurlUrlRejection.IdnConversionFailed" /> when <paramref name="refuseUnconvertibleName" />
+    /// is set, which curl 8.22.0 fails with exit 3 and <c>URL using bad/illegal format or missing URL</c>
+    /// rather than a <c>URL rejected:</c> text, as its IDN conversion runs after the URL parsed.
+    /// </summary>
+    private static CurlUrlRejection NormalizeName(
+        string decoded,
+        string nameToConvert,
+        bool refuseUnconvertibleName,
+        out string normalized,
+        out string idnHost)
     {
         normalized = idnHost = string.Empty;
         if (!IsUsableName(decoded))
         {
-            return false;
+            return CurlUrlRejection.BadHostname;
         }
 
-        string? converted = Ascii.IsValid(decoded) ? decoded : ToPunycode(decoded);
+        string? converted = Ascii.IsValid(decoded) ? decoded : ToPunycode(nameToConvert);
         if (converted is null && refuseUnconvertibleName)
         {
-            return false;
+            return CurlUrlRejection.IdnConversionFailed;
         }
 
         normalized = decoded;
         idnHost = converted ?? decoded;
 
-        return true;
+        return CurlUrlRejection.None;
     }
 
     private static bool IsUsableName(string decoded) =>
@@ -125,7 +178,69 @@ internal static class CurlUrlHost
     /// </summary>
     private static string? PercentDecode(string text)
     {
-        byte[] encoded = UrlByteText.ToBytes(text);
+        byte[] decoded = PercentDecodeBytes(UrlByteText.ToBytes(text));
+
+        return decoded.Any(value => value < 0x20) ? null : UrlByteText.ToText(decoded);
+    }
+
+    /// <summary>
+    /// The host as the Windows curl 8.22.0 build hands it to <c>idn2_lookup_ul</c>, read back as
+    /// Windows-1252 (CGR-059, ADR-0939): a character typed in the URL is its Windows-1252 byte, as the
+    /// ANSI <c>argv</c> holds it (<c>ü</c> is <c>FC</c>), or its UTF-8 when Windows-1252 lacks it; an
+    /// escape is the byte it decodes to, so <c>%C3%BC</c> is <c>Ã¼</c> and not <c>ü</c>. A byte
+    /// Windows-1252 leaves undefined stays a lone <c>U+DC80</c> to <c>U+DCFF</c>, which no label converts
+    /// with (<c>a%D7%90</c>).
+    /// </summary>
+    private static string ReadHostAsWindows1252(string host) =>
+        new([.. PercentDecodeBytes(ToWindows1252Bytes(host)).Select(Windows1252CharacterOf)]);
+
+    /// <summary>
+    /// The host as curl off Windows hands it to <c>idn2_lookup_ul</c> in a UTF-8 locale: a name whose
+    /// every character is one byte, as a <c>Location</c> header's bytes reach <c>CurlUrl</c>, and whose
+    /// bytes are valid UTF-8 is that UTF-8, so <c>Ã¥Ã¤Ã¶</c> is <c>åäö</c> (upstream test1448,
+    /// ADR-0960); any other name is kept as decoded.
+    /// </summary>
+    private static string ReadLatin1BytesAsUtf8(string name)
+    {
+        if (name.Any(character => character > 'ÿ'))
+        {
+            return name;
+        }
+
+        byte[] bytes = Encoding.Latin1.GetBytes(name);
+
+        return System.Text.Unicode.Utf8.IsValid(bytes) ? Encoding.UTF8.GetString(bytes) : name;
+    }
+
+    private static byte[] ToWindows1252Bytes(string text)
+    {
+        var bytes = new List<byte>(text.Length);
+        for (int index = 0; index < text.Length; index++)
+        {
+            int length = char.IsSurrogatePair(text, index) ? 2 : 1;
+            int windows1252Byte = Windows1252ByteOf(text[index]);
+            bytes.AddRange(length == 1 && windows1252Byte >= 0 ? [(byte)windows1252Byte] : UrlByteText.ToBytes(text.Substring(index, length)));
+            index += length - 1;
+        }
+
+        return [.. bytes];
+    }
+
+    /// <summary>The Windows-1252 byte of <paramref name="character" />, or -1 when Windows-1252 lacks it.</summary>
+    private static int Windows1252ByteOf(char character) =>
+        character is < '\u0080' or (>= ' ' and <= 'ÿ')
+            ? character
+            : Windows1252ByteFrom80To9FOf(character);
+
+    private static int Windows1252ByteFrom80To9FOf(char character)
+    {
+        int index = character == '￿' ? -1 : Windows1252Characters80To9F.IndexOf(character, StringComparison.Ordinal);
+
+        return index < 0 ? -1 : 0x80 + index;
+    }
+
+    private static byte[] PercentDecodeBytes(byte[] encoded)
+    {
         var decoded = new List<byte>(encoded.Length);
         for (int index = 0; index < encoded.Length; index++)
         {
@@ -139,7 +254,7 @@ internal static class CurlUrlHost
             decoded.Add(value);
         }
 
-        return decoded.Any(value => value < 0x20) ? null : UrlByteText.ToText([.. decoded]);
+        return [.. decoded];
     }
 
     private static bool TryReadEscape(byte[] bytes, int start, out byte value)
@@ -166,23 +281,102 @@ internal static class CurlUrlHost
     /// <summary>
     /// Maps a host name that is not ASCII as UTS #46 does (<see cref="CurlUrlHostNameMapping" />,
     /// so <c>BÜCHER</c> is <c>xn--bcher-kva</c> and <c>Ａb</c> is <c>ab</c>) and converts it to
-    /// punycode, or returns <see langword="null" />
-    /// when <see cref="IdnMapping" /> cannot convert it: bytes that are not UTF-8
-    /// (<c>invalid-utf8-%e2%90.local</c>, upstream test 1034) or a label longer than 63
-    /// characters once converted (test 1035). curl 8.22.0 in a UTF-8 locale fails a transfer
-    /// to such a host with exit 3, while its URL API keeps the name (ADR-0734).
+    /// punycode label by label as libidn2 does for curl 8.22.0, or returns <see langword="null" />
+    /// when a label cannot be converted (<see cref="ToAsciiLabel" />). A byte that is not UTF-8
+    /// (in a UTF-8 locale) or not Windows-1252 (on Windows, <see cref="ReadHostAsWindows1252" />)
+    /// makes the name unconvertible (<c>invalid-utf8-%e2%90.local</c>, upstream test 1034).
+    /// curl fails a transfer to such a host with exit 3, while its URL API keeps the name (ADR-0734).
     /// </summary>
     private static string? ToPunycode(string name)
     {
         string mapped = CurlUrlHostNameMapping.Map(name);
-        try
+        if (Ascii.IsValid(mapped))
         {
-            return Ascii.IsValid(mapped) ? mapped : Idn.GetAscii(mapped);
+            return mapped;
         }
-        catch (ArgumentException)
+
+        string?[] labels = [.. mapped.Split(LabelSeparators).Select(ToAsciiLabel)];
+
+        return labels.Contains(null) ? null : string.Join('.', labels);
+    }
+
+    /// <summary>
+    /// Converts one label as libidn2 does for curl 8.22.0 (CGR-059): an empty label stays empty
+    /// (<c>ü..example</c> is <c>xn--tda..example</c>); a label that starts or ends with a hyphen,
+    /// or has two at its third and fourth characters without being an <c>xn--</c> label, is refused
+    /// (<c>-ü</c>, <c>ab--c</c>), ASCII or not; bidirectional text is not checked
+    /// (<c>aא</c> is <c>xn--a-0hc</c>); and a label with a lone surrogate (a byte that is not
+    /// UTF-8), a control character (<c>U+0090</c>, upstream test 1034), the replacement character
+    /// <c>U+FFFD</c>, which UTS #46 disallows (test 1034's bytes as a config file off Windows reads
+    /// them, BL-3946), or longer than 63 characters once converted (upstream test 1035) is refused,
+    /// as is an <c>xn--</c> label that does not decode (<see cref="KeepAsciiLabelUnlessUndecodable" />).
+    /// </summary>
+    /// <returns>The ASCII label, or <see langword="null" /> when it cannot be converted.</returns>
+    private static string? ToAsciiLabel(string label)
+    {
+        if (HasMisplacedHyphen(label))
         {
             return null;
         }
+
+        string? converted = Ascii.IsValid(label) ? KeepAsciiLabelUnlessUndecodable(label) : EncodeLabel(label);
+
+        return converted?.Length > MaximumLabelLength ? null : converted;
+    }
+
+    /// <summary>
+    /// Passes an ASCII label as written, but refuses an <c>xn--</c> label that libidn2 cannot decode
+    /// (BL-3945): one that is not punycode (<c>xn--zz</c>), decodes to no character outside ASCII
+    /// (<c>xn--</c>, <c>xn--abc-</c>), or decodes to a character IDNA refuses (<c>xn--a</c> is
+    /// <c>U+0080</c>, <c>xn--ib9b</c> a lone surrogate).
+    /// </summary>
+    private static string? KeepAsciiLabelUnlessUndecodable(string label) =>
+        !label.StartsWith("xn--", StringComparison.Ordinal) || IsDecodableLabel(CurlUrlPunycode.Decode(label[4..]))
+            ? label
+            : null;
+
+    private static bool IsDecodableLabel(List<int>? codePoints) =>
+        codePoints is not null
+        && codePoints.Exists(codePoint => codePoint >= 0x80)
+        && codePoints.TrueForAll(codePoint => Rune.IsValid(codePoint) && !IsRefusedInLabel(new Rune(codePoint)));
+
+    private static bool HasMisplacedHyphen(string label) =>
+        label.StartsWith('-')
+        || label.EndsWith('-')
+        || (label.Length > 3 && label.AsSpan(2, 2) is "--" && !label.StartsWith("xn--", StringComparison.OrdinalIgnoreCase));
+
+    private static string? EncodeLabel(string label)
+    {
+        // Enumerating runes reads a lone surrogate as U+FFFD, which IsRefusedInLabel refuses.
+        var codePoints = new List<int>(label.Length);
+        foreach (Rune rune in label.EnumerateRunes())
+        {
+            if (IsRefusedInLabel(rune) || codePoints.Count == MaximumLabelLength)
+            {
+                return null;
+            }
+
+            codePoints.Add(rune.Value);
+        }
+
+        return "xn--" + CurlUrlPunycode.Encode(codePoints);
+    }
+
+    /// <summary>
+    /// Whether IDNA refuses <paramref name="rune" /> in a label: a control character or <c>U+FFFD</c>,
+    /// which a lone surrogate (a byte that is not UTF-8) reads as.
+    /// </summary>
+    private static bool IsRefusedInLabel(Rune rune) => Rune.IsControl(rune) || rune == Rune.ReplacementChar;
+
+    /// <summary>
+    /// The Windows-1252 character of <paramref name="value" />, or the lone <c>U+DC80</c> to
+    /// <c>U+DCFF</c> <see cref="UrlByteText" /> carries the byte as when Windows-1252 leaves it undefined.
+    /// </summary>
+    private static char Windows1252CharacterOf(byte value)
+    {
+        char mapped = value is < 0x80 or >= 0xA0 ? (char)value : Windows1252Characters80To9F[value - 0x80];
+
+        return mapped == '￿' ? (char)(0xDC00 + value) : mapped;
     }
 
     /// <summary>
@@ -191,8 +385,8 @@ internal static class CurlUrlHost
     /// and a zone id of 1 to 15 characters, and the address printed back in its shortest
     /// form when that is no longer than the address as written (zone id aside), so
     /// <c>[::FFFF:7f00:0001]</c> is <c>[::ffff:127.0.0.1]</c> but <c>[::ffff:7f00:1]</c> stays
-    /// as written (CGR-058). A zone id longer than 15 characters is a bad host name to curl; every other
-    /// fault is a bad IPv6 address.
+    /// as written (CGR-058). A zone id longer than 15 characters is a bad IPv6 address to curl, as is every other fault (CGR-191); a control character in the host
+    /// is a bad host name before this point.
     /// </summary>
     /// <returns>Why curl rejects the address, or <see cref="CurlUrlRejection.None" />.</returns>
     private static CurlUrlRejection NormalizeIPv6(string host, out string normalized, out string idnHost, out string? zoneId)
@@ -264,7 +458,7 @@ internal static class CurlUrlHost
 
         if (id.Length > MaximumZoneIdLength)
         {
-            return CurlUrlRejection.BadHostname;
+            return CurlUrlRejection.BadIPv6;
         }
 
         zoneId = id;

@@ -318,7 +318,7 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         context.Progress.ReportTransferStarted();
         var name = new FtpControlConnectionName(connected.ConnectionNumber, target.Host, target.Port);
         FtpKeptConnection? reused = connected.IsReused ? connection.Session as FtpKeptConnection : null;
-        return await CloseUnlessHandedBackAsync(connection, () => TransferAsync(connection, name, connectEvents.Opened, controlConnectEvents, context, implicitTls, started, trace, reused, run)).ConfigureAwait(false);
+        return await CloseUnlessHandedBackAsync(connection, () => TransferAsync(connection, name, connectEvents.Opened, controlConnectEvents, context, implicitTls, started, connected.Timings, trace, reused, run)).ConfigureAwait(false);
     }
 
     /// <summary>The control connection's target: the URL's host, and its port or the scheme's default.</summary>
@@ -369,11 +369,11 @@ public sealed class FtpProtocolHandler : IProtocolHandler
         return connected;
     }
 
-    private async ValueTask<FtpConnectOnlyOutcome> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, InfoLineStoppingTransferEvents controlConnectEvents, ITransferContext context, bool implicitTls, long started, FtpStateTrace trace, FtpKeptConnection? reused, Func<FtpSession, ValueTask<FtpConnectOnlyOutcome>> run)
+    private async ValueTask<FtpConnectOnlyOutcome> TransferAsync(IConnection control, FtpControlConnectionName name, ConnectionOpenedEvent? controlOpened, InfoLineStoppingTransferEvents controlConnectEvents, ITransferContext context, bool implicitTls, long started, ConnectTimings? controlConnectTimings, FtpStateTrace trace, FtpKeptConnection? reused, Func<FtpSession, ValueTask<FtpConnectOnlyOutcome>> run)
     {
         var connections = new FtpSessionConnections(dataConnector, listener, tlsProvider, dnsResolver, interfaceLookup, controlOpened);
         using var connectPhase = new FtpConnectPhaseLimit(context, started);
-        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks) { StopsBeforeEntryPath = StopsBeforeEntryPath };
+        var session = new FtpSession(connections, new FtpControlChannel(control, context.Events, connectPhase.Token, new FtpDiagnosticLog(context.DiagnosticLog), context.DumpHeaderOutput, controlConnectEvents), name, context, implicitTls, connectPhase, trace, reused, WildcardHooks) { StopsBeforeEntryPath = StopsBeforeEntryPath, TransferStarted = started, ControlConnectTimings = controlConnectTimings };
         await using (session.ConfigureAwait(false))
         {
             return await run(session).ConfigureAwait(false);

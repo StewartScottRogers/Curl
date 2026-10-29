@@ -113,7 +113,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 25, MissingCloseNotify), result);
         AssertTranscript(["<= iHello\tfake\t(NULL)\t0\r\n.\r\n", "* " + MissingCloseNotify, "* closing connection #0"], events);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 25, MissingCloseNotify), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 25, MissingCloseNotify), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "<= iHello\tfake\t(NULL)\t0\r\n.\r\n", "* " + MissingCloseNotify, "* closing connection #0" },
             events.Transcript);
@@ -180,7 +180,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
         AssertTranscript(["* Send failure: Connection was reset", "* Failed sending Gopher request", "* closing connection #3"], events);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was reset"), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "* Send failure: Connection was reset", "* Failed sending Gopher request", "* closing connection #3" },
             events.Transcript);
@@ -206,7 +206,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + reset.Message), result);
         AssertTranscript(["* Send failure: " + reset.Message, "* Failed sending Gopher request", "* closing connection #3"], events);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + reset.Message), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + reset.Message), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "* Send failure: " + reset.Message, "* Failed sending Gopher request", "* closing connection #3" },
             events.Transcript);
@@ -226,7 +226,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
         AssertTranscript(["* Failed sending Gopher request", "* closing connection #0"], events);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Failed sending data to the peer"), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "* Failed sending Gopher request", "* closing connection #0" },
             events.Transcript);
@@ -248,7 +248,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
         Report(result, null);
 
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: Connection was aborted"), result with { Report = null });
     }
 
     [TestMethod]
@@ -268,7 +268,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
         Report(result, null);
 
         Diagnostics.Assert("result", TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + aborted.Message), result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + aborted.Message), result);
+        Assert.AreEqual(TransferResult.Failure(CurlExitCode.SendError, "Send failure: " + aborted.Message), result with { Report = null });
     }
 
     [TestMethod]
@@ -292,7 +292,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + words), result);
         AssertTranscript(["<= iHe", "* Recv failure: " + words, "* closing connection #2"], events);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + words), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + words), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "<= iHe", "* Recv failure: " + words, "* closing connection #2" },
             events.Transcript);
@@ -317,7 +317,7 @@ public sealed class GopherProtocolHandlerTransferEventsTests
 
         Diagnostics.Assert("result", new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + failure.Message), result);
         AssertTranscript(["<= iHe", "* Recv failure: " + failure.Message, "* closing connection #2"], events);
-        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + failure.Message), result);
+        Assert.AreEqual(new TransferResult(CurlExitCode.RecvError, 3, "Recv failure: " + failure.Message), result with { Report = null });
         CollectionAssert.AreEqual(
             new[] { "<= iHe", "* Recv failure: " + failure.Message, "* closing connection #2" },
             events.Transcript);

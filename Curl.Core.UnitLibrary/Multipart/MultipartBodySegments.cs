@@ -114,9 +114,29 @@ internal sealed class MultipartBodySegments(Encoding textEncoding) : IDisposable
 
     private void FlushText()
     {
-        byte[] bytes = textEncoding.GetBytes(pendingText.ToString());
+        byte[] bytes = EncodeKeepingEscapedBytes(pendingText.ToString());
         pendingText.Clear();
         segments.Add(new MemoryStream(bytes, writable: false));
         knownLength += bytes.Length;
+    }
+
+    // Text as bytes in textEncoding, with each lone surrogate from U+DC80 to U+DCFF (a header-file
+    // byte UTF-8 could not read, CGR-020) given as that byte; same rule as the HTTP head.
+    private byte[] EncodeKeepingEscapedBytes(string text)
+    {
+        List<byte> bytes = [];
+        int runStart = 0;
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (text[index] is >= '\uDC80' and <= '\uDCFF' && !char.IsHighSurrogate(text[Math.Max(index - 1, 0)]))
+            {
+                bytes.AddRange(textEncoding.GetBytes(text[runStart..index]));
+                bytes.Add((byte)(text[index] - 0xDC00));
+                runStart = index + 1;
+            }
+        }
+
+        bytes.AddRange(textEncoding.GetBytes(text[runStart..]));
+        return [.. bytes];
     }
 }

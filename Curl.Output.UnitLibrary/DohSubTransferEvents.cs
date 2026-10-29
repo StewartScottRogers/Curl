@@ -14,21 +14,33 @@ namespace Curl.Output;
 /// </summary>
 /// <param name="inner">The transfer's own events.</param>
 /// <param name="tlsBackend">The curl build whose wording the TLS events get (ADR-0085).</param>
+/// <param name="writesDnsFilterLines">Whether the <c>[DNS]</c> filter lines are written: curl writes them under the <c>dns</c> component, not <c>doh</c> alone (BL-3814).</param>
+/// <param name="writesSubTransferLines">Whether the sub-transfer's own lines, headers and TLS bytes are written: curl writes them under the <c>doh</c> component, not <c>dns</c> alone (BL-3814).</param>
 /// <remarks>
 /// The one exception is the DNS filter's creation line, <c>[DNS] created DNS filter for ...</c>,
 /// which curl writes through its DNS trace feature rather than the filter, so it keeps its one
 /// prefix.
 /// </remarks>
-public sealed class DohSubTransferEvents(ITransferEvents inner, TlsBackend tlsBackend) : ITransferEvents
+public sealed class DohSubTransferEvents(ITransferEvents inner, TlsBackend tlsBackend, bool writesDnsFilterLines = true, bool writesSubTransferLines = true) : ITransferEvents
 {
     /// <summary>The prefix curl puts on a DoH sub-transfer's info lines.</summary>
     public const string Prefix = "[DoH] ";
 
+    private const string DnsLinePrefix = "[DNS] ";
+
     private const string FilterCreatedLineStart = "[DNS] created DNS filter for ";
 
     /// <inheritdoc />
-    public void ReportInfo(string text) =>
+    public void ReportInfo(string text)
+    {
+        var isDnsLine = text.StartsWith(DnsLinePrefix, StringComparison.Ordinal);
+        if (isDnsLine ? !writesDnsFilterLines : !writesSubTransferLines)
+        {
+            return;
+        }
+
         inner.ReportInfo(text.StartsWith(FilterCreatedLineStart, StringComparison.Ordinal) ? text : Prefix + text);
+    }
 
     /// <inheritdoc />
     public void ReportConnectionOpened(ConnectionOpenedEvent opened) => ReportInfo(TransferEventInfoText.ConnectionOpened(opened));
@@ -40,7 +52,7 @@ public sealed class DohSubTransferEvents(ITransferEvents inner, TlsBackend tlsBa
     public void ReportTlsHandshake(TlsHandshakeEvent handshake) => ReportLines(TransferEventInfoText.TlsHandshake(handshake, tlsBackend));
 
     /// <inheritdoc />
-    public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent) => inner.ReportTlsData(bytes, sent);
+    public void ReportTlsData(ReadOnlySpan<byte> bytes, bool sent) => ForwardTlsData(bytes, sent);
 
     /// <inheritdoc />
     public void ReportTlsMessage(TlsMessageEvent message)
@@ -53,22 +65,57 @@ public sealed class DohSubTransferEvents(ITransferEvents inner, TlsBackend tlsBa
     public void ReportTlsTrust(TlsTrustEvent trust) => ReportLines(TransferEventInfoText.TlsTrust(trust, tlsBackend));
 
     /// <inheritdoc />
+    public void ReportWarning(string text) => inner.ReportWarning(text);
+
+    /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => inner.ReportCertificateVerifyResult(verifyResult, isProxy);
 
     /// <inheritdoc />
     public void ReportTlsEarlyData(long bytes) => inner.ReportTlsEarlyData(bytes);
 
     /// <inheritdoc />
-    public void ReportRequestHeader(ReadOnlySpan<byte> bytes) => inner.ReportRequestHeader(bytes);
+    public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
+    {
+        if (writesSubTransferLines)
+        {
+            inner.ReportRequestHeader(bytes);
+        }
+    }
 
     /// <inheritdoc />
-    public void ReportResponseHeader(ReadOnlySpan<byte> bytes) => inner.ReportResponseHeader(bytes);
+    public void ReportResponseHeader(ReadOnlySpan<byte> bytes)
+    {
+        if (writesSubTransferLines)
+        {
+            inner.ReportResponseHeader(bytes);
+        }
+    }
 
     /// <inheritdoc />
-    public void ReportDataSent(ReadOnlySpan<byte> bytes) => inner.ReportDataSent(bytes);
+    public void ReportDataSent(ReadOnlySpan<byte> bytes)
+    {
+        if (writesSubTransferLines)
+        {
+            inner.ReportDataSent(bytes);
+        }
+    }
 
     /// <inheritdoc />
-    public void ReportDataReceived(ReadOnlySpan<byte> bytes) => inner.ReportDataReceived(bytes);
+    public void ReportDataReceived(ReadOnlySpan<byte> bytes)
+    {
+        if (writesSubTransferLines)
+        {
+            inner.ReportDataReceived(bytes);
+        }
+    }
+
+    private void ForwardTlsData(ReadOnlySpan<byte> bytes, bool sent)
+    {
+        if (writesSubTransferLines)
+        {
+            inner.ReportTlsData(bytes, sent);
+        }
+    }
 
     private void ReportLines(IReadOnlyList<string> lines)
     {

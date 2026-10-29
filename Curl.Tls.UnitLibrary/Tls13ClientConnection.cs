@@ -19,12 +19,14 @@ public sealed class Tls13ClientConnection
     private bool changeCipherSpecSent;
     private ReadOnlyMemory<byte> earlyData;
     private int earlyDataSent;
+    private ushort receivedRecordVersion;
 
     private Tls13ClientConnection(Tls13ClientSettings settings, Tls13ClientHandshake handshake, Stream transport)
     {
         this.settings = settings;
         this.handshake = handshake;
         layer = new Tls13RecordLayer(transport, handshake);
+        handshake.MessageReceived = message => Observe(TlsTrafficDirection.Read, TlsContentType.Handshake, receivedRecordVersion, message);
     }
 
     /// <summary>
@@ -216,9 +218,11 @@ public sealed class Tls13ClientConnection
     {
         TlsContentType type = (TlsContentType)record[0];
         ReadOnlySpan<byte> fragment = record.AsSpan(Tls13RecordProtection.RecordHeaderLength);
+        receivedRecordVersion = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(record.AsSpan(1));
         if (type == TlsContentType.ChangeCipherSpec)
         {
             CheckCompatibilityChangeCipherSpec(fragment);
+            Observe(TlsTrafficDirection.Read, TlsContentType.ChangeCipherSpec, receivedRecordVersion, fragment);
             return null;
         }
 
@@ -267,6 +271,7 @@ public sealed class Tls13ClientConnection
         if (settings.SendLegacySessionId && !changeCipherSpecSent)
         {
             changeCipherSpecSent = true;
+            Observe(TlsTrafficDirection.Write, TlsContentType.ChangeCipherSpec, Tls13RecordProtection.LegacyRecordVersion, [1]);
             await layer.SendAsync(TlsEncryptionLevel.Initial, TlsContentType.ChangeCipherSpec, new byte[] { 1 }, Tls13RecordProtection.LegacyRecordVersion, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -280,7 +285,11 @@ public sealed class Tls13ClientConnection
         }
 
         ushort recordVersion = isFirstClientHello ? settings.ClientHelloRecordVersion : Tls13RecordProtection.LegacyRecordVersion;
+        Observe(TlsTrafficDirection.Write, TlsContentType.Handshake, recordVersion, bytes.Bytes);
         await layer.SendAsync(bytes.Level, TlsContentType.Handshake, bytes.Bytes, recordVersion, cancellationToken).ConfigureAwait(false);
         clientHelloSent = true;
     }
+
+    private void Observe(TlsTrafficDirection direction, TlsContentType contentType, ushort recordVersion, ReadOnlySpan<byte> message) =>
+        settings.HandshakeMessageObserver?.Invoke(direction, contentType, recordVersion, message);
 }

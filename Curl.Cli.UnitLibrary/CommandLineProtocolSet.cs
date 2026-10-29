@@ -27,8 +27,11 @@ namespace Curl.Cli;
 /// <para>
 /// <c>smb</c> and <c>smbs</c> are unrecognized here on every platform, as neither reference build of curl
 /// 8.22.0 has SMB: measured on Windows on 2026-10-26, <c>--proto =smb -sS smb://127.0.0.1:20002/share/x</c>
-/// exits 2 with <c>curl: unrecognized protocol 'smb'</c> and sends nothing (CGR-043, BL-3888, ADR-0835).
-/// <see cref="KnownScheme"/>, which <c>--proto-default</c> reads, still knows them.
+/// exits 2 with <c>curl: unrecognized protocol 'smb'</c> and sends nothing (CGR-043, BL-3888, ADR-0835), and
+/// <c>--proto-default smb -sS 127.0.0.1:20002/share/x</c> exits 1 with <c>curl: option --proto-default: a
+/// specified protocol is unsupported by libcurl</c> and the try-help line, sending nothing (BL-3889).
+/// <see cref="KnownScheme"/>, which <c>--proto-default</c> reads, does not know them either;
+/// <see cref="SchemeLibcurlNames"/>, curl's scheme table for unit1627, still does.
 /// </para>
 /// </remarks>
 internal static class CommandLineProtocolSet
@@ -50,8 +53,9 @@ internal static class CommandLineProtocolSet
         "wss");
 
     /// <summary>
-    /// The schemes <c>--proto</c> and <c>--proto-redir</c> know: <see cref="KnownSchemes"/> less <c>smb</c> and
-    /// <c>smbs</c>, which curl 8.22.0 refuses there as unrecognized (BL-3888).
+    /// The schemes <c>--proto</c>, <c>--proto-redir</c> and <c>--proto-default</c> know:
+    /// <see cref="KnownSchemes"/> less <c>smb</c> and <c>smbs</c>, which curl 8.22.0 refuses there as
+    /// unrecognized or unsupported (BL-3888, BL-3889).
     /// </summary>
     private static FrozenSet<string> ProtoSchemes { get; } =
         KnownSchemes.Except(["smb", "smbs"], StringComparer.OrdinalIgnoreCase).ToFrozenSet(StringComparer.OrdinalIgnoreCase);
@@ -86,12 +90,24 @@ internal static class CommandLineProtocolSet
 
     /// <summary>
     /// The lowercase name of a known scheme, for <c>--proto-default</c>; <see langword="null"/> for a name
-    /// curl 8.21.0 does not know, <c>all</c> included, which it refuses as unsupported.
+    /// curl 8.21.0 does not know, <c>all</c>, <c>smb</c> and <c>smbs</c> included, which it refuses as
+    /// unsupported (BL-3889).
     /// </summary>
     /// <param name="name">The value exactly as given.</param>
     /// <returns>The scheme, lowercase, or <see langword="null"/>.</returns>
-    internal static string? KnownScheme(string name) =>
-        KnownSchemes.TryGetValue(name, out string? scheme) ? scheme : null;
+    internal static string? KnownScheme(string name) => FindIn(ProtoSchemes, name);
+
+    /// <summary>
+    /// The lowercase name of a scheme in <see cref="KnownSchemes"/>, <c>smb</c> and <c>smbs</c> included: the
+    /// scheme table libcurl's <c>Curl_get_scheme</c> reads, which unit1627 checks; <see langword="null"/> for
+    /// any other name.
+    /// </summary>
+    /// <param name="name">The scheme, in any case.</param>
+    /// <returns>The scheme, lowercase, or <see langword="null"/>.</returns>
+    internal static string? SchemeLibcurlNames(string name) => FindIn(KnownSchemes, name);
+
+    private static string? FindIn(FrozenSet<string> schemes, string name) =>
+        schemes.TryGetValue(name, out string? scheme) ? scheme : null;
 
     /// <summary>
     /// Applies one non-empty item to <paramref name="allowed"/>, or returns its name, as curl repeats it, when

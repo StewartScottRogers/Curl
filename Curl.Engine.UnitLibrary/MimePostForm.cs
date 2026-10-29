@@ -1,5 +1,6 @@
 using Curl.Api.Callbacks;
 using Curl.Api.Options.Http;
+using Curl.Core;
 using Curl.Core.Multipart;
 using Curl.Protocol.Abstractions;
 
@@ -82,10 +83,18 @@ internal static class MimePostForm
     private static EasyMimePart WithStandardInput(EasyMimePart part, Stream standardInput) =>
         part switch
         {
-            { Data: EasyMimeStandardInput } => part with { Data = new EasyMimeCallback(-1, buffer => standardInput.Read(buffer), (offset, origin) => Seek(standardInput, offset, origin)) },
+            { Data: EasyMimeStandardInput } => part with { Data = new EasyMimeCallback(-1, StandardInputReadOf(standardInput), (offset, origin) => Seek(standardInput, offset, origin)) },
             { SubParts: { } files } => part with { SubParts = WithStandardInput(files, standardInput) },
             _ => part,
         };
+
+    /// <summary>
+    /// The read callback of a part named <c>-</c>: <c>fread</c> on <paramref name="standardInput" />, or, when the process
+    /// was started with standard input closed (<see cref="ClosedStandardInputStream" />), <c>CURL_READFUNC_ABORT</c>, as
+    /// curl 8.22.0's <c>fread</c> fails there, so the transfer ends with exit 42 after the request head is sent (CGR-110, ADR-0967).
+    /// </summary>
+    private static ReadCallback StandardInputReadOf(Stream standardInput) =>
+        standardInput is ClosedStandardInputStream ? _ => ReadCallbackResult.Abort : buffer => standardInput.Read(buffer);
 
     /// <summary><c>fseeko</c> on standard input: <see cref="SeekResult.CantSeek" /> when it cannot seek.</summary>
     private static SeekResult Seek(Stream standardInput, long offset, SeekOrigin origin)

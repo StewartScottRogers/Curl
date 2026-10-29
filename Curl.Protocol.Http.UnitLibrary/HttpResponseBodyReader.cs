@@ -71,6 +71,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         passesChunks ? ReadOnlyMemory<byte>.Empty : decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets or sets the trailers of an HTTP/2 or HTTP/3 stream as header pairs, which count
+    /// as response headers for <c>%{num_headers}</c> (CGR-273). Empty by default.
+    /// </summary>
+    internal IReadOnlyList<KeyValuePair<string, string>> StreamTrailers { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets how many response headers the transfer has stored before a chunked body's
     /// trailers, which leave the trailers what is left of
     /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" /> (<see cref="HttpChunkedDecoder.TrailerLimit" />,
@@ -552,14 +558,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Reports the bytes read along with the head of a 204 or 304 as received and as excess
-    /// (<see cref="ReportExcess" />), as curl 8.22.0 does; nothing for <c>-I</c>, whose body is
-    /// left unread (measured, BL-3530 Notes).
+    /// (<see cref="ReportExcess" />), as curl 8.22.0 does; for <c>-I</c>, whose body is
+    /// left unread, only as received (measured, BL-3530 Notes, CGR-222).
     /// </summary>
     private void ReportBytesAfterBodilessHead(HttpResponseHead head, bool noBody)
     {
-        ReadOnlyMemory<byte> excess = noBody ? default : head.BodyPrefix;
+        ReadOnlyMemory<byte> excess = head.BodyPrefix;
         ReportReceived(excess);
-        ReportExcess(excess.Length);
+        ReportExcess(noBody ? 0 : excess.Length);
     }
 
     /// <summary>

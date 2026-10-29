@@ -45,6 +45,12 @@ internal static class HttpTransferMessages
     internal const string UnsupportedHttp3Version = "Unsupported HTTP version (3.0) in response";
 
     /// <summary>
+    /// The exit 1 message for an <c>HTTP/2</c> status line over HTTP/1.x, as curl built without
+    /// HTTP/2 (Schannel on Windows) writes it (measured, BL-3730 Notes).
+    /// </summary>
+    internal const string UnsupportedHttp2Version = "Unsupported HTTP version (2.0) in response";
+
+    /// <summary>
     /// The exit 8 message for an <c>HTTP/2</c> status line over HTTP/1.x, as curl's OpenSSL
     /// build writes it (measured, upstream test1704, BL-2715 Notes).
     /// </summary>
@@ -113,6 +119,19 @@ internal static class HttpTransferMessages
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
 
     /// <summary>
+    /// The exit 56 message for an HTTP/2 connection a GOAWAY with an error ended part way
+    /// through a response (CGR-272, measured on curl 8.18.0 with nghttp2).
+    /// </summary>
+    internal const string Http2GoAwayReceiveFailure = ReceiveFailurePrefix + "Connection reset by peer";
+
+    /// <summary>
+    /// The exit 16 message for a frame nghttp2 rejects with a connection error its callback
+    /// then fails on, such as a WINDOW_UPDATE that overflows the window, a stream the server
+    /// opened with an even ID or an invalid SETTINGS value (CGR-272, measured on curl 8.18.0).
+    /// </summary>
+    internal const string Http2RecvCallbackFailed = "nghttp2 recv error -902: The user callback function failed";
+
+    /// <summary>
     /// The exit 16 message for an HTTP/2 connection the peer closed before a response head
     /// arrived (measured, BL-658 Notes).
     /// </summary>
@@ -160,6 +179,30 @@ internal static class HttpTransferMessages
     /// <returns>The message.</returns>
     internal static string Http2ShutsDownConnection(Curl.Http2.Http2ErrorCode errorCode) =>
         string.Create(CultureInfo.InvariantCulture, $"nghttp2 shuts down connection with error {(uint)errorCode}: {Http2ErrorName(errorCode)}");
+
+    /// <summary>
+    /// Formats the exit 92 message for a PUSH_PROMISE on a connection with push disabled:
+    /// <c>[HTTP2] [1] received invalid frame: FRAME[PUSH_PROMISE, len=7, hend=1], error -505:
+    /// Protocol error</c> (measured with curl 8.22.0, BL-3912 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream the PUSH_PROMISE came on.</param>
+    /// <param name="payloadLength">The frame's payload length.</param>
+    /// <param name="isEndHeaders">Whether the frame carries END_HEADERS.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2PushPromiseReceivedWithPushDisabled(int streamId, int payloadLength, bool isEndHeaders) =>
+        string.Create(CultureInfo.InvariantCulture, $"[HTTP2] [{streamId}] received invalid frame: FRAME[PUSH_PROMISE, len={payloadLength}, hend={(isEndHeaders ? 1 : 0)}], error -505: Protocol error");
+
+    /// <summary>
+    /// Formats the exit 8 message for a response head with no <c>:status</c>:
+    /// <c>[HTTP2] [1] received invalid frame: FRAME[HEADERS, len=4, hend=1, eos=1], error -532:
+    /// Violation in HTTP messaging rule</c> (measured with curl 8.22.0, BL-3912 Notes).
+    /// </summary>
+    /// <param name="streamId">The stream.</param>
+    /// <param name="headerBlockLength">The length of the head's header block.</param>
+    /// <param name="isEndStream">Whether the head ended the stream.</param>
+    /// <returns>The message.</returns>
+    internal static string Http2HeadWithoutStatusReceived(int streamId, int headerBlockLength, bool isEndStream) =>
+        string.Create(CultureInfo.InvariantCulture, $"[HTTP2] [{streamId}] received invalid frame: FRAME[HEADERS, len={headerBlockLength}, hend=1, eos={(isEndStream ? 1 : 0)}], error -532: Violation in HTTP messaging rule");
 
     /// <summary>
     /// The exit 3 message for <c>--http3-only</c> with a URL that is not <c>https://</c>
@@ -319,6 +362,42 @@ internal static class HttpTransferMessages
     internal const string MalformedChunkedEncoding = "Malformed encoding found in chunked-encoding";
 
     /// <summary>
+    /// The <c>-v</c> line curl 8.22.0 writes after <see cref="ChunkSizeTooLong" /> (measured, BL-3952).
+    /// </summary>
+    internal const string TooLongHexadecimalNumberInChunkedEncoding = "Too long hexadecimal number in chunked-encoding";
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.22.0 writes after a chunk size that is not hexadecimal or does not
+    /// fit 63 bits (measured, BL-3952).
+    /// </summary>
+    internal const string IllegalHexadecimalSequenceInChunkedEncoding = "Illegal or missing hexadecimal sequence in chunked-encoding";
+
+    /// <summary>
+    /// Whether <paramref name="message" /> is the exit 18 text of a Content-Length body the peer left short.
+    /// </summary>
+    internal static bool IsBodyBytesMissing(string message) =>
+        message.StartsWith("end of response with ", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether <paramref name="message" /> is a content-decoding failure curl's zlib wrapper words
+    /// (<c>Error while processing content unencoding: ...</c>).
+    /// </summary>
+    internal static bool IsContentUnencodingError(string message) =>
+        message.StartsWith("Error while processing content unencoding", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The <c>-v</c> line curl 8.22.0 writes after the failf line of a chunk size that is not
+    /// hexadecimal, does not fit, or is too long; <see langword="null" /> for any other message.
+    /// </summary>
+    internal static string? ChunkSizeFollowUpLine(string message) =>
+        message == ChunkSizeTooLong
+            ? TooLongHexadecimalNumberInChunkedEncoding
+            : message.StartsWith("chunk hex-length char not a hex digit", StringComparison.Ordinal)
+                || message.StartsWith("invalid chunk size", StringComparison.Ordinal)
+                ? IllegalHexadecimalSequenceInChunkedEncoding
+                : null;
+
+    /// <summary>
     /// The exit 100 message for a trailer line of
     /// <see cref="HttpChunkedDecoder.MaximumTrailerLineLength" /> bytes or more once its
     /// carriage return and line feed are added.
@@ -360,6 +439,19 @@ internal static class HttpTransferMessages
     /// curl 8.21.0 says for upstream test223's broken deflate header (BL-1810).
     /// </summary>
     internal const string InvalidStoredBlockLengths = "Error while processing content unencoding: invalid stored block lengths";
+
+    /// <summary>
+    /// The exit 61 message for a <c>deflate</c> body without a zlib header whose first block is dynamic
+    /// and declares more than 286 length or 30 distance symbols: zlib's text (CGR-200, BL-3729).
+    /// </summary>
+    internal const string TooManyLengthOrDistanceSymbols = "Error while processing content unencoding: too many length or distance symbols";
+
+    /// <summary>
+    /// The exit 61 message for a <c>deflate</c> body without a zlib header whose first block is dynamic
+    /// and whose code of code lengths is over-subscribed or incomplete: zlib's text, what curl 8.22.0
+    /// says for text sent as <c>deflate</c> (CGR-200, BL-3729).
+    /// </summary>
+    internal const string InvalidCodeLengthsSet = "Error while processing content unencoding: invalid code lengths set";
 
     /// <summary>
     /// The exit 61 message for a gzip member whose CRC-32, or a zlib stream whose Adler-32,
@@ -448,6 +540,12 @@ internal static class HttpTransferMessages
     /// writing that piece (measured, BL-2007).
     /// </summary>
     internal const string DecodedFileSizeLimitExceeded = "Would have exceeded max file size";
+
+    /// <summary>
+    /// The generic text of exit 22, which <c>%{errormsg}</c> prints after <c>--fail-with-body</c>
+    /// (measured, CGR-214).
+    /// </summary>
+    internal const string HttpResponseCodeSaidError = "HTTP response code said error";
 
     /// <summary>
     /// Formats the exit 22 message for a final status of 400 or above under <c>-f</c> or

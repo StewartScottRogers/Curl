@@ -28,6 +28,28 @@ internal sealed partial class TransferPerformer
     internal const string UrlRejectedPrefix = "URL rejected: ";
 
     /// <summary>
+    /// The error text of a transfer URL curl rejects: <see cref="UrlRejectedPrefix" /> and the
+    /// parser's reason, except for a host IDNA cannot convert, which curl 8.22.0 reports with
+    /// <c>CURLE_URL_MALFORMAT</c>'s own text, <c>URL using bad/illegal format or missing URL</c> (CGR-059).
+    /// </summary>
+    /// <param name="rejection">Why the URL was rejected.</param>
+    /// <returns>The text.</returns>
+    internal static string UrlRejectionText(CurlUrlRejection rejection) =>
+        IsBareText(rejection) ? rejection.ToCurlMessage() : UrlRejectedPrefix + rejection.ToCurlMessage();
+
+    /// <summary>Whether curl reports <paramref name="rejection" /> with its code's own text: no <c>URL rejected: </c> and no info line.</summary>
+    private static bool IsBareText(CurlUrlRejection rejection) =>
+        rejection is CurlUrlRejection.IdnConversionFailed or CurlUrlRejection.UrlTooLong or CurlUrlRejection.UrlAtLengthLimit;
+
+    private static CurlExitCode ExitCodeOf(CurlUrlRejection rejection) => rejection switch
+    {
+        CurlUrlRejection.UserNotAllowed => CurlExitCode.LoginDenied,
+        CurlUrlRejection.UrlTooLong => CurlExitCode.BadFunctionArgument,
+        CurlUrlRejection.UrlAtLengthLimit => CurlExitCode.OutOfMemory,
+        _ => CurlExitCode.UrlMalformat,
+    };
+
+    /// <summary>
     /// The longest percent-decoded host, in bytes, curl 8.21.0 connects to; a longer one
     /// fails with <see cref="TooLongHostnameMessage" /> before any connection.
     /// </summary>
@@ -98,27 +120,41 @@ internal sealed partial class TransferPerformer
         bool disallowUsernameInUrl,
         bool pathAsIs,
         [NotNullWhen(true)] out CurlUrl? url,
-        out CurlUrlRejection rejection) =>
-        disallowUsernameInUrl
+        out CurlUrlRejection rejection)
+    {
+        if (CurlUrl.TransferLengthRejection(text) is { } lengthRejection)
+        {
+            url = null;
+            rejection = lengthRejection;
+
+            return false;
+        }
+
+        return disallowUsernameInUrl
             ? CurlUrl.TryParseDisallowingUser(text, pathAsIs, out url, out rejection)
             : CurlUrl.TryParse(text, pathAsIs, out url, out rejection);
+    }
 
     /// <summary>
     /// Reports a transfer URL curl's parser rejects as the <c>-v</c> info line
     /// <c>URL rejected: &lt;reason&gt;</c>, as curl 8.21.0's <c>failf</c> in <c>lib/url.c</c> does
     /// (measured 2026-10-03, BL-1332), and fails with exit 67 for
     /// <see cref="CurlUrlRejection.UserNotAllowed" /> and exit 3 for every other rejection, with the same text.
+    /// A host IDNA cannot convert (<see cref="CurlUrlRejection.IdnConversionFailed" />) is exit 3 with
+    /// <see cref="UrlRejectionText" />'s bare text and no info line, as curl 8.22.0 prints (CGR-059).
     /// </summary>
     /// <param name="rejection">Why the URL was rejected.</param>
     /// <param name="events">The transfer's events before connecting.</param>
     /// <returns>The failure carrying the same text.</returns>
     internal static TransferResult ReportUrlRejected(CurlUrlRejection rejection, ITransferEvents events)
     {
-        string message = UrlRejectedPrefix + rejection.ToCurlMessage();
-        events.ReportInfo(message);
-        return TransferResult.Failure(
-            rejection == CurlUrlRejection.UserNotAllowed ? CurlExitCode.LoginDenied : CurlExitCode.UrlMalformat,
-            message);
+        string message = UrlRejectionText(rejection);
+        if (!IsBareText(rejection))
+        {
+            events.ReportInfo(message);
+        }
+
+        return TransferResult.Failure(ExitCodeOf(rejection), message);
     }
 
     /// <summary>
@@ -199,6 +235,8 @@ internal sealed partial class TransferPerformer
         {
             return false;
         }
+
+        EngineComposition.ReportEnvironmentProxy(dispatch.ProxySelector, proxyOptions, url.Scheme, proxy, events.ReportInfo);
 
         bool looked = credentialLookup.TryLookUp(authentication, url, out NetworkCredential? lookedUpCredentials, out failure, events.ReportInfo);
         state.LookedUpCredentials = lookedUpCredentials;

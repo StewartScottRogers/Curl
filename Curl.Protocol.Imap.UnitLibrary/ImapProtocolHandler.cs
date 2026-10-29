@@ -152,6 +152,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
                 new TransferResult(connected.ExitCode, 0, connected.ErrorMessage) { IsConnectionRefused = connected.IsConnectionRefused }, null);
         }
 
+        context.Progress.ReportTransferStarted();
         return await OpenOnlyAsync(context, connectPhase, connection, target, connected.ConnectionNumber, connectEvents.Opened).ConfigureAwait(false);
     }
 
@@ -226,6 +227,7 @@ public sealed class ImapProtocolHandler : IProtocolHandler
             };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             ImapKeptConnection? reused = connected.IsReused ? connection.Session as ImapKeptConnection : null;
@@ -246,20 +248,33 @@ public sealed class ImapProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// Connects, which the run's connection cache may serve from a connection a previous URL
-    /// left intact (BL-1987); one kept for another login is closed, with its <c>LOGOUT</c>, and
+    /// left intact (BL-1987); one kept for another login stays in the cache, to be closed with its <c>LOGOUT</c> at exit, and
     /// the connect tried again, as curl 8.21.0 reuses an IMAP connection only for the same login
     /// (upstream test 836).
     /// </summary>
     private async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
     {
         ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        List<IConnection> otherLogins = [];
         while (connected is { IsReused: true, Connection: { Session: ImapKeptConnection kept } connection } && !kept.Serves(loginKey))
         {
-            await connection.DisposeAsync().ConfigureAwait(false);
+            otherLogins.Add(connection);
             connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         }
 
+        await ReturnToCacheAsync(otherLogins).ConfigureAwait(false);
+
         return connected;
+    }
+
+    /// <summary>Hands connections kept for another login back to the run's connection cache, still open.</summary>
+    private static async ValueTask ReturnToCacheAsync(List<IConnection> connections)
+    {
+        foreach (IConnection connection in connections)
+        {
+            connection.MarkReusable();
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <summary>

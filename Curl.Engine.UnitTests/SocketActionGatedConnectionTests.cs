@@ -156,13 +156,68 @@ public sealed class SocketActionGatedConnectionTests
         TransferSocketWait wait = new(new SettableClock());
         wait.Start(new EasyOptions());
 
+        Assert.IsFalse(wait.IsConnecting);
+
         wait.BeginConnect();
         Assert.AreEqual(CurlPoll.Out, wait.Waiting);
-        Assert.AreEqual(Epoch + TransferSocketWait.DefaultConnectTimeout, wait.EarliestDeadline);
+        Assert.IsNull(wait.EarliestDeadline);
+        Assert.IsTrue(wait.IsConnecting);
 
         wait.EndConnect();
         Assert.AreEqual(CurlPoll.None, wait.Waiting);
         Assert.IsNull(wait.EarliestDeadline);
+        Assert.IsFalse(wait.IsConnecting);
+    }
+
+    [TestMethod]
+    [DataRow(CurlSocketSelect.Out)]
+    [DataRow(CurlSocketSelect.Error)]
+    public void Signal_OutOrErrorWhileConnecting_WaitsOnNothingUntilTheDialerConnectsAnotherSocket(CurlSocketSelect events)
+    {
+        TransferSocketWait wait = new(new SettableClock());
+        wait.BeginConnect();
+        wait.ConnectingOn(812);
+
+        wait.Signal(events);
+        Assert.AreEqual(CurlPoll.None, wait.Waiting);
+        Assert.IsTrue(wait.IsConnecting);
+
+        wait.ConnectingOn(813);
+        Assert.AreEqual(CurlPoll.Out, wait.Waiting);
+    }
+
+    [TestMethod]
+    public void Signal_OutWhileConnecting_WaitsOutAgainOnTheNextConnect()
+    {
+        TransferSocketWait wait = new(new SettableClock());
+        wait.BeginConnect();
+        wait.Signal(CurlSocketSelect.Out);
+
+        wait.BeginConnect();
+
+        Assert.AreEqual(CurlPoll.Out, wait.Waiting);
+    }
+
+    [TestMethod]
+    public void Signal_InWhileConnecting_KeepsWaitingOut()
+    {
+        TransferSocketWait wait = new(new SettableClock());
+        wait.BeginConnect();
+
+        wait.Signal(CurlSocketSelect.In);
+
+        Assert.AreEqual(CurlPoll.Out, wait.Waiting);
+    }
+
+    [TestMethod]
+    public void Signal_OutBeforeConnecting_DoesNotAnswerTheLaterConnect()
+    {
+        TransferSocketWait wait = new(new SettableClock());
+        wait.Signal(CurlSocketSelect.Out);
+
+        wait.BeginConnect();
+
+        Assert.AreEqual(CurlPoll.Out, wait.Waiting);
     }
 
     [TestMethod]

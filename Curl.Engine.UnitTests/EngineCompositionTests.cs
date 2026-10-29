@@ -244,8 +244,8 @@ public sealed partial class EngineCompositionTests
         CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
 
         Diagnostics.Act("proxy tls client options", transports.ProxyTlsClientOptions);
-        Diagnostics.Assert("proxy tls client options", new TlsClientOptions(), transports.ProxyTlsClientOptions);
-        Assert.AreEqual(new TlsClientOptions(), transports.ProxyTlsClientOptions);
+        Diagnostics.Assert("proxy tls client options", new TlsClientOptions(PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance), transports.ProxyTlsClientOptions);
+        Assert.AreEqual(new TlsClientOptions(PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance), transports.ProxyTlsClientOptions);
         Assert.AreSame(transports.ProxyTlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "_proxyTlsProvider"));
         Assert.AreSame(transports.ProxyTlsClientOptions, CapturedDependency<TlsClientOptions>(transports.ProxyTlsProvider));
     }
@@ -265,12 +265,12 @@ public sealed partial class EngineCompositionTests
         Diagnostics.Act("target tls client options", transports.TlsClientOptions);
         Diagnostics.Assert(
             "proxy tls client options",
-            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs"),
+            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs", PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance),
             transports.ProxyTlsClientOptions);
         Assert.AreEqual(
-            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs"),
+            new TlsClientOptions(Insecure: true, CaCertificateFile: "proxy.pem", CaCertificateDirectory: "proxy-certs", PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance),
             transports.ProxyTlsClientOptions);
-        Assert.AreEqual(new TlsClientOptions(CaCertificateFile: "x.pem"), transports.TlsClientOptions);
+        Assert.AreEqual(new TlsClientOptions(CaCertificateFile: "x.pem", PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance), transports.TlsClientOptions);
         Assert.AreNotSame(transports.TlsProvider, transports.ProxyTlsProvider);
         Assert.AreSame(transports.ProxyTlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "_proxyTlsProvider"));
         Assert.AreSame(transports.TlsProvider, CapturedDependency<ITlsProvider>(transports.TcpConnector, "<tlsProvider>"));
@@ -299,7 +299,7 @@ public sealed partial class EngineCompositionTests
 
         CurlTransports transports = EngineComposition.CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options));
 
-        TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsVersion.Tls13, CaCertificateFile: "x.pem");
+        TlsClientOptions expected = new(Insecure: true, MinimumVersion: TlsVersion.Tls13, CaCertificateFile: "x.pem", PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance);
         Diagnostics.Act("tls client options", transports.TlsClientOptions);
         Diagnostics.Assert("tls client options", expected, transports.TlsClientOptions);
         Assert.AreEqual(expected, transports.TlsClientOptions);
@@ -363,7 +363,8 @@ public sealed partial class EngineCompositionTests
             Passphrase: "pw",
             PrivateKey: "k.pem",
             Ciphers: "AES128-SHA",
-            Tls13Ciphers: "TLS_AES_128_GCM_SHA256");
+            Tls13Ciphers: "TLS_AES_128_GCM_SHA256",
+            PemPassPhrasePrompt: TerminalPemPassPhrasePrompt.Instance);
         Diagnostics.Act("tls client options", transports.TlsClientOptions);
         Diagnostics.Assert("tls client options", expected, transports.TlsClientOptions);
         Assert.AreEqual(expected, transports.TlsClientOptions);

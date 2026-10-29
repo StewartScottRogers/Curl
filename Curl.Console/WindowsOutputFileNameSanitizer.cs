@@ -77,7 +77,7 @@ internal static class WindowsOutputFileNameSanitizer
     /// </remarks>
     internal static string SanitizeRemoteName(string fileName)
     {
-        string sanitized = Curl.Core.Globbing.WindowsOutputFileNameSanitizer.Sanitize(fileName).Replace(':', '_');
+        string sanitized = Curl.Core.Globbing.WindowsOutputFileNameSanitizer.Sanitize(fileName).Replace(':', '_').TrimEnd('.', ' ');
         int dot = sanitized.IndexOf('.', StringComparison.Ordinal);
         string stem = dot < 0 ? sanitized : sanitized[..dot];
 

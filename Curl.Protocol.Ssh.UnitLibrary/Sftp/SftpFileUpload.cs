@@ -34,7 +34,11 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
     /// <summary>The most bytes libssh2 puts in one <c>SSH_FXP_WRITE</c>, its <c>MAX_SFTP_OUTGOING_SIZE</c>, as measured.</summary>
     internal const int WriteChunkSize = 30000;
 
-    private static readonly byte[] HomeDirectory = "."u8.ToArray();
+    /// <summary>
+    /// Gets the connection's SFTP session and home directory, which a reused connection
+    /// already holds (CGR-130); a slot of the upload's own when not given.
+    /// </summary>
+    internal SftpSessionSlot Sessions { get; init; } = new();
 
     // The failed first-open statuses after which --ftp-create-dirs makes the directories,
     // and the MKDIR statuses it goes on past, as measured: no such file, failure and no
@@ -74,14 +78,11 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         SftpQuoteCommands? quotes = null)
     {
         quotes ??= SftpQuoteCommands.None;
-        Trace.Enter("SSH_SFTP_INIT");
-        SftpSession session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
+        SftpSession session = await Sessions.StartAsync(transport, Trace, cancellationToken).ConfigureAwait(false);
         return await session.CloseChannelOnFailureAsync(
             async () =>
             {
-                Trace.Enter("SSH_SFTP_REALPATH");
-                byte[] homeDirectory = await SshConnectionFailure.ReportAsSshLayerErrorAsync(
-                    () => session.RealPathAsync(HomeDirectory, cancellationToken)).ConfigureAwait(false);
+                byte[] homeDirectory = await Sessions.HomeDirectoryAsync(session, Trace, cancellationToken).ConfigureAwait(false);
                 byte[] path = SftpRemotePath.ResolveUrlPath(urlPath, homeDirectory);
                 Trace.EndSftpConnectPhase();
                 Trace.Enter("SSH_SFTP_QUOTE_INIT");

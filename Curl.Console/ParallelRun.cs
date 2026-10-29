@@ -26,6 +26,9 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <summary>Cancelled by the first failure under <c>--fail-early</c>, aborting every running transfer.</summary>
     private readonly CancellationTokenSource abort = new();
 
+    /// <summary>Cancelled at once by the first failure under <c>--fail-early</c>, so no waiting transfer starts.</summary>
+    private readonly CancellationTokenSource stopStarts = new();
+
     /// <summary>The reports left for the end of the run, with the transfer number they are ordered by.</summary>
     private readonly List<(long TransferId, Func<Task> Report)> deferredReports = [];
 
@@ -34,6 +37,18 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
     /// <summary>The queue for a free slot, built on first use so that it can start <see cref="Hosts" />' freed transfers.</summary>
     private ParallelTransferQueue? queue;
+
+    /// <summary>
+    /// The transfers of the run's first batch set up so far, held unstarted until the batch is complete:
+    /// each one's start, and its report should a later setup of the batch fail (CGR-170, BL-3699).
+    /// </summary>
+    private readonly List<(Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)> heldTransfers = [];
+
+    /// <summary>
+    /// How many more transfers the run's first batch sets up before any starts: curl 8.22.0 sets up
+    /// <c>--parallel-max</c> plus one before its first <c>curl_multi_perform</c> (BL-3699 Notes).
+    /// </summary>
+    private int setupsLeftInFirstBatch = maxRunning + 1;
 
     /// <summary>
     /// Gets the queue the run's transfers wait in for a free slot; before each wait it starts the transfers
@@ -59,8 +74,21 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <summary>Gets the token every transfer of the run is aborted through.</summary>
     internal CancellationToken AbortToken => abort.Token;
 
-    /// <summary>Gets a value indicating whether <c>--fail-early</c> has aborted the run.</summary>
+    /// <summary>
+    /// How long after the first failure under <c>--fail-early</c> the running transfers are aborted: curl
+    /// 8.22.0 checks for the abort about once a second, so a transfer whose response arrives first completes
+    /// (CGR-294).
+    /// </summary>
+    internal static readonly TimeSpan AbortDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>Gets a value indicating whether <c>--fail-early</c> has aborted the running transfers.</summary>
     internal bool IsAborted => abort.IsCancellationRequested;
+
+    /// <summary>Gets a value indicating whether <c>--fail-early</c> has seen its first failure, so no transfer starts.</summary>
+    internal bool HasFailedEarly => stopStarts.IsCancellationRequested;
+
+    /// <summary>Gets the token that ends a wait to start, cancelled at the first failure under <c>--fail-early</c>.</summary>
+    internal CancellationToken StopStartsToken => stopStarts.Token;
 
     /// <summary>
     /// Gets a value indicating whether a result that ends the run without <c>--fail-early</c>, such as
@@ -72,10 +100,85 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     internal TransferResult? FirstFailure { get; private set; }
 
     /// <summary>
-    /// Gets the run's exit code: the first failure's, in completion order, or
-    /// <see cref="CurlExitCode.Ok" /> when none failed (ADR-0127, decision 3).
+    /// Gets the last failure to set a transfer up (a bad glob, a <c>-T</c> file that cannot be opened),
+    /// whose code is the run's whatever failed before it, as in curl 8.22.0 (BL-3699 Notes);
+    /// <see langword="null" /> while none has.
     /// </summary>
-    internal CurlExitCode ExitCode => FirstFailure?.ExitCode ?? CurlExitCode.Ok;
+    internal TransferResult? SetupFailure { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the run is still setting up its first batch, whose transfers are
+    /// held unstarted (<see cref="HoldInFirstBatch" />).
+    /// </summary>
+    internal bool HoldsFirstBatch => setupsLeftInFirstBatch > 0;
+
+    /// <summary>
+    /// Gets the run's exit code: the last setup failure's, else the first failure's, in completion order,
+    /// or <see cref="CurlExitCode.Ok" /> when none failed (ADR-0127, decision 3; BL-3699).
+    /// </summary>
+    internal CurlExitCode ExitCode => (SetupFailure ?? FirstFailure)?.ExitCode ?? CurlExitCode.Ok;
+
+    /// <summary>
+    /// Holds a transfer of the first batch unstarted until <see cref="StartHeldAsync" /> or
+    /// <see cref="AbandonFirstBatchAsync" />.
+    /// </summary>
+    /// <param name="start">Starts the transfer; <see langword="true" /> when the run has ended.</param>
+    /// <param name="abandon">Reports the transfer with the setup failure that abandoned the batch.</param>
+    /// <returns><see langword="true" /> when the batch is now complete.</returns>
+    internal bool HoldInFirstBatch(Func<Task<bool>> start, Func<TransferResult, Task> abandon)
+    {
+        heldTransfers.Add((start, abandon));
+        return --setupsLeftInFirstBatch == 0;
+    }
+
+    /// <summary>
+    /// Ends the first batch and starts its held transfers in order; once one finds the run ended, every
+    /// later one finds it ended too and starts nothing, as <see cref="HasEnded" /> never clears.
+    /// </summary>
+    /// <returns><see langword="true" /> when the run has ended.</returns>
+    internal async Task<bool> StartHeldAsync()
+    {
+        setupsLeftInFirstBatch = 0;
+        (Func<Task<bool>> Start, Func<TransferResult, Task> Abandon)[] held = [.. heldTransfers];
+        heldTransfers.Clear();
+        bool hasEnded = false;
+        foreach ((Func<Task<bool>> start, _) in held)
+        {
+            hasEnded = await start().ConfigureAwait(false);
+        }
+
+        return hasEnded;
+    }
+
+    /// <summary>
+    /// Ends the run at a setup failure in its first batch, as curl 8.22.0 abandons the batch: no held
+    /// transfer starts, and each is reported, in command-line order, with the failure's code
+    /// (CGR-170, BL-3699).
+    /// </summary>
+    /// <param name="failure">The setup failure.</param>
+    /// <returns>A task that completes when the held transfers are reported.</returns>
+    internal async Task AbandonFirstBatchAsync(TransferResult failure)
+    {
+        setupsLeftInFirstBatch = 0;
+        RecordSetupFailure(failure, endsTheRun: true);
+        foreach ((_, Func<TransferResult, Task> abandon) in heldTransfers)
+        {
+            await abandon(failure).ConfigureAwait(false);
+        }
+
+        heldTransfers.Clear();
+    }
+
+    /// <summary>
+    /// Records a failure to set a transfer up, whose code becomes the run's (<see cref="SetupFailure" />).
+    /// </summary>
+    /// <param name="failure">The setup failure.</param>
+    /// <param name="endsTheRun">Whether it stops any further transfer starting.</param>
+    internal void RecordSetupFailure(TransferResult failure, bool endsTheRun)
+    {
+        SetupFailure = failure;
+        HasEnded |= endsTheRun;
+    }
 
     /// <summary>
     /// Records how a transfer ended: a failure becomes the first failure unless one came before it, and
@@ -98,7 +201,8 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
         if (failEarly)
         {
-            abort.Cancel();
+            stopStarts.Cancel();
+            abort.CancelAfter(AbortDelay);
         }
         else
         {

@@ -70,6 +70,11 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
 {
     private const int BufferSize = 4096;
 
+    // Read and write sharing for a write open: curl's Windows build opens -o files with the
+    // C runtime's fopen, which shares the file for reading and writing, so two -Z transfers
+    // writing one file both open it and interleave their writes (CGR-174, BL-3703).
+    private const FileShare WriteShare = FileShare.ReadWrite;
+
     /// <summary>The runtime's <c>O_RDONLY</c> (its PAL value, the same on Linux and macOS).</summary>
     private const int ReadOnly = 0x0000;
 
@@ -183,7 +188,7 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
         FileMode fileMode = FileModeFor(mode);
         FileStreamOptions options = setsUnixCreateMode
             ? WriteOptionsWithCreateMode(fileMode, createMode)
-            : OptionsFor(fileMode, FileAccess.Write, FileShare.Read);
+            : OptionsFor(fileMode, FileAccess.Write, WriteShare);
 
         return ValueTask.FromResult(Open(path, options));
     }
@@ -271,7 +276,7 @@ public sealed partial class PhysicalFileSystem : IFileSystem, IDirectoryLister, 
         {
             Mode = fileMode,
             Access = FileAccess.Write,
-            Share = FileShare.Read,
+            Share = WriteShare,
             BufferSize = BufferSize,
             Options = FileOptions.None,
             UnixCreateMode = createMode,

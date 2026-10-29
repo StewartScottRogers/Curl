@@ -30,8 +30,8 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>The SETTINGS INITIAL_WINDOW_SIZE 65536 curl sends before the first stream it opens after the upgrade (BL-970 Notes).</summary>
     private const string UpgradedStreamSettings = "000006040000000000000400010000";
 
-    /// <summary>curl's WINDOW_UPDATE growing stream 3 to 10 MiB from the default 65535, sent twice (BL-970 Notes).</summary>
-    private const string Stream3WindowUpdate = "000004080000000003009F0001";
+    /// <summary>curl's WINDOW_UPDATE growing stream 3 to 10 MiB from 65536 (the upgrade settings count as acknowledged), sent twice (BL-970 Notes, CGR-277 corrects the increment to 10420224).</summary>
+    private const string Stream3WindowUpdate = "000004080000000003009F0000";
 
     /// <summary>The RST_STREAM with STREAM_CLOSED curl sends on stream 1 when it ignores that stream's body (BL-970 Notes).</summary>
     private const string Stream1ClosedReset = "00000403000000000100000005";
@@ -387,6 +387,53 @@ public sealed partial class HttpProtocolHandlerTests
             Diagnostics.Assert("body length", 0L, output.Length);
             Assert.AreEqual(0L, output.Length, $"Chunk size {chunkSize}");
         }
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_Http2UpgradeAnswered101BeforeTheBodyIsSent_StopsTheBodyAndGoesOnInHttp2()
+    {
+        // curl 8.18.0 --http2 --data-binary @2m.bin against a server that answers 101, SETTINGS,
+        // a SETTINGS ACK and HEADERS :status 200 END_STREAM once it has the head: 1,835,008 of the
+        // 2,097,152 body bytes, then the preface and HTTP/2 frames; exit 0, [2 200 1] (BL-3910 Notes).
+        const int Length = 2097152;
+        byte[] response = [.. Encoding.Latin1.GetBytes(SwitchingProtocolsHead), .. Convert.FromHexString("000000040000000000" + "000000040100000000" + "00000101050000000188")];
+        GatedConnection connection = new(response, 65536, 1);
+        RecordingTransferEvents events = new();
+        Diagnostics.Arrange("body length, response", $"{Length}, 101 then HTTP/2 frames once the head has arrived");
+
+        TransferResult result = await Handler(QueueConnector.For(connection)).ExecuteAsync(new TransferContext
+        {
+            Url = CurlUrl.Parse("http://127.0.0.1:48717/echo"),
+            Output = new MemoryStream(),
+            Events = events,
+            Http = new HttpRequestOptions { Version = HttpVersionPreference.Http2, UserAgent = MeasuredUserAgent, Body = new BytesBody(new byte[Length], "application/x-www-form-urlencoded") },
+        });
+
+        byte[] written = connection.Written;
+        int headLength = written.AsSpan().IndexOf("\r\n\r\n"u8) + 4;
+        int prefaceAt = written.AsSpan().IndexOf("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"u8);
+        Diagnostics.Act("exit code, bytes written, preface at", $"{result.ExitCode}, {written.Length}, {prefaceAt}");
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(200, result.Report!.ResponseCode);
+        Assert.AreEqual(new Version(2, 0), result.Report.HttpVersion);
+        Assert.IsGreaterThan(headLength, prefaceAt, "The head and some of the body go before the preface");
+        Assert.IsLessThan(headLength + Length, prefaceAt, "The rest of the body is not sent once the 101 has arrived");
+        Assert.IsTrue(written.AsSpan(headLength, prefaceAt - headLength).IndexOfAnyExcept((byte)0) < 0, "Only body bytes go between the head and the preface");
+        CollectionAssert.Contains(events.Info, HttpConnectionInfoLines.SwitchingToHttp2);
+    }
+
+    [TestMethod]
+    public async Task ReadAsync_BeforeAnyWrite_WatchesForThe101AndHandsOutAnHttp11Response()
+    {
+        byte[] response = Encoding.Latin1.GetBytes("HTTP/1.1 200 OK\r\n\r\n");
+        HttpH2cUpgradeConnection connection = new(new ScriptedConnection(response, 64), new RecordingTransferEvents(), "http");
+        byte[] buffer = new byte[64];
+
+        int read = await connection.ReadAsync(buffer, CancellationToken.None);
+
+        Diagnostics.Act("read", Latin1(buffer[..read]));
+        Assert.AreEqual("HTTP/1.1 200 OK\r\n\r\n", Latin1(buffer[..read]));
+        Assert.IsFalse(connection.IsUpgraded);
     }
 
     /// <summary>

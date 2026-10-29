@@ -1,8 +1,13 @@
 using System.Collections.Concurrent;
+using System.Net;
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Api.Options;
+using Curl.Api.Options.Network;
+using Curl.Networking;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Engine;
 
@@ -370,5 +375,138 @@ public sealed partial class ManagedMultiTransferTests
         multi.Options = new MultiOptions { NetworkChanged = CurlNetworkChange.ClearConnections | CurlNetworkChange.ClearDns };
 
         Assert.AreEqual(CurlNetworkChange.None, multi.Options.NetworkChanged);
+    }
+
+    [TestMethod]
+    public async Task GetWaitSockets_NoSocketCallback_IsTheOperatingSystemSocketTheTransferDials()
+    {
+        HeldSocketDialer dialer = new(HeldSocket);
+        await using ManagedCurlEngine engine = EngineOver(dialer);
+        await using IMultiTransfer multi = engine.CreateMulti();
+        multi.Add(EasyTo(engine));
+        CurlWaitSocket[] sockets = new CurlWaitSocket[2];
+
+        await multi.PerformAsync(CancellationToken.None);
+        await dialer.Requested.Task.WaitAsync(LongestSocketWait);
+        CurlMultiCode code = multi.GetWaitSockets(sockets, out int count);
+
+        Assert.AreEqual(CurlMultiCode.Ok, code);
+        Assert.AreEqual(2, count);
+        Assert.AreEqual(new CurlWaitSocket(new CurlSocket(HeldSocket), CurlWaitEvents.PollIn, CurlWaitEvents.None), sockets[0]);
+        Assert.AreEqual(new CurlSocket(ManagedMultiTransfer.ResolverWakeupSocket), sockets[1].Socket);
+    }
+
+    [TestMethod]
+    public async Task GetWaitSockets_NoSocketCallbackAndAConnectionWithoutAnOperatingSystemSocket_IsItsEngineSocket()
+    {
+        HeldSocketDialer dialer = new(null);
+        await using ManagedCurlEngine engine = EngineOver(dialer);
+        await using IMultiTransfer multi = engine.CreateMulti();
+        multi.Add(EasyTo(engine));
+        CurlWaitSocket[] sockets = new CurlWaitSocket[2];
+
+        await multi.PerformAsync(CancellationToken.None);
+        await dialer.Requested.Task.WaitAsync(LongestSocketWait);
+        multi.GetWaitSockets(sockets, out int count);
+
+        Assert.AreEqual(2, count);
+        Assert.IsGreaterThan((nint)TransferSocketWait.FirstEngineSocket, sockets[0].Socket.Handle);
+    }
+
+    [TestMethod]
+    public async Task GetWaitSockets_SocketCallback_IsTheOperatingSystemSocketTheCallbackIsTold()
+    {
+        HeldSocketDialer dialer = new(HeldSocket);
+        await using ManagedCurlEngine engine = EngineOver(dialer);
+        await using IMultiTransfer multi = engine.CreateMulti();
+        ConcurrentQueue<CurlSocket> told = new();
+        multi.Options = new MultiOptions { Socket = (_, socket, _, _) => { told.Enqueue(socket); return 0; } };
+        multi.Add(EasyTo(engine));
+        CurlWaitSocket[] sockets = new CurlWaitSocket[2];
+
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        await dialer.Dialing.Task.WaitAsync(LongestSocketWait);
+        multi.GetWaitSockets(sockets, out int count);
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+
+        Assert.AreEqual(2, count);
+        Assert.AreEqual(new CurlSocket(HeldSocket), sockets[0].Socket);
+        CollectionAssert.Contains(told.ToArray(), new CurlSocket(HeldSocket));
+    }
+
+    private const nint HeldSocket = 4242;
+
+    private static readonly TimeSpan LongestSocketWait = TimeSpan.FromSeconds(30);
+
+    private static IEasyTransfer EasyTo(ManagedCurlEngine engine)
+    {
+        IEasyTransfer easy = engine.CreateEasy();
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" } };
+        return easy;
+    }
+
+    private static ManagedCurlEngine EngineOver(ITcpDialer dialer) =>
+        new(TimeProvider.System, null, dialing: new EngineDialing(dialer, new LoopbackDnsResolver(), new RecordingDatagramConnector(CurlExitCode.CouldntConnect, "no udp")));
+
+    /// <summary>
+    /// A dialer whose one connection carries <paramref name="socket" /> as its operating system socket (none when
+    /// <see langword="null" />), published as the dial starts as <see cref="TcpDialer" /> publishes it, takes the
+    /// request and never answers, so the transfer keeps running on it.
+    /// </summary>
+    private sealed class HeldSocketDialer(nint? socket) : ITcpDialer
+    {
+        private Action<nint> published = _ => { };
+
+        public TaskCompletionSource Dialing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Requested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ITcpDialer PublishingSocketsTo(Action<nint> socketCreated)
+        {
+            published = socketCreated;
+            return this;
+        }
+
+        public ValueTask<DialedTcpConnection> DialAsync(IPEndPoint endPoint, CancellationToken cancellationToken)
+        {
+            if (socket is { } handle)
+            {
+                published(handle);
+            }
+
+            Dialing.TrySetResult();
+            return ValueTask.FromResult(new DialedTcpConnection(new HeldConnection(socket, Requested), new IPEndPoint(IPAddress.Loopback, 50000)));
+        }
+
+        public ValueTask<DialedTcpConnection> DialFromAsync(IPEndPoint endPoint, IPEndPoint localEndPoint, int localPortCount, CancellationToken cancellationToken) =>
+            DialAsync(endPoint, cancellationToken);
+
+        public ValueTask<IConnection> DialUnixSocketAsync(UnixSocketAddress address, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class HeldConnection(nint? socket, TaskCompletionSource requested) : IConnection
+    {
+        public bool IsSecure => false;
+
+        public EndPoint? RemoteEndPoint => new IPEndPoint(IPAddress.Loopback, 9000);
+
+        public nint? SocketHandle => socket;
+
+        public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            requested.TrySetResult();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

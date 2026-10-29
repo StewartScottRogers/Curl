@@ -47,7 +47,7 @@ public sealed class SftpTransferQuoteTests
             "/~/a.txt", Mode0644, output, NoTransferProgress.Instance, CancellationToken.None, Quotes(header, ["rm /a", "pwd"], ["rm /b", "pwd"]));
         Diagnostics.ActResult(result);
 
-        Assert.AreEqual(TransferResult.Success(5), result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(5)), result);
         CollectionAssert.AreEqual(Hello, output.ToArray());
         Assert.AreEqual("257 \"/home/fake/a.txt\" is current directory.\n257 \"(nil)\" is current directory.\n", Encoding.UTF8.GetString(header.ToArray()), "as measured");
         AssertRequests(
@@ -73,7 +73,7 @@ public sealed class SftpTransferQuoteTests
             "/f", Mode0644, new MemoryStream(), NoTransferProgress.Instance, CancellationToken.None, Quotes(null, [], ["rm /zz"]));
         Diagnostics.ActResult(result);
 
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.QuoteError, "rm \"/zz\" failed: No such file or directory", 5), result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.QuoteError, "rm \"/zz\" failed: No such file or directory", 5)), result);
         AssertChannelClosedLast(connection);
     }
 
@@ -168,7 +168,7 @@ public sealed class SftpTransferQuoteTests
             "/d/", listOnly: false, noBody: false, new MemoryStream(), NoTransferProgress.Instance, CancellationToken.None, Quotes(header, ["rm /b", "pwd"], ["mkdir /nd"]));
         Diagnostics.ActResult(result);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(0)), result);
         Assert.AreEqual("257 \"/d/\" is current directory.\n", Encoding.UTF8.GetString(header.ToArray()), "as measured");
         AssertRequests(
             connection,
@@ -191,7 +191,7 @@ public sealed class SftpTransferQuoteTests
             "/d/", listOnly: false, noBody: true, new MemoryStream(), NoTransferProgress.Instance, CancellationToken.None, Quotes(null, ["rm /a"], ["rm /b"]));
         Diagnostics.ActResult(result);
 
-        Assert.AreEqual(TransferResult.Success(0), result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(0)), result);
         AssertRequests(
             connection,
             Realpath,

@@ -143,7 +143,10 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetPort(ref EasyOptions o, object? v) => SetInRange(ref o, v, 0, MostPort, (n, port) => n with { Port = (int)port });
 
-    private static CurlCode SetInterface(ref EasyOptions o, object? v) => Set(ref o, n => n with { Interface = (string?)v });
+    private static CurlCode SetInterface(ref EasyOptions o, object? v) => HasEmptyInterfaceName((string?)v) ? CurlCode.BadFunctionArgument : Set(ref o, n => n with { Interface = (string?)v });
+
+    /// <summary>True for <c>if!</c>, <c>host!</c> and <c>ifhost!</c> with nothing after the bang, which libcurl refuses.</summary>
+    private static bool HasEmptyInterfaceName(string? value) => value is "if!" or "host!" or "ifhost!";
 
     private static CurlCode SetLocalPort(ref EasyOptions o, object? v) => SetInRange(ref o, v, 0, MostPort, (n, port) => n with { LocalPort = (int)port });
 
@@ -153,7 +156,7 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetAbstractUnixSocket(ref EasyOptions o, object? v) => Set(ref o, n => n with { AbstractUnixSocket = (string?)v });
 
-    private static CurlCode SetAddressScope(ref EasyOptions o, object? v) => SetInRange(ref o, v, 0, uint.MaxValue, (n, scope) => n with { AddressScope = scope });
+    private static CurlCode SetAddressScope(ref EasyOptions o, object? v) => SetInRange(ref o, v, int.MinValue, uint.MaxValue, (n, scope) => n with { AddressScope = unchecked((uint)scope) });
 
     private static CurlCode SetConnectTo(ref EasyOptions o, object? v) => Set(ref o, n => n with { ConnectTo = ListOf(v) });
 
@@ -199,8 +202,8 @@ internal static class EasyNetworkOptionSetters
 
     private static CurlCode SetForbidReuse(ref EasyOptions o, object? v) => Set(ref o, n => n with { ForbidReuse = IsOn(v) });
 
-    /// <summary><c>CURLOPT_MAXCONNECTS</c>: 1 to <c>INT_MAX</c>; 0 and below are <see cref="CurlCode.BadFunctionArgument"/>.</summary>
-    private static CurlCode SetMaxConnects(ref EasyOptions o, object? v) => SetInRange(ref o, v, 1, MostCount, (n, count) => n with { MaxConnects = (int)count });
+    /// <summary><c>CURLOPT_MAXCONNECTS</c>: 0 to <c>INT_MAX</c>; negative values are <see cref="CurlCode.BadFunctionArgument"/>.</summary>
+    private static CurlCode SetMaxConnects(ref EasyOptions o, object? v) => SetInRange(ref o, v, 0, MostCount, (n, count) => n with { MaxConnects = (int)count });
 
     private static CurlCode SetMaxIdleConnectionAge(ref EasyOptions o, object? v) => SetCount(ref o, v, (n, seconds) => n with { MaxIdleConnectionAge = TimeSpan.FromSeconds(seconds) });
 

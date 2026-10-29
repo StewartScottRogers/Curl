@@ -175,9 +175,9 @@ public sealed class SmtpProtocolHandlerSessionTests
         SmtpRun run = await RunAsync(Url, Greeting + "502 no\r\n501 no\r\n");
 
         Diagnostics.Diff("sent", Ehlo + "HELO client.example\r\n", run.Sent);
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 501"), run.Result);
+        Diagnostics.AssertResult((TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 501") with { Report = new TransferReport { ResponseCode = 501 } }), run.Result);
         Assert.AreEqual(Ehlo + "HELO client.example\r\n", run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 501"), run.Result);
+        Assert.AreEqual((TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 501") with { Report = new TransferReport { ResponseCode = 501 } }), run.Result);
     }
 
     [TestMethod]
@@ -187,9 +187,9 @@ public sealed class SmtpProtocolHandlerSessionTests
         SmtpRun run = await RunAsync(Url, Greeting + "502 no\r\n", Required);
 
         Diagnostics.Diff("sent", Ehlo, run.Sent);
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 502"), run.Result);
+        Diagnostics.AssertResult((TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 502") with { Report = new TransferReport { ResponseCode = 502 } }), run.Result);
         Assert.AreEqual(Ehlo, run.Sent);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 502"), run.Result);
+        Assert.AreEqual((TransferResult.Failure(CurlExitCode.RemoteAccessDenied, "Remote access denied: 502") with { Report = new TransferReport { ResponseCode = 502 } }), run.Result);
     }
 
     [TestMethod]

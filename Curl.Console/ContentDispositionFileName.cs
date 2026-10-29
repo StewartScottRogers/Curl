@@ -1,5 +1,7 @@
 using System.Buffers;
 using System.Text;
+using Curl.Authentication;
+using Curl.Cli;
 
 namespace Curl.Console;
 
@@ -26,9 +28,11 @@ namespace Curl.Console;
 /// curl uses the value's bytes as the name. They are read here in the encoding the caller
 /// gives: the ANSI code page on Windows, where curl 8.22.0's Windows build opens the name
 /// with the ANSI file API (byte E9 writes <c>café.txt</c>, bytes C3 A9 write <c>cafÃ©.txt</c>
-/// under code page 1252; BL-3580 Notes, CGR-051), and UTF-8 elsewhere, the encoding .NET
-/// file names round-trip through, so a name that is not valid UTF-8 off Windows gets U+FFFD
-/// in place of its raw bytes (ADR-0821).
+/// under code page 1252; BL-3580 Notes, CGR-051), and UTF-8 elsewhere (ADR-0912). Off Windows
+/// each byte outside a valid UTF-8 sequence is kept as its <see cref="InvalidUtf8ByteEscape" />
+/// surrogate, so the output file opens under the raw bytes (<see cref="RawByteFileName" />), as
+/// curl 8.18.0 OpenSSL on Linux does: <c>filename="caf\xE9.txt"</c> creates the file named
+/// 63 61 66 E9 2E 74 78 74 (BL-3858 Notes, ADR-0977).
 /// </para>
 /// </remarks>
 internal static class ContentDispositionFileName
@@ -42,6 +46,15 @@ internal static class ContentDispositionFileName
 
     /// <summary>The parameter curl looks for, matched exactly.</summary>
     private static ReadOnlySpan<byte> FileNameParameter => "filename="u8;
+
+    /// <summary>
+    /// The encoding the platform's curl gives the name's bytes in: the ANSI code page on Windows,
+    /// and elsewhere UTF-8 that keeps each byte outside a valid sequence as its raw byte.
+    /// </summary>
+    /// <param name="isWindows">Whether the process runs on Windows.</param>
+    /// <returns>The encoding for <see cref="Find" />.</returns>
+    internal static Encoding EncodingFor(bool isWindows) =>
+        isWindows ? CredentialEncoding.ForPlatform(isWindows: true) : InvalidUtf8ByteEscape.Encoding;
 
     /// <summary>
     /// Finds the file name in one header line.

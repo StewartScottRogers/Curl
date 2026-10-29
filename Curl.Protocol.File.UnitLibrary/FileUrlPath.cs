@@ -125,7 +125,11 @@ public sealed record FileUrlPath
     /// character encoded as its UTF-8 bytes and the hexadecimal digits of each well-formed
     /// escape uppercased, a malformed one left as written. <strong>Decode:</strong>
     /// <c>OsPath</c> is that text with each <c>%XX</c> escape decoded to the byte it names
-    /// and runs of escapes read as UTF-8, <c>%2F</c> included, a malformed escape left as
+    /// and runs of escapes read as the host's curl reads them (CGR-114, ADR-0864): in the
+    /// system ANSI code page on Windows, so <c>caf%E9.txt</c> opens <c>café.txt</c> on a
+    /// Windows-1252 host, and as raw bytes elsewhere, so a byte that is not UTF-8 reaches
+    /// <c>open()</c> unchanged (<see cref="RawBytePath" />). <c>%2F</c> is included, a
+    /// malformed escape left as
     /// written, and <c>/</c> turned into the platform's directory separator; no trailing
     /// separator is trimmed and no case is changed.
     /// </para>
@@ -135,6 +139,50 @@ public sealed record FileUrlPath
     /// </exception>
     public static bool TryParse(CurlUrl url, [MaybeNullWhen(false)] out FileUrlPath path) =>
         TryParse(url, OperatingSystem.IsWindows(), out path);
+
+    /// <summary>
+    /// The code page of Windows-1252, the ANSI code page of an English Windows system.
+    /// </summary>
+    private const int Windows1252CodePage = 1252;
+
+    /// <summary>
+    /// Reads the bytes of a run of escapes as the host's curl does (CGR-114, ADR-0864): in
+    /// the system ANSI code page on Windows, and as the raw bytes handed to <c>open()</c>
+    /// elsewhere.
+    /// </summary>
+    private static readonly Func<byte[], string> PlatformEscapedBytesReader = EscapedBytesReaderFor(
+        OperatingSystem.IsWindows(),
+        ReadSystemAnsiCodePage(() => CodePagesEncodingProvider.Instance.GetEncoding(0)));
+
+    /// <summary>
+    /// Reads the host's system ANSI code page, asking a second time when the first answer is
+    /// <see langword="null" />, because Windows can fail one of several first calls made at
+    /// once (BL-1200, BL-1203). On Linux and macOS both answers are <see langword="null" />.
+    /// </summary>
+    /// <param name="readCodePageZero">Asks the code page provider for code page 0.</param>
+    /// <returns>The system ANSI code page, or <see langword="null" /> when the host has none.</returns>
+    internal static Encoding? ReadSystemAnsiCodePage(Func<Encoding?> readCodePageZero) =>
+        readCodePageZero() ?? readCodePageZero();
+
+    /// <summary>
+    /// Chooses how a platform's curl reads the bytes of a run of <c>%XX</c> escapes in a
+    /// <c>file://</c> path (CGR-114, ADR-0864).
+    /// </summary>
+    /// <param name="isWindows"><see langword="true" /> for Windows behaviour.</param>
+    /// <param name="systemAnsiCodePage">
+    /// The host's system ANSI code page, or <see langword="null" /> on a host that has none.
+    /// </param>
+    /// <returns>
+    /// On Windows, the bytes read in <paramref name="systemAnsiCodePage" />, Windows-1252 when
+    /// that is <see langword="null" />, as the non-Unicode curl 8.22.0 hands them to the ANSI
+    /// file API: <c>caf%E9.txt</c> opens <c>café.txt</c>. Elsewhere, the bytes in
+    /// <see cref="RawBytePath" /> form, so a byte that is not UTF-8 reaches <c>open()</c>
+    /// unchanged, as curl 8.18.0 on Linux passes it.
+    /// </returns>
+    internal static Func<byte[], string> EscapedBytesReaderFor(bool isWindows, Encoding? systemAnsiCodePage) =>
+        isWindows
+            ? (systemAnsiCodePage ?? CodePagesEncodingProvider.Instance.GetEncoding(Windows1252CodePage)!).GetString
+            : bytes => RawBytePath.FromBytes(bytes);
 
     /// <summary>
     /// Extracts the URL path and the operating-system path from a <c>file://</c> URL with
@@ -158,6 +206,35 @@ public sealed record FileUrlPath
     internal static bool TryParse(
         CurlUrl url,
         bool driveLetters,
+        [MaybeNullWhen(false)] out FileUrlPath path) =>
+        TryParse(url, driveLetters, PlatformEscapedBytesReader, out path);
+
+    /// <summary>
+    /// Extracts the URL path and the operating-system path from a <c>file://</c> URL with
+    /// the drive-letter rule and the escape reading of the chosen platform.
+    /// </summary>
+    /// <param name="url">The URL to read. Its scheme must be <c>file</c>.</param>
+    /// <param name="driveLetters">
+    /// <see langword="true" /> for the Windows drive-letter rule; see
+    /// <see cref="TryParse(CurlUrl, bool, out FileUrlPath)" />.
+    /// </param>
+    /// <param name="readEscapedBytes">
+    /// Turns the bytes of each run of consecutive escapes into text; see
+    /// <see cref="EscapedBytesReaderFor" />.
+    /// </param>
+    /// <param name="path">
+    /// On success, the parsed pair; otherwise undefined and not to be read.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="url" /> is a <c>file://</c> URL.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="url" /> is <see langword="null" />.
+    /// </exception>
+    internal static bool TryParse(
+        CurlUrl url,
+        bool driveLetters,
+        Func<byte[], string> readEscapedBytes,
         [MaybeNullWhen(false)] out FileUrlPath path)
     {
         ArgumentNullException.ThrowIfNull(url);
@@ -176,7 +253,7 @@ public sealed record FileUrlPath
 
         path = new FileUrlPath(
             UppercaseEscapes(EncodeNonAscii(urlPath)),
-            ToOperatingSystemPath(urlPath));
+            ToOperatingSystemPath(urlPath, readEscapedBytes));
 
         return true;
     }
@@ -190,9 +267,17 @@ public sealed record FileUrlPath
         urlPath.Length >= 3
         && urlPath[0] == '/'
         && char.IsAsciiLetter(urlPath[1])
-        && (urlPath[2] == ':' || urlPath[2] == '|')
+        && IsDriveSeparator(urlPath.AsSpan(2))
             ? urlPath[1..]
             : urlPath;
+
+    /// <summary>
+    /// Tells whether the text starts with the <c>:</c> or <c>|</c> after a drive letter, or the escape <c>%3A</c> curl decodes to <c>:</c> first.
+    /// </summary>
+    /// <param name="rest">The path after the drive letter.</param>
+    /// <returns><see langword="true" /> for a drive separator.</returns>
+    private static bool IsDriveSeparator(ReadOnlySpan<char> rest) =>
+        rest[0] is ':' or '|' || rest.StartsWith("%3A", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Percent-encodes every non-ASCII character as its UTF-8 bytes, leaving ASCII,
@@ -257,17 +342,19 @@ public sealed record FileUrlPath
     /// Decodes the escapes and switches to the platform's directory separator.
     /// </summary>
     /// <param name="urlPath">The still-encoded path.</param>
+    /// <param name="readEscapedBytes">Turns the bytes of a run of escapes into text.</param>
     /// <returns>The path to hand to <see cref="Abstractions.IFileSystem" />.</returns>
-    private static string ToOperatingSystemPath(string urlPath) =>
-        Decode(urlPath).Replace('/', Path.DirectorySeparatorChar);
+    private static string ToOperatingSystemPath(string urlPath, Func<byte[], string> readEscapedBytes) =>
+        Decode(urlPath, readEscapedBytes).Replace('/', Path.DirectorySeparatorChar);
 
     /// <summary>
-    /// Percent-decodes <paramref name="encoded" />, reading each run of escapes as UTF-8
-    /// and leaving a malformed escape exactly as written.
+    /// Percent-decodes <paramref name="encoded" />, reading each run of escapes with
+    /// <paramref name="readEscapedBytes" /> and leaving a malformed escape exactly as written.
     /// </summary>
     /// <param name="encoded">The still-encoded path.</param>
+    /// <param name="readEscapedBytes">Turns the bytes of a run of escapes into text.</param>
     /// <returns>The decoded text.</returns>
-    private static string Decode(string encoded)
+    private static string Decode(string encoded, Func<byte[], string> readEscapedBytes)
     {
         if (!encoded.Contains('%', StringComparison.Ordinal))
         {
@@ -287,12 +374,12 @@ public sealed record FileUrlPath
                 continue;
             }
 
-            Flush(escaped, decoded);
+            Flush(escaped, decoded, readEscapedBytes);
             decoded.Append(encoded[index]);
             index++;
         }
 
-        Flush(escaped, decoded);
+        Flush(escaped, decoded, readEscapedBytes);
 
         return decoded.ToString();
     }
@@ -338,18 +425,19 @@ public sealed record FileUrlPath
         char.IsAsciiDigit(digit) ? digit - '0' : ((digit | 0x20) - 'a') + 10;
 
     /// <summary>
-    /// Appends the bytes gathered so far as UTF-8 text and empties the buffer.
+    /// Appends the bytes gathered so far as text and empties the buffer.
     /// </summary>
     /// <param name="escaped">The bytes from a run of consecutive escapes.</param>
     /// <param name="decoded">The text being built.</param>
-    private static void Flush(List<byte> escaped, StringBuilder decoded)
+    /// <param name="readEscapedBytes">Turns the bytes of a run of escapes into text.</param>
+    private static void Flush(List<byte> escaped, StringBuilder decoded, Func<byte[], string> readEscapedBytes)
     {
         if (escaped.Count == 0)
         {
             return;
         }
 
-        decoded.Append(Encoding.UTF8.GetString(escaped.ToArray()));
+        decoded.Append(readEscapedBytes(escaped.ToArray()));
         escaped.Clear();
     }
 }

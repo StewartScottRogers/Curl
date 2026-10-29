@@ -188,7 +188,7 @@ public sealed class EngineCompositionDohTests
     public async Task Connect_WithResolveForTheSameHost_DialsTheEntryWithoutAskingTheDohServer()
     {
         // curl -v --resolve example.test:48712:127.0.0.1 --doh-url ... --doh-insecure http://example.test:48712/
-        // -> "Added ... to DNS cache", "Hostname example.test was found in DNS cache", no byte to the DoH server.
+        // -> "[DNS] added ... to cache", "Hostname example.test was found in DNS cache", no byte to the DoH server.
         ScriptedConnector dohServer = new([AAnswer, AAnswer]);
         ScriptedConnector webServer = new([]);
 
@@ -204,7 +204,7 @@ public sealed class EngineCompositionDohTests
     }
 
     [TestMethod]
-    public async Task Connect_WithBogusDohUrl_AsksHostBogusOverPlainHttpAndFailsWithExit6()
+    public async Task Connect_WithBogusDohUrl_AsksHostBogusOverHttpsAndFailsWithExit6()
     {
         // curl -sS -v --doh-url bogus http://example.test:48712/ -> "* Could not resolve host: example.test",
         // "curl: (6) Could not resolve host: example.test"; nothing reached either server.
@@ -217,7 +217,7 @@ public sealed class EngineCompositionDohTests
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
         Diagnostics.Assert("result.ErrorMessage", "Could not resolve host: example.test", result.ErrorMessage);
         Assert.AreEqual("Could not resolve host: example.test", result.ErrorMessage);
-        Assert.AreEqual(new ConnectTarget("bogus", 80, false), dohServer.Targets[0] with { PoolScheme = null });
+        Assert.AreEqual(new ConnectTarget("bogus", 443, true), dohServer.Targets[0] with { PoolScheme = null });
         Diagnostics.Assert("webServer.Targets count", 0, webServer.Targets.Count);
         Assert.IsEmpty(webServer.Targets);
     }
@@ -266,8 +266,8 @@ public sealed class EngineCompositionDohTests
     [DataRow("https://127.0.0.1:48711/dns-query", "https://127.0.0.1:48711/dns-query")]
     [DataRow("HTTPS://dns.example/q", "https://dns.example/q")]
     [DataRow("http://dns.example/", "http://dns.example/")]
-    [DataRow("127.0.0.1:48711/dns-query", "http://127.0.0.1:48711/dns-query")]
-    [DataRow("bogus", "http://bogus/")]
+    [DataRow("127.0.0.1:48711/dns-query", "https://127.0.0.1:48711/dns-query")]
+    [DataRow("bogus", "https://bogus/")]
     public void DohUrlOf_MakesTheUrlCurlAsks(string value, string expected)
     {
         Diagnostics.Arrange("value", value);

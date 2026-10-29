@@ -46,8 +46,8 @@ internal sealed record OptionGroupConnectionSettings(
     /// <c>curl_strequal</c>, so <c>PEM</c> and <c>pem</c> share a connection (BL-2974).</returns>
     internal static OptionGroupConnectionSettings Of(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy) =>
         new(
-            WithUpperCaseTypes(TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile)),
-            WithUpperCaseTypes(TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn)),
+            WithUpperCaseTypes(TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile, tracesHandshakeMessages: tool.TracesTransfer)),
+            WithUpperCaseTypes(TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn, tracesHandshakeMessages: tool.TracesTransfer)),
             EngineComposition.UnixSocketOf(network),
             EngineComposition.LocalBindingOf(network),
             EngineComposition.AddressFamilyOf(network),

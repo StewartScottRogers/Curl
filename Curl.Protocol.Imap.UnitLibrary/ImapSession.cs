@@ -60,7 +60,8 @@ namespace Curl.Protocol.Imap;
 /// (BL-1311): under <c>-I</c> the first of them is exit 8 <c>Weird server reply</c> with
 /// nothing written; past the limit the bytes left under it are written and the transfer is
 /// exit 63. Either ends with <c>shutting down connection</c>; a listing sends <c>LOGOUT</c>
-/// first and a <c>FETCH</c> does not (measured 2026-10-03).</item>
+/// first and a <c>FETCH</c> does only when its completion had not arrived with the literal
+/// (measured 2026-10-03, CGR-233 2026-10-28).</item>
 /// </list>
 /// </remarks>
 internal sealed class ImapSession(
@@ -756,11 +757,13 @@ internal sealed class ImapSession(
     /// </summary>
     private async ValueTask<TransferResult> DownloadAsync(long size)
     {
-        context.Progress.ReportTransferStarted();
         Phase = ImapSessionPhase.Transferring;
         if (await CopyLiteralAsync(size, 0, reportsProgress: true).ConfigureAwait(false) is { } failure)
         {
-            return failure;
+            // -I refusing the literal sends LOGOUT unless the whole response was already read (CGR-233).
+            return failure.ExitCode == CurlExitCode.WeirdServerReply && !channel.HasUnreadBytes
+                ? await LogoutIfBodyRefusedAsync(failure).ConfigureAwait(false)
+                : failure;
         }
 
         Phase = ImapSessionPhase.Completing;

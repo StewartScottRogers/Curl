@@ -202,6 +202,7 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
             };
         }
 
+        context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
             var channel = new SmtpControlChannel(
@@ -266,19 +267,32 @@ public sealed class SmtpProtocolHandler : IProtocolHandler
 
     /// <summary>
     /// Connects, which the run's connection cache may serve from a connection a previous URL
-    /// left greeted (BL-3181); one kept for another login is closed, with its <c>QUIT</c>, and
+    /// left greeted (BL-3181); one kept for another login stays in the cache, to be closed with its <c>QUIT</c> at exit, and
     /// the connect tried again, as curl reuses an SMTP connection only for the same login.
     /// </summary>
     private async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, string loginKey, CancellationToken cancellationToken)
     {
         ConnectResult connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
+        List<IConnection> otherLogins = [];
         while (connected is { IsReused: true, Connection: { Session: SmtpKeptConnection kept } connection } && !kept.Serves(loginKey))
         {
-            await connection.DisposeAsync().ConfigureAwait(false);
+            otherLogins.Add(connection);
             connected = await connector.ConnectAsync(target, cancellationToken).ConfigureAwait(false);
         }
 
+        await ReturnToCacheAsync(otherLogins).ConfigureAwait(false);
+
         return connected;
+    }
+
+    /// <summary>Hands connections kept for another login back to the run's connection cache, still open.</summary>
+    private static async ValueTask ReturnToCacheAsync(List<IConnection> connections)
+    {
+        foreach (IConnection connection in connections)
+        {
+            connection.MarkReusable();
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
     /// <summary>

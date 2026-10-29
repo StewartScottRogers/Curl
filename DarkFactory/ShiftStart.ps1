@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 if (-not $Lane) {
     while ($true) {
         $ciFixWaiting = [bool](Get-ChildItem (Join-Path $Root 'Tasks\Backlog') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Select-String -Pattern '^title: .*(Fix CI failure|Fix flaky CI test)' -List)
-        $decision = Get-ShiftStartDecision @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine) $Continuous.IsPresent $ciFixWaiting
+        $decision = Get-ShiftStartDecision @(Get-FactoryProcessTable | Select-Object CommandLine) $Continuous.IsPresent $ciFixWaiting
         if ($decision -eq 'start') { break }
         if ($decision -eq 'refuse') { Write-Trace '-' 'refuse' 'An audit is running; shifts start between audits.' 'Red'; exit 1 }
         Write-Trace '-' 'audit' 'An audit is running; shifts start between audits. Looking again in 5 minutes.' 'Yellow'

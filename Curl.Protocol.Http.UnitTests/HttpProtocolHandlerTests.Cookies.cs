@@ -383,11 +383,11 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// A head that fails before a header is whole still reports that header's lines, but hands
-    /// no cookie to the store.
+    /// A head that fails at a line without a colon shows the header before it whole, so that
+    /// header's cookie is stored and its lines reported (CGR-207, BL-3736).
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_HeadFailsAfterASetCookieLine_ReportsTheLineAndStoresNothing()
+    public async Task ExecuteAsync_HeadFailsAfterASetCookieLine_ReportsTheLineAndStoresTheCookie()
     {
         const string head = "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nno colon\r\n\r\n";
         ScriptedCookieStore store = new() { ReportedLine = header => "Added " + header };
@@ -402,11 +402,11 @@ public sealed partial class HttpProtocolHandlerTests
         WriteEvents("head events", HeadEvents(events));
         Diagnostics.Assert("exit code", CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        string[] expected = ["< HTTP/1.1 200 OK\r\n", "< Set-Cookie: a=1\r\n"];
+        string[] expected = ["< HTTP/1.1 200 OK\r\n", "* Added a=1", "< Set-Cookie: a=1\r\n"];
         WriteExpectedLines("head events", expected, HeadEvents(events));
         CollectionAssert.AreEqual(expected, HeadEvents(events));
-        Diagnostics.Assert("store responses", 0, store.Responses.Count);
-        Assert.IsEmpty(store.Responses);
+        Diagnostics.Assert("store responses", 1, store.Responses.Count);
+        Assert.HasCount(1, store.Responses);
     }
 
     /// <summary>

@@ -346,12 +346,11 @@ public sealed class CurlCommandRunnerFormTests
 
     /// <summary>
     /// curl 8.21.0 sends piped standard input to the first URL of <c>-F "a=&lt;-" URL1 URL2</c>
-    /// and an empty part to the second, which it declares with the first body's length and fails
-    /// with exit 26 (BL-311 Context). ADR-0062 matches the first URL and sends the second a
-    /// consistent body with the empty part.
+    /// and nothing to the second, which it declares with the first body's length and fails
+    /// with exit 26 before sending (BL-311 Context; ADR-0958, which amends ADR-0062).
     /// </summary>
     [TestMethod]
-    public async Task RunAsync_FormContentFromStandardInputOnTwoUrls_SendsTheInputOnceThenAnEmptyPart()
+    public async Task RunAsync_FormContentFromStandardInputOnTwoUrls_SendsTheInputOnceThenFailsTheSecond()
     {
         ScriptedConnector twoResponses = new(
         [
@@ -362,25 +361,15 @@ public sealed class CurlCommandRunnerFormTests
         int exitCode = await RunWithStandardInputAsync(twoResponses, "-sS", "-F", "a=<-", Url, Url);
 
         string written = Encoding.Latin1.GetString(twoResponses.Written);
-        int secondRequest = written.IndexOf("POST", 1, StringComparison.Ordinal);
-        string secondText = written[secondRequest..];
-        Diagnostics.Assert("exit code", 0, exitCode);
+        Diagnostics.Assert("exit code", 26, exitCode);
         Diagnostics.Diff(
-            "first request tail",
+            "request tail",
             "Content-Length: 159\r\n" + FormBody(SentBoundary(written), "hello\nworld"),
-            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..secondRequest]);
-        Diagnostics.Diff(
-            "second request tail",
-            "Content-Length: 148\r\n" + FormBody(SentBoundary(secondText), string.Empty),
-            secondText[secondText.IndexOf("Content-Length", StringComparison.Ordinal)..]);
-        Assert.AreEqual(0, exitCode);
+            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..]);
+        Assert.AreEqual(26, exitCode);
         Assert.AreEqual(
             "Content-Length: 159\r\n" + FormBody(SentBoundary(written), "hello\nworld"),
-            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..secondRequest]);
-        string second = written[secondRequest..];
-        Assert.AreEqual(
-            "Content-Length: 148\r\n" + FormBody(SentBoundary(second), string.Empty),
-            second[second.IndexOf("Content-Length", StringComparison.Ordinal)..]);
+            written[written.IndexOf("Content-Length", StringComparison.Ordinal)..]);
     }
 
     private static string FormBody(string boundary, string content) =>

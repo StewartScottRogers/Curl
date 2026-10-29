@@ -16,7 +16,8 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var events = new RecordingTransferEvents();
 
-        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events);
+        // A host of its own, so no earlier test's session is resumed without the server's key share (BL-4053).
+        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, targetHost: $"{Guid.NewGuid():N}.test");
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
@@ -30,9 +31,87 @@ public sealed partial class SslStreamTlsProviderTests
         Assert.IsNotNull(handshake.CipherSuite);
         Assert.IsNull(handshake.NegotiatedApplicationProtocol);
         Assert.IsEmpty(handshake.OfferedApplicationProtocols);
+        Diagnostics.Assert("group", "a name", handshake.NegotiatedGroupName);
+        Assert.IsNotNull(handshake.NegotiatedGroupName);
+        AssertSignatureTypeNameOfTheRsaCertificate(handshake);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_OverTls12_ReportsTheGroupAndSignatureTypeFromTheServerKeyExchange()
+    {
+        var events = new RecordingTransferEvents();
+
+        // A host of its own, so no earlier test's TLS 1.2 session is resumed without a ServerKeyExchange.
+        var result = await ReportingHandshakeAsync(
+            new TlsClientOptions(Insecure: true), events, targetHost: $"{Guid.NewGuid():N}.test", serverProtocols: SslProtocols.Tls12);
+
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Diagnostics.Act("cipher suite", handshake.CipherSuite);
+        Diagnostics.Act("signature type", handshake.PeerSignatureTypeName);
+        Diagnostics.Assert("version", SslProtocols.Tls12, handshake.ProtocolVersion);
+        Assert.AreEqual(SslProtocols.Tls12, handshake.ProtocolVersion);
+        Assert.IsNotNull(handshake.NegotiatedGroupName);
+        AssertSignatureTypeNameOfTheRsaCertificate(handshake);
+        await result.Connection!.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_InTheSchannelBuild_ReportsNoGroupOrSignatureType()
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.None);
+        var options = new TlsClientOptions(Insecure: true);
+        var provider = new SslStreamTlsProvider(options, SchannelBuild);
+        var events = new RecordingTransferEvents();
+        ArrangeOptions(options);
+        Diagnostics.Arrange("build", "Schannel");
+
+        ConnectResult result;
+        using (Diagnostics.Phase("handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(
+                new StreamConnection(client, ServerEndPoint), CertificateHost, events, CancellationToken.None);
+        }
+
+        ActResult(result);
+        Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
         Assert.IsNull(handshake.NegotiatedGroupName);
         Assert.IsNull(handshake.PeerSignatureTypeName);
         await result.Connection!.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
+    [TestMethod]
+    public void KeyAlgorithmOf_TheServerCertificateOrNone_IsItsKeyAlgorithmOidOrNull()
+    {
+        Diagnostics.Arrange("certificate", "the test's RSA certificate, then none");
+
+        var rsa = SslStreamTlsProvider.KeyAlgorithmOf(s_serverCertificate);
+        var none = SslStreamTlsProvider.KeyAlgorithmOf(null);
+
+        Diagnostics.Act("OIDs", $"{rsa}, {none}");
+        Assert.AreEqual("1.2.840.113549.1.1.1", rsa);
+        Assert.IsNull(none);
+    }
+
+    // TLS 1.3 signs with RSA-PSS for an RSA key; TLS 1.2's scheme is the server's choice, which
+    // differs by platform, so either RSA type is taken there.
+    private void AssertSignatureTypeNameOfTheRsaCertificate(TlsHandshakeEvent handshake)
+    {
+        Diagnostics.Assert("signature type", handshake.ProtocolVersion == SslProtocols.Tls13 ? "RSASSA-PSS" : "RSASSA-PSS or rsaEncryption", handshake.PeerSignatureTypeName);
+        if (handshake.ProtocolVersion == SslProtocols.Tls13)
+        {
+            Assert.AreEqual("RSASSA-PSS", handshake.PeerSignatureTypeName);
+        }
+        else
+        {
+            CollectionAssert.Contains(new[] { "RSASSA-PSS", "rsaEncryption" }, handshake.PeerSignatureTypeName);
+        }
     }
 
     [TestMethod]
@@ -87,7 +166,8 @@ public sealed partial class SslStreamTlsProviderTests
         // before the handshake lines (curl 8.21.0 OpenSSL, measured, BL-405).
         var events = new RecordingTransferEvents();
 
-        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events);
+        // A host of its own, so no earlier test's session is resumed without the server's key share (BL-4053).
+        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, targetHost: $"{Guid.NewGuid():N}.test");
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Diagnostics.Assert("TLS event count", 2, events.TlsEvents.Count);
@@ -236,13 +316,14 @@ public sealed partial class SslStreamTlsProviderTests
         TlsClientOptions options,
         RecordingTransferEvents events,
         bool isProxy = false,
-        string targetHost = CertificateHost)
+        string targetHost = CertificateHost,
+        SslProtocols serverProtocols = SslProtocols.None)
     {
         ArrangeOptions(options);
         Diagnostics.Arrange("target host", targetHost);
         Diagnostics.Arrange("proxy", isProxy);
         var (client, server) = InMemoryDuplexStream.CreatePair();
-        var serverTask = RunEchoServerAsync(server, SslProtocols.None);
+        var serverTask = RunEchoServerAsync(server, serverProtocols);
         var provider = new SslStreamTlsProvider(options, OpenSslBuild);
 
         ConnectResult result;

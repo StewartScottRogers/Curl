@@ -9,7 +9,7 @@ namespace Curl.Networking;
 /// An <see cref="ITcpDialer" /> that asks a connect's <see cref="ITcpSocketOpener" /> before each
 /// attempt how its socket opens, as curl 8.22.0's <c>cf_socket_open</c> calls
 /// <c>CURLOPT_OPENSOCKETFUNCTION</c> before the connect, and tells it when the attempt's socket closes
-/// because the connect failed (ADR-0818, CGR-036).
+/// because the connect failed (ADR-0903, CGR-036).
 /// </summary>
 /// <remarks>
 /// A refused attempt fails with a <see cref="SocketException" /> and no socket, so with every address

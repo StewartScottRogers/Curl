@@ -66,7 +66,7 @@ public sealed class HttpStatusLineTests
     {
         Diagnostics.Arrange("line", line);
 
-        HttpTransferException refusal = HttpStatusLine.RefusalOverHttp1(line);
+        HttpTransferException refusal = HttpStatusLine.RefusalOverHttp1(line, withoutHttp2: false);
 
         Diagnostics.Act("refusal", $"exit code {refusal.ExitCode}, message '{refusal.Message}'");
         Diagnostics.Assert("exit code", exitCode, refusal.ExitCode);

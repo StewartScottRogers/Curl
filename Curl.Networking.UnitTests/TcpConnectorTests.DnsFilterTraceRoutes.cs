@@ -96,7 +96,7 @@ public sealed partial class TcpConnectorTests
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added foo:47500:127.0.0.1 to DNS cache",
+                "[DNS] added foo:47500:127.0.0.1 to cache",
                 "[DNS] created DNS filter for foo:47500, transport=3, queries=2",
                 "[DNS] added",
                 "[DNS] cf_dns_start host foo:47500",

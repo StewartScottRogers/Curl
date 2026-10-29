@@ -56,6 +56,7 @@ internal sealed class HttpResponseHeadReader
     private static readonly Func<HttpStatusLine, HttpResponseHeader, bool> DefersNoHeader = static (_, _) => false;
 
     private readonly HttpLineReader lines;
+    private bool sawHttp1StatusLine;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HttpResponseHeadReader" /> class.
@@ -207,6 +208,12 @@ internal sealed class HttpResponseHeadReader
     /// so the line is an HTTP/2 stream's as for <see cref="IsHttp2OrHttp3" />. By default it never has.
     /// </summary>
     internal Func<bool> IsSwitchedToHttp2 { get; init; } = NeverSwitched;
+
+    /// <summary>
+    /// Gets what tells whether an earlier response on the connection was HTTP/1.x
+    /// (<see cref="Http1VersionSeen" />), so an HTTP/2 status line now is a version mismatch.
+    /// </summary>
+    internal Func<bool> HttpVersionSeenBefore { get; init; } = NeverSwitched;
 
     /// <summary>
     /// Gets what decides, for each whole header of a final head that curl acts on, whether it
@@ -376,7 +383,18 @@ internal sealed class HttpResponseHeadReader
         HttpResponseHead head = new(statusLine, [.. heldHeaders.Select(held => held.Header)], read.HeadBytes, ReadOnlyMemory<byte>.Empty);
         failure.HeadBytesBeforeFailure = builder.HeadBytesWithPendingHeader();
         failure.StatusLineBeforeFailure = statusLine;
-        Refusal = FindRefusalOrTooMany(head) ?? throw failure;
+        failure.HeadersStoredBeforeFailure = HeadersStoredBefore + informationalHeaderCount + builder.HeaderCountWithPending;
+        Refusal = FindRefusalOrTooMany(head);
+        if (Refusal is null)
+        {
+            if (failure.Message == HttpTransferMessages.HeaderWithoutColon)
+            {
+                ReleaseHeldHeaders();
+            }
+
+            throw failure;
+        }
+
         heldHeaderLines.Clear();
         heldHeaderInfoLine = null;
         ReleaseHeadBeforeRefusal();
@@ -463,7 +481,8 @@ internal sealed class HttpResponseHeadReader
     /// Gives the head of an HTTP/0.9 response <see cref="AcceptsHttp09" /> accepts, its bytes
     /// so far the start of the body, or <see langword="null" /> when HTTP/0.9 is not accepted
     /// or the response can still begin <c>HTTP/</c>. A HEAD request's HTTP/0.9 answer fails
-    /// with exit 8 and <c>Weird server reply</c>, as curl fails it (upstream test1144, BL-1805, BL-2005).
+    /// with exit 8 and <c>Weird server reply</c>, as curl fails it (upstream test1144, BL-1805, BL-2005),
+    /// unless it is a single line or less: then exit 52 and <c>Empty reply from server</c> (CGR-203, BL-3732).
     /// </summary>
     /// <exception cref="HttpTransferException">The answer is HTTP/0.9 and <see cref="IsHeadRequest" /> is set (exit 8).</exception>
     private async ValueTask<HttpResponseHead?> ReadHttp09HeadAsync(CancellationToken cancellationToken)
@@ -475,7 +494,9 @@ internal sealed class HttpResponseHeadReader
 
         if (IsHeadRequest)
         {
-            throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.WeirdServerReply);
+            throw await lines.HasBytesAfterFirstLineAsync(cancellationToken).ConfigureAwait(false)
+                ? new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.WeirdServerReply)
+                : EmptyReply();
         }
 
         EndedAtEmptyLine = true;
@@ -505,6 +526,13 @@ internal sealed class HttpResponseHeadReader
                 ContentTypeBeforeFailure = builder.ContentType,
             };
         }
+        catch (HttpTransferException failure) when (afterInterimHead && failure.ExitCode == CurlExitCode.Http2Stream && failure.StatusLineBeforeFailure is null)
+        {
+            failure.HeadBytesBeforeFailure = builder.HeadBytesSoFar();
+            failure.StatusLineBeforeFailure = headStatusLine;
+            failure.HeadersStoredBeforeFailure = HeadersStoredBefore + informationalHeaderCount;
+            throw;
+        }
     }
 
     /// <summary>
@@ -526,10 +554,22 @@ internal sealed class HttpResponseHeadReader
             return HttpStatusLine.Http200Alias();
         }
 
-        return HttpStatusLine.NamesHttp2OrHttp3(line)
-            ? throw HttpStatusLine.RefusalOverHttp1(line)
-            : HttpStatusLine.Parse(line);
+        if (HttpStatusLine.NamesHttp2OrHttp3(line))
+        {
+            throw HttpStatusLine.RefusalOverHttp1(line, IsWithoutHttp2());
+        }
+
+        sawHttp1StatusLine = true;
+        return HttpStatusLine.Parse(line);
     }
+
+    /// <summary>
+    /// Tells whether this first HTTP/2 status line over HTTP/1.x comes from a curl built without
+    /// HTTP/2 (Schannel on Windows): no h2c upgrade was asked and no HTTP/1.x response was seen on
+    /// the connection yet, since a later one is a version mismatch (exit 8) as upstream test471 says.
+    /// </summary>
+    private bool IsWithoutHttp2() =>
+        OperatingSystem.IsWindows() && !AsksH2cUpgrade && !sawHttp1StatusLine && !HttpVersionSeenBefore();
 
     /// <summary>
     /// Parses a status line as <see cref="ParseStatusLine" /> does, except that a status code
@@ -630,7 +670,7 @@ internal sealed class HttpResponseHeadReader
             }
 
             bool folds = builder.FoldsIntoPendingHeader(line);
-            builder.AddLine(line);
+            AddLineReleasingWholeHeaderBeforeColonlessLine(line, folds);
             if (!folds)
             {
                 ReleaseHeldHeader();
@@ -646,6 +686,25 @@ internal sealed class HttpResponseHeadReader
 
         EndHeadAtClose();
         return true;
+    }
+
+    /// <summary>
+    /// Adds a header line to the builder. A line without a colon shows the header before it whole,
+    /// so curl 8.22.0 acts on that header (stores its cookie) before failing with
+    /// <c>Header without colon</c>; the header is released to <see cref="HeaderReceived" /> then
+    /// (CGR-207, BL-3736).
+    /// </summary>
+    private void AddLineReleasingWholeHeaderBeforeColonlessLine(HttpLine line, bool folds)
+    {
+        try
+        {
+            builder.AddLine(line);
+        }
+        catch (HttpTransferException failure) when (!folds && failure.Message == HttpTransferMessages.HeaderWithoutColon)
+        {
+            ReleaseHeldHeader();
+            throw;
+        }
     }
 
     /// <summary>

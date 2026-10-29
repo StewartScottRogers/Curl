@@ -48,6 +48,9 @@ public sealed class FlowScopedTransferEvents : ITransferEvents
     public void ReportTlsTrust(TlsTrustEvent trust) => Target.ReportTlsTrust(trust);
 
     /// <inheritdoc />
+    public void ReportWarning(string text) => Target.ReportWarning(text);
+
+    /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) =>
         Target.ReportCertificateVerifyResult(verifyResult, isProxy);
 

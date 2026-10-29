@@ -23,4 +23,42 @@ public sealed class CurlUrlHostTests
         Assert.AreEqual("[fe80::1]", normalized);
         Assert.AreEqual("eth0", zoneId);
     }
+
+    [TestMethod]
+    [DataRow("a\u0090ü.example")]
+    [DataRow("aü�.example")]
+    public void TryNormalizeReadingHost_LabelWithARuneIdnaRefuses_IsAnIdnConversionFailure(string host)
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
+
+        Assert.IsFalse(accepted);
+        Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
+    }
+
+    [TestMethod]
+    public void TryNormalizeReadingHost_LabelWithALoneLowSurrogate_IsAnIdnConversionFailure()
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a\uDC80b.example", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
+
+        Assert.IsFalse(accepted);
+        Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
+    }
+
+    [TestMethod]
+    public void TryNormalizeReadingHost_LabelWithALoneHighSurrogate_IsAnIdnConversionFailure()
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("\uD800ü.example", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out CurlUrlRejection rejection);
+
+        Assert.IsFalse(accepted);
+        Assert.AreEqual(CurlUrlRejection.IdnConversionFailed, rejection);
+    }
+
+    [TestMethod]
+    public void TryNormalizeReadingHost_LabelOfEncodableRunes_IsPunycode()
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("ü.example", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
+
+        Assert.IsTrue(accepted);
+        Assert.AreEqual("xn--tda.example", idnHost);
+    }
 }

@@ -110,7 +110,7 @@ You are the dark factory's shift-end reviewer (ADR-0710). This checkout is detac
 
 1. Run /pr-review-toolkit:review-pr errors types code parallel, scoped to that diff (the changed files and lines, not the whole repository). Review only: change no file but the task files and the report below, and never run the code-simplifier.
 2. Keep only issues that are real and that the diff introduced, checked against the code, CLAUDE.md and the project's own CLAUDE.md files. Drop style preferences and anything the repository's rules already decide another way.
-3. For each Critical or Important issue left, file one task with powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 new -Title "<what to fix>" -Priority <High for Critical, Normal for Important> -Assignee Claude -Pipeline direct -Touches "<the projects or files>", then fill its Goal, Context (the file and line, the reviewer that found it, what is wrong and why) and checkable Acceptance criteria. File none for Suggestions. Never file one that touches an audit path or a guard file.
+3. For each Critical or Important issue left, file one task with powershell (pwsh on Linux and macOS) -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1 new -Title "<what to fix>" -Priority <High for Critical, Normal for Important> -Assignee Claude -Pipeline direct -Touches "<the projects or files>", then fill its Goal, Context (the file and line, the reviewer that found it, what is wrong and why) and checkable Acceptance criteria. File none for Suggestions. Never file one that touches an audit path or a guard file.
 4. Commit only the new task files, with the message "chore(tasks): file shift-end review findings" and [skip ci] in the body, run task-board.ps1 dedupe -Since origin/{BRANCH}, and stop there: do not push. The coordinator pushes the commit once the run ends, holding the lock every lane takes to push (BL-3060).
 5. Write the review summary (Critical, Important and Suggestions, each with the task ID filed for it) to {REPORT}. Its last line is exactly "FILED: <number of tasks filed>".
 '@
@@ -127,7 +127,7 @@ function Invoke-ReviewDedupe {
     $saved = $env:CLAUDE_PROJECT_DIR
     try {
         $env:CLAUDE_PROJECT_DIR = $Dir
-        $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $Board dedupe -Since "origin/$Branch" 2>&1 | ForEach-Object { "$_" })
+        $output = @(& (Get-FactoryPowerShellExe) -NoProfile -ExecutionPolicy Bypass -File $Board dedupe -Since "origin/$Branch" 2>&1 | ForEach-Object { "$_" })
         $dedupeExit = $LASTEXITCODE
     } finally { $env:CLAUDE_PROJECT_DIR = $saved }
     if ($dedupeExit -ne 0) {

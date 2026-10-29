@@ -102,9 +102,8 @@ internal static class EasyTransferOptionSetters
 
     private static CurlCode SetCrlf(ref EasyOptions o, object? v) => Set(ref o, t => t with { Crlf = IsOn(v) });
 
-    /// <summary><c>CURLOPT_PROXY_TRANSFER_MODE</c>: 0 or 1 only; any other value is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
-    private static CurlCode SetProxyTransferMode(ref EasyOptions o, object? v) =>
-        SetInRange(ref o, v, 0, 1, (t, mode) => t with { ProxyTransferMode = mode == 1 });
+    /// <summary><c>CURLOPT_PROXY_TRANSFER_MODE</c>: a boolean, so any non-zero value turns it on.</summary>
+    private static CurlCode SetProxyTransferMode(ref EasyOptions o, object? v) => Set(ref o, t => t with { ProxyTransferMode = IsOn(v) });
 
     /// <summary><c>CURLOPT_TIMECONDITION</c>: <c>CURL_TIMECOND_NONE</c> to <c>_LASTMOD</c>; any other value is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetTimeCondition(ref EasyOptions o, object? v) =>
@@ -131,19 +130,24 @@ internal static class EasyTransferOptionSetters
     private static CurlCode SetTimeoutMilliseconds(ref EasyOptions o, object? v) => SetCount(ref o, v, (t, ms) => t with { Timeout = TimeSpan.FromMilliseconds(ms) });
 
     /// <summary>
-    /// <c>CURLOPT_BUFFERSIZE</c>: below 1 is the 16384-byte default, below 1024 is raised to 1024,
-    /// and past 10 MB is cut to it; never an error.
+    /// <c>CURLOPT_BUFFERSIZE</c>: negative is <see cref="CurlCode.BadFunctionArgument"/>, 0 is the 16384-byte default, below 1024 is raised to 1024,
+    /// and past 10 MB is cut to it.
     /// </summary>
     private static CurlCode SetBufferSize(ref EasyOptions o, object? v)
     {
         var size = NumberOf(v);
+        if (size < 0)
+        {
+            return CurlCode.BadFunctionArgument;
+        }
+
         var kept = size < 1 ? DefaultBufferSize : Math.Clamp(size, LeastBufferSize, MostBufferSize);
         return Set(ref o, t => t with { BufferSize = kept });
     }
 
-    /// <summary><c>CURLOPT_UPLOAD_BUFFERSIZE</c>: held between 16384 bytes and 2 MB; never an error.</summary>
+    /// <summary><c>CURLOPT_UPLOAD_BUFFERSIZE</c>: negative is <see cref="CurlCode.BadFunctionArgument"/>, else held between 16384 bytes and 2 MB.</summary>
     private static CurlCode SetUploadBufferSize(ref EasyOptions o, object? v) =>
-        Set(ref o, t => t with { UploadBufferSize = Math.Clamp(NumberOf(v), LeastUploadBufferSize, MostUploadBufferSize) });
+        NumberOf(v) < 0 ? CurlCode.BadFunctionArgument : Set(ref o, t => t with { UploadBufferSize = Math.Clamp(NumberOf(v), LeastUploadBufferSize, MostUploadBufferSize) });
 
     /// <summary>Replaces the handle's <see cref="EasyTransferOptions"/> with the copy <paramref name="change"/> returns; always <see cref="CurlCode.Ok"/>.</summary>
     private static CurlCode Set(ref EasyOptions options, Func<EasyTransferOptions, EasyTransferOptions> change)

@@ -393,7 +393,7 @@ public sealed class LibcurlSourceCodeProtocolOptionTests
     {
         string[] parsedArguments = ["-s", .. arguments.Split('|')];
         Diagnostics.ArrangeArguments(parsedArguments);
-        // As a build with a QUIC library, ECH and c-ares reads it, so --http3, --ech and the DNS options reach the generator (ADR-0540, ADR-0822, ADR-0841).
+        // As a build with a QUIC library, ECH and c-ares reads it, so --http3, --ech and the DNS options reach the generator (ADR-0540, ADR-0918, ADR-0841).
         return CommandLineParser.Parse(parsedArguments, _ => true, new EmptyPasswordPrompt(), DiskDataFileReader.ForProcess, new DefaultConfigFileSearch(_ => null, isWindows: false, null, null), isWindows: false, _ => null, actsAsQuicBuild: true, actsAsEchBuild: true, actsAsCAresBuild: true).Options!;
     }
 

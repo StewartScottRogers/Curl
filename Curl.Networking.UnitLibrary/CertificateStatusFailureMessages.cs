@@ -17,7 +17,7 @@ internal static class CertificateStatusFailureMessages
     {
         [OcspStapleStatus.NoResponse] = "No OCSP response received",
         [OcspStapleStatus.Malformed] = "Invalid OCSP response",
-        [OcspStapleStatus.IssuerNotFound] = "Error finding issuer certificate",
+        [OcspStapleStatus.IssuerNotFound] = "Error computing OCSP ID",
         [OcspStapleStatus.SignatureInvalid] = "OCSP response verification failed",
         [OcspStapleStatus.ResponderNotAuthorised] = "OCSP response verification failed",
         [OcspStapleStatus.CertificateNotFound] = "Could not find certificate ID in OCSP response",

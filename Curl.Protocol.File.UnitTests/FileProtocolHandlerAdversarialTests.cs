@@ -218,9 +218,11 @@ public sealed class FileProtocolHandlerAdversarialTests
     public async Task ExecuteAsync_NonAsciiName_OpensTheDecodedCharacters()
     {
         var fileSystem = new FakeFileSystem();
-        fileSystem.AddFile(NativePath("/d/日本\U0001F600"), Ten);
+        // Unescaped non-ASCII is kept as typed on every platform; how an escape's bytes are
+        // read depends on the platform (ADR-0864), so the escape here is ASCII.
+        fileSystem.AddFile(NativePath("/d/A日本\U0001F600"), Ten);
         var output = new ChunkRecordingStream();
-        var context = new TransferContext { Url = CurlUrl.Parse("file:///d/%E6%97%A5本\U0001F600"), Output = output };
+        var context = new TransferContext { Url = CurlUrl.Parse("file:///d/%41日本\U0001F600"), Output = output };
 
         var result = await new FileProtocolHandler(fileSystem).ExecuteAsync(context);
 

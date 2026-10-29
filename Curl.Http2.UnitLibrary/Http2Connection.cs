@@ -43,6 +43,9 @@ public sealed class Http2Connection
 
     private static readonly byte[] ClientPrefaceBytes = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"u8.ToArray();
 
+    /// <summary>The debug data of nghttp2's GOAWAY for a PUSH_PROMISE with push disabled, with no NUL (BL-3912 Notes).</summary>
+    private static readonly byte[] PushDisabledDebugData = "PUSH_PROMISE: push disabled"u8.ToArray();
+
     private readonly Stream stream;
     private readonly Dictionary<int, Http2Stream> streams = [];
     private long nextStreamId;
@@ -443,15 +446,15 @@ public sealed class Http2Connection
             connectionError = exception;
         }
 
-        await SendGoAwayAfterErrorAsync(connectionError.ErrorCode, cancellationToken).ConfigureAwait(false);
+        await SendGoAwayAfterErrorAsync(connectionError, cancellationToken).ConfigureAwait(false);
         throw connectionError;
     }
 
-    private async Task SendGoAwayAfterErrorAsync(Http2ErrorCode errorCode, CancellationToken cancellationToken)
+    private async Task SendGoAwayAfterErrorAsync(Http2ProtocolException error, CancellationToken cancellationToken)
     {
         try
         {
-            await SendGoAwayAsync(errorCode, cancellationToken).ConfigureAwait(false);
+            await SendGoAwayAsync(error.ErrorCode, error.GoAwayDebugData, cancellationToken).ConfigureAwait(false);
         }
         catch (IOException)
         {
@@ -576,13 +579,19 @@ public sealed class Http2Connection
     /// Takes a PUSH_PROMISE (RFC 9113 sections 6.6 and 8.4): with push on, it must come on a
     /// stream this client opened and promise an even stream above every earlier promise. The
     /// promised stream is reserved half closed by this endpoint, so its HEADERS and DATA arrive
-    /// like any stream's; the caller resets it if it does not want the push.
+    /// like any stream's; the caller resets it if it does not want the push. With push off it
+    /// is a PROTOCOL_ERROR whose GOAWAY says <c>PUSH_PROMISE: push disabled</c>, as nghttp2's
+    /// does (measured with curl 8.22.0, BL-3912 Notes).
     /// </summary>
     private Http2StreamFrame? ReceivePushPromise(Http2Frame frame)
     {
         if (!IsPushEnabled)
         {
-            throw ProtocolError($"PUSH_PROMISE on stream {frame.StreamId} though SETTINGS_ENABLE_PUSH is 0");
+            throw new Http2ProtocolException(Http2ErrorCode.ProtocolError, $"PUSH_PROMISE on stream {frame.StreamId} though SETTINGS_ENABLE_PUSH is 0")
+            {
+                GoAwayDebugData = PushDisabledDebugData,
+                InvalidFrame = frame,
+            };
         }
 
         var payload = Http2FramePayloadParser.ParsePushPromise(frame);

@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// for the hand-built client in the OpenSSL build (ADR-0151, ADR-0284): the groups, key shares
 /// and signature schemes they name replace the profile's, and the rest of the ClientHello
 /// stays the profile's. The Schannel build ignores both, whatever their value, as curl 8.22.0
-/// Schannel does (measured, BL-3305, ADR-0793). Failures come in the OpenSSL build's order (measured, BL-709): a
+/// Schannel does (measured, BL-3305, ADR-0874). Failures come in the OpenSSL build's order (measured, BL-709): a
 /// refused <c>--curves</c> value, then a refused <c>--sigalgs</c> value (both exit 59), then
 /// no group left, then no signature scheme left, then - when TLS 1.3 is offered - no key
 /// share left (all three exit 35, BL-1082). Under a TLS 1.2 ceiling the one failure is no

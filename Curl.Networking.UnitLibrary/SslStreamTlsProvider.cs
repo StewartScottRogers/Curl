@@ -25,7 +25,7 @@ namespace Curl.Networking;
 /// <see cref="TlsClientOptions.CaCertificateDirectory" />, which the OpenSSL build honours
 /// and the Schannel build ignores with <see cref="Warnings" />.
 /// </remarks>
-public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
+public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings, ISystemStoreTrustTlsProvider
 {
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
@@ -56,10 +56,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     private readonly bool _matchesSchannelBuild;
 
+    // The peers this provider has begun a handshake with: the Schannel build keeps one credential
+    // handle per peer and says so on the next handshake to it (CGR-290).
+    private readonly HashSet<string> _credentialHandlePeers = [];
+
     private readonly SslProtocols _offeredProtocols;
 
     // The highest version offered: the options' ceiling, or TLS 1.2 for the Schannel build
-    // with --ciphers (ADR-0816), whose failure text names it.
+    // with --ciphers (ADR-0896), whose failure text names it.
     private readonly TlsVersion _offeredMaximumVersion;
 
     private readonly TimeProvider _timeProvider;
@@ -197,6 +201,20 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// </summary>
     internal Func<SslStream, SslClientAuthenticationOptions, CancellationToken, Task> AuthenticateSslStreamAsClientAsync { get; init; } =
         SslStreamAuthenticateAsClientAsync;
+
+    /// <summary>
+    /// Gets the settings the provider was built with.
+    /// </summary>
+    internal TlsClientOptions Options => _options;
+
+    /// <inheritdoc />
+    public ITlsProvider WithSystemStoreOnlyTrust() =>
+        new SslStreamTlsProvider(ISystemStoreTrustTlsProvider.SystemStoreOnly(_options), _matchesSchannelBuild, _timeProvider, _certificateStore)
+        {
+            SessionPartitions = SessionPartitions,
+            CipherSuitesPolicyFactory = CipherSuitesPolicyFactory,
+            AuthenticateSslStreamAsClientAsync = AuthenticateSslStreamAsClientAsync,
+        };
 
     /// <inheritdoc />
     /// <remarks>
@@ -374,7 +392,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return clientCertificateFailure;
         }
 
-        events.ReportTlsTrust(DescribeTrust(_options, targetHost));
+        events.ReportTlsTrust(DescribeTrust(_options, targetHost) with { ReusesCredentialHandle = AcquiresCachedCredentialHandle(plaintext, targetHost, isProxy) });
         X509ChainPolicy? chainPolicy;
         X509Certificate2Collection anchorsBesideSystemStore;
         CertificateRevocationListFile? revocationLists;
@@ -400,7 +418,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             EnabledSslProtocols = _offeredProtocols,
             AllowTlsResume = SessionPartitions.MayResume(targetHost, _options),
             CertificateChainPolicy = chainPolicy,
-            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate),
+            LocalCertificateSelectionCallback = ToCertificateSelection(clientCertificate, _matchesSchannelBuild),
             CipherSuitesPolicy = cipherSuitesPolicy,
             ApplicationProtocols = ToSslApplicationProtocols(offeredApplicationProtocols),
             RemoteCertificateValidationCallback = (sender, certificate, chain, errors) =>
@@ -414,14 +432,16 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         };
 
         var transport = OpenTransport(plaintext);
+        transport.HoldsWritesAfterFirstRead = _matchesSchannelBuild;
         var sslStream = new SslStream(transport, leaveInnerStreamOpen: true);
         Exception failure;
         try
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
+            await transport.ReleaseHeldWritesAsync(cancellationToken).ConfigureAwait(false);
             peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols) with
+            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols, transport.HandshakeRecords) with
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
@@ -430,6 +450,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
                 {
+                    MatchesSchannelBuild = _matchesSchannelBuild,
                     TicketRecords = FollowTicketRecordsAfterHandshake(transport, sslStream.SslProtocol),
                     TicketEvents = events,
                 },
@@ -506,9 +527,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return [.. sent];
     }
 
-    // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089).
-    private ConnectionStream OpenTransport(IConnection plaintext) =>
-        new(plaintext) { TicketRecords = _matchesSchannelBuild ? new SessionTicketRecordDetector() : null };
+    // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089); the
+    // OpenSSL build reads the handshake records for the group and signature names (BL-4041).
+    private ConnectionStream OpenTransport(IConnection plaintext) => new(plaintext)
+    {
+        TicketRecords = _matchesSchannelBuild ? new SessionTicketRecordDetector() : null,
+        HandshakeRecords = _matchesSchannelBuild ? null : new ServerHandshakeRecordReader(),
+    };
 
     /// <summary>
     /// Keeps the transport's <see cref="SessionTicketRecordDetector" /> watching after a TLS 1.3
@@ -532,8 +557,11 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     private static TlsHandshakeEvent DescribeHandshake(
         SslStream sslStream,
         PeerVerification peerVerification,
-        IReadOnlyList<string> offeredApplicationProtocols) => new()
+        IReadOnlyList<string> offeredApplicationProtocols,
+        ServerHandshakeRecordReader? handshakeRecords) => new()
         {
+            NegotiatedGroupName = handshakeRecords?.GroupName,
+            PeerSignatureTypeName = handshakeRecords?.PeerSignatureTypeName(KeyAlgorithmOf(sslStream.RemoteCertificate)),
             ProtocolVersion = sslStream.SslProtocol,
             CipherSuite = sslStream.NegotiatedCipherSuite,
             NegotiatedApplicationProtocol = NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol),
@@ -544,6 +572,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
             PinnedPublicKeyHash = peerVerification.PinnedPublicKeyHash,
         };
+
+    /// <summary>
+    /// Gives the OID of a certificate's public key algorithm, which names the server's TLS 1.3
+    /// signature type (BL-4041).
+    /// </summary>
+    /// <param name="certificate">The server's certificate, or <see langword="null" /> when it sent none.</param>
+    /// <returns>The OID, or <see langword="null" /> when there is no certificate.</returns>
+    internal static string? KeyAlgorithmOf(X509Certificate? certificate) => certificate?.GetKeyAlgorithm();
 
     // What a handshake that failed before the certificate was judged reports: only the offer.
     private static TlsHandshakeEvent Unnegotiated(IReadOnlyList<string> offeredApplicationProtocols) => new()
@@ -699,7 +735,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         : targetHost;
 
     /// <summary>
-    /// Returns the name the handshake sends as SNI, as curl sends it (CGR-093, ADR-0825): the
+    /// Returns the name the handshake sends as SNI, as curl sends it (CGR-093, ADR-0925): the
     /// target host lowercased, without the one trailing dot a fully qualified name may carry,
     /// which RFC 6066 section 3 forbids in SNI. curl lowercases the URL host when it parses the
     /// URL, so <c>https://LOCALHOST/</c> sends <c>localhost</c>; the Host header keeps its case.
@@ -712,7 +748,23 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return lowercased.EndsWith('.') ? lowercased[..^1] : lowercased;
     }
 
-    // ADR-0011, ADR-0816: the Schannel build reads --ciphers as ALG_IDs and ignores
+    // True when the Schannel build already holds a credential handle for this peer, as curl's
+    // schannel_acquire_credential_handle finds it in its cache; the OpenSSL build has none.
+    private bool AcquiresCachedCredentialHandle(IConnection plaintext, string targetHost, bool isProxy)
+    {
+        if (!_matchesSchannelBuild)
+        {
+            return false;
+        }
+
+        var peer = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{isProxy}|{targetHost.ToLowerInvariant()}|{plaintext.RemoteEndPoint}");
+        lock (_credentialHandlePeers)
+        {
+            return !_credentialHandlePeers.Add(peer);
+        }
+    }
+
+    // ADR-0011, ADR-0896: the Schannel build reads --ciphers as ALG_IDs and ignores
     // --tls13-ciphers; the OpenSSL build offers what they name. CipherSuitesPolicy cannot be
     // constructed on Windows, where only the tests run the OpenSSL build, so there the
     // factory builds none and the build cannot apply them.
@@ -743,9 +795,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // then caches that handle as the one for "no certificate", so every later handshake
     // without --cert in the process presented it (BL-254). A callback leaves that first
     // handle anonymous, and the certificate is sent only when the server asks for one,
-    // whatever issuers it names, as curl sends --cert.
-    private static LocalCertificateSelectionCallback? ToCertificateSelection(X509Certificate2? clientCertificate) =>
-        clientCertificate is null ? null : (_, _, _, _, _) => clientCertificate;
+    // whatever issuers it names, as curl sends --cert. The OpenSSL build passes a callback
+    // even without --cert: SslStream on Linux offers post_handshake_auth only when it has a
+    // way to choose a certificate, and curl's OpenSSL build always offers it and answers a
+    // TLS 1.3 post-handshake CertificateRequest with an empty Certificate (ADR-0956, CGR-169).
+    private static LocalCertificateSelectionCallback? ToCertificateSelection(X509Certificate2? clientCertificate, bool matchesSchannelBuild) =>
+        clientCertificate is not null ? (_, _, _, _, _) => clientCertificate
+        : matchesSchannelBuild ? null
+        : (_, _, _, _, _) => null!;
 
     private string SslConnectError(Exception failure) => _matchesSchannelBuild
         ? TlsFailureMessages.SchannelSslConnectError(failure, _offeredMaximumVersion)

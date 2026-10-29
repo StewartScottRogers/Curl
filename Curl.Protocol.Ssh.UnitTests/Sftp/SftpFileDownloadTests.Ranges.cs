@@ -35,8 +35,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, Parse(range), resumeFrom);
 
-        Diagnostics.AssertResult(TransferResult.Success(expected.Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(expected.Length), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Success(expected.Length)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(expected.Length)), outcome.Result);
         Diagnostics.AssertBytes("output", Bytes(expected), outcome.Output);
         CollectionAssert.AreEqual(Bytes(expected), outcome.Output);
         Diagnostics.AssertProgress(new[] { ((long)expected.Length, (long?)expected.Length) }, outcome.Progress);
@@ -56,8 +56,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, Parse(range), resumeFrom);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.RangeError, message)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.RangeError, message)), outcome.Result);
         Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
         Diagnostics.AssertProgress([], outcome.Progress);
@@ -76,8 +76,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, null, 0);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.BadDownloadResume, message), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, message), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.BadDownloadResume, message)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.BadDownloadResume, message)), outcome.Result);
         Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
         Diagnostics.AssertProgress([], outcome.Progress);
@@ -92,8 +92,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, null, 3);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (3) was beyond file size (0)"), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (3) was beyond file size (0)"), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (3) was beyond file size (0)")), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.BadDownloadResume, "Offset (3) was beyond file size (0)")), outcome.Result);
         AssertReadsThenClose(outcome, SftpServerScript.CloseRequest(3));
     }
 
@@ -104,8 +104,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, ByteRange.Bounded(2, 5), null);
 
-        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Success(0)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(0)), outcome.Result);
         byte[][] reads = [.. Enumerable.Range(0, 14).Select(index => SftpServerScript.ReadRequest((uint)(3 + index), (ulong)(index * 30000), 30000))];
         AssertReadsThenClose(outcome, [.. reads, SftpServerScript.CloseRequest(17)]);
     }
@@ -126,8 +126,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadAsync(script, ByteRange.Bounded(First, First + Length - 1), null);
 
-        Diagnostics.AssertResult(TransferResult.Success(Length), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(Length), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Success(Length)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(Length)), outcome.Result);
         Diagnostics.AssertBytes("output", content[First..(First + Length)], outcome.Output);
         CollectionAssert.AreEqual(content[First..(First + Length)], outcome.Output);
         Assert.AreEqual((Length, (long?)Length), outcome.Progress[^1]);

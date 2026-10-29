@@ -16,6 +16,26 @@ function Select-LanesToStop {
     } | Sort-Object)
 }
 
+function Set-ForwardedArgument {
+    # The old shift's arguments (-Forward) with each parameter passed beside -Restart
+    # (-Override: name -> value, a switch as a SwitchParameter) put in place of the old one,
+    # so `-Restart -MaxLanes 12` restarts the same shift with a new lane maximum.
+    param([string[]]$Forward, [hashtable]$Override)
+    $kept = [Collections.Generic.List[string]]::new()
+    for ($i = 0; $i -lt $Forward.Count; $i++) {
+        $name = if ($Forward[$i] -match '^-(\w+)$') { $Matches[1] } else { '' }
+        if (-not $name -or -not $Override.ContainsKey($name)) { $kept.Add($Forward[$i]); continue }
+        if ($i + 1 -lt $Forward.Count -and $Forward[$i + 1] -notmatch '^-\w') { $i++ }
+    }
+    foreach ($name in $Override.Keys | Sort-Object) {
+        $value = $Override[$name]
+        if ($value -is [System.Management.Automation.SwitchParameter]) {
+            if ($value.IsPresent) { $kept.Add("-$name") }
+        } else { $kept.Add("-$name"); $kept.Add("$value") }
+    }
+    return @($kept)
+}
+
 function Add-StoppedShiftEnd {
     # -Restart kills the coordinator before it can log its own "shift end", and the process
     # audit counts any shift log without one as a live shift, so the replaced shift's
@@ -44,33 +64,49 @@ if ($TestRestart) {
     $ok4 = $endLine -match '^19:24:24 - +shift +end \(restarted' -and (Get-Content $scratch)[-1] -ceq $endLine
     Remove-Item $scratch -ErrorAction SilentlyContinue
     Write-Host "$(if ($ok4) { 'PASS' } else { 'FAIL' }) a restart ends the replaced shift's log with a shift end line: $endLine" -ForegroundColor $(if ($ok4) { 'Green' } else { 'Red' })
-    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4) { 0 } else { 1 })
+    $sleeper = if (Test-FactoryOnWindows) { Start-Process -FilePath 'powershell' -ArgumentList '-NoProfile', '-Command', 'Start-Sleep 60' -PassThru -WindowStyle Hidden } else { Start-Process -FilePath 'sleep' -ArgumentList '60' -PassThru }
+    Stop-FactoryProcessTree $sleeper.Id
+    $ok5 = $sleeper.WaitForExit(10000)
+    if (-not $ok5) { $sleeper.Kill() }
+    Write-Host "$(if ($ok5) { 'PASS' } else { 'FAIL' }) -Restart stops a process and its tree on this OS: $ok5" -ForegroundColor $(if ($ok5) { 'Green' } else { 'Red' })
+    $old = @('-NewTab', '-Lanes', 'Auto', '-MaxLanes', '9', '-Continuous', '-Model', 'auto')
+    $set = (Set-ForwardedArgument $old @{ MaxLanes = 12; WeeklyPace = [switch]$true }) -join ' '
+    $ok6 = $set -ceq '-NewTab -Lanes Auto -Continuous -Model auto -MaxLanes 12 -WeeklyPace'
+    Write-Host "$(if ($ok6) { 'PASS' } else { 'FAIL' }) a parameter passed beside -Restart replaces the old shift's: $set" -ForegroundColor $(if ($ok6) { 'Green' } else { 'Red' })
+    $same = (Set-ForwardedArgument $old @{}) -join ' '
+    $ok7 = $same -ceq ($old -join ' ')
+    Write-Host "$(if ($ok7) { 'PASS' } else { 'FAIL' }) with nothing beside -Restart the old arguments carry over unchanged: $same" -ForegroundColor $(if ($ok7) { 'Green' } else { 'Red' })
+    exit $(if ($ok -and $ok2 -and $ok3 -and $ok4 -and $ok5 -and $ok6 -and $ok7) { 0 } else { 1 })
 }
 
 if ($Restart) {
     # This checkout's coordinator only: another repository's factory runs its own copy.
     $mine = [regex]::Escape($FactoryScript)
-    $coordinator = Get-CimInstance Win32_Process | Where-Object {
+    $coordinator = Get-FactoryProcessTable | Where-Object {
         $_.ProcessId -ne $PID -and $_.CommandLine -match "-File\s+`"?$mine`"?(\s|$)" -and
         $_.CommandLine -notmatch '\s-Lane\s' -and $_.CommandLine -notmatch '\s-(Restart|NewTab)\b'
-    } | Sort-Object CreationDate -Descending | Select-Object -First 1
+    } | Sort-Object CreationDate, ProcessId -Descending | Select-Object -First 1
     # The newest: an ended shift's coordinator can still be running its shift-end review
     # beside the next shift (ADR-0710), and it is not the shift to restart.
     if (-not $coordinator) { Write-Host 'No dark factory shift is running in this checkout.'; exit 1 }
     # The same arguments, so a fixed lane count, -WeeklyPace or -Hours carry over.
     $rest = ($coordinator.CommandLine -split [regex]::Escape((Split-Path $FactoryScript -Leaf)), 2)[1]
     $forward = @([regex]::Matches("$rest".Trim().TrimStart('"').Trim(), '"[^"]*"|\S+') | ForEach-Object { $_.Value })
+    # Anything passed beside -Restart (e.g. -MaxLanes 12) replaces the old shift's value.
+    $override = @{}
+    foreach ($name in $FactoryParameters.Keys | Where-Object { $_ -notin 'Restart', 'NewTab' }) { $override[$name] = $FactoryParameters[$name] }
+    $forward = Set-ForwardedArgument $forward $override
     $branchNow = "$(git -C $Root rev-parse --abbrev-ref HEAD)".Trim()
     if ($forward -notcontains '-ShiftBranch' -and $branchNow -notin 'master', 'main', 'HEAD') { $forward += @('-ShiftBranch', $branchNow) }
     $lanesDir = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
     $stamp = if ($lanesDir) { $lanesDir.Name.Substring(6) } else { '' }
     Write-Host "Stopping the shift's coordinator (pid $($coordinator.ProcessId)) first, so it restarts no lane."
-    taskkill /PID $coordinator.ProcessId /T /F 2>&1 | Out-Null
+    Stop-FactoryProcessTree $coordinator.ProcessId
     while ($stamp) {
         $phases = @{}
         foreach ($n in 1..16) {
             $lanePid = Get-LaneState $n 'pid' $stamp
-            if (-not $lanePid -or -not (Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue | Where-Object ProcessName -eq 'powershell')) { continue }
+            if (-not $lanePid -or -not (Get-Process -Id ([int]$lanePid) -ErrorAction SilentlyContinue | Where-Object ProcessName -in 'powershell', 'pwsh')) { continue }
             $beat = Get-LaneStatePath $n 'heartbeat.json' $stamp
             $phases[$n] = if (Test-Path $beat) { "$((Get-Content $beat -Raw | ConvertFrom-Json).phase)" } else { '' }
         }
@@ -81,7 +117,7 @@ if ($Restart) {
             if (Test-Path $taskFile) { $ages[$n] = ((Get-Date) - (Get-Item $taskFile).LastWriteTime).TotalSeconds }
         }
         foreach ($n in Select-LanesToStop $phases $ages) {
-            taskkill /PID ([int](Get-LaneState $n 'pid' $stamp)) /T /F 2>&1 | Out-Null
+            Stop-FactoryProcessTree ([int](Get-LaneState $n 'pid' $stamp))
             Write-Host "$(Get-Date -Format 'HH:mm:ss') lane $n stopped ($(if ($phases[$n]) { $phases[$n] } else { 'no heartbeat' }); $(Get-LaneState $n 'task' $stamp))"
         }
         $waiting = @($phases.Keys | Where-Object { $phases[$_] -in 'claim', 'integrate' -or ($phases[$_] -eq 'run' -and $ages.ContainsKey($_) -and $ages[$_] -lt 120) })

@@ -35,8 +35,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadWithTextAsync(script, text);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.RangeError, message)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.RangeError, message)), outcome.Result);
         Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
         Diagnostics.AssertProgress([], outcome.Progress);
@@ -66,15 +66,15 @@ public sealed partial class SftpFileDownloadTests
     }
 
     [TestMethod]
-    public void Choose_RangeAndRangeText_ReadsTheRange()
+    public void Choose_RangeAndRangeText_ReadsTheText()
     {
-        Diagnostics.Arrange("range, range text, file size", "2-3, \"5-2\", 10");
+        Diagnostics.Arrange("range, range text, file size", "2-3, \"4-5\", 10");
 
-        SftpDownloadPart part = SftpDownloadPart.Choose(ByteRange.Bounded(2, 3), null, 10, "5-2");
+        SftpDownloadPart part = SftpDownloadPart.Choose(ByteRange.Bounded(2, 3), null, 10, "4-5");
 
         Diagnostics.Act("part", part);
-        Diagnostics.Assert("part", new SftpDownloadPart(2, 2), part);
-        Assert.AreEqual(new SftpDownloadPart(2, 2), part);
+        Diagnostics.Assert("part", new SftpDownloadPart(4, 2), part);
+        Assert.AreEqual(new SftpDownloadPart(4, 2), part);
     }
 
     [TestMethod]
@@ -84,8 +84,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadWithTextAsync(script, "5-2");
 
-        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Success(0)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(0)), outcome.Result);
         byte[][] reads = [.. Enumerable.Range(0, 14).Select(index => SftpServerScript.ReadRequest((uint)(3 + index), (ulong)(index * 30000), 30000))];
         AssertReadsThenClose(outcome, [.. reads, SftpServerScript.CloseRequest(17)]);
     }

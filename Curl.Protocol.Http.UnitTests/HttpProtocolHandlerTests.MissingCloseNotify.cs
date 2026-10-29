@@ -16,7 +16,7 @@ public sealed partial class HttpProtocolHandlerTests
     private const string SchannelMissingCloseNotify = "schannel: server closed abruptly (missing close_notify)";
 
     private const string OpenSslMissingCloseNotify =
-        "OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0";
+        "OpenSSL SSL_read: OpenSSL/3.5.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0";
 
     [TestMethod]
     [DataRow("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello", SchannelMissingCloseNotify, DisplayName = "Read until close, Schannel")]

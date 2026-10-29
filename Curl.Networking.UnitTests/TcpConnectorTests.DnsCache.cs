@@ -167,7 +167,7 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_WithAResolveEntry_ReportsItAddedAndFoundInDnsCacheOnEveryTransferIncludingTheFirst()
     {
         // curl -s -v --resolve foo.example:47181:127.0.0.1 http://foo.example:47181/a http://foo.example:47181/b
-        // -> * Added foo.example:47181:127.0.0.1 to DNS cache, then * Hostname foo.example was found in
+        // -> * [DNS] added foo.example:47181:127.0.0.1 to cache, then * Hostname foo.example was found in
         // DNS cache and the resolved lines before each transfer's Trying; the second transfer first
         // reports * RESOLVE foo.example:47181 - old addresses discarded (measured 2026-09-27, BL-482).
         var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1");
@@ -180,7 +180,7 @@ public sealed partial class TcpConnectorTests
 
         string[] resolved =
         [
-            "Added foo.example:47181:127.0.0.1 to DNS cache",
+            "[DNS] added foo.example:47181:127.0.0.1 to cache",
             "Hostname foo.example was found in DNS cache",
             "Host foo.example:47181 was resolved.",
             "IPv6: (none)",
@@ -206,8 +206,8 @@ public sealed partial class TcpConnectorTests
         await ConnectLoggedAsync(connector, target with { Events = new RecordingTransferEvents() });
         await ConnectLoggedAsync(connector, target);
 
-        Diagnostics.Assert("events.Info.Count(line => line.StartsWith('Added ', StringComparison.Ordinal))", 1, events.Info.Count(line => line.StartsWith("Added ", StringComparison.Ordinal)));
-        Assert.AreEqual(1, events.Info.Count(line => line.StartsWith("Added ", StringComparison.Ordinal)));
+        Diagnostics.Assert("events.Info.Count(line => line.StartsWith('[DNS] added ', StringComparison.Ordinal))", 1, events.Info.Count(line => line.StartsWith("[DNS] added ", StringComparison.Ordinal)));
+        Assert.AreEqual(1, events.Info.Count(line => line.StartsWith("[DNS] added ", StringComparison.Ordinal)));
         Assert.AreEqual(2, events.Info.Count(line => line == "Hostname foo.example was found in DNS cache"));
     }
 
@@ -221,7 +221,7 @@ public sealed partial class TcpConnectorTests
         connector.LoadResolveEntries(transferStart);
         await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = connect });
 
-        CollectionAssert.AreEqual(new[] { "Added foo.example:47181:127.0.0.1 to DNS cache" }, transferStart.Info);
+        CollectionAssert.AreEqual(new[] { "[DNS] added foo.example:47181:127.0.0.1 to cache" }, transferStart.Info);
         Diagnostics.Assert("connect.Info[0]", "Hostname foo.example was found in DNS cache", connect.Info[0]);
         Assert.AreEqual("Hostname foo.example was found in DNS cache", connect.Info[0]);
     }
@@ -243,17 +243,17 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_WithSeveralAddressesInAResolveEntry_NamesThemVerbatimAndListsEachFamilyInOrder()
     {
         // curl -s -v --resolve foo.example:47181:127.0.0.1,127.0.0.2,[::1] http://foo.example:47181/a ->
-        // * Added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to DNS cache ... * IPv6: ::1 / * IPv4: 127.0.0.1, 127.0.0.2
+        // * [DNS] added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to cache ... * IPv6: ::1 / * IPv4: 127.0.0.1, 127.0.0.2
         var connector = CreateConnectorWithResolveEntries("foo.example:47181:127.0.0.1,127.0.0.2,[::1]");
         var events = new RecordingTransferEvents();
 
         await ConnectLoggedAsync(connector, new ConnectTarget("foo.example", 47181, UseTls: false) { Events = events });
 
-        Diagnostics.Assert("events.Info.Take(5).ToArray()", string.Join(" | ", new[] { "Added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to DNS cache", "Hostname foo.example was found in DNS cache", "Host foo.example:47181 was resolved.", "IPv6: ::1", "IPv4: 127.0.0.1, 127.0.0.2", }), string.Join(" | ", events.Info.Take(5).ToArray()));
+        Diagnostics.Assert("events.Info.Take(5).ToArray()", string.Join(" | ", new[] { "[DNS] added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to cache", "Hostname foo.example was found in DNS cache", "Host foo.example:47181 was resolved.", "IPv6: ::1", "IPv4: 127.0.0.1, 127.0.0.2", }), string.Join(" | ", events.Info.Take(5).ToArray()));
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to DNS cache",
+                "[DNS] added foo.example:47181:127.0.0.1,127.0.0.2,[::1] to cache",
                 "Hostname foo.example was found in DNS cache",
                 "Host foo.example:47181 was resolved.",
                 "IPv6: ::1",
@@ -266,18 +266,18 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_WithAWildcardResolveEntry_ReportsItNonPermanentAndTheWildcardAsTheResolvedHost()
     {
         // curl -s -v --resolve +*:47181:127.0.0.1 http://127.0.0.1:47181/b ->
-        // * Added *:47181:127.0.0.1 to DNS cache (non-permanent) / * RESOLVE *:47181 using wildcard /
+        // * [DNS] added *:47181:127.0.0.1 to cache (non-permanent) / * RESOLVE *:47181 using wildcard /
         // * Hostname 127.0.0.1 was found in DNS cache / * Host *:47181 was resolved. (measured)
         var connector = CreateConnectorWithResolveEntries("+*:47181:127.0.0.1");
         var events = new RecordingTransferEvents();
 
         await ConnectLoggedAsync(connector, new ConnectTarget("127.0.0.1", 47181, UseTls: false) { Events = events });
 
-        Diagnostics.Assert("events.Info", string.Join(" | ", new[] { "Added *:47181:127.0.0.1 to DNS cache (non-permanent)", "RESOLVE *:47181 using wildcard", "Hostname 127.0.0.1 was found in DNS cache", "Host *:47181 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", TryingLoopback, }), string.Join(" | ", events.Info));
+        Diagnostics.Assert("events.Info", string.Join(" | ", new[] { "[DNS] added *:47181:127.0.0.1 to cache (non-permanent)", "RESOLVE *:47181 using wildcard", "Hostname 127.0.0.1 was found in DNS cache", "Host *:47181 was resolved.", "IPv6: (none)", "IPv4: 127.0.0.1", TryingLoopback, }), string.Join(" | ", events.Info));
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added *:47181:127.0.0.1 to DNS cache (non-permanent)",
+                "[DNS] added *:47181:127.0.0.1 to cache (non-permanent)",
                 "RESOLVE *:47181 using wildcard",
                 "Hostname 127.0.0.1 was found in DNS cache",
                 "Host *:47181 was resolved.",
@@ -302,16 +302,16 @@ public sealed partial class TcpConnectorTests
         connector.LoadResolveEntries(second);
         await ConnectLoggedAsync(connector, new ConnectTarget("Bar.Example", 47181, UseTls: false) { Events = second });
 
-        Diagnostics.Assert("first.Info", string.Join(" | ", new[] { "Added FOO.example:47181:127.0.0.1 to DNS cache", "Added bar.example:47181:127.0.0.1 to DNS cache", TryingLoopback }), string.Join(" | ", first.Info));
+        Diagnostics.Assert("first.Info", string.Join(" | ", new[] { "[DNS] added FOO.example:47181:127.0.0.1 to cache", "[DNS] added bar.example:47181:127.0.0.1 to cache", TryingLoopback }), string.Join(" | ", first.Info));
         CollectionAssert.AreEqual(
-            new[] { "Added FOO.example:47181:127.0.0.1 to DNS cache", "Added bar.example:47181:127.0.0.1 to DNS cache", TryingLoopback },
+            new[] { "[DNS] added FOO.example:47181:127.0.0.1 to cache", "[DNS] added bar.example:47181:127.0.0.1 to cache", TryingLoopback },
             first.Info);
         CollectionAssert.AreEqual(
             new[]
             {
-                "Added FOO.example:47181:127.0.0.1 to DNS cache",
+                "[DNS] added FOO.example:47181:127.0.0.1 to cache",
                 "RESOLVE bar.example:47181 - old addresses discarded",
-                "Added bar.example:47181:127.0.0.1 to DNS cache",
+                "[DNS] added bar.example:47181:127.0.0.1 to cache",
                 "Hostname Bar.Example was found in DNS cache",
                 "Host bar.example:47181 was resolved.",
                 "IPv6: (none)",
@@ -325,7 +325,7 @@ public sealed partial class TcpConnectorTests
     public async Task ConnectAsync_WithAResolveEntryThatDoesNotParse_ReportsTheEntriesBeforeItAddedAndFailsWithExit49()
     {
         // curl -s -v --resolve Foo.Example:47181:127.0.0.1 --resolve bad http://127.0.0.1:47181/a ->
-        // * Added Foo.Example:47181:127.0.0.1 to DNS cache, then exit 49 (measured).
+        // * [DNS] added Foo.Example:47181:127.0.0.1 to cache, then exit 49 (measured).
         var connector = CreateConnectorWithResolveEntries("Foo.Example:47181:127.0.0.1", "bad");
         var events = new RecordingTransferEvents();
 
@@ -333,7 +333,7 @@ public sealed partial class TcpConnectorTests
 
         Diagnostics.Assert("result.ExitCode", CurlExitCode.SetoptOptionSyntax, result.ExitCode);
         Assert.AreEqual(CurlExitCode.SetoptOptionSyntax, result.ExitCode);
-        CollectionAssert.AreEqual(new[] { "Added Foo.Example:47181:127.0.0.1 to DNS cache" }, events.Info);
+        CollectionAssert.AreEqual(new[] { "[DNS] added Foo.Example:47181:127.0.0.1 to cache" }, events.Info);
     }
 
     private static TcpConnector CreateConnectorWithResolveEntries(params string[] entries) =>
