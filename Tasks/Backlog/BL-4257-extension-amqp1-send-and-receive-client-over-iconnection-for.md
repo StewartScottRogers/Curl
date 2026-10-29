@@ -4,7 +4,7 @@ title: Extension Amqp1: send and receive client over IConnection for amqp1 and a
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4255, BL-4256]
+depends-on: [BL-4258, BL-4256]
 touches: [Curl.Extension.Amqp1.UnitLibrary/Client, Curl.Extension.Amqp1.UnitTests/Client, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ An `IProtocolHandler` in `Curl.Extension.Amqp1.UnitLibrary` serves `amqp1://host
 
 ## Context
 
-Split from BL-4118 (AMQP 1.0, extension 17 of 63) for size by its first pass. Builds on BL-4255 (`Types/`) and BL-4256 (`Frames/`). Specification: OASIS AMQP Version 1.0. Scheme names `amqp1`/`amqp1s` because BL-4117's AMQP 0-9-1 extension (extension 16) owns `amqp://`/`amqps://`; BL-4118's ADR records that. Put the code in `Client/`. Never reference a `Curl.Protocol.*` library other than Abstractions, or another extension. Do not register the handler in any catalogue here: BL-4118 does that.
+Split from BL-4118 (AMQP 1.0, extension 17 of 63) for size by its first pass. Builds on BL-4258 (`Types/`) and BL-4256 (`Frames/`). Specification: OASIS AMQP Version 1.0. Scheme names `amqp1`/`amqp1s` because BL-4117's AMQP 0-9-1 extension (extension 16) owns `amqp://`/`amqps://`; BL-4118's ADR records that. Put the code in `Client/`. Never reference a `Curl.Protocol.*` library other than Abstractions, or another extension. Do not register the handler in any catalogue here: BL-4118 does that.
 
 ## Acceptance criteria
 

@@ -4,7 +4,7 @@ title: Extension Amqp1: AMQP 1.0 frames, performatives, SASL frames and message 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4255]
+depends-on: [BL-4258]
 touches: [Curl.Extension.Amqp1.UnitLibrary/Frames, Curl.Extension.Amqp1.UnitTests/Frames]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4118 (AMQP 1.0, extension 17 of 63) for size by its first pass. Builds on BL-4255's type system (`Types/`). Specification: OASIS AMQP Version 1.0, Part 2 "Transport", Part 3 "Messaging" and Part 5 "Security". Put the code in `Frames/` (and its tests in `Frames/`), so BL-4257 (`Client/`) works in a disjoint folder. Never reference a `Curl.Protocol.*` library or another extension. Do not register anything here: BL-4118 does that.
+Split from BL-4118 (AMQP 1.0, extension 17 of 63) for size by its first pass. Builds on BL-4258's type system (`Types/`). Specification: OASIS AMQP Version 1.0, Part 2 "Transport", Part 3 "Messaging" and Part 5 "Security". Put the code in `Frames/` (and its tests in `Frames/`), so BL-4257 (`Client/`) works in a disjoint folder. Never reference a `Curl.Protocol.*` library or another extension. Do not register anything here: BL-4118 does that.
 
 ## Acceptance criteria
 

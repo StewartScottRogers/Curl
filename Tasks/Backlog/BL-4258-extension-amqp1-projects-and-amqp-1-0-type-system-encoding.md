@@ -1,5 +1,5 @@
 ---
-id: BL-4255
+id: BL-4258
 title: Extension Amqp1: projects and AMQP 1.0 type system encoding
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4255 — Extension Amqp1: projects and AMQP 1.0 type system encoding
+# BL-4258 — Extension Amqp1: projects and AMQP 1.0 type system encoding
 
 ## Goal
 
