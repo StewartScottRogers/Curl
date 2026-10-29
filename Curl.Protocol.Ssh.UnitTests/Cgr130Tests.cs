@@ -83,6 +83,23 @@ public sealed class Cgr130Tests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_AFailedTransferOnAReusedConnection_SendsOneDisconnect()
+    {
+        InMemorySshServer server = NewServer();
+        KeepingConnector cache = new(server);
+
+        await RunAsync(cache, "sftp://files.example/data/hello.txt", Password);
+        (TransferResult second, _) = await RunAsync(cache, "sftp://files.example/data/missing.txt", Password);
+        await cache.CloseAsync();
+        await server.WhenSessionsEndAsync();
+
+        Assert.IsFalse(second.IsSuccess);
+        Assert.HasCount(1, server.Targets);
+        Assert.AreEqual(1, server.Events.Count(line => line.StartsWith("disconnect", StringComparison.Ordinal)));
+        Assert.AreEqual(0, cache.WritesWhileClosing);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_AReusedConnectionWithNoSshSession_IsClosedAndAnotherOpened()
     {
         InMemorySshServer server = NewServer();
@@ -169,6 +186,11 @@ public sealed class Cgr130Tests
     {
         private KeptConnection? idle;
 
+        // What the client wrote while a connection's session was shut down at its close. The
+        // in-memory server stops reading at the first DISCONNECT, so a second one shows only
+        // here (BL-4059).
+        public int WritesWhileClosing { get; set; }
+
         public bool HandsOutAnEmptyReusedConnectionFirst { get; set; }
 
         public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -216,7 +238,17 @@ public sealed class Cgr130Tests
 
         public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) => inner.ReadAsync(buffer, cancellationToken);
 
-        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken) => inner.WriteAsync(buffer, cancellationToken);
+        private bool isClosing;
+
+        public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        {
+            if (isClosing)
+            {
+                cache.WritesWhileClosing++;
+            }
+
+            return inner.WriteAsync(buffer, cancellationToken);
+        }
 
         public ValueTask FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
 
@@ -243,7 +275,9 @@ public sealed class Cgr130Tests
         {
             if (Session is { } session)
             {
+                isClosing = true;
                 await session.ShutDownAsync(CancellationToken.None);
+                isClosing = false;
             }
 
             await inner.DisposeAsync();
