@@ -211,8 +211,8 @@ internal sealed partial class ManagedMultiTransfer
 
     /// <summary>
     /// Whether an action on <paramref name="socket" /> wakes <paramref name="wait" />: an action on its own socket,
-    /// or a timeout action while it has no operating system socket (an in-memory connection), which the timer's
-    /// <see cref="RunningTransferCheckInterval" /> brings the application back for.
+    /// or a timeout action while it has no operating system socket (an in-memory connection), which the timer's 0
+    /// brings the application back for (ADR-0998).
     /// </summary>
     private static bool IsActionFor(TransferSocketWait wait, CurlSocket socket) =>
         wait.Socket is { } handle ? new CurlSocket(handle) == socket : socket == CurlMultiSockets.Timeout;

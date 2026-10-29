@@ -34,7 +34,7 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreEqual((CurlMultiCode.Ok, 0), finished);
         Assert.AreEqual(1, transfer.PerformCount);
         CollectionAssert.AreEqual(
-            new[] { "timer 0", "timer 10", "timer 10", "timer -1" },
+            new[] { "timer 0", "timer 0", "timer 0", "timer -1" },
             calls);
         Assert.IsTrue(multi.TryReadInfo(out CurlMultiMessage? message, out _));
         Assert.AreEqual(new CurlMultiMessage(CurlMultiMessageType.Done, transfer, CurlCode.Ok), message);
@@ -52,7 +52,7 @@ public sealed partial class ManagedMultiTransferTests
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         CollectionAssert.AreEqual(
-            new[] { "timer 0", "timer 0", "timer 10" },
+            new[] { "timer 0", "timer 0", "timer 0" },
             calls);
     }
 
@@ -69,7 +69,7 @@ public sealed partial class ManagedMultiTransferTests
         await multi.SocketActionAsync(WrappedSocket, CurlSocketSelect.In, CancellationToken.None);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
-        CollectionAssert.AreEqual(new[] { "timer 10" }, calls);
+        CollectionAssert.AreEqual(new[] { "timer 0" }, calls);
     }
 
     [TestMethod]
@@ -91,7 +91,7 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task SocketActionAsync_TransferTimeoutSoonerThanTheCheckInterval_IsTheTimer()
+    public async Task SocketActionAsync_RunningTransferWithATimeoutAndNoSocket_MakesTheTimerZero()
     {
         List<string> calls = [];
         await using ManagedMultiTransfer multi = NewMulti(new TimerManualTimeProvider());
@@ -100,7 +100,7 @@ public sealed partial class ManagedMultiTransferTests
 
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
-        Assert.AreEqual("timer 4", calls[^1]);
+        Assert.AreEqual("timer 0", calls[^1]);
     }
 
     [TestMethod]
