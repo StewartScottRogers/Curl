@@ -250,18 +250,37 @@ internal static class TlsFailureMessages
 
     /// <summary>
     /// The Schannel build's message for exit 35 when the hand-built client's handshake fails
-    /// for a reason other than verification (ADR-0140, "Failures and text"): the server
-    /// closing, or any range of only TLS 1.0 and 1.1 (as <see cref="SchannelSslConnectError(Exception, bool)" />
-    /// reports it), is <c>failed to receive handshake</c>; an alert either side sent is the
-    /// line Schannel's curl prints for a fatal alert.
+    /// for a reason other than verification (ADR-0140, "Failures and text"; ADR-0984): the
+    /// server closing, or an alert the client sent under a ceiling of TLS 1.0 or 1.1, is
+    /// <c>failed to receive handshake</c>; an alert received under that ceiling is
+    /// <c>SEC_E_ILLEGAL_MESSAGE</c>'s line when the range offered both TLS 1.0 and TLS 1.1
+    /// and <c>SEC_E_UNSUPPORTED_FUNCTION</c>'s when it offered one of them (measured against
+    /// curl 8.22.0 and <c>openssl s_server</c>); any other alert is the line Schannel's curl
+    /// prints for a fatal alert.
     /// </summary>
     /// <param name="failure">Why the hand-built handshake failed.</param>
-    /// <param name="offersOnlyVersionsBelowTls12"><see langword="true" /> when the ceiling was TLS 1.0 or TLS 1.1.</param>
+    /// <param name="minimumVersion">The lowest version the range offered (<c>--tlsv1.x</c>).</param>
+    /// <param name="maximumVersion">The highest version the range offered (<c>--tls-max</c>).</param>
     /// <returns>The message curl prints.</returns>
-    public static string SchannelHandBuiltHandshakeFailure(TlsHandshakeFailure failure, bool offersOnlyVersionsBelowTls12) =>
-        failure.Origin == TlsHandshakeFailureOrigin.TransportClosed || offersOnlyVersionsBelowTls12
-            ? SchannelHandshakeNotReceived
+    public static string SchannelHandBuiltHandshakeFailure(TlsHandshakeFailure failure, TlsVersion minimumVersion, TlsVersion maximumVersion)
+    {
+        if (failure.Origin == TlsHandshakeFailureOrigin.TransportClosed)
+        {
+            return SchannelHandshakeNotReceived;
+        }
+
+        return maximumVersion is TlsVersion.Tls10 or TlsVersion.Tls11
+            ? SchannelAlertBelowTls12(failure.Origin, minimumVersion, maximumVersion)
             : SchannelFatalAlertReceived;
+    }
+
+    // An alert under a TLS 1.0 or 1.1 ceiling (ADR-0984): the client's own keeps BL-502's line,
+    // a received one is SEC_E_ILLEGAL_MESSAGE for TLS 1.0 to 1.1 and SEC_E_UNSUPPORTED_FUNCTION
+    // for any other range.
+    private static string SchannelAlertBelowTls12(TlsHandshakeFailureOrigin origin, TlsVersion minimumVersion, TlsVersion maximumVersion) =>
+        origin == TlsHandshakeFailureOrigin.AlertSent ? SchannelHandshakeNotReceived
+        : minimumVersion == TlsVersion.Tls10 && maximumVersion == TlsVersion.Tls11 ? SchannelFatalAlertReceived
+        : SchannelUnsupportedFunction;
 
     /// <summary>
     /// The message for exit 101 when the server did not accept the hand-built client's ECH

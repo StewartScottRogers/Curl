@@ -807,7 +807,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     // The Schannel build ignores --sigalgs and --curves (ADR-0874), so its failed handshake
     // prints Schannel's text whether or not either is given.
     private string HandshakeFailureMessage(TlsHandshakeFailure failure) =>
-        _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, OffersOnlyVersionsBelowTls12)
+        _matchesSchannelBuild ? TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, _options.MinimumVersion, _options.MaximumVersion)
         : TlsFailureMessages.OpenSslHandBuiltHandshakeFailure(failure);
 
     // What a handshake was prepared with: the ClientHello's settings, the --cert certificate

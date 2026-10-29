@@ -14,26 +14,39 @@ public sealed partial class TlsFailureMessagesTests
     private const string SchannelFatalAlertReceived =
         "schannel: next InitializeSecurityContext failed: SEC_E_ILLEGAL_MESSAGE (0x80090326) - This error usually occurs when a fatal SSL/TLS alert is received (e.g. handshake failed). More detail may be available in the Windows System event log.";
 
+    private const string SchannelUnsupportedFunction =
+        "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported";
+
+    // Measured with curl 8.22.0 Schannel against openssl s_server's protocol_version alert (ADR-0984).
     [TestMethod]
-    [DataRow(TlsHandshakeFailureOrigin.TransportClosed, false, SchannelHandshakeNotReceived)]
-    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, true, SchannelHandshakeNotReceived)]
-    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, false, SchannelFatalAlertReceived)]
-    [DataRow(TlsHandshakeFailureOrigin.AlertSent, false, SchannelFatalAlertReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.TransportClosed, TlsVersion.SystemDefault, TlsVersion.SystemDefault, SchannelHandshakeNotReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.TransportClosed, TlsVersion.SystemDefault, TlsVersion.Tls10, SchannelHandshakeNotReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.TransportClosed, TlsVersion.Tls10, TlsVersion.Tls11, SchannelHandshakeNotReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.SystemDefault, TlsVersion.Tls10, SchannelUnsupportedFunction)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.SystemDefault, TlsVersion.Tls11, SchannelUnsupportedFunction)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls10, TlsVersion.Tls10, SchannelUnsupportedFunction)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls11, TlsVersion.Tls11, SchannelUnsupportedFunction)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls10, TlsVersion.Tls11, SchannelFatalAlertReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertSent, TlsVersion.SystemDefault, TlsVersion.Tls10, SchannelHandshakeNotReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.SystemDefault, TlsVersion.SystemDefault, SchannelFatalAlertReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertReceived, TlsVersion.Tls10, TlsVersion.Tls12, SchannelFatalAlertReceived)]
+    [DataRow(TlsHandshakeFailureOrigin.AlertSent, TlsVersion.SystemDefault, TlsVersion.Tls13, SchannelFatalAlertReceived)]
     public void SchannelHandBuiltHandshakeFailure_IsTheLineSchannelsCurlPrints(
         TlsHandshakeFailureOrigin origin,
-        bool offersOnlyVersionsBelowTls12,
+        TlsVersion minimumVersion,
+        TlsVersion maximumVersion,
         string expected)
     {
-        var failure = new TlsHandshakeFailure(TlsAlertDescription.HandshakeFailure, null) { Origin = origin };
+        var failure = new TlsHandshakeFailure(TlsAlertDescription.ProtocolVersion, null) { Origin = origin };
 
-        Diagnostics.Arrange("origin, offersOnlyVersionsBelowTls12", $"{origin}, {offersOnlyVersionsBelowTls12}");
+        Diagnostics.Arrange("origin, minimumVersion, maximumVersion", $"{origin}, {minimumVersion}, {maximumVersion}");
 
-        var message = TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, offersOnlyVersionsBelowTls12);
+        var message = TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, minimumVersion, maximumVersion);
 
         Diagnostics.Act("message", message);
         Diagnostics.Assert("message", expected, message);
 
-        Assert.AreEqual(expected, TlsFailureMessages.SchannelHandBuiltHandshakeFailure(failure, offersOnlyVersionsBelowTls12));
+        Assert.AreEqual(expected, message);
     }
 
     [TestMethod]
