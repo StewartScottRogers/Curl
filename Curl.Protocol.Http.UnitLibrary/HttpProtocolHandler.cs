@@ -1799,6 +1799,7 @@ public sealed class HttpProtocolHandler(
             plan.Context.DiagnosticLog,
             TracesStreamsOf(streams) ? plan.Context.Events : null);
         (stream as Http2StreamConnection)?.PushSink = Http2PushSink;
+        (stream as Http2StreamConnection)?.ReceiveBytesPerSecond = plan.Options.ReceiveBytesPerSecond;
         return stream;
     }
 

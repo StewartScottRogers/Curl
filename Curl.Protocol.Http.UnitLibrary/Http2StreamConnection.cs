@@ -106,6 +106,12 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     internal IHttp2PushSink? PushSink { get; set; }
 
     /// <summary>
+    /// Gets or sets the rate (<c>--limit-rate</c>) the transfer receives at, or <see langword="null" /> for none: it
+    /// shrinks the receive window the stream is grown to (CGR-281, <see cref="Http2Session.StreamReceiveWindowSizeFor" />).
+    /// </summary>
+    internal long? ReceiveBytesPerSecond { get; set; }
+
+    /// <summary>
     /// Makes this the stream a server's PUSH_PROMISE reserved: it sends nothing, as the client's
     /// side of a promised stream is closed, and reads the pushed response from it.
     /// </summary>
@@ -337,7 +343,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         }
 
         isReceiveWindowGrown = true;
-        await session.GrowStreamReceiveWindowAsync(streamId, cancellationToken).ConfigureAwait(false);
+        await session.GrowStreamReceiveWindowAsync(streamId, ReceiveBytesPerSecond, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
