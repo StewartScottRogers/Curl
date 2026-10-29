@@ -35,5 +35,6 @@ internal static class ExtensionOptionCatalogue
         OAuth2.Options.OAuth2Options.AuthorizeUrl,
         OAuth2.Options.OAuth2Options.RedirectPort,
         OAuth2.Options.OAuth2Options.TokenCache,
+        Curl.Extension.WebSocketRepl.WebSocketReplExtension.Option,
     ];
 }

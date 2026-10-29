@@ -28,5 +28,6 @@ internal static class ExtensionDescriptionCatalogue
         OAuth2.Options.OAuth2Options.Description,
         Kafka.Client.KafkaExtension.Description,
         Redis.Client.RedisExtension.Description,
+        Curl.Extension.WebSocketRepl.WebSocketReplExtension.Description,
     ];
 }

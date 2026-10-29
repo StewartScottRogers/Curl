@@ -22,5 +22,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.HookFor,
         Curl.Extension.HttpCache.HttpCacheExtension.HookFor,
         OAuth2.Options.OAuth2Options.ActivatedBy,
+        Curl.Extension.WebSocketRepl.WebSocketReplExtension.HookFor,
     ];
 }
