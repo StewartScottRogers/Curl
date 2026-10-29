@@ -30,3 +30,4 @@ Seen by BL-4010's run on 2026-10-28 (Windows, nine lanes building): both failed 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: cb8ac472 3d836d5e.
