@@ -43,7 +43,8 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
   write by hand, filed as BL-4277.
 - Metadata and leader routing: superseded by ADR-1080 (BL-4275), which asks the URL's broker for Metadata v4 first
   and sends Produce or Fetch to the partition's leader.
-- SASL authentication (`--user`): filed as BL-4276, after BL-4275 since both change the connection flow.
+- SASL authentication (`--user`): superseded by ADR-1081 (BL-4276), which authenticates every connection with SASL
+  PLAIN before its first request.
 - Keys, headers, transactions, idempotent producing, consumer groups and offset commits: no curl option maps onto
   them without inventing new options. A later task can add options for them through the extension option catalogue.
 - Read committed isolation: it needs the aborted transactions list applied to the batches; read uncommitted is
