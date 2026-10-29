@@ -16,5 +16,6 @@ public static class ExtensionConnectionHookCatalogue
     /// <summary>Gets the activators; at most one may activate for an option group.</summary>
     public static IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> Entries { get; } =
     [
+        Curl.Extension.NamedPipe.NamedPipeExtension.Activate,
     ];
 }

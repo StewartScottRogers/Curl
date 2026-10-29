@@ -12,5 +12,6 @@ internal static class ExtensionOptionCatalogue
     /// <summary>Gets the options, in the order they are registered.</summary>
     internal static IReadOnlyList<ExtensionOption> Entries { get; } =
     [
+        Curl.Extension.NamedPipe.NamedPipeExtension.Option,
     ];
 }
