@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Console]
+touches: [Curl.Console, Curl.Console.UnitTests/NotBuiltInTlsSetoptWarningTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4182 — Fix AF-0461: --curves, --sigalgs, --crlfile, --proxy-crlfile and --tcp-fastopen fail with exit 4 'setopt 0x... got bad argument' on Windows where curl 8.22.0 Schannel carries on and exits 0
 
@@ -41,12 +41,19 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: `ToolEasyHandle.IgnoredWhenNotBuiltIn` now also holds `CURLOPT_CRLFILE`, `CURLOPT_PROXY_CRLFILE`, `CURLOPT_SSL_EC_CURVES`, `CURLOPT_SSL_SIGNATURE_ALGORITHMS` and `CURLOPT_TCP_FASTOPEN`, so a `CURLE_NOT_BUILT_IN` answer to them (Libcurl on Windows, ADR-0995) is passed over silently, as curl 8.22.0 Schannel does. Decision recorded in ADR-1031.
+- Touches: added `Curl.Console.UnitTests/NotBuiltInTlsSetoptWarningTests.cs`, the existing test class for this list (five new DataRows); no task in Doing on origin/work/dark-factory names it.
+- Measured: the finding's reproduction, extended to `--crlfile global.json` and `--proxy-crlfile global.json`, gives exit 0, no `curl:` or `Warning` line and 472 bytes of stderr (progress meter only) for reference curl 8.22.0 and Curl alike.
+- Build clean; fast tests green (0 failures); Measure-CodeQuality.ps1 -Library Curl.Console: 0 failing members.
+- CI on Linux and macOS: the change is platform-neutral (a set membership, tested with a fake setopt), so nothing differs there.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. --crlfile, --proxy-crlfile, --curves, --sigalgs and --tcp-fastopen carry on and exit 0 on Windows as curl 8.22.0 Schannel does
