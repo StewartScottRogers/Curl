@@ -30,3 +30,4 @@ Prerequisite of BL-3990 (CGR-034), found by its 2026-10-28 run. `TransferSocketW
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d99bf904 779790c0.
