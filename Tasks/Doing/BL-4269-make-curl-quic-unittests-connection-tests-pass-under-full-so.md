@@ -30,3 +30,4 @@ Found by BL-4110 on lane 10 (2026-10-29). In the full fast run, 10 tests failed 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 8cae939c 3d836d5e.
