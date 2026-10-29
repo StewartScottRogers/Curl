@@ -17,5 +17,6 @@ public static class ExtensionTransferHookCatalogue
     public static IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>> Entries { get; } =
     [
         GraphQl.GraphQlTransferHook.ActivatedBy,
+        Curl.Extension.JsonRpc.JsonRpcExtension.HookFor,
     ];
 }

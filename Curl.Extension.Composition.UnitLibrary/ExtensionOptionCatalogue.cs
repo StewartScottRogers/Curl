@@ -17,5 +17,6 @@ internal static class ExtensionOptionCatalogue
         GraphQl.GraphQlOptions.Variables,
         GraphQl.GraphQlOptions.Operation,
         GraphQl.GraphQlOptions.Introspect,
+        Curl.Extension.JsonRpc.JsonRpcExtension.Option,
     ];
 }
