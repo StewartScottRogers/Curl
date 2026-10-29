@@ -554,6 +554,32 @@ public sealed class CurlUrlHostNameMappingTests
     public void TryNormalize_MeasuredCombiningMarkOrder_ConvertsAsCurlWithLibidn2(string host, string expected) =>
         AssertConvertsTo(host, expected);
 
+    [TestMethod]
+    [DataRow("ﷺ", DisplayName = "U+FDFA sallallahou alayhe wasallam ligature")]
+    [DataRow("ﷻ", DisplayName = "U+FDFB jalla jalalouhou ligature")]
+    [DataRow("ﹰ", DisplayName = "U+FE70 fathatan isolated form")]
+    [DataRow("ﹲ", DisplayName = "U+FE72 dammatan isolated form")]
+    [DataRow("ﹴ", DisplayName = "U+FE74 kasratan isolated form")]
+    [DataRow("ﹶ", DisplayName = "U+FE76 fatha isolated form")]
+    [DataRow("ﹸ", DisplayName = "U+FE78 damma isolated form")]
+    [DataRow("ﹺ", DisplayName = "U+FE7A kasra isolated form")]
+    [DataRow("ﹼ", DisplayName = "U+FE7C shadda isolated form")]
+    [DataRow("ﹾ", DisplayName = "U+FE7E sukun isolated form")]
+    public void TryNormalizeReadingHost_MeasuredArabicFormCurlRefusesWithExit3_IsRefused(string character)
+    {
+        bool accepted = CurlUrlHost.TryNormalizeReadingHost("a" + character + "b.test", refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out _, out _, out _);
+
+        Assert.IsFalse(accepted);
+    }
+
+    [TestMethod]
+    [DataRow("a℀b.test", "aa/cb.test", DisplayName = "U+2100 account of")]
+    [DataRow("a℁b.test", "aa/sb.test", DisplayName = "U+2101 addressed to the subject")]
+    [DataRow("a℅b.test", "ac/ob.test", DisplayName = "U+2105 care of")]
+    [DataRow("a℆b.test", "ac/ub.test", DisplayName = "U+2106 cada una")]
+    public void TryNormalizeReadingHost_MeasuredLetterlikeSymbolCurlRefusesWithExit27ThroughAProxy_ConvertsToSlashText(string host, string expected) =>
+        AssertConvertsTo(host, expected);
+
     private static void AssertConvertsTo(string host, string expected)
     {
         bool accepted = CurlUrlHost.TryNormalizeReadingHost(host, refuseUnconvertibleName: true, hostAsWindows1252: false, out _, out string idnHost, out _, out _);
