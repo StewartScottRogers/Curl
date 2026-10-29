@@ -34,3 +34,4 @@ The managed connect fails and closes its socket before the REMOVE callback and a
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 37b1443b 3debadd1.
