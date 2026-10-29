@@ -251,11 +251,29 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         try
         {
             open.Write(buffer.Span);
+            FlushIgnoringFailure(open);
             return ValueTask.CompletedTask;
         }
         catch (IOException exception)
         {
             return ValueTask.FromException(exception);
+        }
+    }
+
+    /// <summary>
+    /// Pushes what the file stream buffers out to the file, so a process killed mid-transfer leaves
+    /// the bytes received so far, as curl 8.22.0 does on Windows (CGR-237). A failure is left for
+    /// <see cref="CompleteAsync" />'s flush to report, as curl reports it at <c>fclose</c> (CGR-026).
+    /// </summary>
+    /// <param name="open">The open file.</param>
+    private static void FlushIgnoringFailure(Stream open)
+    {
+        try
+        {
+            open.Flush();
+        }
+        catch (IOException)
+        {
         }
     }
 
@@ -277,6 +295,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
         }
 
         await target.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+        FlushIgnoringFailure(target);
     }
 
     /// <summary>
