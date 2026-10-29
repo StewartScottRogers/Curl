@@ -90,12 +90,23 @@ internal static partial class EngineComposition
             ? NewDohResolver(connector, url, proxy, addressFamily, dohTrace, easyErrorText, traces)
             : new UnusableDohUrlResolver();
 
+    // curl writes the [DNS] filter lines under the dns component and the sub-transfers' own lines under doh (BL-3814); no components given writes both.
+    internal static DohSubTransferEvents DohSubTransferEventsOf(ITransferEvents dohTrace, EngineTraceComponents? traces)
+    {
+        var doh = traces is not null && TraceComponentIsOn(traces, "doh");
+        var dns = traces is not null && TraceComponentIsOn(traces, "dns");
+        return new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess, writesDnsFilterLines: dns || !doh, writesSubTransferLines: doh || !dns);
+    }
+
+    private static bool TraceComponentIsOn(EngineTraceComponents traces, string component) =>
+        traces.Components.Contains(component) || traces.Components.Contains("all") || traces.Components.Contains("network");
+
     // The DoH resolver CreateDohResolver makes of a usable DoH URL and the proxy chosen for it.
     private static DohDnsResolver NewDohResolver(IConnector connector, Uri url, ProxyEndpoint? proxy, AddressFamily addressFamily, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces) =>
         new(connector, url, dohTrace ?? NoTransferEvents.Instance, easyErrorText ?? NoEasyErrorText)
         {
             AddressFamily = addressFamily,
-            SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : new DohSubTransferEvents(dohTrace, PlatformTlsBackend.ForProcess),
+            SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : DohSubTransferEventsOf(dohTrace, traces),
             HttpsRecordTrace = HttpsRecordTraceOf(traces),
             Proxy = proxy,
         };
