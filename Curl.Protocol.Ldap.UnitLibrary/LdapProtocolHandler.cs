@@ -177,7 +177,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// The WinLDAP dialect's bind as the logged-on user: curl's own connection,
     /// <paramref name="curlConnection" />, stays open and carries no bytes while WinLDAP opens a
     /// second connection to <paramref name="target" /> for the binds and the search, as curl
-    /// 8.22.0's Schannel build does without <c>-u</c> (CGR-234, BL-3999, ADR-0974).
+    /// 8.22.0's Schannel build does without <c>-u</c> (CGR-234, BL-3999, ADR-0978).
     /// </summary>
     private async ValueTask<TransferResult> SearchBesideEmptyConnectionAsync(IConnection curlConnection, ConnectTarget target, ITransferContext context)
     {

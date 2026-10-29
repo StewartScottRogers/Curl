@@ -1,4 +1,4 @@
-# ADR-0974: The WinLDAP logon bind opens curl's empty connection before WinLDAP's own
+# ADR-0978: The WinLDAP logon bind opens curl's empty connection before WinLDAP's own
 
 - Status: Accepted
 - Date: 2026-10-28

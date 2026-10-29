@@ -18,7 +18,7 @@ Without `-u`, Curl's Windows (WinLDAP) LDAP transfer opens curl's own empty TCP 
 
 ## Context
 
-CGR-234 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`; BL-3763 fixed the bind failure text and split this out. Code: `LdapProtocolHandler.ConnectAndSearchAsync`. Decision: ADR-0974.
+CGR-234 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`; BL-3763 fixed the bind failure text and split this out. Code: `LdapProtocolHandler.ConnectAndSearchAsync`. Decision: ADR-0978.
 
 ## Acceptance criteria
 
@@ -32,7 +32,7 @@ CGR-234 in `Documentation/Reviews/Curl-Gap-Report-2026-10-25.md`; BL-3763 fixed 
   - With `-u`, and in the OpenLDAP dialect, there is one connection.
   - `Curl.Protocol.Ldap.UnitLibrary` meets the quality gates (Measure-CodeQuality: 0 failing members).
 
-- Scope taken from the gap report: the extra connection is pinned only without `-u`, because the report's Windows re-run found that with `-u` the wire already matched. Real curl was not re-measured (no LDAP bench in this repository); recorded in ADR-0974.
+- Scope taken from the gap report: the extra connection is pinned only without `-u`, because the report's Windows re-run found that with `-u` the wire already matched. Real curl was not re-measured (no LDAP bench in this repository); recorded in ADR-0978.
 - The verbose connection lines still name the first (curl's) connection; a default taken because curl's own connection is the one its verbose output describes.
 - Tests are fake-connection unit tests, platform-neutral.
 - Quality: the first measure found `ConnectAndSearchAsync` at complexity 12; the dialect choice moved to `SearchAsync`, after which 0 failing members, worst CRAP 10.
