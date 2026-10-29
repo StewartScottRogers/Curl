@@ -44,3 +44,4 @@ Found by BL-3811 (CGR-282). `CallbackTransferProgress.Of` (Curl.Engine.UnitLibra
 - 2026-10-28: Doing -> Backlog. Waits on BL-4018 (move the progress meter into Curl.Engine.UnitLibrary); Goal and criteria are still the template placeholders and must be written in Backlog
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 5a165af6 a4efa820 e4d345af 82989fe8.
 - 2026-10-28: Doing -> Backlog. Run budget ran out; 3 quality-gate failures left in the stashed work (see Notes)
+- 2026-10-29: Backlog -> Deferred. Over its cost cap; split into BL-4054 and BL-4055
