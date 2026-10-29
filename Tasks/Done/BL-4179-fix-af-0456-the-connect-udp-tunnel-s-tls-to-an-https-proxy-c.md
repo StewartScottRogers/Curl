@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4179 — Fix AF-0456: The CONNECT-UDP tunnel's TLS to an HTTPS proxy can drop isProxy: true with no test failing
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Added `ConnectMultiplexedAsync_ThroughAnHttpsProxy_MakesItsHandshakeAsTheProxys` (Curl.Networking.UnitTests/TcpConnectorQuicTests.UdpTunnel.cs): it drives a CONNECT-UDP through an HTTPS proxy with a `FakeTlsProvider` (which records `isProxy`) and asserts the one handshake is made with `isProxy: true`. No production change was needed. Added that test file to `touches` (no task in Doing on work/dark-factory names it).
+- The reproduction runs `Audit/Tools/Invoke-MutationTest.ps1`, which a lane may not run, so I applied the same mutant by hand (line 166 `isProxy: true` -> `false`): the new test failed (killed), passed with it restored, and the source was restored with `git restore`.
+- Fast tests: 50 test assemblies passed, none failed; build clean. Only a test changed, so no Measure-CodeQuality run was needed.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. A test now pins the CONNECT-UDP HTTPS proxy handshake as isProxy: true, killing the AF-0456 mutant
