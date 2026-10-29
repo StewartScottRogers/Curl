@@ -635,9 +635,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
         await session.Frames.SendGoAwayAsync(Http2ErrorCode.ProtocolError, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Gives the head's <c>content-length</c>, already checked by <see cref="Http2ResponseHead.IndexOfInvalidField" />, or <see langword="null" /> when it has none.</summary>
+    /// <summary>
+    /// Gives the head's first <c>content-length</c> that nghttp2 does not ignore, or
+    /// <see langword="null" /> when it has none. A field whose value holds a CR, LF or NUL is
+    /// skipped (<see cref="Http2ResponseHead.IsIgnored" />), as <see cref="Http2ResponseHead.IndexOfInvalidField" />
+    /// skips it; every other one is already checked by that method.
+    /// </summary>
     private static long? ContentLengthOf(IReadOnlyList<HeaderField> fields) =>
-        fields.Where(field => field.Name == "content-length").Select(field => (long?)long.Parse(field.Value, NumberStyles.None, CultureInfo.InvariantCulture)).FirstOrDefault();
+        fields.Where(field => field.Name == "content-length" && !Http2ResponseHead.IsIgnored(field)).Select(field => (long?)long.Parse(field.Value, NumberStyles.None, CultureInfo.InvariantCulture)).FirstOrDefault();
 
     /// <summary>Gives the status line and header lines curl writes for a head it fails part way through: no empty line.</summary>
     private byte[] HeadWithoutEmptyLine(int statusCode, IReadOnlyList<HeaderField> fields) =>

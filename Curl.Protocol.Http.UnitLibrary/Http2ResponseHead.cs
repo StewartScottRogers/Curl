@@ -134,7 +134,7 @@ internal static class Http2ResponseHead
     /// Tells whether nghttp2 ignores a regular field without a message: its value holds a CR, LF
     /// or NUL, or its name is not a token (<see cref="HeaderLines" />).
     /// </summary>
-    private static bool IsIgnored(HeaderField field) =>
+    internal static bool IsIgnored(HeaderField field) =>
         !IsTokenName(field.Name) || field.Value.AsSpan().ContainsAny("\r\n\0");
 
     /// <summary>
