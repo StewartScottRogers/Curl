@@ -239,7 +239,8 @@ in "Git and GitHub"). A lane that meets an audit path stops and leaves it to an 
 session.
 
 Run an audit with `Audit\RunAudit.cmd -NewTab` (in herdr, like the factory; never with
-`Start-Process`). `-Auditors` picks some of the five (and warns about any left out that have
+`Start-Process`); on Linux and macOS, with `Audit/RunAudit.sh -NewTab` (PowerShell 7, `pwsh`,
+required; same arguments, BL-3927). `-Auditors` picks some of the five (and warns about any left out that have
 accepted findings, which go un-re-audited), `-Planted` the defect count (default
 8), `-Ref` the commit (default `origin/work/dark-factory`), `-DryRun` prints the plan. It
 refuses inside a factory process and while a shift runs; `-AlongsideShift` runs it anyway,
