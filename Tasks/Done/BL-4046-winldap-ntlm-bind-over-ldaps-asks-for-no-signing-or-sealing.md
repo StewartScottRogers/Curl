@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Ldap.UnitLibrary/ILdapLogonTokenSource.cs, Curl.Protocol.Ldap.UnitLibrary/NegotiateLogonTokenSource.cs, Curl.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitTests/Fakes/FakeLogonTokenSource.cs, Curl.Protocol.Ldap.UnitTests/Cgr289Tests.cs]
+touches: [Curl.Protocol.Ldap.UnitLibrary/ILdapLogonTokenSource.cs, Curl.Protocol.Ldap.UnitLibrary/NegotiateLogonTokenSource.cs, Curl.Protocol.Ldap.UnitLibrary/WinLdapLogonBind.cs, Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitTests/Fakes/FakeLogonTokenSource.cs, Curl.Protocol.Ldap.UnitTests/Cgr289Tests.cs, Curl.Protocol.Ldap.UnitTests/NegotiateLogonTokenSourceTests.cs, Curl.Protocol.Ldap.UnitTests/LdapSaslSecurityLayerTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4046 — WinLDAP NTLM bind over ldaps:// asks for no signing or sealing (flags 07B208A2) as curl 8.22.0 does
 
@@ -22,9 +22,9 @@ BL-4044 measured it (2026-10-28) with `Record-CurlExchange.ps1 -Port 21909 -Tls 
 
 ## Acceptance criteria
 
-- [ ] Through real curl and Curl, the command above sends the same bytes on the wire and gives the same exit code and stderr; both results are recorded in Notes.
-- [ ] A focused unit test in `Curl.Protocol.Ldap.UnitTests` pins the protection level asked for over `ldaps://` and over `ldap://`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Through real curl and Curl, the command above sends the same bytes on the wire and gives the same exit code and stderr; both results are recorded in Notes.
+- [x] A focused unit test in `Curl.Protocol.Ldap.UnitTests` pins the protection level asked for over `ldaps://` and over `ldap://`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -32,3 +32,4 @@ BL-4044 measured it (2026-10-28) with `Record-CurlExchange.ps1 -Port 21909 -Tls 
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 4a3a8bb2 db97300f 779790c0.
+- 2026-10-28: Doing -> Done. WinLDAP NTLM bind over ldaps asks for no signing or sealing (07 b2 08 a2), starts no security layer, and a close during it is Unavailable (ADR-0985)
