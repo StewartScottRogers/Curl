@@ -29,9 +29,9 @@ BL-4142 (ADR-1021) added `--npipe` as the extension `Curl.Extension.NamedPipe.Un
 
 ## Notes
 
-- Plan (ADR-1049): `IConnectionHook` gains a default `ConnectorOver(curlConnector, curlTlsProvider)`, `ConnectionHooks` the matching overload, and `CurlComposition.ExtensionConnectorOf` hands the hook the option groups TLS provider (built from `-k`, `--cacert` and the rest). `NamedPipeConnector` opens the pipe and runs `AuthenticateAsClientAsync(pipe, TlsServerName ?? Host, target.Events)` over it; with no provider it still refuses TLS with exit 4. The engine needed no change.
+- Plan (ADR-1055): `IConnectionHook` gains a default `ConnectorOver(curlConnector, curlTlsProvider)`, `ConnectionHooks` the matching overload, and `CurlComposition.ExtensionConnectorOf` hands the hook the option groups TLS provider (built from `-k`, `--cacert` and the rest). `NamedPipeConnector` opens the pipe and runs `AuthenticateAsClientAsync(pipe, TlsServerName ?? Host, target.Events)` over it; with no provider it still refuses TLS with exit 4. The engine needed no change.
 - Choice: the seam hands the TLS provider rather than adding a stream-only hook to the engines connector factory, because the engine is outside this tasks touches and BL-4249 holds Curl.Networking and Curl.Protocol.Abstractions; the provider carries every TLS option but ALPN.
-- ALPN is left to BL-4263 (filed): the public `ITlsProvider` overloads offer no ALPN, so HTTPS over the pipe runs HTTP/1.1 until it lands. ADR-1021 is left as it is; ADR-1049 says it replaces that ADRs first Left out item.
+- ALPN is left to BL-4263 (filed): the public `ITlsProvider` overloads offer no ALPN, so HTTPS over the pipe runs HTTP/1.1 until it lands. ADR-1021 is left as it is; ADR-1055 says it replaces that ADRs first Left out item.
 - Added Curl.Console.UnitTests/ExtensionConnectionHookTests.cs to touches: `ExtensionConnectorOf` took a new parameter, so its tests changed; no task in Doing on origin/work/dark-factory names it.
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary,Curl.Extension.NamedPipe.UnitLibrary,Curl.Console: all three 100% line and branch, 0 failing members. dotnet build clean; fast tests exit 0. The tests use only in-memory fakes, so they do not depend on the platform.
 

@@ -815,7 +815,7 @@ internal static class CurlComposition
 
     /// <summary>Gives the engine's <c>extensionConnector</c> for an option group's connection hook.</summary>
     /// <param name="hooks">The group's connection hook, or <see langword="null" /> for none.</param>
-    /// <param name="tlsProvider">The group's TLS provider, handed to the hook so one that supplies only the byte stream layers curl's TLS over it (ADR-1049).</param>
+    /// <param name="tlsProvider">The group's TLS provider, handed to the hook so one that supplies only the byte stream layers curl's TLS over it (ADR-1055).</param>
     /// <returns><see cref="ConnectionHooks.ConnectorOver(IConnector, ITlsProvider)" /> over <paramref name="tlsProvider" />, or <see langword="null" /> without a hook, so the engine keeps curl's connector.</returns>
     internal static Func<IConnector, IConnector>? ExtensionConnectorOf(ConnectionHooks? hooks, ITlsProvider tlsProvider) =>
         hooks is { Hook: not null } ? curlConnector => hooks.ConnectorOver(curlConnector, tlsProvider) : null;

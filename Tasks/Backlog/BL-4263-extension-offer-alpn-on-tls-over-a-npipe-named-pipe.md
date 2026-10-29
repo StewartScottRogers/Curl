@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-BL-4206 (ADR-1049) runs curl's TLS handshake over the pipe through the public `ITlsProvider.AuthenticateAsClientAsync(plaintext, host, events, token)`, which offers no ALPN: the overload that does (`isProxy`, `applicationProtocols`) is on `Curl.Networking`'s internal `IHandshakeReportingTlsProvider`, which an extension cannot reach. Add a public default ALPN-offering overload to `Curl.Protocol.Abstractions`' `ITlsProvider` (default: the four-argument one), implement it in `SslStreamTlsProvider`, `HandBuiltTlsProvider` and `CertificateCheckingTlsProvider`, and have `NamedPipeConnector` pass `ConnectTarget.ApplicationProtocols` for an `https` pool scheme as `TcpConnector.ApplicationProtocolsFor` does.
+BL-4206 (ADR-1055) runs curl's TLS handshake over the pipe through the public `ITlsProvider.AuthenticateAsClientAsync(plaintext, host, events, token)`, which offers no ALPN: the overload that does (`isProxy`, `applicationProtocols`) is on `Curl.Networking`'s internal `IHandshakeReportingTlsProvider`, which an extension cannot reach. Add a public default ALPN-offering overload to `Curl.Protocol.Abstractions`' `ITlsProvider` (default: the four-argument one), implement it in `SslStreamTlsProvider`, `HandBuiltTlsProvider` and `CertificateCheckingTlsProvider`, and have `NamedPipeConnector` pass `ConnectTarget.ApplicationProtocols` for an `https` pool scheme as `TcpConnector.ApplicationProtocolsFor` does.
 
 ## Acceptance criteria
 

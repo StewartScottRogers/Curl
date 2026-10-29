@@ -5,7 +5,7 @@ namespace Curl.Extension.NamedPipe;
 /// <summary>
 /// Opens every connection of a transfer over one named pipe, whatever host and port its URL names, as
 /// <c>--unix-socket</c> does over a socket (ADR-1021), and runs curl's TLS handshake over the pipe for a TLS
-/// target (ADR-1049).
+/// target (ADR-1055).
 /// </summary>
 /// <param name="name">The pipe.</param>
 /// <param name="opener">Opens the pipe.</param>

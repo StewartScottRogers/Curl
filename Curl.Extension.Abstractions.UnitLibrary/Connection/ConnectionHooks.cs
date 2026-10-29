@@ -37,7 +37,7 @@ public sealed class ConnectionHooks
 
     /// <summary>
     /// Gives the connector a transfer's stream connections open through, handing the hook curl's TLS provider so a
-    /// hook that supplies only the byte stream can layer curl's TLS over it (ADR-1049).
+    /// hook that supplies only the byte stream can layer curl's TLS over it (ADR-1055).
     /// </summary>
     /// <param name="curlConnector">The connector curl would use.</param>
     /// <param name="curlTlsProvider">The TLS provider curl built from the option group's TLS options.</param>

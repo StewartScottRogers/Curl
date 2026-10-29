@@ -1,4 +1,4 @@
-# ADR-1049: A connection hook layers curl's TLS over its own stream
+# ADR-1055: A connection hook layers curl's TLS over its own stream
 
 - Status: Accepted
 - Date: 2026-10-29

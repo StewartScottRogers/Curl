@@ -18,7 +18,7 @@ public interface IConnectionHook
     /// <summary>
     /// Gives the connector a transfer's stream connections open through, with the TLS provider curl built from the
     /// option group's TLS options (<c>-k</c>, <c>--cacert</c> and the rest), so a hook that supplies only the byte
-    /// stream can run curl's TLS handshake over it for an <c>https://</c> target (ADR-1049).
+    /// stream can run curl's TLS handshake over it for an <c>https://</c> target (ADR-1055).
     /// </summary>
     /// <param name="curlConnector">The connector curl would use, for a hook that reaches its transport through it.</param>
     /// <param name="curlTlsProvider">The TLS provider curl would layer over a connection it opened.</param>
