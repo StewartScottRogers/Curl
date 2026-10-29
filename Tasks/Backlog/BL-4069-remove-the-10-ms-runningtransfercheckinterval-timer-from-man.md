@@ -4,7 +4,7 @@ title: Remove the 10 ms RunningTransferCheckInterval timer from ManagedMultiTran
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4068, BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-4036, BL-4037, BL-4038]
+depends-on: [BL-4072, BL-4073, BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-4036, BL-4037, BL-4038]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/ManagedMultiTransfer.Timer.cs, Curl.Engine.UnitLibrary/CLAUDE.md, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Timers.cs, Curl.Engine.UnitTests/Cgr148Tests.cs, Documentation/Decisions]
 requirement: none
 created: 2026-10-29

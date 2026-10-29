@@ -39,3 +39,4 @@ Part 1 of 2 of BL-3990 (CGR-034). Drop `TellSocketCallback`'s `NeedsSocket` bran
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: c707c13f aaefc491 da38b818 18d43fff 779790c0.
 - 2026-10-29: Doing -> Backlog. Needs BL-4070 (Limits.cs and ManagedMultiTransferTests.cs tests over real sockets) before the synthetic socket numbers can go
+- 2026-10-29: Backlog -> Deferred. Split for cost cap into BL-4072 (code and tests) and BL-4073 (ADR, CLAUDE.md, quality run)
