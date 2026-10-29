@@ -1108,3 +1108,4 @@ Each option and the specific reason it lost.
 | [1072](ADR-1072-async-quic-tests-time-out-cooperatively.md) | Asynchronous QUIC tests time out cooperatively (BL-4269) | Accepted | 2026-10-29 |
 | [1073](ADR-1073-http-file-expands-a-dot-http-file-into-curl-arguments-with-http-env-choosing-the-environment.md) | --http-file expands a .http file into curl arguments, with --http-env choosing the environment (BL-4154) | Accepted | 2026-10-29 |
 | [1074](ADR-1074-mcp-urls-list-tools-without-data-and-call-one-with-a-json-data-body.md) | MCP URLs list tools without data and call one with a JSON data body (BL-4159) | Accepted | 2026-10-29 |
+| [1066](ADR-1066-oauth2-options-name-the-flow-by-its-token-endpoint-and-send-a-bearer-token.md) | The OAuth2 options name the flow by its token endpoint and send a Bearer token (BL-4161) | Accepted | 2026-10-29 |
