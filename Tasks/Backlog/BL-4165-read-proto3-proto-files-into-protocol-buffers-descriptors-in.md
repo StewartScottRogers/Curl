@@ -4,7 +4,7 @@ title: Read proto3 .proto files into Protocol Buffers descriptors in Curl.Protob
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4164, BL-4167, BL-4168, BL-4169]
+depends-on: [BL-4164, BL-4170, BL-4168, BL-4169]
 touches: [Curl.Protobuf.UnitLibrary/Descriptors, Curl.Protobuf.UnitTests/Descriptors]
 requirement: none
 created: 2026-10-29
@@ -30,10 +30,10 @@ Second of three parts split from BL-4099. Builds on BL-4164's wire codec. Code g
 
 ## Notes
 
-- 2026-10-29 (lane 5): Split for size before any code: the parser, services and imports, and the descriptor-driven codec each fill a run with the 100% coverage gate. BL-4167 (messages, enums, fields, errors), BL-4168 (services, rpc, imports), BL-4169 (dynamic message codec, under `DynamicMessages/`). Once all three are Done this task only verifies the criteria and moves to Done.
+- 2026-10-29 (lane 5): Split for size before any code: the parser, services and imports, and the descriptor-driven codec each fill a run with the 100% coverage gate. BL-4170 (messages, enums, fields, errors), BL-4168 (services, rpc, imports), BL-4169 (dynamic message codec, under `DynamicMessages/`). Once all three are Done this task only verifies the criteria and moves to Done.
 
 ## Log
 
 - 2026-10-29: Created (split from BL-4099).
 - 2026-10-29: Backlog -> Doing. Criteria at claim: db2edfd5 ef33a4ad 05c7963a 7ae6d7ff 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Split for size into BL-4167, BL-4168 and BL-4169; waits on them
+- 2026-10-29: Doing -> Backlog. Split for size into BL-4170, BL-4168 and BL-4169; waits on them

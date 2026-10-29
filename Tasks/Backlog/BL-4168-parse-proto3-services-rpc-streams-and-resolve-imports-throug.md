@@ -4,7 +4,7 @@ title: Parse proto3 services, rpc streams and resolve imports through an injecte
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4167]
+depends-on: [BL-4170]
 touches: [Curl.Protobuf.UnitLibrary/Descriptors, Curl.Protobuf.UnitTests/Descriptors]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Second of three parts split from BL-4165. Extends BL-4167's parser under `Descriptors/`. Services hold methods with input and output message types, client and server `stream` flags, and the `option`s in service and method bodies. `import`, `import public` and `import weak` are resolved through an injected file-reader interface (no direct file system access), so references to imported messages and enums resolve; a missing import or an import cycle is a typed error with line and column. Base class library only, native AOT safe.
+Second of three parts split from BL-4165. Extends BL-4170's parser under `Descriptors/`. Services hold methods with input and output message types, client and server `stream` flags, and the `option`s in service and method bodies. `import`, `import public` and `import weak` are resolved through an injected file-reader interface (no direct file system access), so references to imported messages and enums resolve; a missing import or an import cycle is a typed error with line and column. Base class library only, native AOT safe.
 
 ## Acceptance criteria
 

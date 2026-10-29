@@ -4,7 +4,7 @@ title: Encode and decode a message described by a Protocol Buffers descriptor th
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4167]
+depends-on: [BL-4170]
 touches: [Curl.Protobuf.UnitLibrary/DynamicMessages, Curl.Protobuf.UnitTests/DynamicMessages]
 requirement: none
 created: 2026-10-29
@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-A message described by a BL-4167 descriptor is encoded to and decoded from Protocol Buffers binary through the BL-4164 wire codec.
+A message described by a BL-4170 descriptor is encoded to and decoded from Protocol Buffers binary through the BL-4164 wire codec.
 
 ## Context
 

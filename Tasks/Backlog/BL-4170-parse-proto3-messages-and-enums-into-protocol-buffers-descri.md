@@ -1,5 +1,5 @@
 ---
-id: BL-4167
+id: BL-4170
 title: Parse proto3 messages and enums into Protocol Buffers descriptors in Curl.Protobuf
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4167 — Parse proto3 messages and enums into Protocol Buffers descriptors in Curl.Protobuf
+# BL-4170 — Parse proto3 messages and enums into Protocol Buffers descriptors in Curl.Protobuf
 
 ## Goal
 
