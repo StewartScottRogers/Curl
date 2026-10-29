@@ -19,7 +19,8 @@ public sealed class Mqtt5ProtocolHandler : IProtocolHandler
 
     private const int SecureDefaultPort = 8883;
 
-    private const string ClientIdentifierPrefix = "curl";
+    /// <summary>The start of every client identifier, as curl makes it.</summary>
+    internal const string ClientIdentifierPrefix = "curl";
 
     private const string ClientIdentifierAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -31,7 +32,7 @@ public sealed class Mqtt5ProtocolHandler : IProtocolHandler
 
     /// <summary>Creates the handler over <paramref name="connector"/>, with curl's random client identifier "curl" and eight letters or digits.</summary>
     public Mqtt5ProtocolHandler(IConnector connector)
-        : this(connector, () => RandomNumberGenerator.GetString(ClientIdentifierAlphabet, ClientIdentifierSuffixLength))
+        : this(connector, NewClientIdentifierSuffix)
     {
     }
 
@@ -58,6 +59,9 @@ public sealed class Mqtt5ProtocolHandler : IProtocolHandler
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
     }
+
+    /// <summary>Gives eight random letters or digits, the rest of curl's client identifier.</summary>
+    internal static string NewClientIdentifierSuffix() => RandomNumberGenerator.GetString(ClientIdentifierAlphabet, ClientIdentifierSuffixLength);
 
     internal static ConnectTarget TargetOf(ITransferContext context)
     {
