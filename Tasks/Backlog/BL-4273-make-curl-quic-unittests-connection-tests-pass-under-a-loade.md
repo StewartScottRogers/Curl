@@ -1,5 +1,5 @@
 ---
-id: BL-4267
+id: BL-4273
 title: Make Curl.Quic.UnitTests' connection tests pass under a loaded full fast run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4267 — Make Curl.Quic.UnitTests' connection tests pass under a loaded full fast run
+# BL-4273 — Make Curl.Quic.UnitTests' connection tests pass under a loaded full fast run
 
 ## Goal
 
