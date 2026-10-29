@@ -109,7 +109,10 @@
     curl still sends until it stops for two seconds or closes its end. Default -1: off.
     Each read then waits up to five seconds, so curl's one-second wait for
     100 Continue does not end the read early. Use it to measure a response that arrives
-    while the body is being sent (BL-319, BL-395).
+    while the body is being sent (BL-319, BL-395). With ResponseDelayMilliseconds over
+    1000, RespondAfterBodyBytes 0 holds each answer until curl's one-second wait for
+    100 Continue has expired, so curl has begun sending the body before the answer
+    comes: a deterministic early answer to an Expect: 100-continue upload (BL-3827).
 
 .PARAMETER RequestReadMilliseconds
     How long each read of an HTTP request waits for its next byte before the request is
