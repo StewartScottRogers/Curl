@@ -30,6 +30,12 @@ Namespace `Curl.Extension.Composition`.
   `--doh-url`, and hands `ResolverOver` to the engine twice: as `CreateTransports`' `wrapLookUps`, so the TCP and UDP
   connectors look names up through it, and as `CreateProtocolHandlers`' `extensionResolver`. Two resolver claimants
   (two hooks, or a hook and `--doh-url`) are curl's command-line error with exit 2 (ADR-1012).
+- `ExtensionCertificateCheckHookCatalogue.Entries` holds each extension's certificate check hook activator (its
+  `ICertificateCheckHook` when its option was given, else `null`), one line each, also `merge=union` and a shared list
+  file. `CurlComposition.ExtensionCertificateCheckHooksOf` passes them to `CertificateCheckHooks.ActivatedBy` for each
+  option group and hands the engine its `ConnectorOver` and `TlsProviderOver` as `extensionCertificateConnector` and
+  `extensionTlsProvider`, or `null` for both without a hook; every activated check runs, and the first refusal fails
+  the transfer with exit 60. FTPS data connections are not checked yet (ADR-1016).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

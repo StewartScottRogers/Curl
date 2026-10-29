@@ -14,4 +14,5 @@ Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs
 Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs
 Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs
 Curl.Extension.Composition.UnitLibrary/ExtensionResolverHookCatalogue.cs
+Curl.Extension.Composition.UnitLibrary/ExtensionCertificateCheckHookCatalogue.cs
 Curl.slnx
