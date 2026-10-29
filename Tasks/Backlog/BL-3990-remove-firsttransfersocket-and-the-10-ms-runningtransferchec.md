@@ -4,7 +4,7 @@ title: Remove FirstTransferSocket and the 10 ms RunningTransferCheckInterval tim
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4006, BL-4007]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4008, BL-4007]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Counts.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.Timers.cs, Curl.Engine.UnitTests/Cgr148Tests.cs]
 requirement: none
 created: 2026-10-28

@@ -4,7 +4,7 @@ title: Fix the upstream test582 SFTP multi upload hang under the socket-gated wa
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4006]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4008]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitTests/Cgr034Tests.cs]
 requirement: none
 created: 2026-10-28
@@ -14,11 +14,11 @@ completed:
 
 ## Goal
 
-Upstream test582 (`Lib582Run`, an SFTP upload over socket actions) finishes within the conformance runner's 20 s with BL-4006's socket-gated wait in place, and `Curl.Engine.UnitLibrary` stays inside the quality gates.
+Upstream test582 (`Lib582Run`, an SFTP upload over socket actions) finishes within the conformance runner's 20 s with BL-4008's socket-gated wait in place, and `Curl.Engine.UnitLibrary` stays inside the quality gates.
 
 ## Context
 
-Split from BL-3989 (cost cap). BL-4006 lands the socket-gated wait; with it test582 hangs past 20 s, and it is on the ratchet and passes without it. Likely cause: an SSH read or write waiting in a direction the socket callback was not told, or `Waiting` being `None` while the transfer computes.
+Split from BL-3989 (cost cap). BL-4008 lands the socket-gated wait; with it test582 hangs past 20 s, and it is on the ratchet and passes without it. Likely cause: an SSH read or write waiting in a direction the socket callback was not told, or `Waiting` being `None` while the transfer computes.
 
 ## Acceptance criteria
 
@@ -29,7 +29,7 @@ Split from BL-3989 (cost cap). BL-4006 lands the socket-gated wait; with it test
 
 ## Notes
 
-- Split from BL-3989 (cost cap). Builds on BL-4006's landed code, which holds the stashed work; read BL-4006 and BL-3989's Notes first.
+- Split from BL-3989 (cost cap). Builds on BL-4008's landed code, which holds the stashed work; read BL-4008 and BL-3989's Notes first.
 
 ## Log
 

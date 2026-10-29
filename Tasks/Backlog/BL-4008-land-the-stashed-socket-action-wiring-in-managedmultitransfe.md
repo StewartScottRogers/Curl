@@ -1,5 +1,5 @@
 ---
-id: BL-4006
+id: BL-4008
 title: Land the stashed socket-action wiring in ManagedMultiTransfer and pin CGR-034 C_20, C_74, C_75
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4006 — Land the stashed socket-action wiring in ManagedMultiTransfer and pin CGR-034 C_20, C_74, C_75
+# BL-4008 — Land the stashed socket-action wiring in ManagedMultiTransfer and pin CGR-034 C_20, C_74, C_75
 
 ## Goal
 
