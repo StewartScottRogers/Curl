@@ -83,3 +83,4 @@ Notes (2026-10-28 lane 8, requeue): The fix needs ConnectTarget to carry an SNI 
 - 2026-10-28: Doing -> Backlog. Code for the ldaps second connection landed; real-curl measurement and NTLM flags left to BL-4044
 
 Notes (2026-10-28 lane 4): Code done: LdapProtocolHandler.WinLdapTargetOf gives the WinLDAP second ldaps connection TlsServerName = Environment.MachineName and TrustsSystemStoreOnly; Cgr289Tests.cs pins it; Ldap fast tests pass (638); Measure-CodeQuality for the library reports 0 failing members. Not done: real-curl measurement, NTLM flags and single bind; filed BL-4044. Once BL-4044 is Done, tick the criteria here from its Notes.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
