@@ -34,3 +34,4 @@ BL-4222 (ADR-1043) added the optional interface `IDatagramCarryingConnection` in
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3d2b7b40 7e5d0c04 54cafd17 3d836d5e.
