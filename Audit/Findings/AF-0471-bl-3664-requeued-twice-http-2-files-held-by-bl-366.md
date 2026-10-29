@@ -3,8 +3,8 @@ id: AF-0471
 title: BL-3664 requeued twice (HTTP/2 files held by BL-3667/BL-3668, then BL-3979 with the fix stashed) and then Deferred and split
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3664:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
