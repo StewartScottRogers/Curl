@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ws.Fakes;
+namespace Curl.WebSocket.Fakes;
 
 /// <summary>
 /// An <see cref="IWebSocketRandomSource" /> that fills every request with the same bytes, so a

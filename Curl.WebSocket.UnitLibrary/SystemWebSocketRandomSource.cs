@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Fills WebSocket keys and masks from <see cref="RandomNumberGenerator" />, the operating

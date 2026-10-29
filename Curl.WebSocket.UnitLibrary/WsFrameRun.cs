@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// One run of a received frame's payload as <see cref="WsFrameMetadataDecoder" /> passes it on,

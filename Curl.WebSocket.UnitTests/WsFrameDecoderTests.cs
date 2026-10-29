@@ -1,13 +1,12 @@
 using System.Text;
-using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Pins the frame reader against what curl 8.21.0 did with each server frame, measured on
 /// 2026-09-28 with <c>Record-CurlExchange.ps1</c> (BL-581): which payloads reach the output,
-/// which ping is answered, and the exit 56 message of each violation.
+/// which ping is answered, and the message of each violation (curl exits 56 with it).
 /// </summary>
 [TestClass]
 public sealed class WsFrameDecoderTests
@@ -26,8 +25,8 @@ public sealed class WsFrameDecoderTests
         Assert.AreEqual("hello", Text(decoded.Payload));
         diagnostics.Assert("decoded.LastPing is null", true, decoded.LastPing is null);
         Assert.IsNull(decoded.LastPing);
-        diagnostics.Assert("decoded.Failure is null", true, decoded.Failure is null);
-        Assert.IsNull(decoded.Failure);
+        diagnostics.Assert("decoded.ViolationMessage is null", true, decoded.ViolationMessage is null);
+        Assert.IsNull(decoded.ViolationMessage);
     }
 
     [TestMethod]
@@ -71,7 +70,7 @@ public sealed class WsFrameDecoderTests
     }
 
     [TestMethod]
-    public void Decode_64BitLengthWithTheTopBitSet_FailsWith56()
+    public void Decode_64BitLengthWithTheTopBitSet_StopsWithAViolation()
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         WsDecodedBytes decoded = Run(diagnostics, "82 7f 80 00 00 00 00 00 00 02", "ok");
@@ -89,8 +88,8 @@ public sealed class WsFrameDecoderTests
 
         diagnostics.Assert("Text(decoded.Payload)", "hello", Text(decoded.Payload));
         Assert.AreEqual("hello", Text(decoded.Payload));
-        diagnostics.Assert("decoded.Failure is null", true, decoded.Failure is null);
-        Assert.IsNull(decoded.Failure);
+        diagnostics.Assert("decoded.ViolationMessage is null", true, decoded.ViolationMessage is null);
+        Assert.IsNull(decoded.ViolationMessage);
     }
 
     [TestMethod]
@@ -170,8 +169,8 @@ public sealed class WsFrameDecoderTests
 
         diagnostics.Assert("Text(decoded.Payload)", "hello", Text(decoded.Payload));
         Assert.AreEqual("hello", Text(decoded.Payload));
-        diagnostics.Assert("decoded.Failure is null", true, decoded.Failure is null);
-        Assert.IsNull(decoded.Failure);
+        diagnostics.Assert("decoded.ViolationMessage is null", true, decoded.ViolationMessage is null);
+        Assert.IsNull(decoded.ViolationMessage);
     }
 
     [TestMethod]
@@ -272,8 +271,8 @@ public sealed class WsFrameDecoderTests
 
         diagnostics.Assert("Text(decoded.Payload)", "hel", Text(decoded.Payload));
         Assert.AreEqual("hel", Text(decoded.Payload));
-        diagnostics.Assert("decoded.Failure is null", true, decoded.Failure is null);
-        Assert.IsNull(decoded.Failure);
+        diagnostics.Assert("decoded.ViolationMessage is null", true, decoded.ViolationMessage is null);
+        Assert.IsNull(decoded.ViolationMessage);
     }
 
     [TestMethod]
@@ -294,7 +293,7 @@ public sealed class WsFrameDecoderTests
     [DataRow("8a 7e 00 7e", "[WS] received PONG frame is too big", DisplayName = "126-byte pong")]
     [DataRow("88 7e 00 7e", "[WS] received CLOSE frame is too big", DisplayName = "126-byte close")]
     [DataRow("89 7f", "[WS] received PING frame is too big", DisplayName = "64-bit ping")]
-    public void Decode_ProtocolViolation_FailsWith56AndCurlsMessage(string head, string message)
+    public void Decode_ProtocolViolation_StopsWithCurlsMessage(string head, string message)
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         WsDecodedBytes decoded = Run(diagnostics, head, "hello");
@@ -336,8 +335,8 @@ public sealed class WsFrameDecoderTests
 
         diagnostics.Assert("decoded.LastPing is null", true, decoded.LastPing is null);
         Assert.IsNull(decoded.LastPing);
-        diagnostics.Assert("decoded.Failure is not null", true, decoded.Failure is not null);
-        Assert.IsNotNull(decoded.Failure);
+        diagnostics.Assert("decoded.ViolationMessage is not null", true, decoded.ViolationMessage is not null);
+        Assert.IsNotNull(decoded.ViolationMessage);
     }
 
     [TestMethod]
@@ -352,18 +351,16 @@ public sealed class WsFrameDecoderTests
         Assert.IsEmpty(decoded.Payload);
         diagnostics.Assert("decoded.LastPing is null", true, decoded.LastPing is null);
         Assert.IsNull(decoded.LastPing);
-        diagnostics.Assert("decoded.Failure is null", true, decoded.Failure is null);
-        Assert.IsNull(decoded.Failure);
+        diagnostics.Assert("decoded.ViolationMessage is null", true, decoded.ViolationMessage is null);
+        Assert.IsNull(decoded.ViolationMessage);
     }
 
     private static void AssertViolation(TestDiagnostics diagnostics, string message, WsDecodedBytes decoded)
     {
-        diagnostics.Assert("decoded.Failure is not null", true, decoded.Failure is not null);
-        Assert.IsNotNull(decoded.Failure);
-        diagnostics.Assert("exit code", CurlExitCode.RecvError, decoded.Failure.ExitCode);
-        Assert.AreEqual(CurlExitCode.RecvError, decoded.Failure.ExitCode);
-        diagnostics.Assert("failure message", message, decoded.Failure.Message);
-        Assert.AreEqual(message, decoded.Failure.Message);
+        diagnostics.Assert("decoded.ViolationMessage is not null", true, decoded.ViolationMessage is not null);
+        Assert.IsNotNull(decoded.ViolationMessage);
+        diagnostics.Assert("violation message", message, decoded.ViolationMessage);
+        Assert.AreEqual(message, decoded.ViolationMessage);
         diagnostics.Assert("decoded.LastPing is null", true, decoded.LastPing is null);
         Assert.IsNull(decoded.LastPing);
     }
@@ -382,7 +379,7 @@ public sealed class WsFrameDecoderTests
     {
         diagnostics.Act(
             "decoded",
-            $"payload {decoded.Payload.Length} bytes, ping {(decoded.LastPing is null ? "none" : decoded.LastPing.Length + " bytes")}, failure {(decoded.Failure is null ? "none" : "exit " + decoded.Failure.ExitCode + " " + decoded.Failure.Message)}");
+            $"payload {decoded.Payload.Length} bytes, ping {(decoded.LastPing is null ? "none" : decoded.LastPing.Length + " bytes")}, violation {decoded.ViolationMessage ?? "none"}");
     }
 
     private static string Text(byte[] bytes) => Encoding.Latin1.GetString(bytes);

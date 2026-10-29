@@ -1,7 +1,7 @@
-using Curl.Protocol.Ws.Fakes;
 using Curl.Testing;
+using Curl.WebSocket.Fakes;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Pins the client frames against the bytes curl 8.21.0 sent on 2026-09-28 (BL-581), with the

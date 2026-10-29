@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 [TestClass]
 public sealed class SystemWebSocketRandomSourceTests

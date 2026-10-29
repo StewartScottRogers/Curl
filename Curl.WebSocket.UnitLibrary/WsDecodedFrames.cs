@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>What <see cref="WsFrameMetadataDecoder" /> made of one run of received bytes (BL-2471).</summary>
 /// <param name="Runs">

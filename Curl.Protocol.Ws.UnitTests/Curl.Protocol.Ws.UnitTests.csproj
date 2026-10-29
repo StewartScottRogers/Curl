@@ -12,4 +12,14 @@
     <ProjectReference Include="..\Curl.Protocol.Ws.UnitLibrary\Curl.Protocol.Ws.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="Curl.WebSocket" />
+    <Using Include="Curl.WebSocket.Fakes" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Curl.WebSocket.UnitTests\Fakes\FixedRandomSource.cs" Link="Fakes\FixedRandomSource.cs" />
+    <Compile Include="..\Curl.WebSocket.UnitTests\Fakes\ScriptedRandomSource.cs" Link="Fakes\ScriptedRandomSource.cs" />
+  </ItemGroup>
+
 </Project>

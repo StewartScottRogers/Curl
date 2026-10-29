@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// The RFC 6455 frame opcodes curl 8.21.0 accepts; a received frame with any other value fails

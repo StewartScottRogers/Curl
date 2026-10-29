@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Reads RFC 6455 server frames from bytes as they arrive, keeping its place between calls, and
@@ -21,6 +21,6 @@ public sealed class WsFrameMetadataDecoder
     {
         WsDecodedBytes decoded = decoder.Decode(received);
         ReadOnlyMemory<byte>? completedPing = decoded.LastPing is { } ping ? ping : default(ReadOnlyMemory<byte>?);
-        return new WsDecodedFrames(decoder.TakeRuns(), completedPing, decoded.Failure?.Message);
+        return new WsDecodedFrames(decoder.TakeRuns(), completedPing, decoded.ViolationMessage);
     }
 }

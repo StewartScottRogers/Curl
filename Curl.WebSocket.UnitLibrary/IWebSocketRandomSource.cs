@@ -1,4 +1,4 @@
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Supplies the random bytes a WebSocket transfer needs: the 16 bytes behind

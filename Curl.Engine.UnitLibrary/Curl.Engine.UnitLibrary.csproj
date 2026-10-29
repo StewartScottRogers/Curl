@@ -38,4 +38,8 @@
     <ProjectReference Include="..\Curl.Protocol.Ws.UnitLibrary\Curl.Protocol.Ws.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="Curl.WebSocket" />
+  </ItemGroup>
+
 </Project>

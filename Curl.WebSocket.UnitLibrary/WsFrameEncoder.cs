@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Writes one client frame as RFC 6455 requires and curl 8.21.0 sends it: the FIN bit as asked
@@ -47,7 +47,7 @@ public static class WsFrameEncoder
     /// <param name="payload">The payload, unmasked.</param>
     /// <param name="randomSource">Supplies the frame's 4-byte mask.</param>
     /// <returns>The frame's bytes, ready to send.</returns>
-    internal static byte[] Encode(WsOpcode opcode, ReadOnlySpan<byte> payload, IWebSocketRandomSource randomSource) =>
+    public static byte[] Encode(WsOpcode opcode, ReadOnlySpan<byte> payload, IWebSocketRandomSource randomSource) =>
         Encode(opcode, isFinal: true, payload, randomSource);
 
     /// <summary>

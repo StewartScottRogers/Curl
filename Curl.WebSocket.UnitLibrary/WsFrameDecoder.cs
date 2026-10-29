@@ -1,9 +1,8 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Globalization;
-using Curl.Protocol.Abstractions;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Reads RFC 6455 server frames from bytes as they arrive, keeping its place between calls, so a
@@ -12,23 +11,19 @@ namespace Curl.Protocol.Ws;
 /// <remarks>
 /// Payloads are passed on as they arrive, not held until the frame ends, because curl writes a
 /// partial frame's payload before the connection closes (measured, BL-581). Only a ping's
-/// payload is held, to be echoed in a pong once the ping is complete. Each violation fails with
-/// exit 56 and curl 8.21.0's message, checked in curl's order: reserved bits and opcode on the
+/// payload is held, to be echoed in a pong once the ping is complete. Each violation stops decoding with
+/// curl 8.21.0's message (curl then exits 56), checked in curl's order: reserved bits and opcode on the
 /// first byte, the mask bit on the second, then the length.
 /// </remarks>
-/// <param name="diagnosticLog">
-/// Receives each frame's opcode, FIN bit and length, and a close frame with an unexpected code
-/// (<see cref="WsTransferLog" />); nothing is written when it is <see langword="null" />.
-/// </param>
-/// <param name="trace">
-/// Receives curl's <c>--trace-config ws</c> lines for each frame decoded and each run of payload
-/// passed on (<see cref="WsFrameTrace" />, BL-1164); <see langword="null" /> writes none.
+/// <param name="observer">
+/// Told of each frame opened, each run of payload passed on and each close frame's payload, for the
+/// protocol's diagnostic log and <c>--trace-config ws</c> lines; <see langword="null" /> tells no one.
 /// </param>
 /// <param name="recordsRuns">
 /// Whether each run of payload, ping payloads included, is kept with its frame's metadata for
 /// <see cref="TakeRuns" /> (<see cref="WsFrameMetadataDecoder" />, BL-2471).
 /// </param>
-internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFrameTrace? trace = null, bool recordsRuns = false)
+public sealed class WsFrameDecoder(IWsFrameDecodeObserver? observer = null, bool recordsRuns = false)
 {
     private const byte FinalFragment = 0x80;
 
@@ -50,9 +45,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
 
     private readonly byte[] head = new byte[LongestHead];
 
-    private readonly WsTransferLog log = new(diagnosticLog ?? NoDiagnosticLog.Instance);
-
-    private readonly WsFrameTrace trace = trace ?? WsFrameTrace.Off;
+    private readonly IWsFrameDecodeObserver observer = observer ?? NoWsFrameDecodeObserver.Instance;
 
     // A ping's payload, echoed in a pong, or a close frame's, whose code is logged.
     private readonly ArrayBufferWriter<byte> controlPayload = new(Longest7BitLength);
@@ -76,7 +69,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
     /// <summary>Decodes the next run of received bytes.</summary>
     /// <param name="received">The bytes, continuing from where the previous call ended.</param>
     /// <returns>The payload to write, the last completed ping, and any violation.</returns>
-    internal WsDecodedBytes Decode(ReadOnlySpan<byte> received)
+    public WsDecodedBytes Decode(ReadOnlySpan<byte> received)
     {
         ArrayBufferWriter<byte> payload = new();
         lastPing = null;
@@ -89,9 +82,9 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
                     : ConsumeHeadByte(received);
             }
         }
-        catch (WsTransferException failure)
+        catch (WsFrameViolationException violation)
         {
-            return new WsDecodedBytes(payload.WrittenSpan.ToArray(), null, failure);
+            return new WsDecodedBytes(payload.WrittenSpan.ToArray(), null, violation.Message);
         }
 
         return new WsDecodedBytes(payload.WrittenSpan.ToArray(), lastPing, null);
@@ -101,7 +94,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
     /// Gives the runs of payload decoded since the last call, with their frames' metadata, and
     /// forgets them; only for a decoder made to record runs.
     /// </summary>
-    internal WsFrameRun[] TakeRuns()
+    public WsFrameRun[] TakeRuns()
     {
         WsFrameRun[] taken = [.. runs!];
         runs!.Clear();
@@ -140,7 +133,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
 
         runs?.Add(new WsFrameRun(opcode, IsFinal(), payloadLength - payloadRemaining, payloadRemaining - length, chunk.ToArray()));
         payloadRemaining -= length;
-        trace.PayloadPassed(opcode, IsFinal(), length, payloadLength - payloadRemaining, payloadLength);
+        observer.PayloadPassed(opcode, IsFinal(), length, payloadLength - payloadRemaining, payloadLength);
         if (payloadRemaining == 0)
         {
             CloseFrame();
@@ -240,13 +233,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
         opcode = (WsOpcode)(head[0] & OpcodeBits);
         payloadLength = PayloadLength();
         payloadRemaining = payloadLength;
-        log.Frame("received", opcode, IsFinal(), payloadRemaining);
-        trace.FrameDecoded(opcode, IsFinal(), payloadLength);
-        if (opcode == WsOpcode.Ping)
-        {
-            trace.AutoPong(payloadLength);
-        }
-
+        observer.FrameOpened(opcode, IsFinal(), payloadLength);
         headCount = 0;
         isFrameOpen = true;
         controlPayload.ResetWrittenCount();
@@ -257,7 +244,7 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
         }
         else if (isLastByteOfRead)
         {
-            trace.Passing(opcode, IsFinal(), 0, payloadLength);
+            observer.HeadEndedRead(opcode, IsFinal(), payloadLength);
         }
     }
 
@@ -291,13 +278,13 @@ internal sealed class WsFrameDecoder(IDiagnosticLog? diagnosticLog = null, WsFra
         }
         else if (opcode == WsOpcode.Close)
         {
-            log.CloseReceived(controlPayload.WrittenSpan);
+            observer.CloseReceived(controlPayload.WrittenSpan);
         }
     }
 
     /// <summary>Names an opcode as curl's messages do: <c>TEXT</c>, <c>BINARY</c>, <c>CLOSE</c>, <c>PING</c>, <c>PONG</c>.</summary>
     private static string Name(WsOpcode frameOpcode) => frameOpcode.ToString().ToUpperInvariant();
 
-    private static WsTransferException Violation(string message) =>
-        new(CurlExitCode.RecvError, "[WS] " + message) { IsFrameViolation = true };
+    private static WsFrameViolationException Violation(string message) =>
+        new("[WS] " + message);
 }

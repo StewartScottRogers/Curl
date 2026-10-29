@@ -106,4 +106,8 @@
     <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="Curl.WebSocket" />
+  </ItemGroup>
+
 </Project>

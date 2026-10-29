@@ -1,7 +1,7 @@
 using System.Text;
 using Curl.Testing;
 
-namespace Curl.Protocol.Ws;
+namespace Curl.WebSocket;
 
 /// <summary>
 /// Pins the public frame decoder behind libcurl's <c>curl_ws_recv</c> and <c>curl_ws_meta</c>
@@ -87,7 +87,7 @@ public sealed class WsFrameMetadataDecoderTests
     {
         var diagnostics = TestDiagnostics.For(TestContext);
         diagnostics.Arrange("received", receivedHex);
-        string? toolMessage = new WsFrameDecoder().Decode(Hex(receivedHex)).Failure?.Message;
+        string? toolMessage = new WsFrameDecoder().Decode(Hex(receivedHex)).ViolationMessage;
 
         WsDecodedFrames decoded = new WsFrameMetadataDecoder().Decode(Hex(receivedHex));
 
