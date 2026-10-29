@@ -1,4 +1,4 @@
-# ADR-1062: --sse writes normalised events and reconnects only after an event stream ends
+# ADR-1067: --sse writes normalised events and reconnects only after an event stream ends
 
 - Status: Accepted
 - Date: 2026-10-29

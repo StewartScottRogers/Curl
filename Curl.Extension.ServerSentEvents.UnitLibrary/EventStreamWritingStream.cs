@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.ServerSentEvents;
 
 /// <summary>
-/// The stream <c>--sse</c> has curl's handler write the response body to (ADR-1062): it feeds the bytes to the
+/// The stream <c>--sse</c> has curl's handler write the response body to (ADR-1067): it feeds the bytes to the
 /// parser and writes each event they complete to <paramref name="output" /> as a normalised event stream, an
 /// <c>event</c> line, an <c>id</c> line when the last event ID is not empty, one <c>data</c> line per line of data
 /// and an empty line. Comments, unknown fields and an event a closed connection cut off are not written.

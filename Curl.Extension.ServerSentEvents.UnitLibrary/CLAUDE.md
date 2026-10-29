@@ -1,6 +1,6 @@
 # Curl.Extension.ServerSentEvents.UnitLibrary
 
-The Server-Sent Events extension (ADR-0999, ADR-1011, ADR-1062). Namespace `Curl.Extension.ServerSentEvents`.
+The Server-Sent Events extension (ADR-0999, ADR-1011, ADR-1067). Namespace `Curl.Extension.ServerSentEvents`.
 It references only `Curl.Extension.Abstractions.UnitLibrary`; `Curl.Extension.Composition` registers its
 option, description and transfer hook.
 

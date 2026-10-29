@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ServerSentEvents;
 
 /// <summary>
-/// The <c>--sse</c> extension (ADR-1062): reads a <c>text/event-stream</c> response as WHATWG HTML §9.2 "Server-sent
+/// The <c>--sse</c> extension (ADR-1067): reads a <c>text/event-stream</c> response as WHATWG HTML §9.2 "Server-sent
 /// events" says, writes its events, and reconnects with <c>Last-Event-ID</c> after the stream's reconnection time.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>

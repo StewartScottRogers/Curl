@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ServerSentEvents;
 
 /// <summary>
-/// What <c>--sse</c> does to an HTTP transfer (ADR-1062). It asks for an event stream with the headers
+/// What <c>--sse</c> does to an HTTP transfer (ADR-1067). It asks for an event stream with the headers
 /// §9.2.2 "The EventSource interface" fetches with, and <c>Last-Event-ID</c> once the stream has set one
 /// (§9.2.4 "Processing model"); writes the response body as the events §9.2.6 dispatches
 /// (<see cref="EventStreamWritingStream" />); and, when a <c>200</c> <c>text/event-stream</c> response ends,
