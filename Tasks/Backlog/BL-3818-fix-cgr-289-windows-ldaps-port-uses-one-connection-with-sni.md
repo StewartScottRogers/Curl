@@ -4,7 +4,7 @@ title: Fix CGR-289: Windows ldaps://: PORT uses one connection with SNI localhos
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
+depends-on: [BL-4022]
 touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitLibrary/WinLdapResultText.cs, Curl.Protocol.Ldap.UnitTests/Cgr289Tests.cs]
 model: sonnet
 requirement: none
@@ -76,3 +76,6 @@ curl -sS --cacert TP\ca.crt --ssl-no-revoke ldaps://localhost:21900/dc=test
 
 - 2026-10-26: Created from CGR-289 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+Notes (2026-10-28 lane 8, requeue): The fix needs ConnectTarget to carry an SNI host and a system-store-only trust flag (neither exists; ConnectTarget lives in Curl.Protocol.Abstractions, TLS in Curl.Networking). Filed BL-4022 for that. Then this task must: in LdapProtocolHandler's WinLdap ldaps path, close the first connection and open a second with SNI = Environment.MachineName and system-store trust (so --cacert gives Server Down, -k gives the Protocol Error after 3 RootDSE searches, an NTLM bind and an unbind), and match the NTLM flags B7B208E2 and the single bind (WinLdapLogonBind). Measure real curl with Record-CurlExchange.ps1 first. Add Curl.Networking and Curl.Protocol.Abstractions files from BL-4022 to this task's touches only if they still need changes.
+- 2026-10-28: Doing -> Backlog. Needs BL-4022 (ConnectTarget SNI host and system-store-only trust in Abstractions and Networking)
