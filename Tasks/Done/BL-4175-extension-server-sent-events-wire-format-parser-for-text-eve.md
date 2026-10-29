@@ -30,7 +30,7 @@ Split from BL-4110 for size (its Notes ask for "wire format, then the client flo
 ## Notes
 
 - Pipeline `feature` run directly in one lane pass: a single BCL-only class with no seams to plan, so the architect stage was skipped (sensible default, rule 1).
-- `EventStreamParser.Parse(ReadOnlySpan<byte>)` returns the events each chunk completes; `LastEventId` and `ReconnectionTimeMilliseconds` are properties. Decisions (the 64-bit `retry` limit, decoding, API shape) in ADR-1010.
+- `EventStreamParser.Parse(ReadOnlySpan<byte>)` returns the events each chunk completes; `LastEventId` and `ReconnectionTimeMilliseconds` are properties. Decisions (the 64-bit `retry` limit, decoding, API shape) in ADR-1011.
 - 29 unit tests, each citing §9.2.6; the specification's four examples are fed whole and one byte at a time. Measure-CodeQuality: 100% line and branch, 8 members, worst CRAP 8 (ReadCharacter split after a first run found complexity 12).
 - Platform-neutral: pure in-memory parsing, no paths, OS text or scheduling, so CI on Linux and macOS sees the same results.
 

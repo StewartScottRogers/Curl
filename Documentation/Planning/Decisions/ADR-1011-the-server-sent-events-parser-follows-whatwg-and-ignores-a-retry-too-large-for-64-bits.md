@@ -1,4 +1,4 @@
-# ADR-1010: The Server-Sent Events parser follows WHATWG §9.2.6 and ignores a `retry` too large for 64 bits
+# ADR-1011: The Server-Sent Events parser follows WHATWG §9.2.6 and ignores a `retry` too large for 64 bits
 
 - Status: Accepted
 - Date: 2026-10-29

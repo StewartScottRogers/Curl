@@ -196,7 +196,7 @@ public sealed class EventStreamParserTests
     public void Parse_RetryNotOfAsciiDigitsOnly_IsIgnored(string value)
     {
         // §9.2.6: "If the field value consists of only ASCII digits ... Otherwise, ignore the field." A value too
-        // large for a 64-bit count of milliseconds is ignored too (ADR-1010).
+        // large for a 64-bit count of milliseconds is ignored too (ADR-1011).
         var parser = new EventStreamParser();
         parser.Parse("retry: 5\n"u8);
 
