@@ -2,14 +2,19 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Kafka.Client;
 
-/// <summary>A fake <see cref="IConnector"/> that records the target it is asked for and returns a set result.</summary>
-internal sealed class ScriptedKafkaConnector(ConnectResult result) : IConnector
+/// <summary>
+/// A fake <see cref="IConnector"/> that records every target it is asked for and returns its set results in turn, the
+/// last one again once they run out.
+/// </summary>
+internal sealed class ScriptedKafkaConnector(params ConnectResult[] results) : IConnector
 {
-    public ConnectTarget? Target { get; private set; }
+    public List<ConnectTarget> Targets { get; } = [];
+
+    public ConnectTarget? Target => Targets.FirstOrDefault();
 
     public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
-        Target = target;
-        return ValueTask.FromResult(result);
+        Targets.Add(target);
+        return ValueTask.FromResult(results[Math.Min(Targets.Count, results.Length) - 1]);
     }
 }

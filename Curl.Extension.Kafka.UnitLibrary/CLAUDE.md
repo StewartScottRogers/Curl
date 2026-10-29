@@ -11,7 +11,8 @@ it `Curl.Protocol.Abstractions`) and the base class library. The handler is regi
   `ProtocolHandlerServices.Connector`.
 - `KafkaProtocolHandler` serves `kafka://` (port 9092) and `kafkas://` (port 9093, TLS); `KafkaAddress` reads the
   topic, partition and `?offset=N` from the URL.
-- `KafkaClientFlow` produces one record with a body, or fetches from the offset to the high watermark and writes each
+- `KafkaClientFlow` first finds the partition's leader with Metadata (ADR-1077; the handler reconnects to it when it is
+  another broker), then produces one record with a body, or fetches from the offset to the high watermark and writes each
   record value and a line feed. `KafkaClientMessages` holds the error texts and `KafkaClientException` carries the exit
   code.
 
@@ -19,5 +20,5 @@ it `Curl.Protocol.Abstractions`) and the base class library. The handler is regi
 
 - `KafkaWriter` and `KafkaReader` are the primitive types; `Crc32C` is the record batch checksum.
 - `KafkaRecordBatch` writes and reads magic 2 record batches (`KafkaRecord`, `KafkaRecordSet`), gzip included.
-- `KafkaRequests` writes Produce v3 and Fetch v4; `KafkaResponses` reads their responses into
-  `KafkaPartitionResponse`; `KafkaResponseReader` reads one sized response and checks its correlation id.
+- `KafkaRequests` writes Metadata v4, Produce v3 and Fetch v4; `KafkaResponses` reads the Produce and Fetch responses
+  into `KafkaPartitionResponse`, and `KafkaMetadataResponse` reads Metadata into the partition's `KafkaMetadataLeader`; `KafkaResponseReader` reads one sized response and checks its correlation id.

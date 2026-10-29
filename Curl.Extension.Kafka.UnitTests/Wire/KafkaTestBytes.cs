@@ -35,6 +35,31 @@ internal static class KafkaTestBytes
         return Framed(records is null ? body.Int32(-1) : body.Bytes(records));
     }
 
+    /// <summary>
+    /// Gives a framed Metadata v4 response for one topic: <paramref name="brokers"/> by node id, host and port, and
+    /// <paramref name="partitions"/> by error code, index and leader id, each with one replica and one in-sync replica.
+    /// </summary>
+    public static byte[] MetadataResponse(int correlationId, short topicErrorCode, (int NodeId, string Host, int Port)[] brokers, params (short ErrorCode, int Index, int LeaderId)[] partitions)
+    {
+        KafkaWriter body = new KafkaWriter().Int32(correlationId).Int32(0).Int32(brokers.Length);
+        foreach ((int nodeId, string host, int port) in brokers)
+        {
+            body.Int32(nodeId).String(host).Int32(port).NullString();
+        }
+
+        body.String("cluster").Int32(0).Int32(1).Int16(topicErrorCode).String("t").Int8(0).Int32(partitions.Length);
+        foreach ((short errorCode, int index, int leaderId) in partitions)
+        {
+            body.Int16(errorCode).Int32(index).Int32(leaderId).Int32(1).Int32(leaderId).Int32(1).Int32(leaderId);
+        }
+
+        return Framed(body);
+    }
+
+    /// <summary>Gives a framed Metadata v4 response naming <paramref name="host"/>:<paramref name="port"/> as the leader of partitions 0 to 2.</summary>
+    public static byte[] MetadataLeader(int correlationId, string host, int port) =>
+        MetadataResponse(correlationId, 0, [(1, host, port)], (0, 0, 1), (0, 1, 1), (0, 2, 1));
+
     /// <summary>Gives <paramref name="body"/> with its <c>INT32</c> size prefix.</summary>
     public static byte[] Framed(KafkaWriter body)
     {

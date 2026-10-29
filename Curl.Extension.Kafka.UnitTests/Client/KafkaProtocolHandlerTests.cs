@@ -10,22 +10,24 @@ public sealed class KafkaProtocolHandlerTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000);
 
+    private static readonly byte[] Leader = KafkaTestBytes.MetadataLeader(1, "broker", 9092);
+
     [TestMethod]
     public async Task ExecuteAsync_Body_ProducesOneRecordToTheUrlsPartition()
     {
-        ScriptedKafkaConnection connection = new(KafkaTestBytes.ProduceResponse(1, 0, 17));
+        ScriptedKafkaConnection connection = new(Leader, KafkaTestBytes.ProduceResponse(2, 0, 17));
 
         TransferResult result = await ExecuteAsync(connection, "kafka://broker/orders/2", new MemoryStream(), "hi");
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        CollectionAssert.AreEqual(KafkaRequests.Produce(1, "orders", 2, KafkaRecordBatch.Encode("hi"u8, Now.ToUnixTimeMilliseconds())), connection.Writes.Single());
+        CollectionAssert.AreEqual(KafkaRequests.Produce(2, "orders", 2, KafkaRecordBatch.Encode("hi"u8, Now.ToUnixTimeMilliseconds())), connection.Writes[1]);
         Assert.IsTrue(connection.IsDisposed);
     }
 
     [TestMethod]
     public async Task ExecuteAsync_ProduceRefused_EndsWithWeirdServerReplyNamingTheError()
     {
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.ProduceResponse(1, 3)), "kafka://broker/orders", new MemoryStream(), "hi");
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.ProduceResponse(2, 3)), "kafka://broker/orders", new MemoryStream(), "hi");
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic orders partition 0", result.ErrorMessage);
@@ -36,7 +38,7 @@ public sealed class KafkaProtocolHandlerTests
     {
         byte[] first = KafkaTestBytes.Batch(4, 1, 2, [.. KafkaTestBytes.Record(0, "a"u8.ToArray()), .. KafkaTestBytes.Record(1, "b"u8.ToArray())]);
         byte[] second = KafkaTestBytes.Batch(6, 0, 1, KafkaTestBytes.Record(0, "c"u8.ToArray()));
-        ScriptedKafkaConnection connection = new(KafkaTestBytes.FetchResponse(1, 0, 7, first), KafkaTestBytes.FetchResponse(2, 0, 7, second));
+        ScriptedKafkaConnection connection = new(Leader, KafkaTestBytes.FetchResponse(2, 0, 7, first), KafkaTestBytes.FetchResponse(3, 0, 7, second));
         MemoryStream output = new();
 
         TransferResult result = await ExecuteAsync(connection, "kafka://broker/orders/1?offset=5", output);
@@ -44,18 +46,18 @@ public sealed class KafkaProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual("b\nc\n", Encoding.UTF8.GetString(output.ToArray()));
         Assert.AreEqual(4L, result.BytesTransferred);
-        CollectionAssert.AreEqual(new[] { KafkaRequests.Fetch(1, "orders", 1, 5), KafkaRequests.Fetch(2, "orders", 1, 6) }.SelectMany(bytes => bytes).ToArray(), connection.Writes.SelectMany(bytes => bytes).ToArray());
+        CollectionAssert.AreEqual(new[] { KafkaRequests.Fetch(2, "orders", 1, 5), KafkaRequests.Fetch(3, "orders", 1, 6) }.SelectMany(bytes => bytes).ToArray(), connection.Writes.Skip(1).SelectMany(bytes => bytes).ToArray());
     }
 
     [TestMethod]
     public async Task ExecuteAsync_FetchWithNoWholeBatch_StopsRatherThanFetchingTheSameOffsetAgain()
     {
-        ScriptedKafkaConnection connection = new(KafkaTestBytes.FetchResponse(1, 0, 100, [0, 0, 0]));
+        ScriptedKafkaConnection connection = new(Leader, KafkaTestBytes.FetchResponse(2, 0, 100, [0, 0, 0]));
 
         TransferResult result = await ExecuteAsync(connection, "kafka://broker/orders", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual(1, connection.Writes.Count);
+        Assert.AreEqual(2, connection.Writes.Count);
     }
 
     [TestMethod]
@@ -63,7 +65,7 @@ public sealed class KafkaProtocolHandlerTests
     [DataRow((short)999, "Kafka broker answered error 999 (UNNAMED) for topic orders partition 0")]
     public async Task ExecuteAsync_FetchRefused_EndsWithWeirdServerReplyNamingTheError(short errorCode, string message)
     {
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.FetchResponse(1, errorCode, 0, null)), "kafka://broker/orders", new MemoryStream());
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.FetchResponse(2, errorCode, 0, null)), "kafka://broker/orders", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
@@ -75,7 +77,7 @@ public sealed class KafkaProtocolHandlerTests
         byte[] batch = KafkaTestBytes.Batch(0, 0, 1, KafkaTestBytes.Record(0, "a"u8.ToArray()));
         batch[^2] ^= 0xFF;
 
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.FetchResponse(1, 0, 1, batch)), "kafka://broker/orders", new MemoryStream());
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.FetchResponse(2, 0, 1, batch)), "kafka://broker/orders", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual("Kafka record batch fails its CRC-32C check", result.ErrorMessage);
@@ -84,7 +86,7 @@ public sealed class KafkaProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_TruncatedResponseBody_EndsWithWeirdServerReply()
     {
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.Framed(new KafkaWriter().Int32(1))), "kafka://broker/orders", new MemoryStream());
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.Framed(new KafkaWriter().Int32(2))), "kafka://broker/orders", new MemoryStream());
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
         Assert.AreEqual(KafkaReader.Truncated, result.ErrorMessage);
@@ -93,10 +95,10 @@ public sealed class KafkaProtocolHandlerTests
     [TestMethod]
     public async Task ExecuteAsync_WrongCorrelationId_EndsWithWeirdServerReply()
     {
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.ProduceResponse(9, 0)), "kafka://broker/orders", new MemoryStream(), "hi");
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.ProduceResponse(9, 0)), "kafka://broker/orders", new MemoryStream(), "hi");
 
         Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
-        Assert.AreEqual("Kafka response has correlation id 9, not 1", result.ErrorMessage);
+        Assert.AreEqual("Kafka response has correlation id 9, not 2", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -114,7 +116,7 @@ public sealed class KafkaProtocolHandlerTests
         TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection { FailsWrites = true }, "kafka://broker/orders", new MemoryStream(), "hi");
 
         Assert.AreEqual(CurlExitCode.SendError, result.ExitCode);
-        Assert.AreEqual("Failed sending Kafka Produce request", result.ErrorMessage);
+        Assert.AreEqual("Failed sending Kafka Metadata request", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -122,7 +124,7 @@ public sealed class KafkaProtocolHandlerTests
     {
         byte[] batch = KafkaTestBytes.Batch(0, 0, 1, KafkaTestBytes.Record(0, "abc"u8.ToArray()));
 
-        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.FetchResponse(1, 0, 1, batch)), "kafka://broker/orders", new FailingStream());
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(Leader, KafkaTestBytes.FetchResponse(2, 0, 1, batch)), "kafka://broker/orders", new FailingStream());
 
         Assert.AreEqual(CurlExitCode.WriteError, result.ExitCode);
         Assert.AreEqual("Failure writing output to destination, passed 4 returned 0", result.ErrorMessage);
@@ -155,6 +157,69 @@ public sealed class KafkaProtocolHandlerTests
         Assert.AreEqual(CurlExitCode.UrlMalformat, result.ExitCode);
         Assert.AreEqual(KafkaClientMessages.NoTopic, result.ErrorMessage);
         Assert.IsNull(connector.Target);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UrlsBrokerIsNotTheLeader_ProducesThroughTheLeaderMetadataNames()
+    {
+        ScriptedKafkaConnection first = new(KafkaTestBytes.MetadataLeader(1, "leader", 9192));
+        ScriptedKafkaConnection second = new(KafkaTestBytes.ProduceResponse(1, 0, 17));
+        ScriptedKafkaConnector connector = new(ConnectResult.Connected(first), ConnectResult.Connected(second));
+
+        TransferResult result = await new KafkaProtocolHandler(connector).ExecuteAsync(Context("kafkas://broker/orders/2", new MemoryStream(), "hi"));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(KafkaRequests.Metadata(1, "orders"), first.Writes.Single());
+        CollectionAssert.AreEqual(KafkaRequests.Produce(1, "orders", 2, KafkaRecordBatch.Encode("hi"u8, Now.ToUnixTimeMilliseconds())), second.Writes.Single());
+        Assert.IsTrue(first.IsDisposed);
+        Assert.IsTrue(second.IsDisposed);
+        Assert.AreEqual(("leader", 9192, true), (connector.Targets[1].Host, connector.Targets[1].Port, connector.Targets[1].UseTls));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_LeaderRefusesTheConnection_EndsWithCouldntConnect()
+    {
+        ScriptedKafkaConnector connector = new(ConnectResult.Connected(new ScriptedKafkaConnection(KafkaTestBytes.MetadataLeader(1, "leader", 9092))), ConnectResult.Refused("refused"));
+
+        TransferResult result = await new KafkaProtocolHandler(connector).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream()));
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.AreEqual("leader", connector.Targets[1].Host);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TopicUnknownToMetadata_EndsWithWeirdServerReplyNamingTheError()
+    {
+        ScriptedKafkaConnection connection = new(KafkaTestBytes.MetadataResponse(1, 3, [(1, "broker", 9092)]));
+
+        TransferResult result = await ExecuteAsync(connection, "kafka://broker/orders", new MemoryStream());
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual("Kafka broker answered error 3 (UNKNOWN_TOPIC_OR_PARTITION) for topic orders partition 0", result.ErrorMessage);
+        Assert.AreEqual(1, connection.Writes.Count);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_MalformedMetadata_EndsWithWeirdServerReply()
+    {
+        TransferResult result = await ExecuteAsync(new ScriptedKafkaConnection(KafkaTestBytes.Framed(new KafkaWriter().Int32(1).Int32(0).Int32(0))), "kafka://broker/orders", new MemoryStream());
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.AreEqual(KafkaReader.Truncated, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    [DataRow("broker", 9092, false)]
+    [DataRow("BROKER", 9092, false)]
+    [DataRow("broker", 9093, true)]
+    [DataRow("other", 9092, true)]
+    public void RedirectOf_Leader_IsNullOnlyForTheSameHostAndPort(string host, int port, bool redirects)
+    {
+        ConnectTarget target = new("broker", 9092, false);
+
+        ConnectTarget? redirect = KafkaProtocolHandler.RedirectOf(Context("kafka://broker/t", new MemoryStream()), target, new KafkaMetadataLeader(0, host, port));
+
+        Assert.AreEqual(redirects, redirect is not null);
     }
 
     [TestMethod]

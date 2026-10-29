@@ -4,9 +4,10 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Kafka.Client;
 
 /// <summary>
-/// The Kafka exchange over any byte transport (ADR-1076): Produce v3 of one record and its acknowledgement, or Fetch
-/// v4 from an offset, writing each record's value and a line feed to the output and fetching again until the
-/// partition's high watermark. A partition error, a malformed response or a wrong correlation id ends with exit 8.
+/// The Kafka exchange over any byte transport (ADR-1076, ADR-1077): Metadata v4 to find the partition's leader, then
+/// Produce v3 of one record and its acknowledgement, or Fetch v4 from an offset, writing each record's value and a line
+/// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
+/// response or a wrong correlation id ends with exit 8.
 /// </summary>
 internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
 {
@@ -17,12 +18,24 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     /// <summary>The bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
 
+    /// <summary>
+    /// Sends Metadata for the address's topic and gives the host and port of the broker that leads its partition; a
+    /// topic or partition error, or a partition with no leader among the brokers, ends with exit 8 naming the error.
+    /// </summary>
+    internal async ValueTask<KafkaMetadataLeader> FindLeaderAsync(KafkaAddress address)
+    {
+        ReadOnlyMemory<byte> body = await ExchangeAsync("Metadata", id => KafkaRequests.Metadata(id, address.Topic)).ConfigureAwait(false);
+        KafkaMetadataLeader leader = Decoded(() => KafkaMetadataResponse.ReadLeader(body, address.Partition));
+        ThrowOnError(leader.ErrorCode, address);
+        return leader;
+    }
+
     /// <summary>Produces one record whose value is <paramref name="value"/> to the address's partition.</summary>
     internal async ValueTask ProduceAsync(KafkaAddress address, ReadOnlyMemory<byte> value, long timestampMilliseconds)
     {
         byte[] batch = KafkaRecordBatch.Encode(value.Span, timestampMilliseconds);
         ReadOnlyMemory<byte> body = await ExchangeAsync("Produce", id => KafkaRequests.Produce(id, address.Topic, address.Partition, batch)).ConfigureAwait(false);
-        ThrowOnError(Decoded(() => KafkaResponses.ReadProduce(body)), address);
+        ThrowOnError(Decoded(() => KafkaResponses.ReadProduce(body)).ErrorCode, address);
         progress.ReportUploaded(value.Length, value.Length);
     }
 
@@ -34,7 +47,7 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
             long fetchOffset = offset;
             ReadOnlyMemory<byte> body = await ExchangeAsync("Fetch", id => KafkaRequests.Fetch(id, address.Topic, address.Partition, fetchOffset)).ConfigureAwait(false);
             KafkaPartitionResponse response = Decoded(() => KafkaResponses.ReadFetch(body));
-            ThrowOnError(response, address);
+            ThrowOnError(response.ErrorCode, address);
             KafkaRecordSet records = Decoded(() => KafkaRecordBatch.Decode(response.Records, fetchOffset));
             foreach (KafkaRecord record in records.Records)
             {
@@ -62,11 +75,11 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
         }
     }
 
-    private static void ThrowOnError(KafkaPartitionResponse response, KafkaAddress address)
+    private static void ThrowOnError(short errorCode, KafkaAddress address)
     {
-        if (response.ErrorCode != 0)
+        if (errorCode != 0)
         {
-            throw new KafkaClientException(CurlExitCode.WeirdServerReply, KafkaClientMessages.BrokerError(response.ErrorCode, address.Topic, address.Partition));
+            throw new KafkaClientException(CurlExitCode.WeirdServerReply, KafkaClientMessages.BrokerError(errorCode, address.Topic, address.Partition));
         }
     }
 
