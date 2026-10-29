@@ -50,7 +50,7 @@ option parser and transfers do the rest, and no transfer changes.
 
 ## Left out, and why
 
-- **YAML descriptions.** The base class library has no YAML reader; BL-4275 writes one. Until then a YAML file
+- **YAML descriptions.** The base class library has no YAML reader; BL-4287 writes one. Until then a YAML file
   fails with "is not a JSON OpenAPI description", exit 2.
 - **Remote descriptions and non-local `$ref`s.** An expander runs before any transfer and reads only files
   (ADR-1040); fetching first is `curl -o spec.json <url>`. A `$ref` to another document fails with exit 2.

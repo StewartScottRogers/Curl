@@ -1,5 +1,5 @@
 ---
-id: BL-4275
+id: BL-4287
 title: Extension: read YAML OpenAPI descriptions with --openapi
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4275 — Extension: read YAML OpenAPI descriptions with --openapi
+# BL-4287 — Extension: read YAML OpenAPI descriptions with --openapi
 
 ## Goal
 
