@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.ServerSentEvents.UnitLibrary, Curl.Extension.ServerSentEvents.UnitTests, Curl.slnx]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4175 — Extension: Server-Sent Events wire-format parser for text/event-stream
 
@@ -22,14 +22,20 @@ Split from BL-4110 for size (its Notes ask for "wire format, then the client flo
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.ServerSentEvents.UnitLibrary` and `Curl.Extension.ServerSentEvents.UnitTests` exist in `/Extensions/ServerSentEvents/` in `Curl.slnx` and the build's `VerifyExtensionIsolation` passes.
-- [ ] Its parser yields events, the last event ID and the reconnection time from `text/event-stream` bytes fed in arbitrary chunks, per §9.2.6, with unit tests citing the section for each rule above (including the specification's own examples).
-- [ ] The library meets the four quality gates by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Curl.Extension.ServerSentEvents.UnitLibrary` and `Curl.Extension.ServerSentEvents.UnitTests` exist in `/Extensions/ServerSentEvents/` in `Curl.slnx` and the build's `VerifyExtensionIsolation` passes.
+- [x] Its parser yields events, the last event ID and the reconnection time from `text/event-stream` bytes fed in arbitrary chunks, per §9.2.6, with unit tests citing the section for each rule above (including the specification's own examples).
+- [x] The library meets the four quality gates by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Pipeline `feature` run directly in one lane pass: a single BCL-only class with no seams to plan, so the architect stage was skipped (sensible default, rule 1).
+- `EventStreamParser.Parse(ReadOnlySpan<byte>)` returns the events each chunk completes; `LastEventId` and `ReconnectionTimeMilliseconds` are properties. Decisions (the 64-bit `retry` limit, decoding, API shape) in ADR-1010.
+- 29 unit tests, each citing §9.2.6; the specification's four examples are fed whole and one byte at a time. Measure-CodeQuality: 100% line and branch, 8 members, worst CRAP 8 (ReadCharacter split after a first run found complexity 12).
+- Platform-neutral: pure in-memory parsing, no paths, OS text or scheduling, so CI on Linux and macOS sees the same results.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 6fec639a 5e614b5d 3180db99 3d836d5e.
+- 2026-10-29: Doing -> Done. EventStreamParser turns text/event-stream bytes fed in any chunks into events, last event ID and reconnection time per WHATWG 9.2.6
