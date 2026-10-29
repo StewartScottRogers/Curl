@@ -1610,6 +1610,7 @@ public sealed class HttpProtocolHandler(
             SharedHeadLength = framing.AwaitsContinue ? 0 : request.Length,
             HeldHead = request,
             IsUpload = framing.IsUpload,
+            IsReadFunctionBody = framing.Body is StreamBody { ContentType: var bodyType } && !bodyType.StartsWith("multipart/", StringComparison.Ordinal),
             Progress = plan.Progress,
             Events = plan.Context.Events,
             EarlyResponseWatch = responseConnection as HttpContinueWaitConnection,

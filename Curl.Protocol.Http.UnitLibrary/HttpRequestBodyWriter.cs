@@ -106,6 +106,12 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     internal bool IsUpload { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether the body is a non-multipart stream (a <c>CURLOPT_READFUNCTION</c> POST), whose
+    /// short read curl reports as <c>client read function EOF fail</c> like a <c>-T</c> upload (CGR-261).
+    /// </summary>
+    internal bool IsReadFunctionBody { get; init; }
+
+    /// <summary>
     /// Gets where the body bytes sent so far (<see cref="BytesSent" />, chunk framing included) are
     /// reported, with the body's length when it is known: after each piece and the closing chunk, and
     /// once before the first byte unless the head waited for <c>100 Continue</c>, after which curl
@@ -783,7 +789,7 @@ internal sealed class HttpRequestBodyWriter(IConnection connection)
     {
         if (length is { } needed)
         {
-            string message = IsUpload
+            string message = IsUpload || IsReadFunctionBody
                 ? HttpTransferMessages.UploadEndedEarly(BytesWritten, needed)
                 : HttpTransferMessages.BodyStreamEndedEarly(BytesWritten, needed);
             throw new HttpTransferException(CurlExitCode.ReadError, message);
