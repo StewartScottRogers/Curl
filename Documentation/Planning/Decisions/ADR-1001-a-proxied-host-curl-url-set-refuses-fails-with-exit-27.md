@@ -14,4 +14,4 @@ A UTS 46 mapping can leave a character in an ASCII host that curl's URL parser w
 
 ## Consequences
 
-On Windows, `CurlUrlHost` converts a non-ASCII host from its bytes read as Windows-1252, which leaves no such character, so the path is reached only off Windows. Its end-to-end test runs only there. BL-4088 makes it covered on Windows.
+On Windows, `CurlUrlHost` converts a non-ASCII host from its bytes read as Windows-1252, which leaves no such character, so the path is reached only off Windows. Its end-to-end test runs only there. BL-4090 makes it covered on Windows.

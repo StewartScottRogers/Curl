@@ -1,5 +1,5 @@
 ---
-id: BL-4088
+id: BL-4090
 title: Cover HttpProtocolHandler's absolute-form host refusal on Windows
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4088 — Cover HttpProtocolHandler's absolute-form host refusal on Windows
+# BL-4090 — Cover HttpProtocolHandler's absolute-form host refusal on Windows
 
 ## Goal
 
