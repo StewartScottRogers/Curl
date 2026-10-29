@@ -57,6 +57,12 @@ internal static class CurlComposition
     private static readonly Func<CurlExitCode, string> EasyErrorText = new(CurlEasyErrorText.Of);
 
     /// <summary>
+    /// <see cref="Environment.GetEnvironmentVariable(string)" /> as one delegate made once, so no call site
+    /// re-checks a compiler-cached method-group delegate, whose two sides coverage counted by test order (BL-4083).
+    /// </summary>
+    private static readonly Func<string, string?> ProcessEnvironmentVariable = new(Environment.GetEnvironmentVariable);
+
+    /// <summary>
     /// Creates the runner that parses a command line and performs its transfers against
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
@@ -694,8 +700,7 @@ internal static class CurlComposition
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
     internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null, ConnectionHooks? extensionConnectionHooks = null)
     {
-        // One delegate for both readers, so the compiler's cached method group is checked once (BL-4173 Notes).
-        Func<string, string?> readEnvironmentVariable = Environment.GetEnvironmentVariable;
+        Func<string, string?> readEnvironmentVariable = ProcessEnvironmentVariable;
         return new(
             new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: extensionTransferHooks, extensionConnector: ExtensionConnectorOf(extensionConnectionHooks), extensionDatagramConnector: ExtensionDatagramConnectorOf(extensionConnectionHooks))),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
