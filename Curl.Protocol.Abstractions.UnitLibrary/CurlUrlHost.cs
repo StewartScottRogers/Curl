@@ -52,6 +52,36 @@ internal static class CurlUrlHost
     private static readonly bool HostAsWindows1252 = OperatingSystem.IsWindows();
 
     /// <summary>
+    /// Whether a host name that is not ASCII is refused because the locale is not UTF-8: off Windows,
+    /// libidn2 cannot convert such a name under <c>LC_ALL=C</c> and curl exits 3 (CGR-238).
+    /// </summary>
+    private static readonly bool LocaleRejectsNonAsciiName =
+        LocaleRejectsNonAsciiNameOn(OperatingSystem.IsWindows(), Environment.GetEnvironmentVariable);
+
+    /// <summary>Whether the platform and locale make libidn2 refuse a name that is not ASCII: any non-Windows platform not in a UTF-8 locale.</summary>
+    internal static bool LocaleRejectsNonAsciiNameOn(bool isWindows, Func<string, string?> getEnvironmentVariable) =>
+        !isWindows && !LocaleIsUtf8(getEnvironmentVariable);
+
+    /// <summary>
+    /// Whether the locale the environment names is UTF-8: the first non-empty of <c>LC_ALL</c>,
+    /// <c>LC_CTYPE</c> and <c>LANG</c> holds <c>UTF-8</c> or <c>utf8</c>; none set is the C locale.
+    /// </summary>
+    internal static bool LocaleIsUtf8(Func<string, string?> getEnvironmentVariable)
+    {
+        foreach (string name in new[] { "LC_ALL", "LC_CTYPE", "LANG" })
+        {
+            string? value = getEnvironmentVariable(name);
+            if (!string.IsNullOrEmpty(value))
+            {
+                return value.Contains("UTF-8", StringComparison.OrdinalIgnoreCase)
+                    || value.Contains("UTF8", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Normalises <paramref name="host" />, or returns <see langword="false" /> when curl
     /// rejects it, with <paramref name="rejection" /> saying why. With
     /// <paramref name="refuseUnconvertibleName" />, as for the URL of a transfer, a name
@@ -65,7 +95,7 @@ internal static class CurlUrlHost
         out string idnHost,
         out string? zoneId,
         out CurlUrlRejection rejection) =>
-        TryNormalizeReadingHost(host, refuseUnconvertibleName, HostAsWindows1252, out normalized, out idnHost, out zoneId, out rejection);
+        TryNormalizeReadingHost(host, refuseUnconvertibleName, HostAsWindows1252, out normalized, out idnHost, out zoneId, out rejection, LocaleRejectsNonAsciiName);
 
     /// <summary>
     /// Normalises <paramref name="host" /> as <see cref="TryNormalize(string, bool, out string, out string, out string?, out CurlUrlRejection)" />
@@ -80,7 +110,8 @@ internal static class CurlUrlHost
         out string normalized,
         out string idnHost,
         out string? zoneId,
-        out CurlUrlRejection rejection)
+        out CurlUrlRejection rejection,
+        bool localeRejectsNonAsciiName = false)
     {
         zoneId = null;
         normalized = idnHost = string.Empty;
@@ -100,7 +131,7 @@ internal static class CurlUrlHost
         }
 
         string nameToConvert = hostAsWindows1252 ? ReadHostAsWindows1252(host) : ReadLatin1BytesAsUtf8(decoded);
-        rejection = NormalizeAddressOrName(decoded, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
+        rejection = NormalizeAddressOrName(decoded, nameToConvert, refuseUnconvertibleName, localeRejectsNonAsciiName, out normalized, out idnHost);
 
         return rejection == CurlUrlRejection.None;
     }
@@ -116,6 +147,7 @@ internal static class CurlUrlHost
         string host,
         string nameToConvert,
         bool refuseUnconvertibleName,
+        bool localeRejectsNonAsciiName,
         out string normalized,
         out string idnHost)
     {
@@ -133,7 +165,7 @@ internal static class CurlUrlHost
             return CurlUrlRejection.None;
         }
 
-        return NormalizeName(host, nameToConvert, refuseUnconvertibleName, out normalized, out idnHost);
+        return NormalizeName(host, nameToConvert, refuseUnconvertibleName, localeRejectsNonAsciiName, out normalized, out idnHost);
     }
 
     /// <summary>
@@ -147,6 +179,7 @@ internal static class CurlUrlHost
         string decoded,
         string nameToConvert,
         bool refuseUnconvertibleName,
+        bool localeRejectsNonAsciiName,
         out string normalized,
         out string idnHost)
     {
@@ -156,7 +189,7 @@ internal static class CurlUrlHost
             return CurlUrlRejection.BadHostname;
         }
 
-        string? converted = Ascii.IsValid(decoded) ? decoded : ToPunycode(nameToConvert);
+        string? converted = Ascii.IsValid(decoded) ? decoded : (localeRejectsNonAsciiName ? null : ToPunycode(nameToConvert));
         if (converted is null && refuseUnconvertibleName)
         {
             return CurlUrlRejection.IdnConversionFailed;
