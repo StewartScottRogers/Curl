@@ -1119,3 +1119,4 @@ Each option and the specific reason it lost.
 | [1075](ADR-1075-redis-sends-one-command-from-the-url-path-over-resp3-and-writes-its-reply-as-redis-cli-raw-does.md) | Redis sends one command from the URL path over RESP3 and writes its reply as redis-cli --raw does (BL-4122) | Accepted | 2026-10-29 |
 | [1079](ADR-1079-redis-sends-one-command-from-the-url-path-over-resp3-and-writes-its-reply-as-redis-cli-raw-does.md) | Redis sends one command from the URL path over RESP3 and writes its reply as redis-cli --raw does (BL-4122) | Accepted | 2026-10-29 |
 | [1080](ADR-1080-kafka-asks-the-urls-broker-for-metadata-and-connects-to-the-partitions-leader.md) | Kafka asks the URL's broker for Metadata and connects to the partition's leader (BL-4275) | Accepted | 2026-10-29 |
+| [1076](ADR-1076-ws-repl-is-a-transfer-hook-that-takes-over-ws-and-wss-transfers.md) | --ws-repl is a transfer hook that takes over ws and wss transfers (BL-4111) | Accepted | 2026-10-29 |
