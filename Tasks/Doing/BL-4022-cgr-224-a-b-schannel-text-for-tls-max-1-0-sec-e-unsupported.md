@@ -50,3 +50,4 @@ Each line is prefixed `curl: (35) schannel: next InitializeSecurityContext faile
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs (to pass the offered minimum, not just the ceiling), which BL-4009 holds in Doing; depends-on BL-4009
+- 2026-10-28: Backlog -> Doing. Criteria at claim: b0de8074 eddd41c7 4f4028d3 329708f7 3d836d5e.
