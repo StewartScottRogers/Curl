@@ -11,7 +11,7 @@ namespace Curl.Networking;
 /// loopback that nothing connects to; the real accept is in
 /// <see cref="TcpConnectionListenerTests" />' <c>Integration</c> test (BL-456). One test
 /// accepts a loopback peer that sends nothing, to see the FIN when the accepted connection is
-/// disposed (AF-0458, ADR-1015).
+/// disposed (AF-0458, ADR-1022).
 /// </summary>
 [TestClass]
 public sealed class TcpPendingConnectionTests

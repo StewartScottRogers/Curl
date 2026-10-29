@@ -582,7 +582,7 @@ the test, so TLS is tested without a socket. `TcpConnectionListenerTests` and
 `TcpPendingConnectionTests` bind local TCP sockets without connecting to them
 (`TcpPendingConnection.HasConnectionWaiting`, which polls the listening socket, is pinned on one nothing connects to, BL-2638),
 except `TcpPendingConnectionTests`' one accept of a loopback peer that sends nothing, which sees the
-FIN when the accepted connection is disposed, so the accepted socket stays owned (AF-0458, ADR-1015). The tests that
+FIN when the accepted connection is disposed, so the accepted socket stays owned (AF-0458, ADR-1022). The tests that
 connect or send bytes are the loopback tests in `TcpDialerTests` (TCP and Unix socket), `UdpDatagramChannelTests`,
 `TcpConnectorTests.LocalEndPoint` (plain and over TLS) and the accepting test in `TcpConnectionListenerTests`, tagged
 `[TestCategory("Integration")]`, as is `DnsSocketOpenerTests`' TCP connect. Per ADR-0083 the members only those tests can reach,

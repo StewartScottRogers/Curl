@@ -1,4 +1,4 @@
-# ADR-1015: A fast test accepts a silent loopback peer to see the accepted socket's FIN
+# ADR-1022: A fast test accepts a silent loopback peer to see the accepted socket's FIN
 
 - Status: Accepted
 - Date: 2026-10-29
