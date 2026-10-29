@@ -30,3 +30,4 @@ Prerequisite of BL-3990 (CGR-034), found by its 2026-10-28 run. `GetWaitSockets`
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 34f617db 779790c0.
