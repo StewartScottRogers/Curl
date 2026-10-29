@@ -1088,3 +1088,4 @@ Each option and the specific reason it lost.
 | [1053](ADR-1053-the-amqp1-type-codec-maps-each-amqp-type-to-one-clr-type-and-refuses-malformed-input-with-one-exception.md) | The AMQP 1.0 type codec maps each AMQP type to one CLR type and refuses malformed input with one exception (BL-4258) | Accepted | 2026-10-29 |
 | [1054](ADR-1054-mqtt5-over-websocket-upgrades-to-slash-mqtt-on-port-80-and-takes-the-topic-from-the-url-path.md) | MQTT 5 over WebSocket upgrades to /mqtt on port 80 and takes the topic from the URL path (BL-4244) | Accepted | 2026-10-29 |
 | [1055](ADR-1055-a-connection-hook-layers-curls-tls-over-its-own-stream.md) | A connection hook layers curl's TLS over its own stream (BL-4206) | Accepted | 2026-10-29 |
+| [1049](ADR-1049-the-amqp0-codec-maps-each-wire-fault-to-one-amqp-reply-code.md) | The AMQP 0-9-1 codec maps each wire fault to one AMQP reply code (BL-4259) | Accepted | 2026-10-29 |
