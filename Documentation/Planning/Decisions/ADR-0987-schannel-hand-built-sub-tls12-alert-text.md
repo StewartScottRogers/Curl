@@ -1,4 +1,4 @@
-# ADR-0984: The Schannel build's text for an alert received under a TLS 1.0 or 1.1 ceiling
+# ADR-0987: The Schannel build's text for an alert received under a TLS 1.0 or 1.1 ceiling
 
 - Status: Accepted
 - Date: 2026-10-28

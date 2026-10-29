@@ -17,7 +17,7 @@ public sealed partial class TlsFailureMessagesTests
     private const string SchannelUnsupportedFunction =
         "schannel: next InitializeSecurityContext failed: SEC_E_UNSUPPORTED_FUNCTION (0x80090302) - The function requested is not supported";
 
-    // Measured with curl 8.22.0 Schannel against openssl s_server's protocol_version alert (ADR-0984).
+    // Measured with curl 8.22.0 Schannel against openssl s_server's protocol_version alert (ADR-0987).
     [TestMethod]
     [DataRow(TlsHandshakeFailureOrigin.TransportClosed, TlsVersion.SystemDefault, TlsVersion.SystemDefault, SchannelHandshakeNotReceived)]
     [DataRow(TlsHandshakeFailureOrigin.TransportClosed, TlsVersion.SystemDefault, TlsVersion.Tls10, SchannelHandshakeNotReceived)]
