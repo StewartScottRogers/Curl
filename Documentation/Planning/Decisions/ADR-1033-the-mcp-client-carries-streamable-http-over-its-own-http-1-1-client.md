@@ -1,4 +1,4 @@
-# ADR-1028: The MCP client carries Streamable HTTP over its own HTTP/1.1 client
+# ADR-1033: The MCP client carries Streamable HTTP over its own HTTP/1.1 client
 
 - Status: Accepted
 - Date: 2026-10-29
