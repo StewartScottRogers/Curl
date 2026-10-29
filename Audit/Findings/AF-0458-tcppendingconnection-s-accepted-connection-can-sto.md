@@ -3,8 +3,8 @@ id: AF-0458
 title: TcpPendingConnection's accepted connection can stop owning its socket (ownsSocket: true -> false) with no test failing, so an accepted data connection is never closed
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:NetworkStream-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpPendingConnection.cs:99:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
