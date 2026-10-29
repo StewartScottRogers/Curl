@@ -1,6 +1,6 @@
 # Curl.Extension.OpenApi.UnitLibrary
 
-The OpenAPI extension (ADR-0999, ADR-1075), tested against the OpenAPI Specification 3.1
+The OpenAPI extension (ADR-0999, ADR-1083), tested against the OpenAPI Specification 3.1
 (spec.openapis.org/oas/v3.1.1). Namespace `Curl.Extension.OpenApi`. It references only `Curl.Extension.Abstractions`
 (and through it `Curl.Protocol.Abstractions`) and the base class library; descriptions are read with
 `System.Text.Json`'s `JsonDocument` (no serializer, so AOT-safe).

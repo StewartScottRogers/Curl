@@ -5,7 +5,7 @@ namespace Curl.Extension.OpenApi;
 
 /// <summary>
 /// Expands <c>--openapi &lt;spec&gt; --operation &lt;id&gt; name=value...</c> into the curl arguments that call the
-/// operation (ADR-1040, ADR-1051, ADR-1075): the method, the server URL with the path and query, the header and
+/// operation (ADR-1040, ADR-1051, ADR-1083): the method, the server URL with the path and query, the header and
 /// cookie parameters, and the body. A <c>--openapi-server &lt;url&gt;</c> in the same group replaces the description's
 /// server URL.
 /// </summary>

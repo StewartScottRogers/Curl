@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Description;
 
 namespace Curl.Extension.OpenApi;
 
-/// <summary>The command-line options the OpenAPI extension adds, and its description (ADR-1075).</summary>
+/// <summary>The command-line options the OpenAPI extension adds, and its description (ADR-1083).</summary>
 public static class OpenApiOptions
 {
     /// <summary>Gets <c>--openapi &lt;spec&gt;</c>: the OpenAPI description, a JSON file, whose operation the group calls.</summary>

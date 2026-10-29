@@ -1,4 +1,4 @@
-# ADR-1075 — --openapi expands an operation of an OpenAPI description into curl arguments
+# ADR-1083 — --openapi expands an operation of an OpenAPI description into curl arguments
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
