@@ -41,8 +41,8 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
 
 - Snappy, lz4 and zstd batches end with exit 8: the BCL has none of the three, and each is a decoder of its own to
   write by hand, filed as BL-4277.
-- Metadata and leader routing: the request goes to the URL's broker, which answers NOT_LEADER_OR_FOLLOWER when it does
-  not lead the partition; filed as BL-4275.
+- Metadata and leader routing: superseded by ADR-1077 (BL-4275), which asks the URL's broker for Metadata v4 first
+  and sends Produce or Fetch to the partition's leader.
 - SASL authentication (`--user`): filed as BL-4276, after BL-4275 since both change the connection flow.
 - Keys, headers, transactions, idempotent producing, consumer groups and offset commits: no curl option maps onto
   them without inventing new options. A later task can add options for them through the extension option catalogue.
