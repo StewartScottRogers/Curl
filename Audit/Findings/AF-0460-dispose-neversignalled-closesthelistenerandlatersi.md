@@ -3,8 +3,8 @@ id: AF-0460
 title: Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing has no assertion, so the listener's closing is never checked
 auditor: quality
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs:Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing:no-assertion
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs -Pat
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
