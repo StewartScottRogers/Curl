@@ -4,8 +4,8 @@ title: Fix flaky CI test job Quality gates (windows-latest) step Measure coverag
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Measure-CodeQuality.ps1]
+depends-on: [BL-4082]
+touches: [Measure-CodeQuality.ps1, Curl.Engine.UnitLibrary/EngineComposition.cs, Curl.Engine.UnitTests/EngineCompositionTests.Extensions.cs, Curl.Console/CurlComposition.cs, Curl.Console.UnitTests/CurlCompositionTests.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -31,7 +31,13 @@ Lanes test only on Windows, so reproduce with `gh run view 40885502110 --log-fai
 
 ## Notes
 
+- 2026-10-29 (lane 1, first pass, no code edited): Neither failure is in Measure-CodeQuality.ps1. Both come from BL-4079 (f7b52c9e0, ADR-0999), which landed just before 000cd2ae:
+  - `EngineComposition.CreateProtocolHandlers` complexity: BL-4079 added `.. extensionHandlers?.Invoke(new ProtocolHandlerServices(...)) ?? []` to the handler array. That adds two branch points and puts the method past 10. Fix: move that expression into a small private static method (e.g. `ExtensionHandlersOf(extensionHandlers, services)`) and cover both of its branches in `EngineCompositionTests.Extensions.cs`.
+  - `CurlComposition.CreateTransferDispatch(CurlTransports, bool, ...)` branch: BL-4079 added `ExtensionProtocolHandlers.For(Environment.GetEnvironmentVariable)` beside the existing `new ProxySelector(Environment.GetEnvironmentVariable)`. Each method-group conversion compiles to a cached-delegate `??` check, which coverlet counts as a branch. Both sites share one cache field, and the first evaluation in a test process fills it. So which side of each check gets covered depends on test order and on the coverage shard. That is what makes the failure intermittent. Fix: make the delegate one `private static readonly Func<string, string?>` field set once (no branch at the use sites) (or cover both sides of `cookies?.HandlerStore` if coverlet still reports a branch), and check the branch with Measure-CodeQuality.ps1 -Library Curl.Console,Curl.Engine.UnitLibrary.
+  - Touches widened to those files (Curl.Console/CurlComposition.cs is not held by any Doing task). Curl.Engine.UnitLibrary is held whole by BL-4082 (Doing on origin/work/dark-factory), so BL-4082 was added to depends-on and the task requeued.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 32ef7b66 e2ff6521.
+- 2026-10-29: Doing -> Backlog. Needs Curl.Engine.UnitLibrary/EngineComposition.cs, held whole by BL-4082 (Doing); depends-on BL-4082
