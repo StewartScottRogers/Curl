@@ -22,11 +22,13 @@ Split from BL-4277 (which wires the decoders into Curl.Extension.Kafka.UnitLibra
 
 ## Acceptance criteria
 
-- [ ] Lz4FrameDecompressor decompresses frames with compressed and uncompressed blocks, long literal and match lengths, overlapping matches and the optional fields present, checked by unit tests against hand-assembled vectors.
-- [ ] A wrong magic number, truncated input and an offset of 0 or before the start of the output throw FormatException naming lz4.
-- [ ] The library meets the four quality gates and the fast tests pass.
+- [x] Lz4FrameDecompressor decompresses frames with compressed and uncompressed blocks, long literal and match lengths, overlapping matches and the optional fields present, checked by unit tests against hand-assembled vectors.
+- [x] A wrong magic number, truncated input and an offset of 0 or before the start of the output throw FormatException naming lz4.
+- [x] The library meets the four quality gates and the fast tests pass.
 
 ## Notes
+
+- Decision: header, block and content checksums (xxHash32) are skipped, not verified; the record batch CRC covers integrity. Linked blocks decode (matches may reach earlier blocks). Quality run: 0 failing members.
 
 ## Log
 
