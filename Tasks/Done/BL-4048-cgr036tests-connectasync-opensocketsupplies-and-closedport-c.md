@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/Cgr036Tests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4048 — Cgr036Tests ConnectAsync_OpenSocketSupplies and ClosedPort_CallsOpen fail in the full fast run and pass alone
 
@@ -22,12 +22,15 @@ Seen by BL-4010's run on 2026-10-28 (Windows, nine lanes building): both failed 
 
 ## Acceptance criteria
 
-- [ ] Both tests wait for the event they need (or move to an Integration project if they touch a real socket), and pass in the full fast run.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Both tests wait for the event they need (or move to an Integration project if they touch a real socket), and pass in the full fast run.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Not reproducible here (passes alone and in the full Engine run). Tests run method-level parallel on a machine with nine lanes, so the freed port the closed-port test dials could be taken by a listener elsewhere, making the connect succeed. ClosedLoopbackPort now probes the port and picks another if anything accepts on it; the supplied-socket test starts AcceptAsync before the connect and bounds the wait at 30 s. No real-socket move needed (loopback only, per the lane rules).
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: cb8ac472 3d836d5e.
+- 2026-10-28: Doing -> Done. Cgr036 closed-port test probes for a taken port; supplied-socket test accepts before connecting
