@@ -34,3 +34,4 @@ BL-4087 adds the fake-clock test. The stash's Cgr109Tests fail-early test hung i
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 2b0d65e4 4e425806 e1984c9d.
