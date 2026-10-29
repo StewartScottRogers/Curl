@@ -5,7 +5,7 @@ namespace Curl.Extension.Xmpp.Client;
 
 /// <summary>
 /// Serves <c>xmpp://[user@]domain[:port]/[target-jid][?query]</c> (port 5222, STARTTLS when offered) and <c>xmpps://</c>
-/// (port 5223, TLS from the connector, XEP-0368) as RFC 5122's authority form (ADR-1066): it logs in to the URL's domain
+/// (port 5223, TLS from the connector, XEP-0368) as RFC 5122's authority form (ADR-1068): it logs in to the URL's domain
 /// with <c>--user</c>, then sends the message or disco query <see cref="XmppRequests"/> makes of the URL's query to the
 /// path's JID, or to the domain itself when the path is empty. The exchange is <see cref="XmppClientFlow"/>.
 /// </summary>

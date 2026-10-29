@@ -36,7 +36,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 - ExtensionDescriptionCatalogue.cs added to touches: it lists each extension's description for --extensions and --ai-help extensions. CurlCompositionTests.cs added: its list of TCP handlers names each handler, so XmppProtocolHandler joins it.
-- SCRAM-SHA-1/256 is not yet done (ADR-1066); PLAIN over STARTTLS and ANONYMOUS are. Tests are platform-neutral (no paths, output written without indentation so no platform newline), so CI on Linux and macOS holds.
+- SCRAM-SHA-1/256 is not yet done (ADR-1068); PLAIN over STARTTLS and ANONYMOUS are. Tests are platform-neutral (no paths, output written without indentation so no platform newline), so CI on Linux and macOS holds.
 - Quality: Measure-CodeQuality.ps1 reports Curl.Extension.Xmpp.UnitLibrary at 100% line and branch, 0 failing members.
 
 ## Log

@@ -8,7 +8,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Xmpp.Client;
 
 /// <summary>
-/// The XMPP client exchange (RFC 6120; ADR-1066): opens the stream (4.2), negotiates STARTTLS when the server offers it
+/// The XMPP client exchange (RFC 6120; ADR-1068): opens the stream (4.2), negotiates STARTTLS when the server offers it
 /// and the connection is not yet secure (5.4), authenticates with SASL PLAIN, or ANONYMOUS without credentials (6.4),
 /// restarting the stream after each (4.3.3), binds a server-chosen resource (7.6), sends the request stanza, writes a
 /// disco answer's payload to the output, then closes the stream (4.4) and reads until the server closes its own.

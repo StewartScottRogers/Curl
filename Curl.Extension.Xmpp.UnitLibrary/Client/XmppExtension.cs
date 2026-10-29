@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Xmpp.Client;
 
-/// <summary>The <c>xmpp://</c> and <c>xmpps://</c> extension's description and handler factory (ADR-1066).</summary>
+/// <summary>The <c>xmpp://</c> and <c>xmpps://</c> extension's description and handler factory (ADR-1068).</summary>
 public static class XmppExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

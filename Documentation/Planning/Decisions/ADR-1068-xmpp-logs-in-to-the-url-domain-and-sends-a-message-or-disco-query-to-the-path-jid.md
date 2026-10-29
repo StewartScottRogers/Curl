@@ -1,4 +1,4 @@
-# ADR-1066: XMPP logs in to the URL's domain and sends a message or disco query to the path's JID
+# ADR-1068: XMPP logs in to the URL's domain and sends a message or disco query to the path's JID
 
 - Status: Accepted
 - Date: 2026-10-29

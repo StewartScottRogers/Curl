@@ -1,6 +1,6 @@
 namespace Curl.Extension.Xmpp.Client;
 
-/// <summary>The error messages an XMPP transfer ends with (ADR-1066).</summary>
+/// <summary>The error messages an XMPP transfer ends with (ADR-1068).</summary>
 internal static class XmppClientMessages
 {
     /// <summary>The connection ended where an element was due.</summary>

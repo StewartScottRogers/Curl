@@ -7,7 +7,7 @@ namespace Curl.Extension.Xmpp.Client;
 
 /// <summary>
 /// Turns an <c>xmpp:</c> URI's query (RFC 5122, 2.2 "iquery"; the XMPP URI query registry's <c>message</c> and
-/// <c>disco</c> types) into the stanza the client sends (ADR-1066). <c>?message;subject=..;body=..;type=..</c> gives a
+/// <c>disco</c> types) into the stanza the client sends (ADR-1068). <c>?message;subject=..;body=..;type=..</c> gives a
 /// <c>&lt;message/&gt;</c> (RFC 6121, 5.2), its body from <c>-d</c> when given; <c>?disco;request=info|items;node=..</c>
 /// gives a service discovery <c>&lt;iq type='get'/&gt;</c> (XEP-0030, 3.1 and 4.1). With no query type, a body makes
 /// it a message and no body a disco#info query.
