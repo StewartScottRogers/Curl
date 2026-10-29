@@ -94,6 +94,16 @@ public sealed class TraceIdsTransferEvents(
     }
 
     /// <inheritdoc />
+    public void ReportWarning(string text)
+    {
+        lock (prefix)
+        {
+            prefix.Set(transferId, connectionId());
+            writer.ReportWarning(text);
+        }
+    }
+
+    /// <inheritdoc />
     public void ReportRequestHeader(ReadOnlySpan<byte> bytes)
     {
         lock (prefix)

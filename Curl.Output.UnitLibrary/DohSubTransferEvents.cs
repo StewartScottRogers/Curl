@@ -53,6 +53,9 @@ public sealed class DohSubTransferEvents(ITransferEvents inner, TlsBackend tlsBa
     public void ReportTlsTrust(TlsTrustEvent trust) => ReportLines(TransferEventInfoText.TlsTrust(trust, tlsBackend));
 
     /// <inheritdoc />
+    public void ReportWarning(string text) => inner.ReportWarning(text);
+
+    /// <inheritdoc />
     public void ReportCertificateVerifyResult(long verifyResult, bool isProxy) => inner.ReportCertificateVerifyResult(verifyResult, isProxy);
 
     /// <inheritdoc />
