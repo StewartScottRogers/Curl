@@ -8,7 +8,7 @@ depends-on: [BL-4091, BL-4093, BL-4092, BL-4197, BL-4198, BL-4199]
 touches: [Curl.Extension.S3.UnitLibrary, Curl.Extension.S3.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Console.UnitTests/CurlCompositionTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4124 — Extension: Read and write Amazon S3 objects with s3://
 
@@ -47,3 +47,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 5141452e 986a113e d035ed3b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4197 (project and SigV4 signer), BL-4198 (S3 XML bodies) and BL-4199 (HTTP/1.1 exchange)
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 5141452e 986a113e d035ed3b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Done. s3://bucket/key downloads, uploads (multipart from 8 MiB) and lists, signed with SigV4, against AWS, MinIO and R2
