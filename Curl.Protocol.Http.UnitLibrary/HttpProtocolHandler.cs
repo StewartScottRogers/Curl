@@ -3481,7 +3481,7 @@ public sealed class HttpProtocolHandler(
         /// <summary>
         /// Builds the report: what the connect and request told, their timings with the
         /// transfer's end taken now, and what the final head told once it was read. The request
-        /// size counts the body bytes sent, chunk framing included, as well as the head, as curl 8.21.0's
+        /// size counts the body bytes sent, chunk framing included, as well as the head once the request was ready to send (a request refused before it, as an HTTP/1.0 upload of unknown size is, counts none: CGR-263), as curl 8.21.0's
         /// <c>%{size_request}</c> does (BL-175 Notes); the upload size counts the chunk framing too, as
         /// libcurl 8.22.0's <c>CURLINFO_SIZE_UPLOAD_T</c> does (BL-3320).
         /// </summary>
@@ -3495,7 +3495,7 @@ public sealed class HttpProtocolHandler(
             TransferReport report = new()
             {
                 Method = method,
-                RequestSize = RequestSizeSoFar() + headSize + upload.BytesSent,
+                RequestSize = RequestSizeSoFar() + HeadSizeSent() + upload.BytesSent,
                 UploadSize = upload.BytesSent,
                 DownloadSize = body.BytesWritten,
                 DeliveredSize = body.BytesDelivered,
@@ -3520,6 +3520,8 @@ public sealed class HttpProtocolHandler(
         }
 
         private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
+
+        private int HeadSizeSent() => RequestReady is null ? 0 : headSize;
 
         private int ConnectionCountSoFar() => earlier?.ConnectionCount ?? 0;
 
