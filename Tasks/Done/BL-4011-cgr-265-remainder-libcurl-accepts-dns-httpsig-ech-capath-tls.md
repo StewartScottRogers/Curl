@@ -8,7 +8,7 @@ depends-on: [BL-4029]
 touches: [Libcurl/Options/Tls/EasyTlsOptionSetters.cs, Libcurl/Options/Network/EasyNetworkOptionSetters.cs, Libcurl/Options/Authentication/EasyAuthenticationOptionSetters.cs, Libcurl.UnitTests/Cgr265RemainderTests.cs, Libcurl.UnitTests/Options/Tls/TlsPeerOptionSettersTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-29
 ---
 # BL-4011 — CGR-265 remainder: Libcurl accepts DNS_*, HTTPSIG_*, ECH, CAPATH, TLS13_CIPHERS and other options the advertised build lacks
 
@@ -22,7 +22,7 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
 
@@ -41,3 +41,7 @@ completed:
 - Requeued for BL-4029 before any edit. Gating `PROXY_CAPATH`/`TLS13_CIPHERS` in Libcurl alone would break the curl tool on Windows: `ToolEasyHandle.SetOptions` fails the transfer on any setopt error, and `--capath` always sets `PROXY_CAPATH` too. Plan for the next claim: add `Tls13CiphersIsBuiltIn` and `ProxyCaPathIsBuiltIn` (default `!OperatingSystem.IsWindows()`, like `SrpIsBuiltIn`) in `EasyTlsOptionSetters`. Move the Capath/Tls13Ciphers twin tests out of `TlsPeerOptionSettersTests` (added to touches) into the `[DoNotParallelize]` `Cgr265RemainderTests`, with both flag values. Then write an ADR.
 - 2026-10-28: Doing -> Backlog. Waits for BL-4029: the curl tool must tolerate CURLE_NOT_BUILT_IN for --capath/--tls13-ciphers before Libcurl gates PROXY_CAPATH and TLS13_CIPHERS on Windows
 - 2026-10-29: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-29 (lane 6): Did the plan above. `EasyTlsOptionSetters` gates `TLS13_CIPHERS`, `PROXY_TLS13_CIPHERS` (`Tls13CiphersIsBuiltIn`) and `PROXY_CAPATH` (`ProxyCaPathIsBuiltIn`), both `!OperatingSystem.IsWindows()`; off they answer NOT_BUILT_IN for every value, NULL included, as `setopt.c`'s `Curl_ssl_supports` check does. `CAPATH` stays OK, as measured. ADR-0991. The Capath/Tls13Ciphers twin tests moved from `TlsPeerOptionSettersTests` into the `[DoNotParallelize]` `Cgr265RemainderTests`, which pins both flag values, so the tests are platform-neutral.
+- The placeholder acceptance criterion was ticked with the build clean, the fast tests green (Libcurl.UnitTests 1513 passed, Curl.Console.UnitTests 3042 passed, no failures in any project) and `Measure-CodeQuality.ps1 -Library Libcurl` reporting 0 failing members.
+- The options still left (DNS_*, ECH, CRLFILE, ISSUERCERT, curves, sigalgs, VERIFYSTATUS, HTTP_VERSION 3+, STREAM_WEIGHT, TCP_FASTOPEN, KRBLEVEL, PROXYTYPE 8, Linux SSLENGINE, HTTPSIG_*) need a libcurl-level measurement the tool cannot give; filed as BL-4054. Touches were not changed: EasyNetworkOptionSetters, EasyAuthenticationOptionSetters and Cgr265RemainderTests' other cases were not needed.
+- 2026-10-29: Doing -> Done. Libcurl answers CURLE_NOT_BUILT_IN for TLS13_CIPHERS, PROXY_TLS13_CIPHERS and PROXY_CAPATH on the Schannel build (ADR-0991); the rest is BL-4054
