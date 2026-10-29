@@ -76,3 +76,4 @@ curl -sS AUTH --speed-limit 100000000 --speed-time 2 --limit-rate 50K -o NUL U/b
 ## Log
 
 - 2026-10-26: Created from CGR-270 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
