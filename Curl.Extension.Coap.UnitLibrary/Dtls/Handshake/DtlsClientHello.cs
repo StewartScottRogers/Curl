@@ -9,7 +9,7 @@ namespace Curl.Extension.Coap.Dtls.Handshake;
 /// The DTLS 1.2 ClientHello body (RFC 6347 section 4.2.1): TLS 1.2's ClientHello with a cookie after
 /// the session id. It offers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and
 /// TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (RFC 5289), the secp256r1 group, uncompressed points and the
-/// signature schemes <see cref="DtlsServerKeyExchangeSignature" /> verifies, and names a host
+/// signature schemes <see cref="DtlsServerKeyExchangeSignature" /> verifies, extended_master_secret (RFC 7627), and names a host
 /// name target in server_name.
 /// </summary>
 internal static class DtlsClientHello
@@ -52,6 +52,7 @@ internal static class DtlsClientHello
             SupportedGroupsExtension.Encode([TlsNamedGroup.Secp256r1]),
             EcPointFormatsExtension.Encode([0]),
             SignatureAlgorithmsExtension.Encode(DtlsServerKeyExchangeSignature.Schemes),
+            ExtendedMasterSecretExtension.Encode(),
         ];
         if (!IPAddress.TryParse(targetHost, out _))
         {

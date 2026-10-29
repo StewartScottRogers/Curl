@@ -90,6 +90,9 @@ internal sealed class DtlsTestServer : IDisposable
     /// <summary>Gets the ClientHello random the server last accepted.</summary>
     public byte[] ClientRandom { get; private set; } = [];
 
+    /// <summary>Gets or sets whether the server echoes extended_master_secret (RFC 7627) and derives its master secret from the session hash.</summary>
+    public bool EchoExtendedMasterSecret { get; set; }
+
     /// <summary>Gets the ServerHello random the server sent.</summary>
     public byte[] ServerRandom { get; private set; } = [];
 
@@ -193,7 +196,9 @@ internal sealed class DtlsTestServer : IDisposable
         byte[] publicValue = Tls12ClientKeyExchange.Decode(body, Tls12KeyExchange.Ecdhe).Value.ExchangeKeys;
         byte[] preMasterSecret = keyShare.ComputeSharedSecret(publicValue[1..])
             ?? throw new InvalidOperationException("The client's ECDHE public value is not a point on the curve.");
-        masterSecret = TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret, ClientRandom, ServerRandom);
+        masterSecret = EchoExtendedMasterSecret
+            ? TlsPrf.Sha256.ComputeExtendedMasterSecret(preMasterSecret, SHA256.HashData(transcript.ToArray()))
+            : TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret, ClientRandom, ServerRandom);
         Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(masterSecret, ClientRandom, ServerRandom);
         unprotector = new DtlsAes128GcmRecordUnprotector(keys.ClientWrite, 1);
         protector = new DtlsAes128GcmRecordProtector(keys.ServerWrite, 1);
@@ -224,7 +229,7 @@ internal sealed class DtlsTestServer : IDisposable
         ushort scheme = keyKind == DtlsTestServerKeyKind.Ecdsa ? TlsSignatureScheme.EcdsaSecp256r1Sha256 : TlsSignatureScheme.RsaPssRsaeSha256;
         Tls12ServerKeyExchange unsigned = new(new Tls12EcdheParameters(TlsNamedGroup.Secp256r1, keyShare.PublicKey), scheme, null);
         Tls12ServerKeyExchange keyExchange = unsigned with { Signature = signingKey.Sign(scheme, unsigned.BuildSignedContent(ClientRandom, ServerRandom)) };
-        ServerHello hello = new(DtlsRecordHeader.Dtls12Version, ServerRandom, [], CipherSuite, 0, []);
+        ServerHello hello = new(DtlsRecordHeader.Dtls12Version, ServerRandom, [], CipherSuite, 0, EchoExtendedMasterSecret ? [ExtendedMasterSecretExtension.Encode()] : []);
         nextMessageSequence = 1;
         List<byte[]> records =
         [

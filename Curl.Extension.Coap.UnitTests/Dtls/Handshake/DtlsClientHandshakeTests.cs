@@ -27,6 +27,19 @@ public sealed class DtlsClientHandshakeTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task RunAsync_Rfc7627Section4_ServerEchoesExtendedMasterSecretOrNot_CompletesTheHandshake(bool echo)
+    {
+        using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa) { EchoExtendedMasterSecret = echo };
+        DtlsTestServerChannel channel = new(server);
+
+        using DtlsClientSession session = await RunAsync(channel, insecure: true);
+
+        Assert.IsTrue(server.HandshakeComplete);
+    }
+
+    [TestMethod]
     public async Task RunAsync_Rfc6347Section4_2_1_HelloVerifyRequest_ResendsTheClientHelloWithTheCookieAndTheSameRandom()
     {
         using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);

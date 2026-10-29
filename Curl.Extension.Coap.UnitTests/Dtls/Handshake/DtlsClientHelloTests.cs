@@ -24,7 +24,7 @@ public sealed class DtlsClientHelloTests
         List<TlsExtension> extensions = DtlsClientHello.ExtensionsFor("coap.example");
 
         CollectionAssert.AreEqual(
-            new[] { TlsExtensionType.SupportedGroups, TlsExtensionType.EcPointFormats, TlsExtensionType.SignatureAlgorithms, TlsExtensionType.ServerName },
+            new[] { TlsExtensionType.SupportedGroups, TlsExtensionType.EcPointFormats, TlsExtensionType.SignatureAlgorithms, TlsExtensionType.ExtendedMasterSecret, TlsExtensionType.ServerName },
             extensions.Select(extension => extension.Type).ToArray());
     }
 

@@ -25,8 +25,9 @@ forbid changing `Curl.Tls` for an extension. Upstream curl has no CoAP, so no cu
   `--pinnedpubkey` apply as for curl's TLS; a rejection ends with the verdict's exit code (60 for an untrusted
   chain). The ServerKeyExchange signature is checked against the leaf even under `-k`, as OpenSSL does.
 - Every other failure, the retransmission limit (ADR-1061) included, is exit 35 (`CURLE_SSL_CONNECT_ERROR`).
-- It does not offer extended_master_secret (RFC 7627) yet: the in-memory test server ignores it, so the extended
-  derivation could not be tested here. BL-4282 adds it with the test server's support.
+- It offers extended_master_secret (RFC 7627, BL-4282). When the ServerHello echoes it, the master secret comes from
+  `TlsPrf.Sha256.ComputeExtendedMasterSecret` over the SHA-256 of the transcript through ClientKeyExchange; when it
+  does not, from the classic client and server randoms. The test server echoes it when `EchoExtendedMasterSecret` is set.
 - A flight is resent byte for byte, record sequence numbers included; the peer's replay window drops a repeated
   protected Finished and answers the repeated ClientKeyExchange with its own last flight.
 

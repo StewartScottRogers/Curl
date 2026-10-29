@@ -132,9 +132,14 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         Require(
             DtlsServerKeyExchangeSignature.Verify(leaf, keyExchange.SignatureAlgorithm!.Value, keyExchange.BuildSignedContent(clientRandom, hello.Random), keyExchange.Signature!),
             "the server's ServerKeyExchange signature does not verify with its certificate's key");
-        byte[] masterSecret = TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret!, clientRandom, hello.Random);
         byte[] clientKeyExchange = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, [(byte)clientShare.PublicKey.Length, .. clientShare.PublicKey]).Encode()[HandshakeMessage.HeaderLength..];
-        return await FinishAsync(masterSecret, DtlsAes128GcmKeyBlock.Derive(masterSecret, clientRandom, hello.Random), clientKeyExchange, cancellationToken).ConfigureAwait(false);
+        byte[] keyExchangeFragment = new DtlsHandshakeMessage(HandshakeType.ClientKeyExchange, nextMessageSequence++, clientKeyExchange).TranscriptBytes();
+        transcript.AddRange(keyExchangeFragment);
+        // RFC 7627 section 4: the session hash covers the transcript through ClientKeyExchange.
+        byte[] masterSecret = hello.Extensions.Any(extension => extension.Type == TlsExtensionType.ExtendedMasterSecret)
+            ? TlsPrf.Sha256.ComputeExtendedMasterSecret(preMasterSecret!, SHA256.HashData([.. transcript]))
+            : TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret!, clientRandom, hello.Random);
+        return await FinishAsync(masterSecret, DtlsAes128GcmKeyBlock.Derive(masterSecret, clientRandom, hello.Random), keyExchangeFragment, cancellationToken).ConfigureAwait(false);
     }
 
     private byte[] VerifyCertificateChain(Tls12CertificateMessage certificate)
@@ -150,7 +155,7 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
     }
 
     /// <summary>Sends ClientKeyExchange, ChangeCipherSpec and the protected Finished, and checks the server's Finished (RFC 5246 section 7.4.9).</summary>
-    private async ValueTask<DtlsClientSession> FinishAsync(byte[] masterSecret, Tls12KeyBlock keys, byte[] clientKeyExchange, CancellationToken cancellationToken)
+    private async ValueTask<DtlsClientSession> FinishAsync(byte[] masterSecret, Tls12KeyBlock keys, byte[] keyExchangeFragment, CancellationToken cancellationToken)
     {
         DtlsAes128GcmRecordProtector protector = new(keys.ClientWrite, 1);
         DtlsAes128GcmRecordUnprotector unprotector = new(keys.ServerWrite, 1);
@@ -158,8 +163,6 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         try
         {
             openRecord = unprotector.TryUnprotect;
-            byte[] keyExchangeFragment = new DtlsHandshakeMessage(HandshakeType.ClientKeyExchange, nextMessageSequence++, clientKeyExchange).TranscriptBytes();
-            transcript.AddRange(keyExchangeFragment);
             byte[] verifyData = TlsPrf.Sha256.ComputeClientVerifyData(masterSecret, SHA256.HashData([.. transcript]));
             byte[] finishedFragment = new DtlsHandshakeMessage(HandshakeType.Finished, nextMessageSequence++, verifyData).TranscriptBytes();
             transcript.AddRange(finishedFragment);
