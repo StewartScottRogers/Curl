@@ -1,5 +1,5 @@
 ---
-id: BL-4267
+id: BL-4269
 title: Make Curl.Quic.UnitTests connection tests pass under full-solution load
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4267 — Make Curl.Quic.UnitTests connection tests pass under full-solution load
+# BL-4269 — Make Curl.Quic.UnitTests connection tests pass under full-solution load
 
 ## Goal
 
