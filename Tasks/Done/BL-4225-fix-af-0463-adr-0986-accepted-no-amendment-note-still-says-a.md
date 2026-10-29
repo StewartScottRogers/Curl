@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4225 — Fix AF-0463: ADR-0986 (Accepted, no amendment note) still says a fake transfer keeps the FirstTransferSocket number and the 10 ms timer, both removed
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Done directly rather than through align-and-document: a two-line ADR edit. ADR-0986's status line and README row now say its fake-transfer Decision point is replaced by ADR-0997 and ADR-0998, and that point is rewritten to say what the code does now (told no socket, left out of GetWaitSockets, timer 0). The reproduction's Select-String now finds nothing; the code count stays 0.
+- Build clean; fast tests: 63 test projects passed, 0 failed.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. ADR-0986 marks its fake-transfer point replaced by ADR-0997 and ADR-0998 and no longer claims FirstTransferSocket or the 10 ms timer
