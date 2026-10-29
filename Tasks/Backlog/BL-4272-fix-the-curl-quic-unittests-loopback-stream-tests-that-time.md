@@ -1,5 +1,5 @@
 ---
-id: BL-4267
+id: BL-4272
 title: Fix the Curl.Quic.UnitTests loopback stream tests that time out on a loaded machine
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4267 — Fix the Curl.Quic.UnitTests loopback stream tests that time out on a loaded machine
+# BL-4272 — Fix the Curl.Quic.UnitTests loopback stream tests that time out on a loaded machine
 
 ## Goal
 
