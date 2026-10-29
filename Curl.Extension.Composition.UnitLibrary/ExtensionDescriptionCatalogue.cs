@@ -15,5 +15,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
+        SocketIo.SocketIoExtension.Description,
     ];
 }

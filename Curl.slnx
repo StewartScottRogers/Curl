@@ -317,6 +317,7 @@
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
   <Folder Name="/Extensions/SignalR/"><Project Path="Curl.Extension.SignalR.UnitLibrary/Curl.Extension.SignalR.UnitLibrary.csproj" /><Project Path="Curl.Extension.SignalR.UnitTests/Curl.Extension.SignalR.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/SocketIo/"><Project Path="Curl.Extension.SocketIo.UnitLibrary/Curl.Extension.SocketIo.UnitLibrary.csproj" /><Project Path="Curl.Extension.SocketIo.UnitTests/Curl.Extension.SocketIo.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/OAuth2/"><Project Path="Curl.Extension.OAuth2.UnitLibrary/Curl.Extension.OAuth2.UnitLibrary.csproj" /><Project Path="Curl.Extension.OAuth2.UnitTests/Curl.Extension.OAuth2.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/GraphQl/"><Project Path="Curl.Extension.GraphQl.UnitLibrary/Curl.Extension.GraphQl.UnitLibrary.csproj" /><Project Path="Curl.Extension.GraphQl.UnitTests/Curl.Extension.GraphQl.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/JsonRpc/"><Project Path="Curl.Extension.JsonRpc.UnitLibrary/Curl.Extension.JsonRpc.UnitLibrary.csproj" /><Project Path="Curl.Extension.JsonRpc.UnitTests/Curl.Extension.JsonRpc.UnitTests.csproj" /></Folder>

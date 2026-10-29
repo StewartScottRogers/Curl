@@ -14,5 +14,6 @@ internal static class ExtensionCatalogue
     /// <summary>Gets the factories, in the order their handlers are registered.</summary>
     internal static IReadOnlyList<Func<ProtocolHandlerServices, IProtocolHandler>> Entries { get; } =
     [
+        SocketIo.SocketIoExtension.CreateHandler,
     ];
 }
