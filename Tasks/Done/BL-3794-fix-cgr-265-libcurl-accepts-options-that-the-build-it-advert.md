@@ -9,7 +9,7 @@ touches: [Libcurl.UnitTests/Cgr265Tests.cs, Libcurl/Options/Authentication/EasyA
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3794 — Fix CGR-265: Libcurl accepts options that the build it advertises does not support (REF answers CURLE_NOT_BUILT_IN or UNKNOWN_OPTION)
 
@@ -89,3 +89,4 @@ probe.exe repro
 - 2026-10-26: Created from CGR-265 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Partly fixed. TLSAUTH_TYPE/USERNAME/PASSWORD and PROXY_ twins answer CURLE_NOT_BUILT_IN (4) on Windows (Schannel has no SRP), unchanged on Linux/macOS, via `EasyAuthenticationOptionSetters.SrpIsBuiltIn`; unit tests in Cgr265Tests.cs (before the fix Windows answered 0). The probe/REF libcurl of the report is not available; expected codes are the report's. Remaining options split to BL-4000 (HTTPSIG_* change reverted: LibTest Lib5000/5004 expect it accepted). Build clean, fast tests green, Measure-CodeQuality Libcurl: 0 failing members.
+- 2026-10-28: Doing -> Done. TLSAUTH fixed; remainder in BL-4000
