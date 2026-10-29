@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Zstd/ZstdBackwardBitReader.cs, Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Zstd/ZstdFiniteStateEntropyTable.cs, Curl.Extension.Kafka.UnitLibrary/Wire/Compression/Zstd/ZstdHuffmanTable.cs, Curl.Extension.Kafka.UnitTests/Wire/Compression/Zstd/ZstdBackwardBitReaderTests.cs, Curl.Extension.Kafka.UnitTests/Wire/Compression/Zstd/ZstdFiniteStateEntropyTableTests.cs, Curl.Extension.Kafka.UnitTests/Wire/Compression/Zstd/ZstdHuffmanTableTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4280 — Kafka extension: zstd entropy decoding (backward bit reader, FSE and Huffman tables)
 
@@ -22,9 +22,9 @@ Split from BL-4277 (which wires the decoders into Curl.Extension.Kafka.UnitLibra
 
 ## Acceptance criteria
 
-- [ ] ZstdBackwardBitReader, ZstdFiniteStateEntropyTable and ZstdHuffmanTable decode the RFC 8878 structures, checked by unit tests against hand-worked examples, including the predefined distributions' decoding tables.
-- [ ] Malformed table descriptions (accuracy log too large, counts not summing to the table size, weights not completing a power of two) throw FormatException naming zstd.
-- [ ] The library meets the four quality gates and the fast tests pass.
+- [x] ZstdBackwardBitReader, ZstdFiniteStateEntropyTable and ZstdHuffmanTable decode the RFC 8878 structures, checked by unit tests against hand-worked examples, including the predefined distributions' decoding tables.
+- [x] Malformed table descriptions (accuracy log too large, counts not summing to the table size, weights not completing a power of two) throw FormatException naming zstd.
+- [x] The library meets the four quality gates and the fast tests pass.
 
 ## Notes
 
@@ -32,3 +32,4 @@ Split from BL-4277 (which wires the decoders into Curl.Extension.Kafka.UnitLibra
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 0388c6d0 1219da95 dc514177.
+- 2026-10-29: Doing -> Done. ZstdBackwardBitReader, ZstdFiniteStateEntropyTable and ZstdHuffmanTable done; quality gates met; fast tests green; platform-neutral
