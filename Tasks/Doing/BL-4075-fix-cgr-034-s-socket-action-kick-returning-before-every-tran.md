@@ -34,3 +34,4 @@ Found by BL-3978's CGR-034 probe (source and results in `Documentation/Reviews/C
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 7a3f6d23 531793ee b472e15b 779790c0.
