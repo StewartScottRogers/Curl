@@ -73,3 +73,4 @@ timeout -s TERM 3 curl -s -o out.bin "$H/stallbody?len=100000&sent=100"
 ## Log
 
 - 2026-10-26: Created from CGR-237 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
