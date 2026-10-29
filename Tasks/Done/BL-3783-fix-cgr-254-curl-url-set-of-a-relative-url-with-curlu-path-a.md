@@ -9,7 +9,7 @@ touches: [Curl.Engine.UnitLibrary/UrlPartSetter.cs, Curl.Engine.UnitLibrary/Mana
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3783 — Fix CGR-254: curl_url_set of a relative URL with CURLU_PATH_AS_IS keeps the dot segments; libcurl still resolves them
 
@@ -81,3 +81,4 @@ probe.exe url
 - Cause: `ManagedCurlUrlHandle.SetRelativeUrl` parsed the resolved relative URL with `CURLU_PATH_AS_IS`, keeping the dot segments; libcurl's `redirect_url` removes them before the set. Fix: parse the resolved URL without PathAsIs. Added `ManagedCurlUrlHandle.cs` to touches (no other Doing task names it).
 - Repro `set http://a/b/c/d` then `../g/./h` with PATH_AS_IS, get URL: expected `http://a/b/g/h` (issue's REF result); Curl now gives the same (`Cgr254Tests`). Probe project and real-curl DLL not rebuilt; expected value taken from the report.
 - Linux/macOS CI: test is platform-neutral. Quality run for Curl.Engine.UnitLibrary: 0 failing members.
+- 2026-10-29: Doing -> Done. Relative URL set under CURLU_PATH_AS_IS now resolves dot segments; Cgr254Tests added
