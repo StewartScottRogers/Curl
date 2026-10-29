@@ -121,6 +121,8 @@ internal static partial class EngineComposition
     /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from (ADR-0751, BL-2834); <see langword="null" /> for <see cref="System.Security.Cryptography.RandomNumberGenerator" />.</param>
     /// <param name="extensionHandlers">Builds the handlers a host's extensions add beyond upstream curl's, over the same transports, put after curl's (ADR-0999); <see langword="null" /> for curl's alone. The engine never references an extension.</param>
     /// <param name="extensionTransferHooks">Puts each handler's transfers through the hooks of the extensions a host's options activated (ADR-1007); <see langword="null" /> runs no hook. The engine never references an extension.</param>
+    /// <param name="extensionConnector">Gives the connector of the extension a host's options activated in place of <paramref name="connector" /> (ADR-1008), as <c>--unix-socket</c> replaces curl's; <see langword="null" /> keeps <paramref name="connector" />.</param>
+    /// <param name="extensionDatagramConnector">Gives that extension's datagram connector in place of <paramref name="datagramConnector" /> (ADR-1008); <see langword="null" /> keeps <paramref name="datagramConnector" />.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -153,8 +155,12 @@ internal static partial class EngineComposition
         Func<int, byte[]>? digestRandomBytes = null,
         TransferSocketWait? socketWait = null,
         Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null,
-        Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null)
+        Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null,
+        Func<IConnector, IConnector>? extensionConnector = null,
+        Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null)
     {
+        connector = ThroughExtension(connector, extensionConnector);
+        datagramConnector = ThroughExtension(datagramConnector, extensionDatagramConnector);
         Func<RtspRequestSettings?> rtspSettingsOf = rtspRequestSettings ?? (() => null);
         ConnectionEndPointRecorder recorder = new();
         EndPointRecordingConnector recordingConnector = new(connector, recorder);
@@ -193,6 +199,14 @@ internal static partial class EngineComposition
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(ThroughTransferHooks(handler, extensionTransferHooks), recorder))];
     }
+
+    /// <summary>Gives the transport a host's activated extension supplies in place of curl's (ADR-1008).</summary>
+    /// <typeparam name="TTransport">The connector type.</typeparam>
+    /// <param name="transport">The transport curl would use.</param>
+    /// <param name="extension">Gives the extension's transport over curl's, or <see langword="null" /> when no extension supplies one.</param>
+    /// <returns><paramref name="transport" /> itself without an extension, otherwise the extension's.</returns>
+    private static TTransport ThroughExtension<TTransport>(TTransport transport, Func<TTransport, TTransport>? extension) =>
+        extension is null ? transport : extension(transport);
 
     /// <summary>Puts <paramref name="handler" />'s transfers through a host's extension transfer hooks (ADR-1007).</summary>
     /// <param name="handler">One of the engine's handlers.</param>

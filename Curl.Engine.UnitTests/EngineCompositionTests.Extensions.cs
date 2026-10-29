@@ -84,6 +84,73 @@ public sealed partial class EngineCompositionTests
         Assert.IsInstanceOfType<ExtensionSchemeHandler>(((HookedHandler)handlers[^1].GivenHandler).Inner);
     }
 
+    [TestMethod]
+    public async Task CreateProtocolHandlers_WithAnExtensionConnector_CarriesAnHttpTransferOverIt()
+    {
+        RecordingConnector curls = new(CurlExitCode.CouldntConnect, ConnectFailure);
+        ScriptedConnector extensions = new([System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        IConnector? given = null;
+        MemoryStream output = new();
+        Diagnostics.Arrange("extension connector", "scripted");
+        ProtocolDispatcher dispatcher = new(EngineComposition.CreateProtocolHandlers(
+            curls,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            extensionConnector: connector => { given = connector; return extensions; }));
+
+        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = output });
+        Diagnostics.Act("exit code", result.ExitCode.ToString());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("hello", System.Text.Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual("example.com", extensions.Targets.Single().Host);
+        Assert.AreSame(curls, given);
+        Assert.IsEmpty(curls.Targets);
+    }
+
+    [TestMethod]
+    public async Task CreateProtocolHandlers_WithoutAnExtensionConnector_CarriesAnHttpTransferOverCurls()
+    {
+        ScriptedConnector curls = new([System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        MemoryStream output = new();
+        Diagnostics.Arrange("extension connector", "none");
+        ProtocolDispatcher dispatcher = new(EngineComposition.CreateProtocolHandlers(
+            curls,
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver()));
+
+        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = output });
+        Diagnostics.Act("exit code", result.ExitCode.ToString());
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("hello", System.Text.Encoding.ASCII.GetString(output.ToArray()));
+        Assert.AreEqual("example.com", curls.Targets.Single().Host);
+    }
+
+    [TestMethod]
+    public void CreateProtocolHandlers_WithAnExtensionDatagramConnector_GivesItToTheExtensionHandlers()
+    {
+        RecordingDatagramConnector curls = new(CurlExitCode.CouldntConnect, ConnectFailure);
+        RecordingDatagramConnector extensions = new(CurlExitCode.CouldntConnect, ConnectFailure);
+        IDatagramConnector? given = null;
+        ProtocolHandlerServices? services = null;
+        Diagnostics.Arrange("extension datagram connector", "recording");
+
+        _ = EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            curls,
+            new PassThroughTlsProvider(),
+            new LoopbackDnsResolver(),
+            extensionHandlers: handlerServices => { services = handlerServices; return []; },
+            extensionDatagramConnector: datagramConnector => { given = datagramConnector; return extensions; });
+        Diagnostics.Act("given", given?.GetType().Name ?? "none");
+
+        Assert.AreSame(curls, given);
+        Assert.IsInstanceOfType<EndPointRecordingDatagramConnector>(services!.DatagramConnector);
+    }
+
     private sealed class HookedHandler(IProtocolHandler inner) : IProtocolHandler
     {
         public IProtocolHandler Inner => inner;
