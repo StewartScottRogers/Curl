@@ -32,3 +32,4 @@ Found by BL-4112's first pass: `Http3Session.cs` and `Http3StreamConnection.cs` 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d757f172 d98609d6 478f867b 3d836d5e.
