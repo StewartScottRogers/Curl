@@ -1085,3 +1085,4 @@ Each option and the specific reason it lost.
 | [1050](ADR-1050-the-socket-callback-quic-wrapper-always-carries-datagrams.md) | The socket-callback QUIC wrapper always carries datagrams (BL-4254) | Accepted | 2026-10-29 |
 | [1051](ADR-1051-an-argument-expander-takes-its-companion-options-and-claimed-positional-arguments.md) | An argument expander takes its companion options and claimed positional arguments (BL-4217) | Accepted | 2026-10-29 |
 | [1052](ADR-1052-an-extension-verifies-a-server-chain-through-itlsprovider.md) | An extension verifies a server chain through ITlsProvider (BL-4249) | Accepted | 2026-10-29 |
+| [1050](ADR-1050-the-amqp1-type-codec-maps-each-amqp-type-to-one-clr-type-and-refuses-malformed-input-with-one-exception.md) | The AMQP 1.0 type codec maps each AMQP type to one CLR type and refuses malformed input with one exception (BL-4258) | Accepted | 2026-10-29 |
