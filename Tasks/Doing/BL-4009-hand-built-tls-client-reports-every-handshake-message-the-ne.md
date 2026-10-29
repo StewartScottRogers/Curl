@@ -35,3 +35,4 @@ Split out of BL-3997 (CGR-226, BL-3755). `SslStream` hides every TLS 1.3 handsha
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: edd99237 40b0b9e0 addde585 3d836d5e.
 - 2026-10-28: Doing -> Backlog. Needs the Curl.Tls hooks filed as BL-4014 (handshake message observer) and BL-4013 (peer signature scheme)
+- 2026-10-28: Backlog -> Doing. Criteria at claim: edd99237 40b0b9e0 addde585 3d836d5e.
