@@ -31,3 +31,4 @@ Split from BL-4277 (which wires the decoders into Curl.Extension.Kafka.UnitLibra
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: b8e6bd36 8adc22a9 dc514177.
