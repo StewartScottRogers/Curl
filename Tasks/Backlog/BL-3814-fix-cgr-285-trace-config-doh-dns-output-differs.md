@@ -4,8 +4,8 @@ title: Fix CGR-285: --trace-config doh / dns output differs
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitTests/Cgr285Tests.cs, Curl.Output.UnitLibrary/DohSubTransferEvents.cs, Curl.Output.UnitTests/Cgr285Tests.cs]
+depends-on: [BL-3812]
+touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Networking.UnitLibrary/DohDnsResolver.SubTransferTrace.cs, Curl.Networking.UnitTests/Cgr285Tests.cs, Curl.Output.UnitLibrary/DohSubTransferEvents.cs, Curl.Output.UnitTests/Cgr285Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -75,3 +75,11 @@ curl -v -s --trace-config doh --doh-url http://127.0.0.1:21800/dns-query http://
 
 - 2026-10-26: Created from CGR-285 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes (2026-10-28, lane 8, first claim, no code edited)
+
+- **Measured** curl 8.22.0 (Schannel, debug build) with `Record-CurlExchange.ps1 -NoServer -DohPort 18853 -Curl ... -CurlArgs -v,-s,--trace-config,<doh|dns>,--doh-insecure,--doh-url,https://127.0.0.1:18853/dns-query,http://foo.test:18854/x` (exit 7 both). `doh` alone: only `[DoH]`-prefixed sub-transfer lines (plus plain `* Host ... was resolved.`), no `[DNS]` lines, `Connection #1 is not open enough, cannot reuse`. `dns` alone: `[DNS] [A+AAAA] created DNS filter ..., transport=3`, `hostip_resolv`, cache lines, `[DNS] [DoH] probe done`, no sub-transfer lines or headers.
+- Curl today writes the **identical** output for `doh` and `dns` (both the `[DNS]` filter lines and the full DoH sub-transfers). Byte parity is not reachable: the reference is a debug build whose lines are timing-dependent (`still waiting 25ms for AAAA result`, schannel handshake step counts, `Curl_xfer_send`), so only the component gating is deterministic.
+- **Plan** (needs the engine, which BL-3812 holds in `EngineComposition.Dns.cs`, hence `depends-on` and the new `touches` entry): pass the run's `--trace-config` components to `DohSubTransferEvents` (new optional parameter in `Curl.Output`) so `doh` writes the `[DoH]` sub-transfer lines without the `[DNS]` filter lines, and `dns` without `doh` writes no sub-transfer lines (`[DNS] [DoH] probe done` instead); `Cgr285Tests` in `Curl.Output.UnitTests` pins it. Reuse line and parallel queries are left (parallel queries are timing-dependent in the debug output).
+- Requeued so as not to edit a file BL-3812 is changing.
+- 2026-10-28: Doing -> Backlog. Needs EngineComposition.Dns.cs, held by BL-3812 (depends-on BL-3812)
