@@ -1,7 +1,9 @@
 using System.Net;
 using System.Security.Authentication;
 using Curl.Networking.Fakes;
+using Curl.Networking.Fakes.Tls13Server;
 using Curl.Protocol.Abstractions;
+using TlsSignatureScheme = Curl.Tls.TlsSignatureScheme;
 
 namespace Curl.Networking;
 
@@ -14,18 +16,19 @@ namespace Curl.Networking;
 public sealed partial class HandBuiltTlsProviderTests
 {
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
     public async Task AuthenticateAsClientAsync_Tls13InTheOpenSslBuild_ReportsEveryHandshakeMessageInOrder()
     {
         var events = new RecordingTransferEvents();
         Diagnostics.Arrange("build", "OpenSSL");
-        Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls13);
+        Diagnostics.Arrange("server", "Tls13TestServer, X25519, RSASSA-PSS");
         Diagnostics.Arrange("curves", "X25519");
 
-        // BL-4049: one group, the one the ClientHello carries a key share for, so the server
-        // has no other group to ask for in a HelloRetryRequest (the Windows Server Schannel on
-        // CI's windows-latest runners asks for one when it may pick from the default list).
-        var result = await HandshakeWithEchoServerAsync(new TlsClientOptions(Insecure: true, Curves: "X25519"), SslProtocols.Tls13, OpenSslBuild, events);
+        // BL-4052: the managed Tls13TestServer rather than SslStream, so the flight does not
+        // hang on the platform's TLS 1.3 server (the Windows Server Schannel on CI's
+        // windows-latest runners asked for a HelloRetryRequest, BL-4049, then answered the
+        // hand-built ClientHello with a protocol_version alert; macOS has no TLS 1.3 server).
+        var testServer = new Tls13TestServer(TestServerCredential.Rsa(TlsSignatureScheme.RsaPssRsaeSha256));
+        var (result, _) = await HandshakeWithTestServerAsync(Provider(new TlsClientOptions(Insecure: true, Curves: "X25519"), OpenSslBuild), testServer, events);
         await using var connection = result.Connection!;
         var handshakeMessages = HandshakeMessagesOf(events);
         Diagnostics.Act("handshake messages", string.Join(" ", handshakeMessages));
