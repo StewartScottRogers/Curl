@@ -38,3 +38,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d6b5ac49 5bfa7aa8 eda661d1 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
