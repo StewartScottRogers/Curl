@@ -30,3 +30,4 @@ BL-3818 made LdapProtocolHandler open WinLDAP's second ldaps connection with Tls
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 8d4a1a39 779790c0.
