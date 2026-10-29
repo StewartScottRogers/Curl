@@ -19,5 +19,6 @@ internal static class ExtensionCatalogue
         Stomp.Client.StompExtension.CreateHandler,
         Nats.NatsExtension.CreateHandler,
         Xmpp.Client.XmppExtension.CreateHandler,
+        McpClient.Client.McpClientExtension.CreateHandler,
     ];
 }
