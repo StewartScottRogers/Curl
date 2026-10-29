@@ -125,6 +125,13 @@ public sealed record Tls13ClientSettings
     public TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     /// <summary>
+    /// Gets what a connection over these settings tells of each handshake message and
+    /// <c>change_cipher_spec</c> it sends or receives, or <see langword="null" /> to tell nothing.
+    /// <see cref="Tls13ClientHandshake" /> used on its own (as QUIC does) never calls it.
+    /// </summary>
+    public TlsHandshakeMessageObserver? HandshakeMessageObserver { get; init; }
+
+    /// <summary>
     /// Gets the session to resume (RFC 8446 section 2.2), or <see langword="null" /> for a
     /// full handshake. The ClientHello offers its ticket in <c>pre_shared_key</c> with a
     /// binder, for <c>psk_dhe_ke</c>, when <see cref="TlsSessionRecord.CanResumeAt" /> holds

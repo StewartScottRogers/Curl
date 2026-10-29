@@ -90,6 +90,12 @@ public sealed class Tls13ClientHandshake : IDisposable
         this.verifier = verifier;
     }
 
+    /// <summary>
+    /// Gets or sets what is handed each whole handshake message received, header included,
+    /// before the handshake acts on it; a connection sets it to tell its <see cref="TlsHandshakeMessageObserver" />.
+    /// </summary>
+    internal Action<byte[]>? MessageReceived { get; set; }
+
     /// <summary>Gets a value indicating whether the handshake has completed.</summary>
     public bool IsComplete => state == State.Connected;
 
@@ -321,6 +327,7 @@ public sealed class Tls13ClientHandshake : IDisposable
         received.AddRange(bytes);
         while (state != State.Failed && TryReadMessage(out HandshakeMessage? message, out byte[] encoded))
         {
+            MessageReceived?.Invoke(encoded);
             ReceiveMessage(level, message!, encoded, output);
         }
     }

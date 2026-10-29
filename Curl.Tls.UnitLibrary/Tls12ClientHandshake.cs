@@ -92,6 +92,12 @@ public sealed class Tls12ClientHandshake
     /// <summary>Gets why the handshake failed, or <see langword="null" /> while it has not.</summary>
     public TlsHandshakeFailure? Failure { get; private set; }
 
+    /// <summary>
+    /// Gets or sets what is handed each whole handshake message received, header included,
+    /// before the handshake acts on it; a connection sets it to tell its <see cref="TlsHandshakeMessageObserver" />.
+    /// </summary>
+    internal Action<byte[]>? MessageReceived { get; set; }
+
     /// <summary>Gets the version the server chose, once its ServerHello has arrived.</summary>
     public TlsProtocolVersion? Version { get; private set; }
 
@@ -202,6 +208,7 @@ public sealed class Tls12ClientHandshake
             received.AddRange(bytes);
             while (state != State.Failed && TryReadMessage(out HandshakeMessage? message, out byte[] encoded))
             {
+                MessageReceived?.Invoke(encoded);
                 ReceiveMessage(message!, encoded, output);
             }
         }

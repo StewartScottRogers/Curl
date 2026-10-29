@@ -64,7 +64,8 @@ internal sealed class Tls12RecordLayer(Stream transport, TlsProtocolVersion firs
             return null;
         }
 
-        CheckVersion(BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(1)));
+        ushort recordVersion = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(1));
+        CheckVersion(recordVersion);
         int length = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(3));
         byte[] fragment = new byte[length];
         if (await transport.ReadAtLeastAsync(fragment, length, false, cancellationToken).ConfigureAwait(false) < length)
@@ -74,7 +75,7 @@ internal sealed class Tls12RecordLayer(Stream transport, TlsProtocolVersion firs
 
         TlsContentType type = (TlsContentType)header[0];
         TlsDecodeResult<byte[]> content = reader.Unprotect(type, fragment);
-        return content.Succeeded ? new Tls12RecordContent(type, content.Value) : throw new TlsAlertException(content.Alert!.Value, false);
+        return content.Succeeded ? new Tls12RecordContent(type, content.Value, recordVersion) : throw new TlsAlertException(content.Alert!.Value, false);
     }
 
     /// <summary>Protects and sends <paramref name="content" /> as records of <paramref name="contentType" />.</summary>
