@@ -3,8 +3,8 @@ id: AF-0465
 title: BL-3563 claimed 3 times and requeued 3 times before it was split and Deferred
 auditor: process
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3563:redone-work
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
