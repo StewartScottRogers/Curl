@@ -4,7 +4,7 @@ title: Extension: Make CoAP and CoAPs requests
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4222, BL-4223, BL-4224, BL-4225, BL-4226, BL-4227, BL-4228, BL-4229]
 touches: [Curl.Extension.Coap.UnitLibrary, Curl.Extension.Coap.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -32,6 +32,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+- 2026-10-29 (lane 2, sizing pass before any code): too large for one run, so split by the Notes' own rule (wire format, client flow, options) plus DTLS. Filed: BL-4222 CoAP message and option codec (creates the project pair); BL-4223 coap:// GET/POST/PUT/DELETE over UDP with registration, description, CURL_EXTENSIONS=0 test and the ADR; BL-4224 block-wise (RFC 7959); BL-4225 Observe (RFC 7641) and its option; BL-4227 DTLS 1.2 record and handshake framing; BL-4228 DTLS 1.2 client handshake; BL-4229 coaps:// over DTLS.
+- Missing engine hook found: an extension cannot verify a server certificate with curl's trust settings outside a TLS stream (`ProtocolHandlerServices` gives only the stream `ITlsProvider`, `Curl.Networking`'s `HandBuiltCertificateVerifier` is internal, trust options are not on `ITransferContext`). Filed BL-4226 for that seam; BL-4228 depends on it.
+- Decision: DTLS is written inside this extension (`Dtls/`) over `Curl.Tls`'s public TLS 1.2 pieces, since no curl protocol shares it; `Curl.Tls` is a shared layer an extension may reference.
+- When all of them are Done, this task's run only checks the criteria end to end (catalogue line, `--extensions`, quality gates, build and tests) and ticks them.
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
@@ -39,3 +43,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: d6b5ac49 5bfa7aa8 eda661d1 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4222 to BL-4229 (CoAP codec, coap:// client, block-wise, Observe, certificate-verification seam for extensions, DTLS framing, DTLS handshake, coaps://)
