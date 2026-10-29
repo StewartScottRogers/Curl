@@ -31,3 +31,4 @@ Split out of BL-3997. `SslStream` cannot report the encrypted TLS 1.3 handshake 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: ead23c02 e0fbbd90 3d836d5e.
