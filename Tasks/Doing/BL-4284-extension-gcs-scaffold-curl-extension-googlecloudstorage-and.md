@@ -33,3 +33,4 @@ Split from BL-4125 (`gs://` extension) for size, as BL-4197 was split from BL-41
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: adf7364c c4387dd4 3e5be813 3180db99 3d836d5e.
