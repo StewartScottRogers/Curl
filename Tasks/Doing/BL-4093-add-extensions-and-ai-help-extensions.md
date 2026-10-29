@@ -36,3 +36,4 @@ The option `--extensions` is Curl's own: record in an ADR that it is not a curl 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: bb166f31 34fde2bb 99a0caca 8b541e9f e35aff77 3d836d5e.
