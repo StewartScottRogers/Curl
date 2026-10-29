@@ -109,10 +109,20 @@ public sealed class SocketActionGatedResolverTests
     public void Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing()
     {
         LoopbackLookupWakeup wakeup = LoopbackLookupWakeup.Open();
+        IPEndPoint listening = LocalEndPointOf(wakeup.Handle);
 
         wakeup.Dispose();
-
         wakeup.Signal();
+
+        using Socket probe = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        SocketException refused = Assert.ThrowsExactly<SocketException>(() => probe.Connect(listening));
+        Assert.AreEqual(SocketError.ConnectionRefused, refused.SocketErrorCode);
+    }
+
+    private static IPEndPoint LocalEndPointOf(nint handle)
+    {
+        using Socket socket = new(new SafeSocketHandle(handle, ownsHandle: false));
+        return (IPEndPoint)socket.LocalEndPoint!;
     }
 
     private static bool IsReadable(nint handle, TimeSpan timeout)
