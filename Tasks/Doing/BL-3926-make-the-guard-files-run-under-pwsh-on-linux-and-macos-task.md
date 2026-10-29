@@ -45,3 +45,4 @@ where Windows has it too, or a wrapper that tries one then the other, and say wh
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: cfdfcaf2 1ae8d327 10b7d122 52dc155f d0e9ac37.
