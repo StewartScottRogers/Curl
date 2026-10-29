@@ -72,12 +72,18 @@ internal readonly struct HttpLine
     /// Fails a line whose content holds a carriage return, as curl 8.22.0 does.
     /// </summary>
     /// <exception cref="HttpTransferException">
-    /// The content holds a carriage return (exit 8, <c>Carriage return found in header</c>).
+    /// The content holds a carriage return (exit 8, <c>Carriage return found in header</c>), or
+    /// a NUL byte as well (exit 8, <c>Nul byte in header</c>, which curl checks first, CGR-236).
     /// </exception>
     internal void RefuseCarriageReturn()
     {
         if (Content.Contains('\r', StringComparison.Ordinal))
         {
+            if (Content.Contains('\0', StringComparison.Ordinal))
+            {
+                throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.NulByteInHeader);
+            }
+
             throw new HttpTransferException(CurlExitCode.WeirdServerReply, HttpTransferMessages.CarriageReturnInHeader);
         }
     }
