@@ -9,7 +9,7 @@ touches: [.claude/skills/task-board/task-board.ps1, .claude/hooks/guard-audit-pa
 lane: no
 requirement: none
 created: 2026-10-27
-completed:
+completed: 2026-10-29
 ---
 # BL-3926 — Make the guard files run under pwsh on Linux and macOS (task-board.ps1, guard hook, settings.json hooks, audit guard)
 
@@ -38,7 +38,7 @@ where Windows has it too, or a wrapper that tries one then the other, and say wh
 - [x] Under `pwsh` on Linux with `CURL_DARK_FACTORY_LANE` set, `guard-audit-paths.ps1` refuses a payload that reads `Audit/README.md` and allows one that reads `README.md`.
 - [x] Every hook command in `.claude/settings.json` starts on Windows and on Linux, and an ADR marked "Decided by Claude under Stewart's delegation" records the form chosen.
 - [x] `pwsh -File Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest` passes on Linux and Windows.
-- [ ] The change reached `master` through the audit-branch pull request with CI green on Windows, Linux and macOS.
+- [x] The change reached `master` through the audit-branch pull request with CI green on Windows, Linux and macOS.
 
 ## Notes
 
@@ -48,3 +48,5 @@ where Windows has it too, or a wrapper that tries one then the other, and say wh
 - 2026-10-29: Backlog -> Doing. Criteria at claim: cfdfcaf2 1ae8d327 10b7d122 52dc155f d0e9ac37.
 - 2026-10-29: Linux checks run under pwsh 7.4.6 in WSL Ubuntu (invariant globalization), Windows under pwsh 7. task-board.ps1 status, next, capacity, hotspots -Min 3, new, move (Blocked, Backlog, Deferred, Doing) on a scratch copy of the live board: all 12 outputs and the moved task file byte-identical on both. guard-audit-paths.ps1 with CURL_DARK_FACTORY_LANE=1: Read Audit/README.md exit 2, audit/readme.md exit 2, Read README.md exit 0, Edit .claude/settings.json exit 2, unparseable input exit 2; without the variable exit 0. Test-AuditPathsUntouched.ps1 -SelfTest: all 18 cases PASS on Linux and Windows.
 - 2026-10-29: Hooks: Claude Code runs hook commands with sh (Git Bash on Windows, measured). settings.json's three commands are now sh lines running powershell or else pwsh, the guard failing closed with neither (ADR-1015). New Audit/Guard/Test-GuardHooks.ps1: 7/7 PASS on Windows and Linux; CI job guard-hooks runs it on all three platforms. PR #252.
+- 2026-10-29: PR #252 merged to master (98e12cbb1) with CI green on Windows, Linux and macOS, guard-hooks included; master merged into work/dark-factory.
+- 2026-10-29: Doing -> Done. The hooks start under powershell or pwsh on Windows, Linux and macOS, the audit guard fails closed, and CI's guard-hooks job proves it on all three
