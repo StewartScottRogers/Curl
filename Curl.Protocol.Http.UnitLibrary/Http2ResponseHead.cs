@@ -37,16 +37,67 @@ internal static class Http2ResponseHead
     }
 
     /// <summary>
+    /// Finds the first field of a response header block that nghttp2 1.68 rejects as an invalid
+    /// header field, which curl fails the transfer for (RFC 9113 sections 8.2 and 8.3, measured,
+    /// BL-3664 Notes), or -1 when there is none. A pseudo-header is invalid in trailers, after a
+    /// regular field or another pseudo-header, when it is not <c>:status</c>, or when it is
+    /// <c>:status 101</c>; a regular field is invalid when its name has an upper-case letter,
+    /// when it is connection-specific (<c>te</c> other than <c>trailers</c>), or when it is a
+    /// second <c>content-length</c> or one that is not a decimal number. A field nghttp2 ignores
+    /// (<see cref="IsIgnored" />) is skipped; a <c>:status</c> value that is not three digits is
+    /// left to <see cref="StatusOf" />.
+    /// </summary>
+    /// <param name="fields">The decoded header block.</param>
+    /// <param name="isTrailer">Whether the block came after the final head.</param>
+    /// <returns>The index of the first invalid field, or -1.</returns>
+    internal static int IndexOfInvalidField(IReadOnlyList<HeaderField> fields, bool isTrailer)
+    {
+        bool isPseudoHeaderAllowed = !isTrailer;
+        bool isContentLengthSeen = false;
+        for (int index = 0; index < fields.Count; index++)
+        {
+            HeaderField field = fields[index];
+            if (IsIgnoredRegularField(field))
+            {
+                continue;
+            }
+
+            if (!IsValidField(field, isPseudoHeaderAllowed, isContentLengthSeen))
+            {
+                return index;
+            }
+
+            isPseudoHeaderAllowed = false;
+            isContentLengthSeen |= field.Name == "content-length";
+        }
+
+        return -1;
+    }
+
+    private static bool IsIgnoredRegularField(HeaderField field) => !field.Name.StartsWith(':') && IsIgnored(field);
+
+    private static bool IsValidField(HeaderField field, bool isPseudoHeaderAllowed, bool isContentLengthSeen) =>
+        field.Name.StartsWith(':') ? isPseudoHeaderAllowed && IsValidStatus(field) : IsValidRegularField(field, isContentLengthSeen);
+
+    private static bool IsValidStatus(HeaderField field) => field.Name == ":status" && field.Value != "101";
+
+    private static bool IsValidRegularField(HeaderField field, bool isContentLengthSeen) =>
+        !field.Name.AsSpan().ContainsAnyInRange('A', 'Z')
+        && !IsConnectionSpecific(field)
+        && (field.Name != "content-length" || IsValidContentLength(field.Value, isContentLengthSeen));
+
+    /// <summary>
     /// Tells whether <paramref name="field" /> is a connection-specific field nghttp2 rejects in
     /// a response (RFC 9113 section 8.2.2): <c>connection</c>, <c>keep-alive</c>,
     /// <c>proxy-connection</c>, <c>transfer-encoding</c>, <c>upgrade</c>, or <c>te</c> with a
     /// value other than <c>trailers</c> (CGR-136, measured, BL-3665 Notes).
     /// </summary>
-    /// <param name="field">A decoded header field.</param>
-    /// <returns><see langword="true" /> for a field that makes the response malformed.</returns>
-    internal static bool IsConnectionSpecific(HeaderField field) =>
+    private static bool IsConnectionSpecific(HeaderField field) =>
         ConnectionSpecificNames.Contains(field.Name)
         || (field.Name == "te" && !field.Value.Equals("trailers", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsValidContentLength(string value, bool isContentLengthSeen) =>
+        !isContentLengthSeen && long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out _);
 
     /// <summary>
     /// Gives the head bytes for a header block with <paramref name="statusCode" />: the status
@@ -77,7 +128,14 @@ internal static class Http2ResponseHead
     /// header lines (CGR-011, CGR-137).
     /// </summary>
     private static string HeaderLines(IReadOnlyList<HeaderField> fields) =>
-        string.Concat(fields.Where(field => !field.Name.StartsWith(':') && IsTokenName(field.Name) && !field.Value.AsSpan().ContainsAny("\r\n\0")).Select(field => $"{field.Name}: {field.Value}\r\n"));
+        string.Concat(fields.Where(field => !field.Name.StartsWith(':') && !IsIgnored(field)).Select(field => $"{field.Name}: {field.Value}\r\n"));
+
+    /// <summary>
+    /// Tells whether nghttp2 ignores a regular field without a message: its value holds a CR, LF
+    /// or NUL, or its name is not a token (<see cref="HeaderLines" />).
+    /// </summary>
+    private static bool IsIgnored(HeaderField field) =>
+        !IsTokenName(field.Name) || field.Value.AsSpan().ContainsAny("\r\n\0");
 
     /// <summary>
     /// Tells whether <paramref name="name" /> is a field name nghttp2 hands on: one or more
