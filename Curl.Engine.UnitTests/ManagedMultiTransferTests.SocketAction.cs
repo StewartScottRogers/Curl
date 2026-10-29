@@ -239,6 +239,9 @@ public sealed partial class ManagedMultiTransferTests
         await using ManagedCurlEngine engine = new(time, null);
         await using ManagedMultiTransfer multi = NewMulti(time);
         multi.Options = RecordingOptions(calls);
+
+        // The action lets the woken transfer run on to its end; a busy runner can take longer than the 200 ms default (BL-4050).
+        multi.SocketWaitSettleLimit = TimeSpan.FromSeconds(30);
         await using WrappingEasyTransfer transfer = new((ManagedEasyTransfer)engine.CreateEasy(), async (wait, token) =>
         {
             wait.TakeSocket(WrappedSocket.Handle);
