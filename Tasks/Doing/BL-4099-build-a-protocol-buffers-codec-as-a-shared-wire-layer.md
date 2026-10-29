@@ -35,3 +35,4 @@ Split if larger than one run: wire format first, then `.proto` parsing, then JSO
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 20879125 8627716d 72bc5ee6 e35aff77 3d836d5e.
