@@ -79,7 +79,8 @@ internal static class HttpRequestOptionsMapping
     /// <see cref="HttpRequestOptions.CustomMethod" />, and <see cref="EasyBehaviourOptions.FailOnError" /> as
     /// <see cref="HttpRequestOptions.Fail" /> <see cref="HttpFailMode.Fail" />, otherwise <c>--fail-with-body</c>'s
     /// <see cref="EngineTransferSettings.FailMode" />; <see cref="EasyBehaviourOptions.KeepSendingOnError" /> verbatim;
-    /// a positive <see cref="EasyTransferOptions.MaxSendSpeed" /> as <see cref="HttpRequestOptions.SendBytesPerSecond" />. From <paramref name="authentication" />:
+    /// a positive <see cref="EasyTransferOptions.MaxSendSpeed" /> as <see cref="HttpRequestOptions.SendBytesPerSecond" />;
+    /// a positive <see cref="EasyTransferOptions.MaxReceiveSpeed" /> as <see cref="HttpRequestOptions.ReceiveBytesPerSecond" />. From <paramref name="authentication" />:
     /// <see cref="EasyAuthenticationOptions.HttpAuthentication" /> as <see cref="HttpRequestOptions.AuthSchemes" />
     /// (<see cref="AuthSchemesOf" />), <see cref="EasyAuthenticationOptions.XOAuth2Bearer" /> as
     /// <see cref="HttpRequestOptions.BearerToken" /> and <see cref="EasyAuthenticationOptions.AwsSigV4" /> verbatim;
@@ -138,6 +139,7 @@ internal static class HttpRequestOptionsMapping
             ContinueWait = http.Expect100Timeout,
             HappyEyeballsTimeout = settings.HappyEyeballsTimeout,
             SendBytesPerSecond = transfer.MaxSendSpeed > 0 ? transfer.MaxSendSpeed : null,
+            ReceiveBytesPerSecond = transfer.MaxReceiveSpeed > 0 ? transfer.MaxReceiveSpeed : null,
         };
 
     /// <summary>

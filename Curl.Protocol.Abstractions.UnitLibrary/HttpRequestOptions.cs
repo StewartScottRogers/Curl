@@ -393,4 +393,14 @@ public sealed record HttpRequestOptions
     /// so the handler limits only a body of bytes (BL-2957).
     /// </remarks>
     public long? SendBytesPerSecond { get; init; }
+
+    /// <summary>
+    /// Gets the most bytes a second a response is received at (<c>--limit-rate</c>, libcurl's
+    /// <c>CURLOPT_MAX_RECV_SPEED_LARGE</c>), or <see langword="null" />, the default, to receive it
+    /// as fast as it arrives.
+    /// </summary>
+    /// <remarks>
+    /// Carried so an HTTP/2 session can size its stream receive window from the rate (BL-4045, BL-3810).
+    /// </remarks>
+    public long? ReceiveBytesPerSecond { get; init; }
 }
