@@ -119,6 +119,19 @@ internal static class HttpTransferMessages
     internal const string ReceiveFailed = "Failure when receiving data from the peer";
 
     /// <summary>
+    /// The exit 56 message for an HTTP/2 connection a GOAWAY with an error ended part way
+    /// through a response (CGR-272, measured on curl 8.18.0 with nghttp2).
+    /// </summary>
+    internal const string Http2GoAwayReceiveFailure = ReceiveFailurePrefix + "Connection reset by peer";
+
+    /// <summary>
+    /// The exit 16 message for a frame nghttp2 rejects with a connection error its callback
+    /// then fails on, such as a WINDOW_UPDATE that overflows the window, a stream the server
+    /// opened with an even ID or an invalid SETTINGS value (CGR-272, measured on curl 8.18.0).
+    /// </summary>
+    internal const string Http2RecvCallbackFailed = "nghttp2 recv error -902: The user callback function failed";
+
+    /// <summary>
     /// The exit 16 message for an HTTP/2 connection the peer closed before a response head
     /// arrived (measured, BL-658 Notes).
     /// </summary>

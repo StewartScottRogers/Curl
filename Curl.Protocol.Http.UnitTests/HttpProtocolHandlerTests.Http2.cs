@@ -266,8 +266,8 @@ public sealed partial class HttpProtocolHandlerTests
         WriteResult(result);
         Diagnostics.Assert("exit code", CurlExitCode.RecvError, result.ExitCode);
         Assert.AreEqual(CurlExitCode.RecvError, result.ExitCode);
-        Diagnostics.Assert("error message", "Failure when receiving data from the peer", result.ErrorMessage);
-        Assert.AreEqual("Failure when receiving data from the peer", result.ErrorMessage);
+        Diagnostics.Assert("error message", "Recv failure: Connection reset by peer", result.ErrorMessage);
+        Assert.AreEqual("Recv failure: Connection reset by peer", result.ErrorMessage);
         Diagnostics.Assert("body", "hello", Latin1(output.ToArray()));
         Assert.AreEqual("hello", Latin1(output.ToArray()));
     }

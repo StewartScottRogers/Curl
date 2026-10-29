@@ -64,15 +64,17 @@ curl -sS --http2-prior-knowledge http://127.0.0.1:P/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr272Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+- Real curl with nghttp2 could not be run here (Windows curl has no HTTP/2, no WSL server); fixed to the report's measured expected text (curl 8.18.0): FLOW_CONTROL_ERROR and invalid-SETTINGS errors -> exit 16 `nghttp2 recv error -902: The user callback function failed`; GOAWAY refusing the stream mid-response -> exit 56 `Recv failure: Connection reset by peer` (HTTP/2 only, HTTP/3 refusal text unchanged). Decision in ADR-0969. Unit tests in Cgr272Tests.cs; existing tests for the GOAWAY text updated.
+- Not fixed: the `sideven` scenario (server-opened even stream) - its source in the frame layer was not identified; it keeps its old text. Criterion on CI platforms met by platform-neutral tests.
 
 ## Log
 

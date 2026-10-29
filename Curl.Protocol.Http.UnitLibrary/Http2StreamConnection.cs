@@ -422,7 +422,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// marked <see cref="HttpTransferException.LeavesConnectionIntact" />, since it ends only the
     /// stream and the next transfer goes on the same connection (CGR-140).
     /// </summary>
-    private HttpTransferException? FailureOf(Exception exception) => IsRefusal(exception) ? Refused() : exception switch
+    private HttpTransferException? FailureOf(Exception exception) => IsRefusal(exception) ? Refused(exception) : exception switch
     {
         Http2StreamResetException reset => new(CurlExitCode.Http2Stream, ResetMessageOf(reset))
         {
@@ -430,7 +430,7 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
             LeavesConnectionIntact = true,
         },
         Http2ProtocolException error => ConnectionErrorOf(error),
-        Http2GoAwayException => new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed),
+        Http2GoAwayException => new(CurlExitCode.RecvError, HttpTransferMessages.Http2GoAwayReceiveFailure),
         EndOfStreamException => Closed(),
         _ => null,
     };
@@ -442,7 +442,17 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// </summary>
     private static HttpTransferException ConnectionErrorOf(Http2ProtocolException error) => error.InvalidFrame is { } frame
         ? new(CurlExitCode.Http2Stream, HttpTransferMessages.Http2PushPromiseReceivedWithPushDisabled(frame.StreamId, frame.Payload.Length, frame.HasFlag(Http2FrameFlags.EndHeaders)))
-        : new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode));
+        : new(CurlExitCode.Http2, IsCallbackFailure(error)
+            ? HttpTransferMessages.Http2RecvCallbackFailed
+            : HttpTransferMessages.Http2ShutsDownConnection(error.ErrorCode));
+
+    /// <summary>
+    /// Tells whether nghttp2 fails its receive callback for the error: a flow control violation or an invalid
+    /// SETTINGS value (CGR-272); other protocol errors keep the connection-shutdown wording (BL-658).
+    /// </summary>
+    private static bool IsCallbackFailure(Http2ProtocolException error) =>
+        error.ErrorCode == Http2ErrorCode.FlowControlError
+        || (error.ErrorCode == Http2ErrorCode.ProtocolError && error.Message.Contains(": SETTINGS_", StringComparison.Ordinal));
 
     /// <summary>
     /// Tells whether the server refused this stream: reset it with REFUSED_STREAM, or sent a
@@ -459,8 +469,8 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
     /// new connection as curl 8.18.0 with nghttp2 does, with no <c>-v</c> line of its own
     /// (measured, BL-3560 Notes).
     /// </summary>
-    private static HttpTransferException Refused() =>
-        new(CurlExitCode.RecvError, HttpTransferMessages.ReceiveFailed) { IsStreamRefused = true };
+    private static HttpTransferException Refused(Exception exception) =>
+        new(CurlExitCode.RecvError, exception is Http2GoAwayException ? HttpTransferMessages.Http2GoAwayReceiveFailure : HttpTransferMessages.ReceiveFailed) { IsStreamRefused = true };
 
     private void ThrowIfClosed()
     {

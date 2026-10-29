@@ -2214,7 +2214,7 @@ public sealed class HttpProtocolHandler(
     {
         if (responseBegan)
         {
-            return new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
+            return new HttpAttemptOutcome(refused.ErrorMessage == HttpTransferMessages.Http2GoAwayReceiveFailure ? refused : refused with { ErrorMessage = HttpTransferMessages.ReceiveFailed }, null, KeepsAlive: false);
         }
 
         plan.Context.Events.ReportInfo(HttpConnectionInfoLines.RefusedStreamRetrying);
