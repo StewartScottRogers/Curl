@@ -17,6 +17,7 @@ public sealed class CommandLineOptions
     private readonly List<string> urls = [];
     private readonly List<UrlOutput> urlOutputs = [];
     private readonly List<string> uploadFiles = [];
+    private readonly Dictionary<string, string> extensionOptionValues = new(StringComparer.Ordinal);
 
     private readonly List<bool> remoteNameAllAtEachUploadFile = [];
     private readonly List<string> telnetOptions = [];
@@ -326,6 +327,18 @@ public sealed class CommandLineOptions
     /// This process's environment unless <see cref="CommandLineParser"/> is given the run's own reader (BL-1943).
     /// </summary>
     internal Func<string, string?> ReadEnvironmentVariable { get => globals.ReadEnvironmentVariable; set => globals.ReadEnvironmentVariable = value; }
+
+    /// <summary>The extensions' long options <see cref="CommandLineParser"/> reads beyond curl's own, by name (ADR-1004).</summary>
+    internal IReadOnlyDictionary<string, CommandLineExtensionOption> ExtensionOptions { get => globals.ExtensionOptions; set => globals.ExtensionOptions = value; }
+
+    /// <summary>
+    /// The value this group gave each extension option (<see cref="CommandLineExtensionOption"/>), by long name:
+    /// the last value given, or the empty string for a flag (ADR-1004).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ExtensionOptionValues => extensionOptionValues;
+
+    /// <summary>Records <paramref name="value"/> as this group's value of the extension option <paramref name="longName"/>, replacing an earlier one.</summary>
+    internal void SetExtensionOptionValue(string longName, string value) => extensionOptionValues[longName] = value;
 
     /// <summary><see langword="true"/> when <c>-s</c> / <c>--silent</c> was given and no <c>--no-silent</c> came after it.</summary>
     public bool Silent { get => globals.Silent; internal set => globals.Silent = value; }
