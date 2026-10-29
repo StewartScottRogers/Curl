@@ -35,9 +35,11 @@
     file is deleted once hashed.
 
 .PARAMETER Curl
-    The reference curl. Default: Git for Windows' curl, found as Record-CurlExchange.ps1 finds
-    it: ucrt64\bin\curl.exe first (Git 2.56.0 and later, curl 8.22.0), then mingw64\bin\curl.exe,
-    beside git.exe and then under Program Files\Git.
+    The reference curl. Default on Windows: Git for Windows' curl, found as
+    Record-CurlExchange.ps1 finds it: ucrt64\bin\curl.exe first (Git 2.56.0 and later, curl
+    8.22.0), then mingw64\bin\curl.exe, beside git.exe and then under Program Files\Git. Off
+    Windows: CURL_DIFFERENTIAL_REFERENCE (set by sourcing Set-DifferentialEnvironment.sh, the
+    OpenSSL build), else the first curl on PATH.
 
 .PARAMETER Candidate
     The executable under test. Default: Curl.Console of this repository, published first as a
@@ -83,12 +85,23 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on Windows, PowerShell 7 elsewhere (BL-3927).
+$OnWindows = $PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows
+$PowerShellExe = if ($OnWindows) { 'powershell' } else { 'pwsh' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $record = Join-Path $repo 'Record-CurlExchange.ps1'
 $LargeBytes = 50MB
 
 function Get-ReferenceCurl {
     if ($Curl) { return (Resolve-Path $Curl).Path }
+    if (-not $OnWindows) {
+        # Off Windows the reference is the OpenSSL build: the one Set-DifferentialEnvironment.sh
+        # chose, else the first curl on PATH.
+        if ($env:CURL_DIFFERENTIAL_REFERENCE) { return $env:CURL_DIFFERENTIAL_REFERENCE }
+        $onPath = Get-Command curl -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($onPath) { return $onPath.Source }
+        throw 'The reference curl was not found; source Set-DifferentialEnvironment.sh or pass -Curl.'
+    }
     # Git for Windows 2.56.0 moved its curl from mingw64\bin to ucrt64\bin: try ucrt64 first,
     # then mingw64, beside git.exe and then under Program Files.
     $roots = @()
@@ -127,7 +140,7 @@ function Get-FreePort {
 function ConvertTo-Quoted([string]$Text) { return "'" + $Text.Replace("'", "''") + "'" }
 
 function Invoke-Run($Load, [string]$Exe, [string]$Folder) {
-    # One recorded run in its own Windows PowerShell, killed after -TimeoutSeconds; returns its
+    # One recorded run in its own PowerShell process, killed after -TimeoutSeconds; returns its
     # exit code (or "timeout") and the output file's length and SHA-256.
     New-Item -ItemType Directory -Force $Folder | Out-Null
     $port = Get-FreePort
@@ -143,11 +156,11 @@ function Invoke-Run($Load, [string]$Exe, [string]$Folder) {
             ) -join "`r`n") + "`r`n")
     $exitFile = Join-Path $Folder 'exitcode.txt'
     Remove-Item -LiteralPath $exitFile, $outFile -ErrorAction SilentlyContinue
-    $p = Start-Process -FilePath 'powershell' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"") `
+    $p = Start-Process -FilePath $PowerShellExe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"") `
         -WorkingDirectory $Folder -NoNewWindow -PassThru -RedirectStandardOutput (Join-Path $Folder 'record.out') -RedirectStandardError (Join-Path $Folder 'record.err')
     $null = $p.Handle
     $exit = if (-not $p.WaitForExit($TimeoutSeconds * 1000)) {
-        & taskkill /PID $p.Id /T /F 2>&1 | Out-Null
+        if ($OnWindows) { & taskkill /PID $p.Id /T /F 2>&1 | Out-Null } else { $p.Kill($true) }
         'timeout'
     } elseif (Test-Path -LiteralPath $exitFile) {
         "$(Get-Content -LiteralPath $exitFile -Raw)".Trim()
@@ -186,7 +199,7 @@ if ($Candidate) {
     # Publish the candidate as a native AOT binary.
     $installer = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer'
     if ((Test-Path -LiteralPath $installer) -and ($env:PATH -notlike "*$installer*")) { $env:PATH = "$installer;$env:PATH" }
-    $publishDir = "$repo.audit\publish-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+    $publishDir = Join-Path "$repo.audit" "publish-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
     $publish = @('publish', (Join-Path $repo 'Curl.Console'), '-c', 'Release', '-o', $publishDir, '-nologo')
     if ($Runtime) { $publish += @('-r', $Runtime) }
     if ($PublishArguments) { $publish += @($PublishArguments -split ' ' | Where-Object { $_ }) }
@@ -197,7 +210,7 @@ if ($Candidate) {
     # Kept for the conformance auditor, which reads it for trim and AOT warnings (IL2xxx, IL3xxx).
     [IO.File]::WriteAllText((Join-Path $OutDirectory 'publish.log'), $publishOutput)
     $ErrorActionPreference = 'Stop'
-    $candidateExe = Join-Path $publishDir 'curl.exe'
+    $candidateExe = Join-Path $publishDir $(if ($OnWindows) { 'curl.exe' } else { 'curl' })
     if ($publishExit -ne 0 -or -not (Test-Path -LiteralPath $candidateExe)) {
         $why = @($publishOutput -split "`n" | Where-Object { $_ -match 'error' } | Select-Object -First 3) -join ' | '
         Write-Host "Publishing Curl.Console failed (exit $publishExit): $why" -ForegroundColor Red
