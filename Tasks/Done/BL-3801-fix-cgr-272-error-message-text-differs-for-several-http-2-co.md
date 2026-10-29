@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary/HttpTransferMessages.cs, Curl.Protocol.
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3801 — Fix CGR-272: Error message text differs for several HTTP/2 connection errors that have the same exit code
 
@@ -80,3 +80,4 @@ curl -sS --http2-prior-knowledge http://127.0.0.1:P/x
 
 - 2026-10-26: Created from CGR-272 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. HTTP/2 -902 callback text and GOAWAY mid-response text fixed; sideven not covered (see Notes)
