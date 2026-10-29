@@ -28,7 +28,10 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 - `CoapObservation` adds Observe 0 to the GET; when the answer is a 2.xx with Observe, writes it and each later
   notification (payload, then a newline; under `-i` a `CoAP/1.0 c.dd` line first), drops one
   `CoapNotificationOrder` calls older (section 3.4), acknowledges confirmable ones, resets other messages,
-  ends after a notification without Observe or not a 2.xx, and on cancellation (`--max-time`, interruption)
+  ends after a notification without Observe or not a 2.xx, re-registers (a non-confirmable GET with Observe 0
+  and the same token) when the last notification's Max-Age (default 60 seconds) and 5 seconds pass without
+  another, fetches the later blocks of a notification carrying Block2 with M set through `CoapBlockwiseTransfer`
+  (without Observe, under a token of their own) and writes it once, whole, and on cancellation (`--max-time`, interruption)
   sends a GET with Observe 1 and the registration's token. An answer without Observe is written as a plain GET's.
 
 `Blockwise/` (namespace `Curl.Extension.Coap.Blockwise`, ADR-1057) carries large bodies (RFC 7959):

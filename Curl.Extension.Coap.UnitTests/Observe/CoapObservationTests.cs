@@ -174,6 +174,77 @@ public sealed class CoapObservationTests
     public void IsNotification_AnObserveValueLongerThanThreeBytes_IsNot() =>
         Assert.IsFalse(CoapObservation.IsNotification(new CoapMessage(CoapMessageType.NonConfirmable, CoapCode.Content, 1, Token, [new CoapOption(CoapOptionNumber.Observe, [1, 2, 3, 4])], [])));
 
+    [TestMethod]
+    [DataRow(null, 65, DisplayName = "without Max-Age the default 60 seconds and the margin pass")]
+    [DataRow(10u, 15, DisplayName = "a Max-Age of 10 seconds and the margin pass")]
+    public async Task ExecuteAsync_NoNotificationWithinMaxAgeAndTheMargin_ReregistersWithObserveZeroAndTheSameToken(uint? maxAge, int expectedWaitSeconds)
+    {
+        var clock = new ImmediateTimeProvider();
+        var channel = new ScriptedDatagramChannel((count, sent) => count switch
+        {
+            1 => [Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Content, sent.MessageId, sent.Token, [Observe(5), .. MaxAgeOptions(maxAge)], Encoding.ASCII.GetBytes("a")))],
+            2 => [Notification(CoapMessageType.NonConfirmable, 3, null, "end")],
+            _ => [],
+        });
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Observed(output, clock));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("a\nend\n", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.HasCount(2, channel.Sent);
+        CoapMessage reregistration = channel.Sent[1];
+        Assert.AreEqual(CoapCode.Get, reregistration.Code);
+        Assert.AreEqual(CoapMessageType.NonConfirmable, reregistration.Type);
+        Assert.AreEqual(unchecked((ushort)(channel.Sent[0].MessageId + 1)), reregistration.MessageId);
+        CollectionAssert.AreEqual(Token, reregistration.Token);
+        CollectionAssert.AreEqual(new[] { "3=h", "6=", "11=r" }, OptionTexts(reregistration));
+        Assert.Contains(TimeSpan.FromSeconds(expectedWaitSeconds), clock.DueTimes);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ANotificationWithMoreBlocks_FetchesTheLaterBlocksWithoutObserveAndWritesItOnceWhole()
+    {
+        var channel = new ScriptedDatagramChannel((count, sent) => count switch
+        {
+            1 => [Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Content, sent.MessageId, sent.Token, [Observe(5), Block2(0, true)], Encoding.ASCII.GetBytes("0123456789abcdef")))],
+            2 => [
+                Encode(new CoapMessage(CoapMessageType.Acknowledgement, CoapCode.Content, sent.MessageId, sent.Token, [Block2(1, false)], Encoding.ASCII.GetBytes("tail"))),
+                Notification(CoapMessageType.NonConfirmable, 3, null, "end")],
+            _ => [],
+        });
+        var output = new MemoryStream();
+
+        TransferResult result = await Handler(channel).ExecuteAsync(Observed(output));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("0123456789abcdeftail\nend\n", Encoding.ASCII.GetString(output.ToArray()));
+        Assert.HasCount(2, channel.Sent);
+        CoapMessage blockFetch = channel.Sent[1];
+        Assert.AreEqual(CoapCode.Get, blockFetch.Code);
+        Assert.AreEqual(CoapMessageType.Confirmable, blockFetch.Type);
+        Assert.AreEqual(unchecked((ushort)(channel.Sent[0].MessageId + 1)), blockFetch.MessageId);
+        CollectionAssert.AreEqual(CoapObservation.BlockFetchTokenOf(Token), blockFetch.Token);
+        CollectionAssert.AreEqual(new[] { 3, 11, 23 }, blockFetch.Options.Select(option => option.Number).ToArray());
+        CollectionAssert.AreEqual(new CoapBlockValue(1, false, 0).Encode(), blockFetch.Options[^1].Value);
+    }
+
+    [TestMethod]
+    [DataRow(new byte[] { 0, 0, 0, 0 }, new byte[] { 0, 0, 0, 1 }, DisplayName = "the last bit of the registration's token flipped")]
+    [DataRow(new byte[] { 7 }, new byte[] { 6 }, DisplayName = "a one-byte token flipped")]
+    [DataRow(new byte[0], new byte[] { 1 }, DisplayName = "an empty token gives 0x01")]
+    public void BlockFetchTokenOf_ARegistrationToken_GivesAnotherToken(byte[] registrationToken, byte[] expected) =>
+        CollectionAssert.AreEqual(expected, CoapObservation.BlockFetchTokenOf(registrationToken));
+
+    [TestMethod]
+    public void MaxAgeOf_AValueLongerThanFourBytes_GivesTheDefault() =>
+        Assert.AreEqual(CoapObservation.DefaultMaxAge, CoapObservation.MaxAgeOf(new CoapMessage(CoapMessageType.NonConfirmable, CoapCode.Content, 1, Token, [new CoapOption(CoapOptionNumber.MaxAge, [0, 0, 0, 0, 1])], [])));
+
+    private static CoapOption[] MaxAgeOptions(uint? maxAge) =>
+        maxAge is { } seconds ? [new CoapOption(CoapOptionNumber.MaxAge, CoapUnsignedInteger.Encode(seconds))] : [];
+
+    private static CoapOption Block2(uint number, bool more) => new(CoapOptionNumber.Block2, new CoapBlockValue(number, more, 0).Encode());
+
     private static ScriptedDatagramChannel Channel(Func<CoapMessage, IEnumerable<byte[]>> repliesToRegistration) =>
         new((count, sent) => count == 1 ? repliesToRegistration(sent) : []);
 
