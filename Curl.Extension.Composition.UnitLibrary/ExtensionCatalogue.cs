@@ -22,5 +22,6 @@ internal static class ExtensionCatalogue
         McpClient.Client.McpClientExtension.CreateHandler,
         Kafka.Client.KafkaExtension.CreateHandler,
         Redis.Client.RedisExtension.CreateHandler,
+        SignalR.SignalRExtension.CreateHandler,
     ];
 }

@@ -30,5 +30,6 @@ internal static class ExtensionDescriptionCatalogue
         Kafka.Client.KafkaExtension.Description,
         Redis.Client.RedisExtension.Description,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.Description,
+        SignalR.SignalRExtension.Description,
     ];
 }
