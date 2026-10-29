@@ -33,3 +33,4 @@ Split out of BL-4009 (OpenSSL's `-v` message-callback trace from the hand-built 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: eb996827 a2c21a96 17840642 a221f870 3d836d5e.
