@@ -31,7 +31,7 @@ Split from BL-4012 (over its cost cap); needs BL-4057, which makes the Engine dr
 
 - Split from BL-4012.
 - BL-4057 already added `CurlEasyProgressMeterTests.cs` with the three tests this task asks for; this run verified them rather than changing them. They pass (3/3).
-- Measured real curl 8.22.0 (Schannel, mingw) on Windows: its default meter, which is libcurl's built-in meter, starts `  % Total    % Received % Xferd  Average Speed` and its second line holds `Dload  Upload`, which is what the tests pin. The tests check only those fragments, `100 ` and a trailing `Environment.NewLine`, so they do not depend on the platform. Nobody measured a libcurl C program directly, because a lane has no C toolchain; the curl tool draws this meter through libcurl, so its output stands in for that.
+- Measured real curl 8.22.0 (Schannel, mingw) on Windows: its default meter, which is libcurl's built-in meter, starts `  % Total    % Received % Xferd  Average Speed` and its second line holds `Dload  Upload`, which is what the tests pin. The tests check only those fragments, `\r100 ` and a trailing `Environment.NewLine`, so they do not depend on the platform. Nobody measured a libcurl C program directly, because a lane has no C toolchain; the curl tool draws this meter through libcurl, so its output stands in for that.
 - `dotnet build` clean; fast tests green (exit 0). `Measure-CodeQuality.ps1 -Library Libcurl`: 0 failing members. No production code changed.
 
 ## Log
