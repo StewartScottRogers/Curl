@@ -31,7 +31,7 @@ Lanes test only on Windows, so reproduce with `gh run view 40801399142 --log-fai
 ## Notes
 
 - The gate failures came from afe4338c7 (BL-3791), not fcc2b504. No test covered `MissingFileFailure`'s `encoder?.Name` when the part waits for the send and has an encoder. `PerformBuildingMimePostAsync` lost its only test of a form that fails to build once a missing file stopped failing at build. Fixed with two tests and no production change: a waiting missing file with a base64 encoder (Curl.Core.UnitTests), and a `CURLOPT_MIMEPOST` whose name holds a line feed under `CURLMIMEOPT_FORMESCAPE`, which fails with exit 43 before connecting (Curl.Engine.UnitTests). Added both test files to touches: no task in Doing on origin/work/dark-factory names them.
-- `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary,Curl.Engine.UnitLibrary`: 0 failing members. It was scored with -SkipTestRun after its test run, because Libcurl.UnitTests failed three tests in a static-state race between Cgr265Tests and EasyAuthenticationOptionSettersTests (filed as BL-4018). Every other test project that reaches Core and Engine passed in that run.
+- `Measure-CodeQuality.ps1 -Library Curl.Core.UnitLibrary,Curl.Engine.UnitLibrary`: 0 failing members. It was scored with -SkipTestRun after its test run, because Libcurl.UnitTests failed three tests in a static-state race between Cgr265Tests and EasyAuthenticationOptionSettersTests (filed as BL-4023). Every other test project that reaches Core and Engine passed in that run.
 - CI on Linux and macOS: both new tests are platform-neutral (an in-memory file system and a scripted connector, no path or OS text). That and the green tests here meet the criterion; the shift's CI watch files any failure.
 
 ## Log

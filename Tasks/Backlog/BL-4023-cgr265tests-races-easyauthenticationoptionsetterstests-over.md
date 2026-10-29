@@ -1,5 +1,5 @@
 ---
-id: BL-4018
+id: BL-4023
 title: Cgr265Tests races EasyAuthenticationOptionSettersTests over the static SrpIsBuiltIn
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4018 — Cgr265Tests races EasyAuthenticationOptionSettersTests over the static SrpIsBuiltIn
+# BL-4023 — Cgr265Tests races EasyAuthenticationOptionSettersTests over the static SrpIsBuiltIn
 
 ## Goal
 
