@@ -31,3 +31,4 @@ Split from BL-4251 for size (extension 15 of 63, BL-4116). Test code only, for B
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 8678a52f 13fba537 3d836d5e.
