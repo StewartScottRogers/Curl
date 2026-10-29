@@ -1,4 +1,4 @@
-# ADR-1049 — The AMQP 0-9-1 codec maps each wire fault to one AMQP reply code
+# ADR-1056 — The AMQP 0-9-1 codec maps each wire fault to one AMQP reply code
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
