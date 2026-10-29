@@ -33,3 +33,4 @@ Split from BL-3997 (over its cost cap). The signature type is BL-4040; wiring an
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 187274bf 18ff86a5 93da3646.
