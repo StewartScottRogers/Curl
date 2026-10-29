@@ -33,3 +33,4 @@ Split from BL-4062.
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 26540cf8 8a182fd3 3d836d5e.
