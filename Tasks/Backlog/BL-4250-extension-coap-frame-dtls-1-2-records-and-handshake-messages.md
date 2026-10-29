@@ -1,16 +1,16 @@
 ---
-id: BL-4227
+id: BL-4250
 title: Extension CoAP: frame DTLS 1.2 records and handshake messages (RFC 6347)
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4222]
+depends-on: [BL-4245]
 touches: [Curl.Extension.Coap.UnitLibrary/Curl.Extension.Coap.UnitLibrary.csproj, Curl.Extension.Coap.UnitLibrary/Dtls/Wire, Curl.Extension.Coap.UnitTests/Dtls/Wire]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4227 — Extension CoAP: frame DTLS 1.2 records and handshake messages (RFC 6347)
+# BL-4250 — Extension CoAP: frame DTLS 1.2 records and handshake messages (RFC 6347)
 
 ## Goal
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4226
+id: BL-4249
 title: Let an extension verify a server certificate chain with curl's trust settings
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4226 — Let an extension verify a server certificate chain with curl's trust settings
+# BL-4249 — Let an extension verify a server certificate chain with curl's trust settings
 
 ## Goal
 

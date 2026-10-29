@@ -1,5 +1,5 @@
 ---
-id: BL-4222
+id: BL-4245
 title: Extension CoAP: encode and decode CoAP messages and options
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4222 — Extension CoAP: encode and decode CoAP messages and options
+# BL-4245 — Extension CoAP: encode and decode CoAP messages and options
 
 ## Goal
 
@@ -20,7 +20,7 @@ completed:
 
 Part of BL-4116 (extension 15 of 63, split for size). Extension rules: ADR-0999 and the lane rules "Extensions": it references only `Curl.Protocol.Abstractions`, the shared layers (`Curl.Tls`, `Curl.Cryptography`, `Curl.Networking`) and `Curl.Extension.Abstractions`, never a `Curl.Protocol.*` library or another extension, is tested against the RFCs, not curl, and never changes what curl does. Held to the four quality gates.
 
-Creates the project pair (`new-project` skill; `/Extensions/Coap/` folder in `Curl.slnx` under the marker comment, ADR-1003; csproj like `Curl.Extension.GraphQl.UnitLibrary`'s). Specification: RFC 7252 sections 3 (message format), 3.1 (option format), 5.4 and 5.10 (option numbers), 12.1 (codes); RFC 7959 section 2.2 (block option value); RFC 7641 section 2 (Observe option value). Namespace `Curl.Extension.Coap.Wire`. No handler yet and no catalogue line: BL-4223 registers it.
+Creates the project pair (`new-project` skill; `/Extensions/Coap/` folder in `Curl.slnx` under the marker comment, ADR-1003; csproj like `Curl.Extension.GraphQl.UnitLibrary`'s). Specification: RFC 7252 sections 3 (message format), 3.1 (option format), 5.4 and 5.10 (option numbers), 12.1 (codes); RFC 7959 section 2.2 (block option value); RFC 7641 section 2 (Observe option value). Namespace `Curl.Extension.Coap.Wire`. No handler yet and no catalogue line: BL-4246 registers it.
 
 ## Acceptance criteria
 
