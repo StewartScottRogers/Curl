@@ -3,7 +3,7 @@ using Curl.Extension.Redis.Client;
 
 namespace Curl.Extension.Redis.Wire;
 
-/// <summary>Checks how each RESP3 reply type is written to the output (ADR-1075).</summary>
+/// <summary>Checks how each RESP3 reply type is written to the output (ADR-1077).</summary>
 [TestClass]
 public sealed class RespReplyRenderingTests
 {

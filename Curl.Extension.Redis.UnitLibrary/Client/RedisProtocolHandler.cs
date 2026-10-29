@@ -4,7 +4,7 @@ namespace Curl.Extension.Redis.Client;
 
 /// <summary>
 /// Serves <c>redis://[user:password@]host[:port]/[db]/command/argument/...</c> and <c>rediss://</c> (TLS from the
-/// connector), both on port 6379 by default (ADR-1075): one command, its reply written to the output. The command
+/// connector), both on port 6379 by default (ADR-1077): one command, its reply written to the output. The command
 /// comes from the URL's path (<see cref="RedisUrlCommand"/>), <c>-d</c> appends one more argument, and
 /// <c>--user</c> or the URL's user information authenticate. The exchange itself is <see cref="RedisClientFlow"/>.
 /// </summary>

@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Redis.Client;
 
-/// <summary>The <c>redis://</c> and <c>rediss://</c> extension's description and handler factory (ADR-1075).</summary>
+/// <summary>The <c>redis://</c> and <c>rediss://</c> extension's description and handler factory (ADR-1077).</summary>
 public static class RedisExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

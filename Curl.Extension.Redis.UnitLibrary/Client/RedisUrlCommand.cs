@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.Redis.Client;
 
 /// <summary>
-/// The command a <c>redis://</c> URL's path names (ADR-1075): <c>/[db]/command/argument/...</c>, an all-digit first
+/// The command a <c>redis://</c> URL's path names (ADR-1077): <c>/[db]/command/argument/...</c>, an all-digit first
 /// segment the database to <c>SELECT</c> (the redis URI scheme's <c>db-number</c>), every later segment, URL-decoded,
 /// one argument.
 /// </summary>

@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Redis.Client;
 
-/// <summary>Ends a Redis transfer with the exit code ADR-1075 gives the failure.</summary>
+/// <summary>Ends a Redis transfer with the exit code ADR-1077 gives the failure.</summary>
 internal sealed class RedisClientException(CurlExitCode exitCode, string message) : Exception(message)
 {
     /// <summary>The exit code the transfer ends with.</summary>

@@ -1,6 +1,6 @@
 # Curl.Extension.Redis.UnitLibrary
 
-The Redis extension (ADR-0999, ADR-1075), tested against the RESP3 specification and the redis URI scheme (IANA),
+The Redis extension (ADR-0999, ADR-1077), tested against the RESP3 specification and the redis URI scheme (IANA),
 not against curl. It references only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`) and
 the base class library. The handler is registered by one line in `ExtensionCatalogue.cs` and described in
 `ExtensionDescriptionCatalogue.cs`.

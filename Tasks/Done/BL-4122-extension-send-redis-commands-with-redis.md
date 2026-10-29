@@ -35,7 +35,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- 2026-10-29 (lane 7): Decisions in ADR-1075: the command comes from the URL path (`/[db]/command/arg/...`), `-d`
+- 2026-10-29 (lane 7): Decisions in ADR-1077: the command comes from the URL path (`/[db]/command/arg/...`), `-d`
   appends the last argument, `HELLO 3 [AUTH]` first, replies written as `redis-cli --raw` does, error replies exit 8
   (67 for a refused HELLO with credentials or NOAUTH). Port 6379 for both schemes, as the IANA registrations give.
 - Added `ExtensionDescriptionCatalogue.cs` to touches (a shared list file; the description must be listed for
