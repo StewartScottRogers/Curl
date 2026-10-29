@@ -1,4 +1,4 @@
-# ADR-1050 — The AMQP 1.0 type codec maps each AMQP type to one CLR type and refuses malformed input with one exception
+# ADR-1053 — The AMQP 1.0 type codec maps each AMQP type to one CLR type and refuses malformed input with one exception
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

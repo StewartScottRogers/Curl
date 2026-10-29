@@ -4,7 +4,7 @@ The AMQP 1.0 client extension (ADR-0999, BL-4118). Namespace `Curl.Extension.Amq
 Version 1.0 (29 October 2012), not against curl. Never references a `Curl.Protocol.*` library or another extension,
 including `Curl.Extension.Amqp0.UnitLibrary` (AMQP 0-9-1, which owns `amqp://` and `amqps://`).
 
-- `Types/`: the type system of Part 1 (ADR-1050). `Amqp1Writer` writes every value in its smallest encoding and
+- `Types/`: the type system of Part 1 (ADR-1053). `Amqp1Writer` writes every value in its smallest encoding and
   `Amqp1Reader` reads every encoding; `Amqp1FormatCode` names the constructors of section 1.6. The value types are
   in `Amqp1Values.cs`: `Amqp1Symbol`, `Amqp1Timestamp`, `Amqp1Decimal`, `Amqp1Map`, `Amqp1Array` and
   `Amqp1Described` (section 1.3).

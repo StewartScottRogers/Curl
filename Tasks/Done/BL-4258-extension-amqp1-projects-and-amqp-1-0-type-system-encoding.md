@@ -32,7 +32,7 @@ Split from BL-4118 (AMQP 1.0, extension 17 of 63) for size by its first pass. Ex
 ## Notes
 
 - Filed by BL-4118's lane 3 prerequisite pass.
-- Design (ADR-1050): one CLR type per AMQP type (Rune for char, Guid for uuid, byte[] for binary, Amqp1Symbol, Amqp1Timestamp, Amqp1Decimal as raw bytes, IReadOnlyList<object?> for list, Amqp1Map/Amqp1Array/Amqp1Described records). `Amqp1Writer` writes smallest, `Amqp1Reader` reads every form; both raise `Amqp1MalformedEncodingException`.
+- Design (ADR-1053): one CLR type per AMQP type (Rune for char, Guid for uuid, byte[] for binary, Amqp1Symbol, Amqp1Timestamp, Amqp1Decimal as raw bytes, IReadOnlyList<object?> for list, Amqp1Map/Amqp1Array/Amqp1Described records). `Amqp1Writer` writes smallest, `Amqp1Reader` reads every form; both raise `Amqp1MalformedEncodingException`.
 - Default taken: a compound count may not exceed the bytes left in it, and nesting is capped at 100, so crafted input cannot loop, allocate without bound or overflow the stack. An array of a body-less element constructor (0x40 etc.) longer than its size is refused; no peer sends one.
 - Default taken: body-less codes (null, true, false, uint0, ulong0, list0) cannot be an array element constructor when writing.
 - Verified: dotnet build clean (0 warnings), fast tests green (119 in Curl.Extension.Amqp1.UnitTests), Measure-CodeQuality.ps1 -Library Curl.Extension.Amqp1.UnitLibrary: 100% line, 100% branch, 0 failing members. Tests use hex bytes only, so they are platform-neutral.
