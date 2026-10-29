@@ -92,12 +92,11 @@ public sealed partial class HttpProtocolHandlerTests
     }
 
     /// <summary>
-    /// Measured (BL-975): <c>-v --connect-to example.invalid:80:127.0.0.1:18499 http://example.invalid/</c>
-    /// makes curl 8.21.0 end <c>* Connection #0 to host 127.0.0.1:18499 left intact</c>, naming the
-    /// destination the connector reports, ahead of any alt-svc alternative.
+    /// With <c>--connect-to</c> curl 8.22.0 no longer names the destination (measured, BL-3741): the line names the
+    /// alt-svc alternative when there is one, as for a connection with no mapping.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_KeptAliveOnAConnectToDestination_ReportsTheDestinationLeftIntact()
+    public async Task ExecuteAsync_KeptAliveOnAConnectToDestination_ReportsTheAltSvcAlternativeLeftIntact()
     {
         RecordingTransferEvents events = new();
         Diagnostics.Arrange("url, alt-svc route, connect-to", $"{AltSvcHttpsUrl}, h1 -> localhost:18443, 127.0.0.1:18499");
@@ -108,9 +107,9 @@ public sealed partial class HttpProtocolHandlerTests
 
         WriteResult(result);
         WriteEvents("info lines", events.Info);
-        Diagnostics.Assert("last info line", "Connection #0 to host 127.0.0.1:18499 left intact", events.Info[^1]);
+        Diagnostics.Assert("last info line", "Connection #0 to host localhost:18443 left intact", events.Info[^1]);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
-        Assert.AreEqual("Connection #0 to host 127.0.0.1:18499 left intact", events.Info[^1]);
+        Assert.AreEqual("Connection #0 to host localhost:18443 left intact", events.Info[^1]);
     }
 
     [TestMethod]

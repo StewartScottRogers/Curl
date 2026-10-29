@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.H
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3741 — Fix CGR-212: -v Connection #N to host X left intact names the --connect-to target or the unix-socket path instead of the URL host:port
 
@@ -74,10 +74,10 @@ curl -v -sS --connect-to foo.test:21802:localhost:21802 http://foo.test:21802/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -92,3 +92,10 @@ curl -v -sS --connect-to foo.test:21802:localhost:21802 http://foo.test:21802/x
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Fix lives in Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, held by BL-3736; waits for BL-3736
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes
+
+- Measured curl 8.22.0 (Schannel): `curl -sv --connect-to ex.test:80:127.0.0.1:20611 http://ex.test/x` ends `Connection #0 to host ex.test:80 left intact`. Curl now names the URL host:port for --connect-to and --unix-socket (the report gives the same expected text for the socket case). Removed the unix-socket and mapped-host branches from LeftIntactLine, and LeftIntactOverUnixSocket.
+- Decision: with --connect-to plus an alt-svc route (unmeasured) the line names the alt-svc alternative, as without a mapping.
+- Linux 8.18 differences are not reproduced; change is platform-neutral. Quality run clean, build clean, fast tests green.
+- 2026-10-29: Doing -> Done. CGR-212: left-intact line names URL host:port

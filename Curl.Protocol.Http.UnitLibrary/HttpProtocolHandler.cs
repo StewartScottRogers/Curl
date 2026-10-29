@@ -1307,18 +1307,14 @@ public sealed class HttpProtocolHandler(
         exitCode is not (CurlExitCode.Ok or CurlExitCode.GotNothing);
 
     /// <summary>
-    /// Names a connection left intact by its Unix domain socket, else by the <c>--connect-to</c>
-    /// destination the connector reports it dialled, else by the alt-svc alternative it was
-    /// dialled to, else by the target's host and port: curl 8.21.0 names the host it connected
-    /// to, not the origin (BL-623 case 1, BL-900, BL-975), except through a CONNECT tunnel or a
-    /// SOCKS proxy, where it names the origin, not the proxy (BL-1074).
+    /// Names a connection left intact by the alt-svc alternative it was dialled to, else by the
+    /// target's host and port: curl 8.22.0 names the URL's host and port even when <c>--connect-to</c>
+    /// or <c>--unix-socket</c> dialled elsewhere (measured, BL-3741, CGR-212).
     /// </summary>
     private static string LeftIntactLine(ConnectTarget target, ConnectResult connect) =>
-        (connect.UnixSocketPath, connect.MappedHost, target.AltSvcRoute) switch
+        target.AltSvcRoute switch
         {
-            ({ } socketPath, _, _) => HttpConnectionInfoLines.LeftIntactOverUnixSocket(connect.ConnectionNumber, socketPath),
-            (null, { } mappedHost, _) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, mappedHost, connect.MappedPort),
-            (null, null, { Alternative: var alternative }) => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
+            { Alternative: var alternative } => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, alternative.Host, alternative.Port),
             _ => HttpConnectionInfoLines.LeftIntact(connect.ConnectionNumber, target.Host, target.Port),
         };
 
