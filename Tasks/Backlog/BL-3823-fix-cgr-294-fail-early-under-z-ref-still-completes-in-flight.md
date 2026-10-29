@@ -4,8 +4,8 @@ title: Fix CGR-294: --fail-early under -Z: REF still completes in-flight transfe
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Console.UnitTests/Cgr294Tests.cs, Curl.Console/ParallelRun.cs]
+depends-on: [BL-3822]
+touches: [Curl.Console.UnitTests/Cgr294Tests.cs, Curl.Console.UnitTests/ParallelRunTests.cs, Curl.Console.UnitTests/CurlCommandRunnerParallelTests.cs, Curl.Console/ParallelRun.cs, Curl.Console/CurlCommandRunner.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -70,7 +70,10 @@ curl -Z --parallel-immediate -s --fail-early -f -w "%{urlnum} %{exitcode} %{http
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr294Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-28 (lane 2): Work done but uncommitted (stashed): ParallelRun.RecordEnd now sets HasFailedEarly/StopStartsToken at once and cancels the abort token after AbortDelay (1 s, curl checks about once a second); CurlCommandRunner uses HasFailedEarly to stop starts, run.StopStartsToken for host waits, and reports a wait cancelled by the failure as aborted; Cgr294Tests added, ParallelRunTests and CurlCommandRunnerParallelTests updated (an in-flight transfer ending before the abort now completes). Console fast tests pass (3086). Not yet done: real-curl repro comparison, Measure-CodeQuality for Curl.Console. Needs CurlCommandRunner.cs, held by BL-3822 in Doing, so requeued with depends-on BL-3822.
+
 ## Log
 
 - 2026-10-26: Created from CGR-294 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs held by BL-3822; depends-on BL-3822
