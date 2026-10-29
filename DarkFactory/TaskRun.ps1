@@ -158,7 +158,7 @@ function Invoke-TaskRun {
     $runModel = $script:ModelChoice.Model
     if (-not (Test-Path $raw)) { Add-Content -Path $raw -Value ([pscustomobject][ordered]@{ type = 'factory'; model = $runModel; why = $script:ModelChoice.Why } | ConvertTo-Json -Compress) -Encoding UTF8 }
     $context = Get-LaneContextArguments $Root $LogDir
-    $psi = New-ClaudeRunStartInfo "/d /c claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose $context$budget$turns --disallowedTools $denied 2>`"$err`""
+    $psi = New-ClaudeRunStartInfo "claude -p --model $runModel --dangerously-skip-permissions --output-format stream-json --verbose $context$budget$turns --disallowedTools $denied 2>`"$err`""
     # No claude.ai connectors and no auto memory either: the operator's memory is not a lane's.
     $psi.EnvironmentVariables['ENABLE_CLAUDEAI_MCP_SERVERS'] = 'false'
     $psi.EnvironmentVariables['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] = '1'
@@ -179,7 +179,7 @@ function Invoke-TaskRun {
             if ($evt) { try { Write-Event $Id $evt } catch { Write-Trace $Id 'trace' "could not trace an event: $(Get-Short $_.Exception.Message)" 'DarkYellow' } }
             $pending = $p.StandardOutput.ReadLineAsync()
         } elseif ((Get-Date) -gt $deadline) {
-            & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
+            Stop-FactoryProcessTree -ProcessId $p.Id
             $timedOut = $true
             # A killed run sends no result event, so its end is traced here: without it the
             # lane log's last line for the run is whatever step it was in (AF-0034).

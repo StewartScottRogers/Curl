@@ -188,7 +188,7 @@ function Invoke-ShiftReview {
         $text = $ShiftReviewPrompt.Replace('{BASE}', $Base).Replace('{HEAD}', $Head).Replace('{REPORT}', $report).Replace('{BRANCH}', $Branch)
         $budget = $ShiftReviewBudgetUsd.ToString([System.Globalization.CultureInfo]::InvariantCulture)
         $denied = ($Forbidden | ForEach-Object { "`"Bash($_`:*)`" `"PowerShell($_`:*)`"" }) -join ' '
-        $psi = New-ClaudeRunStartInfo "/d /c claude -p --model opus --dangerously-skip-permissions --output-format stream-json --verbose --max-budget-usd $budget --disallowedTools $denied 2>nul"
+        $psi = New-ClaudeRunStartInfo "claude -p --model opus --dangerously-skip-permissions --output-format stream-json --verbose --max-budget-usd $budget --disallowedTools $denied 2>$(Get-FactoryNullDevice)"
         $psi.WorkingDirectory = $dir
         $p = [System.Diagnostics.Process]::Start($psi)
         $p.StandardInput.Write($text)
@@ -203,7 +203,7 @@ function Invoke-ShiftReview {
                 Add-Content -Path $raw -Value $pending.Result -Encoding UTF8
                 $pending = $p.StandardOutput.ReadLineAsync()
             } elseif ((Get-Date) -gt $deadline) {
-                & taskkill /T /F /PID $p.Id 2>&1 | Out-Null
+                Stop-FactoryProcessTree -ProcessId $p.Id
                 return "review of $short killed after $ShiftReviewMinutes min; see $raw"
             }
         }

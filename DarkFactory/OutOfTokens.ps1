@@ -112,8 +112,7 @@ function Invoke-LimitProbe {
     if (Test-WakeRequested $reset) { return }
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = $env:ComSpec
-        $psi.Arguments = "/d /c claude -p --model $ProbeModel --output-format stream-json --verbose --max-turns 1 2>nul"
+        Set-FactoryShellCommand $psi "claude -p --model $ProbeModel --output-format stream-json --verbose --max-turns 1 2>$(Get-FactoryNullDevice)"
         $psi.WorkingDirectory = $Root
         $psi.UseShellExecute = $false
         $psi.RedirectStandardInput = $true
@@ -122,7 +121,7 @@ function Invoke-LimitProbe {
         $p.StandardInput.Write('Reply with the single word OK.')
         $p.StandardInput.Close()
         $read = $p.StandardOutput.ReadToEndAsync()
-        if (-not $p.WaitForExit(120000)) { & taskkill /T /F /PID $p.Id 2>&1 | Out-Null; return }
+        if (-not $p.WaitForExit(120000)) { Stop-FactoryProcessTree -ProcessId $p.Id; return }
         $out = $read.Result
     } catch { return }
     $answered = $out -match '"type":"result"' -and $out -notmatch '"status":"rejected"' -and $out -notmatch '"is_error":true'
