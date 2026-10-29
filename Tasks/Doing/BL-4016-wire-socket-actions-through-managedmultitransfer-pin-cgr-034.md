@@ -39,3 +39,4 @@ Split from BL-4008 (cost cap); read its Notes, including the test582 trace. Expe
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 3a1e0c49 1d22eb8b b5d1c01e 2ab811e5 aaf07a19 a34d30af.
