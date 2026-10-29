@@ -4,7 +4,7 @@ title: Compare Curl with real curl on the CGR-034 probe cases and meet the quali
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-3989, BL-3990, BL-3977]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4006, BL-4007, BL-3990, BL-3977]
 touches: [Documentation/Reviews/Cgr034ProbeResults.md, Curl.Engine.UnitTests/Cgr034Tests.cs]
 requirement: none
 created: 2026-10-28
