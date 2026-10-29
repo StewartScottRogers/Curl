@@ -4,7 +4,7 @@ namespace Curl.Extension.Amqp0.Client;
 
 /// <summary>
 /// Serves <c>amqp://</c> (port 5672) and <c>amqps://</c> (port 5671, TLS from the connector) as an AMQP 0-9-1 client
-/// (ADR-1057): it declares the URL's queue in the URL's virtual host, and with a body (<c>-d</c>) publishes it there,
+/// (ADR-1060): it declares the URL's queue in the URL's virtual host, and with a body (<c>-d</c>) publishes it there,
 /// otherwise takes one message with basic.get and writes its body to the output. <c>--user</c> is the PLAIN login,
 /// guest/guest without it. The exchange itself is <see cref="Amqp0ClientFlow"/>.
 /// </summary>

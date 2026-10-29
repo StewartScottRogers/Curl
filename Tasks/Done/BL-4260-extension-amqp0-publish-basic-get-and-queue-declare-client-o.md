@@ -33,7 +33,7 @@ Split from BL-4117 (extension 16 of 63) for size by its first pass. Extension ru
 - Filed by BL-4117's lane 9 prerequisite pass.
 - Built in `Client/` on the Mqtt5 client's pattern: `Amqp0ProtocolHandler` (connector, ports 5672/5671),
   `Amqp0UrlQueue` (path `/<vhost>/<queue>`), `Amqp0ClientFlow`, `Amqp0FrameChannel`, messages and exception.
-  Decisions in ADR-1057: queue is the second path segment, no exchange or routing key in the URL (publish uses the
+  Decisions in ADR-1060: queue is the second path segment, no exchange or routing key in the URL (publish uses the
   default exchange with the queue as routing key); client channel-max 2047, frame-max 131072, heartbeat 0;
   client-properties carry `authentication_failure_close` so RabbitMQ reports a bad login as connection.close 403;
   403 maps to exit 67, other server closes to 8, each answered with its close-ok best effort.
@@ -48,4 +48,4 @@ Split from BL-4117 (extension 16 of 63) for size by its first pass. Extension ru
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b6acbd07 64204dd7 e5ad1fae 17098196 14de81cc.
-- 2026-10-29: Doing -> Done. amqp:// and amqps:// AMQP 0-9-1 handler publishes with -d or takes one message with basic.get (ADR-1057)
+- 2026-10-29: Doing -> Done. amqp:// and amqps:// AMQP 0-9-1 handler publishes with -d or takes one message with basic.get (ADR-1060)

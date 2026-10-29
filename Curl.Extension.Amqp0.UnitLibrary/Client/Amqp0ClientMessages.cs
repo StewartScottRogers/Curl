@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Curl.Extension.Amqp0.Client;
 
-/// <summary>The error messages an AMQP 0-9-1 transfer ends with (ADR-1057); the ones curl also gives are its text.</summary>
+/// <summary>The error messages an AMQP 0-9-1 transfer ends with (ADR-1060); the ones curl also gives are its text.</summary>
 internal static class Amqp0ClientMessages
 {
     /// <summary>The text for a URL whose path is not <c>/virtual-host/queue</c>.</summary>

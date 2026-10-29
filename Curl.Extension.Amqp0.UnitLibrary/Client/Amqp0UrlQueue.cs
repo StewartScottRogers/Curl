@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Amqp0.Client;
 
 /// <summary>
-/// The virtual host and queue an <c>amqp://</c> URL names (ADR-1057): the path is <c>/virtual-host/queue</c>, each
+/// The virtual host and queue an <c>amqp://</c> URL names (ADR-1060): the path is <c>/virtual-host/queue</c>, each
 /// segment URL-decoded, and an empty virtual host is <c>/</c> as RabbitMQ's URI specification has it.
 /// </summary>
 internal sealed record Amqp0UrlQueue(string VirtualHost, string Queue)

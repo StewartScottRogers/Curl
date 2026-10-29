@@ -1,4 +1,4 @@
-# ADR-1057 — The AMQP 0-9-1 client names the virtual host and queue in the URL path and ends a server close naming its reply code
+# ADR-1060 — The AMQP 0-9-1 client names the virtual host and queue in the URL path and ends a server close naming its reply code
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
