@@ -58,6 +58,31 @@ public sealed partial class HandBuiltTlsProviderTests
         Assert.IsNotNull(events.Handshakes[0].PeerSignatureTypeName);
     }
 
+    // ADR-0984 (BL-4010): options no other row routes, which SslStream would run, go to the
+    // hand-built client in the OpenSSL build once the handshake messages are traced, and the
+    // trace begins with the ClientHello.
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_AnSslStreamConnectionTracedInTheOpenSslBuild_ReportsItsClientHello()
+    {
+        var events = new RecordingTransferEvents();
+        var options = new TlsClientOptions(Insecure: true, TracesHandshakeMessages: true);
+        Diagnostics.Arrange("build", "OpenSSL");
+        Diagnostics.Arrange("untraced reason", TlsClientRouting.ReasonInBuild(options with { TracesHandshakeMessages = false }, OpenSslBuild) ?? "null");
+
+        var reason = TlsClientRouting.ReasonInBuild(options, OpenSslBuild);
+        var result = await HandshakeWithEchoServerAsync(Tls12Only(options), SslProtocols.Tls12, OpenSslBuild, events);
+        await using var connection = result.Connection!;
+        Diagnostics.Act("reason", reason ?? "null");
+        Diagnostics.Act("first message", events.TlsMessages.Count == 0 ? "none" : Describe(events.TlsMessages[0]));
+
+        Assert.IsNull(TlsClientRouting.ReasonInBuild(options with { TracesHandshakeMessages = false }, OpenSslBuild));
+        Assert.IsNotNull(reason);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.IsTrue(events.TlsMessages[0].Sent);
+        Assert.AreEqual(TlsContentType.Handshake, events.TlsMessages[0].ContentType);
+        Assert.AreEqual((byte)1, events.TlsMessages[0].Bytes.Span[0]);
+    }
+
     [TestMethod]
     public async Task AuthenticateAsClientAsync_InTheSchannelBuild_ReportsNoHandshakeMessage()
     {

@@ -194,6 +194,12 @@ namespace Curl.Networking;
 /// <paramref name="Passphrase" />, in the OpenSSL build only, as OpenSSL's default callback does
 /// (ADR-0948, CGR-095); <see langword="null" /> asks nothing and the key does not load.
 /// </param>
+/// <param name="TracesHandshakeMessages">
+/// <see langword="true" /> when <c>-v</c> or <c>--trace</c> asks for the OpenSSL build's handshake
+/// message trace (<c>TLSv1.3 (OUT), TLS handshake, Client hello (1):</c>). <c>SslStream</c> shows none of
+/// those messages, so in the OpenSSL build <see cref="TlsClientRouting" /> sends such a connection to
+/// <see cref="HandBuiltTlsProvider" /> (ADR-0984, BL-4010); the Schannel build prints no such trace.
+/// </param>
 public sealed record TlsClientOptions(
     bool Insecure = false,
     TlsVersion MinimumVersion = TlsVersion.SystemDefault,
@@ -227,7 +233,8 @@ public sealed record TlsClientOptions(
     string? KeyLogFile = null,
     bool ChecksHostNameWhenInsecure = false,
     ReadOnlyMemory<byte>? CaCertificateBlob = null,
-    IPemPassPhrasePrompt? PemPassPhrasePrompt = null)
+    IPemPassPhrasePrompt? PemPassPhrasePrompt = null,
+    bool TracesHandshakeMessages = false)
 {
     /// <summary>
     /// Whether the chain must lead to roots of the handshake's own, a <see cref="CaCertificateFile" />
