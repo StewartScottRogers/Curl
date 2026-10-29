@@ -34,3 +34,4 @@ Fourth part of BL-4161 (split for size). Builds on BL-4212 (wire format), BL-421
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 5bc17d39 e1c80d50 3180db99 3d836d5e.
