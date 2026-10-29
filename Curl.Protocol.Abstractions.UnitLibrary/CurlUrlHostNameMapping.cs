@@ -3,193 +3,292 @@ using System.Text;
 namespace Curl.Protocol.Abstractions;
 
 /// <summary>
-/// Maps a host name that is not ASCII as IDNA (UTS #46, non-transitional) does before it is
-/// converted to punycode, as libidn2 does for curl 8.22.0: characters mapped to nothing are
-/// dropped, letters are lower-cased (<c>İ</c> to <c>i</c> and a combining dot above),
-/// full-width ASCII and the Latin ligatures <c>U+FB00</c> to <c>U+FB06</c> become plain
-/// ASCII, the Latin-1 ordinals, superscript digits, <c>µ</c> and vulgar fractions are spelled
-/// out (<c>¼</c> to <c>1⁄4</c>), and a lower-case Latin, Greek or Cyrillic letter followed by a combining mark is
-/// composed into the precomposed letter. <c>ß</c> and final sigma stay as they are. Curl runs
-/// with invariant globalization, where <see cref="System.Globalization.IdnMapping" /> and
-/// <see cref="string.Normalize()" /> map nothing, so the mapping is done here (ADR-0816).
+/// Maps a host name that is not ASCII as IDNA (UTS #46, non-transitional, Unicode 15.1) does before
+/// it is converted to punycode, as libidn2 2.3.8 does for curl 8.22.0: every character the IDNA
+/// mapping table maps (including <c>disallowed_STD3_mapped</c>, as libidn2 does not apply the STD3
+/// rules) is replaced by its mapping, ignored characters are dropped, and the result is put in
+/// Normalization Form C (canonical decomposition, canonical reordering and composition, Hangul
+/// included). <c>ß</c> and final sigma (deviations) and disallowed characters stay as they are.
+/// Curl runs with invariant globalization, where <see cref="System.Globalization.IdnMapping" /> and
+/// <see cref="string.Normalize()" /> map nothing, so the mapping is done here from
+/// <see cref="CurlUrlHostNameMappingTable" /> (ADR-0816, ADR-0972).
 /// </summary>
 internal static class CurlUrlHostNameMapping
 {
     /// <summary>
-    /// The characters UTS #46 maps to nothing: soft hyphen, combining grapheme joiner,
-    /// Mongolian variation selectors, zero-width space, non-joiner and joiner, word joiner,
-    /// variation selectors and the byte order mark.
+    /// The characters dropped before the table is read: soft hyphen, combining grapheme joiner,
+    /// Mongolian variation selectors and vowel separator, zero-width space, non-joiner and joiner,
+    /// word joiner, variation selectors and the byte order mark. curl 8.22.0 drops the joiners too,
+    /// as its transitional retry maps them to nothing (their context rules are BL-3588's).
     /// </summary>
     public const string CharactersMappedToNothing =
         "­͏᠋᠌᠍᠎᠏​‌‍⁠"
         + "︀︁︂︃︄︅︆︇︈︉︊︋︌︍︎️﻿";
 
-    private const char FirstFullWidthAscii = '！';
+    private const int HangulSyllableBase = 0xAC00;
 
-    private const char LastFullWidthAscii = '～';
+    private const int HangulLeadingBase = 0x1100;
 
-    private const char FirstLigature = 'ﬀ';
+    private const int HangulVowelBase = 0x1161;
 
-    private const char LastLigature = 'ﬆ';
+    private const int HangulTrailingBase = 0x11A7;
 
-    private const int FullWidthOffset = FirstFullWidthAscii - '!';
+    private const int HangulLeadingCount = 19;
 
-    private static readonly string[] Ligatures = ["ff", "fi", "fl", "ffi", "ffl", "st", "st"];
+    private const int HangulVowelCount = 21;
 
-    /// <summary>
-    /// The Latin-1 letters, superscript digits and vulgar fractions UTS #46 maps to other text, as a
-    /// Windows host read as Windows-1252 meets them: <c>%C3%BC</c> is <c>Ã¼</c>, which curl 8.22.0
-    /// sends as <c>xn--14-ria7423a</c> (<c>ã1⁄4</c>, BL-3953).
-    /// </summary>
-    private static readonly Dictionary<char, string> Latin1Mappings = new()
-    {
-        ['ª'] = "a",
-        ['²'] = "2",
-        ['³'] = "3",
-        ['µ'] = "μ",
-        ['¹'] = "1",
-        ['º'] = "o",
-        ['¼'] = "1⁄4",
-        ['½'] = "1⁄2",
-        ['¾'] = "3⁄4",
-    };
+    private const int HangulTrailingCount = 28;
 
-    /// <summary>
-    /// Triples of a lower-case letter, a combining mark and the precomposed letter they make,
-    /// for U+00C0 to U+024F, U+0370 to U+04FF and U+1E00 to U+1FFF, taken from the Unicode
-    /// canonical decompositions with a globalization-enabled .NET 10.
-    /// </summary>
-    private const string CompositionTriples = ""
-        + "\u0061\u0300\u00E0\u0061\u0301\u00E1\u0061\u0302\u00E2\u0061\u0303\u00E3\u0061\u0308\u00E4\u0061\u030A\u00E5"
-        + "\u0063\u0327\u00E7\u0065\u0300\u00E8\u0065\u0301\u00E9\u0065\u0302\u00EA\u0065\u0308\u00EB\u0069\u0300\u00EC"
-        + "\u0069\u0301\u00ED\u0069\u0302\u00EE\u0069\u0308\u00EF\u006E\u0303\u00F1\u006F\u0300\u00F2\u006F\u0301\u00F3"
-        + "\u006F\u0302\u00F4\u006F\u0303\u00F5\u006F\u0308\u00F6\u0075\u0300\u00F9\u0075\u0301\u00FA\u0075\u0302\u00FB"
-        + "\u0075\u0308\u00FC\u0079\u0301\u00FD\u0079\u0308\u00FF\u0061\u0304\u0101\u0061\u0306\u0103\u0061\u0328\u0105"
-        + "\u0063\u0301\u0107\u0063\u0302\u0109\u0063\u0307\u010B\u0063\u030C\u010D\u0064\u030C\u010F\u0065\u0304\u0113"
-        + "\u0065\u0306\u0115\u0065\u0307\u0117\u0065\u0328\u0119\u0065\u030C\u011B\u0067\u0302\u011D\u0067\u0306\u011F"
-        + "\u0067\u0307\u0121\u0067\u0327\u0123\u0068\u0302\u0125\u0069\u0303\u0129\u0069\u0304\u012B\u0069\u0306\u012D"
-        + "\u0069\u0328\u012F\u006A\u0302\u0135\u006B\u0327\u0137\u006C\u0301\u013A\u006C\u0327\u013C\u006C\u030C\u013E"
-        + "\u006E\u0301\u0144\u006E\u0327\u0146\u006E\u030C\u0148\u006F\u0304\u014D\u006F\u0306\u014F\u006F\u030B\u0151"
-        + "\u0072\u0301\u0155\u0072\u0327\u0157\u0072\u030C\u0159\u0073\u0301\u015B\u0073\u0302\u015D\u0073\u0327\u015F"
-        + "\u0073\u030C\u0161\u0074\u0327\u0163\u0074\u030C\u0165\u0075\u0303\u0169\u0075\u0304\u016B\u0075\u0306\u016D"
-        + "\u0075\u030A\u016F\u0075\u030B\u0171\u0075\u0328\u0173\u0077\u0302\u0175\u0079\u0302\u0177\u007A\u0301\u017A"
-        + "\u007A\u0307\u017C\u007A\u030C\u017E\u006F\u031B\u01A1\u0075\u031B\u01B0\u0061\u030C\u01CE\u0069\u030C\u01D0"
-        + "\u006F\u030C\u01D2\u0075\u030C\u01D4\u00FC\u0304\u01D6\u00FC\u0301\u01D8\u00FC\u030C\u01DA\u00FC\u0300\u01DC"
-        + "\u00E4\u0304\u01DF\u0227\u0304\u01E1\u00E6\u0304\u01E3\u0067\u030C\u01E7\u006B\u030C\u01E9\u006F\u0328\u01EB"
-        + "\u01EB\u0304\u01ED\u0292\u030C\u01EF\u006A\u030C\u01F0\u0067\u0301\u01F5\u006E\u0300\u01F9\u00E5\u0301\u01FB"
-        + "\u00E6\u0301\u01FD\u00F8\u0301\u01FF\u0061\u030F\u0201\u0061\u0311\u0203\u0065\u030F\u0205\u0065\u0311\u0207"
-        + "\u0069\u030F\u0209\u0069\u0311\u020B\u006F\u030F\u020D\u006F\u0311\u020F\u0072\u030F\u0211\u0072\u0311\u0213"
-        + "\u0075\u030F\u0215\u0075\u0311\u0217\u0073\u0326\u0219\u0074\u0326\u021B\u0068\u030C\u021F\u0061\u0307\u0227"
-        + "\u0065\u0327\u0229\u00F6\u0304\u022B\u00F5\u0304\u022D\u006F\u0307\u022F\u022F\u0304\u0231\u0079\u0304\u0233"
-        + "\u00A8\u0301\u0385\u03CA\u0301\u0390\u03B1\u0301\u03AC\u03B5\u0301\u03AD\u03B7\u0301\u03AE\u03B9\u0301\u03AF"
-        + "\u03CB\u0301\u03B0\u03B9\u0308\u03CA\u03C5\u0308\u03CB\u03BF\u0301\u03CC\u03C5\u0301\u03CD\u03C9\u0301\u03CE"
-        + "\u03D2\u0301\u03D3\u03D2\u0308\u03D4\u0438\u0306\u0439\u0435\u0300\u0450\u0435\u0308\u0451\u0433\u0301\u0453"
-        + "\u0456\u0308\u0457\u043A\u0301\u045C\u0438\u0300\u045D\u0443\u0306\u045E\u0475\u030F\u0477\u0436\u0306\u04C2"
-        + "\u0430\u0306\u04D1\u0430\u0308\u04D3\u0435\u0306\u04D7\u04D9\u0308\u04DB\u0436\u0308\u04DD\u0437\u0308\u04DF"
-        + "\u0438\u0304\u04E3\u0438\u0308\u04E5\u043E\u0308\u04E7\u04E9\u0308\u04EB\u044D\u0308\u04ED\u0443\u0304\u04EF"
-        + "\u0443\u0308\u04F1\u0443\u030B\u04F3\u0447\u0308\u04F5\u044B\u0308\u04F9\u0061\u0325\u1E01\u0062\u0307\u1E03"
-        + "\u0062\u0323\u1E05\u0062\u0331\u1E07\u00E7\u0301\u1E09\u0064\u0307\u1E0B\u0064\u0323\u1E0D\u0064\u0331\u1E0F"
-        + "\u0064\u0327\u1E11\u0064\u032D\u1E13\u0113\u0300\u1E15\u0113\u0301\u1E17\u0065\u032D\u1E19\u0065\u0330\u1E1B"
-        + "\u0229\u0306\u1E1D\u0066\u0307\u1E1F\u0067\u0304\u1E21\u0068\u0307\u1E23\u0068\u0323\u1E25\u0068\u0308\u1E27"
-        + "\u0068\u0327\u1E29\u0068\u032E\u1E2B\u0069\u0330\u1E2D\u00EF\u0301\u1E2F\u006B\u0301\u1E31\u006B\u0323\u1E33"
-        + "\u006B\u0331\u1E35\u006C\u0323\u1E37\u1E37\u0304\u1E39\u006C\u0331\u1E3B\u006C\u032D\u1E3D\u006D\u0301\u1E3F"
-        + "\u006D\u0307\u1E41\u006D\u0323\u1E43\u006E\u0307\u1E45\u006E\u0323\u1E47\u006E\u0331\u1E49\u006E\u032D\u1E4B"
-        + "\u00F5\u0301\u1E4D\u00F5\u0308\u1E4F\u014D\u0300\u1E51\u014D\u0301\u1E53\u0070\u0301\u1E55\u0070\u0307\u1E57"
-        + "\u0072\u0307\u1E59\u0072\u0323\u1E5B\u1E5B\u0304\u1E5D\u0072\u0331\u1E5F\u0073\u0307\u1E61\u0073\u0323\u1E63"
-        + "\u015B\u0307\u1E65\u0161\u0307\u1E67\u1E63\u0307\u1E69\u0074\u0307\u1E6B\u0074\u0323\u1E6D\u0074\u0331\u1E6F"
-        + "\u0074\u032D\u1E71\u0075\u0324\u1E73\u0075\u0330\u1E75\u0075\u032D\u1E77\u0169\u0301\u1E79\u016B\u0308\u1E7B"
-        + "\u0076\u0303\u1E7D\u0076\u0323\u1E7F\u0077\u0300\u1E81\u0077\u0301\u1E83\u0077\u0308\u1E85\u0077\u0307\u1E87"
-        + "\u0077\u0323\u1E89\u0078\u0307\u1E8B\u0078\u0308\u1E8D\u0079\u0307\u1E8F\u007A\u0302\u1E91\u007A\u0323\u1E93"
-        + "\u007A\u0331\u1E95\u0068\u0331\u1E96\u0074\u0308\u1E97\u0077\u030A\u1E98\u0079\u030A\u1E99\u017F\u0307\u1E9B"
-        + "\u0061\u0323\u1EA1\u0061\u0309\u1EA3\u00E2\u0301\u1EA5\u00E2\u0300\u1EA7\u00E2\u0309\u1EA9\u00E2\u0303\u1EAB"
-        + "\u1EA1\u0302\u1EAD\u0103\u0301\u1EAF\u0103\u0300\u1EB1\u0103\u0309\u1EB3\u0103\u0303\u1EB5\u1EA1\u0306\u1EB7"
-        + "\u0065\u0323\u1EB9\u0065\u0309\u1EBB\u0065\u0303\u1EBD\u00EA\u0301\u1EBF\u00EA\u0300\u1EC1\u00EA\u0309\u1EC3"
-        + "\u00EA\u0303\u1EC5\u1EB9\u0302\u1EC7\u0069\u0309\u1EC9\u0069\u0323\u1ECB\u006F\u0323\u1ECD\u006F\u0309\u1ECF"
-        + "\u00F4\u0301\u1ED1\u00F4\u0300\u1ED3\u00F4\u0309\u1ED5\u00F4\u0303\u1ED7\u1ECD\u0302\u1ED9\u01A1\u0301\u1EDB"
-        + "\u01A1\u0300\u1EDD\u01A1\u0309\u1EDF\u01A1\u0303\u1EE1\u01A1\u0323\u1EE3\u0075\u0323\u1EE5\u0075\u0309\u1EE7"
-        + "\u01B0\u0301\u1EE9\u01B0\u0300\u1EEB\u01B0\u0309\u1EED\u01B0\u0303\u1EEF\u01B0\u0323\u1EF1\u0079\u0300\u1EF3"
-        + "\u0079\u0323\u1EF5\u0079\u0309\u1EF7\u0079\u0303\u1EF9\u03B1\u0313\u1F00\u03B1\u0314\u1F01\u1F00\u0300\u1F02"
-        + "\u1F01\u0300\u1F03\u1F00\u0301\u1F04\u1F01\u0301\u1F05\u1F00\u0342\u1F06\u1F01\u0342\u1F07\u03B5\u0313\u1F10"
-        + "\u03B5\u0314\u1F11\u1F10\u0300\u1F12\u1F11\u0300\u1F13\u1F10\u0301\u1F14\u1F11\u0301\u1F15\u03B7\u0313\u1F20"
-        + "\u03B7\u0314\u1F21\u1F20\u0300\u1F22\u1F21\u0300\u1F23\u1F20\u0301\u1F24\u1F21\u0301\u1F25\u1F20\u0342\u1F26"
-        + "\u1F21\u0342\u1F27\u03B9\u0313\u1F30\u03B9\u0314\u1F31\u1F30\u0300\u1F32\u1F31\u0300\u1F33\u1F30\u0301\u1F34"
-        + "\u1F31\u0301\u1F35\u1F30\u0342\u1F36\u1F31\u0342\u1F37\u03BF\u0313\u1F40\u03BF\u0314\u1F41\u1F40\u0300\u1F42"
-        + "\u1F41\u0300\u1F43\u1F40\u0301\u1F44\u1F41\u0301\u1F45\u03C5\u0313\u1F50\u03C5\u0314\u1F51\u1F50\u0300\u1F52"
-        + "\u1F51\u0300\u1F53\u1F50\u0301\u1F54\u1F51\u0301\u1F55\u1F50\u0342\u1F56\u1F51\u0342\u1F57\u03C9\u0313\u1F60"
-        + "\u03C9\u0314\u1F61\u1F60\u0300\u1F62\u1F61\u0300\u1F63\u1F60\u0301\u1F64\u1F61\u0301\u1F65\u1F60\u0342\u1F66"
-        + "\u1F61\u0342\u1F67\u03B1\u0300\u1F70\u03B5\u0300\u1F72\u03B7\u0300\u1F74\u03B9\u0300\u1F76\u03BF\u0300\u1F78"
-        + "\u03C5\u0300\u1F7A\u03C9\u0300\u1F7C\u1F00\u0345\u1F80\u1F01\u0345\u1F81\u1F02\u0345\u1F82\u1F03\u0345\u1F83"
-        + "\u1F04\u0345\u1F84\u1F05\u0345\u1F85\u1F06\u0345\u1F86\u1F07\u0345\u1F87\u1F20\u0345\u1F90\u1F21\u0345\u1F91"
-        + "\u1F22\u0345\u1F92\u1F23\u0345\u1F93\u1F24\u0345\u1F94\u1F25\u0345\u1F95\u1F26\u0345\u1F96\u1F27\u0345\u1F97"
-        + "\u1F60\u0345\u1FA0\u1F61\u0345\u1FA1\u1F62\u0345\u1FA2\u1F63\u0345\u1FA3\u1F64\u0345\u1FA4\u1F65\u0345\u1FA5"
-        + "\u1F66\u0345\u1FA6\u1F67\u0345\u1FA7\u03B1\u0306\u1FB0\u03B1\u0304\u1FB1\u1F70\u0345\u1FB2\u03B1\u0345\u1FB3"
-        + "\u03AC\u0345\u1FB4\u03B1\u0342\u1FB6\u1FB6\u0345\u1FB7\u00A8\u0342\u1FC1\u1F74\u0345\u1FC2\u03B7\u0345\u1FC3"
-        + "\u03AE\u0345\u1FC4\u03B7\u0342\u1FC6\u1FC6\u0345\u1FC7\u1FBF\u0300\u1FCD\u1FBF\u0301\u1FCE\u1FBF\u0342\u1FCF"
-        + "\u03B9\u0306\u1FD0\u03B9\u0304\u1FD1\u03CA\u0300\u1FD2\u03B9\u0342\u1FD6\u03CA\u0342\u1FD7\u1FFE\u0300\u1FDD"
-        + "\u1FFE\u0301\u1FDE\u1FFE\u0342\u1FDF\u03C5\u0306\u1FE0\u03C5\u0304\u1FE1\u03CB\u0300\u1FE2\u03C1\u0313\u1FE4"
-        + "\u03C1\u0314\u1FE5\u03C5\u0342\u1FE6\u03CB\u0342\u1FE7\u00A8\u0300\u1FED\u1F7C\u0345\u1FF2\u03C9\u0345\u1FF3"
-        + "\u03CE\u0345\u1FF4\u03C9\u0342\u1FF6\u1FF6\u0345\u1FF7"
-        ;
+    private const int HangulVowelSyllables = HangulVowelCount * HangulTrailingCount;
 
-    private static readonly Dictionary<int, char> Compositions = ReadCompositions();
+    private const int HangulSyllableCount = HangulLeadingCount * HangulVowelSyllables;
+
+    private static readonly Dictionary<int, string> Mappings = ReadMappings();
+
+    private static readonly Dictionary<int, int> CombiningClasses = ReadCombiningClasses();
+
+    private static readonly Dictionary<int, int[]> Decompositions = [];
+
+    private static readonly Dictionary<long, int> Compositions = ReadDecompositions();
 
     /// <summary>Maps <paramref name="name" /> as UTS #46 does; see the class summary.</summary>
     public static string Map(string name)
     {
         var mapped = new StringBuilder(name.Length);
-        foreach (char character in name)
+        foreach (Rune character in name.EnumerateRunes())
         {
-            if (!CharactersMappedToNothing.Contains(character))
+            if (character.IsBmp && CharactersMappedToNothing.Contains((char)character.Value))
             {
-                mapped.Append(MapCharacter(character));
+                continue;
             }
-        }
 
-        return Compose(mapped.ToString());
-    }
-
-    private static string MapCharacter(char character) => character switch
-    {
-        >= FirstFullWidthAscii and <= LastFullWidthAscii => char.ToLowerInvariant((char)(character - FullWidthOffset)).ToString(),
-        >= FirstLigature and <= LastLigature => Ligatures[character - FirstLigature],
-        _ => MapCharacterOutsideTheRanges(character),
-    };
-
-    private static string MapCharacterOutsideTheRanges(char character) => character switch
-    {
-        'İ' => "i̇",
-        _ when Latin1Mappings.TryGetValue(character, out string? latin1Mapping) => latin1Mapping,
-        _ => char.ToLowerInvariant(character).ToString(),
-    };
-
-    private static string Compose(string mapped)
-    {
-        var composed = new StringBuilder(mapped.Length);
-        foreach (char character in mapped)
-        {
-            if (composed.Length > 0 && Compositions.TryGetValue(CompositionKey(composed[^1], character), out char letter))
+            if (Mappings.TryGetValue(character.Value, out string? mapping))
             {
-                composed[^1] = letter;
+                mapped.Append(mapping);
             }
             else
             {
-                composed.Append(character);
+                mapped.Append(character.ToString());
             }
         }
 
-        return composed.ToString();
+        return Compose(Decompose(mapped.ToString()));
     }
 
-    private static Dictionary<int, char> ReadCompositions()
+    private static List<int> Decompose(string mapped)
     {
-        var compositions = new Dictionary<int, char>(CompositionTriples.Length / 3);
-        for (int index = 0; index < CompositionTriples.Length; index += 3)
+        var decomposed = new List<int>(mapped.Length);
+        foreach (Rune character in mapped.EnumerateRunes())
         {
-            compositions.Add(CompositionKey(CompositionTriples[index], CompositionTriples[index + 1]), CompositionTriples[index + 2]);
+            AppendDecomposition(decomposed, character.Value);
+        }
+
+        return decomposed;
+    }
+
+    private static void AppendDecomposition(List<int> decomposed, int codePoint)
+    {
+        int syllableIndex = codePoint - HangulSyllableBase;
+        if ((uint)syllableIndex < HangulSyllableCount)
+        {
+            AppendHangulDecomposition(decomposed, syllableIndex);
+        }
+        else if (Decompositions.TryGetValue(codePoint, out int[]? parts))
+        {
+            foreach (int part in parts)
+            {
+                AppendDecomposition(decomposed, part);
+            }
+        }
+        else
+        {
+            AppendInCanonicalOrder(decomposed, codePoint);
+        }
+    }
+
+    private static void AppendHangulDecomposition(List<int> decomposed, int syllableIndex)
+    {
+        decomposed.Add(HangulLeadingBase + (syllableIndex / HangulVowelSyllables));
+        decomposed.Add(HangulVowelBase + (syllableIndex % HangulVowelSyllables / HangulTrailingCount));
+        int trailingIndex = syllableIndex % HangulTrailingCount;
+        if (trailingIndex != 0)
+        {
+            decomposed.Add(HangulTrailingBase + trailingIndex);
+        }
+    }
+
+    private static void AppendInCanonicalOrder(List<int> decomposed, int codePoint)
+    {
+        int combiningClass = CombiningClassOf(codePoint);
+        int index = decomposed.Count;
+        while (combiningClass != 0 && index > 0 && CombiningClassOf(decomposed[index - 1]) > combiningClass)
+        {
+            index--;
+        }
+
+        decomposed.Insert(index, codePoint);
+    }
+
+    private static string Compose(List<int> decomposed)
+    {
+        var composed = new List<int>(decomposed.Count);
+        int starterIndex = -1;
+        int lastClass = 0;
+        foreach (int codePoint in decomposed)
+        {
+            int combiningClass = CombiningClassOf(codePoint);
+            if (!IsBlocked(composed, starterIndex, lastClass, combiningClass) && TryCompose(composed[starterIndex], codePoint, out int composite))
+            {
+                composed[starterIndex] = composite;
+                continue;
+            }
+
+            starterIndex = combiningClass == 0 ? composed.Count : starterIndex;
+            lastClass = combiningClass;
+            composed.Add(codePoint);
+        }
+
+        return ToText(composed);
+    }
+
+    private static bool IsBlocked(List<int> composed, int starterIndex, int lastClass, int combiningClass) =>
+        starterIndex < 0 || (composed.Count - 1 != starterIndex && lastClass >= combiningClass);
+
+    private static string ToText(List<int> composed)
+    {
+        var text = new StringBuilder(composed.Count);
+        foreach (int codePoint in composed)
+        {
+            text.Append(char.ConvertFromUtf32(codePoint));
+        }
+
+        return text.ToString();
+    }
+
+    private static bool TryCompose(int starter, int codePoint, out int composite)
+    {
+        int leadingIndex = starter - HangulLeadingBase;
+        int vowelIndex = codePoint - HangulVowelBase;
+        if ((uint)leadingIndex < HangulLeadingCount && (uint)vowelIndex < HangulVowelCount)
+        {
+            composite = HangulSyllableBase + (((leadingIndex * HangulVowelCount) + vowelIndex) * HangulTrailingCount);
+            return true;
+        }
+
+        int syllableIndex = starter - HangulSyllableBase;
+        int trailingIndex = codePoint - HangulTrailingBase;
+        if ((uint)syllableIndex < HangulSyllableCount && syllableIndex % HangulTrailingCount == 0 && (uint)(trailingIndex - 1) < HangulTrailingCount - 1)
+        {
+            composite = starter + trailingIndex;
+            return true;
+        }
+
+        return Compositions.TryGetValue(CompositionKey(starter, codePoint), out composite);
+    }
+
+    private static int CombiningClassOf(int codePoint) => CombiningClasses.GetValueOrDefault(codePoint);
+
+    private static long CompositionKey(int starter, int mark) => ((long)starter << 21) | (uint)mark;
+
+    private static Dictionary<int, string> ReadMappings()
+    {
+        var mappings = new Dictionary<int, string>();
+        var reader = new TableReader(CurlUrlHostNameMappingTable.Mappings);
+        int start = 0;
+        while (!reader.IsAtEnd)
+        {
+            start += reader.ReadNumber();
+            int end = start + reader.ReadNumber();
+            int[] mapping = reader.ReadCodePoints(reader.ReadNumber(), start);
+            string mappingText = string.Concat(mapping.Select(char.ConvertFromUtf32));
+            for (int codePoint = start; codePoint <= end; codePoint++)
+            {
+                mappings.Add(codePoint, mappingText);
+            }
+
+            start = end + 1;
+        }
+
+        return mappings;
+    }
+
+    private static Dictionary<int, int> ReadCombiningClasses()
+    {
+        var classes = new Dictionary<int, int>();
+        var reader = new TableReader(CurlUrlHostNameMappingTable.CombiningClasses);
+        int start = 0;
+        while (!reader.IsAtEnd)
+        {
+            start += reader.ReadNumber();
+            int end = start + reader.ReadNumber();
+            int combiningClass = reader.ReadNumber();
+            for (int codePoint = start; codePoint <= end; codePoint++)
+            {
+                classes.Add(codePoint, combiningClass);
+            }
+
+            start = end + 1;
+        }
+
+        return classes;
+    }
+
+    private static Dictionary<long, int> ReadDecompositions()
+    {
+        var compositions = new Dictionary<long, int>();
+        var reader = new TableReader(CurlUrlHostNameMappingTable.Decompositions);
+        int codePoint = -1;
+        while (!reader.IsAtEnd)
+        {
+            codePoint += reader.ReadNumber() + 1;
+            int header = reader.ReadNumber();
+            int[] parts = reader.ReadCodePoints(header / 2, codePoint);
+            Decompositions.Add(codePoint, parts);
+            if (header % 2 == 1)
+            {
+                compositions.Add(CompositionKey(parts[0], parts[1]), codePoint);
+            }
         }
 
         return compositions;
     }
 
-    private static int CompositionKey(char letter, char mark) => (letter << 16) | mark;
+    /// <summary>Reads the unsigned LEB128 numbers of one Base64 table in <see cref="CurlUrlHostNameMappingTable" />.</summary>
+    private sealed class TableReader(string base64)
+    {
+        private readonly byte[] bytes = Convert.FromBase64String(base64);
+
+        private int position;
+
+        public bool IsAtEnd => position == bytes.Length;
+
+        public int ReadNumber()
+        {
+            int value = 0;
+            int shift = 0;
+            byte current;
+            do
+            {
+                current = bytes[position++];
+                value |= (current & 0x7F) << shift;
+                shift += 7;
+            }
+            while (current >= 0x80);
+
+            return value;
+        }
+
+        public int[] ReadCodePoints(int count, int previous)
+        {
+            int[] codePoints = new int[count];
+            for (int index = 0; index < count; index++)
+            {
+                int difference = ReadNumber();
+                previous += (difference >> 1) ^ -(difference & 1);
+                codePoints[index] = previous;
+            }
+
+            return codePoints;
+        }
+    }
 }

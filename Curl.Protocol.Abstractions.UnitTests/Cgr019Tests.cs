@@ -44,7 +44,7 @@ public sealed class Cgr019Tests
     [DataRow("İ", "i̇")]
     [DataRow("Ａｚ０", "az0")]
     [DataRow("ﬀﬃﬆ", "ffffist")]
-    [DataRow("﫿﬇＀｟į", "﫿﬇＀｟į")]
+    [DataRow("﫿﬇＀｟į", "﫿﬇＀⦅į")]
     [DataRow("a­͏​‌‍⁠️﻿b", "ab")]
     [DataRow("é", "é")]
     [DataRow("ǖ", "ǖ")]
