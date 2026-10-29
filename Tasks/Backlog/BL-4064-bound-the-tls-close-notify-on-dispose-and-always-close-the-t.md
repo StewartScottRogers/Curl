@@ -1,5 +1,5 @@
 ---
-id: BL-4057
+id: BL-4064
 title: Bound the TLS close_notify on dispose and always close the transport
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4057 — Bound the TLS close_notify on dispose and always close the transport
+# BL-4064 — Bound the TLS close_notify on dispose and always close the transport
 
 ## Goal
 

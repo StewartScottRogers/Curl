@@ -1,5 +1,5 @@
 ---
-id: BL-4055
+id: BL-4062
 title: Start the -Z --fail-early abort delay once, on the injected TimeProvider
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4055 — Start the -Z --fail-early abort delay once, on the injected TimeProvider
+# BL-4062 — Start the -Z --fail-early abort delay once, on the injected TimeProvider
 
 ## Goal
 

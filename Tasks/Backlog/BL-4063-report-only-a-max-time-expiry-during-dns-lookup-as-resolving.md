@@ -1,5 +1,5 @@
 ---
-id: BL-4056
+id: BL-4063
 title: Report only a --max-time expiry during DNS lookup as Resolving timed out
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4056 — Report only a --max-time expiry during DNS lookup as Resolving timed out
+# BL-4063 — Report only a --max-time expiry during DNS lookup as Resolving timed out
 
 ## Goal
 

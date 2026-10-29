@@ -1,5 +1,5 @@
 ---
-id: BL-4054
+id: BL-4061
 title: Stop the lookup wakeup socket being signalled after StopGating disposed it
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4054 — Stop the lookup wakeup socket being signalled after StopGating disposed it
+# BL-4061 — Stop the lookup wakeup socket being signalled after StopGating disposed it
 
 ## Goal
 

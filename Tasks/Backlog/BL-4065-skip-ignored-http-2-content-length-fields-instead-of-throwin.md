@@ -1,5 +1,5 @@
 ---
-id: BL-4058
+id: BL-4065
 title: Skip ignored HTTP/2 content-length fields instead of throwing FormatException
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4058 — Skip ignored HTTP/2 content-length fields instead of throwing FormatException
+# BL-4065 — Skip ignored HTTP/2 content-length fields instead of throwing FormatException
 
 ## Goal
 
