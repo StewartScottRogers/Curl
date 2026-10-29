@@ -32,3 +32,4 @@ Found by BL-4112's first pass: extensions may not reference `Curl.Protocol.*` (A
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: e418ffa8 fc07ca31 478f867b 3d836d5e.
