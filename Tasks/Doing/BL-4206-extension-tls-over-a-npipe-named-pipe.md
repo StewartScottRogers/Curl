@@ -32,3 +32,4 @@ BL-4142 (ADR-1021) added `--npipe` as the extension `Curl.Extension.NamedPipe.Un
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: ab2f5cba 7090b3af 478f867b 3d836d5e.
