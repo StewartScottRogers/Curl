@@ -9,7 +9,7 @@ touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3750 — Fix CGR-221: -v uses the pre-8.22 wording Added H:P:A to DNS cache for --resolve (8.22: [DNS] added H:P:A to cache) and the old IPv6 Established conne...
 
@@ -99,3 +99,4 @@ curl -sv --resolve ex.test:20600:127.0.0.1 http://ex.test:20600/x
 
 - 2026-10-26: Created from CGR-221 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Verbose output now writes the 8.22 DNS cache line and brackets an IPv6 literal host (ADR-0969)
