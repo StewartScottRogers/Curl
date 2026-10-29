@@ -33,3 +33,4 @@ BL-4076 made `CurlUrlHostNameMapping.Map` replace any mapping that holds an ASCI
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6fcecf4c 12204d7a 779790c0.
