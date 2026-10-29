@@ -22,7 +22,8 @@ namespace Curl.Engine;
 /// both tell <see cref="MultiOptions.Socket" /> and <see cref="MultiOptions.Timer" /> what to wait for: a
 /// <see cref="ManagedEasyTransfer" /> started while the socket callback is set runs on a
 /// <see cref="TransferSocketWait" />, its real socket told with <see cref="CurlPoll.Out" /> or
-/// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0973); any other running transfer is
+/// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0973), and one started without it records
+/// its real socket on a <see cref="TransferSocketWait" /> that never gates its I/O (ADR-0981); any other running transfer is
 /// one engine-numbered socket, and while one runs the timer asks to be called back every
 /// <see cref="RunningTransferCheckInterval" /> (ADR-0599). <see cref="GetHandles" />,
 /// <see cref="GetWaitSockets" />, <see cref="GetInfo" />, the notifications and
@@ -466,9 +467,11 @@ internal sealed class ManagedMultiTransfer(
     /// <summary>
     /// <c>curl_multi_waitfds</c>: one <see cref="CurlWaitEvents.PollIn" /> socket for each transfer whose
     /// perform has started and whose message is not yet queued, in the order added (but none for one that
-    /// waits for an earlier transfer's connection, <see cref="WaitsForEarlierConnection" />) - the engine-numbered
-    /// socket the socket callback is told of for the same transfer (<see cref="FirstTransferSocket" />) -
-    /// then, while there is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
+    /// waits for an earlier transfer's connection, <see cref="WaitsForEarlierConnection" />) - the transfer's real
+    /// socket once its dial has one (its operating system socket, or ADR-0955's engine number for a connection with
+    /// none), with or without a socket callback (ADR-0981), and until then, or for a transfer that is not a
+    /// <see cref="ManagedEasyTransfer" />, the engine-numbered socket the socket callback is told of for it
+    /// (<see cref="FirstTransferSocket" />) - then, while there is any, the threaded resolver's <see cref="ResolverWakeupSocket" />.
     /// </summary>
     /// <param name="sockets">Filled with up to its length of sockets, each with no returned events.</param>
     /// <param name="socketCount">How many sockets the handle waits on, even past <paramref name="sockets" />' length.</param>
@@ -486,7 +489,7 @@ internal sealed class ManagedMultiTransfer(
         }
 
         List<MultiEntry> running = entries.FindAll(entry => !entry.Done && entry.Perform is not null);
-        List<CurlSocket> waiting = [.. running.Where((entry, index) => !WaitsForEarlierConnection(entry, running.Take(index))).Select(SocketNumberOf)];
+        List<CurlSocket> waiting = [.. running.Where((entry, index) => !WaitsForEarlierConnection(entry, running.Take(index))).Select(WaitSocketOf)];
         if (waiting.Count > 0)
         {
             waiting.Add(new CurlSocket(ResolverWakeupSocket));
@@ -677,6 +680,8 @@ internal sealed class ManagedMultiTransfer(
     }
 
     private CurlSocket SocketNumberOf(MultiEntry entry) => entry.Number ??= new CurlSocket(nextTransferSocket++);
+
+    private CurlSocket WaitSocketOf(MultiEntry entry) => entry.SocketRecord?.Socket is { } handle ? new CurlSocket(handle) : SocketNumberOf(entry);
 
     private static TaskCompletionSource NewWakeupSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -918,7 +923,7 @@ internal sealed class ManagedMultiTransfer(
 
         if (NeedsSocket(entry))
         {
-            entry.Socket = SocketNumberOf(entry);
+            entry.Socket = WaitSocketOf(entry);
             return callback(entry.Transfer, entry.Socket.Value, CurlPoll.In, null);
         }
 
@@ -1096,7 +1101,7 @@ internal sealed class ManagedMultiTransfer(
         if (entry.Transfer is ManagedEasyTransfer easy)
         {
             easy.MultiCallbacks = callbacks;
-            easy.SocketWait = entry.SocketWait = SocketWaitFor(entry);
+            easy.SocketWait = entry.SocketRecord = SocketWaitFor(entry);
         }
 
         try
@@ -1127,18 +1132,23 @@ internal sealed class ManagedMultiTransfer(
     }
 
     /// <summary>
-    /// The socket wait a transfer of this engine runs on while the application has a socket callback, so its I/O
-    /// waits for the application's poll (ADR-0821, ADR-0973); none without one, where perform and wait drive it.
+    /// The socket wait a transfer of this engine runs on: while the application has a socket callback, the
+    /// entry's <see cref="MultiEntry.SocketWait" />, so its I/O waits for the application's poll (ADR-0821,
+    /// ADR-0973); without one, a wait whose gating is stopped from the start, so perform and wait drive the transfer
+    /// and the wait only records its socket for <see cref="GetWaitSockets" /> (ADR-0981).
     /// </summary>
-    private TransferSocketWait? SocketWaitFor(MultiEntry entry)
+    private TransferSocketWait SocketWaitFor(MultiEntry entry)
     {
+        TransferSocketWait wait = new(timeProvider);
         if (Options.Socket is null)
         {
-            return null;
+            wait.StopGating();
+            entry.SocketWait = null;
+            return wait;
         }
 
-        TransferSocketWait wait = new(timeProvider);
         wait.Changed += entry.MarkChanged;
+        entry.SocketWait = wait;
         return wait;
     }
 
@@ -1368,6 +1378,9 @@ internal sealed class ManagedMultiTransfer(
         public CurlCode? ForcedResult { get; set; }
 
         public TransferSocketWait? SocketWait { get; set; }
+
+        // The wait the transfer's dial records its socket on, gating or not (SocketWait or the no-callback one).
+        public TransferSocketWait? SocketRecord { get; set; }
 
         public CurlPoll ReportedPoll { get; set; }
 
