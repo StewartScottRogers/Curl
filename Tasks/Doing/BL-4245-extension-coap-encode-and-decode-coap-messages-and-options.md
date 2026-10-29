@@ -36,3 +36,4 @@ Creates the project pair (`new-project` skill; `/Extensions/Coap/` folder in `Cu
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 954eeb9c 9fd73c22 d877c528 a4a68863 3180db99 3d836d5e.
