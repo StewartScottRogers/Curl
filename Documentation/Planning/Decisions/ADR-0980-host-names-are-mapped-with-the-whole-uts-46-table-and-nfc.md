@@ -1,4 +1,4 @@
-# ADR-0972 — Host names are mapped with the whole UTS #46 table and NFC, from generated compact tables
+# ADR-0980 — Host names are mapped with the whole UTS #46 table and NFC, from generated compact tables
 
 - Status: Accepted
 - Date: 2026-10-28

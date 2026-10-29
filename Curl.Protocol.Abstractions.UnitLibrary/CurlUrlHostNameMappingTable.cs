@@ -3,7 +3,7 @@ namespace Curl.Protocol.Abstractions;
 /// <summary>
 /// The Unicode 15.1 data <see cref="CurlUrlHostNameMapping" /> maps and normalizes with, generated
 /// from <c>IdnaMappingTable.txt</c>, <c>UnicodeData.txt</c> and <c>CompositionExclusions.txt</c> by a
-/// C# file-based app (ADR-0972). Each table is a Base64 run of unsigned LEB128 numbers; a code point
+/// C# file-based app (ADR-0980). Each table is a Base64 run of unsigned LEB128 numbers; a code point
 /// is the gap after the previous entry, and a mapped or decomposed code point is a zig-zag
 /// difference from the one before it.
 /// </summary>

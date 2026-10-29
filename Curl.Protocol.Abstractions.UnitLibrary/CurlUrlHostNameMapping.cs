@@ -11,7 +11,7 @@ namespace Curl.Protocol.Abstractions;
 /// included). <c>ß</c> and final sigma (deviations) and disallowed characters stay as they are.
 /// Curl runs with invariant globalization, where <see cref="System.Globalization.IdnMapping" /> and
 /// <see cref="string.Normalize()" /> map nothing, so the mapping is done here from
-/// <see cref="CurlUrlHostNameMappingTable" /> (ADR-0816, ADR-0972).
+/// <see cref="CurlUrlHostNameMappingTable" /> (ADR-0816, ADR-0980).
 /// </summary>
 internal static class CurlUrlHostNameMapping
 {

@@ -2,7 +2,7 @@ namespace Curl.Protocol.Abstractions.UnitTests;
 
 /// <summary>
 /// <see cref="CurlUrlHostNameMapping" /> maps with the whole UTS #46 table and normalizes to NFC as
-/// libidn2 2.3.8 does (BL-3829, ADR-0972). The punycode hosts follow the Unicode 15.1 IDNA
+/// libidn2 2.3.8 does (BL-3829, ADR-0980). The punycode hosts follow the Unicode 15.1 IDNA
 /// mapping table and NFC; measuring them against curl 8.22.0 with libidn2 on Linux is BL-4025.
 /// </summary>
 [TestClass]
