@@ -1,0 +1,35 @@
+---
+id: BL-4084
+title: Rerun the CGR-034 probe against real curl and record REF and PORT results
+priority: High
+assignee: Claude
+pipeline: feature
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-4072, BL-4073, BL-4069, BL-3977, BL-4075]
+touches: [Documentation/Reviews/Cgr034ProbeResults.md]
+requirement: none
+created: 2026-10-29
+completed:
+---
+# BL-4084 — Rerun the CGR-034 probe against real curl and record REF and PORT results
+
+## Goal
+
+CGR-034's probe cases `C_20`, `C_21`, `C_65`, `C_74`, `C_75` give the same return codes, callback sequences and bytes on the wire through Curl (PORT) as through real curl (REF), and the results are recorded.
+
+## Context
+
+Split from BL-3978 (cost cap). The probe is a C# file-based app (`dotnet run`, no Python): P/Invoke to a real `libcurl-4.dll` for REF and `Libcurl` for PORT, with a recording server on 127.0.0.1:21700 (`200 hello`) and 21701 (`200 other`), 21702 silent (for `C_75`), and 21799 closed. A first version is in `Documentation/Reviews/Cgr034ProbeResults.md`; BL-4075 (now Done) fixed the socket-action kick that made `C_21` and `C_75` differ. Keep the probe under `Documentation/Reviews` or the temp area; do not commit it outside `touches`.
+
+## Acceptance criteria
+
+- [ ] The probe commands and both REF and PORT results for `C_20`, `C_21`, `C_65`, `C_74`, `C_75` are recorded in `Documentation/Reviews/Cgr034ProbeResults.md`, and PORT equals REF in each (`C_21`'s removal order may vary in REF too; record that).
+- [ ] Repro variants that already matched curl still match.
+
+## Notes
+
+- Split from BL-3978 (cost cap).
+- Continues the stashed work of BL-3978.
+
+## Log
+
+- 2026-10-29: Created.
