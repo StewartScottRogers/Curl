@@ -36,3 +36,4 @@ Part 1 of 2 of BL-3990 (CGR-034). Drop `TellSocketCallback`'s `NeedsSocket` bran
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c707c13f aaefc491 da38b818 18d43fff 779790c0.
