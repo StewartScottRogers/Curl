@@ -32,3 +32,4 @@ Split from BL-3978 (cost cap), the quality-gate part. Run after BL-4084 has reco
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d1c58933 779790c0.
