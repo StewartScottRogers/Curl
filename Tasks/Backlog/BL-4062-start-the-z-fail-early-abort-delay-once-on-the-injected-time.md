@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Console/ParallelRun.cs, Curl.Console.UnitTests]
+touches: [Curl.Console/ParallelRun.cs, Curl.Console/CurlCommandRunner.cs, Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-29
 completed:
@@ -37,3 +37,4 @@ Found by the shift-end review of 2026-10-28 (code-reviewer, ADR-0710), in the di
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 2b0d65e4 9b094dd8 9264385c 01556522.
+- 2026-10-29: Doing -> Backlog. Ran out of time: Cgr109Tests fail-early test hangs intermittently on the fake clock and the full Console fast run hung; the fix is uncommitted in the working tree
