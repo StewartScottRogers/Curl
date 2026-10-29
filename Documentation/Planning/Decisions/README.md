@@ -1045,3 +1045,4 @@ Each option and the specific reason it lost.
 | [1011](ADR-1011-the-server-sent-events-parser-follows-whatwg-and-ignores-a-retry-too-large-for-64-bits.md) | The Server-Sent Events parser follows WHATWG §9.2.6 and ignores a `retry` too large for 64 bits (BL-4175) | Accepted | 2026-10-29 |
 | [1012](ADR-1012-an-extension-resolver-hook-replaces-curls-resolver-and-refuses-doh-url.md) | An extension resolver hook replaces curl's resolver, and refuses `--doh-url` beside it (BL-4096) | Accepted | 2026-10-29 |
 | [1013](ADR-1013-the-s3-extension-signs-with-its-own-sigv4-signer-returning-the-headers-to-add.md) | The S3 extension signs with its own SigV4 signer, which returns the headers to add (BL-4197) | Accepted | 2026-10-29 |
+| [1012](ADR-1012-two-extension-connection-hook-options-are-a-command-line-error-with-exit-2.md) | Two extension connection-hook options are a command-line error with exit 2 (BL-4192) | Accepted | 2026-10-29 |

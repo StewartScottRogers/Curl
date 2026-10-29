@@ -19,6 +19,11 @@ Namespace `Curl.Extension.Composition`.
   when its option was given, else `null`), one line each, also `merge=union` and a shared list file.
   `Curl.Console`'s `CurlComposition.ExtensionTransferHooksOf` passes them to `TransferHooks.ActivatedBy` for each
   option group and hands the engine `TransferHooks.Around`, or `null` when the group activated none (ADR-1007).
+- `ExtensionConnectionHookCatalogue.Entries` holds each extension's connection hook activator (its `IConnectionHook`
+  when its option was given, else `null`), one line each, also `merge=union` and a shared list file.
+  `CurlComposition.ExtensionConnectionHooksOf` passes them to `ConnectionHooks.ActivatedBy` for each option group
+  and hands the engine its `ConnectorOver` and `DatagramConnectorOver`, or `null` for both without a hook; two
+  hooks are curl's command-line error with exit 2 (ADR-1010, ADR-1012).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

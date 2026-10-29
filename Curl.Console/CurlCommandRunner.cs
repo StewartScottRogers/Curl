@@ -1564,12 +1564,23 @@ internal sealed class CurlCommandRunner(
     /// <returns>
     /// The last transfer's exit code, and whether the run ended: a transfer <see cref="EndsTheRun" />
     /// names is the last, and the URLs after it are not transferred. A URL that is not a well-formed
-    /// glob also ends the run, with exit 3.
+    /// glob also ends the run, with exit 3, and a group whose extension options claim its connection twice
+    /// (<see cref="ExtensionOptionConflictException" />) ends it with exit 2 before anything is transferred.
     /// </returns>
     private async Task<(CurlExitCode ExitCode, bool RunEnded)> TransferAllAsync(CommandLineOptions options, CurlExitCode exitCode)
     {
         firstTransferIdOfGroup = transferPerformer.NextTransferId;
-        TransferDispatch dispatch = createTransferDispatch(options);
+        TransferDispatch dispatch;
+        try
+        {
+            dispatch = createTransferDispatch(options);
+        }
+        catch (ExtensionOptionConflictException conflict)
+        {
+            // Two extension options claim the group's connection: a command-line error, even under -s (ADR-1010).
+            await WriteErrorLinesAsync(["curl: " + conflict.Message, CommandLineRefusal.TryHelpLine]).ConfigureAwait(false);
+            return (CurlExitCode.FailedInit, true);
+        }
 
         return await ThenCleanUpAsync(TransferEachUrlAsync(dispatch, options, exitCode), () => EndGroupAsync(dispatch, options)).ConfigureAwait(false);
     }
