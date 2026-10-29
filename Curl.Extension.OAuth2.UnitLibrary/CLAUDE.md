@@ -1,6 +1,6 @@
 # Curl.Extension.OAuth2.UnitLibrary
 
-The OAuth2 extension (ADR-0999, ADR-1022). Namespace `Curl.Extension.OAuth2`. It references the
+The OAuth2 extension (ADR-0999, ADR-1025). Namespace `Curl.Extension.OAuth2`. It references the
 base class library and `Curl.Protocol.Abstractions`. Not registered in the extension catalogue yet:
 the options and the flows arrive in BL-4161.
 

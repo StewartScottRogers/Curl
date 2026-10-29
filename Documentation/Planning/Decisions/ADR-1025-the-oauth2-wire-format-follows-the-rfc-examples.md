@@ -1,4 +1,4 @@
-# ADR-1022: The OAuth2 extension's wire format follows the RFC examples
+# ADR-1025: The OAuth2 extension's wire format follows the RFC examples
 
 - Status: Accepted
 - Date: 2026-10-29

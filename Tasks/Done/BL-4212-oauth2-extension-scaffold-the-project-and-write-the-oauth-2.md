@@ -37,7 +37,7 @@ Write, in `Wire/`:
 ## Notes
 
 - Filed by BL-4161's lane 2 run (split for size).
-- Delivered directly rather than through the full /feature subagent stages: the work is one small library of wire-format types with RFC examples to test against, and the stages would have spent the cost cap on handoffs. The choices the RFCs leave open are recorded in ADR-1022 (Appendix B form encoding, HTTP Basic by default with form-encoded credentials, fixed parameter order, 32 to 96 verifier octets and S256 only, JSON integers for expires_in and interval, unknown error codes as Unrecognized).
+- Delivered directly rather than through the full /feature subagent stages: the work is one small library of wire-format types with RFC examples to test against, and the stages would have spent the cost cap on handoffs. The choices the RFCs leave open are recorded in ADR-1025 (Appendix B form encoding, HTTP Basic by default with form-encoded credentials, fixed parameter order, 32 to 96 verifier octets and S256 only, JSON integers for expires_in and interval, unknown error codes as Unrecognized).
 - References only `Curl.Protocol.Abstractions` (as S3 does); `Curl.Extension.Abstractions` is left for BL-4161, which registers the extension.
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.OAuth2.UnitLibrary: 100% line, 100% branch, 0 failing members. 43 tests in Curl.Extension.OAuth2.UnitTests; dotnet build clean (VerifyExtensionIsolation ran) and the fast tests green on Windows. The tests use no file system, paths or OS text, so they are platform-neutral for CI on Linux and macOS.
 
