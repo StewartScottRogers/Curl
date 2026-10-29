@@ -4,8 +4,8 @@ title: Extension: Speak graphql-ws, WAMP and STOMP over WebSocket
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.WebSocketSubprotocols.UnitLibrary, Curl.Extension.WebSocketSubprotocols.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4222]
+touches: [Curl.Extension.WebSocketSubprotocols.UnitLibrary, Curl.Extension.WebSocketSubprotocols.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,25 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 1, first pass, no code written): requeued for BL-4222. The extension is a transfer hook like
+  `--jsonrpc` (`Curl.Extension.JsonRpc.UnitLibrary`): for a ws/wss URL it adds `Sec-WebSocket-Protocol` through
+  `RequestHeadersFor` (the ws handler reads `context.Http.Headers`) and replaces the upload with the subprotocol's
+  opening messages (graphql-transport-ws `connection_init` + `subscribe`; WAMP `HELLO`; STOMP `CONNECT` +
+  `SUBSCRIBE`/`SEND`). But `WsProtocolHandler.SendUploadAsync` frames any plain upload into binary frames of up to
+  64 KiB, so several messages would go out as one binary frame, and all three protocols need one text frame per
+  message. The per-frame seam (`IWsUploadFrameSource`) is in `Curl.Protocol.Ws`, which an extension may not
+  reference. BL-4222 adds `IWsUploadMessageSource` in the shared layer `Curl.WebSocket.UnitLibrary`; this
+  extension then references `Curl.WebSocket.UnitLibrary` (allowed: not `Curl.Protocol.*`) and gives its upload as
+  one. No other hook is missing: `ExtensionOption`, `ExtensionDescription`, `ITransferHook.ExecuteAsync` and the
+  option, description and transfer hook catalogues all exist. The handler sends the whole upload, then receives
+  until the server closes, so the messages are pipelined (no wait for `connection_ack`/`WELCOME`/`CONNECTED`);
+  record that in the ADR.
+- Touches widened to the option, description and transfer hook catalogues: they are shared list files
+  (`Tasks/SharedListFiles.txt`), so they make no overlap; `ExtensionCatalogue.cs` (protocol handlers) is not the
+  registration a transfer hook extension uses.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 971c9652 1f2ca384 653e3607 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4222: an upload seam in Curl.WebSocket.UnitLibrary that sends one text frame per message, which graphql-transport-ws, WAMP and STOMP need
