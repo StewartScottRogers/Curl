@@ -72,6 +72,8 @@ curl -s -Z --http2-prior-knowledge http://127.0.0.1:P/1 http://127.0.0.1:P/2 htt
 
 - 2026-10-28 (lane 5): Cause found before any edit. Prior-knowledge h2 transfers skip ParallelHostQueue; the 2nd and 3rd wait in PoolingConnector on MultiplexingNegotiation.Decided, a TaskCompletionSource with RunContinuationsAsynchronously, so they wake on the thread pool in arbitrary order. The fix (wake waiters in the order they began to wait, e.g. a queue of per-waiter tasks released in sequence) lands in Curl.Networking.UnitLibrary (PoolingConnector.cs, MultiplexingNegotiation.cs) plus a test in Curl.Networking.UnitTests, which BL-4006 holds whole. Added those to touches and BL-4006 to depends-on.
 
+- 2026-10-29 (lane 5): Fix: MultiplexingNegotiation now releases waiters one at a time in the order they began to wait (WaitAsync, ReleaseNext); PoolingConnector.ShareAsync releases the next waiter after its own FindShareable. A cancelled waiter passes its turn on. Test: Curl.Networking.UnitTests/MultiplexingNegotiationTests.cs (the ordering test failed with the old unordered thread-pool wake-up). Not measured against real curl: the repro needs a Linux nghttp2 server and curl 8.18/8.22 OpenSSL, unavailable on this Windows lane; the expected order (/1, /2, /3) is the report's. Measure-CodeQuality for Curl.Networking.UnitLibrary: 0 failing members (ShareAsync kept within complexity 10 by extracting ReportFullLeases). Build clean, fast tests green; tests are platform-neutral, so the CI criterion is met.
+
 ## Log
 
 - 2026-10-26: Created from CGR-279 of the third-party gap report.
