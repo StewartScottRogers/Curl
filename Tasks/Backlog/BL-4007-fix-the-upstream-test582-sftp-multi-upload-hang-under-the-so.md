@@ -4,7 +4,7 @@ title: Fix the upstream test582 SFTP multi upload hang under the socket-gated wa
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4008]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4012, BL-4013]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitTests/Cgr034Tests.cs]
 requirement: none
 created: 2026-10-28
