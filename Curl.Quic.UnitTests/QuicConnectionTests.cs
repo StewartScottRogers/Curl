@@ -117,6 +117,33 @@ public sealed class QuicConnectionTests
 
     [TestMethod]
     [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    public async Task AcceptBidirectionalStreamAsync_ServerStream_IsAcceptedReadAndWritten()
+    {
+        Diagnostics.Arrange("server stream", "1 carrying 'signal' with fin; the client answers 'ok'");
+        (QuicConnection connection, QuicTestLiveChannel channel, _) = await ConnectAsync();
+        await using (connection)
+        {
+            IPeerBidirectionalStreamAccepting accepting = connection;
+            Task<IMultiplexedStream> accept = accepting.AcceptBidirectionalStreamAsync(CancellationToken.None).AsTask();
+            IMultiplexedStream stream;
+            using (Diagnostics.Phase("data transfer"))
+            {
+                channel.FromServer(new QuicStreamFrame(1, 0, "signal"u8.ToArray(), true));
+                stream = await accept;
+                await stream.WriteAsync("ok"u8.ToArray(), endStream: true, CancellationToken.None);
+                await channel.WaitUntilSentAsync(() => channel.Sent<QuicStreamFrame>().Any(frame => frame.StreamId == 1 && frame.IsFin));
+            }
+
+            string text = await ReadToEndAsync(stream);
+            string answer = Encoding.ASCII.GetString(channel.Sent<QuicStreamFrame>().Single(frame => frame.StreamId == 1).Data.Span);
+            Diagnostics.Act("(stream id, text read, answer sent)", (stream.StreamId, text, answer));
+            Diagnostics.Assert("(stream id, text read, answer sent)", (1L, "signal", "ok"), (stream.StreamId, text, answer));
+            Assert.AreEqual((1L, "signal", "ok"), (stream.StreamId, text, answer));
+        }
+    }
+
+    [TestMethod]
+    [Timeout(QuicTest.HangTimeoutMilliseconds)]
     public async Task ReadAsync_ServerResetsTheStream_ThrowsWithItsCode()
     {
         Diagnostics.Arrange("RESET_STREAM error code", 0x10c);

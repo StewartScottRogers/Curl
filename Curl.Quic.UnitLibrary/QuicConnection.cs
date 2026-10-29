@@ -12,7 +12,7 @@ namespace Curl.Quic;
 /// the channel; they change the <see cref="QuicClientConnectionState" />'s streams under one lock
 /// and wait for the loop to report that something arrived.
 /// </summary>
-public sealed class QuicConnection : IMultiplexedConnection, IDatagramCarryingConnection
+public sealed class QuicConnection : IMultiplexedConnection, IDatagramCarryingConnection, IPeerBidirectionalStreamAccepting
 {
     private const int ReceiveBufferLength = (int)QuicTransportParameters.DefaultMaxUdpPayloadSize;
 
@@ -85,6 +85,10 @@ public sealed class QuicConnection : IMultiplexedConnection, IDatagramCarryingCo
     /// <inheritdoc />
     public ValueTask<IMultiplexedStream> AcceptUnidirectionalStreamAsync(CancellationToken cancellationToken) =>
         WaitForStreamAsync(streams => streams.AcceptUnidirectional(), cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<IMultiplexedStream> AcceptBidirectionalStreamAsync(CancellationToken cancellationToken) =>
+        WaitForStreamAsync(streams => streams.AcceptBidirectional(), cancellationToken);
 
     /// <inheritdoc />
     public int MaxDatagramPayloadLength
