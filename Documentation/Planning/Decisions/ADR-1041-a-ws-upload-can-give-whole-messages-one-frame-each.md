@@ -1,4 +1,4 @@
-# ADR-1039 — A ws upload can give whole messages, one frame each
+# ADR-1041 — A ws upload can give whole messages, one frame each
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

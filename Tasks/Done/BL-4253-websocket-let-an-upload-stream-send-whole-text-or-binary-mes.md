@@ -31,7 +31,7 @@ Found by BL-4114 (the graphql-transport-ws, WAMP and STOMP subprotocols extensio
 
 ## Notes
 
-- Plan: `IWsUploadMessageSource` (a list of `WsUploadMessage`, not an async sequence: the extensions know their messages up front, and a list keeps the loop simple) and `WsUploadMessage` in `Curl.WebSocket.UnitLibrary`; `WsProtocolHandler.SendMessagesAsync` sends each as one final masked frame of its opcode, traced and logged like the read-by-read frames. Recorded in ADR-1039.
+- Plan: `IWsUploadMessageSource` (a list of `WsUploadMessage`, not an async sequence: the extensions know their messages up front, and a list keeps the loop simple) and `WsUploadMessage` in `Curl.WebSocket.UnitLibrary`; `WsProtocolHandler.SendMessagesAsync` sends each as one final masked frame of its opcode, traced and logged like the read-by-read frames. Recorded in ADR-1041.
 - Under `RawMode` a message source sends its stream bytes unframed, as any upload does (raw means no framing); pinned by a test.
 - Upload size, request size and progress count the sum of the payloads as the criterion asks, unlike the read-by-read path, which counts frame bytes.
 - Measure-CodeQuality.ps1 -Library Curl.WebSocket.UnitLibrary,Curl.Protocol.Ws.UnitLibrary: 0 failing members. Full build clean; fast tests green (Curl.Protocol.Ws.UnitTests 398 passed, Curl.WebSocket.UnitTests 79 passed).

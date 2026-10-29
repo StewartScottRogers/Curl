@@ -660,7 +660,7 @@ public sealed class WsProtocolHandler(
 
     /// <summary>
     /// Sends each of <paramref name="messages" /> as one final masked frame of its own opcode, in order, so an
-    /// extension's subprotocol gets one text frame per message (BL-4253, ADR-1039). The stream's own bytes are not read.
+    /// extension's subprotocol gets one text frame per message (BL-4253, ADR-1041). The stream's own bytes are not read.
     /// </summary>
     /// <returns>The sum of the message payloads.</returns>
     private async ValueTask<long> SendMessagesAsync(IConnection connection, ITransferContext context, IReadOnlyList<WsUploadMessage> messages, WsFrameTrace trace)
