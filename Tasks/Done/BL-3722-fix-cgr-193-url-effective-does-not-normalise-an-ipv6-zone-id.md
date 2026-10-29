@@ -5,11 +5,11 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr193Tests.cs]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr193Tests.cs, Curl.Engine.UnitLibrary/UrlEffective.cs, Curl.Engine.UnitTests/Cgr193Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3722 — Fix CGR-193: %{url_effective} does not normalise an IPv6 zone id
 
@@ -66,10 +66,10 @@ curl -sS -g "http://[::1%25%41]:20200/a" -w "%{url_effective}"
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -80,3 +80,10 @@ curl -sS -g "http://[::1%25%41]:20200/a" -w "%{url_effective}"
 
 - 2026-10-26: Created from CGR-193 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes (run)
+
+- The fix is in `Curl.Engine.UnitLibrary/UrlEffective.cs` (`Host`), not `CurlUrlHost.cs`: it printed the typed zone text; it now prints `%25` plus `CurlUrl.ZoneId` (decoded once). Added the engine files and `Curl.Engine.UnitTests/Cgr193Tests.cs` to `touches` (no other Doing task names them); the focused test lives in the fixed library's own UnitTests (ADR-0482).
+- Measured with real curl 8.22.0 (`-g -w %{url_effective}`, connect refused is fine): `[::1%lo]` -> `[::1%25lo]`; `[::1%25%41]` -> `[::1%25A]`; `[::1%2541]` -> `[::1%2541]`; `%25a%7eb` -> `%25a~b`; spaces, `/`, `^`, `"` and non-ASCII print raw. Curl now gives the same (unit test pins the URLs; no wire change, the request does not carry the zone).
+- Fast Engine tests green (2747 passed); Measure-CodeQuality for Curl.Engine.UnitLibrary: 0 failing members. Linux/macOS: platform-neutral string test.
+- 2026-10-28: Doing -> Done. url_effective prints an IPv6 zone id as %25 plus the decoded zone id, as curl 8.22.0

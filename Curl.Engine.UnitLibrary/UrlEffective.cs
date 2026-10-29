@@ -18,7 +18,7 @@ namespace Curl.Engine;
 /// curl rejects, such as <c>http://local host</c>, prints as it is. Measured with curl 8.22.0 on
 /// 2026-10-22 (BL-3173 Notes): <c>http://0x7f.1:09/</c> prints <c>http://127.0.0.1:9/</c>,
 /// <c>http://127.0.0.1.:9/</c> drops the dot, <c>http://h:/</c> drops the empty port,
-/// <c>[0:0:0:0:0:0:0:1]</c> prints <c>[::1]</c>, and a zone id keeps its typed <c>%25</c> form.
+/// <c>[0:0:0:0:0:0:0:1]</c> prints <c>[::1]</c>, and a zone id prints as <c>%25</c> and the zone id decoded once (CGR-193), so <c>[::1%lo]</c> prints <c>[::1%25lo]</c>.
 /// </remarks>
 internal static class UrlEffective
 {
@@ -118,8 +118,7 @@ internal static class UrlEffective
     {
         if (parsed.Host.StartsWith('['))
         {
-            int zoneStart = typedHost.IndexOf('%');
-            string zone = zoneStart < 0 ? string.Empty : typedHost[zoneStart..^1];
+            string zone = parsed.ZoneId is null ? string.Empty : "%25" + parsed.ZoneId;
 
             return parsed.Host[..^1] + zone + "]";
         }
