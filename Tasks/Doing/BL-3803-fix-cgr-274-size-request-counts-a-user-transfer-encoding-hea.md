@@ -77,3 +77,4 @@ curl -sSk -H 'Transfer-Encoding: chunked' -d hello https://127.0.0.1:P/echo -w '
 ## Log
 
 - 2026-10-26: Created from CGR-274 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
