@@ -33,3 +33,4 @@ Follows BL-4248, whose ADR-1064 left these two parts of RFC 7641 to this task. `
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 76fa3855 8bb8989a 2ee4459d bd9d4ca0 3d836d5e.
