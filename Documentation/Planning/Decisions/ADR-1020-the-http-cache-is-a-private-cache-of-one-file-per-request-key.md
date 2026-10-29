@@ -1,4 +1,4 @@
-# ADR-1018 — The HTTP cache is a private cache of one file per request key
+# ADR-1020 — The HTTP cache is a private cache of one file per request key
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -1,6 +1,6 @@
 # Curl.Extension.HttpCache.UnitLibrary
 
-The HTTP cache extension's RFC 9111 core (ADR-0999, ADR-1018). Namespace `Curl.Extension.HttpCache`.
+The HTTP cache extension's RFC 9111 core (ADR-0999, ADR-1020). Namespace `Curl.Extension.HttpCache`.
 It references nothing but the base class library so far; the `--cache-dir` option, its transfer
 hook and its registration in `Curl.Extension.Composition` arrive with BL-4133.
 

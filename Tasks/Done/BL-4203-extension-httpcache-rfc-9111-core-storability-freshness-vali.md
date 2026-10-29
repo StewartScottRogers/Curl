@@ -32,7 +32,7 @@ Split from BL-4133 for size (its Notes ask for wire format first, then the clien
 
 ## Notes
 
-- Plan: pure RFC 9111 types in Curl.Extension.HttpCache (ResponseStorability, FreshnessCalculator, CacheValidation, CacheKey, CacheDirectory with StoredResponseEncoding); decisions in ADR-1018 (private cache by default with an isSharedCache flag for the shared-cache rules, GET only without 206/304, SHA-256 key file names, magic-line binary entry written by temp file and move). Pipeline run directly rather than through subagents to keep within the cost cap.
+- Plan: pure RFC 9111 types in Curl.Extension.HttpCache (ResponseStorability, FreshnessCalculator, CacheValidation, CacheKey, CacheDirectory with StoredResponseEncoding); decisions in ADR-1020 (private cache by default with an isSharedCache flag for the shared-cache rules, GET only without 206/304, SHA-256 key file names, magic-line binary entry written by temp file and move). Pipeline run directly rather than through subagents to keep within the cost cap.
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.HttpCache.UnitLibrary: 100% line, 100% branch, max complexity 10 after moving the status list to a FrozenSet and splitting IsStorable. 73 unit tests; solution build clean, fast tests green on Windows. The file tests use a temporary directory they delete (a unit test per CLAUDE.md) and paths built with Path.Combine, so they are platform-neutral.
 
 ## Log
