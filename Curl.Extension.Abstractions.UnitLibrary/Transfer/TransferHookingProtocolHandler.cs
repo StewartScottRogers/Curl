@@ -4,7 +4,7 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// Runs an extension's <see cref="ITransferHook" />s around one of curl's protocol handlers (ADR-1007):
 /// the hooks' request headers go after curl's own, the handler writes the body through the hooks' streams
 /// before curl's output, each hook may answer the transfer itself or replace the response the handler
-/// received (ADR-1017), and each hook reads the result before curl reports it. When a hook asks for the
+/// received (ADR-1019), and each hook reads the result before curl reports it. When a hook asks for the
 /// transfer to be repeated (ADR-1009), it waits that long on the transfer's <see cref="TimeProvider" /> and
 /// runs the handler again, asking the hooks' request headers afresh.
 /// </summary>
@@ -57,7 +57,7 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
 
     /// <summary>
     /// Runs the hooks' <see cref="ITransferHook.ExecuteAsync" /> from <paramref name="index" /> on, the first
-    /// outermost, each given the rest as its next step, and curl's handler innermost (ADR-1017).
+    /// outermost, each given the rest as its next step, and curl's handler innermost (ADR-1019).
     /// </summary>
     private ValueTask<TransferResult> ExecuteThroughHooksAsync(int index, ITransferContext context) =>
         index == hooks.Count

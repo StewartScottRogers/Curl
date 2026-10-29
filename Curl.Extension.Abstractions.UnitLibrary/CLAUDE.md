@@ -14,7 +14,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   `TransferResult` (status, headers, timings). `TransferHooks.ActivatedBy` keeps the hooks whose option
   was given; a host passes `TransferHooks.Around` to the engine (ADR-1007), which gives each handler
   back unchanged when no hook is active. Its `ExecuteAsync(context, next)` runs the transfer, the hooks
-  outermost first in request order and curl's handler innermost (ADR-1017): a hook may skip `next` and
+  outermost first in request order and curl's handler innermost (ADR-1019): a hook may skip `next` and
   write its own response and `TransferResult` (a fresh cached response), or call `next` with
   `context.WithOutputs(...)` (`TransferContextOutputs`) to capture curl's response and write a different
   one (a stored response for a 304). By default it calls `next` unchanged.

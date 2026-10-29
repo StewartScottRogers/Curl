@@ -31,7 +31,7 @@ Found by BL-4133 (`--cache-dir`, RFC 9111) in its prerequisite pass. ADR-1007's 
 
 ## Notes
 
-- Plan: `ITransferHook.ExecuteAsync(context, next) => next(context)`, run per run of the transfer (repeats included) outermost first in request order, curl's handler innermost, inside the body streams and before `TransferFinished`/`RepeatAfter` (ADR-1017). A public `TransferContextOutputs.WithOutputs` extension lets a hook run `next` with its own body, `-i` and `-D` outputs; `HookedTransferContext` now carries both header outputs.
+- Plan: `ITransferHook.ExecuteAsync(context, next) => next(context)`, run per run of the transfer (repeats included) outermost first in request order, curl's handler innermost, inside the body streams and before `TransferFinished`/`RepeatAfter` (ADR-1019). A public `TransferContextOutputs.WithOutputs` extension lets a hook run `next` with its own body, `-i` and `-D` outputs; `HookedTransferContext` now carries both header outputs.
 - Tests: `TransferHookingProtocolHandlerTests.Execute.cs` (a partial of the existing class, one test class per production class) and `TransferContextOutputsTests.cs`; 41 tests in Curl.Extension.Abstractions.UnitTests pass, the existing ones unchanged except the class made partial.
 - Measure-CodeQuality.ps1: Curl.Extension.Abstractions.UnitLibrary 100% line, 100% branch, 0 failing members. Full build clean, fast tests green (52 test assemblies).
 - Changes are platform-neutral (in-memory streams only).
@@ -40,4 +40,4 @@ Found by BL-4133 (`--cache-dir`, RFC 9111) in its prerequisite pass. ADR-1007's 
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: c05685ad ae76495d e36ca50f 24779316 e7c4212f 3d836d5e.
-- 2026-10-29: Doing -> Done. An extension transfer hook can answer a transfer itself or capture curl's response and replace it (ITransferHook.ExecuteAsync, ADR-1017)
+- 2026-10-29: Doing -> Done. An extension transfer hook can answer a transfer itself or capture curl's response and replace it (ITransferHook.ExecuteAsync, ADR-1019)

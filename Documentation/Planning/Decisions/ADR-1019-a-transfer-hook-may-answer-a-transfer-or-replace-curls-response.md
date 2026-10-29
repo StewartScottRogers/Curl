@@ -1,4 +1,4 @@
-# ADR-1017: A transfer hook may answer a transfer itself or replace curl's response
+# ADR-1019: A transfer hook may answer a transfer itself or replace curl's response
 
 - Status: Accepted
 - Date: 2026-10-29

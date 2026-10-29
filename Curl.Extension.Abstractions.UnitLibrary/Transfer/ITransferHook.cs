@@ -23,7 +23,7 @@ public interface ITransferHook
     Stream ResponseBodyOver(Stream output) => output;
 
     /// <summary>
-    /// Runs the transfer (ADR-1017). The hooks run outermost first, in request order, each given the rest of
+    /// Runs the transfer (ADR-1019). The hooks run outermost first, in request order, each given the rest of
     /// the hooks and curl's handler as <paramref name="next" />. A hook may skip <paramref name="next" /> and
     /// answer itself (a fresh cached response), writing the body to <paramref name="context" />'s
     /// <see cref="ITransferContext.Output" /> and the headers to its <see cref="ITransferContext.HeaderOutput" />

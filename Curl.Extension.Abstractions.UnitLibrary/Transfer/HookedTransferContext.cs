@@ -4,7 +4,7 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// The context an extension's <see cref="TransferHookingProtocolHandler" /> gives curl's handler: the
 /// transfer's own context, but with the hooks' request headers after curl's and the response body
 /// written through the hooks' streams (ADR-1007); also the context a hook's
-/// <see cref="TransferContextOutputs.WithOutputs" /> gives, with the response written where the hook chose (ADR-1017).
+/// <see cref="TransferContextOutputs.WithOutputs" /> gives, with the response written where the hook chose (ADR-1019).
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>
 /// <param name="output">Where the handler writes the response body: the outermost hook's stream.</param>
