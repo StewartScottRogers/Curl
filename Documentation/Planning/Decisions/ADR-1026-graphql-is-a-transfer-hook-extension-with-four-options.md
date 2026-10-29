@@ -1,4 +1,4 @@
-# ADR-1022 — GraphQL is a transfer hook extension with four options
+# ADR-1026 — GraphQL is a transfer hook extension with four options
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

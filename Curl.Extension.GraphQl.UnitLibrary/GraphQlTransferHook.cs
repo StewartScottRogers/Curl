@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.GraphQl;
 
 /// <summary>
-/// Sends one HTTP transfer as a GraphQL-over-HTTP request (ADR-1022): a POST of the JSON request
+/// Sends one HTTP transfer as a GraphQL-over-HTTP request (ADR-1026): a POST of the JSON request
 /// <see cref="GraphQlRequestEncoding" /> writes, with its <c>Accept</c> header, and, once the response is in,
 /// one readable line on stderr for each error it reports. The response body reaches curl's output unchanged.
 /// A transfer that is not HTTP runs as curl runs it.

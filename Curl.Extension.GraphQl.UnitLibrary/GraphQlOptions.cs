@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Description;
 
 namespace Curl.Extension.GraphQl;
 
-/// <summary>The command-line options the GraphQL extension adds, and its description (ADR-1022).</summary>
+/// <summary>The command-line options the GraphQL extension adds, and its description (ADR-1026).</summary>
 public static class GraphQlOptions
 {
     /// <summary>Gets <c>--graphql &lt;file&gt;</c>: sends the GraphQL document in the file as a GraphQL-over-HTTP POST.</summary>

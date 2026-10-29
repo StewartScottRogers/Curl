@@ -1,6 +1,6 @@
 # Curl.Extension.GraphQl.UnitLibrary
 
-The GraphQL extension (ADR-0999, ADR-1022), tested against GraphQL over HTTP
+The GraphQL extension (ADR-0999, ADR-1026), tested against GraphQL over HTTP
 (graphql.github.io/graphql-over-http). Namespace `Curl.Extension.GraphQl`. It references only
 `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`) and the base class library;
 JSON is read and written with `System.Text.Json`'s `JsonDocument` and `Utf8JsonWriter` (no serializer,

@@ -1058,4 +1058,4 @@ Each option and the specific reason it lost.
 | [1023](ADR-1023-engine-composition-keeps-one-unit-per-partial-file.md) | EngineComposition keeps one unit per partial file (BL-4172) | Accepted | 2026-10-29 |
 | [1024](ADR-1024-encrypted-dns-dot-resolver-pipelines-aaaa-and-a-over-one-tls-connection.md) | The DNS-over-TLS resolver pipelines AAAA and A over one TLS connection (BL-4207) | Accepted | 2026-10-29 |
 | [1025](ADR-1025-the-oauth2-wire-format-follows-the-rfc-examples.md) | The OAuth2 extension's wire format follows the RFC examples (BL-4212) | Accepted | 2026-10-29 |
-| [1022](ADR-1022-graphql-is-a-transfer-hook-extension-with-four-options.md) | GraphQL is a transfer hook extension with four options (BL-4105) | Accepted | 2026-10-29 |
+| [1026](ADR-1026-graphql-is-a-transfer-hook-extension-with-four-options.md) | GraphQL is a transfer hook extension with four options (BL-4105) | Accepted | 2026-10-29 |
