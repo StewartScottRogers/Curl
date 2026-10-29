@@ -33,11 +33,25 @@ internal sealed record HandBuiltHandshake(
     // TLS 1.3's version code point, which TlsProtocolVersion does not name.
     private const ushort Tls13WireVersion = 0x0304;
 
+    /// <summary>Gets the key exchange group negotiated, or <see langword="null" /> when none was (BL-4009).</summary>
+    internal ushort? NegotiatedGroup { get; init; }
+
+    /// <summary>Gets the scheme of the server signature that verified, or <see langword="null" /> when none named one.</summary>
+    internal ushort? PeerSignatureScheme { get; init; }
+
+    /// <summary>Gets the algorithm OID of the key behind the server signature that verified, or <see langword="null" />.</summary>
+    internal string? PeerSignatureKeyAlgorithmOid { get; init; }
+
     /// <summary>Describes a completed TLS 1.3 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
     /// <returns>The outcome.</returns>
     internal static HandBuiltHandshake Completed(Tls13ClientStream stream) =>
-        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus, stream.Handshake.EncryptedClientHelloRetryConfigs);
+        new(stream, SslProtocols.Tls13, stream.Handshake.CipherSuite!.Code, stream.Handshake.ApplicationProtocol, null, stream.Handshake.CertificateStatus, stream.Handshake.EncryptedClientHelloRetryConfigs)
+        {
+            NegotiatedGroup = stream.Handshake.NegotiatedGroup,
+            PeerSignatureScheme = stream.Handshake.PeerSignatureScheme,
+            PeerSignatureKeyAlgorithmOid = stream.Handshake.PeerSignatureKeyAlgorithmOid,
+        };
 
     /// <summary>Describes a completed TLS 1.2, 1.1 or 1.0 handshake.</summary>
     /// <param name="stream">The connected stream.</param>
@@ -49,7 +63,12 @@ internal sealed record HandBuiltHandshake(
             stream.Handshake.CipherSuite!.Code,
             stream.Handshake.ApplicationProtocol,
             null,
-            stream.Handshake.CertificateStatus);
+            stream.Handshake.CertificateStatus)
+        {
+            NegotiatedGroup = stream.Handshake.NegotiatedGroup,
+            PeerSignatureScheme = stream.Handshake.PeerSignatureScheme,
+            PeerSignatureKeyAlgorithmOid = stream.Handshake.PeerSignatureKeyAlgorithmOid,
+        };
 
     /// <summary>Describes a failed handshake.</summary>
     /// <param name="failure">Why it failed.</param>

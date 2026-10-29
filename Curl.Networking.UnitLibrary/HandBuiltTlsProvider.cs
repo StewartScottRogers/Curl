@@ -258,9 +258,11 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         var peerKey = SessionPeerKey(targetHost, plaintext.RemoteEndPoint);
         var session = OfferedSession(peerKey);
         ReportReusedSession(events, session);
-        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session } };
+        var messageTrace = _matchesSchannelBuild ? null : new HandBuiltHandshakeMessageTrace(events, OfferedWireVersion);
+        TlsHandshakeMessageObserver? observer = messageTrace is null ? null : (direction, contentType, _, message) => messageTrace.Observe(direction, contentType, message);
+        prepared = prepared with { Settings = prepared.Settings with { ResumptionSession = session, HandshakeMessageObserver = observer } };
         var handshakeStarted = _timeProvider.GetTimestamp();
-        var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey);
+        var handshakeRun = new HandshakeRun(plaintext, targetHost, events, isProxy, prepared, offeredApplicationProtocols, peerKey) { MessageTrace = messageTrace };
         if (EarlyDataApplicationProtocol(session, offeredApplicationProtocols) is { } earlyDataProtocol)
         {
             return DeferHandshake(handshakeRun, session!, earlyDataProtocol, handshakeStarted);
@@ -283,6 +285,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CancellationToken cancellationToken)
     {
         var (handshake, thrown) = await TryHandshakeAsync(run.Plaintext, run.Prepared, earlyData, cancellationToken).ConfigureAwait(false);
+        run.MessageTrace?.ReportHeld(Completed(handshake) ? handshake.ProtocolVersion : HandBuiltHandshake.NegotiatedBy(run.Prepared.Verifier.Presented).ProtocolVersion);
         run.Prepared.Verifier.Observed.ReportVerifyResult(run.Events, run.IsProxy, _matchesSchannelBuild);
         if (!Completed(handshake))
         {
@@ -403,7 +406,15 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         bool IsProxy,
         PreparedHandshake Prepared,
         IReadOnlyList<string> OfferedApplicationProtocols,
-        string? PeerKey);
+        string? PeerKey)
+    {
+        // The OpenSSL build's handshake message trace; the Schannel build reports none (BL-4009).
+        internal HandBuiltHandshakeMessageTrace? MessageTrace { get; init; }
+    }
+
+    // The ClientHello's highest version, which OpenSSL's message callback names until the
+    // server answers (ADR-0982).
+    private int OfferedWireVersion => OffersTls13 ? 0x0304 : (int)ClientSettings.Tls12Maximum(_options);
 
     private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>
         _options.UseAlpn ? applicationProtocols : [];
@@ -516,6 +527,8 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             CertificateVerifyResult = verifier.Observed.VerifyResult,
             PeerCertificateChain = [.. verifier.Observed.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
             PinnedPublicKeyHash = verifier.Observed.PinnedPublicKeyHash,
+            NegotiatedGroupName = OpenSslHandshakeNames.GroupName(handshake.NegotiatedGroup),
+            PeerSignatureTypeName = OpenSslHandshakeNames.SignatureTypeName(handshake.PeerSignatureScheme, handshake.PeerSignatureKeyAlgorithmOid),
         };
 
     /// <summary>
@@ -833,6 +846,9 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         // SSLKEYLOGFILE: where the TLS 1.3 and TLS 1.2 handshakes log their secrets (BL-2327, BL-2339).
         internal ITlsKeyLog? KeyLog { get; init; }
 
+        // The OpenSSL build's -v: told each handshake message the TLS 1.3 or TLS 1.2 client sees (BL-4009).
+        internal TlsHandshakeMessageObserver? HandshakeMessageObserver { get; init; }
+
         private IReadOnlyList<ushort> OfferedSuites => CipherSuites ?? Profile.CipherSuites;
 
         internal static ClientSettings Of(
@@ -866,6 +882,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             EncryptedClientHelloConfigs = EchConfigs,
             SendEncryptedClientHelloGrease = SendEchGrease,
             KeyLog = KeyLog,
+            HandshakeMessageObserver = HandshakeMessageObserver,
         };
 
         // padding follows the measured extensions and early_data, where OpenSSL sends it (BL-1048).
@@ -906,6 +923,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             FixedExtensions = ClientHelloProfileMapping.Tls12FixedExtensions(Profile),
             InsertEmptyFragment = InsertsEmptyFragment(options),
             KeyLog = KeyLog,
+            HandshakeMessageObserver = HandshakeMessageObserver,
         };
 
         // Schannel's hello below a TLS 1.3 ceiling is in a record of that ceiling; a TLS 1.2
@@ -920,7 +938,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
                 ? TlsProtocolVersion.Tls12
                 : ToTlsProtocolVersion(options.MinimumVersion);
 
-        private static TlsProtocolVersion Tls12Maximum(TlsClientOptions options) =>
+        internal static TlsProtocolVersion Tls12Maximum(TlsClientOptions options) =>
             ReachesTls13(options) ? TlsProtocolVersion.Tls12 : ToTlsProtocolVersion(options.MaximumVersion);
 
         // Below a TLS 1.2 ceiling an unset minimum is TLS 1.0, as TlsVersionRange offers it.
