@@ -26,12 +26,18 @@ namespace Curl.Console;
 /// being made, as curl's <c>mkdir</c> does on Windows (CGR-188, BL-3717). <see langword="null" />
 /// leaves the length to the platform, as off Windows.
 /// </param>
+/// <param name="findsDosDevices">
+/// Whether <see cref="Exists(string)" /> finds a DOS device name such as <c>NUL</c> or <c>COM1</c>
+/// there, as curl's <c>stat</c> does on Windows, so <c>--skip-existing -o NUL</c> skips the transfer
+/// (CGR-182, BL-3711). .NET's file APIs do not see those devices.
+/// </param>
 internal sealed class PhysicalOutputPaths(
     Func<string, bool>? isRegularFile,
     CRuntimeErrorNumbers errorNumbers,
     Func<byte[], int>? makeDirectoryUnderRawBytes = null,
     RawByteFileName.FileOperations? rawByteFiles = null,
-    int? directoryPathLengthLimit = null) : IOutputPaths
+    int? directoryPathLengthLimit = null,
+    bool findsDosDevices = false) : IOutputPaths
 {
     /// <summary>
     /// Windows' <c>CreateDirectory</c> limit: a directory's full path must be shorter than 248
@@ -51,9 +57,18 @@ internal sealed class PhysicalOutputPaths(
             CRuntimeErrorNumbers.For(OperatingSystem.IsWindows(), OperatingSystem.IsMacOS()),
             OffWindows<Func<byte[], int>>(RawByteFileName.MakeDirectoryUnderRawBytes),
             OffWindows(RawByteFileName.FileOperations.Native),
-            OnWindows(WindowsDirectoryPathLengthLimit))
+            OnWindows(WindowsDirectoryPathLengthLimit),
+            OperatingSystem.IsWindows())
     {
     }
+
+    /// <summary>The names of the DOS devices <c>stat</c> finds on Windows without a path.</summary>
+    private static readonly string[] DosDeviceNames =
+    [
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
 
     /// <summary>
     /// Gives <paramref name="rawByteOperation" /> off Windows and none on Windows, where argument
@@ -144,7 +159,13 @@ internal sealed class PhysicalOutputPaths(
     /// <inheritdoc />
     public bool Exists(string path) => rawByteFiles is { } raw && RawByteFileName.HoldsEscapedByte(path)
         ? raw.FileTypeOf(RawByteFileName.NullTerminatedBytes(path)) >= 0
-        : File.Exists(path) || Directory.Exists(path);
+        : File.Exists(path) || Directory.Exists(path) || (findsDosDevices && IsDosDeviceName(path));
+
+    /// <summary>Whether <paramref name="path" /> is exactly a DOS device name, in any case.</summary>
+    /// <param name="path">The output file's name.</param>
+    /// <returns><see langword="true" /> for <c>NUL</c>, <c>nul</c>, <c>COM1</c> and the like.</returns>
+    private static bool IsDosDeviceName(string path) =>
+        Array.Exists(DosDeviceNames, name => string.Equals(name, path, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Tells whether the directory <paramref name="path" /> would be created in is a regular file,
