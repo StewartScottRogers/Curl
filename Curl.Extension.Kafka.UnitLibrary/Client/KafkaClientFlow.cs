@@ -1,10 +1,12 @@
 using Curl.Extension.Kafka.Wire;
+using Curl.Extension.Kafka.Wire.KafkaSasl;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Kafka.Client;
 
 /// <summary>
-/// The Kafka exchange over any byte transport (ADR-1076, ADR-1080): Metadata v4 to find the partition's leader, then
+/// The Kafka exchange over any byte transport (ADR-1076, ADR-1080, ADR-1081): SASL PLAIN when the transfer has
+/// credentials, Metadata v4 to find the partition's leader, then
 /// Produce v3 of one record and its acknowledgement, or Fetch v4 from an offset, writing each record's value and a line
 /// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
 /// response or a wrong correlation id ends with exit 8.
@@ -17,6 +19,28 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
 
     /// <summary>The bytes written to the output so far.</summary>
     internal long BytesWritten { get; private set; }
+
+    /// <summary>
+    /// Authenticates with SASL PLAIN (ADR-1081): SaslHandshake v1 naming PLAIN, then SaslAuthenticate v0 carrying the RFC
+    /// 4616 message for <paramref name="credentials"/>. A broker that does not enable PLAIN, or refuses the
+    /// credentials, ends with exit 67 and the broker's error message.
+    /// </summary>
+    internal async ValueTask AuthenticateAsync(System.Net.NetworkCredential credentials)
+    {
+        ReadOnlyMemory<byte> handshakeBody = await ExchangeAsync("SaslHandshake", KafkaSaslRequests.Handshake).ConfigureAwait(false);
+        KafkaSaslHandshakeResponse handshake = Decoded(() => KafkaSaslResponses.ReadHandshake(handshakeBody));
+        if (handshake.ErrorCode != 0)
+        {
+            throw new KafkaClientException(CurlExitCode.LoginDenied, KafkaSaslMessages.PlainNotEnabled(handshake.Mechanisms));
+        }
+
+        ReadOnlyMemory<byte> body = await ExchangeAsync("SaslAuthenticate", id => KafkaSaslRequests.Authenticate(id, credentials.UserName, credentials.Password)).ConfigureAwait(false);
+        KafkaSaslAuthenticateResponse response = Decoded(() => KafkaSaslResponses.ReadAuthenticate(body));
+        if (response.ErrorCode != 0)
+        {
+            throw new KafkaClientException(CurlExitCode.LoginDenied, KafkaSaslMessages.AuthenticationFailed(response.ErrorCode, response.ErrorMessage));
+        }
+    }
 
     /// <summary>
     /// Sends Metadata for the address's topic and gives the host and port of the broker that leads its partition; a

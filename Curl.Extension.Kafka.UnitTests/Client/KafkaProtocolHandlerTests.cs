@@ -1,5 +1,7 @@
+using System.Net;
 using System.Text;
 using Curl.Extension.Kafka.Wire;
+using Curl.Extension.Kafka.Wire.KafkaSasl;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Kafka.Client;
@@ -177,6 +179,61 @@ public sealed class KafkaProtocolHandlerTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_User_AuthenticatesWithSaslPlainBeforeMetadata()
+    {
+        ScriptedKafkaConnection connection = new(
+            KafkaSaslTestBytes.HandshakeResponse(1, 0, "PLAIN"),
+            KafkaSaslTestBytes.AuthenticateResponse(2, 0),
+            KafkaTestBytes.MetadataLeader(3, "broker", 9092),
+            KafkaTestBytes.ProduceResponse(4, 0));
+
+        TransferResult result = await new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream(), "hi", new NetworkCredential("alice", "s3cret")));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(KafkaSaslRequests.Handshake(1), connection.Writes[0]);
+        CollectionAssert.AreEqual(KafkaSaslRequests.Authenticate(2, "alice", "s3cret"), connection.Writes[1]);
+        CollectionAssert.AreEqual(KafkaRequests.Metadata(3, "orders"), connection.Writes[2]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_UserAndAnotherLeader_AuthenticatesBothConnections()
+    {
+        ScriptedKafkaConnection first = new(KafkaSaslTestBytes.HandshakeResponse(1, 0, "PLAIN"), KafkaSaslTestBytes.AuthenticateResponse(2, 0), KafkaTestBytes.MetadataLeader(3, "leader", 9092));
+        ScriptedKafkaConnection second = new(KafkaSaslTestBytes.HandshakeResponse(1, 0, "PLAIN"), KafkaSaslTestBytes.AuthenticateResponse(2, 0), KafkaTestBytes.FetchResponse(3, 0, 0, null));
+        ScriptedKafkaConnector connector = new(ConnectResult.Connected(first), ConnectResult.Connected(second));
+
+        TransferResult result = await new KafkaProtocolHandler(connector).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream(), credentials: new NetworkCredential("alice", "s3cret")));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        CollectionAssert.AreEqual(KafkaSaslRequests.Authenticate(2, "alice", "s3cret"), second.Writes[1]);
+        CollectionAssert.AreEqual(KafkaRequests.Fetch(3, "orders", 0, 0), second.Writes[2]);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_CredentialsRefused_EndsWithLoginDeniedAndTheBrokersMessage()
+    {
+        ScriptedKafkaConnection connection = new(KafkaSaslTestBytes.HandshakeResponse(1, 0, "PLAIN"), KafkaSaslTestBytes.AuthenticateResponse(2, 58, "Authentication failed: Invalid username or password"));
+
+        TransferResult result = await new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream(), credentials: new NetworkCredential("alice", "wrong")));
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("Kafka SASL PLAIN authentication failed: Authentication failed: Invalid username or password", result.ErrorMessage);
+        Assert.HasCount(2, connection.Writes);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_PlainNotEnabled_EndsWithLoginDeniedNamingTheEnabledMechanisms()
+    {
+        ScriptedKafkaConnection connection = new(KafkaSaslTestBytes.HandshakeResponse(1, 33, "SCRAM-SHA-512"));
+
+        TransferResult result = await new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(Context("kafka://broker/orders", new MemoryStream(), credentials: new NetworkCredential("alice", "s3cret")));
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("Kafka broker does not enable SASL PLAIN, it enables: SCRAM-SHA-512", result.ErrorMessage);
+        Assert.HasCount(1, connection.Writes);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_LeaderRefusesTheConnection_EndsWithCouldntConnect()
     {
         ScriptedKafkaConnector connector = new(ConnectResult.Connected(new ScriptedKafkaConnection(KafkaTestBytes.MetadataLeader(1, "leader", 9092))), ConnectResult.Refused("refused"));
@@ -233,9 +290,10 @@ public sealed class KafkaProtocolHandlerTests
     private static ValueTask<TransferResult> ExecuteAsync(ScriptedKafkaConnection connection, string url, Stream output, string? body = null) =>
         new KafkaProtocolHandler(new ScriptedKafkaConnector(ConnectResult.Connected(connection))).ExecuteAsync(Context(url, output, body));
 
-    private static TransferContext Context(string url, Stream output, string? body = null) => new()
+    private static TransferContext Context(string url, Stream output, string? body = null, NetworkCredential? credentials = null) => new()
     {
         Url = CurlUrl.Parse(url),
+        Credentials = credentials,
         Output = output,
         PostData = body is null ? null : (ReadOnlyMemory<byte>?)Encoding.UTF8.GetBytes(body),
         TimeProvider = new FixedTimeProvider(Now),
