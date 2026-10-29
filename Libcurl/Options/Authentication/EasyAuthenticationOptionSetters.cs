@@ -136,7 +136,8 @@ internal static class EasyAuthenticationOptionSetters
         return Change(ref o, a => a with { GssApiDelegation = bits });
     }
 
-    private static CurlCode SetKerberosLevel(ref EasyOptions o, object? v) => Change(ref o, a => a with { KerberosLevel = (string?)v });
+    /// <summary><c>CURLOPT_KRBLEVEL</c>: <see cref="CurlCode.NotBuiltIn"/> for every value, as curl 8.22.0 answers since FTP Kerberos was removed in 8.17.0 (ADR-0995).</summary>
+    private static CurlCode SetKerberosLevel(ref EasyOptions o, object? v) => CurlCode.NotBuiltIn;
 
     /// <summary><c>CURLOPT_AWS_SIGV4</c>: a string also sets <see cref="EasyAuthenticationOptions.HttpAuthentication"/> to <c>CURLAUTH_AWS_SIGV4</c>, as libcurl does.</summary>
     private static CurlCode SetAwsSigV4(ref EasyOptions o, object? v) =>

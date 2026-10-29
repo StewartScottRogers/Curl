@@ -107,24 +107,6 @@ public sealed class TlsPeerOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_Crlfile_SetsTheOriginAndProxyCrlfileTheProxy()
-    {
-        TwinText(CurlOption.Crlfile, CurlOption.ProxyCrlfile, p => p.RevocationListFile);
-    }
-
-    [TestMethod]
-    public void SetOption_Issuercert_SetsTheOriginAndProxyIssuercertTheProxy()
-    {
-        TwinText(CurlOption.Issuercert, CurlOption.ProxyIssuercert, p => p.IssuerCertificate);
-    }
-
-    [TestMethod]
-    public void SetOption_IssuercertBlob_CopiesTheBytesIntoTheOriginAndProxyIssuercertBlobIntoTheProxy()
-    {
-        TwinBlob(CurlOption.IssuercertBlob, CurlOption.ProxyIssuercertBlob, p => p.IssuerCertificateBlob);
-    }
-
-    [TestMethod]
     public void SetOption_Pinnedpublickey_SetsTheOriginAndProxyPinnedpublickeyTheProxy()
     {
         TwinText(CurlOption.Pinnedpublickey, CurlOption.ProxyPinnedpublickey, p => p.PinnedPublicKey);

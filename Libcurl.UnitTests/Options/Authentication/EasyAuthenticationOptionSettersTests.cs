@@ -104,9 +104,6 @@ public sealed class EasyAuthenticationOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_Krblevel_SetsTheLevelAndNullClearsIt() => Text(CurlOption.Krblevel, a => a.KerberosLevel);
-
-    [TestMethod]
     public void SetOption_AwsSigv4_SetsTheProvidersAndTurnsOnSigV4AuthenticationAndNullClearsOnlyTheProviders()
     {
         var options = Set(new EasyOptions(), CurlOption.AwsSigv4, "aws:amz:us-east-1:s3");
