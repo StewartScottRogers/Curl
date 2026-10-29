@@ -1,6 +1,6 @@
 # Curl.Extension.JsonRpc.UnitLibrary
 
-The `--jsonrpc` extension (ADR-0999, ADR-1021): JSON-RPC 2.0 calls over HTTP. Namespace `Curl.Extension.JsonRpc`.
+The `--jsonrpc` extension (ADR-0999, ADR-1028): JSON-RPC 2.0 calls over HTTP. Namespace `Curl.Extension.JsonRpc`.
 Tested against the JSON-RPC 2.0 specification (https://www.jsonrpc.org/specification), not against curl.
 
 - `JsonRpcExtension` holds the `--jsonrpc` `ExtensionOption`, the `ExtensionDescription` and `HookFor`, the transfer

@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.JsonRpc;
 
 /// <summary>
-/// The <c>--jsonrpc</c> extension (ADR-1021): JSON-RPC 2.0 calls over HTTP, with ids, batches and replies paired
+/// The <c>--jsonrpc</c> extension (ADR-1028): JSON-RPC 2.0 calls over HTTP, with ids, batches and replies paired
 /// with their calls. <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>
 public static class JsonRpcExtension

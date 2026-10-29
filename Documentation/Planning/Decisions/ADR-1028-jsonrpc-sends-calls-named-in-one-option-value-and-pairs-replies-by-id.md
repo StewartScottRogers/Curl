@@ -1,4 +1,4 @@
-# ADR-1021 — --jsonrpc sends the calls named in one option value and pairs the replies by id
+# ADR-1028 — --jsonrpc sends the calls named in one option value and pairs the replies by id
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

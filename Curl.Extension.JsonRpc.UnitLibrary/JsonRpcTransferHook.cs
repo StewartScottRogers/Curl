@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.JsonRpc;
 
 /// <summary>
-/// What <c>--jsonrpc</c> does to an HTTP transfer (ADR-1021): sends its calls as the request body, a POST of
+/// What <c>--jsonrpc</c> does to an HTTP transfer (ADR-1028): sends its calls as the request body, a POST of
 /// <c>application/json</c> in place of any <c>-d</c> data, and writes the server's responses paired with the calls
 /// (<see cref="JsonRpcReplyPairing" />). A transfer that is not HTTP runs unchanged; a value that names no valid
 /// call fails the transfer with exit 2 before anything is sent.

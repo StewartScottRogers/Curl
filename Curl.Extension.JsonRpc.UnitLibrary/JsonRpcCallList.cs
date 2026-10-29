@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Curl.Extension.JsonRpc;
 
 /// <summary>
-/// Reads the calls a <c>--jsonrpc</c> value names (ADR-1021): each a method name, a leading <c>!</c> making it a
+/// Reads the calls a <c>--jsonrpc</c> value names (ADR-1028): each a method name, a leading <c>!</c> making it a
 /// notification, then optionally its params as a JSON array or object; several calls separated by <c>;</c> are
 /// one batch (JSON-RPC 2.0 section 6). Calls that are not notifications get the ids 1, 2, 3 and so on, in order.
 /// </summary>
