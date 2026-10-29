@@ -1054,3 +1054,4 @@ Each option and the specific reason it lost.
 | [1020](ADR-1020-the-http-cache-is-a-private-cache-of-one-file-per-request-key.md) | The HTTP cache is a private cache of one file per request key (BL-4203) | Accepted | 2026-10-29 |
 | [1021](ADR-1021-npipe-runs-a-transfer-over-a-windows-named-pipe.md) | --npipe runs a transfer over a Windows named pipe (BL-4142) | Accepted | 2026-10-29 |
 | [1015](ADR-1015-hook-commands-run-powershell-or-else-pwsh-through-sh.md) | Hook commands in `.claude/settings.json` run `powershell`, or else `pwsh`, through `sh`, and the audit guard fails closed without either (BL-3926) | Accepted | 2026-10-29 |
+| [1020](ADR-1020-engine-composition-keeps-one-unit-per-partial-file.md) | EngineComposition keeps one unit per partial file (BL-4172) | Accepted | 2026-10-29 |
