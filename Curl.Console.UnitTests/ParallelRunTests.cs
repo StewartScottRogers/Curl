@@ -132,6 +132,28 @@ public sealed class ParallelRunTests
     }
 
     [TestMethod]
+    public void RecordEnd_SecondFailureUnderFailEarly_AbortsOneSecondAfterTheFirst()
+    {
+        Diagnostics.Arrange("results", "refused connection at 0 ms, missing file at 600 ms, both run-ending, --fail-early, manual clock");
+        ManualTimerTimeProvider clock = new();
+        ParallelRun run = new(2, 0, true, clock);
+
+        run.RecordEnd(Refused, endsTheRun: true, failEarly: true);
+        clock.Advance(600);
+        run.RecordEnd(Missing, endsTheRun: true, failEarly: true);
+        clock.Advance(399);
+        bool abortedAt999 = run.IsAborted;
+        clock.Advance(1);
+        bool abortedAt1000 = run.IsAborted;
+        Diagnostics.Act("aborted at 999 ms / at 1000 ms", $"{abortedAt999}/{abortedAt1000}");
+
+        Diagnostics.Assert("aborted at 999 ms / at 1000 ms", "False/True", $"{abortedAt999}/{abortedAt1000}");
+        Assert.IsFalse(abortedAt999);
+        Assert.IsTrue(abortedAt1000);
+        Assert.AreSame(Refused, run.FirstFailure);
+    }
+
+    [TestMethod]
     public async Task EndAsync_WritesDeferredReportsInTransferOrderThenClosesTheDispatches()
     {
         Diagnostics.Arrange("deferred reports", "transfers 2, 0, 1 in that order, and one dispatch to close");
