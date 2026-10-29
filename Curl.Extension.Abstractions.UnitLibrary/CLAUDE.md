@@ -23,7 +23,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   of curl's (DNS-over-TLS, DNS-over-QUIC, Oblivious DoH), given curl's. `ResolverHooks.ActivatedBy`
   keeps the one hook whose option was given and throws an `ArgumentException` naming every option when
   two or more were, or one was beside `--doh-url`; a host passes `ResolverOver` to the engine's
-  `extensionResolver` (ADR-1011), which keeps curl's resolver when no hook is active.
+  `extensionResolver` (ADR-1012), which keeps curl's resolver when no hook is active.
 
 Later groundwork adds certificate hooks in their own subfolder.
 

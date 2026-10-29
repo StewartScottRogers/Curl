@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Resolution;
 
 /// <summary>
-/// The resolver hook of the extension one option group activated (ADR-1011). A host builds it from the
+/// The resolver hook of the extension one option group activated (ADR-1012). A host builds it from the
 /// group's <see cref="ExtensionOptionValues" /> and whether the group gave <c>--doh-url</c>, and passes
 /// <see cref="ResolverOver" /> to the engine; with no extension option given it holds no hook and gives
 /// curl's resolver back unchanged.

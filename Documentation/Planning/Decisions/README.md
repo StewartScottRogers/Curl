@@ -1043,4 +1043,4 @@ Each option and the specific reason it lost.
 | [1010](ADR-1010-an-extension-connection-hook-replaces-curls-connector-and-two-fail.md) | An extension connection hook replaces curl's connector, and two claiming one transfer fail (BL-4095) | Accepted | 2026-10-29 |
 | [1009](ADR-1009-an-extension-transfer-hook-can-repeat-the-transfer-after-a-delay.md) | An extension transfer hook can repeat the transfer after a delay on the transfer's `TimeProvider` (BL-4174) | Accepted | 2026-10-29 |
 | [1011](ADR-1011-the-server-sent-events-parser-follows-whatwg-and-ignores-a-retry-too-large-for-64-bits.md) | The Server-Sent Events parser follows WHATWG §9.2.6 and ignores a `retry` too large for 64 bits (BL-4175) | Accepted | 2026-10-29 |
-| [1011](ADR-1011-an-extension-resolver-hook-replaces-curls-resolver-and-refuses-doh-url.md) | An extension resolver hook replaces curl's resolver, and refuses `--doh-url` beside it (BL-4096) | Accepted | 2026-10-29 |
+| [1012](ADR-1012-an-extension-resolver-hook-replaces-curls-resolver-and-refuses-doh-url.md) | An extension resolver hook replaces curl's resolver, and refuses `--doh-url` beside it (BL-4096) | Accepted | 2026-10-29 |

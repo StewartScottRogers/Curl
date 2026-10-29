@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Resolution;
 
 /// <summary>
-/// What an activated extension supplies in place of curl's resolver (ADR-1011): the <see cref="IDnsResolver" />
+/// What an activated extension supplies in place of curl's resolver (ADR-1012): the <see cref="IDnsResolver" />
 /// every transfer of its option group looks host names up with - DNS-over-TLS, DNS-over-QUIC or Oblivious
 /// DoH - as <c>--doh-url</c> replaces curl's.
 /// </summary>

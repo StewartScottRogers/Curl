@@ -1,4 +1,4 @@
-# ADR-1011: An extension resolver hook replaces curl's resolver, and refuses `--doh-url` beside it
+# ADR-1012: An extension resolver hook replaces curl's resolver, and refuses `--doh-url` beside it
 
 - Status: Accepted
 - Date: 2026-10-29
