@@ -18,7 +18,6 @@ public sealed class CurlShareTests
     [DataRow(CurlLockData.Dns)]
     [DataRow(CurlLockData.SslSession)]
     [DataRow(CurlLockData.Connect)]
-    [DataRow(CurlLockData.Psl)]
     [DataRow(CurlLockData.Hsts)]
     public void SetOption_ShareAndUnshareOfEachKind_AskTheEngine(CurlLockData data)
     {
@@ -45,6 +44,7 @@ public sealed class CurlShareTests
     }
 
     [TestMethod]
+    [DataRow(CurlShareOption.Unshare, CurlLockData.Psl, DisplayName = "UNSHARE of PSL")]
     [DataRow(CurlShareOption.Share, CurlLockData.None, DisplayName = "SHARE of NONE")]
     [DataRow(CurlShareOption.Share, CurlLockData.Share, DisplayName = "SHARE of SHARE")]
     [DataRow(CurlShareOption.Unshare, (CurlLockData)8, DisplayName = "UNSHARE of 8")]

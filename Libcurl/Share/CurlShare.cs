@@ -116,7 +116,13 @@ public sealed class CurlShare
             return CurlShareCode.BadOption;
         }
 
-        return option == CurlShareOption.Share ? handle.Share(data) : handle.Unshare(data);
+        if (option == CurlShareOption.Share)
+        {
+            return handle.Share(data);
+        }
+
+        // libcurl 8.22.0 answers CURLSHE_BAD_OPTION to CURLSHOPT_UNSHARE of CURL_LOCK_DATA_PSL (CGR-257).
+        return data == CurlLockData.Psl ? CurlShareCode.BadOption : handle.Unshare(data);
     }
 
     /// <summary><c>CURLSHOPT_LOCKFUNC</c>: hands the engine the callback; <see langword="null"/> removes it, any other type is <see cref="CurlShareCode.BadOption"/>.</summary>
