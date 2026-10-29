@@ -31,3 +31,4 @@ Prerequisite of BL-3990 (CGR-034), found by its 2026-10-28 run. `ManagedMultiTra
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 46b14221 05bdc202 779790c0.
