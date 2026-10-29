@@ -1101,3 +1101,4 @@ Each option and the specific reason it lost.
 | [1065](ADR-1065-nats-subscribes-without-data-publishes-with-it-and-requests-with-a-query-field.md) | NATS subscribes without data, publishes with it, and requests with a query field (BL-4120) | Accepted | 2026-10-29 |
 | [1066](ADR-1066-a-connection-hooks-tls-offers-curls-alpn-list.md) | A connection hook's TLS offers curl's ALPN list (BL-4263) | Accepted | 2026-10-29 |
 | [1067](ADR-1067-sse-writes-normalised-events-and-reconnects-only-after-an-event-stream-ends.md) | --sse writes normalised events and reconnects only after an event stream ends (BL-4110) | Accepted | 2026-10-29 |
+| [1066](ADR-1066-xmpp-logs-in-to-the-url-domain-and-sends-a-message-or-disco-query-to-the-path-jid.md) | XMPP logs in to the URL's domain and sends a message or disco query to the path's JID (BL-4123) | Accepted | 2026-10-29 |

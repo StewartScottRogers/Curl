@@ -20,5 +20,6 @@ internal static class ExtensionDescriptionCatalogue
         Stomp.Client.StompExtension.Description,
         Nats.NatsExtension.Description,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
+        Xmpp.Client.XmppExtension.Description,
     ];
 }
