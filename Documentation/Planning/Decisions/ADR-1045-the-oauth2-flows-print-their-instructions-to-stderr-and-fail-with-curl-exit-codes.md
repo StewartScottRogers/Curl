@@ -1,4 +1,4 @@
-# ADR-1041: The OAuth 2.0 flows print their instructions to standard error and fail with curl's exit codes
+# ADR-1045: The OAuth 2.0 flows print their instructions to standard error and fail with curl's exit codes
 
 - Status: Accepted
 - Date: 2026-10-29

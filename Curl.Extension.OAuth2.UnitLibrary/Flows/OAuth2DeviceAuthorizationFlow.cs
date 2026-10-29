@@ -12,7 +12,7 @@ namespace Curl.Extension.OAuth2.Flows;
 /// Polls every <c>interval</c> seconds by the <see cref="TimeProvider"/>, at least one, adding
 /// <see cref="SlowDownIncrease"/> on each <c>slow_down</c>. It stops with <see cref="CurlExitCode.OperationTimedOut"/>
 /// once <c>expires_in</c> has passed or on <c>expired_token</c>, and with <see cref="CurlExitCode.LoginDenied"/> on
-/// <c>access_denied</c> or any other error (ADR-1041).
+/// <c>access_denied</c> or any other error (ADR-1045).
 /// </remarks>
 /// <param name="httpClient">Sends the device authorization and token requests.</param>
 /// <param name="timeProvider">Waits between polls and tells when the device code expires.</param>

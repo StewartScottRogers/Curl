@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.OAuth2.Flows;
 
-/// <summary>Pins the order a token is got in (ADR-1041): the cache first, a refresh through it, and only then the flow.</summary>
+/// <summary>Pins the order a token is got in (ADR-1045): the cache first, a refresh through it, and only then the flow.</summary>
 [TestClass]
 public sealed class OAuth2CachedTokenSourceTests
 {

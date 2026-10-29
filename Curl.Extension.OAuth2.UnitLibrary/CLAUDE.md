@@ -39,7 +39,7 @@ reads `curl-oauth2-tokens.json` whole (missing or corrupt reads as empty, `OAuth
 and writes it atomically, owner-only off Windows; `OAuth2TokenCacheLocation` finds its default
 directory from curl's per-user file variables.
 
-`Flows/` gets the token (ADR-1041). Each grant is an `IOAuth2TokenFlow` built with an
+`Flows/` gets the token (ADR-1045). Each grant is an `IOAuth2TokenFlow` built with an
 `OAuth2FlowRequest` (token endpoint, client, scope) and ends in an `OAuth2FlowResult`: the token, or
 curl's exit code and message (an error response is 67, `expired_token` or a lapsed device code 28,
 an unusable answer 8). `OAuth2TokenEndpoint` posts a form and reads the answer for all of them.

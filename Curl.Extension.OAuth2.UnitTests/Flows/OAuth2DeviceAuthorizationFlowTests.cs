@@ -7,7 +7,7 @@ namespace Curl.Extension.OAuth2.Flows;
 /// <summary>
 /// Pins the device authorization grant (RFC 8628): the request (§3.1), what the user is told (§3.3), polling at the
 /// interval (§3.4), <c>slow_down</c>, <c>access_denied</c> and <c>expired_token</c> (§3.5), and expiry by
-/// <c>expires_in</c> (§3.2), all by a fake <see cref="TimeProvider"/> (ADR-1041).
+/// <c>expires_in</c> (§3.2), all by a fake <see cref="TimeProvider"/> (ADR-1045).
 /// </summary>
 [TestClass]
 public sealed class OAuth2DeviceAuthorizationFlowTests

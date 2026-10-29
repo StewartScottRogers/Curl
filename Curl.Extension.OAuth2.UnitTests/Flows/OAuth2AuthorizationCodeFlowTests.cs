@@ -9,7 +9,7 @@ namespace Curl.Extension.OAuth2.Flows;
 /// <summary>
 /// Pins the authorization code grant with PKCE (RFC 6749 §4.1, RFC 7636) through a loopback redirect (RFC 8252 §7.3):
 /// the listen, the authorization URL told to the user, the redirect's <c>state</c> check (RFC 6749 §10.12), its error
-/// (§4.1.2.1), and the code exchange with the verifier (§4.1.3, RFC 7636 §4.5), with a fake listener (ADR-1041).
+/// (§4.1.2.1), and the code exchange with the verifier (§4.1.3, RFC 7636 §4.5), with a fake listener (ADR-1045).
 /// </summary>
 [TestClass]
 public sealed class OAuth2AuthorizationCodeFlowTests

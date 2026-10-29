@@ -14,7 +14,7 @@ namespace Curl.Extension.OAuth2.Flows;
 /// <remarks>
 /// A redirect whose <c>state</c> is missing or not the one sent, or that carries an <c>error</c> (§4.1.2.1), ends the
 /// flow with <see cref="CurlExitCode.LoginDenied"/>; one with neither a code nor an error with
-/// <see cref="CurlExitCode.WeirdServerReply"/> (ADR-1041).
+/// <see cref="CurlExitCode.WeirdServerReply"/> (ADR-1045).
 /// </remarks>
 /// <param name="httpClient">Sends the token request.</param>
 /// <param name="listener">Listens on the loopback port the redirect comes to.</param>

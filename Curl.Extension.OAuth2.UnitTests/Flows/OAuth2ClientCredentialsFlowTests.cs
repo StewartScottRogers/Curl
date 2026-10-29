@@ -6,7 +6,7 @@ namespace Curl.Extension.OAuth2.Flows;
 
 /// <summary>
 /// Pins the client credentials grant (RFC 6749 §4.4) and how every flow reads the token endpoint's answer: the token
-/// (§5.1), an error (§5.2), and answers that are neither (ADR-1041).
+/// (§5.1), an error (§5.2), and answers that are neither (ADR-1045).
 /// </summary>
 [TestClass]
 public sealed class OAuth2ClientCredentialsFlowTests

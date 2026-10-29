@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.OAuth2.Flows;
 
 /// <summary>
-/// How a flow ended (ADR-1041): with an access token, refused by an OAuth 2.0 error response, or failed with curl's exit
+/// How a flow ended (ADR-1045): with an access token, refused by an OAuth 2.0 error response, or failed with curl's exit
 /// code and the message it prints.
 /// </summary>
 public sealed class OAuth2FlowResult

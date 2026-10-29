@@ -4,7 +4,7 @@ using Curl.Extension.OAuth2.Wire;
 namespace Curl.Extension.OAuth2.Flows;
 
 /// <summary>
-/// Gets an access token the cheapest way (ADR-1034, ADR-1041): an unexpired cached one, else a refreshed one, else by
+/// Gets an access token the cheapest way (ADR-1034, ADR-1045): an unexpired cached one, else a refreshed one, else by
 /// running the flow and caching what it gets.
 /// </summary>
 /// <param name="cache">The token cache, which also refreshes an expired token (RFC 6749 §6).</param>
