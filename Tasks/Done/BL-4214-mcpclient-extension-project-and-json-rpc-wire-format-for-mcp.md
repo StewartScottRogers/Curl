@@ -31,7 +31,7 @@ First of BL-4159's split (wire format, then the transports, then the handler). E
 ## Notes
 
 - No handler, scheme registration or description here: BL-4159 adds those once the transports (BL-4215, BL-4216) exist.
-- Plan: `Wire/McpRequestWriter` (Utf8JsonWriter, ids from 1, an id taken only when the request is written) and `Wire/McpResponseReader` (JsonDocument; skips messages with a `method` or another id; typed readers for InitializeResult, tools/list and CallToolResult; malformed messages throw `McpWireFormatException`). Decisions in ADR-1022.
+- Plan: `Wire/McpRequestWriter` (Utf8JsonWriter, ids from 1, an id taken only when the request is written) and `Wire/McpResponseReader` (JsonDocument; skips messages with a `method` or another id; typed readers for InitializeResult, tools/list and CallToolResult; malformed messages throw `McpWireFormatException`). Decisions in ADR-1027.
 - Default taken: `initialize` declares empty `capabilities` (no roots, sampling or elicitation) and asks for 2025-06-18; the handler (BL-4159) decides what to do with another version.
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.McpClient.UnitLibrary: 100% line, 100% branch, 0 failing members. 51 unit tests; full build clean, fast tests green. Tests are pure in-memory byte checks, so platform-neutral for CI on Linux and macOS.
 

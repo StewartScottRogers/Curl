@@ -1,4 +1,4 @@
-# ADR-1022: The MCP client's wire format is strict JSON-RPC 2.0 over System.Text.Json
+# ADR-1027: The MCP client's wire format is strict JSON-RPC 2.0 over System.Text.Json
 
 - Status: Accepted
 - Date: 2026-10-29
