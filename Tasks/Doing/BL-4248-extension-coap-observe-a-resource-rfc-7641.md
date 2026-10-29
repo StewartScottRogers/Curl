@@ -35,3 +35,4 @@ Builds on BL-4247. Declare the option as an `ExtensionOption` and add its line t
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: b7ba7c71 188377f5 05c51823 478f867b 3d836d5e.
