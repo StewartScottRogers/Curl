@@ -41,3 +41,4 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 40a3375d 4378bd6c 0bd084c8 c934e2ba e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waiting on BL-4083 (EngineComposition.CreateProtocolHandlers complexity) and BL-4167 (CurlMcpHost.Build branch), the two quality-gate failures in libraries this task changes
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 40a3375d 4378bd6c 0bd084c8 c934e2ba e35aff77 3d836d5e.
