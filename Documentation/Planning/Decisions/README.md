@@ -1063,4 +1063,4 @@ Each option and the specific reason it lost.
 | [1028](ADR-1028-jsonrpc-sends-calls-named-in-one-option-value-and-pairs-replies-by-id.md) | --jsonrpc sends the calls named in one option value and pairs the replies by id (BL-4106) | Accepted | 2026-10-29 |
 | [1029](ADR-1029-encrypted-dns-doq-resolver-uses-one-stream-per-query-on-the-hand-built-quic-client.md) | The DNS-over-QUIC resolver uses one stream per query on the hand-built QUIC client (BL-4208) | Accepted | 2026-10-29 |
 | [1030](ADR-1030-the-oauth2-extension-posts-to-its-endpoints-with-its-own-small-http-1-1-client.md) | The OAuth2 extension posts to its endpoints with its own small HTTP/1.1 client (BL-4213) | Accepted | 2026-10-29 |
-| [1029](ADR-1029-the-mcp-client-stdio-transport-sits-behind-a-process-seam.md) | The MCP client's stdio transport sits behind a process seam (BL-4216) | Accepted | 2026-10-29 |
+| [1031](ADR-1031-the-mcp-client-stdio-transport-sits-behind-a-process-seam.md) | The MCP client's stdio transport sits behind a process seam (BL-4216) | Accepted | 2026-10-29 |

@@ -10,10 +10,10 @@ namespace Curl.Extension.McpClient.Stdio;
 /// Transports &gt; stdio").
 /// </summary>
 /// <remarks>
-/// Every line starts or drives a real process, so per ADR-0083 and ADR-1029 the type is left out of
+/// Every line starts or drives a real process, so per ADR-0083 and ADR-1031 the type is left out of
 /// the fast-run coverage measure; everything above the seam is unit tested with in-memory streams.
 /// </remarks>
-[ExcludeFromCodeCoverage(Justification = "ADR-1029: a thin System.Diagnostics.Process adapter.")]
+[ExcludeFromCodeCoverage(Justification = "ADR-1031: a thin System.Diagnostics.Process adapter.")]
 public sealed class McpServerProcessStarter : IMcpServerProcessStarter
 {
     /// <inheritdoc/>

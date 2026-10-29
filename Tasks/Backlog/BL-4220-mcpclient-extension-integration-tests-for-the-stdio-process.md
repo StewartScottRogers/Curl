@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-BL-4216 added `Curl.Extension.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs` behind `IMcpServerProcessStarter` and excluded it from coverage under ADR-0083 and ADR-1029, which expect such an adapter to be checked by an Integration run. No `Curl.Extension.McpClient.IntegrationTests` project exists yet: create it with the `new-project` skill (sorted directly before the library in `Curl.slnx`). The child process must be platform-neutral: for example a C# file-based app or the test host itself (`dotnet` with a small echo program) that reads newline-delimited JSON-RPC from stdin and answers on stdout - never `cmd.exe` or a POSIX shell alone.
+BL-4216 added `Curl.Extension.McpClient.UnitLibrary/Stdio/McpServerProcessStarter.cs` behind `IMcpServerProcessStarter` and excluded it from coverage under ADR-0083 and ADR-1031, which expect such an adapter to be checked by an Integration run. No `Curl.Extension.McpClient.IntegrationTests` project exists yet: create it with the `new-project` skill (sorted directly before the library in `Curl.slnx`). The child process must be platform-neutral: for example a C# file-based app or the test host itself (`dotnet` with a small echo program) that reads newline-delimited JSON-RPC from stdin and answers on stdout - never `cmd.exe` or a POSIX shell alone.
 
 ## Acceptance criteria
 

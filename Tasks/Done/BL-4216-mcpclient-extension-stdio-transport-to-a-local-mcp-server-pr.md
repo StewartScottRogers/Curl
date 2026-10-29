@@ -30,9 +30,9 @@ Third of BL-4159's split. Specification: Model Context Protocol revision 2025-06
 ## Notes
 
 - Delivered directly rather than through the full `/feature` agent stages: the change is one folder of one library with a fixed specification, so the extra planning and review agents cost more than they saved under the lane's cost cap.
-- Design (ADR-1029): `IMcpServerProcess` / `IMcpServerProcessStarter` seam; `McpServerProcessStarter` is the one `Process` adapter, excluded from coverage under ADR-0083; `McpLineReader` splits stdout on `\n` (dropping `\r`); `McpStdioSession` sends one line per message, skips empty lines, notifications, server requests and other ids, throws `McpServerExitedException` at end of stdout and `McpWireFormatException` on a non-JSON-RPC line (the specification forbids those, so skipping would wait forever); `EndAsync` closes stdin, waits 5 s on the injected `TimeProvider`, then kills.
+- Design (ADR-1031): `IMcpServerProcess` / `IMcpServerProcessStarter` seam; `McpServerProcessStarter` is the one `Process` adapter, excluded from coverage under ADR-0083; `McpLineReader` splits stdout on `\n` (dropping `\r`); `McpStdioSession` sends one line per message, skips empty lines, notifications, server requests and other ids, throws `McpServerExitedException` at end of stdout and `McpWireFormatException` on a non-JSON-RPC line (the specification forbids those, so skipping would wait forever); `EndAsync` closes stdin, waits 5 s on the injected `TimeProvider`, then kills.
 - No test starts a real process, so no IntegrationTests project was needed here; BL-4220 adds Integration tests for the excluded `Process` adapter (that new project and `Curl.slnx` lie outside this task's touches).
-- ADR-1028 was already taken on the shared branch, so this one is ADR-1029.
+- ADR-1028 was already taken on the shared branch, so this one is ADR-1031.
 - CI on Linux and macOS: the tests use only in-memory streams and no paths, so they are platform-neutral; fast tests green here.
 
 ## Log

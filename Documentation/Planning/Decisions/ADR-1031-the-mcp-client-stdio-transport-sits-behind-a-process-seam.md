@@ -1,4 +1,4 @@
-# ADR-1029: The MCP client's stdio transport sits behind a process seam
+# ADR-1031: The MCP client's stdio transport sits behind a process seam
 
 - Status: Accepted
 - Date: 2026-10-29
