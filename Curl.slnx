@@ -312,6 +312,7 @@
     <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
+  <Folder Name="/Extensions/ServerSentEvents/"><Project Path="Curl.Extension.ServerSentEvents.UnitLibrary/Curl.Extension.ServerSentEvents.UnitLibrary.csproj" /><Project Path="Curl.Extension.ServerSentEvents.UnitTests/Curl.Extension.ServerSentEvents.UnitTests.csproj" /></Folder>
 
   <!-- The shared projects sit together in /Shared/ (ADR-0731). -->
   <Folder Name="/Shared/">
