@@ -1,4 +1,4 @@
-# ADR-1071 — MCP URLs list tools without data and call one with a JSON data body
+# ADR-1074 — MCP URLs list tools without data and call one with a JSON data body
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

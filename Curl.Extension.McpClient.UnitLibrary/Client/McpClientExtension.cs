@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.McpClient.Client;
 
-/// <summary>The <c>mcp://</c>, <c>mcps://</c> and <c>mcp+stdio://</c> extension's description and handler factory (ADR-1071).</summary>
+/// <summary>The <c>mcp://</c>, <c>mcps://</c> and <c>mcp+stdio://</c> extension's description and handler factory (ADR-1074).</summary>
 public static class McpClientExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

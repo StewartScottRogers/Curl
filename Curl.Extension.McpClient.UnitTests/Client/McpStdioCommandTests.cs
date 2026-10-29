@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.McpClient.Client;
 
-/// <summary>Checks how an <c>mcp+stdio</c> URL names the local program and its arguments (ADR-1071).</summary>
+/// <summary>Checks how an <c>mcp+stdio</c> URL names the local program and its arguments (ADR-1074).</summary>
 [TestClass]
 public sealed class McpStdioCommandTests
 {

@@ -7,7 +7,7 @@ namespace Curl.Extension.McpClient.Client;
 
 /// <summary>
 /// Serves <c>mcp://host[:port]/endpoint</c> and <c>mcps://</c> over Streamable HTTP and <c>mcp+stdio://localhost/command?args</c>
-/// over stdio (ADR-1071): without a body it lists the server's tools, with a <c>-d</c> body (<see cref="McpToolCall"/>) it
+/// over stdio (ADR-1074): without a body it lists the server's tools, with a <c>-d</c> body (<see cref="McpToolCall"/>) it
 /// calls one. The exchange itself is <see cref="McpClientFlow"/>.
 /// </summary>
 /// <param name="connector">Opens the connection to an HTTP endpoint.</param>

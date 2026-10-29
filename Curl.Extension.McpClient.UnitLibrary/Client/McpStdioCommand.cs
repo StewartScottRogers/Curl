@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.McpClient.Client;
 
 /// <summary>
-/// The local server an <c>mcp+stdio://localhost/command?arg1&amp;arg2</c> URL names (ADR-1071): the percent-decoded path is
+/// The local server an <c>mcp+stdio://localhost/command?arg1&amp;arg2</c> URL names (ADR-1074): the percent-decoded path is
 /// the program, without its leading slash when it is one segment (a name looked up in <c>PATH</c>, <c>mcp+stdio://localhost/npx</c>)
 /// or starts with a drive letter (<c>mcp+stdio://localhost/C:/servers/x.exe</c>); a longer path is absolute
 /// (<c>mcp+stdio://localhost/usr/local/bin/server</c>). Each <c>&amp;</c>-separated part of the query, percent-decoded, is one
