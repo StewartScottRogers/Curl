@@ -441,7 +441,7 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
             await transport.ReleaseHeldWritesAsync(cancellationToken).ConfigureAwait(false);
             peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols) with
+            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols, transport.HandshakeRecords) with
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
@@ -527,9 +527,13 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         return [.. sent];
     }
 
-    // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089).
-    private ConnectionStream OpenTransport(IConnection plaintext) =>
-        new(plaintext) { TicketRecords = _matchesSchannelBuild ? new SessionTicketRecordDetector() : null };
+    // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089); the
+    // OpenSSL build reads the handshake records for the group and signature names (BL-4041).
+    private ConnectionStream OpenTransport(IConnection plaintext) => new(plaintext)
+    {
+        TicketRecords = _matchesSchannelBuild ? new SessionTicketRecordDetector() : null,
+        HandshakeRecords = _matchesSchannelBuild ? null : new ServerHandshakeRecordReader(),
+    };
 
     /// <summary>
     /// Keeps the transport's <see cref="SessionTicketRecordDetector" /> watching after a TLS 1.3
@@ -553,8 +557,11 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     private static TlsHandshakeEvent DescribeHandshake(
         SslStream sslStream,
         PeerVerification peerVerification,
-        IReadOnlyList<string> offeredApplicationProtocols) => new()
+        IReadOnlyList<string> offeredApplicationProtocols,
+        ServerHandshakeRecordReader? handshakeRecords) => new()
         {
+            NegotiatedGroupName = handshakeRecords?.GroupName,
+            PeerSignatureTypeName = handshakeRecords?.PeerSignatureTypeName(KeyAlgorithmOf(sslStream.RemoteCertificate)),
             ProtocolVersion = sslStream.SslProtocol,
             CipherSuite = sslStream.NegotiatedCipherSuite,
             NegotiatedApplicationProtocol = NegotiatedApplicationProtocol(sslStream.NegotiatedApplicationProtocol),
@@ -565,6 +572,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             PeerCertificateChain = [.. peerVerification.Chain.Select(der => X509CertificateLoader.LoadCertificate(der.Span))],
             PinnedPublicKeyHash = peerVerification.PinnedPublicKeyHash,
         };
+
+    /// <summary>
+    /// Gives the OID of a certificate's public key algorithm, which names the server's TLS 1.3
+    /// signature type (BL-4041).
+    /// </summary>
+    /// <param name="certificate">The server's certificate, or <see langword="null" /> when it sent none.</param>
+    /// <returns>The OID, or <see langword="null" /> when there is no certificate.</returns>
+    internal static string? KeyAlgorithmOf(X509Certificate? certificate) => certificate?.GetKeyAlgorithm();
 
     // What a handshake that failed before the certificate was judged reports: only the offer.
     private static TlsHandshakeEvent Unnegotiated(IReadOnlyList<string> offeredApplicationProtocols) => new()

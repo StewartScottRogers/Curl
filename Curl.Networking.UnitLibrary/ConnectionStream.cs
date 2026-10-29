@@ -61,6 +61,13 @@ internal sealed class ConnectionStream(IConnection connection, bool ownsConnecti
     public SessionTicketRecordDetector? TicketRecords { get; set; }
 
     /// <summary>
+    /// Gets or sets the reader every byte read is shown to, so the OpenSSL build can name the
+    /// key-exchange group and the server's signature type the handshake chose (BL-4041);
+    /// <see langword="null" /> shows them to none.
+    /// </summary>
+    public ServerHandshakeRecordReader? HandshakeRecords { get; set; }
+
+    /// <summary>
     /// Gets or sets whether writes after the first read are held back until the next read, the
     /// first write once this is cleared, or <see cref="ReleaseHeldWritesAsync" />. The Schannel
     /// build uses it to keep a TLS 1.3 client's final flight off the wire until the server
@@ -101,6 +108,7 @@ internal sealed class ConnectionStream(IConnection connection, bool ownsConnecti
         var read = await connection.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         TransportEnded |= read == 0 && !buffer.IsEmpty;
         TicketRecords?.ObserveReceived(buffer.Span[..read]);
+        HandshakeRecords?.Append(buffer.Span[..read]);
         return read;
     }
 
