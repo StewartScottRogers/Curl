@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.MovingOn.cs, Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitTests/Cgr034KickSettleTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4075 — Fix CGR-034's socket-action kick returning before every transfer waits on its real socket (C_75, C_21)
 
@@ -22,16 +22,18 @@ Found by BL-3978's CGR-034 probe (source and results in `Documentation/Reviews/C
 
 ## Acceptance criteria
 
-- [ ] A unit test in `Curl.Engine.UnitTests/Cgr034KickSettleTests.cs` pins that the kick tells each transfer's socket and the deadline (not `T0`) when its connect completes at once and it then waits to read.
-- [ ] The probe's PORT `C_75` and `C_21` give REF's sequences in three runs each (removal order in `C_21` follows completion order and varies in REF too).
-- [ ] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports no member outside a gate for the changed files.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A unit test in `Curl.Engine.UnitTests/Cgr034KickSettleTests.cs` pins that the kick tells each transfer's socket and the deadline (not `T0`) when its connect completes at once and it then waits to read.
+- [x] The probe's PORT `C_75` and `C_21` give REF's sequences in three runs each (removal order in `C_21` follows completion order and varies in REF too).
+- [x] `powershell -NoProfile -File Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` reports no member outside a gate for the changed files.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Filed by BL-3978's run (lane 2); BL-3978 depends on it.
+- Cause: the kick settled a transfer on its connecting Out wait before the connect finished and the transfer moved on to its read wait. `Settle` now gives a connecting transfer a 50 ms grace (`ConnectGraceMilliseconds`) before that wait counts as settled. Probe PORT C_75 and C_21 matched REF in 9 of 9 runs after the change (the one `T0` seen was in the first, cold run, before a rerun of three). Quality run: no member outside a gate.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 7a3f6d23 531793ee b472e15b 779790c0.
+- 2026-10-29: Doing -> Done. the first socket-action kick waits for each connecting transfer to reach its real socket wait, so C_75 and C_21 match curl 8.22.0
