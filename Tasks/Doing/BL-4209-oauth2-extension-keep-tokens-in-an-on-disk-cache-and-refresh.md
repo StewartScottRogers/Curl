@@ -34,3 +34,4 @@ Third part of BL-4161 (split for size). Expiry comes from `expires_in` (RFC 6749
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a6c4aafc 4e3ca97b 3180db99 3d836d5e.
