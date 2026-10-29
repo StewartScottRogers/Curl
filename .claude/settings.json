@@ -12,6 +12,8 @@
       "Bash(git log:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1:*)",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-admin.ps1:*)",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-board.ps1:*)",
+      "Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/skills/task-board/task-admin.ps1:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
@@ -54,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard-audit-paths.ps1",
+            "command": "if command -v powershell >/dev/null 2>&1; then exec powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard-audit-paths.ps1; elif command -v pwsh >/dev/null 2>&1; then exec pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard-audit-paths.ps1; elif [ -n \"$CURL_DARK_FACTORY_LANE\" ]; then echo 'Refused by the audit guard: neither powershell nor pwsh is on PATH, so the guard cannot run.' >&2; exit 2; fi",
             "timeout": 30
           }
         ]
@@ -66,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/format-cs.ps1"
+            "command": "if command -v powershell >/dev/null 2>&1; then exec powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/format-cs.ps1; elif command -v pwsh >/dev/null 2>&1; then exec pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/format-cs.ps1; fi"
           }
         ]
       },
@@ -75,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/whisper-milestone.ps1",
+            "command": "if command -v powershell >/dev/null 2>&1; then exec powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/whisper-milestone.ps1; elif command -v pwsh >/dev/null 2>&1; then exec pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/whisper-milestone.ps1; fi",
             "async": true,
             "timeout": 180
           }
