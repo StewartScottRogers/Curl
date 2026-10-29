@@ -37,3 +37,4 @@ Split from BL-4012 (over its cost cap). The stashed work already implements this
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 2aa3d39e 58ff91c0 82a40b63 e4d345af 0b861f72.
