@@ -35,3 +35,4 @@ First of BL-4159's split (wire format, then the transports, then the handler). E
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 15fea506 16e0e381 0687ad8e 18064adb 14de81cc.
