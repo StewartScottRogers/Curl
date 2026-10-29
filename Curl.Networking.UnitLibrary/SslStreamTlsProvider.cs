@@ -441,13 +441,15 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
             await transport.ReleaseHeldWritesAsync(cancellationToken).ConfigureAwait(false);
             peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
-            events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols, transport.HandshakeRecords) with
+            var handshake = DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols, transport.HandshakeRecords) with
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
                 CaCertificateFile = _options.CaCertificateFile,
                 CaCertificateCount = CustomTrustCertificateCount(chainPolicy),
-            });
+            };
+            events.ReportTlsHandshake(handshake);
+            NameRenegotiatedHandshake(transport.TicketRecords, handshake);
             ReportRevocationCheckIncomplete(events, peerVerification);
             return ConnectResult.Connected(
                 new SslStreamConnection(sslStream, transport, plaintext, clientCertificate, TlsFailureMessages.MissingCloseNotify(_matchesSchannelBuild), clearsTls: !_matchesSchannelBuild)
@@ -528,6 +530,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
         return [.. sent];
     }
+
+    // Each ticket the Schannel build renegotiates for checks this handshake's certificate again (BL-4067).
+    private static void NameRenegotiatedHandshake(SessionTicketRecordDetector? ticketRecords, TlsHandshakeEvent handshake) =>
+        ticketRecords?.TicketMessage = SessionTicketRecordDetector.NewSessionTicketReceived with { RenegotiatedHandshake = handshake };
 
     // The Schannel build watches the records read for TLS 1.3 session tickets (BL-1089); the
     // OpenSSL build reads the handshake records for the group and signature names (BL-4041).

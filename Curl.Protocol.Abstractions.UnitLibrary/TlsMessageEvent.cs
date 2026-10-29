@@ -33,4 +33,11 @@ public sealed record TlsMessageEvent
     /// its level and description.
     /// </summary>
     public required ReadOnlyMemory<byte> Bytes { get; init; }
+
+    /// <summary>
+    /// Gets, for a received <c>NewSessionTicket</c>, the handshake curl's Schannel build checks
+    /// the server certificate of again as it renegotiates (BL-4067); <see langword="null" />
+    /// when none is known.
+    /// </summary>
+    public TlsHandshakeEvent? RenegotiatedHandshake { get; init; }
 }

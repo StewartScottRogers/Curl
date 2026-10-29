@@ -32,7 +32,7 @@ internal static class SchannelVerificationText
             ? [$"schannel: added {handshake.CaCertificateCount} certificate(s) from CA file '{file}'"]
             : [];
 
-    private static IReadOnlyList<string> HostNameLines(TlsHandshakeEvent handshake)
+    internal static IReadOnlyList<string> HostNameLines(TlsHandshakeEvent handshake)
     {
         if (handshake.VerifiedHostName is not { } host)
         {

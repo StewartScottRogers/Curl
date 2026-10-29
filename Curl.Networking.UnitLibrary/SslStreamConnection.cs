@@ -99,7 +99,27 @@ internal sealed class SslStreamConnection(
         }
 
         TicketRecords?.ReportTicketRecords(read, TicketEvents);
+        ReportShutdownAfterCloseNotify(read, buffer.IsEmpty, TicketRecords, TicketEvents);
         return read;
+    }
+
+    /// <summary>
+    /// Reports, for a read that returned 0 at <c>close_notify</c> after
+    /// <paramref name="ticketRecords" /> found it already received, curl's Schannel build's
+    /// <c>server indicated shutdown in a prior call</c> line and the 0 bytes it passes on
+    /// (measured with curl 8.22.0 against <c>openssl s_server -WWW</c>, BL-4067).
+    /// </summary>
+    /// <param name="read">The bytes the read returned.</param>
+    /// <param name="bufferIsEmpty">Whether the read asked for no bytes.</param>
+    /// <param name="ticketRecords">The detector watching the records, or <see langword="null" />.</param>
+    /// <param name="events">Where the line and the 0 bytes are reported.</param>
+    internal static void ReportShutdownAfterCloseNotify(int read, bool bufferIsEmpty, SessionTicketRecordDetector? ticketRecords, ITransferEvents events)
+    {
+        if (read == 0 && !bufferIsEmpty && ticketRecords is { CloseNotifyFollows: true })
+        {
+            events.ReportInfo("schannel: server indicated shutdown in a prior call");
+            events.ReportDataReceived([]);
+        }
     }
 
     /// <inheritdoc />
