@@ -21,5 +21,6 @@ internal static class ExtensionCatalogue
         Xmpp.Client.XmppExtension.CreateHandler,
         McpClient.Client.McpClientExtension.CreateHandler,
         Kafka.Client.KafkaExtension.CreateHandler,
+        Redis.Client.RedisExtension.CreateHandler,
     ];
 }

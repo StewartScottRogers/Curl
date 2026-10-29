@@ -27,5 +27,6 @@ internal static class ExtensionDescriptionCatalogue
         McpClient.Client.McpClientExtension.Description,
         OAuth2.Options.OAuth2Options.Description,
         Kafka.Client.KafkaExtension.Description,
+        Redis.Client.RedisExtension.Description,
     ];
 }

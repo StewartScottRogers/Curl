@@ -1115,3 +1115,4 @@ Each option and the specific reason it lost.
 | [1076](ADR-1076-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
 | [1077](ADR-1077-xmpp-logs-in-with-scram-sha-256-or-scram-sha-1-before-plain.md) | XMPP logs in with SCRAM-SHA-256 or SCRAM-SHA-1 before PLAIN (BL-4271) | Accepted | 2026-10-29 |
 | [1078](ADR-1078-the-dtls-client-handshake-offers-ecdhe-aes-128-gcm-and-verifies-through-the-tls-provider.md) | The DTLS client handshake offers ECDHE with AES-128-GCM and verifies through the TLS provider (BL-4251) | Accepted | 2026-10-29 |
+| [1066](ADR-1066-redis-sends-one-command-from-the-url-path-over-resp3-and-writes-its-reply-as-redis-cli-raw-does.md) | Redis sends one command from the URL path over RESP3 and writes its reply as redis-cli --raw does (BL-4122) | Accepted | 2026-10-29 |
