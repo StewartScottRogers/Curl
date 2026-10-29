@@ -35,3 +35,4 @@ Measured in BL-4077's run (WSL Ubuntu, `LC_ALL=C.utf8`): with a socat fake proxy
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 68b26c89 779790c0.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4079 'Map U+2100 U+2101 U+2105 U+2106 to their slash text' (in Doing on another lane; its ID clashes with the Done BL-4079 extensions task): Curl still refuses http://a℀b.test/ at URL parse
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 869e9e21 779790c0.
