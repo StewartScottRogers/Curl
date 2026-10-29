@@ -8,6 +8,10 @@ Namespace `Curl.Extension.Composition`.
   is `0`. `Curl.Console`'s `CurlComposition` passes it in both production compositions.
 - `ExtensionCatalogue.Entries` holds one handler factory per extension, one line each. An extension
   task adds its own line and nothing else here; the file is `merge=union` and a shared list file.
+- `ExtensionOptionCatalogue.Entries` holds each extension's long command-line option (`ExtensionOption`),
+  one line each, also `merge=union` and a shared list file. `ExtensionCommandLineOptions.For(readEnvironmentVariable,
+  isCurlLongOption)` gives them (none when `CURL_EXTENSIONS` is `0`) and fails, naming both, when one has the
+  name of a curl option or of another extension option (ADR-1004).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

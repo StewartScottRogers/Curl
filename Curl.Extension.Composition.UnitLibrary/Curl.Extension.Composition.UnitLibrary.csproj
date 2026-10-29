@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
   </ItemGroup>
 
   <!-- Every extension library is referenced by wildcard, so adding an extension edits no line here (ADR-1003). -->

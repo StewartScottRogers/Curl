@@ -303,6 +303,10 @@
 
   <!-- Extensions: what Curl adds beyond upstream curl, kept apart from curl's own protocols (ADR-0999). -->
   <Folder Name="/Extensions/" />
+  <Folder Name="/Extensions/Abstractions/">
+    <Project Path="Curl.Extension.Abstractions.UnitLibrary/Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <Project Path="Curl.Extension.Abstractions.UnitTests/Curl.Extension.Abstractions.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Extensions/Composition/">
     <Project Path="Curl.Extension.Composition.UnitLibrary/Curl.Extension.Composition.UnitLibrary.csproj" />
     <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
