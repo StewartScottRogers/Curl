@@ -35,3 +35,4 @@ Found by BL-4154 (`--http-file`, the VS Code / Visual Studio REST Client .http f
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: f03ab138 83f8b8c3 45e1ff2e e21923fb acf65c74 478f867b 3d836d5e.
