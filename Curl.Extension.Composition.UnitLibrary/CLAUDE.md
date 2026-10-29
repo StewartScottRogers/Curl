@@ -23,7 +23,7 @@ Namespace `Curl.Extension.Composition`.
   when its option was given, else `null`), one line each, also `merge=union` and a shared list file.
   `CurlComposition.ExtensionConnectionHooksOf` passes them to `ConnectionHooks.ActivatedBy` for each option group
   and hands the engine its `ConnectorOver` and `DatagramConnectorOver`, or `null` for both without a hook; two
-  hooks are curl's command-line error with exit 2 (ADR-1010, ADR-1012).
+  hooks are curl's command-line error with exit 2 (ADR-1010, ADR-1014).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

@@ -1,4 +1,4 @@
-# ADR-1012: Two extension connection-hook options are a command-line error with exit 2
+# ADR-1014: Two extension connection-hook options are a command-line error with exit 2
 
 - Status: Accepted
 - Date: 2026-10-29
