@@ -17,5 +17,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
         SocketIo.SocketIoExtension.Description,
         Coap.Client.CoapExtension.Description,
+        Stomp.Client.StompExtension.Description,
     ];
 }
