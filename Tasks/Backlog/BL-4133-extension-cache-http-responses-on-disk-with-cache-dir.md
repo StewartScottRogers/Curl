@@ -4,8 +4,8 @@ title: Extension: Cache HTTP responses on disk with --cache-dir
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.HttpCache.UnitLibrary, Curl.Extension.HttpCache.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4202, BL-4203]
+touches: [Curl.Extension.HttpCache.UnitLibrary, Curl.Extension.HttpCache.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 1, prerequisite pass before any edit): `--cache-dir` cannot be built yet. (1) `ITransferHook` (ADR-1007, ADR-1009) always runs curl's handler and flushes the body stream before `TransferFinished`, so a hook can neither serve a fresh stored response without the origin (RFC 9111 §4.2) nor send the stored response in place of a 304 (§4.3.4): filed BL-4202 for that seam in `Curl.Extension.Abstractions.UnitLibrary/Transfer`. (2) Split for size as these Notes ask: BL-4203 creates the projects and the RFC 9111 core (storability §3, freshness §4.2, conditional headers and 304 update §4.3, the on-disk entry, cache key §2); this task then adds the option, the hook over BL-4202's member, the registration, the ADR, the `--extensions`/`--ai-help` check and the quality gates. (3) Like `--sse` (BL-4110), the cache adds no scheme, so its registration lands in `ExtensionTransferHookCatalogue`, `ExtensionOptionCatalogue` and `ExtensionDescriptionCatalogue` (one-line shared lists in `Tasks/SharedListFiles.txt`, held by no task in Doing; added to touches); record in the ADR that `ExtensionCatalogue.cs` gets no line because it holds protocol handler factories.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: c2489ee9 e75d06bf b9bb7e59 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4202 (transfer hook that can answer or replace a response, needed for RFC 9111 4.2 and 4.3.4) and BL-4203 (HttpCache projects and RFC 9111 core, split for size)
