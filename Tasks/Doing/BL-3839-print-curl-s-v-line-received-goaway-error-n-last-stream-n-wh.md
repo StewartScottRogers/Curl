@@ -30,3 +30,4 @@ Found by BL-3560 (CGR-031). Measured with real curl 8.18.0 (WSL) against a serve
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: ad00754d 779790c0.
