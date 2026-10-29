@@ -1,4 +1,4 @@
-# ADR-1076 — --ws-repl is a transfer hook that takes over ws and wss transfers
+# ADR-1081 — --ws-repl is a transfer hook that takes over ws and wss transfers
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -12,7 +12,7 @@ The interactive WebSocket session extension behind `--ws-repl` (ADR-0999, ADR-10
   text as it is, binary as hex, one line each), answers pings and closes, and says why it ended
   (`WebSocketReplOutcome`).
 - `Transfer/`: `WebSocketReplTransferHook` takes over a `ws://` or `wss://` transfer when `--ws-repl` is given
-  (ADR-1076): it connects through curl's connector, performs the handshake and runs the session on standard input
+  (ADR-1081): it connects through curl's connector, performs the handshake and runs the session on standard input
   and the transfer's output. Any other scheme's transfer goes on unchanged.
 - `WebSocketReplExtension`: the `--ws-repl` option, the description and the hook activator that
   `Curl.Extension.Composition` registers.

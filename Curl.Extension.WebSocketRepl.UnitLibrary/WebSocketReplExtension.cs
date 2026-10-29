@@ -7,7 +7,7 @@ using Curl.WebSocket;
 namespace Curl.Extension.WebSocketRepl;
 
 /// <summary>
-/// The <c>--ws-repl</c> extension (ADR-1076): on a <c>ws://</c> or <c>wss://</c> URL, opens the connection itself,
+/// The <c>--ws-repl</c> extension (ADR-1081): on a <c>ws://</c> or <c>wss://</c> URL, opens the connection itself,
 /// performs RFC 6455's opening handshake and holds an interactive session, typed lines from standard input sent as
 /// messages and received messages written to the transfer's output. <c>Curl.Extension.Composition</c> registers its
 /// option, description and transfer hook.

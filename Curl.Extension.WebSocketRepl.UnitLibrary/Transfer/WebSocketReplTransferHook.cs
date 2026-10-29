@@ -7,7 +7,7 @@ using Curl.WebSocket;
 namespace Curl.Extension.WebSocketRepl.Transfer;
 
 /// <summary>
-/// Takes over a <c>ws://</c> or <c>wss://</c> transfer when <c>--ws-repl</c> is given (ADR-1076): connects through
+/// Takes over a <c>ws://</c> or <c>wss://</c> transfer when <c>--ws-repl</c> is given (ADR-1081): connects through
 /// curl's connector (TLS for <c>wss</c>, through the transfer's proxy), performs the opening handshake (RFC 6455
 /// section 4.1) and runs a <see cref="WebSocketReplSession" /> until it closes. curl's own handler never sees the
 /// transfer. Any other scheme's transfer goes on unchanged.

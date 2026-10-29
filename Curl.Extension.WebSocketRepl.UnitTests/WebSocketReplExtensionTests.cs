@@ -5,7 +5,7 @@ using Curl.Extension.WebSocketRepl.Transfer;
 
 namespace Curl.Extension.WebSocketRepl;
 
-/// <summary>Pins how <c>--ws-repl</c> is registered and turns its hook on (ADR-1076).</summary>
+/// <summary>Pins how <c>--ws-repl</c> is registered and turns its hook on (ADR-1081).</summary>
 [TestClass]
 public sealed class WebSocketReplExtensionTests
 {

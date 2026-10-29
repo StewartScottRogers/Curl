@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.WebSocketRepl.Transfer;
 
-/// <summary>Pins how <c>--ws-repl</c> takes over a <c>ws://</c> or <c>wss://</c> transfer (ADR-1076, RFC 6455).</summary>
+/// <summary>Pins how <c>--ws-repl</c> takes over a <c>ws://</c> or <c>wss://</c> transfer (ADR-1081, RFC 6455).</summary>
 [TestClass]
 public sealed class WebSocketReplTransferHookTests
 {
