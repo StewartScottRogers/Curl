@@ -36,7 +36,7 @@ Split from BL-4123.
 - Plan: one self-registering file per SASL mechanism (`XmppSaslPlain`, `XmppSaslAnonymous`, `XmppScramSha1`,
   `XmppScramSha256`) adding itself to `XmppSaslMechanisms` from a `[ModuleInitializer]`, CA2255 suppressed for the
   namespace as `Curl.Conformance.Differential` does; `XmppScramExchange` holds RFC 5802's arithmetic and
-  `XmppClientFlow` now carries any number of `<challenge/>` rounds. Decisions in ADR-1075 (a new ADR, so ADR-1068's
+  `XmppClientFlow` now carries any number of `<challenge/>` rounds. Decisions in ADR-1077 (a new ADR, so ADR-1068's
   file was left as it is).
 - Default taken: the server signature is accepted in `<success/>` or in a second `<challenge/>` (some servers send
   it there); password used as UTF-8 without SASLprep (no stringprep in the BCL; ASCII unaffected).

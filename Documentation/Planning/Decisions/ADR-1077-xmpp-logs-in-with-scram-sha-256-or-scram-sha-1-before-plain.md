@@ -1,4 +1,4 @@
-# ADR-1075: XMPP logs in with SCRAM-SHA-256 or SCRAM-SHA-1 before PLAIN
+# ADR-1077: XMPP logs in with SCRAM-SHA-256 or SCRAM-SHA-1 before PLAIN
 
 - Status: Accepted
 - Date: 2026-10-29

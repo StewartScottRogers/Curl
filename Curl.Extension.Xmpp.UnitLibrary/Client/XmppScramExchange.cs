@@ -9,7 +9,7 @@ namespace Curl.Extension.Xmpp.Client;
 /// One SCRAM authentication's client side (RFC 5802, 3 and 5) over <paramref name="hash"/>, without channel binding
 /// (GS2 header <c>n,,</c>): the client-first message, the client proof answering the server-first message, and the
 /// check of the server signature, which arrives in <c>&lt;success/&gt;</c> or, from some servers, in a second challenge.
-/// The password is used as UTF-8 without SASLprep (ADR-1075).
+/// The password is used as UTF-8 without SASLprep (ADR-1077).
 /// </summary>
 /// <param name="hash">The hash function, SHA-1 or SHA-256.</param>
 /// <param name="userName">The user name, escaped as RFC 5802's <c>saslname</c>.</param>
