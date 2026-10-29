@@ -75,3 +75,8 @@ curl -sS -k --ssl-reqd --ftp-ssl-ccc ftp://localhost:21900/file.txt ftp://localh
 
 - 2026-10-26: Created from CGR-288 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+### Notes (lane 5, 2026-10-28)
+- Not fixed, decided by Claude under Stewart's delegation: the report itself says curl's Schannel CCC outcome is nondeterministic (first attempt fails with 81; later ones often, but not always, clear TLS; one original run failed every attempt). A fixed exit 81 per URL (ADR-0280) is one of the outcomes real curl produces, and the single-URL case (both 81) matches. Emulating a coin-flip would make Curl's output depend on process-wide state and could not be pinned by a deterministic test, so the existing behaviour stays.
+- Reproducing "first fails, later succeed" would need a change in Curl.Networking.UnitLibrary (SslStreamConnection.ClearTlsAsync), outside `touches`; no code was changed, so no failing-before unit test exists (ADR-0482 criterion not applicable).
+- Real curl was not re-measured in this run (budget); the commands and REF results are those recorded in the issue above.
