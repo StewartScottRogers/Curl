@@ -1,5 +1,5 @@
 ---
-id: BL-4222
+id: BL-4253
 title: WebSocket: let an upload stream send whole text or binary messages, one frame each
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4222 — WebSocket: let an upload stream send whole text or binary messages, one frame each
+# BL-4253 — WebSocket: let an upload stream send whole text or binary messages, one frame each
 
 ## Goal
 
