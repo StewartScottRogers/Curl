@@ -32,3 +32,4 @@ Split out of BL-3997 (CGR-226, BL-3755). `SslStream` hides every TLS 1.3 handsha
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: edd99237 40b0b9e0 addde585 3d836d5e.
