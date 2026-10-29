@@ -3,8 +3,8 @@ id: AF-0453
 title: ManagedEasyTransfer.OwnInputsOf's ResumeFrom > 0 can become >= 0 with no test failing, so a zero resume offset is passed on as a resume
 auditor: quality
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:OwnInputsOf-gt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:150:>
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Engin
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
