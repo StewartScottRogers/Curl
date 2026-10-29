@@ -83,3 +83,4 @@ curl -v -s --trace-config doh --doh-url http://127.0.0.1:21800/dns-query http://
 - **Plan** (needs the engine, which BL-3812 holds in `EngineComposition.Dns.cs`, hence `depends-on` and the new `touches` entry): pass the run's `--trace-config` components to `DohSubTransferEvents` (new optional parameter in `Curl.Output`) so `doh` writes the `[DoH]` sub-transfer lines without the `[DNS]` filter lines, and `dns` without `doh` writes no sub-transfer lines (`[DNS] [DoH] probe done` instead); `Cgr285Tests` in `Curl.Output.UnitTests` pins it. Reuse line and parallel queries are left (parallel queries are timing-dependent in the debug output).
 - Requeued so as not to edit a file BL-3812 is changing.
 - 2026-10-28: Doing -> Backlog. Needs EngineComposition.Dns.cs, held by BL-3812 (depends-on BL-3812)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
