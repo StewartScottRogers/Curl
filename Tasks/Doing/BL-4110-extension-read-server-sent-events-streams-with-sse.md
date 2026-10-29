@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: daf393cf cf7d9fa9 365c043f e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4173 (hook wiring in Curl.Console), BL-4174 (hook can repeat a transfer, for reconnection) and BL-4175 (SSE projects and parser, split for size)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: daf393cf cf7d9fa9 365c043f e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
