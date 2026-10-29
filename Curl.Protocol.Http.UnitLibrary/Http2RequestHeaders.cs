@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Protocol.Abstractions;
 using Curl.Http2;
 
 namespace Curl.Protocol.Http;
@@ -17,6 +18,9 @@ internal static class Http2RequestHeaders
 {
     private static readonly string[] ConnectionSpecificNames =
         ["host", "connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade"];
+
+    /// <summary>nghttp2's <c>NGHTTP2_HD_MAX_NV</c>: a header whose name and value together pass it is refused, so curl fails the send (exit 55).</summary>
+    private const int MaxNameAndValueLength = 65536;
 
     private static readonly byte[] Http11LineEnd = " HTTP/1.1\r\n"u8.ToArray();
 
@@ -44,8 +48,13 @@ internal static class Http2RequestHeaders
 
         fields.Add(new(":path", methodAndTarget[(targetStart + 1)..]));
         fields.AddRange(headers.Select(Permitted).OfType<HeaderField>());
-        return fields;
+        return RefuseOversizedFields(fields);
     }
+
+    private static List<HeaderField> RefuseOversizedFields(List<HeaderField> fields) =>
+        fields.Any(field => field.Name.Length + field.Value.Length > MaxNameAndValueLength)
+            ? throw new HttpTransferException(CurlExitCode.SendError, HttpTransferMessages.SendFailed)
+            : fields;
 
     /// <summary>
     /// Gives <paramref name="head" /> with its request line's <c>HTTP/1.1</c> made
