@@ -359,8 +359,7 @@ internal sealed class CookieEngine
         }
         else
         {
-            using StringReader line = new(item);
-            store.LoadCookieFile(line, discardSessionCookies: false, now, events);
+            store.AddCookieListLine(item, now, events);
         }
 
         return Task.CompletedTask;
