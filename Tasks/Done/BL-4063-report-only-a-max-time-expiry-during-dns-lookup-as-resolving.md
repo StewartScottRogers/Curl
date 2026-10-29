@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/TcpConnector.cs, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4063 — Report only a --max-time expiry during DNS lookup as Resolving timed out
 
@@ -45,3 +45,4 @@ The Resolving catch now tests the elapsed time against the connect limit (as the
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: ad5c0808 03f70dca abc46c4d fd82824f 3d836d5e.
+- 2026-10-29: Doing -> Done. Resolving timed out now only after the connect limit passes; other cancellations propagate
