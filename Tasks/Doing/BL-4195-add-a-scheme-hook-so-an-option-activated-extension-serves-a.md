@@ -33,3 +33,4 @@ Found by BL-4112's first pass: `Curl.Extension.Abstractions` has transfer hooks 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a262fa8a f6b43e01 7da2aab5 478f867b 3d836d5e.
