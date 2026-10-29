@@ -4,8 +4,8 @@ title: Extension: Connect to SignalR hubs with signalr://
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092]
-touches: [Curl.Extension.SignalR.UnitLibrary, Curl.Extension.SignalR.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4218, BL-4219]
+touches: [Curl.Extension.SignalR.UnitLibrary, Curl.Extension.SignalR.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 6, prerequisite pass before any edit): split for size as these Notes ask. BL-4218 creates the projects and the JSON hub protocol and negotiate codec (HubProtocol.md, TransportProtocols.md); BL-4219 adds the negotiate HTTP/1.1 exchange and the RFC 6455 4.1 upgrade over IConnection, using the shared Curl.WebSocket.UnitLibrary frame codec (an extension may reference a shared layer). This task then adds the handler for signalr:// and signalrs:// (TLS through ProtocolHandlerServices.TlsProvider), how a URL or extension option names the hub method and arguments and chooses invoke or stream, the ExtensionCatalogue line, the description and option catalogue lines (added to touches: --extensions reads ExtensionDescriptionCatalogue.cs; both are one-line shared lists in Tasks/SharedListFiles.txt), the ADR, the CURL_EXTENSIONS=0 test and the quality gates. Checked: ExtensionProtocolHandlers.For is already passed to the engine by CurlComposition, and an unregistered scheme fails in TransferPerformer.Setup.cs with exit 1 "Protocol \"x\" not supported", so no engine hook is missing.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 3031275f 5e90994b fb363012 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4218 (projects and hub protocol codec) and BL-4219 (negotiate and WebSocket upgrade)
