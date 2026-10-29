@@ -88,13 +88,13 @@ public sealed class ConnectTargetTlsOverrideTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
-    public void SslStreamTlsProvider_WithSystemStoreOnlyTrust_DropsEveryTrustBesideTheSystemStore(bool matchesSchannelBuild)
+    public void SslStreamTlsProvider_WithSystemStoreOnlyTrust_DropsEveryCaBesideTheSystemStoreAndKeepsInsecure(bool matchesSchannelBuild)
     {
         var provider = new SslStreamTlsProvider(TrustBesideTheSystemStore, matchesSchannelBuild);
 
         var systemStoreOnly = (SslStreamTlsProvider)provider.WithSystemStoreOnlyTrust();
 
-        AssertTrustsOnlyTheSystemStore(systemStoreOnly.Options);
+        AssertTrustsOnlyTheSystemStoreUnlessInsecure(systemStoreOnly.Options);
         Assert.AreEqual(TrustBesideTheSystemStore, provider.Options);
         Assert.IsEmpty(systemStoreOnly.Warnings);
     }
@@ -102,19 +102,19 @@ public sealed class ConnectTargetTlsOverrideTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
-    public void HandBuiltTlsProvider_WithSystemStoreOnlyTrust_DropsEveryTrustBesideTheSystemStore(bool matchesSchannelBuild)
+    public void HandBuiltTlsProvider_WithSystemStoreOnlyTrust_DropsEveryCaBesideTheSystemStoreAndKeepsInsecure(bool matchesSchannelBuild)
     {
         var provider = new HandBuiltTlsProvider(TrustBesideTheSystemStore, matchesSchannelBuild, TimeProvider.System, new FakeClientCertificateStore(), Curl.Tls.SystemTlsRandomSource.Instance);
 
         var systemStoreOnly = (HandBuiltTlsProvider)provider.WithSystemStoreOnlyTrust();
 
-        AssertTrustsOnlyTheSystemStore(systemStoreOnly.Options);
+        AssertTrustsOnlyTheSystemStoreUnlessInsecure(systemStoreOnly.Options);
         Assert.AreEqual(TrustBesideTheSystemStore, provider.Options);
     }
 
-    private static void AssertTrustsOnlyTheSystemStore(TlsClientOptions options)
+    private static void AssertTrustsOnlyTheSystemStoreUnlessInsecure(TlsClientOptions options)
     {
-        Assert.IsFalse(options.Insecure);
+        Assert.IsTrue(options.Insecure);
         Assert.IsNull(options.CaCertificateFile);
         Assert.IsNull(options.CaCertificateDirectory);
         Assert.IsNull(options.CaCertificateBlob);
