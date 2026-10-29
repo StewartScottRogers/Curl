@@ -75,7 +75,7 @@ internal static class Http2RequestHeaders
     private static (string Name, string Value) Split(string line)
     {
         int colon = line.IndexOf(':', StringComparison.Ordinal);
-        return (line[..colon].ToLowerInvariant(), line[(colon + 1)..].Trim(' ', '\t'));
+        return (line[..colon].ToLowerInvariant(), line[(colon + 1)..].TrimStart(' ', '\t'));
     }
 
     private static HeaderField? Permitted((string Name, string Value) header)
