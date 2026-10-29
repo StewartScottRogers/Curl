@@ -35,3 +35,4 @@ Found by BL-4107 (`--openapi <spec> --operation <id> name=value...`) in its prer
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: b3a7311c 7bceb261 4ead31c2 73b4c612 ce42cc94 478f867b 3d836d5e.
