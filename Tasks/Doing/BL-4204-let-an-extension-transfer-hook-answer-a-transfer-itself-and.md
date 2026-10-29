@@ -34,3 +34,4 @@ Found by BL-4133 (`--cache-dir`, RFC 9111) in its prerequisite pass. ADR-1007's 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c05685ad ae76495d e36ca50f 24779316 e7c4212f 3d836d5e.
