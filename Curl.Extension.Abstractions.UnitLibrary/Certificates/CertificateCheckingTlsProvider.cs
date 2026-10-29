@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Certificates;
 
 /// <summary>
 /// Upgrades connections through curl's TLS provider and puts the chain of each handshake it accepted through
-/// the activated certificate checks (ADR-1013): SMTP, IMAP and POP3 STARTTLS and FTP <c>AUTH TLS</c>.
+/// the activated certificate checks (ADR-1016): SMTP, IMAP and POP3 STARTTLS and FTP <c>AUTH TLS</c>.
 /// </summary>
 /// <param name="inner">curl's TLS provider.</param>
 /// <param name="hooks">The activated checks.</param>

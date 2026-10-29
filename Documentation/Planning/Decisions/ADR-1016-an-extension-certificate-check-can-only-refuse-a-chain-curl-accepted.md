@@ -1,4 +1,4 @@
-# ADR-1013: An extension certificate check can only refuse a chain curl accepted
+# ADR-1016: An extension certificate check can only refuse a chain curl accepted
 
 - Status: Accepted
 - Date: 2026-10-29

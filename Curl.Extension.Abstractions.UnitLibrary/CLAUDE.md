@@ -28,7 +28,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   verification accepted it (DANE/TLSA, Certificate Transparency, ML-DSA): it returns `null` to let the
   chain stand or the message the transfer fails with as exit 60. `CertificateCheckHooks.ActivatedBy` keeps
   every hook whose option was given, run in order until one refuses; a host passes `ConnectorOver` and
-  `TlsProviderOver` to the engine's `extensionCertificateConnector` and `extensionTlsProvider` (ADR-1013).
+  `TlsProviderOver` to the engine's `extensionCertificateConnector` and `extensionTlsProvider` (ADR-1016).
   A chain curl refused, a reused connection and a connection without TLS pass through unchecked, so a
   check can only add a refusal.
 

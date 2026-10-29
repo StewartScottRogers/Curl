@@ -18,7 +18,7 @@ A curl command line that gives an extension's certificate check option fails wit
 
 ## Context
 
-BL-4097 added `Curl.Extension.Abstractions.Certificates.CertificateCheckHooks` and the engine's `extensionCertificateConnector` and `extensionTlsProvider` seams on `EngineComposition.CreateProtocolHandlers` (ADR-1013); nothing in the host builds the hooks yet. Do as BL-4192 does for connection hooks: a catalogue in `Curl.Extension.Composition` listing each extension's `ICertificateCheckHook` activator (one line each, registered in `Tasks/SharedListFiles.txt`), and `Curl.Console`'s composition building `CertificateCheckHooks.ActivatedBy` from the option group and passing `ConnectorOver` and `TlsProviderOver`. FTPS data connections (`ftpDataConnector`) are not checked yet (ADR-1013 Consequences).
+BL-4097 added `Curl.Extension.Abstractions.Certificates.CertificateCheckHooks` and the engine's `extensionCertificateConnector` and `extensionTlsProvider` seams on `EngineComposition.CreateProtocolHandlers` (ADR-1016); nothing in the host builds the hooks yet. Do as BL-4192 does for connection hooks: a catalogue in `Curl.Extension.Composition` listing each extension's `ICertificateCheckHook` activator (one line each, registered in `Tasks/SharedListFiles.txt`), and `Curl.Console`'s composition building `CertificateCheckHooks.ActivatedBy` from the option group and passing `ConnectorOver` and `TlsProviderOver`. FTPS data connections (`ftpDataConnector`) are not checked yet (ADR-1016 Consequences).
 
 ## Acceptance criteria
 

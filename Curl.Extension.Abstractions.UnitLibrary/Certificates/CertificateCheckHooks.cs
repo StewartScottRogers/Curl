@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Certificates;
 
 /// <summary>
-/// The certificate check hooks of the extensions one option group activated (ADR-1013). A host builds them
+/// The certificate check hooks of the extensions one option group activated (ADR-1016). A host builds them
 /// from the group's <see cref="ExtensionOptionValues" /> and passes <see cref="ConnectorOver" /> and
 /// <see cref="TlsProviderOver" /> to the engine. Every activated check runs, in the order of the activators,
 /// on each chain curl accepted; the first refusal fails the connect with exit 60. A chain curl refused is

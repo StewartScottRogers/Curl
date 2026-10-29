@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Certificates;
 
 /// <summary>
 /// A check an activated extension adds to a server's certificate chain after curl's own verification
-/// accepted it (ADR-1013) - DANE/TLSA, Certificate Transparency, ML-DSA certificates. A check can only
+/// accepted it (ADR-1016) - DANE/TLSA, Certificate Transparency, ML-DSA certificates. A check can only
 /// refuse a chain: one curl refused never reaches it.
 /// </summary>
 public interface ICertificateCheckHook

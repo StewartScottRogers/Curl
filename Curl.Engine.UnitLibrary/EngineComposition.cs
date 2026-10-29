@@ -124,8 +124,8 @@ internal static partial class EngineComposition
     /// <param name="extensionConnector">Gives the connector of the extension a host's options activated in place of <paramref name="connector" /> (ADR-1010), as <c>--unix-socket</c> replaces curl's; <see langword="null" /> keeps <paramref name="connector" />.</param>
     /// <param name="extensionDatagramConnector">Gives that extension's datagram connector in place of <paramref name="datagramConnector" /> (ADR-1010); <see langword="null" /> keeps <paramref name="datagramConnector" />.</param>
     /// <param name="extensionResolver">Gives the resolver of the extension a host's options activated in place of <paramref name="dnsResolver" /> (ADR-1012), as <c>--doh-url</c> replaces curl's; <see langword="null" /> keeps <paramref name="dnsResolver" />.</param>
-    /// <param name="extensionCertificateConnector">Puts the connector, after <paramref name="extensionConnector" />, through the certificate checks of the extensions a hosts options activated (ADR-1013), which can only refuse a chain curl accepted; <see langword="null" /> checks nothing more.</param>
-    /// <param name="extensionTlsProvider">Puts <paramref name="tlsProvider" /> through those checks for in-place upgrades (ADR-1013); <see langword="null" /> keeps <paramref name="tlsProvider" />.</param>
+    /// <param name="extensionCertificateConnector">Puts the connector, after <paramref name="extensionConnector" />, through the certificate checks of the extensions a hosts options activated (ADR-1016), which can only refuse a chain curl accepted; <see langword="null" /> checks nothing more.</param>
+    /// <param name="extensionTlsProvider">Puts <paramref name="tlsProvider" /> through those checks for in-place upgrades (ADR-1016); <see langword="null" /> keeps <paramref name="tlsProvider" />.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
