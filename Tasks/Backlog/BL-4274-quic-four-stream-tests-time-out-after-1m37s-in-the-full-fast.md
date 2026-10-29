@@ -1,5 +1,5 @@
 ---
-id: BL-4267
+id: BL-4274
 title: Quic: four stream tests time out after 1m37s in the full fast run but pass alone
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4267 — Quic: four stream tests time out after 1m37s in the full fast run but pass alone
+# BL-4274 — Quic: four stream tests time out after 1m37s in the full fast run but pass alone
 
 ## Goal
 
