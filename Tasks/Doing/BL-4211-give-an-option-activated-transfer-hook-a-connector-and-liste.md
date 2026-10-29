@@ -36,3 +36,4 @@ Found by BL-4161's first pass (OAuth 2.0 extension). `ITransferHook.RequestHeade
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 071e417e 036f0713 7f06cda6 242a931f 478f867b 3d836d5e.
