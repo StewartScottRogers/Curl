@@ -30,3 +30,4 @@ Second of BL-4159's split. Specification: Model Context Protocol revision 2025-0
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: b1a1a1ef cb855ea9 166b8c16 14de81cc.
