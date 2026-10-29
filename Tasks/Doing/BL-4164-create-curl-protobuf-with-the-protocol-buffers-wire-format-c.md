@@ -33,3 +33,4 @@ First of three parts split from BL-4099 (wire format, then `.proto` parsing BL-4
 ## Log
 
 - 2026-10-29: Created (split from BL-4099).
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d8bdab76 20879125 64aad06d 7ae6d7ff 3d836d5e.
