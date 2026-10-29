@@ -1,16 +1,16 @@
 ---
-id: BL-4223
+id: BL-4243
 title: Extension Mqtt5: publish and subscribe client over IConnection for mqtt5 and mqtt5s
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4222]
+depends-on: [BL-4242]
 touches: [Curl.Extension.Mqtt5.UnitLibrary/Client, Curl.Extension.Mqtt5.UnitTests/Client]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4223 — Extension Mqtt5: publish and subscribe client over IConnection for mqtt5 and mqtt5s
+# BL-4243 — Extension Mqtt5: publish and subscribe client over IConnection for mqtt5 and mqtt5s
 
 ## Goal
 
@@ -18,7 +18,7 @@ An `IProtocolHandler` in `Curl.Extension.Mqtt5.UnitLibrary` serves `mqtt5://` (p
 
 ## Context
 
-Split from BL-4115 (extension 14 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: OASIS MQTT Version 5.0. Builds on BL-4222's packet codec. Mirror curl's `mqtt://` user-facing behaviour (lib/mqtt.c: topic from the URL path, URL-decoded; publish when there is a request body; on subscribe, write each message as curl's handler does and stop when it stops) so the MQTT 5 schemes feel the same; curl's `mqtt://` itself stays 3.1.1 and is never changed. Never reference a `Curl.Protocol.*` library other than Abstractions, or another extension. Do not register the handler in any catalogue here: BL-4115 does that. Leave a seam (the flow takes the byte transport it speaks over) so BL-4224 can add `mqtt5+ws://` without changing this flow.
+Split from BL-4115 (extension 14 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: OASIS MQTT Version 5.0. Builds on BL-4242's packet codec. Mirror curl's `mqtt://` user-facing behaviour (lib/mqtt.c: topic from the URL path, URL-decoded; publish when there is a request body; on subscribe, write each message as curl's handler does and stop when it stops) so the MQTT 5 schemes feel the same; curl's `mqtt://` itself stays 3.1.1 and is never changed. Never reference a `Curl.Protocol.*` library other than Abstractions, or another extension. Do not register the handler in any catalogue here: BL-4115 does that. Leave a seam (the flow takes the byte transport it speaks over) so BL-4244 can add `mqtt5+ws://` without changing this flow.
 
 ## Acceptance criteria
 

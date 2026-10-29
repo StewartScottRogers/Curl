@@ -1,20 +1,20 @@
 ---
-id: BL-4224
+id: BL-4244
 title: Extension Mqtt5: MQTT 5 over WebSocket for mqtt5+ws
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4222, BL-4223]
+depends-on: [BL-4242, BL-4243]
 touches: [Curl.Extension.Mqtt5.UnitLibrary/WebSocket, Curl.Extension.Mqtt5.UnitTests/WebSocket, Curl.Extension.Mqtt5.UnitLibrary/Curl.Extension.Mqtt5.UnitLibrary.csproj]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4224 — Extension Mqtt5: MQTT 5 over WebSocket for mqtt5+ws
+# BL-4244 — Extension Mqtt5: MQTT 5 over WebSocket for mqtt5+ws
 
 ## Goal
 
-`mqtt5+ws://host[:port]/topic` runs BL-4223's publish/subscribe flow over a WebSocket connection (subprotocol `mqtt`), as OASIS MQTT Version 5.0 section 6 describes.
+`mqtt5+ws://host[:port]/topic` runs BL-4243's publish/subscribe flow over a WebSocket connection (subprotocol `mqtt`), as OASIS MQTT Version 5.0 section 6 describes.
 
 ## Context
 

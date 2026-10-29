@@ -1,5 +1,5 @@
 ---
-id: BL-4222
+id: BL-4242
 title: Extension Mqtt5: projects and MQTT 5 control packet wire format
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4222 — Extension Mqtt5: projects and MQTT 5 control packet wire format
+# BL-4242 — Extension Mqtt5: projects and MQTT 5 control packet wire format
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4115 (`mqtt5://`, `mqtt5s://`, `mqtt5+ws://`, extension 14 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: OASIS MQTT Version 5.0 (7 March 2019). Reference only `Curl.Protocol.Abstractions.UnitLibrary` and the shared layers; never `Curl.Protocol.Mqtt.UnitLibrary` (curl's 3.1.1 `mqtt://`) or another extension. Use the `new-project` skill; the slnx line is one single-line `<Folder Name="/Extensions/Mqtt5/">` directly under the marker comment (ADR-1003). Pattern to follow: BL-4218 (SignalR wire format). Put the code in `Packets/` (and `Encoding/` for data types), so BL-4223 (`Client/`) and BL-4224 (`WebSocket/`) work in disjoint folders. Do not register the extension in any catalogue here: BL-4115 does that.
+Split from BL-4115 (`mqtt5://`, `mqtt5s://`, `mqtt5+ws://`, extension 14 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: OASIS MQTT Version 5.0 (7 March 2019). Reference only `Curl.Protocol.Abstractions.UnitLibrary` and the shared layers; never `Curl.Protocol.Mqtt.UnitLibrary` (curl's 3.1.1 `mqtt://`) or another extension. Use the `new-project` skill; the slnx line is one single-line `<Folder Name="/Extensions/Mqtt5/">` directly under the marker comment (ADR-1003). Pattern to follow: BL-4218 (SignalR wire format). Put the code in `Packets/` (and `Encoding/` for data types), so BL-4243 (`Client/`) and BL-4244 (`WebSocket/`) work in disjoint folders. Do not register the extension in any catalogue here: BL-4115 does that.
 
 ## Acceptance criteria
 
@@ -33,7 +33,7 @@ Split from BL-4115 (`mqtt5://`, `mqtt5s://`, `mqtt5+ws://`, extension 14 of 63) 
 
 ## Notes
 
-- Filed by BL-4115's lane 6 prerequisite pass. BL-4223 then adds the client flow, BL-4224 the WebSocket transport, BL-4115 the registration, description, ADR and `CURL_EXTENSIONS=0` test.
+- Filed by BL-4115's lane 6 prerequisite pass. BL-4243 then adds the client flow, BL-4244 the WebSocket transport, BL-4115 the registration, description, ADR and `CURL_EXTENSIONS=0` test.
 
 ## Log
 
