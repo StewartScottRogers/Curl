@@ -35,3 +35,4 @@ Split from BL-4133 for size (its Notes ask for wire format first, then the clien
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 8db68a28 272fb791 06ac59f7 ee0d6d31 b9e0db74 3180db99 3d836d5e.
