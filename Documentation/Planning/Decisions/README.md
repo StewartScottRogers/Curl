@@ -1093,4 +1093,4 @@ Each option and the specific reason it lost.
 | [1058](ADR-1058-amqp1-frames-carry-composites-through-one-catalogue-of-descriptor-codes-and-field-names.md) | AMQP 1.0 frames carry composites through one catalogue of descriptor codes and field names (BL-4256) | Accepted | 2026-10-29 |
 | [1059](ADR-1059-stomp-sends-with-a-body-and-subscribes-without-one-over-stomp-1-2.md) | STOMP sends with a body and subscribes without one, over STOMP 1.2 (BL-4119) | Accepted | 2026-10-29 |
 | [1060](ADR-1060-the-amqp0-client-names-virtual-host-and-queue-in-the-url-path-and-ends-a-server-close-naming-its-reply-code.md) | The AMQP 0-9-1 client names the virtual host and queue in the URL path and ends a server close naming its reply code (BL-4260) | Accepted | 2026-10-29 |
-| [1060](ADR-1060-dtls-flights-are-resent-twelve-times-before-the-handshake-gives-up.md) | DTLS flights are resent twelve times before the handshake gives up (BL-4264) | Accepted | 2026-10-29 |
+| [1061](ADR-1061-dtls-flights-are-resent-twelve-times-before-the-handshake-gives-up.md) | DTLS flights are resent twelve times before the handshake gives up (BL-4264) | Accepted | 2026-10-29 |

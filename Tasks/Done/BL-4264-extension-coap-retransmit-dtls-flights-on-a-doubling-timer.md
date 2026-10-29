@@ -33,7 +33,7 @@ Namespace `Curl.Extension.Coap.Dtls.Retransmission`. A flight is the list of dat
 
 - `DtlsFlightRetransmitter.SendFlightAsync(flight, awaitNextFlightAsync, token)` sends the flight, then races a
   `Task.Delay` on the `TimeProvider` against the caller's "peer's next flight started" task; the limit is 12 resends
-  (OpenSSL's `DTLS1_TMO_ALERT_COUNT`), recorded in ADR-1060. Giving up throws `TimeoutException`, which BL-4251's
+  (OpenSSL's `DTLS1_TMO_ALERT_COUNT`), recorded in ADR-1061. Giving up throws `TimeoutException`, which BL-4251's
   handshake turns into exit 35.
 - Tests reuse `Client/ImmediateTimeProvider` (fires every timer at once, records due times): the run that gives up
   shows due times 1, 2, 4, 8, 16, 32 then 60 seven times.

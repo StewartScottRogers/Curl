@@ -3,13 +3,13 @@ namespace Curl.Extension.Coap.Dtls.Retransmission;
 /// <summary>
 /// Sends a DTLS flight and resends it until the peer's next flight starts (RFC 6347 section 4.2.4):
 /// the timer starts at 1 second and doubles after each resend up to 60 seconds, and after
-/// <see cref="MaximumRetransmissions" /> resends with no reply the handshake gives up (ADR-1060).
+/// <see cref="MaximumRetransmissions" /> resends with no reply the handshake gives up (ADR-1061).
 /// </summary>
 /// <param name="sendDatagramAsync">Sends one datagram of the flight to the peer.</param>
 /// <param name="timeProvider">The clock the retransmission timer runs on.</param>
 internal sealed class DtlsFlightRetransmitter(Func<ReadOnlyMemory<byte>, CancellationToken, ValueTask> sendDatagramAsync, TimeProvider timeProvider)
 {
-    /// <summary>How many times a flight is resent before the handshake gives up, OpenSSL's DTLS1_TMO_ALERT_COUNT (ADR-1060).</summary>
+    /// <summary>How many times a flight is resent before the handshake gives up, OpenSSL's DTLS1_TMO_ALERT_COUNT (ADR-1061).</summary>
     public const int MaximumRetransmissions = 12;
 
     /// <summary>The first retransmission timeout, the 1 second RFC 6347 section 4.2.4.1 recommends.</summary>

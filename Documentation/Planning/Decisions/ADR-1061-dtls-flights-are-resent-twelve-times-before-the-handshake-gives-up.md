@@ -1,4 +1,4 @@
-# ADR-1060 — DTLS flights are resent twelve times before the handshake gives up
+# ADR-1061 — DTLS flights are resent twelve times before the handshake gives up
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

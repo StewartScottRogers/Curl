@@ -68,7 +68,7 @@ Each throws `FormatException` for bytes the RFC does not allow.
   record through and dropping one that does not parse, is of another epoch, is a replay or fails its tag.
 
 `Dtls/Retransmission/` (namespace `Curl.Extension.Coap.Dtls.Retransmission`) resends handshake flights
-(RFC 6347 section 4.2.4, ADR-1060): `DtlsFlightRetransmitter` sends a flight's datagrams in order and
+(RFC 6347 section 4.2.4, ADR-1061): `DtlsFlightRetransmitter` sends a flight's datagrams in order and
 resends them on a timer that starts at 1 second and doubles up to 60 seconds on the transfer's
 `TimeProvider`, stops when the peer's next flight starts, and throws `TimeoutException` after 12 resends
 (the handshake's caller turns it into exit 35).
