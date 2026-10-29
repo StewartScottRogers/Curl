@@ -1,4 +1,4 @@
-# ADR-1066 — The encrypted DNS extension names its DoT or DoQ resolver with --dns-over-tls or --dns-over-quic
+# ADR-1070 — The encrypted DNS extension names its DoT or DoQ resolver with --dns-over-tls or --dns-over-quic
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

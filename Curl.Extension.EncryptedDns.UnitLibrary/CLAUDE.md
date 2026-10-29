@@ -5,7 +5,7 @@ server (RFC 7858) or a DNS-over-QUIC server (RFC 9250). Namespaces `Curl.Extensi
 `Curl.Extension.EncryptedDns.DnsOverTls` and `Curl.Extension.EncryptedDns.DnsOverQuic`. Tested against RFC 1035,
 RFC 7858 and RFC 9250, not against curl.
 
-- `EncryptedDnsExtension` (ADR-1066): the `encrypted-dns` description and the options `--dns-over-tls <host[:port]>`
+- `EncryptedDnsExtension` (ADR-1070): the `encrypted-dns` description and the options `--dns-over-tls <host[:port]>`
   and `--dns-over-quic <host[:port]>` (port 853 by default, read by the internal `EncryptedDnsServerAddress`), each
   with its own resolver hook activator in `Curl.Extension.Composition`'s `ExtensionResolverHookCatalogue`
   (ADR-1012). `DnsOverTlsResolverHook` builds the DoT resolver over `Curl.Networking.UnitLibrary`'s `TcpConnector`
