@@ -76,9 +76,28 @@ First of three parts split from BL-4165 (itself split from BL-4099) because the 
     integer/float, `-`/`+` then integer, float, `inf` or `nan`, or `{` aggregate skipped by
     depth (End inside it is an error).
 
+- 2026-10-29, lane 1, second claim ($2.40 run budget): wrote the parser and descriptors on the
+  design above, uncommitted for the shift's stash; `dotnet build Curl.Protobuf.UnitLibrary` is
+  clean, no tests yet. Files: `ProtoParser` (public `TryParse`), `ProtoTokenCursor`,
+  `ProtoStatements` (generic `ParseBlock`/`ParseStatement` over keyword tables, `ParseEmpty`),
+  `ProtoFileParser`, `ProtoMessageParser` (fields, labels, `map<,>`, oneof, field numbers),
+  `ProtoEnumParser`, `ProtoOptionParser`, `ProtoReservedParser`, the bodies (`ProtoFileBody`,
+  `ProtoReservedBody` base of `ProtoMessageBody`/`ProtoEnumBody`, `ProtoOneofBody`) and the
+  public records (`ProtoFileDescriptor`, `ProtoMessageDescriptor`, `ProtoFieldDescriptor`,
+  `ProtoFieldLabel`, `ProtoFieldType` with `Named` and `Map`, `ProtoTypeReference`,
+  `ProtoOneofDescriptor`, `ProtoEnumDescriptor`, `ProtoEnumValueDescriptor`, `ProtoOption`,
+  `ProtoReservedRange` as int Start/End). Choices beyond the design, none needing an ADR:
+  field numbers 19000 to 19999 are rejected as protoc does; an empty oneof and a labelled
+  field in a oneof are errors; a map field's type is `Map` named `map<k, v>`; out-of-range
+  numbers report "Number N is out of range (min to max)." at the number (or its '-').
+  Remaining: unit tests in `Curl.Protobuf.UnitTests/Descriptors` (one per construct and per
+  error, tokenizer escapes, comments, numbers and errors among them) to 100% line and branch
+  coverage, one Measure-CodeQuality.ps1 run for the library, the fast tests, commit.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 690e3591 ee2341fd 7ae6d7ff 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Run budget spent after the tokenizer (left uncommitted for the shift's stash); parser, descriptors and tests remain, design recorded under Notes
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 690e3591 ee2341fd 7ae6d7ff 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Run budget spent after the parser and descriptors (uncommitted for the shift's stash, builds clean); unit tests, quality run and commit remain, recorded under Notes
