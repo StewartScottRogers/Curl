@@ -1,16 +1,16 @@
 ---
-id: BL-4207
+id: BL-4215
 title: McpClient extension: Streamable HTTP transport over IConnection
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4206]
+depends-on: [BL-4214]
 touches: [Curl.Extension.McpClient.UnitLibrary/StreamableHttp, Curl.Extension.McpClient.UnitTests/StreamableHttp]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4207 — McpClient extension: Streamable HTTP transport over IConnection
+# BL-4215 — McpClient extension: Streamable HTTP transport over IConnection
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Second of BL-4159's split. Specification: Model Context Protocol revision 2025-06-18, "Base Protocol > Transports > Streamable HTTP": each message is an HTTP POST to the MCP endpoint with `Accept: application/json, text/event-stream`; the reply is `application/json` or a `text/event-stream` whose `data:` events carry JSON-RPC messages; a notification gets 202 Accepted; the `Mcp-Session-Id` header from the initialize response is sent on every later request; `MCP-Protocol-Version` is sent after initialization; DELETE ends the session. The extension may not reference `Curl.Protocol.Http` or another extension (`Curl.Extension.S3` wrote its own small HTTP/1.1 client for the same reason): write a minimal HTTP/1.1 client here (request line, headers, Content-Length and chunked response bodies, connection close). Builds on BL-4206's `Wire/` messages.
+Second of BL-4159's split. Specification: Model Context Protocol revision 2025-06-18, "Base Protocol > Transports > Streamable HTTP": each message is an HTTP POST to the MCP endpoint with `Accept: application/json, text/event-stream`; the reply is `application/json` or a `text/event-stream` whose `data:` events carry JSON-RPC messages; a notification gets 202 Accepted; the `Mcp-Session-Id` header from the initialize response is sent on every later request; `MCP-Protocol-Version` is sent after initialization; DELETE ends the session. The extension may not reference `Curl.Protocol.Http` or another extension (`Curl.Extension.S3` wrote its own small HTTP/1.1 client for the same reason): write a minimal HTTP/1.1 client here (request line, headers, Content-Length and chunked response bodies, connection close). Builds on BL-4214's `Wire/` messages.
 
 ## Acceptance criteria
 

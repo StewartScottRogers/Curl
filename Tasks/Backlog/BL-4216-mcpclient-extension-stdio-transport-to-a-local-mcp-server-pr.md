@@ -1,16 +1,16 @@
 ---
-id: BL-4208
+id: BL-4216
 title: McpClient extension: stdio transport to a local MCP server process
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4206]
+depends-on: [BL-4214]
 touches: [Curl.Extension.McpClient.UnitLibrary/Stdio, Curl.Extension.McpClient.UnitTests/Stdio]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4208 — McpClient extension: stdio transport to a local MCP server process
+# BL-4216 — McpClient extension: stdio transport to a local MCP server process
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Third of BL-4159's split. Specification: Model Context Protocol revision 2025-06-18, "Base Protocol > Transports > stdio": the client launches the server as a subprocess, writes newline-delimited JSON-RPC messages (no embedded newlines) to its stdin and reads them from its stdout; stderr is the server's log; the client ends the session by closing stdin and then ending the process. Starting the process goes behind an interface of this library (one `System.Diagnostics.Process` implementation behind a thin seam, so everything else is unit tested with in-memory streams). Builds on BL-4206's `Wire/` messages.
+Third of BL-4159's split. Specification: Model Context Protocol revision 2025-06-18, "Base Protocol > Transports > stdio": the client launches the server as a subprocess, writes newline-delimited JSON-RPC messages (no embedded newlines) to its stdin and reads them from its stdout; stderr is the server's log; the client ends the session by closing stdin and then ending the process. Starting the process goes behind an interface of this library (one `System.Diagnostics.Process` implementation behind a thin seam, so everything else is unit tested with in-memory streams). Builds on BL-4214's `Wire/` messages.
 
 ## Acceptance criteria
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4206
+id: BL-4214
 title: McpClient extension: project and JSON-RPC wire format for MCP
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4206 — McpClient extension: project and JSON-RPC wire format for MCP
+# BL-4214 — McpClient extension: project and JSON-RPC wire format for MCP
 
 ## Goal
 
@@ -30,7 +30,7 @@ First of BL-4159's split (wire format, then the transports, then the handler). E
 
 ## Notes
 
-- No handler, scheme registration or description here: BL-4159 adds those once the transports (BL-4207, BL-4208) exist.
+- No handler, scheme registration or description here: BL-4159 adds those once the transports (BL-4215, BL-4216) exist.
 
 ## Log
 
