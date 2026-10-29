@@ -33,3 +33,4 @@ The curl tool either rejects these options (exit 2) or prints no warning, so the
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 34fb773f 6396d0d8 68c0fcc3.
