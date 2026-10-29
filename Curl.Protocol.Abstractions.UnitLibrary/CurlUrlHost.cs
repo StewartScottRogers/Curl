@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -348,32 +347,26 @@ internal static class CurlUrlHost
 
     private static string? EncodeLabel(string label)
     {
+        // Enumerating runes reads a lone surrogate as U+FFFD, which IsRefusedInLabel refuses.
         var codePoints = new List<int>(label.Length);
-        ReadOnlySpan<char> rest = label;
-        while (!rest.IsEmpty && codePoints.Count <= MaximumLabelLength)
+        foreach (Rune rune in label.EnumerateRunes())
         {
-            if (!TryDecodeEncodableRune(rest, out Rune rune, out int consumed))
+            if (IsRefusedInLabel(rune) || codePoints.Count == MaximumLabelLength)
             {
                 return null;
             }
 
             codePoints.Add(rune.Value);
-            rest = rest[consumed..];
         }
 
-        return codePoints.Count > MaximumLabelLength ? null : "xn--" + CurlUrlPunycode.Encode(codePoints);
+        return "xn--" + CurlUrlPunycode.Encode(codePoints);
     }
 
-    /// <summary>Whether IDNA refuses <paramref name="rune" /> in a label: a control character or <c>U+FFFD</c>.</summary>
-    private static bool IsRefusedInLabel(Rune rune) => Rune.IsControl(rune) || rune == Rune.ReplacementChar;
-
     /// <summary>
-    /// Decodes the first character of <paramref name="text" /> and reports whether Punycode may
-    /// carry it: a well-formed scalar value that is neither a control character nor <c>U+FFFD</c>.
+    /// Whether IDNA refuses <paramref name="rune" /> in a label: a control character or <c>U+FFFD</c>,
+    /// which a lone surrogate (a byte that is not UTF-8) reads as.
     /// </summary>
-    private static bool TryDecodeEncodableRune(ReadOnlySpan<char> text, out Rune rune, out int consumed) =>
-        Rune.DecodeFromUtf16(text, out rune, out consumed) == OperationStatus.Done
-        && !IsRefusedInLabel(rune);
+    private static bool IsRefusedInLabel(Rune rune) => Rune.IsControl(rune) || rune == Rune.ReplacementChar;
 
     /// <summary>
     /// The Windows-1252 character of <paramref name="value" />, or the lone <c>U+DC80</c> to
