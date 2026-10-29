@@ -33,6 +33,7 @@ Interactive only: ci.yml is a guard file and changes only through the `audit` br
 
 ## Notes
 - 2026-10-25 19:40 Arizona (interactive session): measured after PR #238. Run 40233303425 (13:59, no competing PRs) went first job start to last job end in 14.5 min. Runs 40253936975 (18:25, 25.1 min) and 40255860809 (18:51, 20.8 min) overlapped the CI of gap PR #243 and audit PRs #244 and #245, which compete for the Windows runners; the last job in both was Quality gates (windows-latest). The shift-end merge PR #246 (19:12) found its completed CI run and went through. Criterion 2 is not met yet: no run after the change that overlapped a shift-end merge finished under 15 min. Stays in Backlog.
+- 2026-10-29 06:00 Arizona (interactive session): shift-end merge PR #250 (08:46 UTC). Its `factory/merge-20261028-201954` PR run 40844535485 was skipped as PR #238 intends; the competitor was the `master` push run 40844580348 (08:46:38 to 09:03:45 UTC, 17.1 min). The overlapping work/dark-factory run 40845247630 went first job start to last job end 08:52:39 to 09:07:40 UTC, 15.0 min (15m01s), missing criterion 2 by about a second. PR #250 itself merged, so criterion 3 holds again. Remaining idea if the next overlapping run also misses: skip the `master` push run's jobs whose tree a green work/dark-factory run already tested, keeping Release's needs intact. Stays in Backlog for the next shift-end merge's sample.
 
 ## Log
 
