@@ -1,7 +1,7 @@
 namespace Curl.Extension.Redis.Wire;
 
 /// <summary>
-/// Writes a reply as <c>redis-cli --raw</c> does (ADR-1077): each string, number, error and null on its own line
+/// Writes a reply as <c>redis-cli --raw</c> does (ADR-1079): each string, number, error and null on its own line
 /// (a null an empty line, a boolean <c>true</c> or <c>false</c>), and an aggregate as its elements in order, a map's
 /// keys and values alternating.
 /// </summary>

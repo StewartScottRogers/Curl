@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Redis.Client;
 
 /// <summary>
-/// The Redis exchange over any byte transport (ADR-1077): <c>HELLO 3</c> (with <c>AUTH</c> when there are
+/// The Redis exchange over any byte transport (ADR-1079): <c>HELLO 3</c> (with <c>AUTH</c> when there are
 /// credentials) to speak RESP3, <c>SELECT</c> when the URL names a database, then the command, its reply written to
 /// the output by <see cref="RespReplyRendering"/>. An error reply to <c>HELLO</c> with credentials or a
 /// <c>NOAUTH</c> error ends with exit 67; any other error reply, or a malformed reply, with exit 8.

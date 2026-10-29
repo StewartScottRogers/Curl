@@ -1,4 +1,4 @@
-# ADR-1077: Redis sends one command from the URL path over RESP3 and writes its reply as redis-cli --raw does
+# ADR-1079: Redis sends one command from the URL path over RESP3 and writes its reply as redis-cli --raw does
 
 - Status: Accepted
 - Date: 2026-10-29
