@@ -31,3 +31,4 @@ BL-4044 measured it (2026-10-28) with `Record-CurlExchange.ps1 -Port 21909 -Tls 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 4a3a8bb2 db97300f 779790c0.
