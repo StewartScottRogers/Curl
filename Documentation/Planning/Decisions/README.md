@@ -1056,3 +1056,4 @@ Each option and the specific reason it lost.
 | [1015](ADR-1015-hook-commands-run-powershell-or-else-pwsh-through-sh.md) | Hook commands in `.claude/settings.json` run `powershell`, or else `pwsh`, through `sh`, and the audit guard fails closed without either (BL-3926) | Accepted | 2026-10-29 |
 | [1020](ADR-1020-engine-composition-keeps-one-unit-per-partial-file.md) | EngineComposition keeps one unit per partial file (BL-4172) | Accepted | 2026-10-29 |
 | [1023](ADR-1023-engine-composition-keeps-one-unit-per-partial-file.md) | EngineComposition keeps one unit per partial file (BL-4172) | Accepted | 2026-10-29 |
+| [1022](ADR-1022-encrypted-dns-dot-resolver-pipelines-aaaa-and-a-over-one-tls-connection.md) | The DNS-over-TLS resolver pipelines AAAA and A over one TLS connection (BL-4207) | Accepted | 2026-10-29 |
