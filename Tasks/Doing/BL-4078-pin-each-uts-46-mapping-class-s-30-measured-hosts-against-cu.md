@@ -33,3 +33,4 @@ BL-3829 (ADR-0980) maps host names with the whole UTS #46 table and NFC. BL-4033
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 77b244f6 779790c0.
