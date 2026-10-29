@@ -33,3 +33,4 @@ CGR-289, part 2 of 3 of BL-4044. Real curl measured: bind flags `07 b2 08 a2`...
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d35ea53d 340d318a 779790c0.
