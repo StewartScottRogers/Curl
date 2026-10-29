@@ -34,3 +34,4 @@ Split from BL-4012 (over its cost cap); needs BL-4057, which makes the Engine dr
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 5a165af6 a4efa820 e4d345af ae9d1d50.
