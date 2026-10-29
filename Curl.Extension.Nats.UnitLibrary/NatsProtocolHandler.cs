@@ -4,7 +4,7 @@ namespace Curl.Extension.Nats;
 
 /// <summary>
 /// Serves <c>nats://[user[:password]@]host[:port]/subject[?request][&amp;count=N]</c> and its TLS form
-/// <c>natss://</c> (ADR-1062): without <c>-d</c> it subscribes to the subject and writes each message's
+/// <c>natss://</c> (ADR-1063): without <c>-d</c> it subscribes to the subject and writes each message's
 /// payload and a newline; with <c>-d</c> it publishes the data; with <c>?request</c> it publishes the
 /// data with a reply subject and writes the one reply.
 /// </summary>

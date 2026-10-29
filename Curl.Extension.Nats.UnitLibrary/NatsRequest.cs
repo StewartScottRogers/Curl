@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Nats;
 
 /// <summary>
-/// What a NATS URL and <c>-d</c> ask for (ADR-1062): the subject, the payload, and the URL query's
+/// What a NATS URL and <c>-d</c> ask for (ADR-1063): the subject, the payload, and the URL query's
 /// fields, <c>request</c> to wait for one reply and <c>count=N</c> to end a subscription after N messages.
 /// </summary>
 /// <param name="Subject">The subject the URL's path names.</param>

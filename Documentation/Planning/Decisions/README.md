@@ -1098,3 +1098,4 @@ Each option and the specific reason it lost.
 | [1063](ADR-1063-an-http3-client-session-offers-server-opened-streams-of-unknown-types-to-an-opt-in-callback.md) | An HTTP/3 client session offers server-opened streams of unknown types to an opt-in callback (BL-4223) | Accepted | 2026-10-29 |
 | [1064](ADR-1064-coap-observe-writes-each-notification-then-a-newline.md) | `--coap-observe` follows a CoAP resource and writes each notification, then a newline (BL-4248) | Accepted | 2026-10-29 |
 | [1062](ADR-1062-nats-subscribes-without-data-publishes-with-it-and-requests-with-a-query-field.md) | NATS subscribes without data, publishes with it, and requests with a query field (BL-4120) | Accepted | 2026-10-29 |
+| [1063](ADR-1063-nats-subscribes-without-data-publishes-with-it-and-requests-with-a-query-field.md) | NATS subscribes without data, publishes with it, and requests with a query field (BL-4120) | Accepted | 2026-10-29 |

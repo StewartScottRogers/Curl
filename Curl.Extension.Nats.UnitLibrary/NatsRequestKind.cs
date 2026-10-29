@@ -1,6 +1,6 @@
 namespace Curl.Extension.Nats;
 
-/// <summary>What a NATS transfer does, chosen from <c>-d</c> and the URL's query (ADR-1062).</summary>
+/// <summary>What a NATS transfer does, chosen from <c>-d</c> and the URL's query (ADR-1063).</summary>
 internal enum NatsRequestKind
 {
     /// <summary>No <c>-d</c>: subscribe to the subject and write each message received.</summary>

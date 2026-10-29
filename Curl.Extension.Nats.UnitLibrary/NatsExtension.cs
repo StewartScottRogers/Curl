@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Nats;
 
-/// <summary>The <c>nats://</c> and <c>natss://</c> extension's description and handler factory (ADR-1062).</summary>
+/// <summary>The <c>nats://</c> and <c>natss://</c> extension's description and handler factory (ADR-1063).</summary>
 public static class NatsExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

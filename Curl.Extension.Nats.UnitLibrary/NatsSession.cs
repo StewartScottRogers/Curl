@@ -6,7 +6,7 @@ namespace Curl.Extension.Nats;
 /// <summary>
 /// Runs one NATS transfer over an open connection (NATS client protocol): reads INFO, sends CONNECT,
 /// the request's SUB, UNSUB and PUB lines and a PING, answers the server's PINGs, and writes the
-/// messages the request asks for to the output (ADR-1062).
+/// messages the request asks for to the output (ADR-1063).
 /// </summary>
 /// <param name="connection">The connection.</param>
 /// <param name="context">The transfer, for its credentials, output and cancellation.</param>

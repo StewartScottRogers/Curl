@@ -1,6 +1,6 @@
 namespace Curl.Extension.Nats;
 
-/// <summary>The error messages the NATS extension ends a transfer with (ADR-1062).</summary>
+/// <summary>The error messages the NATS extension ends a transfer with (ADR-1063).</summary>
 internal static class NatsMessages
 {
     /// <summary>The URL has no subject.</summary>
