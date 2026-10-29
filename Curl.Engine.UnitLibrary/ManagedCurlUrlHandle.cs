@@ -284,7 +284,7 @@ internal sealed class ManagedCurlUrlHandle : ICurlUrlHandle
     {
         if (Get(CurlUrlPart.Url, HeldUrlFlags(value, flags), out string? current) == CurlUrlCode.Ok)
         {
-            return Parse(UrlRelativeReference.Resolve(current!, value), flags);
+            return Parse(UrlRelativeReference.Resolve(current!, value), flags & ~CurlUrlFlags.PathAsIs);
         }
 
         return value.Length == 0 || HoldsDisallowedSpace(value, flags) ? CurlUrlCode.MalformedInput : ParseWithoutScheme(value, flags);
