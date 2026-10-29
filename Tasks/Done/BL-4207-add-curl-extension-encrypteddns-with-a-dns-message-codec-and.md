@@ -31,7 +31,7 @@ Split from BL-4148 (extension 48 of 63; ADR-0999, CLAUDE.md "Extensions"). Creat
 ## Notes
 
 - Filed by BL-4148's run, which split that task for size (its Notes ask for wire format, client flow and options separately).
-- Plan: codec in `Wire/` (`DnsQueryEncoder`, `DnsAnswerDecoder`, `DnsAnswer`, `DnsAnswerFailure`, `DnsRecordType`, internal `DnsMessageReader`), resolver in `DnsOverTls/` (`DnsOverTlsResolver`, `DnsOverTlsServer`). Decisions in ADR-1022 (Decided by Claude under Stewart's delegation): AAAA (ID 2) and A (ID 1) pipelined on one TLS connection per lookup, answers matched by ID, AAAA addresses first as `DohDnsResolver` returns them, every failure gives no addresses (exit 6 at the connector).
+- Plan: codec in `Wire/` (`DnsQueryEncoder`, `DnsAnswerDecoder`, `DnsAnswer`, `DnsAnswerFailure`, `DnsRecordType`, internal `DnsMessageReader`), resolver in `DnsOverTls/` (`DnsOverTlsResolver`, `DnsOverTlsServer`). Decisions in ADR-1024 (Decided by Claude under Stewart's delegation): AAAA (ID 2) and A (ID 1) pipelined on one TLS connection per lookup, answers matched by ID, AAAA addresses first as `DohDnsResolver` returns them, every failure gives no addresses (exit 6 at the connector).
 - Default taken: fixed query IDs rather than random, since the channel is authenticated TLS and fixed IDs keep the wire bytes deterministic for tests.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.EncryptedDns.UnitLibrary` reports 100% line, 100% branch, 0 failing members. 28 unit tests; full fast run green. Tests use no paths, OS text or certificates, so they are platform-neutral for CI on Linux and macOS.
 

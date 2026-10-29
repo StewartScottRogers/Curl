@@ -1,4 +1,4 @@
-# ADR-1022: The DNS-over-TLS resolver pipelines AAAA and A over one TLS connection
+# ADR-1024: The DNS-over-TLS resolver pipelines AAAA and A over one TLS connection
 
 - Status: Accepted
 - Date: 2026-10-29

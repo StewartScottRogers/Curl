@@ -1,6 +1,6 @@
 # Curl.Extension.EncryptedDns.UnitLibrary
 
-Encrypted DNS lookups (ADR-0999, ADR-1022): a DNS message codec and an `IDnsResolver` that asks a DNS-over-TLS
+Encrypted DNS lookups (ADR-0999, ADR-1024): a DNS message codec and an `IDnsResolver` that asks a DNS-over-TLS
 server (RFC 7858). Namespaces `Curl.Extension.EncryptedDns.Wire` and `Curl.Extension.EncryptedDns.DnsOverTls`.
 Tested against RFC 1035 and RFC 7858, not against curl. Not yet registered in any catalogue: BL-4148 adds the
 options, the resolver hook and the `ExtensionCatalogue` line.
