@@ -1,5 +1,5 @@
 ---
-id: BL-4262
+id: BL-4263
 title: Extension: offer ALPN on TLS over a --npipe named pipe
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4262 — Extension: offer ALPN on TLS over a --npipe named pipe
+# BL-4263 — Extension: offer ALPN on TLS over a --npipe named pipe
 
 ## Goal
 
