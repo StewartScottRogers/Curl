@@ -32,3 +32,4 @@ First of three parts split from BL-4165 (itself split from BL-4099) because the 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 690e3591 ee2341fd 7ae6d7ff 3d836d5e.
