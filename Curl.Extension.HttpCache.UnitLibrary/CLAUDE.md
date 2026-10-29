@@ -1,8 +1,14 @@
 # Curl.Extension.HttpCache.UnitLibrary
 
 The HTTP cache extension's RFC 9111 core (ADR-0999, ADR-1020). Namespace `Curl.Extension.HttpCache`.
-It references nothing but the base class library so far; the `--cache-dir` option, its transfer
-hook and its registration in `Curl.Extension.Composition` arrive with BL-4133.
+It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings.
+
+- `HttpCacheExtension` gives the `--cache-dir <dir>` option, its description and its hook activator, which
+  `Curl.Extension.Composition` registers (ADR-1063).
+- `HttpCacheTransferHook` answers a fresh stored response without the origin (§4.2), revalidates a stale one
+  and writes it in place of a 304 that selects it (§4.3), and stores what §3 allows; `CacheableRequest`
+  decides which transfers it handles (plain GET of the whole resource) and `StoredResponseOutput` writes a
+  stored response to the transfer's outputs.
 
 - `ResponseStorability` decides whether a response may be stored (§3, §3.5).
 - `FreshnessCalculator` computes the freshness lifetime (§4.2.1, §4.2.2), the current age (§4.2.3)

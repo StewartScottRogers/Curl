@@ -20,5 +20,6 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.JsonRpc.JsonRpcExtension.Option,
         Coap.Observe.CoapObserveTransferHook.Option,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Option,
+        Curl.Extension.HttpCache.HttpCacheExtension.Option,
     ];
 }

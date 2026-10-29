@@ -20,5 +20,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.JsonRpc.JsonRpcExtension.HookFor,
         Coap.Observe.CoapObserveTransferHook.ActivatedBy,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.HookFor,
+        Curl.Extension.HttpCache.HttpCacheExtension.HookFor,
     ];
 }

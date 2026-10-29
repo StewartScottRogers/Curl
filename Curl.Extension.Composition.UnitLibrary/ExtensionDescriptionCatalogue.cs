@@ -21,5 +21,6 @@ internal static class ExtensionDescriptionCatalogue
         Nats.NatsExtension.Description,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
         Xmpp.Client.XmppExtension.Description,
+        Curl.Extension.HttpCache.HttpCacheExtension.Description,
     ];
 }
