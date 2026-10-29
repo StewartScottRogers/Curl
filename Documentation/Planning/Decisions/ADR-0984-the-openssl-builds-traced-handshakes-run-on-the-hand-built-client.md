@@ -35,7 +35,7 @@ which the hand-built client already honours (ADR-0197, ADR-0191).
   the handshake messages, which SslStream does not show" (the diagnostic log's route reason).
 - The Schannel build never takes the row: curl's Schannel build prints no message trace.
 - Setting the option from `-v`, `--trace` and `--trace-ascii` in the engine's option mapping is
-  BL-4045's (filed with this ADR), so this decision lands the routing alone.
+  BL-4047's (filed with this ADR), so this decision lands the routing alone.
 
 ## Consequences
 

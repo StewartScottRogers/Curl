@@ -1,5 +1,5 @@
 ---
-id: BL-4046
+id: BL-4048
 title: Cgr036Tests ConnectAsync_OpenSocketSupplies and ClosedPort_CallsOpen fail in the full fast run and pass alone
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4046 — Cgr036Tests ConnectAsync_OpenSocketSupplies and ClosedPort_CallsOpen fail in the full fast run and pass alone
+# BL-4048 — Cgr036Tests ConnectAsync_OpenSocketSupplies and ClosedPort_CallsOpen fail in the full fast run and pass alone
 
 ## Goal
 

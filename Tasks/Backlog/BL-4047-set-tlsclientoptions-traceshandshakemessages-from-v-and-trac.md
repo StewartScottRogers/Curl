@@ -1,5 +1,5 @@
 ---
-id: BL-4045
+id: BL-4047
 title: Set TlsClientOptions.TracesHandshakeMessages from -v and --trace so the OpenSSL build prints the handshake message trace
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4045 — Set TlsClientOptions.TracesHandshakeMessages from -v and --trace so the OpenSSL build prints the handshake message trace
+# BL-4047 — Set TlsClientOptions.TracesHandshakeMessages from -v and --trace so the OpenSSL build prints the handshake message trace
 
 ## Goal
 
