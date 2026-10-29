@@ -1,5 +1,5 @@
 ---
-id: BL-4201
+id: BL-4202
 title: Pass the activated extension certificate check hooks from Curl.Console
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4201 — Pass the activated extension certificate check hooks from Curl.Console
+# BL-4202 — Pass the activated extension certificate check hooks from Curl.Console
 
 ## Goal
 

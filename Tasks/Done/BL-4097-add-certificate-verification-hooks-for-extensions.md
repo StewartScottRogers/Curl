@@ -33,7 +33,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - Sensible defaults taken: hooks compose (all run, first refusal wins) rather than refusing two options; reused connections and connections without TLS are not checked; a TLS provider upgrade is checked even when it reports no certificate; the check also runs under `-k`.
 - Touches widened with `Curl.Engine.UnitTests/EngineCompositionTests.Extensions.cs` (the engine seam's test, where the BL-4096 resolver seam is tested) and `Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md` (the library's document); no task in Doing on origin/work/dark-factory names either.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary,Curl.Engine.UnitLibrary`: both 100% line and branch, 0 failing members. Full build clean, fast tests green on Windows; the tests use no path, OS error or certificate and wait on nothing concurrent, so they are platform-neutral for CI on Linux and macOS.
-- Filed BL-4201 for the Curl.Console wiring.
+- Filed BL-4202 for the Curl.Console wiring.
 
 ## Log
 
