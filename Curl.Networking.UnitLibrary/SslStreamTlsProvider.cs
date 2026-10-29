@@ -414,12 +414,14 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         };
 
         var transport = OpenTransport(plaintext);
+        transport.HoldsWritesAfterFirstRead = _matchesSchannelBuild;
         var sslStream = new SslStream(transport, leaveInnerStreamOpen: true);
         Exception failure;
         try
         {
             var handshakeStarted = _timeProvider.GetTimestamp();
             await AuthenticateSslStreamAsClientAsync(sslStream, authenticationOptions, cancellationToken).ConfigureAwait(false);
+            await transport.ReleaseHeldWritesAsync(cancellationToken).ConfigureAwait(false);
             peerVerification.ReportVerifyResult(events, isProxy, _matchesSchannelBuild);
             events.ReportTlsHandshake(DescribeHandshake(sslStream, peerVerification, offeredApplicationProtocols) with
             {
