@@ -37,8 +37,13 @@ MQTT 5 adds reason codes to CONNACK, SUBACK and DISCONNECT, which curl's handler
   | A topic MQTT 5 refuses (a wildcard in a published topic name, a bad filter) | 3 | `Invalid MQTT 5 topic: <reason>`, before anything is sent |
 
   A DISCONNECT with Normal disconnection ends a subscription successfully, as curl's "Got DISCONNECT" does.
-- **Keep Alive 0.** CONNECT asks for no keep-alive, so the client never has to ping while it waits for messages.
-  Honouring a Server Keep Alive a broker returns in CONNACK (section 3.2.2.3.14) is left to a follow-up task.
+- **Keep Alive 0, and the broker's Server Keep Alive honoured.** CONNECT asks for no keep-alive. When CONNACK
+  returns a Server Keep Alive N above 0, the client must use it (section 3.2.2.3.14), so while it waits for messages
+  `Mqtt5ClientFlow` sends a PINGREQ every N/2 seconds on the transfer's `TimeProvider`, counted from the last PINGREQ
+  whatever the server sends meanwhile, since Keep Alive counts only what the client sends (section 3.1.2.10). Half
+  leaves room for the network before the broker's 1.5 N limit. PINGRESP is accepted and ignored; the client does not
+  time out a missing one, since the broker closing the connection already ends the transfer with a receive error
+  (BL-4261).
 - **The flow takes its transport.** `Mqtt5ClientFlow` speaks over any `IConnection`; the handler gets a TCP or TLS
   one from the connector (`ConnectTarget.UseTls` for `mqtt5s://`, port 8883; 1883 otherwise), and BL-4244 can pass a
   WebSocket-carrying one for `mqtt5+ws://` without changing the flow. The handler is not registered here: BL-4115

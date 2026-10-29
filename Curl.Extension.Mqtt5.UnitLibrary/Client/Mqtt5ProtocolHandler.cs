@@ -96,7 +96,7 @@ public sealed class Mqtt5ProtocolHandler : IProtocolHandler
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new Mqtt5ClientFlow(connection, context.Output, context.Progress, context.CancellationToken);
+            var flow = new Mqtt5ClientFlow(connection, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
             try
             {
                 await flow.RunAsync(ConnectFor(ClientIdentifierPrefix + clientIdentifierSuffixSource(), context.Credentials), topic, context.PostData).ConfigureAwait(false);
