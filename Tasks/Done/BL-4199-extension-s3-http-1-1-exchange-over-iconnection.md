@@ -33,7 +33,7 @@ Split from BL-4124 for size. The project is created by BL-4197. An extension nev
   for `IConnection`) and its `CLAUDE.md` (which said `Http/` was still to come); no task in Doing on
   `origin/work/dark-factory` names either.
 - Done directly rather than through the whole `/feature` pipeline, to stay inside the run's cost cap;
-  the design is recorded in ADR-1015.
+  the design is recorded in ADR-1016.
 - Defaults taken: the caller, not the client, calls `MarkReusable` once the body is read (only it knows
   when); obs-fold is rejected; a `Content-Length` list is invalid; a line over 64 KiB fails; chunked
   trailers are discarded; `Expect: 100-continue` is left out, so a 1xx comes back as a response with
