@@ -1113,3 +1113,4 @@ Each option and the specific reason it lost.
 | [1066](ADR-1066-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
 | [1069](ADR-1069-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
 | [1076](ADR-1076-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
+| [1075](ADR-1075-xmpp-logs-in-with-scram-sha-256-or-scram-sha-1-before-plain.md) | XMPP logs in with SCRAM-SHA-256 or SCRAM-SHA-1 before PLAIN (BL-4271) | Accepted | 2026-10-29 |

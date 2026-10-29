@@ -11,8 +11,17 @@ namespace Curl.Extension.Xmpp.Client;
 /// </summary>
 /// <param name="connector">Opens the connection to the server.</param>
 /// <param name="tlsProvider">Secures the connection after STARTTLS.</param>
-internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tlsProvider) : IProtocolHandler
+/// <param name="createClientNonce">Gives a fresh SCRAM client nonce.</param>
+internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tlsProvider, Func<string> createClientNonce) : IProtocolHandler
 {
+    /// <summary>Creates the handler with random SCRAM client nonces.</summary>
+    /// <param name="connector">Opens the connection to the server.</param>
+    /// <param name="tlsProvider">Secures the connection after STARTTLS.</param>
+    internal XmppProtocolHandler(IConnector connector, ITlsProvider tlsProvider)
+        : this(connector, tlsProvider, XmppScramExchange.CreateClientNonce)
+    {
+    }
+
     /// <summary>The port <c>xmpp://</c> connects to when the URL names none (RFC 6120, 3.2.1).</summary>
     internal const int DefaultPort = 5222;
 
@@ -67,7 +76,7 @@ internal sealed class XmppProtocolHandler(IConnector connector, ITlsProvider tls
         context.Progress.ReportTransferStarted();
         await using (connection.ConfigureAwait(false))
         {
-            var flow = new XmppClientFlow(connection, tlsProvider, context.Url.Host, context.Output, context.Progress, context.CancellationToken);
+            var flow = new XmppClientFlow(connection, tlsProvider, context.Url.Host, context.Output, context.Progress, createClientNonce, context.CancellationToken);
             TransferResult result = await RunFlowAsync(flow, context, request).ConfigureAwait(false);
             await flow.DisposeAsync().ConfigureAwait(false);
             return result;

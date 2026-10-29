@@ -138,7 +138,9 @@ public sealed class XmppProtocolHandlerTests
     [DataRow(Header + "<stream:features><starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'/></stream:features>|<failure xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>", CurlExitCode.WeirdServerReply, "Unexpected XMPP element <failure>")]
     [DataRow(Header + "<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>|<failure xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><not-authorized/></failure>", CurlExitCode.LoginDenied, "XMPP authentication failed: not-authorized")]
     [DataRow(Header + "<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>|<foo/>", CurlExitCode.WeirdServerReply, "Unexpected XMPP element <foo>")]
-    [DataRow(Header + "<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>SCRAM-SHA-1</mechanism></mechanisms></stream:features>", CurlExitCode.LoginDenied, "XMPP server does not offer SASL PLAIN")]
+    [DataRow(Header + "<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>DIGEST-MD5</mechanism></mechanisms></stream:features>", CurlExitCode.LoginDenied, "XMPP server does not offer SASL SCRAM-SHA-256 or SCRAM-SHA-1 or PLAIN")]
+    [DataRow(Header + "<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>|<challenge xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>=</challenge>", CurlExitCode.WeirdServerReply, "Unexpected XMPP element <challenge>")]
+    [DataRow(Header + "<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>|<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>!!</success>", CurlExitCode.WeirdServerReply, "XMPP server sent malformed XML")]
     [DataRow(Header + "<stream:error><host-unknown xmlns='urn:ietf:params:xml:ns:xmpp-streams'/></stream:error>", CurlExitCode.WeirdServerReply, "XMPP stream error: host-unknown")]
     [DataRow(Header + "<stream:error/>", CurlExitCode.WeirdServerReply, "XMPP stream error: undefined-condition")]
     [DataRow(Header, CurlExitCode.RecvError, "Connection disconnected")]
@@ -153,6 +155,55 @@ public sealed class XmppProtocolHandlerTests
 
         Assert.AreEqual(exitCode, result.ExitCode);
         Assert.AreEqual(message, result.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScramSha256Offered_ChoosesItOverScramSha1AndPlainAndSendsRfc7677sProof()
+    {
+        ScriptedXmppConnection connection = Script(true, [
+            Features("PLAIN</mechanism><mechanism>SCRAM-SHA-1</mechanism><mechanism>SCRAM-SHA-256"),
+            Sasl("challenge", "r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096"),
+            Sasl("success", "v=6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4="), BindFeatures, BindResult, Close]);
+
+        TransferResult result = await ExecuteScramAsync(connection, "rOprNGfwEbeRWgbNEkqO");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual($"<auth mechanism=\"SCRAM-SHA-256\" xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">{Base64("n,,n=user,r=rOprNGfwEbeRWgbNEkqO")}</auth>", connection.WrittenText.ElementAt(1));
+        Assert.AreEqual(
+            $"<response xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">{Base64("c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,p=dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=")}</response>",
+            connection.WrittenText.ElementAt(2));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScramSha1ServerFinalInAChallenge_AnswersEmptyAndLogsIn()
+    {
+        ScriptedXmppConnection connection = Script(true, [
+            Features("PLAIN</mechanism><mechanism>SCRAM-SHA-1"),
+            Sasl("challenge", "r=fyko+d2lbbFgONRv9qkxdawL3rfcNHYJY1ZVvWVs7j,s=QSXCR+Q6sek8bf92,i=4096"),
+            Sasl("challenge", "v=rmF9pqV8S7suAoZWja4dJRkFsKQ="),
+            "<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>=</success>", BindFeatures, BindResult, Close]);
+
+        TransferResult result = await ExecuteScramAsync(connection, "fyko+d2lbbFgONRv9qkxdawL");
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        Assert.AreEqual(
+            $"<response xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">{Base64("c=biws,r=fyko+d2lbbFgONRv9qkxdawL3rfcNHYJY1ZVvWVs7j,p=v0X8v3Bz2T0CJGbJQyF0X+HI4Ts=")}</response>",
+            connection.WrittenText.ElementAt(2));
+        Assert.AreEqual("<response xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\"></response>", connection.WrittenText.ElementAt(3));
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_ScramWrongServerSignature_FailsAuthenticationWithLoginDenied()
+    {
+        ScriptedXmppConnection connection = Script(true, [
+            Features("SCRAM-SHA-1"),
+            Sasl("challenge", "r=fyko+d2lbbFgONRv9qkxdawL3rfcNHYJY1ZVvWVs7j,s=QSXCR+Q6sek8bf92,i=4096"),
+            Sasl("success", "v=AAAAAAAAAAAAAAAAAAAAAAAAAAA=")]);
+
+        TransferResult result = await ExecuteScramAsync(connection, "fyko+d2lbbFgONRv9qkxdawL");
+
+        Assert.AreEqual(CurlExitCode.LoginDenied, result.ExitCode);
+        Assert.AreEqual("XMPP authentication failed: server signature mismatch", result.ErrorMessage);
     }
 
     [TestMethod]
@@ -249,6 +300,14 @@ public sealed class XmppProtocolHandlerTests
 
     private static string Features(string mechanism) =>
         Header + $"<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>{mechanism}</mechanism></mechanisms></stream:features>";
+
+    private static string Sasl(string element, string text) => $"<{element} xmlns='urn:ietf:params:xml:ns:xmpp-sasl'>{Base64(text)}</{element}>";
+
+    private static string Base64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+
+    private static ValueTask<TransferResult> ExecuteScramAsync(ScriptedXmppConnection connection, string clientNonce) =>
+        new XmppProtocolHandler(new ScriptedXmppConnector(ConnectResult.Connected(connection)), new ScriptedTlsProvider(ConnectResult.Refused("no tls")), () => clientNonce)
+            .ExecuteAsync(Context("xmpp://example.com/romeo@example.net", new NetworkCredential("user", "pencil"), new MemoryStream(), "hi"));
 
     private static ScriptedXmppConnection Script(bool failsWhenDrained, string[] chunks) =>
         new([.. chunks.Select(Encoding.UTF8.GetBytes)]) { FailsWhenDrained = failsWhenDrained };

@@ -21,8 +21,8 @@ internal static class XmppClientMessages
     /// <summary>The disco query's <c>request</c> key names neither <c>info</c> nor <c>items</c>.</summary>
     internal static string UnsupportedDiscoRequest(string request) => $"Unsupported XMPP disco request: {request}";
 
-    /// <summary>The server does not offer the SASL mechanism the client needs.</summary>
-    internal static string MechanismNotOffered(string mechanism) => $"XMPP server does not offer SASL {mechanism}";
+    /// <summary>The server offers none of the SASL <paramref name="mechanisms"/> the client can log in with.</summary>
+    internal static string MechanismNotOffered(IEnumerable<string> mechanisms) => $"XMPP server does not offer SASL {string.Join(" or ", mechanisms)}";
 
     /// <summary>The server refused the SASL authentication with <paramref name="condition"/>.</summary>
     internal static string AuthenticationFailed(string condition) => $"XMPP authentication failed: {condition}";

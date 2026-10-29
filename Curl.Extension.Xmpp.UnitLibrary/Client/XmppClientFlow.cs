@@ -9,11 +9,12 @@ namespace Curl.Extension.Xmpp.Client;
 
 /// <summary>
 /// The XMPP client exchange (RFC 6120; ADR-1068): opens the stream (4.2), negotiates STARTTLS when the server offers it
-/// and the connection is not yet secure (5.4), authenticates with SASL PLAIN, or ANONYMOUS without credentials (6.4),
-/// restarting the stream after each (4.3.3), binds a server-chosen resource (7.6), sends the request stanza, writes a
-/// disco answer's payload to the output, then closes the stream (4.4) and reads until the server closes its own.
+/// and the connection is not yet secure (5.4), authenticates with the most preferred SASL mechanism in
+/// <see cref="XmppSaslMechanisms"/> the server offers (6.4; ADR-1075), restarting the stream after each (4.3.3), binds a
+/// server-chosen resource (7.6), sends the request stanza, writes a disco answer's payload to the output, then closes the
+/// stream (4.4) and reads until the server closes its own.
 /// </summary>
-internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsProvider, string domain, Stream output, ITransferProgress progress, CancellationToken cancellationToken)
+internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsProvider, string domain, Stream output, ITransferProgress progress, Func<string> createClientNonce, CancellationToken cancellationToken)
     : IAsyncDisposable
 {
     /// <summary>The <c>id</c> of the resource binding <c>&lt;iq/&gt;</c>.</summary>
@@ -87,17 +88,18 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
 
     private async ValueTask<XElement> AuthenticateAsync(XElement features, NetworkCredential? credentials)
     {
-        (string mechanism, string response) = credentials is null
-            ? ("ANONYMOUS", "=")
-            : ("PLAIN", Convert.ToBase64String(Encoding.UTF8.GetBytes($"\0{credentials.UserName}\0{credentials.Password}")));
-        bool offered = features.Elements(XmppNamespaces.Sasl + "mechanisms").Elements(XmppNamespaces.Sasl + "mechanism").Any(offer => offer.Value == mechanism);
-        if (!offered)
+        IXmppSaslMechanism mechanism = ChooseMechanism(features, credentials);
+        IXmppSaslExchange exchange = mechanism.Start(credentials, createClientNonce);
+        string initialResponse = exchange.InitialResponse.Length == 0 ? "=" : EncodeSasl(exchange.InitialResponse);
+        await SendAsync(Encode(new XElement(XmppNamespaces.Sasl + "auth", new XAttribute("mechanism", mechanism.Name), initialResponse))).ConfigureAwait(false);
+        XElement outcome = await NextAsync().ConfigureAwait(false);
+        while (outcome.Name == XmppNamespaces.Sasl + "challenge")
         {
-            throw new XmppClientException(CurlExitCode.LoginDenied, XmppClientMessages.MechanismNotOffered(mechanism));
+            string response = exchange.Respond(DecodeSasl(outcome.Value));
+            await SendAsync(Encode(new XElement(XmppNamespaces.Sasl + "response", EncodeSasl(response)))).ConfigureAwait(false);
+            outcome = await NextAsync().ConfigureAwait(false);
         }
 
-        await SendAsync(Encode(new XElement(XmppNamespaces.Sasl + "auth", new XAttribute("mechanism", mechanism), response))).ConfigureAwait(false);
-        XElement outcome = await NextAsync().ConfigureAwait(false);
         if (outcome.Name == XmppNamespaces.Sasl + "failure")
         {
             throw new XmppClientException(CurlExitCode.LoginDenied, XmppClientMessages.AuthenticationFailed(ConditionOf(outcome)));
@@ -108,7 +110,32 @@ internal sealed class XmppClientFlow(IConnection connection, ITlsProvider tlsPro
             throw Unexpected(outcome);
         }
 
+        exchange.Complete(DecodeSasl(outcome.Value));
         return await OpenStreamAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Gives the most preferred mechanism the server offers that logs in with <paramref name="credentials"/> (RFC 6120, 6.3.3).</summary>
+    private static IXmppSaslMechanism ChooseMechanism(XElement features, NetworkCredential? credentials)
+    {
+        HashSet<string> offered = [.. features.Elements(XmppNamespaces.Sasl + "mechanisms").Elements(XmppNamespaces.Sasl + "mechanism").Select(offer => offer.Value)];
+        IReadOnlyList<IXmppSaslMechanism> candidates = XmppSaslMechanisms.For(credentials);
+        return candidates.FirstOrDefault(candidate => offered.Contains(candidate.Name))
+            ?? throw new XmppClientException(CurlExitCode.LoginDenied, XmppClientMessages.MechanismNotOffered(candidates.Select(candidate => candidate.Name)));
+    }
+
+    private static string EncodeSasl(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+
+    /// <summary>Decodes a SASL element's base64 text; <c>=</c> is empty data (RFC 6120, 6.4.2).</summary>
+    private static string DecodeSasl(string text)
+    {
+        try
+        {
+            return text == "=" ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(text));
+        }
+        catch (FormatException)
+        {
+            throw new XmppClientException(CurlExitCode.WeirdServerReply, XmppClientMessages.Malformed);
+        }
     }
 
     private async ValueTask BindAsync()
