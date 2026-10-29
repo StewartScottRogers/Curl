@@ -847,12 +847,19 @@ internal static class TlsFailureMessages
 
     // curl's Schannel build checks the chain's trust errors in this order. An untrusted root
     // is also what anything else, or no chain at all, is reported as.
-    private static string SchannelCaCertificateFileChainError(X509Chain? chain)
+    private static string SchannelCaCertificateFileChainError(X509Chain? chain) =>
+        SchannelCaCertificateFileChainError(ChainStatus(chain));
+
+    internal static string SchannelCaCertificateFileChainError(X509ChainStatusFlags status)
     {
-        var status = ChainStatus(chain);
         if (status.HasFlag(X509ChainStatusFlags.NotTimeValid))
         {
             return SchannelChainNotTimeValid;
+        }
+
+        if (status.HasFlag(X509ChainStatusFlags.Revoked))
+        {
+            return SchannelChainRevoked;
         }
 
         if (status.HasFlag(X509ChainStatusFlags.PartialChain))
