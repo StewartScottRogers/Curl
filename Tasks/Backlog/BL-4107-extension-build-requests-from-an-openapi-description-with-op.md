@@ -4,8 +4,8 @@ title: Extension: Build requests from an OpenAPI description with --openapi
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.OpenApi.UnitLibrary, Curl.Extension.OpenApi.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4205, BL-4209]
+touches: [Curl.Extension.OpenApi.UnitLibrary, Curl.Extension.OpenApi.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionArgumentExpanderCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 prerequisite pass (lane 6, no code edited): `--openapi <spec> --operation <id> name=value...` must supply a whole request (the server URL from the description, the method, path, query and header parameters, a request body), but no extension hook can supply a transfer's URL, method or body (`ITransferHook`, ADR-1007, only adds headers and wraps streams), and a command line without a URL stops at "no URL specified" (exit 2). BL-4205 (Backlog) adds argument expanders that turn an option's value into curl arguments; its contract hands an expander only its own value, so `--operation <id>` and every `name=value` would still be parsed as an option and URLs (`http://petId=5`). Filed BL-4209 (depends on BL-4205) to let an expander take companion options and the matching positional arguments after its option. Planned shape once both land: `OpenApiArgumentExpander` reads the JSON description with `System.Text.Json` (BCL), resolves local `$ref`s, picks `servers[0]` with variable defaults (OAS 3.1 §4.8.5), serializes parameters by `style`/`explode` (§4.8.12.4), sends a `name=value` that is no parameter as a JSON body property (§4.8.13), and expands into `-X`, `-H`, `--data-binary` and the URL. Added `ExtensionOptionCatalogue.cs`, `ExtensionDescriptionCatalogue.cs` and `ExtensionArgumentExpanderCatalogue.cs` to `touches`: the extension registers its options, description and expander one line each (shared list files, BL-4205 creates the last). YAML descriptions are left for that run to decide (a hand-written YAML reader, its own task if too large).
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 2741ec08 0571f249 76c078af e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4205 (argument expanders supplying URL, method and body) and BL-4209 (expander taking --operation and name=value arguments)
