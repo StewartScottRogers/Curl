@@ -1,6 +1,6 @@
 namespace Curl.Extension.Stomp.Client;
 
-/// <summary>The error messages a STOMP transfer ends with (ADR-1057).</summary>
+/// <summary>The error messages a STOMP transfer ends with (ADR-1059).</summary>
 internal static class StompClientMessages
 {
     /// <summary>The URL names no destination.</summary>

@@ -1,6 +1,6 @@
 # Curl.Extension.Stomp.UnitLibrary
 
-The STOMP extension (ADR-0999, ADR-1057), tested against STOMP 1.2, not against curl. It references only
+The STOMP extension (ADR-0999, ADR-1059), tested against STOMP 1.2, not against curl. It references only
 `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`) and the base class library. The handler
 is registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDescriptionCatalogue.cs`.
 

@@ -5,7 +5,7 @@ namespace Curl.Extension.Stomp.Client;
 
 /// <summary>
 /// Serves <c>stomp://host[:port]/destination</c> (port 61613) and <c>stomps://</c> (port 61614, TLS from the
-/// connector) with STOMP 1.2 (ADR-1057): with a body (<c>-d</c>) it sends it to the URL's destination, otherwise it
+/// connector) with STOMP 1.2 (ADR-1059): with a body (<c>-d</c>) it sends it to the URL's destination, otherwise it
 /// subscribes to the destination and writes each message body to the output. <c>--user</c> goes into
 /// <c>CONNECT</c>'s <c>login</c> and <c>passcode</c>. The exchange itself is <see cref="StompClientFlow"/>.
 /// </summary>

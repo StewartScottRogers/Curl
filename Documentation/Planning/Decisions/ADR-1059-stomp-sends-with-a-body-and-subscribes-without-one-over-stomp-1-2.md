@@ -1,4 +1,4 @@
-# ADR-1057: STOMP sends with a body and subscribes without one, over STOMP 1.2
+# ADR-1059: STOMP sends with a body and subscribes without one, over STOMP 1.2
 
 - Status: Accepted
 - Date: 2026-10-29

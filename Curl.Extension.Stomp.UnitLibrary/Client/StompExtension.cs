@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Stomp.Client;
 
-/// <summary>The <c>stomp://</c> and <c>stomps://</c> extension's description and handler factory (ADR-1057).</summary>
+/// <summary>The <c>stomp://</c> and <c>stomps://</c> extension's description and handler factory (ADR-1059).</summary>
 public static class StompExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

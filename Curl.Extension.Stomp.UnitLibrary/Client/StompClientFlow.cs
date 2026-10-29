@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Stomp.Client;
 
 /// <summary>
-/// The STOMP 1.2 exchange over any byte transport (ADR-1057): <c>CONNECT</c> and <c>CONNECTED</c>, then with a body
+/// The STOMP 1.2 exchange over any byte transport (ADR-1059): <c>CONNECT</c> and <c>CONNECTED</c>, then with a body
 /// <c>SEND</c> and a <c>DISCONNECT</c> whose <c>RECEIPT</c> confirms the server processed it, otherwise
 /// <c>SUBSCRIBE</c> and each <c>MESSAGE</c> body written to the output until the server closes the connection.
 /// An <c>ERROR</c> frame, or any frame the exchange does not expect, ends the transfer with exit 8.
