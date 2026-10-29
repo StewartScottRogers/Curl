@@ -30,3 +30,4 @@ Prerequisite of BL-3810 (CGR-281): Http2Session cannot size the HTTP/2 stream re
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d4310f1f 779790c0.
