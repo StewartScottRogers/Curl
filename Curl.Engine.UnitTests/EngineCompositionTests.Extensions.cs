@@ -161,6 +161,33 @@ public sealed partial class EngineCompositionTests
     }
 
     [TestMethod]
+    public async Task CreateProtocolHandlers_WithAnExtensionCertificateCheckRefusing_FailsTheTransferWithExit60()
+    {
+        ScriptedConnector extensions = new([System.Text.Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")]);
+        RecordingConnector refusing = new(CurlExitCode.PeerFailedVerification, "SSL: no TLSA record matches the server certificate");
+        PassThroughTlsProvider curlsTls = new();
+        IConnector? given = null;
+        ITlsProvider? givenTls = null;
+        Diagnostics.Arrange("extension certificate check", "refusing");
+        ProtocolDispatcher dispatcher = new(EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            curlsTls,
+            new LoopbackDnsResolver(),
+            extensionConnector: _ => extensions,
+            extensionCertificateConnector: connector => { given = connector; return refusing; },
+            extensionTlsProvider: tlsProvider => { givenTls = tlsProvider; return tlsProvider; }));
+
+        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream() });
+        Diagnostics.Act("exit code", result.ExitCode.ToString());
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.AreSame(extensions, given);
+        Assert.AreSame(curlsTls, givenTls);
+        Assert.AreEqual("example.com", refusing.Targets.Single().Host);
+    }
+
+    [TestMethod]
     public async Task CreateProtocolHandlers_WithAnExtensionResolver_AnswersATransfersLookupWithIt()
     {
         LoopbackDnsResolver curls = new();

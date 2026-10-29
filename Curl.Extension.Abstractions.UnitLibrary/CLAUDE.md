@@ -24,8 +24,13 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   keeps the one hook whose option was given and throws an `ArgumentException` naming every option when
   two or more were, or one was beside `--doh-url`; a host passes `ResolverOver` to the engine's
   `extensionResolver` (ADR-1012), which keeps curl's resolver when no hook is active.
-
-Later groundwork adds certificate hooks in their own subfolder.
+- `Certificates/ICertificateCheckHook` adds a check to a server's certificate chain after curl's own
+  verification accepted it (DANE/TLSA, Certificate Transparency, ML-DSA): it returns `null` to let the
+  chain stand or the message the transfer fails with as exit 60. `CertificateCheckHooks.ActivatedBy` keeps
+  every hook whose option was given, run in order until one refuses; a host passes `ConnectorOver` and
+  `TlsProviderOver` to the engine's `extensionCertificateConnector` and `extensionTlsProvider` (ADR-1013).
+  A chain curl refused, a reused connection and a connection without TLS pass through unchecked, so a
+  check can only add a refusal.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
 `Curl.Extension.Abstractions.UnitTests`.

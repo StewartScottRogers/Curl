@@ -1,0 +1,18 @@
+namespace Curl.Extension.Abstractions.Certificates;
+
+/// <summary>
+/// Upgrades connections through curl's TLS provider and puts the chain of each handshake it accepted through
+/// the activated certificate checks (ADR-1013): SMTP, IMAP and POP3 STARTTLS and FTP <c>AUTH TLS</c>.
+/// </summary>
+/// <param name="inner">curl's TLS provider.</param>
+/// <param name="hooks">The activated checks.</param>
+internal sealed class CertificateCheckingTlsProvider(ITlsProvider inner, CertificateCheckHooks hooks) : ITlsProvider
+{
+    /// <inheritdoc />
+    public async ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) =>
+        await hooks.CheckedAsync(await inner.AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken).ConfigureAwait(false), targetHost, handshook: true, cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, CancellationToken cancellationToken) =>
+        await hooks.CheckedAsync(await inner.AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken).ConfigureAwait(false), targetHost, handshook: true, cancellationToken).ConfigureAwait(false);
+}

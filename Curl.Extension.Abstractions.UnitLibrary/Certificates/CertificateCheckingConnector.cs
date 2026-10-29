@@ -1,0 +1,23 @@
+namespace Curl.Extension.Abstractions.Certificates;
+
+/// <summary>
+/// Opens connections through curl's connector and puts the chain of each TLS connection it opened through
+/// the activated certificate checks (ADR-1013). A QUIC connection's chain is not reported to it, so a
+/// multiplexed connect passes through unchecked.
+/// </summary>
+/// <param name="inner">curl's connector.</param>
+/// <param name="hooks">The activated checks.</param>
+internal sealed class CertificateCheckingConnector(IConnector inner, CertificateCheckHooks hooks) : IConnector
+{
+    /// <inheritdoc />
+    public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        await hooks.CheckedAsync(await inner.ConnectAsync(target, cancellationToken).ConfigureAwait(false), target.Host, handshook: false, cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        inner.ConnectMultiplexedAsync(target, cancellationToken);
+
+    /// <inheritdoc />
+    public async ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(ConnectTarget target, Func<IMultiplexedConnection, IConnection> openSession, CancellationToken cancellationToken) =>
+        await hooks.CheckedAsync(await inner.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken).ConfigureAwait(false), target.Host, handshook: false, cancellationToken).ConfigureAwait(false);
+}
