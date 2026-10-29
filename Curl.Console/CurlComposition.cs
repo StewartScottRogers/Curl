@@ -655,8 +655,8 @@ internal static class CurlComposition
     /// <see cref="ExtensionTransferHookCatalogue.Entries" /> activate for the group's extension options.
     /// </summary>
     /// <param name="options">The option group.</param>
-    /// <param name="connector">The group's connector, lent to the hooks to make their own requests (ADR-1037).</param>
-    /// <param name="listener">The loopback listener lent to the hooks (ADR-1037).</param>
+    /// <param name="connector">The group's connector, lent to the hooks to make their own requests (ADR-1039).</param>
+    /// <param name="listener">The loopback listener lent to the hooks (ADR-1039).</param>
     /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none.</returns>
     internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options, IConnector connector, IConnectionListener listener) =>
         ExtensionTransferHooksOf(options, ExtensionTransferHookCatalogue.Entries, connector, listener);
@@ -667,8 +667,8 @@ internal static class CurlComposition
     /// </summary>
     /// <param name="options">The option group.</param>
     /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
-    /// <param name="connector">The group's connector, lent to the hooks to make their own requests (ADR-1037).</param>
-    /// <param name="listener">The loopback listener lent to the hooks (ADR-1037).</param>
+    /// <param name="connector">The group's connector, lent to the hooks to make their own requests (ADR-1039).</param>
+    /// <param name="listener">The loopback listener lent to the hooks (ADR-1039).</param>
     /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none, so the engine runs no hook.</returns>
     internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> activators, IConnector connector, IConnectionListener listener)
     {

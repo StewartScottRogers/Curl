@@ -40,7 +40,7 @@ public interface ITransferHook
 
     /// <summary>
     /// Runs the transfer as <see cref="ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" />
-    /// does, given what the host lends a hook to make its own requests first (ADR-1037): curl's connector and a
+    /// does, given what the host lends a hook to make its own requests first (ADR-1039): curl's connector and a
     /// loopback listener. A hook that fetched something, an OAuth 2.0 token, sends it by calling
     /// <paramref name="next" /> with <see cref="TransferContextRequestHeaders.WithRequestHeaders" />. The host calls
     /// this overload when it gave the hooks services, and the other one when it gave none.

@@ -10,7 +10,7 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// </summary>
 /// <param name="handler">Curl's handler.</param>
 /// <param name="hooks">The hooks, in the order they see the request; the first sees the body first.</param>
-/// <param name="services">What the host lends the hooks to make their own requests (ADR-1037), or <see langword="null" /> for none.</param>
+/// <param name="services">What the host lends the hooks to make their own requests (ADR-1039), or <see langword="null" /> for none.</param>
 internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, IReadOnlyList<ITransferHook> hooks, TransferHookServices? services = null) : IProtocolHandler
 {
     /// <inheritdoc />
@@ -59,7 +59,7 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
     /// <summary>
     /// Runs the hooks' <see cref="ITransferHook.ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" /> from <paramref name="index" /> on, the first
     /// outermost, each given the rest as its next step, and curl's handler innermost (ADR-1019); each hook
-    /// gets the services when the host gave some (ADR-1037).
+    /// gets the services when the host gave some (ADR-1039).
     /// </summary>
     private ValueTask<TransferResult> ExecuteThroughHooksAsync(int index, ITransferContext context)
     {

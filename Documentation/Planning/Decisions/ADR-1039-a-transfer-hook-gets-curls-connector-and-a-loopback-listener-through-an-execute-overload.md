@@ -1,4 +1,4 @@
-# ADR-1037: A transfer hook gets curl's connector and a loopback listener through an ExecuteAsync overload
+# ADR-1039: A transfer hook gets curl's connector and a loopback listener through an ExecuteAsync overload
 
 - Status: Accepted
 - Date: 2026-10-29

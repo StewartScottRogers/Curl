@@ -8,7 +8,7 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// </summary>
 /// <param name="hooks">The hooks, in the order they see the request.</param>
 /// <param name="services">
-/// What the host lends the hooks to make their own requests (ADR-1037), passed to each hook's
+/// What the host lends the hooks to make their own requests (ADR-1039), passed to each hook's
 /// services overload of <see cref="ITransferHook.ExecuteAsync(ITransferContext, TransferHookServices, Func{ITransferContext, ValueTask{TransferResult}})" />;
 /// <see langword="null" /> for none, when each hook's other overload runs.
 /// </param>

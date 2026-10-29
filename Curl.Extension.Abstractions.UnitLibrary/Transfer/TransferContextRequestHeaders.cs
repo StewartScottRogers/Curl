@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Transfer;
 
 /// <summary>
 /// Lets a transfer hook's <see cref="ITransferHook.ExecuteAsync(ITransferContext, TransferHookServices, Func{ITransferContext, ValueTask{TransferResult}})" />
-/// run curl's handler with request headers it worked out asynchronously, such as an OAuth 2.0 token it fetched (ADR-1037).
+/// run curl's handler with request headers it worked out asynchronously, such as an OAuth 2.0 token it fetched (ADR-1039).
 /// </summary>
 public static class TransferContextRequestHeaders
 {

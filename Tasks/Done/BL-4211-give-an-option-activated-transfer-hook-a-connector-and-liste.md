@@ -32,10 +32,10 @@ Found by BL-4161's first pass (OAuth 2.0 extension). `ITransferHook.RequestHeade
 ## Notes
 
 - Filed by BL-4161's lane 2 run, which needs it for the OAuth 2.0 flows (BL-4210).
-- Shape (ADR-1037): `TransferHookServices` (connector + listener) reaches a hook through a new default overload `ITransferHook.ExecuteAsync(context, services, next)`, which calls the old one, so existing hooks and catalogue lines are unchanged; `TransferContextRequestHeaders.WithRequestHeaders` adds headers after curl's and the hooks' own. `TransferHooks`/`ActivatedBy` take the services optionally; without them the old overload runs.
+- Shape (ADR-1039): `TransferHookServices` (connector + listener) reaches a hook through a new default overload `ITransferHook.ExecuteAsync(context, services, next)`, which calls the old one, so existing hooks and catalogue lines are unchanged; `TransferContextRequestHeaders.WithRequestHeaders` adds headers after curl's and the hooks' own. `TransferHooks`/`ActivatedBy` take the services optionally; without them the old overload runs.
 - Composition: `ExtensionTransferHooksOf` now takes the group's connector (pooling connector, or the test runner's connector) and a `TcpConnectionListener` (the dialing runner's FTP listener when given). No extension option: still no hook wrapper (unchanged-transfer tests extended).
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary,Curl.Console`: 0 failing members. Fast tests: 62 projects green. Platform-neutral (no paths, OS text or certificates), so CI on Linux and macOS is met by the green Windows run.
-- `Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md` was left alone (outside touches); its statements stay true, ADR-1037 records the new members.
+- `Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md` was left alone (outside touches); its statements stay true, ADR-1039 records the new members.
 
 ## Log
 
