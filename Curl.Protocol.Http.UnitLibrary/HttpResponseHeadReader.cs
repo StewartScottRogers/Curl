@@ -384,7 +384,17 @@ internal sealed class HttpResponseHeadReader
         failure.HeadBytesBeforeFailure = builder.HeadBytesWithPendingHeader();
         failure.StatusLineBeforeFailure = statusLine;
         failure.HeadersStoredBeforeFailure = HeadersStoredBefore + informationalHeaderCount + builder.HeaderCountWithPending;
-        Refusal = FindRefusalOrTooMany(head) ?? throw failure;
+        Refusal = FindRefusalOrTooMany(head);
+        if (Refusal is null)
+        {
+            if (failure.Message == HttpTransferMessages.HeaderWithoutColon)
+            {
+                ReleaseHeldHeaders();
+            }
+
+            throw failure;
+        }
+
         heldHeaderLines.Clear();
         heldHeaderInfoLine = null;
         ReleaseHeadBeforeRefusal();
@@ -660,7 +670,7 @@ internal sealed class HttpResponseHeadReader
             }
 
             bool folds = builder.FoldsIntoPendingHeader(line);
-            builder.AddLine(line);
+            AddLineReleasingWholeHeaderBeforeColonlessLine(line, folds);
             if (!folds)
             {
                 ReleaseHeldHeader();
@@ -676,6 +686,25 @@ internal sealed class HttpResponseHeadReader
 
         EndHeadAtClose();
         return true;
+    }
+
+    /// <summary>
+    /// Adds a header line to the builder. A line without a colon shows the header before it whole,
+    /// so curl 8.22.0 acts on that header (stores its cookie) before failing with
+    /// <c>Header without colon</c>; the header is released to <see cref="HeaderReceived" /> then
+    /// (CGR-207, BL-3736).
+    /// </summary>
+    private void AddLineReleasingWholeHeaderBeforeColonlessLine(HttpLine line, bool folds)
+    {
+        try
+        {
+            builder.AddLine(line);
+        }
+        catch (HttpTransferException failure) when (!folds && failure.Message == HttpTransferMessages.HeaderWithoutColon)
+        {
+            ReleaseHeldHeader();
+            throw;
+        }
     }
 
     /// <summary>
