@@ -33,3 +33,4 @@ Found by BL-4110 (Server-Sent Events, WHATWG HTML "Server-sent events" §9.2.3 "
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 73931ca5 19c0926a 8c59d058 e7c4212f 3d836d5e.
