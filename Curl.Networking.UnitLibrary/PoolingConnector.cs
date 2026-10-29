@@ -397,20 +397,28 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
             return null;
         }
 
+        MultiplexingNegotiation? released = null;
         while (true)
         {
             var (shared, fullLeaseCount, negotiation) = FindShareable(key);
-            if (fullLeaseCount is { } leaseCount)
-            {
-                events.ReportInfo($"MAX_CONCURRENT_STREAMS reached, skip ({leaseCount})");
-            }
+            released?.ReleaseNext();
+            ReportFullLeases(fullLeaseCount, events);
 
             if (shared is not null || negotiation is null)
             {
                 return shared;
             }
 
-            await negotiation.Decided.WaitAsync(cancellationToken);
+            await negotiation.WaitAsync(cancellationToken);
+            released = negotiation;
+        }
+    }
+
+    private static void ReportFullLeases(int? fullLeaseCount, ITransferEvents events)
+    {
+        if (fullLeaseCount is { } leaseCount)
+        {
+            events.ReportInfo($"MAX_CONCURRENT_STREAMS reached, skip ({leaseCount})");
         }
     }
 
