@@ -41,6 +41,13 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   `-K` files, and not again in an expansion); a host calls it before parsing (ADR-1040). The expander reads files and
   the environment through `ArgumentExpansionContext`'s delegates, and throws `ArgumentExpansionException` to end the
   run with `curl: <message>` and its `CurlExitCode` before any transfer.
+- `Arguments/ITrailingArgumentExpander` is an `IArgumentExpander` that also takes what follows its option in the same
+  `--next` group (ADR-1043): the values of its `CompanionOptions` and the positional arguments its
+  `ClaimsPositionalArgument` accepts, such as `--openapi s --operation getPet petId=5`. `ArgumentExpansion.Expand`
+  holds its option until the group ends, removes those arguments, and hands them to
+  `ArgumentsFor(ClaimedArguments, ...)` beside the value, each list in command-line order (`CompanionOptionValue`s
+  and strings). A positional argument it does not claim stays a URL, and one right after an option that may take it
+  as its value (`-d a=1`) is never claimed.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
 `Curl.Extension.Abstractions.UnitTests`.
