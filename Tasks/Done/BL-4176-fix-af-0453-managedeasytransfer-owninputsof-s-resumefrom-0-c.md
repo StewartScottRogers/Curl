@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolInputs.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4176 — Fix AF-0453: ManagedEasyTransfer.OwnInputsOf's ResumeFrom > 0 can become >= 0 with no test failing, so a zero resume offset is passed on as a resume
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The production line is right (a zero CURLOPT_RESUME_FROM is no resume); what was missing was a test. Added `PerformAsync_NoToolInputsAndResumeFromZero_PassesNoResumeOffset` to Curl.Engine.UnitTests/ManagedEasyTransferTests.ToolInputs.cs, which was added to touches (no task in Doing on origin/work/dark-factory names it).
+- Reproduction: the audit guard refuses a lane running the audit office's mutation tool, so the same mutant (`>` to `>=` at ManagedEasyTransfer.SetUp.cs:150) was applied by hand and the new test failed under it (killed); the source was then restored. The re-audit confirms with the tool itself.
+- No production code changed, so no Measure-CodeQuality run. Build clean, fast tests 0 failed on Windows; the test is platform-neutral (an http URL and a recording handler), which meets CI on Linux and macOS.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. A test now kills the ResumeFrom > 0 to >= 0 mutant in OwnInputsOf: a zero resume offset reaches the handler as no resume
