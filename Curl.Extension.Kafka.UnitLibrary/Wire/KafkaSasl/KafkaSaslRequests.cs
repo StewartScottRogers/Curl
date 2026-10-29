@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.Kafka.Wire.KafkaSasl;
 
 /// <summary>
-/// Writes the two requests SASL PLAIN authentication sends (ADR-1081), each with its <c>INT32</c> size prefix and request
+/// Writes the two requests SASL PLAIN authentication sends (ADR-1082), each with its <c>INT32</c> size prefix and request
 /// header v1: SaslHandshake v1 naming the mechanism, and SaslAuthenticate v0 carrying the RFC 4616 message, the last
 /// versions of each before flexible versions.
 /// </summary>

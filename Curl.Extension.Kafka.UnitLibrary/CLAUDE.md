@@ -1,6 +1,6 @@
 # Curl.Extension.Kafka.UnitLibrary
 
-The Kafka extension (ADR-0999, ADR-1076, ADR-1081), tested against the Apache Kafka protocol guide
+The Kafka extension (ADR-0999, ADR-1076, ADR-1082), tested against the Apache Kafka protocol guide
 (<https://kafka.apache.org/protocol>), not against curl. It references only `Curl.Extension.Abstractions` (and through
 it `Curl.Protocol.Abstractions`) and the base class library. The handler is registered by one line in
 `ExtensionCatalogue.cs` and described in `ExtensionDescriptionCatalogue.cs`.
@@ -11,7 +11,7 @@ it `Curl.Protocol.Abstractions`) and the base class library. The handler is regi
   `ProtocolHandlerServices.Connector`.
 - `KafkaProtocolHandler` serves `kafka://` (port 9092) and `kafkas://` (port 9093, TLS); `KafkaAddress` reads the
   topic, partition and `?offset=N` from the URL.
-- `KafkaClientFlow` authenticates with SASL PLAIN when the transfer has `--user` (ADR-1081; the handler does so on every connection), then finds the partition's leader with Metadata (ADR-1080; the handler reconnects to it when it is
+- `KafkaClientFlow` authenticates with SASL PLAIN when the transfer has `--user` (ADR-1082; the handler does so on every connection), then finds the partition's leader with Metadata (ADR-1080; the handler reconnects to it when it is
   another broker), then produces one record with a body, or fetches from the offset to the high watermark and writes each
   record value and a line feed. `KafkaClientMessages` holds the error texts and `KafkaClientException` carries the exit
   code.

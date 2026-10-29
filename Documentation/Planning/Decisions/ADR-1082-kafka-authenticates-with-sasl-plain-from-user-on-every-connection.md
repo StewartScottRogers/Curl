@@ -1,4 +1,4 @@
-# ADR-1081: Kafka authenticates with SASL PLAIN from --user on every connection
+# ADR-1082: Kafka authenticates with SASL PLAIN from --user on every connection
 
 - Status: Accepted
 - Date: 2026-10-29

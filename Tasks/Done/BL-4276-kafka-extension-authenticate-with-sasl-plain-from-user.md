@@ -30,7 +30,7 @@ Follow-up of BL-4121 (ADR-1076): no SASL is offered, so a broker that demands it
 ## Notes
 
 - Touches widened by ADR-1076 (criterion 3 updates its Left out) and the library CLAUDE.md (lists Wire/KafkaSasl); no other task in Doing names either.
-- Delivered directly rather than through the full /feature agents: a small change in one library with a clear spec. Decided in ADR-1081: SaslHandshake v1 and SaslAuthenticate v0 (last non-flexible versions), on every connection including the leader ADR-1080 reconnects to; a handshake error and an authentication error both end with exit 67, the latter with the broker's error_message.
+- Delivered directly rather than through the full /feature agents: a small change in one library with a clear spec. Decided in ADR-1082: SaslHandshake v1 and SaslAuthenticate v0 (last non-flexible versions), on every connection including the leader ADR-1080 reconnects to; a handshake error and an authentication error both end with exit 67, the latter with the broker's error_message.
 - Kafka tests 133 passed; Measure-CodeQuality for Curl.Extension.Kafka.UnitLibrary: 100% line, 100% branch, max complexity 10, 0 failing members. Platform-neutral (no paths, OS text or certificates).
 
 ## Log

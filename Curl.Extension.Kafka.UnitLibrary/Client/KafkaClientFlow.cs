@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Kafka.Client;
 
 /// <summary>
-/// The Kafka exchange over any byte transport (ADR-1076, ADR-1080, ADR-1081): SASL PLAIN when the transfer has
+/// The Kafka exchange over any byte transport (ADR-1076, ADR-1080, ADR-1082): SASL PLAIN when the transfer has
 /// credentials, Metadata v4 to find the partition's leader, then
 /// Produce v3 of one record and its acknowledgement, or Fetch v4 from an offset, writing each record's value and a line
 /// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
@@ -21,7 +21,7 @@ internal sealed class KafkaClientFlow(IConnection transport, Stream output, ITra
     internal long BytesWritten { get; private set; }
 
     /// <summary>
-    /// Authenticates with SASL PLAIN (ADR-1081): SaslHandshake v1 naming PLAIN, then SaslAuthenticate v0 carrying the RFC
+    /// Authenticates with SASL PLAIN (ADR-1082): SaslHandshake v1 naming PLAIN, then SaslAuthenticate v0 carrying the RFC
     /// 4616 message for <paramref name="credentials"/>. A broker that does not enable PLAIN, or refuses the
     /// credentials, ends with exit 67 and the broker's error message.
     /// </summary>
