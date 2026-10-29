@@ -4,8 +4,8 @@ title: Fix CGR-279: With -Z, HTTP/2 streams are opened in an order other than th
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Console.UnitTests/Cgr279Tests.cs, Curl.Console/ParallelHostQueue.cs]
+depends-on: [BL-4006]
+touches: [Curl.Console.UnitTests/Cgr279Tests.cs, Curl.Console/ParallelHostQueue.cs, Curl.Networking.UnitLibrary/PoolingConnector.cs, Curl.Networking.UnitLibrary/MultiplexingNegotiation.cs, Curl.Networking.UnitTests]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -70,7 +70,10 @@ curl -s -Z --http2-prior-knowledge http://127.0.0.1:P/1 http://127.0.0.1:P/2 htt
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr279Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-28 (lane 5): Cause found before any edit. Prior-knowledge h2 transfers skip ParallelHostQueue; the 2nd and 3rd wait in PoolingConnector on MultiplexingNegotiation.Decided, a TaskCompletionSource with RunContinuationsAsynchronously, so they wake on the thread pool in arbitrary order. The fix (wake waiters in the order they began to wait, e.g. a queue of per-waiter tasks released in sequence) lands in Curl.Networking.UnitLibrary (PoolingConnector.cs, MultiplexingNegotiation.cs) plus a test in Curl.Networking.UnitTests, which BL-4006 holds whole. Added those to touches and BL-4006 to depends-on.
+
 ## Log
 
 - 2026-10-26: Created from CGR-279 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Networking.UnitLibrary (PoolingConnector, MultiplexingNegotiation) held by BL-4006; depends-on BL-4006
