@@ -1,5 +1,5 @@
 ---
-id: BL-4033
+id: BL-4036
 title: Tell a socket-action transfer's resolve phase on the threaded resolver's wakeup socket and signal it when the lookup ends (CGR-034)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4033 — Tell a socket-action transfer's resolve phase on the threaded resolver's wakeup socket and signal it when the lookup ends (CGR-034)
+# BL-4036 — Tell a socket-action transfer's resolve phase on the threaded resolver's wakeup socket and signal it when the lookup ends (CGR-034)
 
 ## Goal
 

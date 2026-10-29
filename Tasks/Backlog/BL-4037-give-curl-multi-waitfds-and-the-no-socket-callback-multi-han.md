@@ -1,5 +1,5 @@
 ---
-id: BL-4034
+id: BL-4037
 title: Give curl_multi_waitfds and the no-socket-callback multi handle each transfer's real socket instead of FirstTransferSocket numbers (CGR-034)
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4034 — Give curl_multi_waitfds and the no-socket-callback multi handle each transfer's real socket instead of FirstTransferSocket numbers (CGR-034)
+# BL-4037 — Give curl_multi_waitfds and the no-socket-callback multi handle each transfer's real socket instead of FirstTransferSocket numbers (CGR-034)
 
 ## Goal
 
