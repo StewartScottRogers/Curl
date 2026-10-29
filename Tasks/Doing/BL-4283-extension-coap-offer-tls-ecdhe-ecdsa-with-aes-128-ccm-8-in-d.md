@@ -32,3 +32,4 @@ BL-4251 (ADR-1078) offers only the two AES-128-GCM suites, because `Dtls/Record`
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 01ae170e 42bc4207 cf4c1338 3d836d5e.
