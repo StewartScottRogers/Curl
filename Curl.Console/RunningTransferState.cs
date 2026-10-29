@@ -57,6 +57,12 @@ internal sealed class RunningTransferState(
     internal string? OutputFileName { get; set; }
 
     /// <summary>
+    /// Gets or sets whether <c>--skip-existing</c> skipped the transfer because its output file was
+    /// already there; under <c>-Z</c> its report then waits for the running transfers (CGR-293).
+    /// </summary>
+    internal bool SkippedExistingOutputFile { get; set; }
+
+    /// <summary>
     /// Gets or sets the output file the transfer opened, which <c>--remove-on-error</c> deletes when
     /// it fails; <see langword="null" /> while no file was opened.
     /// </summary>

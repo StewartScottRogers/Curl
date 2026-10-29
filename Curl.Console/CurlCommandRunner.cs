@@ -2245,6 +2245,14 @@ internal sealed class CurlCommandRunner(
 
         run.RecordEnd(ended.Result, EndsTheRun(options, ended.Result), options.FailEarly);
 
+        if (state.SkippedExistingOutputFile)
+        {
+            run.DeferReport(
+                transfer.TransferId,
+                () => ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl));
+            return Task.CompletedTask;
+        }
+
         return ReportAsync(dispatch, options, transfer, state, ended.Result, ended.GivenUrl, ended.TransferUrl);
     }
 
@@ -4283,6 +4291,7 @@ internal sealed class CurlCommandRunner(
     private async Task<TransferResult> SkipExistingOutputFileAsync(CommandLineOptions options, string outputFile)
     {
         Running.OutputFileName = outputFile;
+        Running.SkippedExistingOutputFile = true;
         if (ToolNotes.AreWritten(options))
         {
             await WriteErrorPiecesAsync(WarningLineWrapper.WrapNoteText($"skips transfer, \"{outputFile}\" exists locally", terminalColumns))
