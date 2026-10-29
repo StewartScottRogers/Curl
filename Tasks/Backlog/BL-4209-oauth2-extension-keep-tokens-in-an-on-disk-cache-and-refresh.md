@@ -4,7 +4,7 @@ title: OAuth2 extension: keep tokens in an on-disk cache and refresh an expired 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4207, BL-4208]
+depends-on: [BL-4212, BL-4213]
 touches: [Curl.Extension.OAuth2.UnitLibrary/Cache, Curl.Extension.OAuth2.UnitTests/Cache]
 requirement: none
 created: 2026-10-29

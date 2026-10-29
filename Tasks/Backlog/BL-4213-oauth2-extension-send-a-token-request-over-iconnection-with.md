@@ -1,16 +1,16 @@
 ---
-id: BL-4208
+id: BL-4213
 title: OAuth2 extension: send a token request over IConnection with its own small HTTP/1.1 client
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4207]
+depends-on: [BL-4212]
 touches: [Curl.Extension.OAuth2.UnitLibrary/Http, Curl.Extension.OAuth2.UnitTests/Http]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4208 — OAuth2 extension: send a token request over IConnection with its own small HTTP/1.1 client
+# BL-4213 — OAuth2 extension: send a token request over IConnection with its own small HTTP/1.1 client
 
 ## Goal
 

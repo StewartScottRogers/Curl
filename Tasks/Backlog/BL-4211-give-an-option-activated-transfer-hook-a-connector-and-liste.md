@@ -1,5 +1,5 @@
 ---
-id: BL-4206
+id: BL-4211
 title: Give an option-activated transfer hook a connector and listener so an extension can make its own requests before the transfer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4206 — Give an option-activated transfer hook a connector and listener so an extension can make its own requests before the transfer
+# BL-4211 — Give an option-activated transfer hook a connector and listener so an extension can make its own requests before the transfer
 
 ## Goal
 

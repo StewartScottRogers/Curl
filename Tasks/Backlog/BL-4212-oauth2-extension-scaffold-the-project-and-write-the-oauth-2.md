@@ -1,5 +1,5 @@
 ---
-id: BL-4207
+id: BL-4212
 title: OAuth2 extension: scaffold the project and write the OAuth 2.0, PKCE and device authorization wire format
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4207 — OAuth2 extension: scaffold the project and write the OAuth 2.0, PKCE and device authorization wire format
+# BL-4212 — OAuth2 extension: scaffold the project and write the OAuth 2.0, PKCE and device authorization wire format
 
 ## Goal
 
