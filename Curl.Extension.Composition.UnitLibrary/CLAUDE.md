@@ -1,0 +1,19 @@
+# Curl.Extension.Composition.UnitLibrary
+
+The one place that lists Curl's extensions: what Curl adds beyond upstream curl (ADR-0999).
+Namespace `Curl.Extension.Composition`.
+
+- `ExtensionProtocolHandlers.For(readEnvironmentVariable)` gives the factory a host passes to
+  `EngineComposition.CreateProtocolHandlers`' `extensionHandlers`, or `null` when `CURL_EXTENSIONS`
+  is `0`. `Curl.Console`'s `CurlComposition` passes it in both production compositions.
+- `ExtensionCatalogue.Entries` holds one handler factory per extension, one line each. An extension
+  task adds its own line and nothing else here; the file is `merge=union` and a shared list file.
+
+Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
+
+- Only the hosts and the extensions reference this project; the engine and every `Curl.Protocol.*`
+  never do.
+- This is the only project that references the `Curl.Extension.<Name>` libraries.
+
+Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
+`Curl.Extension.Composition.UnitTests`.

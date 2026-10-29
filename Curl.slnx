@@ -293,6 +293,13 @@
     <Project Path="Curl.Tls.UnitTests/Curl.Tls.UnitTests.csproj" />
   </Folder>
 
+  <!-- Extensions: what Curl adds beyond upstream curl, kept apart from curl's own protocols (ADR-0999). -->
+  <Folder Name="/Extensions/" />
+  <Folder Name="/Extensions/Composition/">
+    <Project Path="Curl.Extension.Composition.UnitLibrary/Curl.Extension.Composition.UnitLibrary.csproj" />
+    <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
+  </Folder>
+
   <!-- The shared projects sit together in /Shared/ (ADR-0731). -->
   <Folder Name="/Shared/">
     <Project Path="Audit/Audit.shproj" />

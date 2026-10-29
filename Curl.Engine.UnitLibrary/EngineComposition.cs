@@ -119,6 +119,7 @@ internal static partial class EngineComposition
     /// <param name="ftpStopsBeforeEntryPath">Whether the FTP handler's new control connections stop before <c>PWD</c> (<see cref="FtpProtocolHandler.StopsBeforeEntryPath" />, BL-2636).</param>
     /// <param name="socketWait">The wait of a transfer driven by <c>curl_multi_socket_action</c>, which holds the HTTP handler's expect-100 deadline (<see cref="ContinueWaitBeginsOf" />, BL-3864); <see langword="null" /> outside socket-action mode.</param>
     /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from (ADR-0751, BL-2834); <see langword="null" /> for <see cref="System.Security.Cryptography.RandomNumberGenerator" />.</param>
+    /// <param name="extensionHandlers">Builds the handlers a host's extensions add beyond upstream curl's, over the same transports, put after curl's (ADR-0999); <see langword="null" /> for curl's alone. The engine never references an extension.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -149,7 +150,8 @@ internal static partial class EngineComposition
         IWebSocketRandomSource? webSocketRandomSource = null,
         bool ftpStopsBeforeEntryPath = false,
         Func<int, byte[]>? digestRandomBytes = null,
-        TransferSocketWait? socketWait = null)
+        TransferSocketWait? socketWait = null,
+        Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null)
     {
         Func<RtspRequestSettings?> rtspSettingsOf = rtspRequestSettings ?? (() => null);
         ConnectionEndPointRecorder recorder = new();
@@ -184,6 +186,7 @@ internal static partial class EngineComposition
             new LazyProtocolHandler(["ftp", "ftps"], () => new RoutingFtpProtocolHandler(
                 http,
                 CreateFtpProtocolHandler(recordingConnector, new EndPointRecordingConnector(ftpDataConnector ?? connector, recorder), tlsProvider, dnsResolver, tracesFtp, ftpListener, ftpWildcardHooks, ftpStopsBeforeEntryPath))),
+            .. extensionHandlers?.Invoke(new ProtocolHandlerServices(recordingConnector, recordingDatagramConnector, tlsProvider, dnsResolver)) ?? [],
         ];
 
         return [.. handlers.Select(handler => new EndPointReportingProtocolHandler(handler, recorder))];

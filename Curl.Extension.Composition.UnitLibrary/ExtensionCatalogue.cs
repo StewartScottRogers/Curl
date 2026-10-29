@@ -1,0 +1,18 @@
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Extension.Composition;
+
+/// <summary>
+/// Every extension's protocol handler factory, one entry per line (ADR-0999). Each extension
+/// task adds its own line and nothing else here; the file is marked <c>merge=union</c> in
+/// <c>.gitattributes</c> and listed in <c>Tasks/SharedListFiles.txt</c>, so lanes adding
+/// different extensions do not overlap. Plain constructor calls, no reflection, so native AOT
+/// sees every type.
+/// </summary>
+internal static class ExtensionCatalogue
+{
+    /// <summary>Gets the factories, in the order their handlers are registered.</summary>
+    internal static IReadOnlyList<Func<ProtocolHandlerServices, IProtocolHandler>> Entries { get; } =
+    [
+    ];
+}

@@ -78,3 +78,4 @@ Documentation/Planning/Decisions/README.md merge=union
 # Extended curltest cases carry file and expected-output parts whose bytes the runner compares,
 # so a checkout must not turn their line feeds into CRLF on Windows.
 Curl.Conformance.UnitTests/CurlTestCases/Extended/**/*.curltest text eol=lf
+Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs merge=union
