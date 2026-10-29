@@ -15,6 +15,10 @@ Namespace `Curl.Extension.Composition`.
 - `ExtensionDescriptionCatalogue.Entries` holds each extension's `ExtensionDescription`, one line each, also `merge=union`
   and a shared list file. `ExtensionListing` builds `curl --extensions`' lines and `curl --ai-help extensions`' Markdown
   from them, or says extensions are off when `CURL_EXTENSIONS` is `0` (ADR-1008).
+- `ExtensionTransferHookCatalogue.Entries` holds each extension's transfer hook activator (its `ITransferHook`
+  when its option was given, else `null`), one line each, also `merge=union` and a shared list file.
+  `Curl.Console`'s `CurlComposition.ExtensionTransferHooksOf` passes them to `TransferHooks.ActivatedBy` for each
+  option group and hands the engine `TransferHooks.Around`, or `null` when the group activated none (ADR-1007).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

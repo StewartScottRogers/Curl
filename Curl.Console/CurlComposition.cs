@@ -13,6 +13,7 @@ using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Engine;
 using Curl.Extension.Abstractions;
+using Curl.Extension.Abstractions.Transfer;
 using Curl.Extension.Composition;
 using Curl.Kerberos;
 using Curl.Networking;
@@ -89,7 +90,7 @@ internal static class CurlComposition
         LateBoundDiagnosticLog runLog = new();
         TransferPerformer performer = new(TimeProvider.System, EasyErrorText);
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), performer.TakeConnectionId), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), performer.TakeConnectionId), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), ExtensionTransferHooksOf(options))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -159,6 +160,8 @@ internal static class CurlComposition
     /// Whether the runner reads the command line as a curl built with ECH does, accepting <c>--ech</c>; off by default, as
     /// every reference build refuses it (ADR-0918). Tests and the conformance harness turn it on to reach the hand-built ECH.
     /// </param>
+    /// <param name="extensionOptions">The extensions' long options the parser reads (ADR-1006); <see langword="null" /> for every registered extension's. Tests pass their own.</param>
+    /// <param name="extensionTransferHookActivators">The extensions' transfer hook activators (ADR-1007); <see langword="null" /> for <see cref="ExtensionTransferHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -174,11 +177,14 @@ internal static class CurlComposition
         bool writesProgressMeter = false,
         IWriteOutFileOpener? writeOutFileOpener = null,
         bool parsesAsQuicBuild = false,
-        bool parsesAsEchBuild = false)
+        bool parsesAsEchBuild = false,
+        IReadOnlyList<ExtensionOption>? extensionOptions = null,
+        IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>>? extensionTransferHookActivators = null)
     {
         LateBoundDiagnosticLog runLog = new();
+        IReadOnlyList<Func<ExtensionOptionValues, ITransferHook?>> activators = extensionTransferHookActivators ?? ExtensionTransferHookCatalogue.Entries;
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.Of(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn, options.SslSessionsFile), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock, runLog)),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(GroupConnectorOf(options, connector, runConnections), datagramConnector, CreateTlsProvider(TlsClientOptionsMapping.Of(EasyOptionsFromCommandLine.TlsOf(options), options.UseAlpn, options.SslSessionsFile), TimeProvider.System), cookies, proxySelector, securityContexts, options, signingClock, runLog, activators)),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -194,7 +200,8 @@ internal static class CurlComposition
             parsesAsWindowsBuild: parsesAsWindowsBuild,
             parsesAsQuicBuild: parsesAsQuicBuild,
             parsesAsEchBuild: parsesAsEchBuild,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText));
+            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            extensionOptions: extensionOptions);
     }
 
     /// <summary>
@@ -451,7 +458,7 @@ internal static class CurlComposition
         ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
         proxyContexts.Bind(securityContexts);
         return new(
-            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener, webSocketRandomSource: webSocketRandomSource, digestRandomBytes: digestRandomBytes, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable))),
+            new ProtocolDispatcher(CreateProtocolHandlers(poolingConnector, datagramConnector, tlsProvider, dnsResolver, cookies?.HandlerStore, securityContexts, proxyAuthSchemes: proxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: NegotiateOptionsMapping.Of(authentication), signingClock: signingClock, ftpDataConnector: poolingConnector.Over(tcpConnector.ForFtpDataConnections()), diagnosticLog: diagnosticLog, ftpListener: ftpListener, webSocketRandomSource: webSocketRandomSource, digestRandomBytes: digestRandomBytes, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: ExtensionTransferHooksOf(options))),
             ProxyDisabledLinesOf(featureMask, proxy),
             cookies,
             new ProxySelector(readEnvironmentVariable),
@@ -552,9 +559,10 @@ internal static class CurlComposition
     /// <param name="transports">The run's connectors.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+    /// <param name="extensionTransferHooks">Puts each handler through the transfer hooks the option group's extension options activated (<see cref="ExtensionTransferHooksOf(CommandLineOptions)" />), or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
-        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions);
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null) =>
+        CreateTransferDispatch(transports, OperatingSystem.IsWindows(), cookies, negotiateOptions, extensionTransferHooks);
 
     /// <summary>
     /// Returns the lines curl 8.21.0 prints to standard error before each URL's transfer, unless
@@ -598,27 +606,54 @@ internal static class CurlComposition
     internal static ExtensionOptionValues ExtensionOptionValuesOf(CommandLineOptions options) =>
         new(options.ExtensionOptionValues);
 
+    /// <summary>
+    /// Gives what the engine puts each of an option group's protocol handlers through (ADR-1007): the transfer hooks
+    /// <see cref="ExtensionTransferHookCatalogue.Entries" /> activate for the group's extension options.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none.</returns>
+    internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options) =>
+        ExtensionTransferHooksOf(options, ExtensionTransferHookCatalogue.Entries);
+
+    /// <summary>
+    /// Gives what the engine puts each of an option group's protocol handlers through: the transfer hooks
+    /// <paramref name="activators" /> activate for the group's extension options (ADR-1007).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
+    /// <returns><see cref="TransferHooks.Around" /> of the activated hooks, or <see langword="null" /> when the group activated none, so the engine runs no hook.</returns>
+    internal static Func<IProtocolHandler, IProtocolHandler>? ExtensionTransferHooksOf(CommandLineOptions options, IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> activators)
+    {
+        TransferHooks hooks = TransferHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators);
+        return hooks.Hooks.Count == 0 ? null : hooks.Around;
+    }
+
     // The tool's warning for an option curl's Schannel build ignores.
     private static string SchannelIgnoredOptionWarning(string option) =>
         $"Warning: ignoring {option}, not supported by libcurl with Schannel";
 
     /// <summary>
-    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?)" />
+    /// Creates what one run transfers through as <see cref="CreateTransferDispatch(CurlTransports, CookieEngine?, NegotiateOptions?, Func{IProtocolHandler, IProtocolHandler}?)" />
     /// does, warning as the named curl build does.
     /// </summary>
     /// <param name="transports">The run's connectors.</param>
     /// <param name="matchesSchannelBuild">Whether the run warns as curl's Schannel build does.</param>
     /// <param name="cookies">The run's cookies, or <see langword="null" /> without <c>-b</c> or <c>-c</c>.</param>
     /// <param name="negotiateOptions">The service names and delegation the HTTP handler's Negotiate answers with; <see cref="NegotiateOptions.Default" /> when <see langword="null" />.</param>
+    /// <param name="extensionTransferHooks">Puts each handler through the transfer hooks the option group's extension options activated, or <see langword="null" /> for none.</param>
     /// <returns>The dispatcher, the warning lines, the cookies, the proxy selector, the connection pool and the <c>--resolve</c> loader.</returns>
-    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null) =>
-        new(
-            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead, extensionHandlers: ExtensionProtocolHandlers.For(Environment.GetEnvironmentVariable))),
+    internal static TransferDispatch CreateTransferDispatch(CurlTransports transports, bool matchesSchannelBuild, CookieEngine? cookies = null, NegotiateOptions? negotiateOptions = null, Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null)
+    {
+        // One delegate for both readers, so the compiler's cached method group is checked once (BL-4173 Notes).
+        Func<string, string?> readEnvironmentVariable = Environment.GetEnvironmentVariable;
+        return new(
+            new ProtocolDispatcher(CreateProtocolHandlers(transports.PoolingConnector, transports.UdpDatagramConnector, transports.TlsProvider, transports.DnsResolver, cookies?.HandlerStore, proxyAuthSchemes: transports.ProxyTunnelOptions.ProxyAuthSchemes, negotiateOptions: negotiateOptions, ftpDataConnector: FtpDataConnectorOf(transports), diagnosticLog: transports.DiagnosticLog, tracesFtp: transports.TracesFtp, tracesSmtp: transports.TracesSmtp, tracesWs: transports.TracesWs, tracesSsh: transports.TracesSsh, tracesHttp2: transports.TracesHttp2, tracesHttp3: transports.TracesHttp3, tracesRead: transports.TracesRead, extensionHandlers: ExtensionProtocolHandlers.For(readEnvironmentVariable), extensionTransferHooks: extensionTransferHooks)),
             WarningLinesBeforeEachTransfer(transports, matchesSchannelBuild),
             cookies,
-            new ProxySelector(Environment.GetEnvironmentVariable),
+            new ProxySelector(readEnvironmentVariable),
             transports.PoolingConnector,
             transports.TcpConnector.LoadResolveEntries);
+    }
 
     /// <summary>
     /// Creates what one run transfers through over the given connectors instead of the real
@@ -639,6 +674,7 @@ internal static class CurlComposition
     /// <param name="signingClock">The clock <c>--aws-sigv4</c> signs with; <see cref="TimeProvider.System" /> when <see langword="null" />.</param>
     /// <returns>The dispatcher, no warning lines, the cookies and the proxy selector.</returns>
     /// <param name="diagnosticLog">The run's diagnostic log, bound by the runner once the command line is read (BL-923).</param>
+    /// <param name="extensionTransferHookActivators">The extensions' transfer hook activators the group's extension options are checked against.</param>
     private static TransferDispatch CreateTransferDispatch(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -648,9 +684,10 @@ internal static class CurlComposition
         ISecurityContextFactory? securityContexts,
         CommandLineOptions options,
         TimeProvider? signingClock,
-        IDiagnosticLog diagnosticLog) =>
+        IDiagnosticLog diagnosticLog,
+        IEnumerable<Func<ExtensionOptionValues, ITransferHook?>> extensionTransferHookActivators) =>
         new(
-            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), signingClock, diagnosticLog: diagnosticLog)),
+            new ProtocolDispatcher(CreateProtocolHandlers(connector, datagramConnector, tlsProvider, new SystemDnsResolver(), cookies?.HandlerStore, securityContexts, options.ProxyAuthSchemes, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), signingClock, diagnosticLog: diagnosticLog, extensionTransferHooks: ExtensionTransferHooksOf(options, extensionTransferHookActivators))),
             [],
             cookies,
             proxySelector);

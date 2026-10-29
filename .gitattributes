@@ -85,3 +85,4 @@ Curl.Conformance.UnitTests/CurlTestCases/Extended/**/*.curltest text eol=lf
 Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs merge=union
 Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs merge=union
 Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs merge=union
+Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs merge=union
