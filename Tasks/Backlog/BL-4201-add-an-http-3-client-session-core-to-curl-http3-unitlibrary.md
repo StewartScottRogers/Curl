@@ -1,5 +1,5 @@
 ---
-id: BL-4197
+id: BL-4201
 title: Add an HTTP/3 client session core to Curl.Http3.UnitLibrary that opens request streams with any pseudo-headers and reports the peer's SETTINGS
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4197 — Add an HTTP/3 client session core to Curl.Http3.UnitLibrary that opens request streams with any pseudo-headers and reports the peer's SETTINGS
+# BL-4201 — Add an HTTP/3 client session core to Curl.Http3.UnitLibrary that opens request streams with any pseudo-headers and reports the peer's SETTINGS
 
 ## Goal
 
