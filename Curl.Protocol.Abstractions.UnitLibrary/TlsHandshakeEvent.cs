@@ -123,4 +123,14 @@ public sealed record TlsHandshakeEvent
     /// <c>ECH: retry_configs for NULL from NULL, 0 3</c>; empty when it sent none (BL-1171).
     /// </summary>
     public IReadOnlyList<string> EchRetryConfigLines { get; init; } = [];
+
+    /// <summary>
+    /// Gets the <c>--cacert</c> file the certificate was checked against, or
+    /// <see langword="null" /> when none was given, for the Schannel build's
+    /// <c>schannel: added N certificate(s) from CA file</c> line (BL-3754, CGR-225).
+    /// </summary>
+    public string? CaCertificateFile { get; init; }
+
+    /// <summary>Gets how many certificates the <see cref="CaCertificateFile" /> added to the trust store.</summary>
+    public int CaCertificateCount { get; init; }
 }

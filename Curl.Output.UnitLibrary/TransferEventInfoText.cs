@@ -111,7 +111,7 @@ internal static class TransferEventInfoText
     {
         // A failed handshake never reached the server's ALPN answer (BL-1149).
         var hashLines = PinnedPublicKeyHashLines(handshake);
-        return [.. alpnLines.Take(1), .. hashLines, .. alpnLines.Skip(handshake.Failed ? 2 : 1)];
+        return [.. alpnLines.Take(1), .. SchannelVerificationText.Lines(handshake), .. hashLines, .. alpnLines.Skip(handshake.Failed ? 2 : 1)];
     }
 
     private static IReadOnlyList<string> AlpnLines(TlsHandshakeEvent handshake)

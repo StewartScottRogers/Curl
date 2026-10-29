@@ -4,8 +4,8 @@ title: Fix CGR-225: Windows -v leaves out the Schannel certificate-verification 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4031, BL-4022]
-touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr225Tests.cs]
+depends-on: [BL-4031, BL-4022, BL-4054]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Protocol.Abstractions.UnitLibrary/TlsHandshakeEvent.cs, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr225Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -82,3 +82,10 @@ curl -sS -v --cacert E\pki\ca.crt --ssl-no-revoke https://localhost:<p>/index.tx
 - Requeued before any edit: BL-4031 (adds ITransferEvents forwarders across Networking decorators) and BL-4022 (HandBuiltTlsProvider.cs) hold the files this needs.
 - 2026-10-28: Doing -> Backlog. Needs ITransferEvents/Output/Networking files held by BL-4031 and BL-4022; touches corrected (Curl.Tls is not where the lines live)
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes (2026-10-29 lane 8 run)
+
+- Measured real curl 8.22.0 (Schannel, debug libcurl) against `openssl s_server -accept 14443 -cert srv.crt -key srv.key -WWW` with `curl -sS -v --cacert srv.crt --ssl-no-revoke https://localhost:14443/index.txt`: exit 0, stdout `hello tls`; stderr has the report's lines. Curl before the fix lacked all of them.
+- Done: `added N certificate(s) from CA file '<path>'` and `connection hostname (H) validated against certificate name (N)` after the first ALPN line, from new `TlsHandshakeEvent.CaCertificateFile`/`CaCertificateCount` (SslStreamTlsProvider) and `SchannelVerificationText` (Output). Tests: `Cgr225Tests.cs` (Networking), `SchannelVerificationTextTests.cs` (Output). Quality gates green for Output, Networking, Abstractions. `TlsHandshakeEvent.cs` added to touches (no other Doing task names it). HandBuiltTlsProvider does not set the new CA fields (the default Windows route is SslStream).
+- Left: store-cache reuse, close_notify, shutdown and `{ [0 bytes data]` lines, filed as BL-4054 (needs a new read-side event).
+- 2026-10-29: Doing -> Backlog. Handshake-time Schannel lines done; remaining close_notify/shutdown/store-cache lines are BL-4054

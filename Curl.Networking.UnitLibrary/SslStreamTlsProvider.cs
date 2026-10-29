@@ -445,6 +445,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
             {
                 IsProxy = isProxy,
                 VerifiedHostName = VerifiedHostName(targetHost, _options.Insecure),
+                CaCertificateFile = _options.CaCertificateFile,
+                CaCertificateCount = CustomTrustCertificateCount(chainPolicy),
             });
             ReportRevocationCheckIncomplete(events, peerVerification);
             return ConnectResult.Connected(
@@ -688,6 +690,8 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         CaCertificateDirectory = options.CaCertificateDirectory,
         HasCaCertificateBlob = options.CaCertificateBlob is not null,
     };
+
+    private static int CustomTrustCertificateCount(X509ChainPolicy? chainPolicy) => chainPolicy?.CustomTrustStore.Count ?? 0;
 
     // A certificate --ssl-revoke-best-effort accepted with its revocation status offline or
     // unknown is a warning in the diagnostic log (ADR-0222, decision 2; BL-968), which only
