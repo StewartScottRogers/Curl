@@ -1046,3 +1046,4 @@ Each option and the specific reason it lost.
 | [1012](ADR-1012-an-extension-resolver-hook-replaces-curls-resolver-and-refuses-doh-url.md) | An extension resolver hook replaces curl's resolver, and refuses `--doh-url` beside it (BL-4096) | Accepted | 2026-10-29 |
 | [1013](ADR-1013-the-s3-extension-signs-with-its-own-sigv4-signer-returning-the-headers-to-add.md) | The S3 extension signs with its own SigV4 signer, which returns the headers to add (BL-4197) | Accepted | 2026-10-29 |
 | [1014](ADR-1014-two-extension-connection-hook-options-are-a-command-line-error-with-exit-2.md) | Two extension connection-hook options are a command-line error with exit 2 (BL-4192) | Accepted | 2026-10-29 |
+| [1015](ADR-1015-a-fast-test-accepts-a-silent-loopback-peer-to-see-the-accepted-sockets-fin.md) | A fast test accepts a silent loopback peer to see the accepted socket's FIN (BL-4181) | Accepted | 2026-10-29 |
