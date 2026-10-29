@@ -29,7 +29,7 @@ BL-4076 made `CurlUrlHostNameMapping.Map` replace any mapping that holds an ASCI
 ## Notes
 
 - Filed by BL-4077's run, which found curl does not refuse these four hosts.
-- Pipeline `feature` run directly in this lane (a one-method change with its measurement already the task's method); decision recorded in ADR-0999.
+- Pipeline `feature` run directly in this lane (a one-method change with its measurement already the task's method); decision recorded in ADR-1000.
 - Measured (WSL Ubuntu, curl 8.18.0, libidn2 2.3.8, `LC_ALL=C.utf8`, `--connect-to` a socat listener): U+2100/2101/2105/2106 send `Host: aa/cb.test`, `aa/sb.test`, `ac/ob.test`, `ac/ub.test`; U+FE10 sends `a,b.test`, U+FE33 `a_b.test` (BL-4076 refused both: refusal dropped); U+FC5E..U+FC63, U+FDFA, U+FE70 exit 3 (refusal kept). Also U+2474 `a(1)b.test`, U+FF0F `a/b.test`, U+00A0 and U+3000 `a b.test`, but `a℀éb`, `a` U+00A0 `éb`, `a︐éb` exit 3 while a literal `a_éb` is `xn--a_b-cma` and `a℀.éb` is `aa/c.xn--b-9fa`: libidn2 refuses such a mapping only in a label that stays outside ASCII, which `Map` now does.
 - Measure-CodeQuality for Curl.Protocol.Abstractions.UnitLibrary: 100% line, one branch (`LabelAt`, the last-label case) uncovered; the last-label test added after it covers it. Fast tests green across the solution.
 

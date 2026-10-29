@@ -6,7 +6,7 @@ namespace Curl.Protocol.Abstractions;
 /// Maps a host name that is not ASCII as IDNA (UTS #46, non-transitional, Unicode 15.1) does before
 /// it is converted to punycode, as libidn2 2.3.8 does for curl 8.22.0: every character the IDNA
 /// mapping table maps (including <c>disallowed_STD3_mapped</c>, refused only in a label that stays
-/// outside ASCII, ADR-0999) is replaced by its mapping, ignored characters are dropped, and the result is put in
+/// outside ASCII, ADR-1000) is replaced by its mapping, ignored characters are dropped, and the result is put in
 /// Normalization Form C (canonical decomposition, canonical reordering and composition, Hangul
 /// included). <c>ß</c> and final sigma (deviations) and disallowed characters stay as they are.
 /// Curl runs with invariant globalization, where <see cref="System.Globalization.IdnMapping" /> and
