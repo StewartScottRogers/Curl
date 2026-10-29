@@ -16,7 +16,7 @@ Every part below exists; the last column names the task that built it.
 
 | Path | What it holds | Built by |
 | --- | --- | --- |
-| `Guard/` | `Test-AuditPathsUntouched.ps1`, the CI audit guard: fails `CI` when `work/dark-factory` changes an audit path or a guard. | BL-998 |
+| `Guard/` | `Test-AuditPathsUntouched.ps1`, the CI audit guard: fails `CI` when `work/dark-factory` changes an audit path or a guard. `Test-GuardHooks.ps1`: every hook in `.claude/settings.json` starts, and the audit guard hook refuses a lane, on each platform. | BL-998, BL-3926 |
 | `Instructions/` | Each auditor's method (`Quality.md`, `Security.md`, `Conformance.md`, `Truthfulness.md`, `Process.md`), the rules every auditor follows (`Auditor-Rules.md`) and the finding, report and scorecard formats (`Report-Format.md`). | BL-1001, BL-1009 to BL-1014 |
 | `PlantedDefects/` | The catalogue of known defects the seeder plants before an audit, to measure each auditor's catch rate - stored encoded (`Catalogue.md.b64`) so no search of the repository returns it - with `Read-PlantedCatalogue.ps1`. | BL-1015, BL-1028 |
 | `Findings/` | One file per finding, `AF-####-*.md`, with severity, evidence and a reproduction. A finding closes only on evidence: its auditor's re-audit backed by the run's own mechanical rerun, a reliable auditor or two re-audits running; or as a duplicate, or by Stewart; a finding about one past run's cost (`cost-outlier`) closes, without a re-audit, at the first audit after all its tasks are Done ([ADR-0422](../Documentation/Planning/Decisions/ADR-0422-audit-findings-close-on-mechanical-evidence.md)). | BL-1001, BL-1016 |
@@ -41,7 +41,10 @@ never offers it to a dark factory lane and refuses a lane that tries to claim or
 **The hook.** Every dark factory process carries `CURL_DARK_FACTORY_LANE` (BL-995). While it
 is set, the PreToolUse hook `.claude/hooks/guard-audit-paths.ps1` refuses any tool call that
 reads or changes an audit path (BL-997), so a lane cannot read the planted defects, the
-auditors' instructions or the gap office's measurements, nor edit them.
+auditors' instructions or the gap office's measurements, nor edit them. `settings.json` starts it
+through `sh` with `powershell` or else `pwsh`, and refuses a lane outright when neither is on PATH,
+so it holds on Windows, Linux and macOS (ADR-1015); `Guard/Test-GuardHooks.ps1` proves that on all
+three in the `CI` workflow's `guard-hooks` job (BL-3926).
 
 **The CI guard.** `Guard/Test-AuditPathsUntouched.ps1` fails the `CI` workflow's
 `audit-guard` job whenever `work/dark-factory` carries a change of its own to an audit path,
