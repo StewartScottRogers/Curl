@@ -1,5 +1,5 @@
 ---
-id: BL-4255
+id: BL-4261
 title: Extension Mqtt5: honour a broker's Server Keep Alive with PINGREQ while subscribed
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4255 — Extension Mqtt5: honour a broker's Server Keep Alive with PINGREQ while subscribed
+# BL-4261 — Extension Mqtt5: honour a broker's Server Keep Alive with PINGREQ while subscribed
 
 ## Goal
 
