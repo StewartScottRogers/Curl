@@ -99,14 +99,21 @@ public sealed record QuicTransportParameters
     public QuicVersionInformation? VersionInformation { get; init; }
 
     /// <summary>
+    /// Gets <c>max_datagram_frame_size</c> (0x20, RFC 9221 section 3): the largest DATAGRAM
+    /// frame, type and length included, the endpoint accepts; 0, the default, means it accepts
+    /// none, and the parameter is not sent.
+    /// </summary>
+    public ulong MaxDatagramFrameSize { get; init; }
+
+    /// <summary>
     /// Writes the parameters that differ from their defaults, in curl's order: the
     /// connection IDs (original destination, initial source, retry source), then
     /// <c>stateless_reset_token</c>, <c>max_idle_timeout</c> and <c>max_udp_payload_size</c>,
     /// then the stream and connection limits (bidirectional stream data before
     /// unidirectional, then <c>initial_max_data</c>, then the stream counts), then
     /// <c>ack_delay_exponent</c>, <c>max_ack_delay</c>, <c>disable_active_migration</c>,
-    /// <c>active_connection_id_limit</c> and <c>preferred_address</c>, and
-    /// <c>version_information</c> last.
+    /// <c>active_connection_id_limit</c>, <c>preferred_address</c> and
+    /// <c>max_datagram_frame_size</c>, and <c>version_information</c> last.
     /// </summary>
     /// <returns>The extension data.</returns>
     public byte[] Encode()
@@ -129,6 +136,7 @@ public sealed record QuicTransportParameters
         WriteBytes(writer, 0x0c, DisableActiveMigration ? [] : null);
         WriteInteger(writer, 0x0e, ActiveConnectionIdLimit, DefaultActiveConnectionIdLimit);
         WriteBytes(writer, 0x0d, PreferredAddress);
+        WriteInteger(writer, 0x20, MaxDatagramFrameSize, 0);
         WriteBytes(writer, 0x11, VersionInformation?.Encode());
         return writer.ToArray();
     }
@@ -165,6 +173,7 @@ public sealed record QuicTransportParameters
             InitialSourceConnectionId = ConnectionId(values, 0x0f),
             RetrySourceConnectionId = ConnectionId(values, 0x10),
             VersionInformation = values.TryGetValue(0x11, out var version) ? QuicVersionInformation.Decode(version) : null,
+            MaxDatagramFrameSize = Integer(values, 0x20, 0),
         };
     }
 

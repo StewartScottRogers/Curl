@@ -51,6 +51,8 @@ public sealed class QuicFrameCodecTests
         [new QuicConnectionCloseFrame((ulong)QuicTransportErrorCode.InternalError, 0, ReadOnlyMemory<byte>.Empty), "1c010000"],
         [new QuicConnectionCloseFrame(0x100, null, "bye"u8.ToArray()), "1d410003627965"],
         [new QuicHandshakeDoneFrame(), "1e"],
+        [new QuicDatagramFrame(Hex("aabb"), HasLength: false), "30aabb"],
+        [new QuicDatagramFrame(Hex("aabb")), "3102aabb"],
     ];
 
     [TestMethod]
@@ -188,6 +190,7 @@ public sealed class QuicFrameCodecTests
     [DataRow("18010015", DisplayName = "NEW_CONNECTION_ID with a 21-byte connection ID")]
     [DataRow("180100", DisplayName = "NEW_CONNECTION_ID ending before its length")]
     [DataRow("1aa1a2a3", DisplayName = "PATH_CHALLENGE shorter than eight bytes")]
+    [DataRow("3105aa", DisplayName = "DATAGRAM shorter than its length")]
     public void Decode_MalformedFrame_IsAFrameEncodingError(string hex)
     {
         Diagnostics.Arrange("payload hex (OneRtt)", hex);
@@ -219,6 +222,8 @@ public sealed class QuicFrameCodecTests
     [DataRow("1b" + "a1a2a3a4a5a6a7a8", QuicPacketType.ZeroRtt, DisplayName = "PATH_RESPONSE in 0-RTT")]
     [DataRow("1d0000", QuicPacketType.Initial, DisplayName = "application CONNECTION_CLOSE in Initial")]
     [DataRow("1e", QuicPacketType.Handshake, DisplayName = "HANDSHAKE_DONE in Handshake")]
+    [DataRow("3101aa", QuicPacketType.Initial, DisplayName = "DATAGRAM in Initial")]
+    [DataRow("30aa", QuicPacketType.Handshake, DisplayName = "DATAGRAM in Handshake")]
     [DataRow("01", QuicPacketType.Retry, DisplayName = "PING in Retry")]
     [DataRow("01", QuicPacketType.VersionNegotiation, DisplayName = "PING in Version Negotiation")]
     [DataRow("01", (QuicPacketType)99, DisplayName = "PING in an undefined packet type")]

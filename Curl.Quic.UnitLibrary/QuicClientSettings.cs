@@ -19,7 +19,12 @@ public sealed record QuicClientSettings
     /// <summary>Gets the TLS 1.3 client settings; their <c>quic_transport_parameters</c> extension is added by the handshake.</summary>
     public required Tls13ClientSettings Tls { get; init; }
 
-    /// <summary>Gets the transport parameters to declare; the handshake sets their <c>initial_source_connection_id</c>.</summary>
+    /// <summary>
+    /// Gets the transport parameters to declare; the handshake sets their <c>initial_source_connection_id</c>.
+    /// A caller opts in to DATAGRAM frames (RFC 9221) by giving them a non-zero
+    /// <see cref="QuicTransportParameters.MaxDatagramFrameSize" />; curl's own defaults leave it
+    /// 0, so curl's HTTP/3 never advertises them.
+    /// </summary>
     public QuicTransportParameters TransportParameters { get; init; } = QuicTransportParameters.CurlClientDefaults;
 
     /// <summary>Gets the length of the connection IDs the client chooses, 8 to 20 bytes (RFC 9000 section 7.2 asks for at least 8 for the first destination).</summary>

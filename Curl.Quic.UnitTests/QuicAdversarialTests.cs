@@ -165,7 +165,7 @@ public sealed class QuicAdversarialTests
 
     [TestMethod]
     [DataRow("1f", DisplayName = "0x1f, one past HANDSHAKE_DONE")]
-    [DataRow("30", DisplayName = "0x30, DATAGRAM (RFC 9221), not negotiated")]
+    [DataRow("32", DisplayName = "0x32, one past DATAGRAM (RFC 9221)")]
     [DataRow("4100", DisplayName = "0x100 in two bytes")]
     [DataRow("bfffffff", DisplayName = "0x3fffffff in four bytes")]
     [DataRow("ffffffffffffffff", DisplayName = "2^62-1 in eight bytes")]

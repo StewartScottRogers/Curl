@@ -43,6 +43,9 @@ public static class QuicFrameCodec
         new(ReadHandshakeDone, PacketSpaces.OneRtt),
     ];
 
+    // DATAGRAM may go in 0-RTT and 1-RTT packets (RFC 9221 section 4).
+    private static readonly FrameRule DatagramRule = new(ReadDatagram, PacketSpaces.ApplicationData);
+
     private delegate QuicFrame FrameReader(QuicReader reader, ulong type);
 
     /// <summary>
@@ -106,17 +109,12 @@ public static class QuicFrameCodec
     private static QuicFrame ReadFrame(QuicReader reader, QuicPacketType packetType)
     {
         var type = reader.ReadVariableLengthInteger(out var encodedLength);
-        if (type >= (ulong)Rules.Length)
-        {
-            throw reader.Fail($"Unknown frame type 0x{type:x}.");
-        }
-
+        var rule = RuleFor(type) ?? throw reader.Fail($"Unknown frame type 0x{type:x}.");
         if (encodedLength != QuicVariableLengthInteger.GetEncodedLength(type))
         {
             throw new QuicTransportException(QuicTransportErrorCode.ProtocolViolation, $"Frame type 0x{type:x} is encoded in {encodedLength} bytes, not the shortest encoding.");
         }
 
-        var rule = Rules[type];
         if ((rule.PermittedIn & SpaceOf(packetType)) == PacketSpaces.None)
         {
             throw new QuicTransportException(QuicTransportErrorCode.ProtocolViolation, $"Frame type 0x{type:x} is not allowed in a {packetType} packet.");
@@ -124,6 +122,13 @@ public static class QuicFrameCodec
 
         return rule.Read(reader, type);
     }
+
+    private static FrameRule? RuleFor(ulong type) => type switch
+    {
+        _ when type < (ulong)Rules.Length => Rules[type],
+        (ulong)QuicFrameType.Datagram or (ulong)QuicFrameType.DatagramWithLength => DatagramRule,
+        _ => null,
+    };
 
     private static PacketSpaces SpaceOf(QuicPacketType packetType) => packetType switch
     {
@@ -261,6 +266,12 @@ public static class QuicFrameCodec
     }
 
     private static QuicHandshakeDoneFrame ReadHandshakeDone(QuicReader reader, ulong type) => new();
+
+    private static QuicDatagramFrame ReadDatagram(QuicReader reader, ulong type)
+    {
+        var hasLength = type == (ulong)QuicFrameType.DatagramWithLength;
+        return new QuicDatagramFrame(hasLength ? reader.ReadLengthPrefixedBytes() : reader.ReadBytes((ulong)reader.Remaining), hasLength);
+    }
 
     private readonly record struct FrameRule(FrameReader Read, PacketSpaces PermittedIn);
 }

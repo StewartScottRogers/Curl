@@ -23,6 +23,13 @@ namespace Curl.Quic;
 /// </summary>
 public sealed class QuicClientConnectionState : IDisposable
 {
+    /// <summary>
+    /// The most application bytes one DATAGRAM frame carries whatever the server allows: what
+    /// a 1200-byte datagram leaves after the longest short header, the AEAD tag, the frame's
+    /// type and length, and room for the ACK and control frames that may share its packet.
+    /// </summary>
+    public const int MaximumDatagramPayloadLength = 1100;
+
     private readonly QuicClientSettings settings;
 
     private readonly TimeProvider timeProvider;
@@ -46,6 +53,10 @@ public sealed class QuicClientConnectionState : IDisposable
     private readonly byte[] sourceConnectionId;
 
     private readonly List<byte[]> receivedTokens = [];
+
+    private readonly Queue<QuicDatagramFrame> outgoingDatagrams = new();
+
+    private readonly Queue<ReadOnlyMemory<byte>> receivedDatagrams = new();
 
     private byte[] destinationConnectionId;
 
@@ -280,7 +291,45 @@ public sealed class QuicClientConnectionState : IDisposable
 
     /// <summary>Returns the datagrams carrying what waits to be sent, such as the stream data, STOP_SENDING or raised limits the application's use of <see cref="Streams" /> queued, as far as the congestion window allows; nothing once the connection has failed.</summary>
     /// <returns>The datagrams to send.</returns>
-    public IReadOnlyList<byte[]> TakeDatagramsToSend() => Failure is null ? Flush() : [];
+    public IReadOnlyList<byte[]> TakeDatagramsToSend() => Failure is null ? FlushWithOutgoingDatagrams() : [];
+
+    /// <summary>
+    /// Gets the most application bytes one DATAGRAM frame may carry (RFC 9221): 0 until the
+    /// server's transport parameters arrive or when they do not advertise
+    /// <c>max_datagram_frame_size</c>, otherwise the smaller of what that leaves after the
+    /// frame's type and length and <see cref="MaximumDatagramPayloadLength" />.
+    /// </summary>
+    public int MaxDatagramPayloadLength => ServerTransportParameters?.MaxDatagramFrameSize is { } size and > QuicDatagramFrame.Overhead
+        ? (int)Math.Min(size - QuicDatagramFrame.Overhead, MaximumDatagramPayloadLength)
+        : 0;
+
+    /// <summary>
+    /// Queues one DATAGRAM frame (RFC 9221) to go in its own 1-RTT packet at the next
+    /// <see cref="TakeDatagramsToSend" />, as the congestion window allows. It is never sent
+    /// again when its packet is lost (section 5).
+    /// </summary>
+    /// <param name="data">The application data, at most <see cref="MaxDatagramPayloadLength" /> bytes.</param>
+    /// <exception cref="InvalidOperationException">The server did not advertise <c>max_datagram_frame_size</c> (section 3).</exception>
+    /// <exception cref="ArgumentException"><paramref name="data" /> is longer than <see cref="MaxDatagramPayloadLength" />.</exception>
+    public void SendDatagram(ReadOnlyMemory<byte> data)
+    {
+        var limit = MaxDatagramPayloadLength;
+        if (limit == 0)
+        {
+            throw new InvalidOperationException("The server did not advertise max_datagram_frame_size, so no DATAGRAM frame may be sent (RFC 9221 section 3).");
+        }
+
+        if (data.Length > limit)
+        {
+            throw new ArgumentException($"A datagram of {data.Length} bytes is longer than the {limit} bytes one DATAGRAM frame may carry.", nameof(data));
+        }
+
+        outgoingDatagrams.Enqueue(new QuicDatagramFrame(data.ToArray()));
+    }
+
+    /// <summary>Takes the application data of the oldest DATAGRAM frame the server sent that has not been taken yet.</summary>
+    /// <returns>The data, or <see langword="null" /> when none waits.</returns>
+    public ReadOnlyMemory<byte>? TakeReceivedDatagram() => receivedDatagrams.TryDequeue(out var data) ? data : (ReadOnlyMemory<byte>?)null;
 
     /// <summary>Closes the connection with an application CONNECTION_CLOSE (frame type 0x1d) carrying <paramref name="applicationErrorCode" />, such as HTTP/3's <c>H3_NO_ERROR</c>.</summary>
     /// <param name="applicationErrorCode">The application's error code.</param>
@@ -325,9 +374,12 @@ public sealed class QuicClientConnectionState : IDisposable
     {
         foreach (var packet in packets)
         {
-            space.RequeueLost(packet.Frames.Where(Streams.ShouldResend));
+            space.RequeueLost(packet.Frames.Where(ShouldResend));
         }
     }
+
+    // A lost DATAGRAM frame is never sent again (RFC 9221 section 5); the streams decide the rest.
+    private bool ShouldResend(QuicFrame frame) => frame is not QuicDatagramFrame && Streams.ShouldResend(frame);
 
     private TimeSpan Now() => timeProvider.GetElapsedTime(startTimestamp);
 
@@ -369,7 +421,7 @@ public sealed class QuicClientConnectionState : IDisposable
     {
         if (Recovery.GetUnacknowledgedPackets(space.Id).FirstOrDefault(packet => packet.IsAckEliciting) is { } oldest)
         {
-            space.RequeueLost(oldest.Frames.Where(Streams.ShouldResend));
+            space.RequeueLost(oldest.Frames.Where(ShouldResend));
         }
 
         if (!space.HasFramesToSend)
@@ -649,11 +701,44 @@ public sealed class QuicClientConnectionState : IDisposable
             case QuicRetireConnectionIdFrame retireConnectionId:
                 QueueApplicationFrames(LocalConnectionIds.Retire(retireConnectionId));
                 break;
+            case QuicDatagramFrame datagram:
+                ReceiveDatagram(datagram);
+                break;
             default:
                 // Stream and flow control frames are the streams'; PADDING and PING ask for nothing more.
                 Streams.Receive(frame);
                 break;
         }
+    }
+
+    private void ReceiveDatagram(QuicDatagramFrame frame)
+    {
+        // A DATAGRAM frame the client did not advertise, or larger than it advertised, is a PROTOCOL_VIOLATION (RFC 9221 section 3).
+        var size = (ulong)QuicFrameCodec.Encode([frame]).Length;
+        if (size > TransportParameters.MaxDatagramFrameSize)
+        {
+            throw new QuicTransportException(QuicTransportErrorCode.ProtocolViolation, $"A DATAGRAM frame of {size} bytes arrived, above the max_datagram_frame_size of {TransportParameters.MaxDatagramFrameSize} the client advertised.");
+        }
+
+        receivedDatagrams.Enqueue(frame.Data);
+    }
+
+    // Sends each queued DATAGRAM frame in a packet of its own, so two never overflow one
+    // packet, then whatever else waits; a frame the congestion window holds back goes first next time.
+    private List<byte[]> FlushWithOutgoingDatagrams()
+    {
+        List<byte[]> datagrams = [];
+        var sent = true;
+        while (sent && outgoingDatagrams.TryDequeue(out var frame))
+        {
+            application.QueueFrame(frame);
+            var flushed = Flush();
+            datagrams.AddRange(flushed);
+            sent = flushed.Count > 0;
+        }
+
+        datagrams.AddRange(Flush());
+        return datagrams;
     }
 
     private void QueueApplicationFrames(IEnumerable<QuicFrame> frames)
