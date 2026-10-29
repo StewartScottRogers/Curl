@@ -87,6 +87,21 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
 `TimeProvider`, stops when the peer's next flight starts, and throws `TimeoutException` after 12 resends
 (the handshake's caller turns it into exit 35).
 
+`Dtls/Handshake/` (namespace `Curl.Extension.Coap.Dtls.Handshake`, ADR-1067) runs the DTLS 1.2 client handshake
+(RFC 6347 section 4.2, RFC 5246 section 7.3):
+
+- `DtlsClientHandshake` sends a `DtlsClientHello` (TLS_ECDHE_ECDSA and TLS_ECDHE_RSA with AES-128-GCM, secp256r1,
+  server_name for a host name), again with a HelloVerifyRequest's cookie; takes ServerHello, Certificate,
+  ServerKeyExchange and ServerHelloDone through `DtlsHandshakeMessageReader` (message_seq order, fragments rebuilt,
+  repeats dropped); hands the chain to `ITlsProvider.VerifyServerCertificateChain` (a rejection fails with its exit
+  code, 60 for an untrusted chain; `-k` accepts); checks the ECDHE signature with `DtlsServerKeyExchangeSignature`;
+  sends ClientKeyExchange, ChangeCipherSpec and the protected Finished and checks the server's Finished over the
+  transcript of section 4.2.6. Each flight goes through `DtlsFlightRetransmitter`; every other failure is exit 35.
+- `DtlsClientSession` then sends and receives application data under epoch 1, dropping unprotected records,
+  replays and records that fail their tag. `DtlsDatagramRecords` splits a datagram into records and a record into
+  handshake fragments, dropping what does not parse.
+
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`, `Curl.Extension.Coap.UnitTests/Observe`,
 `Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client`, `Curl.Extension.Coap.UnitTests/Dtls/Wire`,
-`Curl.Extension.Coap.UnitTests/Dtls/Record` and `Curl.Extension.Coap.UnitTests/Dtls/Retransmission`.
+`Curl.Extension.Coap.UnitTests/Dtls/Record`, `Curl.Extension.Coap.UnitTests/Dtls/Retransmission` and
+`Curl.Extension.Coap.UnitTests/Dtls/Handshake` (which runs the client against `Dtls/TestServer`).
