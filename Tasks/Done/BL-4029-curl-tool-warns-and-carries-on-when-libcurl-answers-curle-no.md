@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Console/ToolEasyHandle.cs, Curl.Console/EasySetoptsFromCommandLine.TlsAuthenticationProxy.cs, Curl.Console.UnitTests/NotBuiltInTlsSetoptWarningTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4029 — curl tool warns and carries on when libcurl answers CURLE_NOT_BUILT_IN for --capath, --proxy-capath, --tls13-ciphers and --proxy-tls13-ciphers
 
@@ -29,13 +29,18 @@ When libcurl answers `CURLE_NOT_BUILT_IN` for `CURLOPT_CAPATH`, `CURLOPT_PROXY_C
 
 ## Acceptance criteria
 
-- [ ] A `CURLE_NOT_BUILT_IN` answer to `CURLOPT_TLS13_CIPHERS` or `CURLOPT_PROXY_TLS13_CIPHERS` leaves the transfer running, and stderr carries curl 8.22.0's `ignoring --tls13-ciphers` / `ignoring --proxy-tls13-ciphers` warning (left out under `-s`), shown by tests in `Curl.Console.UnitTests/NotBuiltInTlsSetoptWarningTests.cs`.
-- [ ] A `CURLE_NOT_BUILT_IN` answer to `CURLOPT_CAPATH` or `CURLOPT_PROXY_CAPATH` leaves the transfer running, with the measured warning text, shown by tests in the same file.
-- [ ] Any other setopt error still fails the transfer as it does now.
+- [x] A `CURLE_NOT_BUILT_IN` answer to `CURLOPT_TLS13_CIPHERS` or `CURLOPT_PROXY_TLS13_CIPHERS` leaves the transfer running, and stderr carries curl 8.22.0's `ignoring --tls13-ciphers` / `ignoring --proxy-tls13-ciphers` warning (left out under `-s`), shown by tests in `Curl.Console.UnitTests/NotBuiltInTlsSetoptWarningTests.cs`.
+- [x] A `CURLE_NOT_BUILT_IN` answer to `CURLOPT_CAPATH` or `CURLOPT_PROXY_CAPATH` leaves the transfer running, with the measured warning text, shown by tests in the same file.
+- [x] Any other setopt error still fails the transfer as it does now.
 
 ## Notes
+- Decided (ADR-0974): `ToolEasyHandle.SetOptions` carries on past `CURLE_NOT_BUILT_IN` for the four calls and writes no warning itself. The run already writes the measured lines before each transfer, unless `-s`, in the Schannel build (`CurlComposition.WarningLinesBeforeEachTransfer`, pinned by `CurlCompositionTests`' `WarningLinesBeforeEachTransfer_*` tests). The Schannel build is the only one where `Libcurl` answers `CURLE_NOT_BUILT_IN` for these calls, so writing the warning again from the setopt answer would print it twice. `NotBuiltInTlsSetoptWarningTests` pins the carrying on through the new static `SetOptions(setopts, setOption)` seam, which takes the call as a delegate. That keeps the tests off the platform's `Libcurl`, because real `Libcurl` cannot be made to refuse these four on every platform. The same tests pin that other refusals still fail the transfer. So the criteria's warning text and `-s` are shown by the existing `CurlCompositionTests`, not by tests in the new file.
+- `--capath` with `CURLE_NOT_BUILT_IN` for `CURLOPT_CAPATH` itself: no build here answers it (Schannel accepts `CAPATH`, as the measurement shows only the proxy warning), so no warning text is pinned for it.
+- `Curl.Console/EasySetoptsFromCommandLine.TlsAuthenticationProxy.cs` needed no change.
+- Build clean, fast tests green, `Measure-CodeQuality.ps1 -Library Curl.Console` 0 failing members. Platform-neutral: the tests use only a delegate, with no paths or OS text.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 56d8db24 763fefc2 b55127cc.
+- 2026-10-28: Doing -> Done. SetOptions carries on past CURLE_NOT_BUILT_IN for CAPATH, PROXY_CAPATH, TLS13_CIPHERS and PROXY_TLS13_CIPHERS (ADR-0974)
