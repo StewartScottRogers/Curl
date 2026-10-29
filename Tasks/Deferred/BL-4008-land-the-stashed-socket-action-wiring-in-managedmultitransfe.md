@@ -44,4 +44,4 @@ Split from BL-3989 (cost cap), itself split from BL-3976 and BL-3563 (CGR-034 in
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 3a1e0c49 1d22eb8b 6e4e49ca 34b11bef a0b1d3ee.
 - 2026-10-28: Doing -> Backlog. Out of run budget: stash lands only together with the upstream test582 hang fix (test582 is on the ratchet in the fast suite); the trace shows a SocketActionAsync(In) on the engine socket never returning, see Notes
-- 2026-10-28: Backlog -> Deferred. Split (cost cap) into BL-4012 and BL-4013
+- 2026-10-28: Backlog -> Deferred. Split (cost cap) into BL-4015 and BL-4016

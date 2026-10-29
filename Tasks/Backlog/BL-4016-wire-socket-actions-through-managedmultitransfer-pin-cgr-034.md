@@ -1,16 +1,16 @@
 ---
-id: BL-4013
+id: BL-4016
 title: Wire socket actions through ManagedMultiTransfer, pin CGR-034 C_20, C_74, C_75 and keep test582 passing
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4012]
+depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4015]
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs, Curl.Engine.UnitTests/Cgr034Tests.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.SocketAction.cs]
 requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4013 — Wire socket actions through ManagedMultiTransfer, pin CGR-034 C_20, C_74, C_75 and keep test582 passing
+# BL-4016 — Wire socket actions through ManagedMultiTransfer, pin CGR-034 C_20, C_74, C_75 and keep test582 passing
 
 ## Goal
 
@@ -32,7 +32,7 @@ Split from BL-4008 (cost cap); read its Notes, including the test582 trace. Expe
 ## Notes
 
 - Split from BL-4008 (cost cap). Continues the stashed work of BL-4008.
-- Apply the stash's `ManagedMultiTransfer.cs`, `Cgr034Tests.cs` and `ManagedMultiTransferTests.SocketAction.cs` hunks (BL-4012 lands the other files). Keep CGR-150's `CloseIdleConnectionsForRoomAsync` beside the wiring. The fallbacks (`FirstTransferSocket`, the 10 ms timer) stay until BL-3990.
+- Apply the stash's `ManagedMultiTransfer.cs`, `Cgr034Tests.cs` and `ManagedMultiTransferTests.SocketAction.cs` hunks (BL-4015 lands the other files). Keep CGR-150's `CloseIdleConnectionsForRoomAsync` beside the wiring. The fallbacks (`FirstTransferSocket`, the 10 ms timer) stay until BL-3990.
 - Write the stash's ADR with a free number (ADR-0969 last run; check), "Decided by Claude under Stewart's delegation", with its README row and citations in `ManagedMultiTransfer.cs` and `Cgr034Tests.cs`.
 - The test582 hang: a `SocketActionAsync(0x50000001, In)` never returns after ~30 actions (~1.1 s). Re-trace inside `MoveTransfersOnAsync` (before and after `RunQueuedCallbacks`, `MoveEveryTransferOn`, `SettleSocketWaitingTransfers`); suspects are the upload read callback run under `Settle`'s synchronous `Task.WaitAny`, or in-memory continuations running inline on the caller's thread. `Settle` is bounded by `SocketWaitSettleLimit` (200 ms). BL-4007 keeps any remaining test582 work and the quality gates.
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4012
+id: BL-4015
 title: Land the stashed TransferSocketWait, gated dialer and ConnectOnlyConnection socket-action pieces
 priority: High
 assignee: Claude
@@ -10,11 +10,11 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4012 — Land the stashed TransferSocketWait, gated dialer and ConnectOnlyConnection socket-action pieces
+# BL-4015 — Land the stashed TransferSocketWait, gated dialer and ConnectOnlyConnection socket-action pieces
 
 ## Goal
 
-`TransferSocketWait`, `SocketActionGatedTcpDialer` and `ConnectOnlyConnection` carry the socket-action pieces of the stashed work (ADR-0828, ADR-0955 `TakeSocket` and `SignalOn`), additive and unused by `ManagedMultiTransfer` until BL-4013, so the fast suite stays green on its own.
+`TransferSocketWait`, `SocketActionGatedTcpDialer` and `ConnectOnlyConnection` carry the socket-action pieces of the stashed work (ADR-0828, ADR-0955 `TakeSocket` and `SignalOn`), additive and unused by `ManagedMultiTransfer` until BL-4016, so the fast suite stays green on its own.
 
 ## Context
 
@@ -30,8 +30,8 @@ Split from BL-4008 (cost cap), itself split from BL-3989, BL-3976 and BL-3563 (C
 ## Notes
 
 - Split from BL-4008 (cost cap). Continues the stashed work of BL-4008.
-- Take only the stash's hunks for the files in `touches`; the `ManagedMultiTransfer.cs`, `Cgr034Tests.cs` and `ManagedMultiTransferTests.SocketAction.cs` hunks belong to BL-4013.
-- The stash's ADR (renumbered to ADR-0969 by the last run; check the number is still free) is written by BL-4013, which wires it.
+- Take only the stash's hunks for the files in `touches`; the `ManagedMultiTransfer.cs`, `Cgr034Tests.cs` and `ManagedMultiTransferTests.SocketAction.cs` hunks belong to BL-4016.
+- The stash's ADR (renumbered to ADR-0969 by the last run; check the number is still free) is written by BL-4016, which wires it.
 
 ## Log
 
