@@ -36,3 +36,4 @@ Split from BL-4008 (cost cap), itself split from BL-3989, BL-3976 and BL-3563 (C
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 00e5f677 1ada490e 62fb8150 a0b1d3ee.
