@@ -1,5 +1,5 @@
 ---
-id: BL-4021
+id: BL-4025
 title: HTTP/2 trailers replace the head's header count in num_headers, as curl 8.18.0 does
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4021 — HTTP/2 trailers replace the head's header count in num_headers, as curl 8.18.0 does
+# BL-4025 — HTTP/2 trailers replace the head's header count in num_headers, as curl 8.18.0 does
 
 ## Goal
 

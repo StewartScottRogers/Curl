@@ -37,7 +37,7 @@ Second half of BL-3664 (split); BL-4004 lands the fix first. BL-3664's Notes hol
   - pseudoafter: 8 naming [:status] [200], `\n[0 000 1 0 0 0]\n`. status101: 16 naming [:status] [101], `\n[0 000 1 0 0 0]\n`.
   - trpseudo, uppertrailer: 16 naming [:status] [200] / [X-T] [1], `HTTP/2 200 \r\n\r\nhello h2\n` + `\n[2 200 1 9 15 0]\n` (REF now 9 too: BL-3664's 10 was the old recorder escape).
   - twoheaders: 16, `HTTP/2 200 \r\n\r\n` + `\n[2 200 1 0 15 0]\n`. trnoes: 16 `nghttp2 shuts down connection with error 1: PROTOCOL_ERROR`, `HTTP/2 200 \r\n\r\nhello h2` + `\n[2 200 1 8 15 0]\n`.
-  - Controls: te: trailers: 0, `[2 200 1 0 29 1]`, GOAWAY error 0, match. Head `x-a: 1` with trailer `x-t: 1`: 0, same bytes, but num_headers REF 1 / PORT 2: with trailers, curl's num_headers is the trailer count alone (also measured: head x-a, x-b + trailer x-t gives REF 1, PORT 3). Not a CGR-135 repro (CGR-273/BL-3802 territory): filed BL-4021.
+  - Controls: te: trailers: 0, `[2 200 1 0 29 1]`, GOAWAY error 0, match. Head `x-a: 1` with trailer `x-t: 1`: 0, same bytes, but num_headers REF 1 / PORT 2: with trailers, curl's num_headers is the trailer count alone (also measured: head x-a, x-b + trailer x-t gives REF 1, PORT 3). Not a CGR-135 repro (CGR-273/BL-3802 territory): filed BL-4025.
 - Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary: 0 failing members. CI on Linux and macOS: the new test drives a scripted in-memory connection with no path, OS error or certificate, so it is platform-neutral; fast tests green here. `dotnet format --verify-no-changes` flags only `Cgr218Tests.cs`, which this task did not change.
 
 ## Log
