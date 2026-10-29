@@ -193,7 +193,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     /// <summary>
     /// The target of WinLDAP's own connection: for <c>ldaps</c> the handshake sends the machine name
     /// as its server name and trusts only the Windows certificate store, whatever <c>--cacert</c>
-    /// says, unless <c>-k</c> turns verification off (CGR-289, ADR-0979, ADR-0991); a plaintext
+    /// says, unless <c>-k</c> turns verification off (CGR-289, ADR-0979, ADR-0992); a plaintext
     /// target is unchanged.
     /// </summary>
     private static ConnectTarget WinLdapTargetOf(ConnectTarget target) =>

@@ -20,7 +20,7 @@ internal interface ISystemStoreTrustTlsProvider : ITlsProvider
     /// <summary>
     /// Returns <paramref name="options" /> with every trust setting beside the system store
     /// removed: no CA file, CA directory or CA blob. <c>-k</c> is kept, as curl 8.22.0's WinLDAP
-    /// connection honours it (measured, BL-4044, ADR-0991).
+    /// connection honours it (measured, BL-4044, ADR-0992).
     /// </summary>
     /// <param name="options">The settings a provider was built with.</param>
     /// <returns>The settings that trust only the system store.</returns>

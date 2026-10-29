@@ -1,4 +1,4 @@
-# ADR-0991: WinLDAP's own ldaps:// connection honours -k
+# ADR-0992: WinLDAP's own ldaps:// connection honours -k
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4044, for CGR-289). Amends ADR-0979.
 

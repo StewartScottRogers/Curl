@@ -31,7 +31,7 @@ CGR-289, part 1 of 3 of BL-4044. The recorder handshook only the first TLS conne
 - Split from BL-4044 (cost cap).
 - Continues the stashed work of BL-4044.
 - Added `Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs` to touches: only the doc comment of `WinLdapTargetOf`, which said WinLDAP's connection ignores `-k` and became false with this fix. No task in Doing on origin/work/dark-factory names it; BL-4055 (Backlog) does and edits code there later.
-- The ADR was written as ADR-0983, a number another lane already used; renumbered to ADR-0991 (ADR-0818); the criterion's ADR-0983 is that ADR.
+- The ADR was written as ADR-0983, a number another lane already used; renumbered to ADR-0992 (ADR-0818); the criterion's ADR-0983 is that ADR.
 - Measured 2026-10-29 with curl 8.22.0 (Schannel): `Record-CurlExchange.ps1 -Port 18636 -Tls -Script` (read ber, close) with `-sS -k ldaps://localhost:18636/dc=test` recorded "TLS handshake completed on connection 1" and "on connection 2", curl exit 38 after 5.4 s (the script closes after one read), no 30 s wait.
 - Measure-CodeQuality.ps1 for Curl.Networking.UnitLibrary and Curl.Protocol.Ldap.UnitLibrary: 0 failing members. Fast tests green.
 
@@ -39,4 +39,4 @@ CGR-289, part 1 of 3 of BL-4044. The recorder handshook only the first TLS conne
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 42fabf5a 9c94189d 779790c0.
-- 2026-10-29: Doing -> Done. Recorder serves WinLDAP's second ldaps connection (measured against curl 8.22.0); system-store-only trust keeps -k (ADR-0991).
+- 2026-10-29: Doing -> Done. Recorder serves WinLDAP's second ldaps connection (measured against curl 8.22.0); system-store-only trust keeps -k (ADR-0992).
