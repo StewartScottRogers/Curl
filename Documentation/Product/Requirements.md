@@ -8,7 +8,9 @@
 > although the code implements much more: FTP and FTPS, IMAP, POP3, SMTP, LDAP,
 > RTSP, WebSocket, HTTP/2 and HTTP/3, the TLS options, `-v` and `--trace`, `-O` and
 > output naming, retries and `--limit-rate`, `--parallel`, netrc and `-K` config
-> files; SFTP, SCP and SMB are registered in `Curl.Console` too. Each row ends
+> files; SFTP and SCP are registered in `Curl.Console` too. SMB is registered only
+> as disabled: `smb://` and `smbs://` URLs fail with exit 1 and `Protocol "<scheme>" is
+> disabled`, as in curl 8.22.0's reference builds (ADR-0835). Each row ends
 > with the tests that show it built,
 > or says which part is missing and names the task that covers it (checked
 > 2026-09-29).
