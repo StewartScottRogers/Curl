@@ -118,3 +118,4 @@ curl -sS --http2-prior-knowledge -i http://127.0.0.1:P/x -w '\n[%{http_version} 
 - 2026-10-26: Doing -> Backlog. Needs Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs (held by BL-3667) and Http2Session.cs (held by BL-3668); REF measured and plan recorded in Notes
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Waits on BL-3979 (num_headers for an HTTP/2 head failed part way, cltwo); every other CGR-135 repro now matches REF, fix stashed
+- 2026-10-28: Backlog -> Deferred. Split into BL-4004 and BL-4005 (over its cost cap)
