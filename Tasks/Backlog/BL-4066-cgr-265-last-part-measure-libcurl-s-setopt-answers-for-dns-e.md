@@ -1,5 +1,5 @@
 ---
-id: BL-4054
+id: BL-4066
 title: CGR-265 last part: measure libcurl's setopt answers for DNS_*, ECH, CRLFILE, ISSUERCERT, curves, sigalgs, VERIFYSTATUS, HTTP_VERSION 3+, STREAM_WEIGHT, TCP_FASTOPEN, KRBLEVEL, PROXYTYPE 8, SSLENGINE, HTTPSIG_* and gate them
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4054 — CGR-265 last part: measure libcurl's setopt answers for DNS_*, ECH, CRLFILE, ISSUERCERT, curves, sigalgs, VERIFYSTATUS, HTTP_VERSION 3+, STREAM_WEIGHT, TCP_FASTOPEN, KRBLEVEL, PROXYTYPE 8, SSLENGINE, HTTPSIG_* and gate them
+# BL-4066 — CGR-265 last part: measure libcurl's setopt answers for DNS_*, ECH, CRLFILE, ISSUERCERT, curves, sigalgs, VERIFYSTATUS, HTTP_VERSION 3+, STREAM_WEIGHT, TCP_FASTOPEN, KRBLEVEL, PROXYTYPE 8, SSLENGINE, HTTPSIG_* and gate them
 
 ## Goal
 
