@@ -57,3 +57,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 971c9652 1f2ca384 653e3607 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4253: an upload seam in Curl.WebSocket.UnitLibrary that sends one text frame per message, which graphql-transport-ws, WAMP and STOMP need
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 971c9652 1f2ca384 653e3607 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
