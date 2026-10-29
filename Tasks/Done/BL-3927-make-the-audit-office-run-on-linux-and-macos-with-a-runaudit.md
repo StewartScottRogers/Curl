@@ -9,7 +9,7 @@ touches: [CLAUDE.md, Audit/RunAudit.ps1, Audit/RunAudit.sh, Audit/Tools, Audit/P
 lane: no
 requirement: none
 created: 2026-10-27
-completed:
+completed: 2026-10-29
 ---
 # BL-3927 — Make the audit office run on Linux and macOS, with a RunAudit.sh launcher
 
@@ -50,3 +50,4 @@ Audit/Guard is BL-3926's.
 - 2026-10-29: Audit/RunAudit.sh added (mode 100755, LF, needs only pwsh, "$@" passed through). Dry run on commit 6255397567e8 with -Seed 1: WSL Ubuntu (pwsh 7.4.6, a clean LF clone) and Windows (RunAudit.cmd, -AlongsideShift as a shift was running) both print the same 22 lines once the repo root, the run stamp and the path separator are normalised; 0 differences.
 - 2026-10-29: Self-tests under pwsh on Linux (clean LF checkout): RunAudit, Find-BooleanNameMismatches, Find-WeakTests, Measure-FactoryProcess, New-TasksFromAcceptedFindings, Test-AuditDue, Write-AuditFindings, Write-AuditScorecard exit 0. Invoke-MutationTest needs dotnet, which WSL lacks; CI's new audit-self-tests job runs it on ubuntu-latest and macos-latest with .NET. Get-AuditorFingerprint and Read-PlantedCatalogue (no self-test) run on Linux too; the fingerprint is identical on both platforms. Five checks in Write-AuditFindings/Write-AuditScorecard failed on Windows CRLF checkouts already on master; they now accept \r. PR #253.
 - 2026-10-29: PR #253 merged into master (merge a9f1a8149); CI green on Windows, Linux and macOS, including Audit self-tests on all three (Invoke-MutationTest ran on ubuntu-latest and macos-latest). A hung quality shard 3 (Curl.Console.UnitTests, not touched here) was rerun and passed. master merged into work/dark-factory.
+- 2026-10-29: Doing -> Done. PR #253 merged with CI green on all three platforms
