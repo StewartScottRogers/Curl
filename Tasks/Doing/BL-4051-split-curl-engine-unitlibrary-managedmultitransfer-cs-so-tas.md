@@ -24,11 +24,13 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Acceptance criteria
 
-- [ ] The per-case or per-stand-in content of `Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
-- [ ] After the waiting tasks' `touches` (BL-3727, BL-3740, BL-3741, BL-3783, BL-3784, BL-3785, BL-3815, BL-3977, BL-3990) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs`.
-- [ ] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The per-case or per-stand-in content of `Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs` moves into one file per unit, and each unit registers itself, so adding or changing one touches only its own file.
+- [x] After the waiting tasks' `touches` (BL-3727, BL-3740, BL-3741, BL-3783, BL-3784, BL-3785, BL-3815, BL-3977, BL-3990) are narrowed to their own files by editing their front matter, `task-board.ps1 hotspots` counts fewer than 5 tasks for `Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs`.
+- [x] `dotnet build` is clean and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+Split by concern into partial-class files ManagedMultiTransfer.{Entries,Perform,Dispose,WaitSockets,Info,Queueing,MovingOn,Timer,Start,Waiting,MultiEntry}.cs; no logic changed. Narrowed touches of BL-3727, 3740, 3741, 3783-3785, 3815, 3977, 3990 to the files their code lives in (best match by grep; a task needing another file adds it under the touches rule). Hotspots now report none for ManagedMultiTransfer.cs. Engine quality gate: 0 failing members.
 
 ## Log
 

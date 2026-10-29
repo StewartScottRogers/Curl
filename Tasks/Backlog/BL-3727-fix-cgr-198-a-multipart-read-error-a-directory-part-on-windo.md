@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests/Cgr198Tests.cs, Curl.Engine.UnitLibrary, Curl.Engine.UnitTests/Cgr198Tests.cs]
+touches: [Curl.Cli.UnitLibrary, Curl.Cli.UnitTests/Cgr198Tests.cs, Curl.Engine.UnitLibrary/ManagedMimePartBuilder.cs, Curl.Engine.UnitTests/Cgr198Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
