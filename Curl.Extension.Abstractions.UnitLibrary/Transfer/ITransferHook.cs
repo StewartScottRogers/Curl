@@ -31,4 +31,16 @@ public interface ITransferHook
     void TransferFinished(TransferResult result)
     {
     }
+
+    /// <summary>
+    /// Asks, once the transfer has ended and every hook has read it, for the same transfer to run again
+    /// after a delay (ADR-1009), as Server-Sent Events reconnect after their reconnection time. The transfer
+    /// is waited for on its <see cref="ITransferContext.TimeProvider" /> and repeated with every hook's
+    /// <see cref="RequestHeadersFor" /> asked afresh and the body written through the same streams; the
+    /// first hook, in request order, that names a delay decides it. Cancelling the transfer ends the wait,
+    /// and the last result is the transfer's.
+    /// </summary>
+    /// <param name="result">The result of the transfer that just ended.</param>
+    /// <returns>How long to wait before repeating; <see langword="null" />, by default, not to repeat.</returns>
+    TimeSpan? RepeatAfter(TransferResult result) => null;
 }
