@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b94d997c 6b67e8fd 8f94f79e bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4259 (wire format) and BL-4260 (amqp/amqps client)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: b94d997c 6b67e8fd 8f94f79e bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
