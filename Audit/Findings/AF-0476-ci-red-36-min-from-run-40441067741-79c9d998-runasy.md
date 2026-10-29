@@ -3,8 +3,8 @@ id: AF-0476
 title: CI red 36 min from run 40441067741 (79c9d998, RunAsync_OutputInUtf8ConfigFileOnWindows on Linux and macOS)
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:40441067741:ci-red
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
