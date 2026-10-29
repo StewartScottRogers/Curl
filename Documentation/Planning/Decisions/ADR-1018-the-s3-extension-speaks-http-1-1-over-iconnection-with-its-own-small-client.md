@@ -1,4 +1,4 @@
-# ADR-1016: The S3 extension speaks HTTP/1.1 over IConnection with its own small client
+# ADR-1018: The S3 extension speaks HTTP/1.1 over IConnection with its own small client
 
 - Status: Accepted
 - Date: 2026-10-29

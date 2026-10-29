@@ -1,6 +1,6 @@
 # Curl.Extension.S3.UnitLibrary
 
-The S3 extension (ADR-0999, ADR-1013, ADR-1016). Namespace `Curl.Extension.S3`. It references the
+The S3 extension (ADR-0999, ADR-1013, ADR-1018). Namespace `Curl.Extension.S3`. It references the
 base class library and `Curl.Protocol.Abstractions` (for `IConnection`), and never `Curl.Protocol.Http`
 (whose `--aws-sigv4` code is curl's, not this extension's). The options arrive in later tasks.
 
@@ -17,7 +17,7 @@ base class library and `Curl.Protocol.Abstractions` (for `IConnection`), and nev
   and returns an `S3HttpResponse` whose body is a stream framed by `Content-Length`, chunked or the
   close; `ConnectionPersists` says whether the caller may mark the connection reusable once the body
   is read. Every failure is an `S3HttpException` naming an `S3HttpFailure`. `Expect: 100-continue`
-  is not sent (ADR-1016).
+  is not sent (ADR-1018).
 
 - `Signing/S3RequestSigner` signs a request with AWS Signature Version 4 as the Amazon S3 API
   reference "Authenticating Requests (AWS Signature Version 4)" says, for a payload in a single
