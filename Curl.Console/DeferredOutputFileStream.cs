@@ -22,6 +22,11 @@ namespace Curl.Console;
 /// <c>-J</c> name; <see langword="null" />, the default, overwrites an <c>-o</c> or <c>-O</c> file
 /// and not a <c>-J</c> one.
 /// </param>
+/// <param name="openUnderRawBytes">
+/// Opens a name holding an argument byte that is not valid UTF-8 under its raw bytes
+/// (<see cref="IOutputPaths.OpenUnderRawBytes" />); <see langword="null" />, the default, opens every
+/// name through <paramref name="fileSystem" />.
+/// </param>
 /// <remarks>
 /// <para>
 /// Opening late is what gives curl's messages: when the file cannot be created, the
@@ -51,7 +56,7 @@ namespace Curl.Console;
 /// curl's <c>fwrite</c> does (BL-1675).
 /// </para>
 /// </remarks>
-internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode, bool? clobber = null) : Stream
+internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string path, FileWriteMode writeMode, bool? clobber = null, Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? openUnderRawBytes = null) : Stream
 {
     /// <summary>
     /// The mode a newly created <c>-o</c> file receives on a POSIX system, before the umask:
@@ -589,7 +594,7 @@ internal sealed class DeferredOutputFileStream(IFileSystem fileSystem, string pa
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>The open's answer.</returns>
     private ValueTask<FileOpenResult> OpenAsync(FileWriteMode mode, CancellationToken cancellationToken) =>
-        RawByteFileName.OpenForWriteAsync(fileSystem, Path, mode, CreateMode, cancellationToken);
+        RawByteFileName.OpenForWriteAsync(fileSystem, Path, mode, CreateMode, openUnderRawBytes, cancellationToken);
 
     /// <summary>
     /// Creates <c>&lt;path&gt;.1</c>, then <c>.2</c>, and so on while each is already taken, up to

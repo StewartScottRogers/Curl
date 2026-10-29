@@ -3686,6 +3686,7 @@ internal sealed class CurlCommandRunner(
                 headerFile,
                 transfer.TransferId == Running.FirstTransferIdOfGroup ? FileWriteMode.Truncate : FileWriteMode.Append,
                 DeferredOutputFileStream.CreateMode,
+                OutputPaths.OpenUnderRawBytes,
                 CancellationToken.None)
             .ConfigureAwait(false);
 
@@ -4860,7 +4861,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="resumeFrom">The resolved <c>-C</c> offset, or <see langword="null" />.</param>
     /// <returns>The stream, not yet opened.</returns>
     private DeferredOutputFileStream CreateOutputFileStream(CommandLineOptions options, string path, long? resumeFrom) =>
-        new(fileSystem, path, resumeFrom is > 0 ? FileWriteMode.Append : FileWriteMode.Truncate, options.Clobber);
+        new(fileSystem, path, resumeFrom is > 0 ? FileWriteMode.Append : FileWriteMode.Truncate, options.Clobber, OutputPaths.OpenUnderRawBytes);
 
     /// <summary>
     /// Gives the wrapper that puts a <see cref="RemoteHeaderNameStream" /> in front of the

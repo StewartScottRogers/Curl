@@ -55,7 +55,7 @@ public sealed class Cgr016OutputFileTests
         await cancelled.CancelAsync();
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () => await RawByteFileName.OpenForWriteAsync(
-            fileSystem, "\uDC80", FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, false, RecordRawOpen, cancelled.Token));
+            fileSystem, "\uDC80", FileWriteMode.Truncate, DeferredOutputFileStream.CreateMode, RecordRawOpen, cancelled.Token));
         Assert.IsEmpty(rawOpens);
     }
 
@@ -98,7 +98,7 @@ public sealed class Cgr016OutputFileTests
 
     private ValueTask<FileOpenResult> OpenAsync(string path, bool isWindows) =>
         RawByteFileName.OpenForWriteAsync(
-            fileSystem, path, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, isWindows, RecordRawOpen, TestContext.CancellationToken);
+            fileSystem, path, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, isWindows ? null : RecordRawOpen, TestContext.CancellationToken);
 
     private FileOpenResult RecordRawOpen(byte[] path, FileWriteMode mode, UnixFileMode createMode)
     {

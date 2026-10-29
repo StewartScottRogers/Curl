@@ -46,34 +46,18 @@ internal static partial class RawByteFileName
     };
 
     /// <summary>
-    /// Opens <paramref name="path" /> for writing: under its raw bytes when it holds an escaped
-    /// byte off Windows, otherwise through <paramref name="fileSystem" />.
-    /// </summary>
-    /// <param name="fileSystem">Opens every name that needs no raw bytes.</param>
-    /// <param name="path">The output file's name, as the runner resolved it.</param>
-    /// <param name="mode">How existing content is treated.</param>
-    /// <param name="createMode">The permissions a created file gets, before the umask.</param>
-    /// <param name="cancellationToken">Cancels the open.</param>
-    /// <returns>The open's answer.</returns>
-    internal static ValueTask<FileOpenResult> OpenForWriteAsync(
-        IFileSystem fileSystem,
-        string path,
-        FileWriteMode mode,
-        UnixFileMode createMode,
-        CancellationToken cancellationToken) =>
-        OpenForWriteAsync(fileSystem, path, mode, createMode, OperatingSystem.IsWindows(), OpenUnderRawBytes, cancellationToken);
-
-    /// <summary>
-    /// Opens <paramref name="path" /> with <paramref name="openRaw" /> when it holds an escaped byte
-    /// and <paramref name="isWindows" /> is <see langword="false" />, otherwise with
-    /// <paramref name="fileSystem" />.
+    /// Opens <paramref name="path" /> with <paramref name="openRaw" /> when there is one and the name
+    /// holds an escaped byte, otherwise with <paramref name="fileSystem" />.
     /// </summary>
     /// <param name="fileSystem">Opens every name that needs no raw bytes.</param>
     /// <param name="path">The output file's name.</param>
     /// <param name="mode">How existing content is treated.</param>
     /// <param name="createMode">The permissions a created file gets, before the umask.</param>
-    /// <param name="isWindows">Whether this is Windows, where argument bytes are never escaped.</param>
-    /// <param name="openRaw">Opens the name's NUL-terminated raw bytes.</param>
+    /// <param name="openRaw">
+    /// Opens the name's NUL-terminated raw bytes; <see langword="null" /> on Windows, where argument
+    /// bytes are never escaped, and wherever <paramref name="fileSystem" /> must answer every open, as
+    /// in tests (<see cref="IOutputPaths.OpenUnderRawBytes" />, BL-4042).
+    /// </param>
     /// <param name="cancellationToken">Cancels the open.</param>
     /// <returns>The open's answer.</returns>
     internal static ValueTask<FileOpenResult> OpenForWriteAsync(
@@ -81,11 +65,10 @@ internal static partial class RawByteFileName
         string path,
         FileWriteMode mode,
         UnixFileMode createMode,
-        bool isWindows,
-        Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult> openRaw,
+        Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? openRaw,
         CancellationToken cancellationToken)
     {
-        if (isWindows || !HoldsEscapedByte(path))
+        if (openRaw is null || !HoldsEscapedByte(path))
         {
             return fileSystem.OpenForWriteAsync(path, mode, createMode, cancellationToken);
         }

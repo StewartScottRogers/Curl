@@ -1,5 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Curl.Engine;
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Console;
 
 /// <summary>
@@ -31,13 +33,19 @@ namespace Curl.Console;
 /// there, as curl's <c>stat</c> does on Windows, so <c>--skip-existing -o NUL</c> skips the transfer
 /// (CGR-182, BL-3711). .NET's file APIs do not see those devices.
 /// </param>
+/// <param name="openUnderRawBytes">
+/// Opens an output file whose name holds an argument byte that is not valid UTF-8 under its raw
+/// bytes (<see cref="OpenUnderRawBytes" />, BL-4042). <see langword="null" /> opens every name
+/// through the runner's <see cref="IFileSystem" />, as on Windows.
+/// </param>
 internal sealed class PhysicalOutputPaths(
     Func<string, bool>? isRegularFile,
     CRuntimeErrorNumbers errorNumbers,
     Func<byte[], int>? makeDirectoryUnderRawBytes = null,
     RawByteFileName.FileOperations? rawByteFiles = null,
     int? directoryPathLengthLimit = null,
-    bool findsDosDevices = false) : IOutputPaths
+    bool findsDosDevices = false,
+    Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? openUnderRawBytes = null) : IOutputPaths
 {
     /// <summary>
     /// Windows' <c>CreateDirectory</c> limit: a directory's full path must be shorter than 248
@@ -49,7 +57,8 @@ internal sealed class PhysicalOutputPaths(
     /// <summary>
     /// Initializes an instance with the running platform's regular-file test,
     /// <see cref="NativeRegularFileTest.ForCurrentPlatform" />, C runtime numbers and, off Windows,
-    /// <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" /> and <see cref="RawByteFileName.FileOperations.Native" />.
+    /// <see cref="RawByteFileName.MakeDirectoryUnderRawBytes" />, <see cref="RawByteFileName.FileOperations.Native" /> and
+    /// <see cref="RawByteFileName.OpenUnderRawBytes" />.
     /// </summary>
     public PhysicalOutputPaths()
         : this(
@@ -58,9 +67,13 @@ internal sealed class PhysicalOutputPaths(
             OffWindows<Func<byte[], int>>(RawByteFileName.MakeDirectoryUnderRawBytes),
             OffWindows(RawByteFileName.FileOperations.Native),
             OnWindows(WindowsDirectoryPathLengthLimit),
-            OperatingSystem.IsWindows())
+            OperatingSystem.IsWindows(),
+            OffWindows<Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>>(RawByteFileName.OpenUnderRawBytes))
     {
     }
+
+    /// <inheritdoc />
+    public Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? OpenUnderRawBytes => openUnderRawBytes;
 
     /// <summary>The names of the DOS devices <c>stat</c> finds on Windows without a path.</summary>
     private static readonly string[] DosDeviceNames =

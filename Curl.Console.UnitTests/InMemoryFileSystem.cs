@@ -148,6 +148,8 @@ internal sealed class InMemoryFileSystem : IFileSystem, IFileTimeSetter, IOutput
 
     public bool Exists(string path) => ExistingPaths.Contains(path);
 
+    public Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? OpenUnderRawBytes => null;
+
     public OutputFileRemoval RemoveFile(string path)
     {
         DeleteAttempts.Add(path);

@@ -1,9 +1,12 @@
+using Curl.Protocol.Abstractions;
+
 namespace Curl.Console;
 
 /// <summary>
 /// Creates the directories <c>--create-dirs</c> makes for an output file, tells whether an
 /// output file <c>--skip-existing</c> would skip is already there, and deletes the output file
-/// of a transfer <c>--remove-on-error</c> saw fail. The seam that keeps them off the disk in tests.
+/// of a transfer <c>--remove-on-error</c> saw fail, and opens an output file whose name holds an
+/// argument byte that is not valid UTF-8 under its raw bytes. The seam that keeps them off the disk in tests.
 /// </summary>
 internal interface IOutputPaths
 {
@@ -43,4 +46,12 @@ internal interface IOutputPaths
     /// could not be deleted, and on Windows when no file was there (<c>NUL</c>, a directory, nothing).
     /// </returns>
     OutputFileRemoval RemoveFile(string path);
+
+    /// <summary>
+    /// Opens for writing the output file named by NUL-terminated raw bytes, for a name holding an
+    /// argument byte that is not valid UTF-8 (<see cref="RawByteFileName" />, CGR-016, ADR-0920);
+    /// <see langword="null" /> when every name opens through the runner's <see cref="IFileSystem" />,
+    /// as on Windows and in tests (BL-4042).
+    /// </summary>
+    Func<byte[], FileWriteMode, UnixFileMode, FileOpenResult>? OpenUnderRawBytes { get; }
 }

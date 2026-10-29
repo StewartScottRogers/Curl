@@ -6,7 +6,7 @@ namespace Curl.Console;
 /// Pins CGR-016's <c>--create-dirs</c> part (BL-3868): off Windows a directory whose name holds an
 /// argument byte that is not valid UTF-8 is made under its raw bytes, as curl 8.18.0 on Linux makes
 /// <c>--create-dirs -o $'\xfd/b.txt'</c>'s directory FD; every other name is made as before. The
-/// <c>-D</c> file opens through <see cref="RawByteFileName.OpenForWriteAsync(Curl.Protocol.Abstractions.IFileSystem, string, Curl.Protocol.Abstractions.FileWriteMode, UnixFileMode, CancellationToken)" />,
+/// <c>-D</c> file opens through <see cref="RawByteFileName.OpenForWriteAsync(Curl.Protocol.Abstractions.IFileSystem, string, Curl.Protocol.Abstractions.FileWriteMode, UnixFileMode, Func{byte[], Curl.Protocol.Abstractions.FileWriteMode, UnixFileMode, Curl.Protocol.Abstractions.FileOpenResult}, CancellationToken)" />,
 /// which <see cref="Cgr016OutputFileTests" /> pins.
 /// </summary>
 [TestClass]
