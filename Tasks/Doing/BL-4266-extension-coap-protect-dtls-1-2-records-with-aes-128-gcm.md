@@ -34,3 +34,4 @@ Namespace `Curl.Extension.Coap.Dtls.Record`. Use `Curl.Tls`'s `TlsPrf.ComputeKey
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: cdf3eb35 fa37309c 54cafd17 3d836d5e.
