@@ -35,3 +35,4 @@ Second half of BL-3605 (CGR-076, `Documentation/Reviews/Curl-Gap-Report-2026-10-
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 8cccd063 d765a162 4573e9ad 9619a602.
