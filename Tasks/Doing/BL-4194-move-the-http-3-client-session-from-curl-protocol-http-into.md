@@ -36,3 +36,4 @@ Found by BL-4112's first pass: `Http3Session.cs` and `Http3StreamConnection.cs` 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: d757f172 d98609d6 478f867b 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4201: the HTTP/3 protocol core must exist in Curl.Http3.UnitLibrary before Http3Session can be rebuilt on it
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d757f172 d98609d6 478f867b 3d836d5e.
