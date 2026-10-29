@@ -1,5 +1,5 @@
 ---
-id: BL-4076
+id: BL-4078
 title: Pin each UTS 46 mapping class's 30 measured hosts against Curl's Host header
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4076 — Pin each UTS 46 mapping class's 30 measured hosts against Curl's Host header
+# BL-4078 — Pin each UTS 46 mapping class's 30 measured hosts against Curl's Host header
 
 ## Goal
 

@@ -38,4 +38,4 @@ BL-3548 (CGR-019, ADR-0895) added `Curl.Protocol.Abstractions.UnitLibrary/CurlUr
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: aacc7631 98808546 779790c0.
 - 2026-10-28: Doing -> Backlog. Waits for BL-4033: measuring the pinned hosts needs a Linux curl 8.22.0 with libidn2, which lanes lack.
-- 2026-10-29: Backlog -> Deferred. Split into BL-4076 and BL-4077; mapping code, table, tests and ADR-0980 are done, only the measured-host criterion remains
+- 2026-10-29: Backlog -> Deferred. Split into BL-4078 and BL-4077; mapping code, table, tests and ADR-0980 are done, only the measured-host criterion remains

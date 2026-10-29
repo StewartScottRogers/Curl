@@ -4,7 +4,7 @@ title: Pin Curl's refusal of the 14 hosts curl 8.18.0 with libidn2 refused
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4033, BL-4076]
+depends-on: [BL-4033, BL-4078]
 touches: [Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs]
 requirement: none
 created: 2026-10-29
