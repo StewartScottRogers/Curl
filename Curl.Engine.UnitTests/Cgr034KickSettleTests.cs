@@ -41,7 +41,9 @@ public sealed partial class Cgr034Tests
         easy.Options = new EasyOptions
         {
             Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" },
-            Transfer = new EasyTransferOptions { Timeout = TimeSpan.FromMilliseconds(4000) },
+            // Far enough off that a loaded runner reaches the read wait before it, so the transfer is not timed out
+            // (told Remove) while the action lets it go on (BL-4089).
+            Transfer = new EasyTransferOptions { Timeout = LongestWait * 2 },
         };
 
         multi.Add(easy);
