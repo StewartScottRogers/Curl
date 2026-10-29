@@ -22,22 +22,25 @@ The log reads: `Tn` the timer callback's value (`T400+` for 400 ms or more), `ad
 n-th distinct socket with `what` (1 IN, 2 OUT, 4 REMOVE), and in `C_21` `(e<handle>,p<socketp>)`, where the loop
 calls `curl_multi_assign(s, 100 + handle)` on the first callback. `wire:` lines are the requests the server received.
 
-## Results (2026-10-29, Windows)
+## Results (2026-10-29, Windows, after BL-4075 and BL-4086)
 
 | Case | REF | PORT | Same |
 |------|-----|------|------|
 | `C_20` one transfer | `T0 add S1=2 T-1 kick S1=1 S1=4`, 0, `hello`, `S1:real`, no poll errors, socket events | the same | yes |
-| `C_21` three, `curl_multi_assign` | `T0 T0 T0 add S1=2(e0,p0) S2=2(e1,p0) S3=2(e2,p0) T-1 kick S1=1(e0,p100) S2=1(e1,p101) S3=1(e2,p102)` then the three removals with their `p`, 0,0,0, `hello,other,hello`, all real | the same in 3 of 4 runs; one run: `... S1=2(e0,p0) S2=2(e1,p0) T0 kick S1=1(e0,p100) S3=2(e2,p0) T-1 ...` | no (intermittent) |
-| `C_65` refused | `T0 add S1=2 T-1 kick S1=4`, 7, `S1:real` | the same | yes |
+| `C_21` three, `curl_multi_assign` | `T0 T0 T0 add S1=2(e0,p0) S2=2(e1,p0) S3=2(e2,p0) T-1 kick S1=1(e0,p100) S2=1(e1,p101) S3=1(e2,p102)` then the three removals with their `p`, 0,0,0, `hello,other,hello`, all real | the same in 4 of 4 runs | yes |
+| `C_65` refused | `T0 add S1=2 T-1 kick S1=4`, 7, `S1:real` | the same in 4 of 4 runs | yes |
 | `C_74` timer only, perform | `T0 add T-1`, 0, `hello`, no socket | the same | yes |
-| `C_75` `TIMEOUT_MS` 600, silent | `T0 add S1=2 T400+ kick S1=1 S1=4 T-1`, 28, `S1:real` | `T0 add T0 kick S1=2 T400+ S1=1 S1=4 T-1` and, next run, `T0 add S1=2 T0 kick S1=1 T400+ S1=4 T-1`; 28 | no |
+| `C_75` `TIMEOUT_MS` 600, silent | `T0 add S1=2 T400+ kick S1=1 S1=4 T-1`, 28, `S1:real` | the same in 4 of 4 runs | yes |
 
-The removal order of `C_21`'s three sockets follows completion order and varies in REF as well (`S1 S2 S3` in two
-runs, `S1 S3 S2` in two), so it is not a difference. Every request on the wire is the same on both sides:
+The removal order of `C_21`'s three sockets follows completion order and varies in REF as well (`S2 S1 S3` in
+this run, `S1 S3 S2` and `S1 S2 S3` in earlier ones; PORT gave `S1 S2 S3` in all four), so it is not a difference.
+Every request on the wire is the same on both sides:
 `GET <path> HTTP/1.1\r\nHost: 127.0.0.1:<port>\r\nAccept: */*\r\n\r\n`.
 
-What differs: PORT's kick can return before every transfer has reached the wait on its real socket, so it tells
-the timer 0 and tells the socket (or its deadline) on a later action. Filed as BL-4075.
+History: the first run differed in `C_21` (intermittently) and `C_75`, because PORT's kick could return before
+every transfer reached the wait on its real socket; BL-4075 fixed that. The next run differed in `C_65`, because
+PORT closed a refused connect's socket before its REMOVE callback (`S1:NOT-A-SOCKET`, poll errors); BL-4086 fixed
+that. All five cases now match.
 
 ## Probe source
 
