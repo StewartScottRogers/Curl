@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Extension.Abstractions.UnitLibrary/Transfer/ITransferHook.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferHookingProtocolHandler.cs, Curl.Extension.Abstractions.UnitTests/Transfer/TransferHookingProtocolHandlerTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4174 — Let an extension transfer hook repeat the transfer after a delay
 
@@ -22,15 +22,20 @@ Found by BL-4110 (Server-Sent Events, WHATWG HTML "Server-sent events" §9.2.3 "
 
 ## Acceptance criteria
 
-- [ ] `ITransferHook` has a default-implemented member by which a hook asks for the transfer to be repeated after a delay; with no hook asking, every transfer runs exactly once, unchanged (unit test).
-- [ ] `TransferHookingProtocolHandler` waits the delay on the context's `TimeProvider`, then runs the handler again with the hooks' request headers asked afresh; cancellation ends the wait (unit tests with a fake time provider, no network).
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records the member and its semantics.
-- [ ] `Curl.Extension.Abstractions.UnitLibrary` meets the four quality gates by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `ITransferHook` has a default-implemented member by which a hook asks for the transfer to be repeated after a delay; with no hook asking, every transfer runs exactly once, unchanged (unit test).
+- [x] `TransferHookingProtocolHandler` waits the delay on the context's `TimeProvider`, then runs the handler again with the hooks' request headers asked afresh; cancellation ends the wait (unit tests with a fake time provider, no network).
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records the member and its semantics.
+- [x] `Curl.Extension.Abstractions.UnitLibrary` meets the four quality gates by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Plan: default member `TimeSpan? RepeatAfter(TransferResult result) => null` on `ITransferHook`; `TransferHookingProtocolHandler` loops: run, flush, `TransferFinished` for each hook, then the first hook in request order naming a delay decides it; waits with `Task.Delay` on the context's `TimeProvider` and `CancellationToken`, then reruns with `RequestHeadersFor` asked afresh; body streams built once. Recorded in ADR-1009.
+- Default taken: cancellation during the wait ends the transfer without an exception and the last run's result is returned, so curl reports it as a single run; no repeat limit (the hook stops by returning null).
+- Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary: 0 failing members. Full build clean; fast tests green. Tests are pure in-memory (fake TimeProvider, no paths or OS text), so platform-neutral for CI on Linux and macOS.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 73931ca5 19c0926a 8c59d058 e7c4212f 3d836d5e.
+- 2026-10-29: Doing -> Done. An ITransferHook can ask, via RepeatAfter, for the transfer to repeat after a delay on the context's TimeProvider, with headers asked afresh
