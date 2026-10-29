@@ -37,3 +37,4 @@ Keep the contract minimal: later groundwork tasks add transfer, connection, reso
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a1784791 6733a932 33e4531e 38c80764 51538dbb e35aff77 3d836d5e.
