@@ -34,3 +34,4 @@ Split from BL-3563 (CGR-034), the verification part. The probe is a C# file-base
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: ae632df0 d1c58933 b084e04d 779790c0.
