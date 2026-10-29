@@ -10,7 +10,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins how <c>%{filename_effective}</c> and the <c>File exists</c> warning print an output name
-/// holding a byte that is not valid UTF-8 (BL-4032, ADR-0978), with the files in an
+/// holding a byte that is not valid UTF-8 (BL-4032, ADR-0981), with the files in an
 /// <see cref="InMemoryFileSystem" />. Measured with curl 8.18.0 OpenSSL on Linux (WSL) on
 /// 2026-10-28: <c>-o $'\xff.txt' -w "%{filename_effective}"</c> prints FF 2E 74 78 74, and with
 /// <c>--no-clobber</c> and every name taken standard error gets

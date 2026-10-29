@@ -1,4 +1,4 @@
-# ADR-0978: Off Windows, `-w` text and the runner's standard error lines write escaped bytes raw
+# ADR-0981: Off Windows, `-w` text and the runner's standard error lines write escaped bytes raw
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4032).
 

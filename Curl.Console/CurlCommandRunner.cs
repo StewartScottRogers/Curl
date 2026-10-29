@@ -459,7 +459,7 @@ internal sealed class CurlCommandRunner(
     /// <summary>The encoding of standard error lines that echo command-line text (a refused command line, a <c>-T</c> or <c>-o</c> file that cannot be opened): the system ANSI code page on Windows, in which that text was read (ADR-0840, BL-3893, BL-3544), and UTF-8 elsewhere.</summary>
     private readonly Encoding commandLineEchoEncoding = CredentialEncoding.ForPlatform(runsOnWindows);
 
-    /// <summary>The encoding of the runner's own standard error lines: UTF-8 on Windows, and off Windows UTF-8 that writes each <see cref="InvalidUtf8ByteEscape" /> surrogate as its raw byte, so a warning naming an output file such as <c>-o $'\xff.txt'</c> prints the byte FF as curl 8.18.0 does on Linux (BL-4032, ADR-0978).</summary>
+    /// <summary>The encoding of the runner's own standard error lines: UTF-8 on Windows, and off Windows UTF-8 that writes each <see cref="InvalidUtf8ByteEscape" /> surrogate as its raw byte, so a warning naming an output file such as <c>-o $'\xff.txt'</c> prints the byte FF as curl 8.18.0 does on Linux (BL-4032, ADR-0981).</summary>
     private readonly Encoding standardErrorTextEncoding = runsOnWindows ? Encoding.UTF8 : InvalidUtf8ByteEscape.Encoding;
 
     /// <summary>Builds each transfer's context on the runner's clock; gives a <c>telnet</c> transfer standard input and sends command-line header text in the platform's encoding (ADR-0067).</summary>
