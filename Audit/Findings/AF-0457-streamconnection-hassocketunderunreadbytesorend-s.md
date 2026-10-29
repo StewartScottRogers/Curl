@@ -3,8 +3,8 @@ id: AF-0457
 title: StreamConnection.HasSocketUnderUnreadBytesOrEnd's || can become && with no test failing, so the check before a write misses a peer that already sent bytes or its FIN
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:HasSocketUnderUnreadBytesOrEnd-or:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:77:||
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
