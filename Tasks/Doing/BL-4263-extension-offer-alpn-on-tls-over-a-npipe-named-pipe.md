@@ -31,3 +31,4 @@ BL-4206 (ADR-1055) runs curl's TLS handshake over the pipe through the public `I
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6a527e98 478f867b 3d836d5e.
