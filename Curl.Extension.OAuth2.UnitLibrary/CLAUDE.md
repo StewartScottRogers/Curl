@@ -1,6 +1,6 @@
 # Curl.Extension.OAuth2.UnitLibrary
 
-The OAuth2 extension (ADR-0999, ADR-1025, ADR-1066). Namespace `Curl.Extension.OAuth2`. It references
+The OAuth2 extension (ADR-0999, ADR-1025, ADR-1075). Namespace `Curl.Extension.OAuth2`. It references
 the base class library, `Curl.Protocol.Abstractions` and `Curl.Extension.Abstractions`. It adds no URL
 scheme, so it has no line in `ExtensionCatalogue.cs`; its options, description and transfer hook have
 lines in the option, description and transfer hook catalogues.
@@ -53,7 +53,7 @@ redirect (`OAuth2RedirectReceiver`, `OAuth2Redirect`), checks its `state` and ex
 with the verifier (RFC 6749 §4.1, RFC 7636, RFC 8252 §7.3). `OAuth2CachedTokenSource` tries the
 cache and its refresh first, runs the flow only when they give nothing, and caches the new token.
 
-`Options/` turns it on (ADR-1066). `OAuth2Options` holds the long options: one flow option,
+`Options/` turns it on (ADR-1075). `OAuth2Options` holds the long options: one flow option,
 `--oauth2-client-credentials`, `--oauth2-device` or `--oauth2-pkce`, names the token endpoint, and
 `--oauth2-client-id`, `--oauth2-client-secret`, `--oauth2-scope`, `--oauth2-device-url`,
 `--oauth2-authorize-url`, `--oauth2-redirect-port` and `--oauth2-token-cache` complete it.

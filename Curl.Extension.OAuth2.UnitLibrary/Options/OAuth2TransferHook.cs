@@ -8,7 +8,7 @@ namespace Curl.Extension.OAuth2.Options;
 
 /// <summary>
 /// Gets a token before the transfer, from the cache (refreshing it, RFC 6749 §6) or by the flow the options chose, and
-/// sends it as <c>Authorization: Bearer</c> (RFC 6750 §2.1) after curl's own request headers (ADR-1066).
+/// sends it as <c>Authorization: Bearer</c> (RFC 6750 §2.1) after curl's own request headers (ADR-1075).
 /// </summary>
 /// <remarks>
 /// A failed flow fails the transfer with the flow's exit code and message, and the transfer is never sent; so does a token

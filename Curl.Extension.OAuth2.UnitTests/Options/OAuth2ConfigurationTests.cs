@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.OAuth2.Options;
 
-/// <summary>Pins how the OAuth2 options are read into a flow (ADR-1066).</summary>
+/// <summary>Pins how the OAuth2 options are read into a flow (ADR-1075).</summary>
 [TestClass]
 public sealed class OAuth2ConfigurationTests
 {

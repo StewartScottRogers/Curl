@@ -7,7 +7,7 @@ using Curl.Extension.OAuth2.Wire;
 
 namespace Curl.Extension.OAuth2.Options;
 
-/// <summary>What the OAuth2 options of one option group ask for (ADR-1066).</summary>
+/// <summary>What the OAuth2 options of one option group ask for (ADR-1075).</summary>
 /// <param name="Flow">The grant.</param>
 /// <param name="Request">The token endpoint, client and scope.</param>
 /// <param name="FlowEndpoint">The device authorization or authorization endpoint; <see langword="null"/> for client credentials.</param>

@@ -4,7 +4,7 @@ using Curl.Extension.Composition;
 
 namespace Curl.Extension.OAuth2.Options;
 
-/// <summary>Pins how the OAuth2 options are registered and turn the hook on (ADR-1066).</summary>
+/// <summary>Pins how the OAuth2 options are registered and turn the hook on (ADR-1075).</summary>
 [TestClass]
 public sealed class OAuth2OptionsTests
 {

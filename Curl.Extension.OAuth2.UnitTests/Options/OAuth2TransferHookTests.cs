@@ -8,7 +8,7 @@ namespace Curl.Extension.OAuth2.Options;
 
 /// <summary>
 /// Pins that the hook gets a token before the transfer and sends it as a Bearer token (RFC 6750 §2.1), from the cache when
-/// it has one, and never sends the transfer when it gets none (ADR-1066).
+/// it has one, and never sends the transfer when it gets none (ADR-1075).
 /// </summary>
 [TestClass]
 public sealed class OAuth2TransferHookTests

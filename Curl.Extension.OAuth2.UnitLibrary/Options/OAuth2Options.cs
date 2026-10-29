@@ -7,7 +7,7 @@ using Curl.Extension.OAuth2.Cache;
 namespace Curl.Extension.OAuth2.Options;
 
 /// <summary>
-/// The OAuth2 extension's long options, its description and its transfer hook activator (ADR-1066): one flow option,
+/// The OAuth2 extension's long options, its description and its transfer hook activator (ADR-1075): one flow option,
 /// <c>--oauth2-client-credentials</c>, <c>--oauth2-device</c> or <c>--oauth2-pkce</c>, names the token endpoint and
 /// turns the extension on; the others complete it.
 /// </summary>

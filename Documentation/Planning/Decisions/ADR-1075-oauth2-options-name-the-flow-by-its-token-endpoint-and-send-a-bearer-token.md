@@ -1,4 +1,4 @@
-# ADR-1066: The OAuth2 options name the flow by its token endpoint and send a Bearer token
+# ADR-1075: The OAuth2 options name the flow by its token endpoint and send a Bearer token
 
 - Status: Accepted
 - Date: 2026-10-29
