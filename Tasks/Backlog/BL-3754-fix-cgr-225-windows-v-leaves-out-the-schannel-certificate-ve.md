@@ -4,8 +4,8 @@ title: Fix CGR-225: Windows -v leaves out the Schannel certificate-verification 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Tls.UnitLibrary, Curl.Tls.UnitTests/Cgr225Tests.cs]
+depends-on: [BL-4031, BL-4022]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr225Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -75,3 +75,9 @@ curl -sS -v --cacert E\pki\ca.crt --ssl-no-revoke https://localhost:<p>/index.tx
 
 - 2026-10-26: Created from CGR-225 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes (2026-10-28 lane 6 scoping)
+
+- The Schannel `-v` lines are not in Curl.Tls (hand-built TLS records): existing Schannel info lines are built in Curl.Output.UnitLibrary (SchannelTrustText, TransferEventInfoText) from `ITransferEvents` events (`ReportTlsTrust`) raised in Curl.Networking.UnitLibrary (HandBuiltTlsProvider.cs:646, SslStreamTlsProvider). The fix needs new events (cert-verified hostname/CA-file count/store-cache, server close_notify/shutdown) in ITransferEvents, text in Output, raising in the Networking providers; touches corrected accordingly. Test goes in Curl.Networking.UnitTests/Cgr225Tests.cs (plus Output tests).
+- Requeued before any edit: BL-4031 (adds ITransferEvents forwarders across Networking decorators) and BL-4022 (HandBuiltTlsProvider.cs) hold the files this needs.
+- 2026-10-28: Doing -> Backlog. Needs ITransferEvents/Output/Networking files held by BL-4031 and BL-4022; touches corrected (Curl.Tls is not where the lines live)
