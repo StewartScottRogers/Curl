@@ -73,3 +73,4 @@ curl -sS -K E\cwd\long2.cfg -o NUL -w "%{size_request}|%{http_code}"
 ## Log
 
 - 2026-10-26: Created from CGR-197 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
