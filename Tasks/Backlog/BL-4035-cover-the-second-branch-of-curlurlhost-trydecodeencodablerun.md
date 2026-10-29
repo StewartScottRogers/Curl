@@ -1,5 +1,5 @@
 ---
-id: BL-4027
+id: BL-4035
 title: Cover the second branch of CurlUrlHost.TryDecodeEncodableRune
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4027 — Cover the second branch of CurlUrlHost.TryDecodeEncodableRune
+# BL-4035 — Cover the second branch of CurlUrlHost.TryDecodeEncodableRune
 
 ## Goal
 

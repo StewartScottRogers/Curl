@@ -1,5 +1,5 @@
 ---
-id: BL-4026
+id: BL-4034
 title: Commit the C# file-based app that generates CurlUrlHostNameMappingTable.cs from the Unicode 15.1 data
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4026 — Commit the C# file-based app that generates CurlUrlHostNameMappingTable.cs from the Unicode 15.1 data
+# BL-4034 — Commit the C# file-based app that generates CurlUrlHostNameMappingTable.cs from the Unicode 15.1 data
 
 ## Goal
 

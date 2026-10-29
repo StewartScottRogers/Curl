@@ -4,7 +4,7 @@ title: Map host names with the whole UTS#46 mapping table, not the BL-3548 subse
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4025]
+depends-on: [BL-4033]
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMapping.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMappingTable.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs, Curl.Protocol.Abstractions.UnitTests/Cgr019Tests.cs]
 requirement: none
 created: 2026-10-26
@@ -30,11 +30,11 @@ BL-3548 (CGR-019, ADR-0895) added `Curl.Protocol.Abstractions.UnitLibrary/CurlUr
 
 - Filed by BL-3548's run; validity differences (disallowed characters, ZWJ context rules) are BL-3588's, not this task's.
 - Resumed run: the earlier run had written the generated table, NFC and the tests but no ADR; this run added ADR-0972, the table and `Cgr019Tests.cs` (its pinned `｟` now maps to `⦅`) to touches, and the abstractions tests pass (1117 passed, 2 skipped).
-- Not measured here: Windows curl uses WinIDN and an ANSI argv, and no Linux curl was reachable (a WSL probe hung). The pinned hosts follow the Unicode 15.1 table and NFC; measuring them is BL-4025 (`lane: no`). Committing the generator app, which the earlier run did not keep, is BL-4026.
-- Requeued for BL-4025: the board refuses a changed criterion, and the first one needs a Linux curl 8.22.0 with libidn2 that no lane has. The mapping code, table, tests and ADR-0972 are committed (build clean, fast tests green, `Measure-CodeQuality.ps1` clean for `CurlUrlHostNameMapping` after `Compose` was split to complexity under 10), since they are finished and only the measurement is left; the next claim ticks the first criterion from BL-4025's recorded measurements and fixes any host that differs.
+- Not measured here: Windows curl uses WinIDN and an ANSI argv, and no Linux curl was reachable (a WSL probe hung). The pinned hosts follow the Unicode 15.1 table and NFC; measuring them is BL-4033 (`lane: no`). Committing the generator app, which the earlier run did not keep, is BL-4034.
+- Requeued for BL-4033: the board refuses a changed criterion, and the first one needs a Linux curl 8.22.0 with libidn2 that no lane has. The mapping code, table, tests and ADR-0972 are committed (build clean, fast tests green, `Measure-CodeQuality.ps1` clean for `CurlUrlHostNameMapping` after `Compose` was split to complexity under 10), since they are finished and only the measurement is left; the next claim ticks the first criterion from BL-4033's recorded measurements and fixes any host that differs.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: aacc7631 98808546 779790c0.
-- 2026-10-28: Doing -> Backlog. Waits for BL-4025: measuring the pinned hosts needs a Linux curl 8.22.0 with libidn2, which lanes lack.
+- 2026-10-28: Doing -> Backlog. Waits for BL-4033: measuring the pinned hosts needs a Linux curl 8.22.0 with libidn2, which lanes lack.

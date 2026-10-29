@@ -28,8 +28,8 @@ nothing, and only the base class library may be used.
   numbers (ranges with gaps, code points as zig-zag differences), read once into dictionaries.
   That keeps the source compact and costs no reflection or resource stream, so it stays
   Native AOT compatible. The table was generated from `IdnaMappingTable.txt`, `UnicodeData.txt`
-  and `CompositionExclusions.txt` with a C# file-based app; committing that app is BL-4026.
-- Measuring the pinned hosts against curl 8.22.0 with libidn2 on Linux is BL-4025: lanes run on
+  and `CompositionExclusions.txt` with a C# file-based app; committing that app is BL-4034.
+- Measuring the pinned hosts against curl 8.22.0 with libidn2 on Linux is BL-4033: lanes run on
   Windows, whose curl uses WinIDN and reads an ANSI argv.
 
 ## Consequences

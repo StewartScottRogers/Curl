@@ -1,5 +1,5 @@
 ---
-id: BL-4025
+id: BL-4033
 title: Measure CurlUrlHostNameMapping's UTS 46 mapping classes against curl 8.22.0 with libidn2 on Linux
 priority: Low
 assignee: Claude
@@ -11,7 +11,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4025 — Measure CurlUrlHostNameMapping's UTS 46 mapping classes against curl 8.22.0 with libidn2 on Linux
+# BL-4033 — Measure CurlUrlHostNameMapping's UTS 46 mapping classes against curl 8.22.0 with libidn2 on Linux
 
 ## Goal
 
