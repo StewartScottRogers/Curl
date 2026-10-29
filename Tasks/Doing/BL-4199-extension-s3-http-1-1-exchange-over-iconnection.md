@@ -32,3 +32,4 @@ Split from BL-4124 for size. The project is created by BL-4197. An extension nev
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3c10a2b0 d089179a 3180db99 3d836d5e.
