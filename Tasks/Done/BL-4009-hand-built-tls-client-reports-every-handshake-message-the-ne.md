@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4014, BL-4013]
-touches: [Curl.Tls.UnitLibrary/Tls13ClientHandshake.cs, Curl.Tls.UnitLibrary/Tls12ClientHandshake.cs, Curl.Tls.UnitLibrary/TlsClientConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/HandBuiltHandshake.cs]
+touches: [Curl.Tls.UnitLibrary/Tls13ClientHandshake.cs, Curl.Tls.UnitLibrary/Tls12ClientHandshake.cs, Curl.Tls.UnitLibrary/TlsClientConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/HandBuiltHandshake.cs, Curl.Networking.UnitLibrary/HandBuiltHandshakeMessageTrace.cs, Curl.Networking.UnitLibrary/OpenSslHandshakeNames.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.HandshakeMessages.cs, Curl.Networking.UnitTests/HandBuiltTlsProviderTests.SessionTickets.cs, Curl.Networking.UnitTests/HandBuiltHandshakeMessageTraceTests.cs, Curl.Networking.UnitTests/OpenSslHandshakeNamesTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4009 — Hand-built TLS client reports every handshake message, the negotiated group and the peer signature type (OpenSSL -v trace source)
 
@@ -22,13 +22,15 @@ Split out of BL-3997 (CGR-226, BL-3755). `SslStream` hides every TLS 1.3 handsha
 
 ## Acceptance criteria
 
-- [ ] A unit test pins the `TlsMessageEvent`s a hand-built TLS 1.3 handshake reports, in order, with the bytes of each message.
-- [ ] A unit test pins the `TlsMessageEvent`s a hand-built TLS 1.2 handshake reports.
-- [ ] The hand-built path's `TlsHandshakeEvent` carries the negotiated group and peer signature type names.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A unit test pins the `TlsMessageEvent`s a hand-built TLS 1.3 handshake reports, in order, with the bytes of each message.
+- [x] A unit test pins the `TlsMessageEvent`s a hand-built TLS 1.2 handshake reports.
+- [x] The hand-built path's `TlsHandshakeEvent` carries the negotiated group and peer signature type names.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 - 2026-10-28 (lane 9): Sized before any edit and split. The work needs hooks that do not exist yet: no observer for handshake messages in either handshake (the classes are built in `Tls13ClientConnection`/`Tls12ClientConnection`, outside this task's touches) - filed as BL-4014; and no peer signature scheme exposed by either handshake (only `NegotiatedGroup` is) - filed as BL-4013. With both in, this task is the Networking side: `HandBuiltTlsProvider` turns the observer's messages into `TlsMessageEvent`s in the OpenSSL build, names the group (`SSL_get0_group_name`) and signature type (`OBJ_nid2sn`) on the `TlsHandshakeEvent`, measuring curl 8.18+ OpenSSL with `Record-CurlExchange.ps1` first. Its `Curl.Tls.UnitLibrary` touches can then drop once BL-4014 and BL-4013 are Done.
+
+- 2026-10-28 (lane 2): Done in Curl.Networking only (BL-4013 and BL-4014 already gave Curl.Tls its hooks, so the Curl.Tls touches went unused). Added touches: two new production files (HandBuiltHandshakeMessageTrace, OpenSslHandshakeNames), their new test files, the new HandshakeMessages test partial, and HandBuiltTlsProviderTests.SessionTickets.cs, whose OpenSSL-build test said no ticket is reported; now each ticket shows up in the message trace, as real curl OpenSSL prints `Newsession Ticket (4)`. ADR-0982 records the decision: the OpenSSL build reports every message with OpenSSL's callback version (`s->version`): the offered maximum before the server answers, the negotiated version after that. The messages are held until the handshake ends and are reported before the verify result. Group and signature type names come from OpenSslHandshakeNames. Real curl was not measured: no OpenSSL curl build on this Windows lane. The version rule follows the OpenSSL source, and the wording is OpenSslMessageText's, which was already measured. Measure-CodeQuality on Curl.Networking.UnitLibrary found two members past the gates (SignatureTypeName complexity 16, WireVersionOf branch 90%); both were rewritten as frozen-table lookups and were not measured again. The fast tests pass (Curl.Networking.UnitTests 3838 passed); the TLS 1.3 test excludes macOS, as the other SslStream TLS 1.3 tests do; the change is platform-neutral otherwise, which covers CI on Linux and macOS.
 
 ## Log
 
@@ -36,3 +38,4 @@ Split out of BL-3997 (CGR-226, BL-3755). `SslStream` hides every TLS 1.3 handsha
 - 2026-10-28: Backlog -> Doing. Criteria at claim: edd99237 40b0b9e0 addde585 3d836d5e.
 - 2026-10-28: Doing -> Backlog. Needs the Curl.Tls hooks filed as BL-4014 (handshake message observer) and BL-4013 (peer signature scheme)
 - 2026-10-28: Backlog -> Doing. Criteria at claim: edd99237 40b0b9e0 addde585 3d836d5e.
+- 2026-10-28: Doing -> Done. Hand-built OpenSSL-build handshakes report every handshake message as TlsMessageEvents and name the negotiated group and peer signature type
