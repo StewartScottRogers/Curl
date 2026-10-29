@@ -38,3 +38,4 @@ Part 1 of 2 of BL-3990 (CGR-034), the code half of BL-4068. Drop `TellSocketCall
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c707c13f aaefc491 da38b818 18d43fff 779790c0.
