@@ -73,3 +73,4 @@ curl -sS AUTH -o NUL -w "[%{ftp_entry_path}]\n" U/hello.txt
 ## Log
 
 - 2026-10-26: Created from CGR-267 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
