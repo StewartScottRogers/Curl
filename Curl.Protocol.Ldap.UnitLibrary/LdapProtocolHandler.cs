@@ -151,13 +151,43 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         ConnectResult connect = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
-            return new TransferResult(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+            return ConnectFailure(connect);
         }
 
         context.Progress.ReportTransferStarted();
-        TransferResult result = await SearchOnAsync(connection, context).ConfigureAwait(false);
+        TransferResult result = await SearchAsync(connection, target, context).ConfigureAwait(false);
         ReportConnectionEnd(context.Events, result, target, connect.ConnectionNumber);
         return result;
+    }
+
+    /// <summary>
+    /// Binds and searches on <paramref name="connection" />, curl's own connection, or, for the WinLDAP
+    /// dialect's bind as the logged-on user, on a second connection WinLDAP opens beside it.
+    /// </summary>
+    private ValueTask<TransferResult> SearchAsync(IConnection connection, ConnectTarget target, ITransferContext context) =>
+        dialect == LdapDialect.WinLdap && context.Credentials is null
+            ? SearchBesideEmptyConnectionAsync(connection, target, context)
+            : SearchOnAsync(connection, context);
+
+    /// <summary>The failure a connect that opened no connection ends the transfer with.</summary>
+    private static TransferResult ConnectFailure(ConnectResult connect) =>
+        new(connect.ExitCode, 0, connect.ErrorMessage) { IsConnectionRefused = connect.IsConnectionRefused };
+
+    /// <summary>
+    /// The WinLDAP dialect's bind as the logged-on user: curl's own connection,
+    /// <paramref name="curlConnection" />, stays open and carries no bytes while WinLDAP opens a
+    /// second connection to <paramref name="target" /> for the binds and the search, as curl
+    /// 8.22.0's Schannel build does without <c>-u</c> (CGR-234, BL-3999, ADR-0974).
+    /// </summary>
+    private async ValueTask<TransferResult> SearchBesideEmptyConnectionAsync(IConnection curlConnection, ConnectTarget target, ITransferContext context)
+    {
+        await using (curlConnection.ConfigureAwait(false))
+        {
+            ConnectResult winLdap = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+            return winLdap.Connection is { } connection
+                ? await SearchOnAsync(connection, context).ConfigureAwait(false)
+                : ConnectFailure(winLdap);
+        }
     }
 
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
