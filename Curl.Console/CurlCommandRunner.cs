@@ -471,7 +471,11 @@ internal sealed class CurlCommandRunner(
             new PhysicalFileSystem(),
             CredentialEncoding.ForPlatform(runsOnWindows),
             MultipartBoundary.CreateRandom,
-            standardInput);
+            standardInput)
+        {
+            SevenBitRefusalWaitsForSend = true,
+            DirectoryReadFailsAtSend = true,
+        };
 
     /// <summary>The C runtime numbers <c>--create-dirs</c> and <c>-R</c> failures are worded in (BL-1433).</summary>
     private readonly CRuntimeErrorNumbers errorNumbers = CRuntimeErrorNumbers.For(runsOnWindows, OperatingSystem.IsMacOS());

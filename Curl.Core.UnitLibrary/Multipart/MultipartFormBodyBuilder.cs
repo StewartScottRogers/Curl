@@ -100,6 +100,13 @@ public sealed class MultipartFormBodyBuilder(
     public bool MissingFileWaitsForSend { get; init; }
 
     /// <summary>
+    /// Gets a value indicating whether a directory part that is not sent empty (<see cref="SendsDirectoryEmpty" /> off, as on
+    /// Windows) fails when the send reaches it, after the head and the part's headers are sent, with exit 26 and
+    /// <see cref="ReadFailedMessage" />, as curl 8.22.0 sends it (CGR-198), instead of failing the build before connecting.
+    /// </summary>
+    public bool DirectoryReadFailsAtSend { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether a file part naming a directory is sent as a part with its
     /// file name and no data, the body's length unknown (chunked), as curl 8.18.0 on Linux sends
     /// <c>-F f=@dir</c> and exits 0 (measured, CGR-069, BL-3896), instead of failing with exit 26,
@@ -467,7 +474,14 @@ public sealed class MultipartFormBodyBuilder(
     {
         if (status == FileAccessStatus.IsDirectory)
         {
-            return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+            if (!DirectoryReadFailsAtSend)
+            {
+                return TransferResult.Failure(CurlExitCode.ReadError, ReadFailedMessage);
+            }
+
+            segments.AddText(MultipartPartHeaders.Format(part, disposition, null, encoder?.Name, nameEscaping, forMail, out _));
+            segments.AddStream(new FailingReadStream(), null);
+            return null;
         }
 
         if (!part.SendsEmptyWhenMissing)
@@ -700,6 +714,12 @@ public sealed class MultipartFormBodyBuilder(
     {
         public override int Read(byte[] buffer, int offset, int count) =>
             throw new RequestBodyReadFailedException(string.Empty);
+    }
+
+    private sealed class FailingReadStream : MemoryStream
+    {
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new RequestBodyReadFailedException(ReadFailedMessage);
     }
 
     private sealed class AbortedReadStream : MemoryStream
