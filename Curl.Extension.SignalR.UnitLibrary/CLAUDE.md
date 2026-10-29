@@ -14,7 +14,7 @@ The SignalR client extension (ADR-0999, ADR-1032). Namespace `Curl.Extension.Sig
   handshake and checks the `101`; `SignalRWebSocketSession` sends records as masked text frames and reads them back,
   answering Ping and Close. `HttpRequestWriter`, `HttpResponseReader` and `BufferedConnectionReader` are its own
   HTTP/1.1 (Content-Length, chunked, read to close); every failure is a `SignalRTransportException`.
-- `Client/`: the `signalr://` and `signalrs://` handler (ADR-1081). `SignalRProtocolHandler` maps the URL to the
+- `Client/`: the `signalr://` and `signalrs://` handler (ADR-1084). `SignalRProtocolHandler` maps the URL to the
   `http`/`https` endpoint, negotiates, upgrades and runs `SignalRHubSession`, which sends the handshake and the
   `-d` call `SignalRCall` reads (`{"type":1|4,"target":...,"arguments":[...]}`) and writes the result, each stream
   item or each hub call as one JSON line. `SignalRExtension` gives the description and handler factory that

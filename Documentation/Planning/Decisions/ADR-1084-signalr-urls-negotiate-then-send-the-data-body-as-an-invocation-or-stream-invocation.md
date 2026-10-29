@@ -1,4 +1,4 @@
-# ADR-1081 — SignalR URLs negotiate, then send the data body as an invocation or stream invocation
+# ADR-1084 — SignalR URLs negotiate, then send the data body as an invocation or stream invocation
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

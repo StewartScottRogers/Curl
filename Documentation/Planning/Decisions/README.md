@@ -1123,4 +1123,4 @@ Each option and the specific reason it lost.
 | [1082](ADR-1082-kafka-authenticates-with-sasl-plain-from-user-on-every-connection.md) | Kafka authenticates with SASL PLAIN from --user on every connection (BL-4276) | Accepted | 2026-10-29 |
 | [1083](ADR-1083-openapi-expands-an-operation-of-an-openapi-description-into-curl-arguments.md) | --openapi expands an operation of an OpenAPI description into curl arguments (BL-4107) | Accepted | 2026-10-29 |
 | [1080](ADR-1080-kafka-asks-the-urls-broker-for-metadata-and-connects-to-the-partitions-leader.md) | Kafka asks the URL's broker for Metadata and connects to the partition's leader (BL-4275) | Accepted | 2026-10-29 |
-| [1081](ADR-1081-signalr-urls-negotiate-then-send-the-data-body-as-an-invocation-or-stream-invocation.md) | SignalR URLs negotiate, then send the data body as an invocation or stream invocation (BL-4108) | Accepted | 2026-10-29 |
+| [1084](ADR-1084-signalr-urls-negotiate-then-send-the-data-body-as-an-invocation-or-stream-invocation.md) | SignalR URLs negotiate, then send the data body as an invocation or stream invocation (BL-4108) | Accepted | 2026-10-29 |

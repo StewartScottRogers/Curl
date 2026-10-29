@@ -5,7 +5,7 @@ using Curl.WebSocket;
 
 namespace Curl.Extension.SignalR;
 
-/// <summary>The <c>signalr://</c> and <c>signalrs://</c> extension's description and handler factory (ADR-1081).</summary>
+/// <summary>The <c>signalr://</c> and <c>signalrs://</c> extension's description and handler factory (ADR-1084).</summary>
 public static class SignalRExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

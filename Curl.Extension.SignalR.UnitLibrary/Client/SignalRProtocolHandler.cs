@@ -5,7 +5,7 @@ using Curl.WebSocket;
 namespace Curl.Extension.SignalR.Client;
 
 /// <summary>
-/// Serves <c>signalr://host[:port]/hub[?query]</c> and its TLS form <c>signalrs://</c> (ADR-1081): negotiates with the
+/// Serves <c>signalr://host[:port]/hub[?query]</c> and its TLS form <c>signalrs://</c> (ADR-1084): negotiates with the
 /// hub at <c>http://</c> (or <c>https://</c>) the same host, port, path and query (TransportProtocols.md), opens the
 /// WebSocket transport it offers and runs <see cref="SignalRHubSession"/> with the <c>-d</c> call.
 /// </summary>
