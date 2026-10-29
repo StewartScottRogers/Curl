@@ -36,3 +36,4 @@ Split from BL-4123.
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d8e97e00 8e9a2876 687a7e2d 0f52d9a9 b582378e 3d836d5e.
