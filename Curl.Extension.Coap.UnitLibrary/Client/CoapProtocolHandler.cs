@@ -1,4 +1,5 @@
 using System.Text;
+using Curl.Extension.Coap.Blockwise;
 using Curl.Extension.Coap.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -6,8 +7,8 @@ namespace Curl.Extension.Coap.Client;
 
 /// <summary>
 /// Serves <c>coap://host[:port]/path[?query]</c> (ADR-1047): sends one confirmable request over UDP,
-/// GET, or POST, PUT or DELETE as <c>-X</c> and <c>-d</c> choose, with the <c>-d</c> data as its payload,
-/// and writes the response payload. A 4.xx or 5.xx response ends with exit 0 as an HTTP error status
+/// GET, or POST, PUT or DELETE as <c>-X</c>, <c>-d</c> and <c>-T</c> choose, with the <c>-d</c> data or the <c>-T</c>
+/// file as its payload, block-wise when either needs more than one block (RFC 7959), and writes the whole response payload. A 4.xx or 5.xx response ends with exit 0 as an HTTP error status
 /// does, or with exit 22 under <c>-f</c> or <c>--fail-with-body</c>. <c>-i</c> writes the response code
 /// as a header line before the payload, and <c>-v</c> reports it.
 /// </summary>
@@ -48,7 +49,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
 
     private async ValueTask<TransferResult> TransferAsync(ITransferContext context)
     {
-        CoapMessage request = RequestOf(context);
+        CoapMessage request = await RequestOfAsync(context).ConfigureAwait(false);
         DatagramOpenResult open = await connector.OpenAsync(context.Url.IdnHost, CoapRequest.PortOf(context.Url), context.CancellationToken).ConfigureAwait(false);
         if (open.Channel is not { } channel)
         {
@@ -58,13 +59,15 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
         await using (channel.ConfigureAwait(false))
         {
             context.Progress.ReportTransferStarted();
-            CoapMessage response = await new CoapExchange(channel, context.TimeProvider)
-                .RunAsync(request, InitialTimeoutOf(randomBytes(1)[0]), context.CancellationToken).ConfigureAwait(false);
+            var exchange = new CoapExchange(channel, context.TimeProvider);
+            TimeSpan initialTimeout = InitialTimeoutOf(randomBytes(1)[0]);
+            CoapMessage response = await new CoapBlockwiseTransfer((message, stop) => exchange.RunAsync(message, initialTimeout, stop))
+                .RunAsync(request, context.CancellationToken).ConfigureAwait(false);
             return await WriteResponseAsync(context, response).ConfigureAwait(false);
         }
     }
 
-    private CoapMessage RequestOf(ITransferContext context)
+    private async ValueTask<CoapMessage> RequestOfAsync(ITransferContext context)
     {
         CoapCode method = CoapRequest.MethodOf(context);
         byte[] identifier = randomBytes(2);
@@ -74,7 +77,7 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
             (ushort)((identifier[0] << 8) | identifier[1]),
             randomBytes(TokenLength),
             CoapRequest.UriOptionsOf(context.Url),
-            context.PostData?.ToArray() ?? []);
+            await CoapRequest.PayloadOfAsync(context).ConfigureAwait(false));
     }
 
     private static async ValueTask<TransferResult> WriteResponseAsync(ITransferContext context, CoapMessage response)

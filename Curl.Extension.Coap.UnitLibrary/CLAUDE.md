@@ -10,15 +10,22 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 
 - `CoapExtension` is the description `curl --extensions` lists and the handler factory, over
   `ProtocolHandlerServices.DatagramConnector`.
-- `CoapProtocolHandler` sends one confirmable request to port 5683 (or the URL's port) and writes the
+- `CoapProtocolHandler` sends a confirmable request (block-wise through `Blockwise/` when the payload or response needs it) to port 5683 (or the URL's port) and writes the
   response payload. A 4.xx or 5.xx response ends with exit 0, or exit 22 under `-f` and
   `--fail-with-body`; `-i` writes `CoAP/1.0 c.dd` before the payload.
-- `CoapRequest` gives the method (GET, POST with `-d`, or `-X` GET, POST, PUT or DELETE; any other is
+- `CoapRequest` gives the method (GET, POST with `-d`, PUT with `-T`, or `-X` GET, POST, PUT or DELETE; any other is
   exit 2) and the Uri-Host, Uri-Path and Uri-Query options (RFC 7252 section 6.4).
 - `CoapExchange` retransmits at ACK_TIMEOUT times a random factor, doubling up to MAX_RETRANSMIT times
   on the transfer's `TimeProvider` (exit 28 after), takes a piggybacked or a separate response matched
   by token (sections 5.2 and 5.3), acknowledges a confirmable separate response, and fails with exit 56
   on a Reset.
+
+`Blockwise/` (namespace `Curl.Extension.Coap.Blockwise`, ADR-1048) carries large bodies (RFC 7959):
+
+- `CoapBlockwiseTransfer` sends a payload over 1024 bytes in Block1 blocks, the next after each 2.31
+  Continue, at the smaller size a 2.31 asks for, and again from block 0 at the smaller size a 4.13 asks
+  for; then fetches a Block2 response block by block at the server's size, and gives it as one
+  response whose payload holds every block once, in order (exit 56 for a block out of order or short).
 
 `Wire/` (namespace `Curl.Extension.Coap.Wire`) holds the message format:
 
@@ -50,5 +57,5 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 
 Each throws `FormatException` for bytes the RFC does not allow.
 
-Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
+Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`,
 `Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client` and `Curl.Extension.Coap.UnitTests/Dtls/Wire`.

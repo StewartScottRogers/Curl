@@ -34,6 +34,11 @@ internal sealed class ScriptedDatagramChannel(Func<int, CoapMessage, IEnumerable
             replies.Enqueue(reply);
         }
 
+        if (waiting is { } cancelled && cancelled.Reply.Task.IsCompleted)
+        {
+            waiting = null;
+        }
+
         if (waiting is { } pending && replies.TryDequeue(out byte[]? next))
         {
             waiting = null;

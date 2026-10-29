@@ -32,10 +32,25 @@ internal static class CoapRequest
     /// <exception cref="CoapException"><c>-X</c> names a method RFC 7252 does not define (exit 2).</exception>
     public static CoapCode MethodOf(ITransferContext context)
     {
-        string name = context.Http?.CustomMethod ?? (context.PostData is not null || context.PostWithoutData ? "POST" : "GET");
+        string name = context.Http?.CustomMethod ?? DefaultMethodOf(context);
         return Methods.TryGetValue(name, out CoapCode method)
             ? method
             : throw new CoapException(CurlExitCode.FailedInit, $"CoAP has no method \"{name}\"; use GET, POST, PUT or DELETE");
+    }
+
+    /// <summary>Gives the request payload: the whole <c>-T</c> upload when given, else the <c>-d</c> data, else none.</summary>
+    /// <param name="context">The transfer.</param>
+    /// <returns>The payload.</returns>
+    public static async ValueTask<byte[]> PayloadOfAsync(ITransferContext context)
+    {
+        if (context.Upload is not { } upload)
+        {
+            return context.PostData?.ToArray() ?? [];
+        }
+
+        var payload = new MemoryStream();
+        await upload.CopyToAsync(payload, context.CancellationToken).ConfigureAwait(false);
+        return payload.ToArray();
     }
 
     /// <summary>
@@ -70,6 +85,16 @@ internal static class CoapRequest
         }
 
         return [.. decoded];
+    }
+
+    private static string DefaultMethodOf(ITransferContext context)
+    {
+        if (context.Upload is not null)
+        {
+            return "PUT";
+        }
+
+        return context.PostData is not null || context.PostWithoutData ? "POST" : "GET";
     }
 
     private static IEnumerable<CoapOption> HostOptionsOf(CurlUrl url) =>
