@@ -1,16 +1,16 @@
 ---
-id: BL-4195
+id: BL-4199
 title: Extension: S3 HTTP/1.1 exchange over IConnection
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4193]
+depends-on: [BL-4197]
 touches: [Curl.Extension.S3.UnitLibrary/Http, Curl.Extension.S3.UnitTests/Http]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4195 — Extension: S3 HTTP/1.1 exchange over IConnection
+# BL-4199 — Extension: S3 HTTP/1.1 exchange over IConnection
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4124 for size. The project is created by BL-4193. An extension never references a `Curl.Protocol.*` library (ADR-0999), so this small client is written here per BL-4124's Notes. RFC 9112 §3 (request line), §4 (status line), §5 (fields), §6.3 (message body length), §7.1 (chunked). Request body streamed from a `Stream` with a known length; response body exposed as a stream so a large object is not buffered. Keep-alive so a multipart upload can reuse the connection. `Expect: 100-continue` is left out (record it). Code in `Http/`; tests use a fake `IConnection` with recorded bytes.
+Split from BL-4124 for size. The project is created by BL-4197. An extension never references a `Curl.Protocol.*` library (ADR-0999), so this small client is written here per BL-4124's Notes. RFC 9112 §3 (request line), §4 (status line), §5 (fields), §6.3 (message body length), §7.1 (chunked). Request body streamed from a `Stream` with a known length; response body exposed as a stream so a large object is not buffered. Keep-alive so a multipart upload can reuse the connection. `Expect: 100-continue` is left out (record it). Code in `Http/`; tests use a fake `IConnection` with recorded bytes.
 
 ## Acceptance criteria
 

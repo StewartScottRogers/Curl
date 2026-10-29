@@ -1,5 +1,5 @@
 ---
-id: BL-4193
+id: BL-4197
 title: Extension: S3 SigV4 request signer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4193 — Extension: S3 SigV4 request signer
+# BL-4197 — Extension: S3 SigV4 request signer
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4124 for size (its Notes ask for "wire format, then the client flow, then the options"). Extension rules: ADR-0999, ADR-1003 (projects join by wildcard reference and one single-line `<Folder Name="/Extensions/S3/">` entry in `Curl.slnx` under the marker comment). Use the `new-project` skill; BL-4175 (ServerSentEvents) is the model. References only `Curl.Extension.Abstractions` and `Curl.Protocol.Abstractions` if needed; never `Curl.Protocol.Http` (its `--aws-sigv4` code may not be shared). BCL only: `SHA256`, `HMACSHA256`. Inputs: method, path, query parameters, headers, payload hash (or `UNSIGNED-PAYLOAD`), access key, secret key, region, service `s3`, an injected time. Canonical URI encodes each path segment once (S3 does not double-encode), canonical query sorted by encoded name, signed headers lower-cased and sorted. Put signing code in `Signing/`; BL-4194 and BL-4195 add `Xml/` and `Http/` beside it.
+Split from BL-4124 for size (its Notes ask for "wire format, then the client flow, then the options"). Extension rules: ADR-0999, ADR-1003 (projects join by wildcard reference and one single-line `<Folder Name="/Extensions/S3/">` entry in `Curl.slnx` under the marker comment). Use the `new-project` skill; BL-4175 (ServerSentEvents) is the model. References only `Curl.Extension.Abstractions` and `Curl.Protocol.Abstractions` if needed; never `Curl.Protocol.Http` (its `--aws-sigv4` code may not be shared). BCL only: `SHA256`, `HMACSHA256`. Inputs: method, path, query parameters, headers, payload hash (or `UNSIGNED-PAYLOAD`), access key, secret key, region, service `s3`, an injected time. Canonical URI encodes each path segment once (S3 does not double-encode), canonical query sorted by encoded name, signed headers lower-cased and sorted. Put signing code in `Signing/`; BL-4198 and BL-4199 add `Xml/` and `Http/` beside it.
 
 ## Acceptance criteria
 

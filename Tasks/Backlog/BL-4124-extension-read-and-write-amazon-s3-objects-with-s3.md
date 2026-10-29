@@ -4,7 +4,7 @@ title: Extension: Read and write Amazon S3 objects with s3://
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4193, BL-4194, BL-4195]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4197, BL-4198, BL-4199]
 touches: [Curl.Extension.S3.UnitLibrary, Curl.Extension.S3.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs]
 requirement: none
 created: 2026-10-29
@@ -35,10 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- 2026-10-29 (lane 1): Split for size before any code, following BL-4110 and BL-4175. Filed BL-4193 (project scaffold and SigV4 signer, written here because an extension may not reference Curl.Protocol.Http), BL-4194 (S3 XML bodies: ListObjectsV2, multipart initiate/complete, Error) and BL-4195 (HTTP/1.1 exchange over IConnection; TLS comes from ConnectTarget.UseTls through the connector). This task keeps the handler (s3://bucket/key to endpoint, path-style or virtual-host, GET, -T PUT with multipart above a part size, listing for an empty key or a trailing slash, credentials and region), registration, description, ADR and the CURL_EXTENSIONS=0 test. Added ExtensionDescriptionCatalogue.cs to touches for the `--extensions` description (no task in Doing names it; BL-4110 in Backlog also adds a line, which is a union-merged list file).
+- 2026-10-29 (lane 1): Split for size before any code, following BL-4110 and BL-4175. Filed BL-4197 (project scaffold and SigV4 signer, written here because an extension may not reference Curl.Protocol.Http), BL-4198 (S3 XML bodies: ListObjectsV2, multipart initiate/complete, Error) and BL-4199 (HTTP/1.1 exchange over IConnection; TLS comes from ConnectTarget.UseTls through the connector). This task keeps the handler (s3://bucket/key to endpoint, path-style or virtual-host, GET, -T PUT with multipart above a part size, listing for an empty key or a trailing slash, credentials and region), registration, description, ADR and the CURL_EXTENSIONS=0 test. Added ExtensionDescriptionCatalogue.cs to touches for the `--extensions` description (no task in Doing names it; BL-4110 in Backlog also adds a line, which is a union-merged list file).
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 5141452e 986a113e d035ed3b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4193 (project and SigV4 signer), BL-4194 (S3 XML bodies) and BL-4195 (HTTP/1.1 exchange)
+- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4197 (project and SigV4 signer), BL-4198 (S3 XML bodies) and BL-4199 (HTTP/1.1 exchange)
