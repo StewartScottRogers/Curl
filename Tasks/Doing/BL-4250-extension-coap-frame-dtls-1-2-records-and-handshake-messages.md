@@ -35,3 +35,4 @@ DTLS is written in the extension, under `Dtls/`, because no curl protocol shares
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 161e98d5 0b901c7e b594308d 54cafd17 3d836d5e.
