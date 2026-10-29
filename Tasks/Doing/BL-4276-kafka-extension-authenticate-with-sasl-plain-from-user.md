@@ -32,3 +32,4 @@ Follow-up of BL-4121 (ADR-1076): no SASL is offered, so a broker that demands it
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6dd0b567 1112e3d2 615ff7b1 dc514177.
