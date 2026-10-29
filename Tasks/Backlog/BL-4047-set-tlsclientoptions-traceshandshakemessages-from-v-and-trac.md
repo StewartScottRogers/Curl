@@ -4,8 +4,8 @@ title: Set TlsClientOptions.TracesHandshakeMessages from -v and --trace so the O
 priority: Low
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4010]
-touches: [Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs, Curl.Engine.UnitLibrary/EngineComposition.Transports.cs, Curl.Engine.UnitLibrary/OptionGroupConnectionSettings.cs, Curl.Engine.UnitTests/TlsClientOptionsMappingTests.cs]
+depends-on: [BL-4010, BL-3766]
+touches: [Curl.Console/EasyOptionsFromCommandLine.cs, Curl.Engine.UnitLibrary/EngineToolOptions.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Engine.UnitLibrary/TlsClientOptionsMapping.cs, Curl.Engine.UnitLibrary/EngineComposition.Transports.cs, Curl.Engine.UnitLibrary/OptionGroupConnectionSettings.cs, Curl.Engine.UnitTests/TlsClientOptionsMappingTests.cs]
 requirement: none
 created: 2026-10-28
 completed:
@@ -27,7 +27,10 @@ BL-4010 (ADR-0985) added `TlsClientOptions.TracesHandshakeMessages` and the `Tls
 
 ## Notes
 
+- 2026-10-28: -v and --trace are known only to Curl.Console (EasyOptionsFromCommandLine.ToolOptionsOf, a new EngineToolOptions member) and to ManagedCurlEngine.CreateTransports (options.Behaviour.Verbose for libcurl). BL-3766 holds the whole of Curl.Console in Doing, so added those files to touches and BL-3766 to depends-on; requeued before any edit.
+
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 5731c438 3d836d5e.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Console/EasyOptionsFromCommandLine.cs, held by BL-3766 (whole Curl.Console); depends-on BL-3766
