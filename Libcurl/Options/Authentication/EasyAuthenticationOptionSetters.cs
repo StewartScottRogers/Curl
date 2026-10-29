@@ -164,19 +164,19 @@ internal static class EasyAuthenticationOptionSetters
 
     /// <summary><c>CURLOPT_TLSAUTH_TYPE</c>: <c>SRP</c> in any case, or <see langword="null"/>; anything else is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetTlsAuthType(ref EasyOptions o, object? v) =>
-        IsTlsAuthType(v) ? Change(ref o, a => a with { TlsAuthType = (string?)v }) : CurlCode.BadFunctionArgument;
+        !SrpIsBuiltIn ? CurlCode.NotBuiltIn : IsTlsAuthType(v) ? Change(ref o, a => a with { TlsAuthType = (string?)v }) : CurlCode.BadFunctionArgument;
 
-    private static CurlCode SetTlsAuthUserName(ref EasyOptions o, object? v) => Change(ref o, a => a with { TlsAuthUserName = (string?)v });
+    private static CurlCode SetTlsAuthUserName(ref EasyOptions o, object? v) => SrpIsBuiltIn ? Change(ref o, a => a with { TlsAuthUserName = (string?)v }) : CurlCode.NotBuiltIn;
 
-    private static CurlCode SetTlsAuthPassword(ref EasyOptions o, object? v) => Change(ref o, a => a with { TlsAuthPassword = (string?)v });
+    private static CurlCode SetTlsAuthPassword(ref EasyOptions o, object? v) => SrpIsBuiltIn ? Change(ref o, a => a with { TlsAuthPassword = (string?)v }) : CurlCode.NotBuiltIn;
 
     /// <summary><c>CURLOPT_PROXY_TLSAUTH_TYPE</c>: <c>SRP</c> in any case, or <see langword="null"/>; anything else is <see cref="CurlCode.BadFunctionArgument"/>.</summary>
     private static CurlCode SetProxyTlsAuthType(ref EasyOptions o, object? v) =>
-        IsTlsAuthType(v) ? Change(ref o, a => a with { ProxyTlsAuthType = (string?)v }) : CurlCode.BadFunctionArgument;
+        !SrpIsBuiltIn ? CurlCode.NotBuiltIn : IsTlsAuthType(v) ? Change(ref o, a => a with { ProxyTlsAuthType = (string?)v }) : CurlCode.BadFunctionArgument;
 
-    private static CurlCode SetProxyTlsAuthUserName(ref EasyOptions o, object? v) => Change(ref o, a => a with { ProxyTlsAuthUserName = (string?)v });
+    private static CurlCode SetProxyTlsAuthUserName(ref EasyOptions o, object? v) => SrpIsBuiltIn ? Change(ref o, a => a with { ProxyTlsAuthUserName = (string?)v }) : CurlCode.NotBuiltIn;
 
-    private static CurlCode SetProxyTlsAuthPassword(ref EasyOptions o, object? v) => Change(ref o, a => a with { ProxyTlsAuthPassword = (string?)v });
+    private static CurlCode SetProxyTlsAuthPassword(ref EasyOptions o, object? v) => SrpIsBuiltIn ? Change(ref o, a => a with { ProxyTlsAuthPassword = (string?)v }) : CurlCode.NotBuiltIn;
 
     /// <summary>
     /// Turns a <c>CURLAUTH_*</c> bitmask into <see cref="HttpAuthenticationMethods"/>: a value with a bit
@@ -197,6 +197,9 @@ internal static class EasyAuthenticationOptionSetters
             ? CurlCode.Ok
             : CurlCode.NotBuiltIn;
     }
+
+    /// <summary>Whether this platform's curl has TLS-SRP: a Schannel build (Windows) has none and answers <see cref="CurlCode.NotBuiltIn"/> for every <c>TLSAUTH_*</c> option.</summary>
+    internal static bool SrpIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
 
     /// <summary>Whether a <c>TLSAUTH_TYPE</c> value is acceptable: <see langword="null"/> (none) or <c>SRP</c> in any case, the one method libcurl knows.</summary>
     private static bool IsTlsAuthType(object? value) =>

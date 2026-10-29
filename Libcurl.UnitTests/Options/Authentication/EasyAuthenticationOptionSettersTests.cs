@@ -8,6 +8,18 @@ namespace Libcurl.UnitTests.Options.Authentication;
 [TestClass]
 public sealed class EasyAuthenticationOptionSettersTests
 {
+    private bool srpWasBuiltIn;
+
+    [TestInitialize]
+    public void MakeSrpBuiltIn()
+    {
+        srpWasBuiltIn = EasyAuthenticationOptionSetters.SrpIsBuiltIn;
+        EasyAuthenticationOptionSetters.SrpIsBuiltIn = true;
+    }
+
+    [TestCleanup]
+    public void RestoreSrp() => EasyAuthenticationOptionSetters.SrpIsBuiltIn = srpWasBuiltIn;
+
     [TestMethod]
     public void SetOption_Netrc_TakesZeroToTwoAndRefusesTheRest()
     {
