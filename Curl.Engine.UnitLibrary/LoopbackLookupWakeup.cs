@@ -7,7 +7,7 @@ namespace Curl.Engine;
 /// The socket a socket-action transfer's look-up wakes the application on, the engine's stand-in for curl 8.22.0's
 /// threaded resolver socket pair: a TCP socket listening on the IPv4 loopback address, which <see cref="Signal" />
 /// makes readable by connecting to it, so an application's poll on <see cref="Handle" /> returns once the look-up
-/// ends without a byte being sent (BL-4036, ADR-0983).
+/// ends without a byte being sent (BL-4036, ADR-0984).
 /// </summary>
 internal sealed class LoopbackLookupWakeup : IDisposable
 {

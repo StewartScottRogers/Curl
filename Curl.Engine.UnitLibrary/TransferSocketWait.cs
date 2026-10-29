@@ -177,7 +177,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// Marks the transfer as resolving its host: it waits readable on <paramref name="wakeupSocket" />, the socket the
     /// look-up makes readable as it ends, as curl 8.22.0 tells the socket callback its threaded resolver's wakeup
     /// socket with <c>CURL_POLL_IN</c>, so the application is brought back by a socket rather than a timer (BL-4036,
-    /// ADR-0983). The wakeup stays the transfer's <see cref="Socket" /> until the dial gives it another; an action
+    /// ADR-0984). The wakeup stays the transfer's <see cref="Socket" /> until the dial gives it another; an action
     /// on it keeps no signal for the transfer's reads and writes. <paramref name="wakeup" /> is disposed when a
     /// later look-up replaces it or <see cref="StopGating" /> runs.
     /// </summary>

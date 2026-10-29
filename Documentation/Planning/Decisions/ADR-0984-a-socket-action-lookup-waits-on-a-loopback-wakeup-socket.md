@@ -1,4 +1,4 @@
-# ADR-0983: A socket-action transfer's look-up waits readable on a loopback wakeup socket the lookup's end signals
+# ADR-0984: A socket-action transfer's look-up waits readable on a loopback wakeup socket the lookup's end signals
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4036, for CGR-034).
 

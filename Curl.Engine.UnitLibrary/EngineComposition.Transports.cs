@@ -120,7 +120,7 @@ internal static partial class EngineComposition
     /// <see cref="TcpConnector" /> then dials through a <see cref="SocketActionGatedTcpDialer" /> over it, so each
     /// dialed connection reads and writes only once the multi handle signals it (ADR-0917), and the connectors look
     /// names up through a <see cref="SocketActionGatedResolver" /> beneath <paramref name="wrapLookUps" />, so a
-    /// look-up waits readable on its wakeup socket (ADR-0983); <see langword="null" />,
+    /// look-up waits readable on its wakeup socket (ADR-0984); <see langword="null" />,
     /// outside socket-action mode, for the dialer as it is.
     /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>

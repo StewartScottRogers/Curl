@@ -10,7 +10,7 @@ namespace Curl.Engine;
 /// transfer waits readable (<see cref="TransferSocketWait.BeginResolve" />) on a <see cref="LoopbackLookupWakeup" />,
 /// which the look-up's end signals before <see cref="TransferSocketWait.EndResolve" />, as curl 8.22.0's threaded
 /// resolver tells its wakeup socket with <c>CURL_POLL_IN</c> and writes to it when the lookup ends (BL-4036,
-/// ADR-0983). The look-up itself is the inner resolver's, its failure reason kept.
+/// ADR-0984). The look-up itself is the inner resolver's, its failure reason kept.
 /// </summary>
 /// <param name="inner">The resolver that looks the names up.</param>
 /// <param name="wait">What the transfer waits for on its socket.</param>
