@@ -208,6 +208,10 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     internal TlsClientOptions Options => _options;
 
     /// <inheritdoc />
+    public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) =>
+        _verification.VerifyChain(certificates, targetHost);
+
+    /// <inheritdoc />
     public ITlsProvider WithSystemStoreOnlyTrust() =>
         new SslStreamTlsProvider(ISystemStoreTrustTlsProvider.SystemStoreOnly(_options), _matchesSchannelBuild, _timeProvider, _certificateStore)
         {

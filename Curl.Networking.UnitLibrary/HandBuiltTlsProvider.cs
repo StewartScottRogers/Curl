@@ -149,6 +149,10 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     internal TlsClientOptions Options => _options;
 
     /// <inheritdoc />
+    public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) =>
+        _verification.VerifyChain(certificates, targetHost);
+
+    /// <inheritdoc />
     public ITlsProvider WithSystemStoreOnlyTrust() =>
         new HandBuiltTlsProvider(
             ISystemStoreTrustTlsProvider.SystemStoreOnly(_options),

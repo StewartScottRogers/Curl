@@ -72,4 +72,29 @@ public interface ITlsProvider
         ITransferEvents events,
         CancellationToken cancellationToken) =>
         AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
+
+    /// <summary>
+    /// Verifies a server certificate chain for <paramref name="targetHost" /> with the
+    /// transfer's trust settings (<c>-k</c>, <c>--cacert</c>, <c>--capath</c>,
+    /// <c>--crlfile</c>, <c>--pinnedpubkey</c>) without opening a TLS stream, so a protocol
+    /// handler that runs its own handshake (DTLS for <c>coaps://</c>) judges the server's
+    /// certificates as curl's own TLS would (ADR-1044).
+    /// </summary>
+    /// <remarks>
+    /// By default the chain is rejected with <see cref="CurlExitCode.PeerFailedVerification" />
+    /// (60), so a provider that cannot verify apart from a handshake never accepts a chain it
+    /// has not checked; the engine's providers override this with the checks their handshakes run.
+    /// </remarks>
+    /// <param name="certificates">The DER certificates in the order the server sent them, its own first.</param>
+    /// <param name="targetHost">The host name the certificate is checked against, IPv6 brackets and all.</param>
+    /// <returns>
+    /// <see cref="ServerCertificateChainVerdict.Accepted" />, or a rejection with the exit code and
+    /// message the handshake would fail with.
+    /// </returns>
+    ServerCertificateChainVerdict VerifyServerCertificateChain(
+        IReadOnlyList<ReadOnlyMemory<byte>> certificates,
+        string targetHost) =>
+        ServerCertificateChainVerdict.Rejected(
+            CurlExitCode.PeerFailedVerification,
+            "This TLS provider cannot verify a certificate chain apart from a handshake");
 }

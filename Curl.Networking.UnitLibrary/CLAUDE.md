@@ -75,6 +75,10 @@ the Schannel build ignores `--crlfile`. The hand-built path's other exit 35 text
 `TlsFailureMessages.SchannelHandBuiltHandshakeFailure` and `OpenSslHandBuiltHandshakeFailure`.
 Its tests run it against a server-side `SslStream` over `Fakes/InMemoryDuplexStream`, TLS 1.3
 excluded on macOS, and compare each failure with `SslStreamTlsProvider`'s.
+Per ADR-1044 (BL-4249) both providers implement `ITlsProvider.VerifyServerCertificateChain` through
+`ServerCertificateVerification.VerifyChain`, which reads the trust anchors and judges a chain with
+`HandBuiltCertificateVerifier` apart from any handshake, so an extension running its own handshake
+(DTLS) gets the handshake's exit 60, 77 or 90 and message; no stapled OCSP response is checked there.
 
 This is the one project allowed to construct a `Socket`, and only inside a transport
 type: `TcpDialer` (behind `ITcpDialer`) and `TcpConnectionListener` with its

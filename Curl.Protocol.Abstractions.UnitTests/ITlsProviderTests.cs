@@ -31,6 +31,21 @@ public sealed class ITlsProviderTests
         Assert.AreEqual("mail.example", provider.TargetHost);
     }
 
+    [TestMethod]
+    public void VerifyServerCertificateChain_NotOverridden_RejectsTheChainWithExit60()
+    {
+        TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
+        diagnostics.Arrange("chain", "one certificate, host coap.example");
+
+        var verdict = ((ITlsProvider)new HostRecordingTlsProvider()).VerifyServerCertificateChain([new byte[] { 1 }], "coap.example");
+
+        diagnostics.Act("exit code", verdict.ExitCode);
+        diagnostics.Assert("exit code", CurlExitCode.PeerFailedVerification, verdict.ExitCode);
+        Assert.IsFalse(verdict.IsAccepted);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, verdict.ExitCode);
+        Assert.IsFalse(string.IsNullOrEmpty(verdict.ErrorMessage));
+    }
+
     private sealed class HostRecordingTlsProvider : ITlsProvider
     {
         public string? TargetHost { get; private set; }
