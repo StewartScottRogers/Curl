@@ -258,6 +258,10 @@
     <Project Path="Curl.Http3.UnitLibrary/Curl.Http3.UnitLibrary.csproj" />
     <Project Path="Curl.Http3.UnitTests/Curl.Http3.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Wire/HttpDatagram/">
+    <Project Path="Curl.HttpDatagram.UnitLibrary/Curl.HttpDatagram.UnitLibrary.csproj" />
+    <Project Path="Curl.HttpDatagram.UnitTests/Curl.HttpDatagram.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Wire/Quic/">
     <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
     <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
