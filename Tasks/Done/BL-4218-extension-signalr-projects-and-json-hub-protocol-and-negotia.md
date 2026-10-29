@@ -32,7 +32,7 @@ Split from BL-4108 for size (its Notes: wire format, then the client flow, then 
 ## Notes
 
 - Put codec files under `HubProtocol/` and `Negotiate/` folders so BL-4219 can work in `Transport/` beside them.
-- Delivered directly (one library, a pure codec): `Json/` (Utf8JsonReader-based member reading that keeps each value's JSON text), `HubProtocol/` (`HubMessageWriter`, `HubFrameSplitter`, `HubMessageReader`, the `HubMessage` records) and `Negotiate/` (`NegotiateResponseReader`, `SignalRUrls`). Decisions in ADR-1029: JSON protocol version 1, arguments/items/results kept as raw JSON text (no serializer, AOT-safe), unknown message types read as `UnknownHubMessage` for the client to ignore, a Completion with both result and error is a format error, MessagePack / Long Polling / Server-Sent Events left out.
+- Delivered directly (one library, a pure codec): `Json/` (Utf8JsonReader-based member reading that keeps each value's JSON text), `HubProtocol/` (`HubMessageWriter`, `HubFrameSplitter`, `HubMessageReader`, the `HubMessage` records) and `Negotiate/` (`NegotiateResponseReader`, `SignalRUrls`). Decisions in ADR-1032: JSON protocol version 1, arguments/items/results kept as raw JSON text (no serializer, AOT-safe), unknown message types read as `UnknownHubMessage` for the client to ignore, a Completion with both result and error is a format error, MessagePack / Long Polling / Server-Sent Events left out.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.SignalR.UnitLibrary` gives 100% line, 100% branch, highest complexity 8, 0 failing members. 46 unit tests pass; full `dotnet build` clean, fast tests green on Windows. The tests use no file system, path, OS error or certificate, so they do not depend on the platform.
 
 ## Log

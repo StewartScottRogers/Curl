@@ -1,4 +1,4 @@
-# ADR-1029 — The SignalR codec speaks the JSON hub protocol, version 1, over WebSockets
+# ADR-1032 — The SignalR codec speaks the JSON hub protocol, version 1, over WebSockets
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

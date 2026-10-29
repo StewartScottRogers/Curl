@@ -1,6 +1,6 @@
 # Curl.Extension.SignalR.UnitLibrary
 
-The SignalR client extension (ADR-0999, ADR-1029). Namespace `Curl.Extension.SignalR`. Tested against ASP.NET Core's
+The SignalR client extension (ADR-0999, ADR-1032). Namespace `Curl.Extension.SignalR`. Tested against ASP.NET Core's
 `HubProtocol.md` and `TransportProtocols.md` (dotnet/aspnetcore `src/SignalR/docs/specs`), not against curl.
 
 - `HubProtocol/`: the JSON hub protocol. `HubMessageWriter` writes the handshake request, Invocation,
