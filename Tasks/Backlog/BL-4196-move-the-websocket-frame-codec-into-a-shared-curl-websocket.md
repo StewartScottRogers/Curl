@@ -1,5 +1,5 @@
 ---
-id: BL-4193
+id: BL-4196
 title: Move the WebSocket frame codec into a shared Curl.WebSocket.UnitLibrary layer
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4193 — Move the WebSocket frame codec into a shared Curl.WebSocket.UnitLibrary layer
+# BL-4196 — Move the WebSocket frame codec into a shared Curl.WebSocket.UnitLibrary layer
 
 ## Goal
 
