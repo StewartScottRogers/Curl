@@ -236,6 +236,8 @@ internal sealed partial class TransferPerformer
             return false;
         }
 
+        EngineComposition.ReportEnvironmentProxy(dispatch.ProxySelector, proxyOptions, url.Scheme, proxy, events.ReportInfo);
+
         bool looked = credentialLookup.TryLookUp(authentication, url, out NetworkCredential? lookedUpCredentials, out failure, events.ReportInfo);
         state.LookedUpCredentials = lookedUpCredentials;
         if (failure is not null)

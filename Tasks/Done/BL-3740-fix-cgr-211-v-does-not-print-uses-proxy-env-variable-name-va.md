@@ -5,11 +5,11 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineComposition.Traces.cs, Curl.Engine.UnitTests/Cgr211Tests.cs]
+touches: [Curl.Engine.UnitLibrary/EngineComposition.Traces.cs, Curl.Engine.UnitLibrary/TransferPerformer.Setup.cs, Curl.Engine.UnitTests/Cgr211Tests.cs, Curl.Core.UnitLibrary/ProxySelector.cs, Curl.Core.UnitTests/ProxySelectorVariableTests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3740 — Fix CGR-211: -v does not print * Uses proxy env variable <name> == '<value>' when a proxy comes from the environment
 
@@ -74,13 +74,16 @@ http_proxy=http://127.0.0.1:21211 ~/curlnet/curl -sv -o /dev/null http://127.0.0
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
+- Fix: `ProxySelector.TryFindProxyVariable` names the environment variable that gave the proxy (same order as before); `TransferPerformer.TrySelectProxyAndCredentials` writes `Uses proxy env variable <name> == '<value>'` as a -v info line via `EngineComposition.ReportEnvironmentProxy` after the proxy is chosen, only when no -x/--preproxy and a proxy was chosen (not for --noproxy matches). Added Core files to touches: the selector lives in Curl.Core and no other live task names it.
+- Repro `http_proxy=http://127.0.0.1:20600 curl -sv --resolve ex.test:20600:127.0.0.1 http://ex.test:20600/x` (nothing listening): real curl and Curl both print `* [DNS] added ...` then `* Uses proxy env variable http_proxy == 'http://127.0.0.1:20600'` then `* Trying 127.0.0.1:20600...`. With `-x` the line is absent in Curl. Library handles (Curl.Api/Libcurl) not changed: only the tool path writes it.
+- Measure-CodeQuality for Curl.Core and Curl.Engine libraries: 100% line/branch, no failing member. Platform-neutral tests.
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr211Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
@@ -88,3 +91,4 @@ http_proxy=http://127.0.0.1:21211 ~/curlnet/curl -sv -o /dev/null http://127.0.0
 
 - 2026-10-26: Created from CGR-211 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-29: Doing -> Done. Curl -v now prints '* Uses proxy env variable <name> == <value>' when the proxy comes from the environment
