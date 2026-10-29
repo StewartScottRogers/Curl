@@ -51,8 +51,9 @@ internal static class FileOpenFailure
     /// (<see cref="IsFileExists(Exception)" />);
     /// <see cref="FileAccessStatus.NotADirectory" /> for <c>ENOTDIR</c>
     /// (<see cref="IsNotADirectory(Exception)" />); and
-    /// <see cref="FileAccessStatus.IoError" /> for everything else, an invalid or
-    /// over-long path included.
+    /// <see cref="FileAccessStatus.NameTooLong" /> for a <see cref="PathTooLongException" />; and
+    /// <see cref="FileAccessStatus.IoError" /> for everything else, an
+    /// invalid path included.
     /// </returns>
     internal static FileAccessStatus StatusFor(Exception exception, bool pathIsDirectory)
     {
@@ -64,6 +65,7 @@ internal static class FileOpenFailure
         return exception switch
         {
             FileNotFoundException or DirectoryNotFoundException => FileAccessStatus.NotFound,
+            PathTooLongException => FileAccessStatus.NameTooLong,
             UnauthorizedAccessException => FileAccessStatus.AccessDenied,
             _ => StatusForErrorCode(exception),
         };

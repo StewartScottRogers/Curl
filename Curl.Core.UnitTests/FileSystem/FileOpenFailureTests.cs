@@ -89,12 +89,12 @@ public sealed class FileOpenFailureTests
     }
 
     [TestMethod]
-    public void StatusFor_PathTooLongException_IsIoError()
+    public void StatusFor_PathTooLongException_IsNameTooLong()
     {
         var status = RunStatusFor(new PathTooLongException(), pathIsDirectory: false);
 
-        TestDiagnostics.For(TestContext).Assert("status", FileAccessStatus.IoError, status);
-        Assert.AreEqual(FileAccessStatus.IoError, status);
+        TestDiagnostics.For(TestContext).Assert("status", FileAccessStatus.NameTooLong, status);
+        Assert.AreEqual(FileAccessStatus.NameTooLong, status);
     }
 
     [TestMethod]

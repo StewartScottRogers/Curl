@@ -42,4 +42,7 @@ public enum FileAccessStatus
     /// (<see cref="NotFound" />).
     /// </summary>
     NotADirectory,
+
+    /// <summary>A name or path is longer than the operating system allows (<c>ENAMETOOLONG</c>).</summary>
+    NameTooLong,
 }
