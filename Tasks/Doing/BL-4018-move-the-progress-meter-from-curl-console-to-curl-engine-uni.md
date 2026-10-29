@@ -34,3 +34,4 @@ Prerequisite of BL-4012 (Libcurl draws the meter under `CURLOPT_NOPROGRESS=0`). 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 89a194a2 2749ad99 e4d345af a1db2646.
