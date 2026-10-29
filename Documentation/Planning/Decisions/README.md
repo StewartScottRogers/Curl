@@ -1052,3 +1052,4 @@ Each option and the specific reason it lost.
 | [1018](ADR-1018-the-s3-extension-speaks-http-1-1-over-iconnection-with-its-own-small-client.md) | The S3 extension speaks HTTP/1.1 over IConnection with its own small client (BL-4199) | Accepted | 2026-10-29 |
 | [1019](ADR-1019-a-transfer-hook-may-answer-a-transfer-or-replace-curls-response.md) | A transfer hook may answer a transfer itself or replace curl's response (BL-4204) | Accepted | 2026-10-29 |
 | [1020](ADR-1020-the-http-cache-is-a-private-cache-of-one-file-per-request-key.md) | The HTTP cache is a private cache of one file per request key (BL-4203) | Accepted | 2026-10-29 |
+| [1017](ADR-1017-npipe-runs-a-transfer-over-a-windows-named-pipe.md) | --npipe runs a transfer over a Windows named pipe (BL-4142) | Accepted | 2026-10-29 |
