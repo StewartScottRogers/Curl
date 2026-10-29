@@ -30,3 +30,4 @@ BL-3829's `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibra
 ## Log
 
 - 2026-10-28: Created by BL-3829's run.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d65f24ce 779790c0.
