@@ -2,7 +2,7 @@
 
 The OAuth2 extension (ADR-0999, ADR-1025). Namespace `Curl.Extension.OAuth2`. It references the
 base class library and `Curl.Protocol.Abstractions`. Not registered in the extension catalogue yet:
-the options and the flows arrive in BL-4161.
+the options and the transfer hook arrive in BL-4161.
 
 `Wire/` writes and reads every message of the client credentials, authorization code with PKCE and
 device authorization flows:
@@ -38,6 +38,19 @@ token. Expiry is `expires_in` by the injected `TimeProvider`, 30 seconds early. 
 reads `curl-oauth2-tokens.json` whole (missing or corrupt reads as empty, `OAuth2TokenCacheFormat`)
 and writes it atomically, owner-only off Windows; `OAuth2TokenCacheLocation` finds its default
 directory from curl's per-user file variables.
+
+`Flows/` gets the token (ADR-1041). Each grant is an `IOAuth2TokenFlow` built with an
+`OAuth2FlowRequest` (token endpoint, client, scope) and ends in an `OAuth2FlowResult`: the token, or
+curl's exit code and message (an error response is 67, `expired_token` or a lapsed device code 28,
+an unusable answer 8). `OAuth2TokenEndpoint` posts a form and reads the answer for all of them.
+`OAuth2ClientCredentialsFlow` makes one request (RFC 6749 §4.4). `OAuth2DeviceAuthorizationFlow`
+asks for a device code, writes where to enter the user code to the given writer (curl's stderr), and
+polls every `interval` seconds on the injected `TimeProvider`, 5 more after each `slow_down`, until
+a token, a refusal or `expires_in` (RFC 8628). `OAuth2AuthorizationCodeFlow` listens on
+127.0.0.1 through the injected `IConnectionListener`, writes the PKCE authorization URL, accepts one
+redirect (`OAuth2RedirectReceiver`, `OAuth2Redirect`), checks its `state` and exchanges the code
+with the verifier (RFC 6749 §4.1, RFC 7636, RFC 8252 §7.3). `OAuth2CachedTokenSource` tries the
+cache and its refresh first, runs the flow only when they give nothing, and caches the new token.
 
 Tested against the RFCs, not against curl. Held to the four quality gates in the root `CLAUDE.md`.
 Its tests are in `Curl.Extension.OAuth2.UnitTests`.
