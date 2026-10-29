@@ -4,8 +4,8 @@ title: Extension: Read Server-Sent Events streams with --sse
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.ServerSentEvents.UnitLibrary, Curl.Extension.ServerSentEvents.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4173, BL-4174, BL-4175]
+touches: [Curl.Extension.ServerSentEvents.UnitLibrary, Curl.Extension.ServerSentEvents.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 2, prerequisite pass before any edit): `--sse` cannot run yet. (1) No host runs extension transfer hooks: BL-4173 (Backlog) adds `ExtensionTransferHookCatalogue` and the Console wiring; this task registers its hook activator there, plus one line each in `ExtensionOptionCatalogue` and `ExtensionDescriptionCatalogue` (added to touches; all three are shared one-line-per-entry lists). (2) Reconnection (§9.2.3) needs the transfer to run again after `retry` with a fresh `Last-Event-ID` header, and `ITransferHook` (ADR-1007) cannot repeat a transfer: filed BL-4174 for that seam in Curl.Extension.Abstractions. (3) Split for size as these Notes ask: BL-4175 creates the projects and the §9.2.6 parser; this task then adds the option, the hook (parse, reconnect, retry), registration, ADR, --extensions/--ai-help check and quality gates. `ExtensionCatalogue.cs` holds protocol handler factories; SSE adds no scheme, so its "one line" registration lands in the hook catalogue plus the option and description catalogues; decide that in the ADR.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: daf393cf cf7d9fa9 365c043f e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4173 (hook wiring in Curl.Console), BL-4174 (hook can repeat a transfer, for reconnection) and BL-4175 (SSE projects and parser, split for size)
