@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Nats;
 
-/// <summary>A NATS transfer that failed, with the exit code curl ends with (ADR-1063).</summary>
+/// <summary>A NATS transfer that failed, with the exit code curl ends with (ADR-1065).</summary>
 /// <param name="exitCode">The exit code.</param>
 /// <param name="message">The message curl prints.</param>
 internal sealed class NatsException(CurlExitCode exitCode, string message) : Exception(message)

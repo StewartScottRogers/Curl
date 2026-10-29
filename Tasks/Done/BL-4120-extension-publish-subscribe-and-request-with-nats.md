@@ -35,7 +35,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- Decisions (ADR-1063, renumbered from 1059, which BL-4119's STOMP ADR took first, then from 1062, which BL-4257's AMQP 1.0 ADR took first): schemes `nats://` and `natss://`, port 4222; `natss://` is TLS from the first byte (server `handshake_first`), because `IConnection` cannot start TLS over an open connection. No `-d` subscribes (each payload and a newline, `?count=N` ends after N), `-d` publishes and waits for the closing PONG, `?request` publishes with an `_INBOX` reply subject and writes the one reply.
+- Decisions (ADR-1065, renumbered from 1059, which BL-4119's STOMP ADR took first, then from 1062, which BL-4257's AMQP 1.0 ADR took first): schemes `nats://` and `natss://`, port 4222; `natss://` is TLS from the first byte (server `handshake_first`), because `IConnection` cannot start TLS over an open connection. No `-d` subscribes (each payload and a newline, `?count=N` ends after N), `-d` publishes and waits for the closing PONG, `?request` publishes with an `_INBOX` reply subject and writes the one reply.
 - Added `ExtensionDescriptionCatalogue.cs` to touches: `curl --extensions` and `--ai-help extensions` list from it (a shared list file; no Doing task held it). Added `Curl.Console.UnitTests/CurlCompositionTests.cs`: its test of every connecting handler names each one, so NATS had to be added (no Doing task held it; on the shared branch BL-4119 already added STOMP there, so the integration merges both names and makes the count 17).
 - The wire-format tests are one class, `NatsWireTests`, across the small wire types (`NatsConnect`, `NatsMessageLine`, `NatsServerInfo`, `NatsSubject`, `NatsOperations`, `NatsWireReader`), each checked against its named specification section.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.Nats.UnitLibrary` 100% line, 100% branch, 0 failing members, worst CRAP 8. Real binary: `curl --extensions` lists nats; `CURL_EXTENSIONS=0 curl nats://127.0.0.1/a` gives exit 1 `Protocol "nats" not supported`.
@@ -45,4 +45,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 9f286a62 a2a765d0 92f7a699 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Done. NATS extension: nats:// and natss:// subscribe, publish and request, registered and described, ADR-1063, gates 100/100
+- 2026-10-29: Doing -> Done. NATS extension: nats:// and natss:// subscribe, publish and request, registered and described, ADR-1065, gates 100/100

@@ -1,4 +1,4 @@
-# ADR-1063 — NATS subscribes without data, publishes with it, and requests with a query field
+# ADR-1065 — NATS subscribes without data, publishes with it, and requests with a query field
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
