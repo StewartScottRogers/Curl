@@ -261,6 +261,9 @@
   <Folder Name="/Wire/HttpDatagram/">
     <Project Path="Curl.HttpDatagram.UnitLibrary/Curl.HttpDatagram.UnitLibrary.csproj" />
     <Project Path="Curl.HttpDatagram.UnitTests/Curl.HttpDatagram.UnitTests.csproj" />
+  <Folder Name="/Wire/Protobuf/">
+    <Project Path="Curl.Protobuf.UnitLibrary/Curl.Protobuf.UnitLibrary.csproj" />
+    <Project Path="Curl.Protobuf.UnitTests/Curl.Protobuf.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Wire/Quic/">
     <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
