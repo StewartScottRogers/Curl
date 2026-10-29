@@ -17,5 +17,6 @@ internal static class ExtensionCatalogue
         SocketIo.SocketIoExtension.CreateHandler,
         Coap.Client.CoapExtension.CreateHandler,
         Stomp.Client.StompExtension.CreateHandler,
+        Nats.NatsExtension.CreateHandler,
     ];
 }

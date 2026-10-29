@@ -18,5 +18,6 @@ internal static class ExtensionDescriptionCatalogue
         SocketIo.SocketIoExtension.Description,
         Coap.Client.CoapExtension.Description,
         Stomp.Client.StompExtension.Description,
+        Nats.NatsExtension.Description,
     ];
 }
