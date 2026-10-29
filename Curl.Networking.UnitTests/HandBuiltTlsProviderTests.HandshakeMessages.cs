@@ -20,8 +20,12 @@ public sealed partial class HandBuiltTlsProviderTests
         var events = new RecordingTransferEvents();
         Diagnostics.Arrange("build", "OpenSSL");
         Diagnostics.Arrange("server TLS protocol", SslProtocols.Tls13);
+        Diagnostics.Arrange("curves", "X25519");
 
-        var result = await HandshakeWithEchoServerAsync(new TlsClientOptions(Insecure: true), SslProtocols.Tls13, OpenSslBuild, events);
+        // BL-4049: one group, the one the ClientHello carries a key share for, so the server
+        // has no other group to ask for in a HelloRetryRequest (the Windows Server Schannel on
+        // CI's windows-latest runners asks for one when it may pick from the default list).
+        var result = await HandshakeWithEchoServerAsync(new TlsClientOptions(Insecure: true, Curves: "X25519"), SslProtocols.Tls13, OpenSslBuild, events);
         await using var connection = result.Connection!;
         var handshakeMessages = HandshakeMessagesOf(events);
         Diagnostics.Act("handshake messages", string.Join(" ", handshakeMessages));
