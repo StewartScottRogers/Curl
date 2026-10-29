@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 3031275f 5e90994b fb363012 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4218 (projects and hub protocol codec) and BL-4219 (negotiate and WebSocket upgrade)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3031275f 5e90994b fb363012 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
