@@ -1,4 +1,4 @@
-# ADR-0975: An SMTP response-read failure always reports `errno: 0`
+# ADR-0976: An SMTP response-read failure always reports `errno: 0`
 
 - Status: Accepted
 - Date: 2026-10-28

@@ -77,5 +77,5 @@ curl -s -S smtp://127.0.0.1:21002 --mail-from a@b --mail-rcpt c@d -T EV/data/msg
 
 ### Result (2026-10-28)
 - Command `curl -s -S smtp://127.0.0.1:21002 --mail-from a@b --mail-rcpt c@d -T msg` against a server that closes after MAIL: curl 8.22.0 (Windows) and Curl both give exit 56, `response reading failed (errno: 0)`. Only curl 8.18.0 on Linux prints `errno: 115` (EINPROGRESS, a stale errno from the connect), which the report rates Probable and version-dependent.
-- Decision (ADR-0975): keep `errno: 0` everywhere; no production change. `Cgr235Tests` pins the text; the fast SMTP tests pass (404 passed). Linux/macOS CI is met by the platform-neutral test.
-- 2026-10-28: Doing -> Done. CGR-235 not a defect: errno 115 is a stale errno of curl 8.18 on Linux; 8.22 prints errno: 0 like Curl (ADR-0975)
+- Decision (ADR-0976): keep `errno: 0` everywhere; no production change. `Cgr235Tests` pins the text; the fast SMTP tests pass (404 passed). Linux/macOS CI is met by the platform-neutral test.
+- 2026-10-28: Doing -> Done. CGR-235 not a defect: errno 115 is a stale errno of curl 8.18 on Linux; 8.22 prints errno: 0 like Curl (ADR-0976)

@@ -1,7 +1,7 @@
 namespace Curl.Protocol.Smtp;
 
 /// <summary>
-/// Pins CGR-235 (ADR-0975): a failed SMTP response read reports <c>errno: 0</c> on every platform,
+/// Pins CGR-235 (ADR-0976): a failed SMTP response read reports <c>errno: 0</c> on every platform,
 /// as curl 8.22.0 does, not the stale <c>errno: 115</c> curl 8.18.0 prints on Linux.
 /// </summary>
 [TestClass]
