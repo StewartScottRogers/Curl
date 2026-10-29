@@ -35,3 +35,4 @@ Split from BL-4123. The work is already committed; this task verifies it and fix
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3d836d5e ebc4dbef 2ca121e1 67701518 0b1d363f.
