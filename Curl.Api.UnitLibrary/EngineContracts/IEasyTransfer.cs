@@ -87,4 +87,11 @@ public interface IEasyTransfer : IAsyncDisposable
     /// where the build has no <c>SSLS-EXPORT</c>, which is all this default answers.
     /// </returns>
     CurlCode ExportTlsSessions(Func<ExportedTlsSession, CurlCode> export) => CurlCode.NotBuiltIn;
+
+    /// <summary>
+    /// The handle whose <see cref="PerformAsync" /> does this handle's transfer: this handle itself, which is all this
+    /// default answers, or the one a wrapper forwards its perform to, so a multi handle gives the wrapped engine
+    /// transfer the socket wait it tells the application's socket callback of (ADR-0983).
+    /// </summary>
+    IEasyTransfer PerformingTransfer => this;
 }

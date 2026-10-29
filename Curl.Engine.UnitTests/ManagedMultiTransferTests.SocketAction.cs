@@ -1,7 +1,11 @@
 using Curl.Api.Callbacks;
 using Curl.Api.Codes;
 using Curl.Api.EngineContracts;
+using Curl.Api.EngineContracts.ConnectOnly;
+using Curl.Api.EngineContracts.Headers;
 using Curl.Api.EngineContracts.Multi;
+using Curl.Api.EngineContracts.WebSocket;
+using Curl.Api.Info;
 using Curl.Api.Options;
 using Curl.Api.Options.Network;
 
@@ -227,6 +231,41 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreEqual(CurlCode.UnsupportedProtocol, message.Result);
     }
 
+    [TestMethod]
+    public async Task SocketActionAsync_WrapperOfAManagedTransfer_IsToldTheSocketOfItsOwnSocketWait()
+    {
+        List<string> calls = [];
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        multi.Options = RecordingOptions(calls);
+        await using WrappingEasyTransfer transfer = new((ManagedEasyTransfer)engine.CreateEasy(), async (wait, token) =>
+        {
+            wait.TakeSocket(WrappedSocket.Handle);
+            await wait.WaitUntilReadableAsync(token);
+            return CurlCode.Ok;
+        });
+        multi.Add(transfer);
+
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        string[] started = [.. calls];
+        (CurlMultiCode Code, int RunningTransfers) finished = await multi.SocketActionAsync(WrappedSocket, CurlSocketSelect.In, CancellationToken.None);
+
+        CollectionAssert.AreEqual(new[] { "timer 0", $"socket {WrappedSocket.Handle} In null", "timer -1" }, started, string.Join(" | ", started));
+        Assert.AreEqual((CurlMultiCode.Ok, 0), finished);
+        Assert.AreEqual($"socket {WrappedSocket.Handle} Remove null", calls[3]);
+    }
+
+    [TestMethod]
+    public void PerformingTransfer_TransferThatWrapsNone_IsItself()
+    {
+        ControlledEasyTransfer transfer = new();
+
+        Assert.AreSame(transfer, ((IEasyTransfer)transfer).PerformingTransfer);
+    }
+
+    private static readonly CurlSocket WrappedSocket = new(0x1234);
+
     private static MultiOptions RecordingOptions(List<string> calls) => new()
     {
         Socket = (_, socket, what, state) =>
@@ -240,4 +279,42 @@ public sealed partial class ManagedMultiTransferTests
             return 0;
         },
     };
+
+    /// <summary>
+    /// A handle that is not a <see cref="ManagedEasyTransfer" /> but wraps one, as Curl.Api's store-bound handle does:
+    /// its perform runs <c>perform</c> on the socket wait the multi handle gave the wrapped transfer.
+    /// </summary>
+    private sealed class WrappingEasyTransfer(ManagedEasyTransfer inner, Func<TransferSocketWait, CancellationToken, Task<CurlCode>> perform) : IEasyTransfer
+    {
+        public EasyOptions Options
+        {
+            get => inner.Options;
+            set => inner.Options = value;
+        }
+
+        public TransferInfo Info => inner.Info;
+
+        public string ErrorText => inner.ErrorText;
+
+        public ITransferHeaders Headers => inner.Headers;
+
+        public IEasyWebSocket WebSocket => inner.WebSocket;
+
+        public IConnectOnlyConnection Connection => inner.Connection;
+
+        public IEasyTransfer PerformingTransfer => inner;
+
+        public async ValueTask<CurlCode> PerformAsync(CancellationToken cancellationToken) =>
+            await perform(inner.SocketWait!, cancellationToken).ConfigureAwait(false);
+
+        public IEasyTransfer Duplicate() => throw new NotSupportedException();
+
+        public void Reset() => inner.Reset();
+
+        public CurlCode Pause(CurlPause directions) => inner.Pause(directions);
+
+        public ValueTask<CurlCode> UpkeepAsync(CancellationToken cancellationToken) => inner.UpkeepAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
 }

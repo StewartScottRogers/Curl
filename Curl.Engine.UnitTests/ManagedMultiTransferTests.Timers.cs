@@ -372,6 +372,26 @@ public sealed partial class ManagedMultiTransferTests
         Assert.AreEqual((CurlMultiCode.Ok, 1500L), multi.GetTimeout());
     }
 
+    [TestMethod]
+    public async Task SocketActionAsync_TransferStillComputingAfterTheSettleLimit_AsksForTheTimerAtOnceNotAfterTheCheckInterval()
+    {
+        List<string> calls = [];
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        multi.SocketWaitSettleLimit = TimeSpan.FromMilliseconds(1);
+        multi.Options = RecordingOptions(calls);
+        TaskCompletionSource<CurlCode> computed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using WrappingEasyTransfer transfer = new((ManagedEasyTransfer)engine.CreateEasy(), (_, _) => computed.Task);
+        multi.Add(transfer);
+        calls.Clear();
+
+        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
+        computed.SetResult(CurlCode.Ok);
+
+        CollectionAssert.AreEqual(new[] { "timer 0" }, calls, string.Join(" | ", calls));
+    }
+
     internal static ManagedMultiTransfer NewMulti(TimeProvider time, IWaitSocketPoller? poller = null) =>
         new(new ConcurrentDictionary<IEasyTransfer, ManagedMultiTransfer>(ReferenceEqualityComparer.Instance), time, poller ?? new ScriptedWaitSocketPoller(), () => ValueTask.CompletedTask, _ => ValueTask.CompletedTask, () => { });
 

@@ -67,6 +67,7 @@ public sealed class StoreBoundEasyTransferTests
         Assert.AreEqual(CurlPause.All, inner.PausedWith);
         Assert.AreEqual(CurlCode.Again, await easy.UpkeepAsync(TestContext.CancellationToken));
         Assert.AreEqual(1, inner.UpkeepCount);
+        Assert.AreSame(inner, easy.PerformingTransfer);
     }
 
     [TestMethod]
