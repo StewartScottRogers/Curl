@@ -33,3 +33,4 @@ Found by BL-4243. ADR-1049: CONNECT asks for Keep Alive 0, but OASIS MQTT 5.0 se
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d9d5fa78 18146616 14de81cc.
