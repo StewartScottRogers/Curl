@@ -89,6 +89,14 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         _addressFamily = addressFamily;
     }
 
+    /// <summary>
+    /// Gets a value indicating whether <c>-4</c> or <c>-6</c> also filters an IP address literal host, so
+    /// <c>-6 tftp://127.0.0.1/</c> has nothing to open and fails with exit 7, as <see cref="TcpConnector" />
+    /// fails it (CGR-186, ADR-0968). The default is the platform build's: off on Windows, where the literal
+    /// is opened as written.
+    /// </summary>
+    public bool FiltersAddressLiterals { get; init; } = !OperatingSystem.IsWindows();
+
     /// <inheritdoc />
     /// <remarks>
     /// <para>
@@ -130,9 +138,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         var (addresses, failure) = await ResolveAsync(destination, cancellationToken).ConfigureAwait(false);
         if (addresses.Count == 0)
         {
-            var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
-            _log.Failed(DiagnosticLogComponents.Dns, exitCode, message);
-            return DatagramOpenResult.Failed(exitCode, message);
+            return NothingToOpen(host, port, destination, failure, resolveStarted);
         }
 
         _log.Resolved(destination.Host, destination.Port, addresses, IsOverridden(destination), _timeProvider.GetElapsedTime(resolveStarted));
@@ -141,6 +147,22 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         return channel is null
             ? OpenFailure(host, port, destination, openStarted)
             : Opened(channel);
+    }
+
+    /// <summary>
+    /// Fails an open whose resolve left no address: exit 7 for an IP address literal the family
+    /// choice filtered out (ADR-0968), else exit 6 or the resolver's reason.
+    /// </summary>
+    private DatagramOpenResult NothingToOpen(string host, int port, ConnectDestination destination, DnsLookupFailure failure, long resolveStarted)
+    {
+        if (AddressFamilyFilter.IsRefusedLiteral(destination.Host, _addressFamily, !FiltersAddressLiterals))
+        {
+            return OpenFailure(host, port, destination, resolveStarted);
+        }
+
+        var (exitCode, message) = NameResolutionFailure.Describe(CurlExitCode.CouldntResolveHost, "host", destination.Host, destination.Port, failure);
+        _log.Failed(DiagnosticLogComponents.Dns, exitCode, message);
+        return DatagramOpenResult.Failed(exitCode, message);
     }
 
     private bool IsOverridden(ConnectDestination destination) =>
@@ -157,7 +179,7 @@ public sealed class UdpDatagramConnector : IDatagramConnector
         var (addresses, failure) = _resolveOverrides.Find(destination.Host, destination.Port) is { } overridden
             ? new DnsResolution(overridden, DnsLookupFailure.None)
             : await LookUpAsync(destination.Host, cancellationToken).ConfigureAwait(false);
-        return new DnsResolution(AddressFamilyFilter.Dialable(destination.Host, addresses, _addressFamily), failure);
+        return new DnsResolution(AddressFamilyFilter.Dialable(destination.Host, addresses, _addressFamily, !FiltersAddressLiterals), failure);
     }
 
     /// <summary>Asks the resolver, with its failure reason when it gives one.</summary>

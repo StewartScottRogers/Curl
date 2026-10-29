@@ -208,7 +208,7 @@ message, as curl 8.21.0 ends a dial the system gave up on. Tests stall through `
 `StallingTlsProvider` and `StallingConnection` and fire the limit with `ManualTimeProvider.Advance`.
 Per ADR-0143 (BL-500) `TcpConnector` and `UdpDatagramConnector` take the `-4`/`-6` choice as an
 `AddressFamily` (`Unspecified` for either): `AddressFamilyFilter` keeps a name's addresses of that
-family only, and leaves an IP address literal alone, as curl 8.21.0 does. A name left with none is
+family only, and leaves an IP address literal alone on Windows, as curl 8.21.0 does; off Windows (`FiltersAddressLiterals`, CGR-186, ADR-0968) a literal of the other family is filtered too and is exit 7. A name left with none is
 exit 6 (exit 5 for a proxy). A looked-up answer is cached and reported with the one family;
 `localhost` and `--resolve` entries are reported whole, and an entry left empty is reported as
 `Negative DNS entry`.

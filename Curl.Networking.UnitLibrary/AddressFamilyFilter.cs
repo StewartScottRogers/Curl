@@ -12,25 +12,11 @@ internal static class AddressFamilyFilter
 {
     /// <summary>
     /// Returns the addresses of <paramref name="family" /> among <paramref name="addresses" />, in
-    /// order; all of them when <paramref name="family" /> is <see cref="AddressFamily.Unspecified" />
-    /// or <paramref name="host" /> is an IP address literal, bracketed or not.
-    /// </summary>
-    /// <param name="host">The host the addresses were resolved for.</param>
-    /// <param name="addresses">The addresses resolved for it.</param>
-    /// <param name="family">
-    /// <see cref="AddressFamily.InterNetwork" /> for <c>-4</c>, <see cref="AddressFamily.InterNetworkV6" />
-    /// for <c>-6</c>, or <see cref="AddressFamily.Unspecified" /> for either.
-    /// </param>
-    /// <returns>The addresses that may be dialled.</returns>
-    internal static IReadOnlyList<IPAddress> Dialable(string host, IReadOnlyList<IPAddress> addresses, AddressFamily family) =>
-        Dialable(host, addresses, family, OperatingSystem.IsWindows());
-
-    /// <summary>
-    /// Returns the addresses of <paramref name="family" /> among <paramref name="addresses" />, as
-    /// <see cref="Dialable(string, IReadOnlyList{IPAddress}, AddressFamily)" /> does, for a platform
-    /// named by <paramref name="isWindows" />: off Windows an IP address literal of the other family
-    /// is filtered out too, so <c>-6 http://127.0.0.1/</c> has nothing to dial and fails with exit 7
-    /// as curl 8.18.0 on Linux does (CGR-186, BL-3715).
+    /// order; all of them when <paramref name="family" /> is <see cref="AddressFamily.Unspecified" />,
+    /// or when <paramref name="host" /> is an IP address literal on Windows. Off Windows
+    /// (<paramref name="isWindows" /> false) an IP address literal of the other family is filtered out
+    /// too, so <c>-6 http://127.0.0.1/</c> has nothing to dial and fails with exit 7 as curl 8.18.0 on
+    /// Linux does (CGR-186, BL-3715).
     /// </summary>
     /// <param name="host">The host the addresses were resolved for.</param>
     /// <param name="addresses">The addresses resolved for it.</param>
