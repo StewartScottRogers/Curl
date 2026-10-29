@@ -516,6 +516,13 @@ internal sealed class HttpResponseHeadReader
                 ContentTypeBeforeFailure = builder.ContentType,
             };
         }
+        catch (HttpTransferException failure) when (afterInterimHead && failure.ExitCode == CurlExitCode.Http2Stream && failure.StatusLineBeforeFailure is null)
+        {
+            failure.HeadBytesBeforeFailure = builder.HeadBytesSoFar();
+            failure.StatusLineBeforeFailure = headStatusLine;
+            failure.HeadersStoredBeforeFailure = HeadersStoredBefore + informationalHeaderCount;
+            throw;
+        }
     }
 
     /// <summary>

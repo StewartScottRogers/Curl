@@ -1392,7 +1392,9 @@ public sealed class HttpProtocolHandler(
         }
         catch (HttpTransferException failure)
         {
-            return OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
+            HttpAttemptOutcome failedOutcome = OutcomeOfFailure(plan, exchange, body, exchangeLog, headReader, upload, !newConnection, failure);
+            failedOutcome.UpgradedSession = UpgradedSessionOf(connection);
+            return failedOutcome;
         }
         catch (OperationCanceledException canceled) when (plan.Deadline.EndedByLimit)
         {
@@ -4024,7 +4026,7 @@ public sealed class HttpProtocolHandler(
         /// Gets the HTTP/2 session the exchange's connection switched to after an h2c upgrade's
         /// <c>101</c> (BL-866), or <see langword="null" /> when it did not switch.
         /// </summary>
-        public Http2Session? UpgradedSession { get; init; }
+        public Http2Session? UpgradedSession { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether the connection is reported left intact: it
