@@ -4682,7 +4682,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Tells whether a transfer shows progress, the meter or the <c>-#</c> bar: only when this
-    /// runner writes it, never under <c>-s</c> or <c>--no-progress-meter</c>, not for a body
+    /// runner writes it, never under <c>-s</c> (except for a <c>-T .</c> upload, which curl 8.22.0 still draws it for, CGR-176) or <c>--no-progress-meter</c>, not for a body
     /// written to standard output when that is a terminal, and never under <c>-Z</c>, whose run draws
     /// one combined meter instead (<see cref="ParallelProgressMeter" />), as curl 8.21.0 does.
     /// </summary>
@@ -4692,9 +4692,18 @@ internal sealed class CurlCommandRunner(
     private bool ShowsProgress(CommandLineOptions options, bool toStandardOutput) =>
         writesProgressMeter
         && parallelRun is null
-        && !options.Silent
+        && !IsSilencedProgress(options)
         && !options.ProgressMeterOff
         && !(toStandardOutput && standardOutputIsTerminal);
+
+    /// <summary>
+    /// Tells whether <c>-s</c> silences progress: it does, except for a <c>-T .</c> upload of
+    /// standard input, which curl 8.22.0 still draws the meter for (CGR-176).
+    /// </summary>
+    /// <param name="options">The accepted command line.</param>
+    /// <returns><see langword="true" /> when <c>-s</c> silences progress.</returns>
+    private bool IsSilencedProgress(CommandLineOptions options) =>
+        options.Silent && !Running.UploadsFromStandardInputWithoutBlocking;
 
     /// <summary>
     /// Chooses how the <c>-i</c> and <c>-I</c> header lines of a transfer writing to standard
