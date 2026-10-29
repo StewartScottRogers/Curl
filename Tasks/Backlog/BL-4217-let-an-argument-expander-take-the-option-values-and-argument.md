@@ -1,5 +1,5 @@
 ---
-id: BL-4209
+id: BL-4217
 title: Let an argument expander take the option values and arguments that follow its option
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4209 — Let an argument expander take the option values and arguments that follow its option
+# BL-4217 — Let an argument expander take the option values and arguments that follow its option
 
 ## Goal
 
