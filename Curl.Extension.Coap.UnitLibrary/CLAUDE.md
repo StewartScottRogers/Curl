@@ -3,7 +3,22 @@
 The CoAP extension (ADR-0999), tested against RFC 7252, RFC 7959, RFC 7641 and RFC 6347, not
 against curl. It references only `Curl.Extension.Abstractions` (and through it
 `Curl.Protocol.Abstractions`), the shared layer `Curl.Tls` (for `TlsContentType` and
-`HandshakeType`, ADR-1042) and the base class library. No handler and no catalogue line yet: BL-4246 registers it.
+`HandshakeType`, ADR-1042) and the base class library. `Client/` holds the `coap://` handler,
+registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDescriptionCatalogue.cs`.
+
+`Client/` (namespace `Curl.Extension.Coap.Client`, ADR-1045) makes requests over UDP:
+
+- `CoapExtension` is the description `curl --extensions` lists and the handler factory, over
+  `ProtocolHandlerServices.DatagramConnector`.
+- `CoapProtocolHandler` sends one confirmable request to port 5683 (or the URL's port) and writes the
+  response payload. A 4.xx or 5.xx response ends with exit 0, or exit 22 under `-f` and
+  `--fail-with-body`; `-i` writes `CoAP/1.0 c.dd` before the payload.
+- `CoapRequest` gives the method (GET, POST with `-d`, or `-X` GET, POST, PUT or DELETE; any other is
+  exit 2) and the Uri-Host, Uri-Path and Uri-Query options (RFC 7252 section 6.4).
+- `CoapExchange` retransmits at ACK_TIMEOUT times a random factor, doubling up to MAX_RETRANSMIT times
+  on the transfer's `TimeProvider` (exit 28 after), takes a piggybacked or a separate response matched
+  by token (sections 5.2 and 5.3), acknowledges a confirmable separate response, and fails with exit 56
+  on a Reset.
 
 `Wire/` (namespace `Curl.Extension.Coap.Wire`) holds the message format:
 
@@ -36,4 +51,4 @@ against curl. It references only `Curl.Extension.Abstractions` (and through it
 Each throws `FormatException` for bytes the RFC does not allow.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
-`Curl.Extension.Coap.UnitTests/Wire` and `Curl.Extension.Coap.UnitTests/Dtls/Wire`.
+`Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client` and `Curl.Extension.Coap.UnitTests/Dtls/Wire`.

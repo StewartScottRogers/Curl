@@ -15,5 +15,6 @@ internal static class ExtensionCatalogue
     internal static IReadOnlyList<Func<ProtocolHandlerServices, IProtocolHandler>> Entries { get; } =
     [
         SocketIo.SocketIoExtension.CreateHandler,
+        Coap.Client.CoapExtension.CreateHandler,
     ];
 }
