@@ -108,6 +108,12 @@ public sealed class Tls13ClientHandshake : IDisposable
     /// <summary>Gets the group of the key exchange, once the ServerHello has arrived.</summary>
     public ushort? NegotiatedGroup { get; private set; }
 
+    /// <summary>Gets the signature scheme the server signed its CertificateVerify with, once that signature has verified; <see langword="null" /> on a resumed handshake.</summary>
+    public ushort? PeerSignatureScheme { get; private set; }
+
+    /// <summary>Gets the algorithm OID of the server certificates public key behind <see cref="PeerSignatureScheme" />, once the CertificateVerify signature has verified.</summary>
+    public string? PeerSignatureKeyAlgorithmOid { get; private set; }
+
     /// <summary>Gets the ALPN protocol the server chose, or <see langword="null" /> when it chose none.</summary>
     public string? ApplicationProtocol { get; private set; }
 
@@ -942,6 +948,8 @@ public sealed class Tls13ClientHandshake : IDisposable
             return alert;
         }
 
+        PeerSignatureScheme = decoded.Value.Algorithm;
+        PeerSignatureKeyAlgorithmOid = serverKey.AlgorithmOid;
         Transcript.Append(encoded);
         state = State.WaitFinished;
         return null;

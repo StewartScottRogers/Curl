@@ -113,6 +113,12 @@ public sealed class Tls12ClientHandshake
     /// <summary>Gets the ECDHE group of the key exchange, or <see langword="null" /> for any other key exchange.</summary>
     public ushort? NegotiatedGroup { get; private set; }
 
+    /// <summary>Gets the signature scheme the server signed its ServerKeyExchange with, once that signature has verified; <see langword="null" /> for RSA and anonymous key exchange, a resumed handshake, and TLS 1.0 and 1.1, whose signatures name no scheme.</summary>
+    public ushort? PeerSignatureScheme { get; private set; }
+
+    /// <summary>Gets the algorithm OID of the server certificates public key that signed the ServerKeyExchange, once that signature has verified; <see langword="null" /> when no signed ServerKeyExchange was verified.</summary>
+    public string? PeerSignatureKeyAlgorithmOid { get; private set; }
+
     /// <summary>Gets the ALPN protocol the server chose, or <see langword="null" /> when it chose none.</summary>
     public string? ApplicationProtocol { get; private set; }
 
@@ -654,7 +660,14 @@ public sealed class Tls12ClientHandshake
         TlsSignatureRule? rule = Version == TlsProtocolVersion.Tls12
             ? FindOfferedRule(message.SignatureAlgorithm!.Value)
             : TlsSignatureScheme.FindLegacyRule(serverKey!.AlgorithmOid);
-        return serverKey!.VerifySignature(rule, message.BuildSignedContent(clientHello!.Random, serverRandom), message.Signature!);
+        TlsAlertDescription? alert = serverKey!.VerifySignature(rule, message.BuildSignedContent(clientHello!.Random, serverRandom), message.Signature!);
+        if (alert is null)
+        {
+            PeerSignatureScheme = message.SignatureAlgorithm;
+            PeerSignatureKeyAlgorithmOid = serverKey.AlgorithmOid;
+        }
+
+        return alert;
     }
 
     private TlsSignatureRule? FindOfferedRule(ushort scheme) =>
