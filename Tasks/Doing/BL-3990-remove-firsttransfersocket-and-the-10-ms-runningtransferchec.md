@@ -37,3 +37,4 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034). BL-3981 land
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 7440ff2a 34a4aed9 18d43fff 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs BL-4036 (resolve-phase socket), BL-4037 (waitfds real sockets) and BL-4038 (non-managed transfers and settle-limit wakeup) before FirstTransferSocket and the 10 ms timer can go
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 7440ff2a 34a4aed9 18d43fff 779790c0.
