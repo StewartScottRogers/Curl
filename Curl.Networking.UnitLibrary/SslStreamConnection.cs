@@ -153,10 +153,24 @@ internal sealed class SslStreamConnection(
     public async ValueTask DisposeAsync()
     {
         await SendCloseNotifyAsync().ConfigureAwait(false);
-        await sslStream.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await sslStream.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The transport is closed below whatever the TLS stream's own disposal throws.
+        }
+
         await plaintext.DisposeAsync().ConfigureAwait(false);
         clientCertificate?.Dispose();
     }
+
+    /// <summary>Gets how long disposing waits for <c>close_notify</c> to be sent before it gives up, as curl's non-blocking <c>SSL_shutdown</c> does.</summary>
+    internal TimeSpan CloseNotifyTimeout { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Gets the clock <see cref="CloseNotifyTimeout" /> runs on.</summary>
+    internal TimeProvider TimeProvider { get; init; } = TimeProvider.System;
 
     private async ValueTask SendCloseNotifyAsync()
     {
@@ -168,9 +182,10 @@ internal sealed class SslStreamConnection(
         _tlsEnded = true;
         try
         {
-            await sslStream.ShutdownAsync().ConfigureAwait(false);
+            using CancellationTokenSource timeout = new(CloseNotifyTimeout, TimeProvider);
+            await sslStream.ShutdownAsync().WaitAsync(timeout.Token).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException)
+        catch (Exception)
         {
             // The transfer is over either way; curl ignores a close_notify it cannot send too.
         }

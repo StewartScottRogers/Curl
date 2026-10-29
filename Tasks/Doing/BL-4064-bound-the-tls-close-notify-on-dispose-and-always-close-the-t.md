@@ -28,12 +28,15 @@ Found by the shift-end review of 2026-10-28 (silent-failure-hunter, ADR-0710), i
 
 ## Acceptance criteria
 
-- [ ] Both connections send `close_notify` under a short bounded token, about as `SshProtocolHandler.ShutDownTimeout` does. A timeout or cancellation of that send is ignored.
-- [ ] Both connections dispose the TLS stream and the transport in a `finally`, so they are disposed whatever the close throws.
-- [ ] A test in `Curl.Networking.UnitTests` uses a transport whose writes never complete. It checks that `DisposeAsync` returns within the bound and that the transport is disposed.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Both connections send `close_notify` under a short bounded token, about as `SshProtocolHandler.ShutDownTimeout` does. A timeout or cancellation of that send is ignored.
+- [x] Both connections dispose the TLS stream and the transport in a `finally`, so they are disposed whatever the close throws.
+- [x] A test in `Curl.Networking.UnitTests` uses a transport whose writes never complete. It checks that `DisposeAsync` returns within the bound and that the transport is disposed.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Bound is CloseNotifyTimeout (5 s, as SshProtocolHandler.ShutDownTimeout) on a TimeProvider seam. The close_notify send ignores every exception (best effort, as curl); a failing TLS stream disposal is swallowed so the transport is always closed. The stall test uses SslStream; the hand-built connection shares the code shape and is tested through the disposal path.
+- CI on Linux and macOS: the tests use in-memory streams only, so they are platform-neutral.
 
 ## Log
 
