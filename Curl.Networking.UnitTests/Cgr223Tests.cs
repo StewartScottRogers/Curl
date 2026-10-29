@@ -39,8 +39,8 @@ public sealed class Cgr223Tests
     public static void DisposeCertificate() => s_serverCertificate.Dispose();
 
     [TestMethod]
-    [DataRow(false, "OpenSSL SSL_read: OpenSSL/3.5.7: error:0A00045C:SSL routines::tlsv13 alert certificate required, errno 0")]
-    [DataRow(true, "OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000418:SSL routines::tlsv1 alert unknown ca, errno 0")]
+    [DataRow(false, "OpenSSL SSL_read: OpenSSL/3.5.5: error:0A00045C:SSL routines::tlsv13 alert certificate required, errno 0")]
+    [DataRow(true, "OpenSSL SSL_read: OpenSSL/3.5.5: error:0A000418:SSL routines::tlsv1 alert unknown ca, errno 0")]
     public void AlertReadFailure_InTheOpenSslBuild_NamesTheAlertTheClientCertificateImplies(bool presentedClientCertificate, string expected)
     {
         var failure = new IOException("read failed", new InvalidOperationException("SSL_ERROR_SSL"));
@@ -105,7 +105,7 @@ public sealed class Cgr223Tests
             async () => await result.Connection!.ReadAsync(new byte[16], CancellationToken.None));
 
         Diagnostics.Act("message", failure.Message);
-        var expectedStart = matchesSchannelBuild ? "schannel: failed to read data from server: " : "OpenSSL SSL_read: OpenSSL/3.5.7: error:0A00045C";
+        var expectedStart = matchesSchannelBuild ? "schannel: failed to read data from server: " : "OpenSSL SSL_read: OpenSSL/3.5.5: error:0A00045C";
         Assert.StartsWith(expectedStart, failure.Message);
     }
 }

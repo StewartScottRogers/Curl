@@ -91,11 +91,11 @@ internal static class TlsFailureMessages
     /// <summary>
     /// The OpenSSL build's exit 56 message for a read that finds the connection ended
     /// without <c>close_notify</c>: <c>SSL_read</c>'s error string, which curl prefixes
-    /// with the OpenSSL version of the reference build, <c>curlimages/curl:8.21.0</c>
+    /// with the OpenSSL version of the Linux reference build, 3.5.5 (CGR-292)
     /// (BL-819; ADR-0221).
     /// </summary>
     internal const string OpenSslMissingCloseNotify =
-        "OpenSSL SSL_read: OpenSSL/3.5.7: " + OpenSslUnexpectedEof + ", errno 0";
+        "OpenSSL SSL_read: OpenSSL/3.5.5: " + OpenSslUnexpectedEof + ", errno 0";
 
     /// <summary>
     /// The exit 56 message of the build being matched for a read that finds the connection
@@ -146,7 +146,7 @@ internal static class TlsFailureMessages
         }
 
         var alert = presentedClientCertificate ? OpenSslUnknownCaAlert : OpenSslCertificateRequiredAlert;
-        return $"OpenSSL SSL_read: OpenSSL/3.5.7: {alert}, errno 0";
+        return $"OpenSSL SSL_read: OpenSSL/3.5.5: {alert}, errno 0";
     }
     // The SEC_E_* names curl's Schannel build prints for a security status; any other is
     // "Unknown error", as curl's own table falls back to.

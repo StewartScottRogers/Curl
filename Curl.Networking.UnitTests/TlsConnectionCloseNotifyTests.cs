@@ -27,7 +27,7 @@ public sealed class TlsConnectionCloseNotifyTests
     private const string SchannelText = "schannel: server closed abruptly (missing close_notify)";
 
     private const string OpenSslText =
-        "OpenSSL SSL_read: OpenSSL/3.5.7: error:0A000126:SSL routines::unexpected eof while reading, errno 0";
+        "OpenSSL SSL_read: OpenSSL/3.5.5: error:0A000126:SSL routines::unexpected eof while reading, errno 0";
 
     private static readonly IPEndPoint ServerEndPoint = new(IPAddress.Loopback, 443);
 
