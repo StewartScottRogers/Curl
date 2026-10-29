@@ -28,11 +28,14 @@ nothing, and only the base class library may be used.
   numbers (ranges with gaps, code points as zig-zag differences), read once into dictionaries.
   That keeps the source compact and costs no reflection or resource stream, so it stays
   Native AOT compatible. The table was generated from `IdnaMappingTable.txt`, `UnicodeData.txt`
-  and `CompositionExclusions.txt` with a C# file-based app; committing that app is BL-4034.
+  and `CompositionExclusions.txt` (Unicode 15.1) by the C# file-based app
+  `Generate-CurlUrlHostNameMappingTable.cs` at the repository root:
+  `dotnet run Generate-CurlUrlHostNameMappingTable.cs -- <IdnaMappingTable.txt> <UnicodeData.txt> <CompositionExclusions.txt> [output]`
+  from the repository root rewrites the table (or `output`) byte for byte (BL-4034).
 - Measuring the pinned hosts against curl 8.22.0 with libidn2 on Linux is BL-4033: lanes run on
   Windows, whose curl uses WinIDN and reads an ANSI argv.
 
 ## Consequences
 
 Every host name is mapped as UTS #46 maps it, outside the BMP included; ADR-0895's hand-written
-ranges are gone. A newer Unicode version means regenerating the table.
+ranges are gone. A newer Unicode version means regenerating the table with that app.

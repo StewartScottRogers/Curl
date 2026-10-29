@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMappingTable.cs, Generate-CurlUrlHostNameMappingTable.cs]
+touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMappingTable.cs, Generate-CurlUrlHostNameMappingTable.cs, Documentation/Planning/Decisions/ADR-0980-host-names-are-mapped-with-the-whole-uts-46-table-and-nfc.md]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4034 — Commit the C# file-based app that generates CurlUrlHostNameMappingTable.cs from the Unicode 15.1 data
 
@@ -22,12 +22,18 @@ BL-3829 (ADR-0980) committed the generated table but not the C# file-based app t
 
 ## Acceptance criteria
 
-- [ ] `Generate-CurlUrlHostNameMappingTable.cs` at the repository root, run with the three Unicode 15.1 files' paths, writes a `CurlUrlHostNameMappingTable.cs` identical to the committed one.
-- [ ] ADR-0980 names the app and how to run it.
+- [x] `Generate-CurlUrlHostNameMappingTable.cs` at the repository root, run with the three Unicode 15.1 files' paths, writes a `CurlUrlHostNameMappingTable.cs` identical to the committed one.
+- [x] ADR-0980 names the app and how to run it.
 
 ## Notes
+
+- Added ADR-0980 to touches: the second criterion edits it; no task in Doing on origin/work/dark-factory names it.
+- The app parses the three files as the table's doc comments say: IDNA lines whose status is mapped, disallowed_STD3_mapped or ignored, one entry per file line as written (no merging); combining classes merged over consecutive code points of one class; canonical decompositions only (compatibility `<tag>` ones skipped), primary composite when two parts, not excluded and the character and its first part are starters.
+- Checked: run with Unicode 15.1.0 files from unicode.org/Public, the output was byte-identical (`cmp`) to the committed table, both to a temp path and over the committed file (git status unchanged). Static methods sit in a class so the top-level Main stays under the complexity gate (CA1502 fails `dotnet run` otherwise).
+- No production code changed, so no Measure-CodeQuality run; build clean and fast tests green.
 
 ## Log
 
 - 2026-10-28: Created by BL-3829's run.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: c47fee76 452eaeed.
+- 2026-10-28: Doing -> Done. Generate-CurlUrlHostNameMappingTable.cs regenerates the host name mapping table byte for byte from the Unicode 15.1 data
