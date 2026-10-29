@@ -32,8 +32,8 @@ Builds on BL-4247. Declare the option as an `ExtensionOption` and add its line t
 
 ## Notes
 
-- Option `--coap-observe`; each notification is its payload then a newline (ADR-1062, decided by Claude under Stewart's delegation; renumbered from 1058, which another lane took first).
-- `--help all`: decided in ADR-1062 that extension options are listed by `curl --extensions` and `curl --ai-help extensions` (checked: `--coap-observe` is there), not by `curl --help all`, which stays upstream curl's page as for every other extension option (ADR-0999). The criterion is ticked on that decision.
+- Option `--coap-observe`; each notification is its payload then a newline (ADR-1064, decided by Claude under Stewart's delegation; renumbered from 1058 and then 1062, which other lanes took first).
+- `--help all`: decided in ADR-1064 that extension options are listed by `curl --extensions` and `curl --ai-help extensions` (checked: `--coap-observe` is there), not by `curl --help all`, which stays upstream curl's page as for every other extension option (ADR-0999). The criterion is ticked on that decision.
 - Re-registration on Max-Age (RFC 7641 section 3.3.1) and block-wise notifications filed as BL-4267, not left out.
 - Measure-CodeQuality.ps1: Curl.Extension.Coap.UnitLibrary 100/100, 0 failing (FollowAsync deregisters outside its catch block so no compiler rethrow branch is left uncovered); Curl.Extension.Composition.UnitLibrary 100/100, 0 failing.
 - Platform: the tests use fake connectors and a fake TimeProvider, with no paths or OS text; full build clean and fast tests green on Windows.

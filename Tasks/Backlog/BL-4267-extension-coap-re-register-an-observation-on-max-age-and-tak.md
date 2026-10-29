@@ -18,13 +18,13 @@ Under `--coap-observe`, Curl re-registers when the last notification's Max-Age r
 
 ## Context
 
-Follows BL-4248, whose ADR-1062 left these two parts of RFC 7641 to this task. `Curl.Extension.Coap.Observe.CoapObservation` follows notifications; `Curl.Extension.Coap.Blockwise.CoapBlockwiseTransfer` fetches Block2 responses. Extension rules: ADR-0999; tested against the RFCs, not curl; held to the four quality gates.
+Follows BL-4248, whose ADR-1064 left these two parts of RFC 7641 to this task. `Curl.Extension.Coap.Observe.CoapObservation` follows notifications; `Curl.Extension.Coap.Blockwise.CoapBlockwiseTransfer` fetches Block2 responses. Extension rules: ADR-0999; tested against the RFCs, not curl; held to the four quality gates.
 
 ## Acceptance criteria
 
 - [ ] A unit test over a fake `IDatagramConnector` and a fake `TimeProvider` shows a GET with Observe 0 and the same token sent again once the last notification's Max-Age (default 60 s) plus a margin passes without a notification (RFC 7641 section 3.3.1).
 - [ ] A unit test shows a notification carrying Block2 with M set written once, whole, after its later blocks are fetched without Observe (RFC 7959 section 2.6).
-- [ ] ADR-1062 is updated to describe both behaviours.
+- [ ] ADR-1064 is updated to describe both behaviours.
 - [ ] `Curl.Extension.Coap.UnitLibrary` meets the four quality gates by `Measure-CodeQuality.ps1`.
 - [ ] `dotnet build` is clean and the fast tests pass.
 
