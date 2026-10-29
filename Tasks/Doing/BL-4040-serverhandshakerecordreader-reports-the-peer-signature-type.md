@@ -33,3 +33,4 @@ Split from BL-3997 (over its cost cap). BL-4041 passes the certificate key algor
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 88a180fe b62fdaeb da2ed308.
