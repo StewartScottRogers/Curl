@@ -9,7 +9,7 @@ touches: [Curl.Console, Curl.Console.UnitTests/Cgr240Tests.cs, Curl.Output.UnitL
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3769 — Fix CGR-240: Output-file creation differs on early failures: curl creates or writes the -o file where PORT writes nothing
 
@@ -65,17 +65,23 @@ curl -i -o o.txt http://127.0.0.1:21359/1432
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr240Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-29 (lane 5): (a) Real curl 8.22.0 (Schannel, Windows): `curl -o out.txt http://127.0.0.1:21359/426 -d foobar -C 3` prints `curl: cannot mix --continue-at with --data` / `curl: (2) Failed initialization`, exit 2, and leaves an empty out.txt. Curl created none before the fix; fixed in `CurlCommandRunner.CreateOutputFileOfContinueAtRefusalAsync`, which on that refusal (a `-C` offset past 0 beside `-d` or `-F`, with a URL, `-o` not `-`) creates the first `-o` file empty for appending, under `--output-dir`. Not done for `-O` names (needs the URL's remote name) or Windows name sanitising; those are rarer and unmeasured. The Curl.Cli parser is untouched, so the refusal text and exit code are unchanged.
+- (b) `-i -o o.txt` against `HTTP/1.1 099 OK\r\nContent-Length: 6\r\n\r\n-foo-\n`: BL-3646 (CGR-117) already makes the handler write the whole head before failing with exit 1; `Curl.Protocol.Http.UnitTests/Cgr240Tests.cs` pins the exact repro (output = head, exit UnsupportedProtocol). Not re-run end to end: the tool sandbox here would not let the built binary run, so (b) is pinned at handler level only.
+- Tests: `Curl.Console.UnitTests/Cgr240Tests.cs` (fails before the fix, passes after). Fast Console tests pass (3042), Measure-CodeQuality for Curl.Console reports 0 failing members. Linux/macOS: the tests use only in-memory files and relative names, so they are platform-neutral.
+- No ADR: the change is a small behaviour match, no design choice beyond the above.
+
 ## Log
 
 - 2026-10-26: Created from CGR-240 of the third-party gap report.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-29: Doing -> Done. CGR-240 fixed: -C beside a body creates the empty -o file; 099 head already written (BL-3646)

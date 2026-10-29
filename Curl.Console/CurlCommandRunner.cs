@@ -971,6 +971,44 @@ internal sealed class CurlCommandRunner(
     }
 
     /// <summary>
+    /// Creates the first <c>-o</c> file, empty and for appending, when the refusal is a <c>-C</c> offset
+    /// beside a request body: curl 8.22.0 opens a resumed transfer's output file before it meets that
+    /// check at transfer setup, so it leaves the file behind with exit 2 (CGR-240, BL-3769). A file that
+    /// cannot be created is passed over.
+    /// </summary>
+    /// <param name="refusal">The refusal.</param>
+    /// <param name="optionsRead">The options read before the refusal.</param>
+    /// <returns>A task that completes when the file is created or passed over.</returns>
+    private async Task CreateOutputFileOfContinueAtRefusalAsync(CommandLineRefusal refusal, CommandLineOptions optionsRead)
+    {
+        if (OutputFileOfContinueAtRefusal(refusal, optionsRead) is not { } path)
+        {
+            return;
+        }
+
+        FileOpenResult opened = await fileSystem
+            .OpenForWriteAsync(path, FileWriteMode.Append, DeferredOutputFileStream.CreateMode, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (opened.Content is { } created)
+        {
+            await created.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Whether <paramref name="options" /> has a <c>-C</c> offset past zero and a request body: a <c>-F</c> form or a <c>-d</c> body not moved into the query by <c>-G</c>.</summary>
+    private static bool ResumesBesideRequestBody(CommandLineOptions options) =>
+        options.ResumeFrom > 0
+        && (options.HttpMethodSelected == SelectedHttpMethod.MultipartFormPost || (options.PostData is not null && !options.DataInQuery))
+        && options.Urls.Count > 0;
+
+    /// <summary>The file <see cref="CreateOutputFileOfContinueAtRefusalAsync" /> creates, or <see langword="null" /> for none.</summary>
+    private static string? OutputFileOfContinueAtRefusal(CommandLineRefusal refusal, CommandLineOptions optionsRead) =>
+        refusal.FoundAtTransferSetup && ResumesBesideRequestBody(optionsRead)
+        && optionsRead.UrlOutputs[0].FileName is { } fileName && fileName != UrlTransfer.StandardOutputFileName
+            ? InOutputDirectory(optionsRead, fileName)
+            : null;
+
+    /// <summary>
     /// Runs a parsed command line, for <see cref="RunAsync" />, once its warning lines are written
     /// and standard error is where its <c>--stderr</c> options send it: a refused one prints the
     /// refusal's lines, an accepted one the config-file note and then the run.
@@ -984,6 +1022,7 @@ internal sealed class CurlCommandRunner(
         if (!parsed.IsAccepted)
         {
             await WriteRefusalAsync(parsed.Refusal, parsed.NotedDefaultConfigFile, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
+            await CreateOutputFileOfContinueAtRefusalAsync(parsed.Refusal, parsed.OptionsReadBeforeRefusal).ConfigureAwait(false);
 
             return (int)parsed.Refusal.ExitCode;
         }
