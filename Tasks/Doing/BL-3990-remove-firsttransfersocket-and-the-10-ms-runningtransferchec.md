@@ -34,3 +34,4 @@ Split from BL-3976 (cost cap), itself split from BL-3563 (CGR-034). BL-3981 land
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 7440ff2a 34a4aed9 18d43fff 779790c0.
