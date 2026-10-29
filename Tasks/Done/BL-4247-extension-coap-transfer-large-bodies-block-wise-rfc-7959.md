@@ -33,7 +33,7 @@ Builds on BL-4246's client and BL-4245's block option codec. RFC 7959 sections 2
 
 - Pipeline `feature` run in the session without sub-agents: the change is one new class plus two small
   handler edits in one library, so a planner and implementer would cost more than they save.
-- Design (ADR-1048): `Blockwise/CoapBlockwiseTransfer` wraps each `CoapExchange`. Block1 at 1024 bytes
+- Design (ADR-1057): `Blockwise/CoapBlockwiseTransfer` wraps each `CoapExchange`. Block1 at 1024 bytes
   (SZX 6), following a smaller size a 2.31 asks for, and restarting from block 0 at the smaller size a 4.13
   asks for; Block2 at the server's size, by byte offset; the body is joined in memory and written once.
   `-T` now gives a PUT whose payload is the whole upload (`CoapRequest.PayloadOfAsync`).

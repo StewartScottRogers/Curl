@@ -20,7 +20,7 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
   by token (sections 5.2 and 5.3), acknowledges a confirmable separate response, and fails with exit 56
   on a Reset.
 
-`Blockwise/` (namespace `Curl.Extension.Coap.Blockwise`, ADR-1048) carries large bodies (RFC 7959):
+`Blockwise/` (namespace `Curl.Extension.Coap.Blockwise`, ADR-1057) carries large bodies (RFC 7959):
 
 - `CoapBlockwiseTransfer` sends a payload over 1024 bytes in Block1 blocks, the next after each 2.31
   Continue, at the smaller size a 2.31 asks for, and again from block 0 at the smaller size a 4.13 asks

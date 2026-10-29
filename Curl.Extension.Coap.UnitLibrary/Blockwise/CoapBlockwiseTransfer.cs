@@ -6,7 +6,7 @@ namespace Curl.Extension.Coap.Blockwise;
 
 /// <summary>
 /// Carries a request whose payload or response is larger than one block across several exchanges
-/// (RFC 7959, ADR-1048). A payload larger than 1024 bytes (SZX 6) goes out in Block1 blocks, the next
+/// (RFC 7959, ADR-1057). A payload larger than 1024 bytes (SZX 6) goes out in Block1 blocks, the next
 /// after each 2.31 Continue, at the smaller size a 2.31's Block1 asks for; a 4.13 Request Entity Too
 /// Large whose Block1 asks for a smaller size starts the payload again at that size. A response with
 /// Block2 is then fetched block after block, at the size the server chooses, by repeating the request

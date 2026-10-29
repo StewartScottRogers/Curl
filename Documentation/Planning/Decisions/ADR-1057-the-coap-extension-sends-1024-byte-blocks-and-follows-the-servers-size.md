@@ -1,4 +1,4 @@
-# ADR-1048 — The CoAP extension sends 1024-byte blocks, follows the server's size, and writes a block-wise body whole
+# ADR-1057 — The CoAP extension sends 1024-byte blocks, follows the server's size, and writes a block-wise body whole
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
