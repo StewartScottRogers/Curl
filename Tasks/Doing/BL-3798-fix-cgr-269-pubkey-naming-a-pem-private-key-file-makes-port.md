@@ -73,3 +73,4 @@ curl -s -v -k -u stewart_rogers: --key E\keys\c_rsa_pem --pubkey E\keys\c_rsa_pe
 ## Log
 
 - 2026-10-26: Created from CGR-269 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
