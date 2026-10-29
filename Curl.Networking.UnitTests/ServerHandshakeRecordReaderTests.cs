@@ -131,6 +131,115 @@ public sealed class ServerHandshakeRecordReaderTests
         [ServerHello(KeyShare(0x001d, 32))[..20]],
     ];
 
+    [TestMethod]
+    [DataRow(0x0804, "RSASSA-PSS")]
+    [DataRow(0x0805, "RSASSA-PSS")]
+    [DataRow(0x0806, "RSASSA-PSS")]
+    [DataRow(0x0809, "RSASSA-PSS")]
+    [DataRow(0x080a, "RSASSA-PSS")]
+    [DataRow(0x080b, "RSASSA-PSS")]
+    [DataRow(0x0201, "rsaEncryption")]
+    [DataRow(0x0401, "rsaEncryption")]
+    [DataRow(0x0501, "rsaEncryption")]
+    [DataRow(0x0601, "rsaEncryption")]
+    [DataRow(0x0203, "id-ecPublicKey")]
+    [DataRow(0x0403, "id-ecPublicKey")]
+    [DataRow(0x0503, "id-ecPublicKey")]
+    [DataRow(0x0603, "id-ecPublicKey")]
+    [DataRow(0x081a, "id-ecPublicKey")]
+    [DataRow(0x081b, "id-ecPublicKey")]
+    [DataRow(0x081c, "id-ecPublicKey")]
+    [DataRow(0x0807, "ED25519")]
+    [DataRow(0x0808, "ED448")]
+    public void PeerSignatureTypeName_Tls12EcdheServerKeyExchange_NamesTheScheme(int scheme, string expected)
+    {
+        var reader = Read(Record(Handshake, [.. ServerHello(null), .. Message(12, EcdheServerKeyExchange((ushort)scheme, 64))]));
+
+        Assert.AreEqual(expected, reader.PeerSignatureTypeName(null));
+    }
+
+    [TestMethod]
+    public void PeerSignatureTypeName_Tls12DheServerKeyExchange_NamesTheScheme()
+    {
+        byte[] parameters = [0x01, 0x00, .. new byte[256], 0x00, 0x01, 0x02, 0x01, 0x00, .. new byte[256]];
+        var reader = Read(Record(Handshake, [.. ServerHello(null), .. Message(12, [.. parameters, .. Signature(0x0401, 256)])]));
+
+        Assert.AreEqual("rsaEncryption", reader.PeerSignatureTypeName(null));
+    }
+
+    [TestMethod]
+    public void PeerSignatureTypeName_Tls12WithACertificateKey_StillNamesTheScheme()
+    {
+        var reader = Read(Record(Handshake, [.. ServerHello(Extension(0x002b, [0x03, 0x03])), .. Message(12, EcdheServerKeyExchange(0x0401, 256))]));
+
+        Assert.AreEqual("rsaEncryption", reader.PeerSignatureTypeName("1.2.840.113549.1.1.1"));
+    }
+
+    [TestMethod]
+    public void PeerSignatureTypeName_Tls12WithoutServerKeyExchange_IsNull() =>
+        Assert.IsNull(Read(Record(Handshake, [.. ServerHello(null), .. Message(11, [0, 0, 0])])).PeerSignatureTypeName("1.2.840.113549.1.1.1"));
+
+    [TestMethod]
+    public void PeerSignatureTypeName_Tls12UnknownScheme_IsNull() =>
+        Assert.IsNull(Read(Record(Handshake, [.. ServerHello(null), .. Message(12, EcdheServerKeyExchange(0x0904, 64))])).PeerSignatureTypeName(null));
+
+    [TestMethod]
+    [DynamicData(nameof(MalformedServerKeyExchanges))]
+    public void PeerSignatureTypeName_MalformedServerKeyExchange_IsNull(byte[] body) =>
+        Assert.IsNull(Read(Record(Handshake, [.. ServerHello(null), .. Message(12, body)])).PeerSignatureTypeName(null));
+
+    public static IEnumerable<object[]> MalformedServerKeyExchanges() =>
+    [
+        [(byte[])[3, 0x00, 0x17]],
+        [(byte[])[3, 0x00, 0x17, 65, .. new byte[65], 0x04, 0x01]],
+        [(byte[])[3, 0x00, 0x17, 1, 0, 0x04, 0x01, 0x00, 0x02, 0]],
+        [(byte[])[3, 0x00, 0x17, 1, 0, 0x04, 0x01, 0x00, 0x01, 0, 0]],
+        [(byte[])[0x00, 0x01, 0, 0x00, 0x01, 2]],
+        [(byte[])[0x00, 0x01, 0, 0x00, 0x01, 2, 0x00, 0x01, 1]],
+        [(byte[])[0x00, 0x05]],
+    ];
+
+    [TestMethod]
+    [DataRow("1.2.840.113549.1.1.1", "RSASSA-PSS")]
+    [DataRow("1.2.840.113549.1.1.10", "RSASSA-PSS")]
+    [DataRow("1.2.840.10045.2.1", "id-ecPublicKey")]
+    [DataRow("1.3.101.112", "ED25519")]
+    [DataRow("1.3.101.113", "ED448")]
+    public void PeerSignatureTypeName_Tls13_NamesTheCertificateKey(string keyAlgorithmOid, string expected)
+    {
+        var reader = Read(Record(Handshake, Tls13ServerHello()));
+
+        Assert.AreEqual(expected, reader.PeerSignatureTypeName(keyAlgorithmOid));
+    }
+
+    [TestMethod]
+    [DataRow("1.2.3.4")]
+    [DataRow(null)]
+    public void PeerSignatureTypeName_Tls13UnknownOrNoCertificateKey_IsNull(string? keyAlgorithmOid) =>
+        Assert.IsNull(Read(Record(Handshake, Tls13ServerHello())).PeerSignatureTypeName(keyAlgorithmOid));
+
+    [TestMethod]
+    public void PeerSignatureTypeName_Tls13ServerHelloSplitAcrossChunks_NamesTheCertificateKey()
+    {
+        var record = Record(Handshake, Tls13ServerHello());
+        var reader = Read(record[..7], record[7..50], record[50..]);
+
+        Assert.AreEqual("id-ecPublicKey", reader.PeerSignatureTypeName("1.2.840.10045.2.1"));
+    }
+
+    [TestMethod]
+    public void PeerSignatureTypeName_NothingRead_IsNull() =>
+        Assert.IsNull(new ServerHandshakeRecordReader().PeerSignatureTypeName("1.2.840.113549.1.1.1"));
+
+    private static byte[] Tls13ServerHello() =>
+        ServerHello([.. Extension(0x002b, [0x03, 0x04]), .. KeyShare(0x001d, 32)]);
+
+    private static byte[] EcdheServerKeyExchange(ushort scheme, int signatureLength) =>
+        [3, 0x00, 0x17, 65, .. new byte[65], .. Signature(scheme, signatureLength)];
+
+    private static byte[] Signature(ushort scheme, int length) =>
+        [(byte)(scheme >> 8), (byte)scheme, (byte)(length >> 8), (byte)length, .. new byte[length]];
+
     private static ServerHandshakeRecordReader Read(params byte[][] chunks)
     {
         var reader = new ServerHandshakeRecordReader();
