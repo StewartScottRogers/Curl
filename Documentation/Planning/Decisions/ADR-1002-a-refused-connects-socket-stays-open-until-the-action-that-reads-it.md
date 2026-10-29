@@ -1,4 +1,4 @@
-# ADR-1001: A refused connect's socket stays open until the action that reads it
+# ADR-1002: A refused connect's socket stays open until the action that reads it
 
 - Status: Accepted
 - Date: 2026-10-29

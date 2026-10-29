@@ -31,7 +31,7 @@ The managed connect fails and closes its socket before the REMOVE callback and a
 
 ## Notes
 
-- Cause: the refused loopback connect fails inside BL-4075's 50 ms connect grace, and `TcpDialer` closed the socket in its catch before the socket callback was told of it. Fix (ADR-1001): `ITcpDialer.HoldingFailedSocketsUntil` and `TcpDialer.CloseFailedSocketAsync` await a hook before closing a failed socket; the gated dialer passes `TransferSocketWait.HoldFailedConnectAsync`, released by the application's Out or Error signal, `StopGating` or cancellation.
+- Cause: the refused loopback connect fails inside BL-4075's 50 ms connect grace, and `TcpDialer` closed the socket in its catch before the socket callback was told of it. Fix (ADR-1002): `ITcpDialer.HoldingFailedSocketsUntil` and `TcpDialer.CloseFailedSocketAsync` await a hook before closing a failed socket; the gated dialer passes `TransferSocketWait.HoldFailedConnectAsync`, released by the application's Out or Error signal, `StopGating` or cancellation.
 - Touches widened to `SocketActionGatedTcpDialer.cs` and the three Curl.Networking files: the socket is closed in `TcpDialer`, so the hold must live there. No task in Doing on origin/work/dark-factory named them.
 - Probe after the fix (Windows): `PORT C_65: T0 add S1=2 T-1 kick S1=4 | results 7 | real: S1:real`; C_20, C_21, C_74 and C_75 equal the REF rows in Cgr034ProbeResults.md.
 - Build clean, fast tests green. Quality run (Engine, Networking): only `EngineComposition.CreateProtocolHandlers` (complexity 12) fails, pre-existing and outside touches, covered by BL-4083.
