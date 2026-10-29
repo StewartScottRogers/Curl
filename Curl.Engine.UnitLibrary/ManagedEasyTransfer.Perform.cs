@@ -228,6 +228,7 @@ internal sealed partial class ManagedEasyTransfer
         LastResult = null;
         LastContext = null;
         lastWriteCallbackOutput = null;
+        lastHeaderCallbackOutput = null;
         StartSocketWait(options);
         if (options.Network.Url is not { } urlText)
         {
