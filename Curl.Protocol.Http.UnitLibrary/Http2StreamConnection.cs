@@ -268,10 +268,14 @@ internal sealed class Http2StreamConnection(Http2Session session, string scheme,
 
     private async ValueTask StartAsync(ReadOnlyMemory<byte> head, CancellationToken cancellationToken)
     {
-        isRequestEnded = bodyLength == 0;
         try
         {
             List<HeaderField> fields = Http2RequestHeaders.Of(head.Span, scheme);
+
+            // An empty body the request declares (-d '' sends Content-Length: 0) still goes out as
+            // an empty DATA frame ending the stream, as curl does (CGR-276); only a request that
+            // declares none ends on its HEADERS.
+            isRequestEnded = bodyLength == 0 && !fields.Exists(field => field.Name == "content-length");
             isHeadRequest = fields.Contains(new HeaderField(":method", "HEAD"));
             streamId = await session.StartStreamAsync(this, fields, isRequestEnded, cancellationToken).ConfigureAwait(false);
         }
