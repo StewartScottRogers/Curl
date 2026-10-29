@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Protoc
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3754 — Fix CGR-225: Windows -v leaves out the Schannel certificate-verification and shutdown info lines
 
@@ -61,10 +61,10 @@ curl -sS -v --cacert E\pki\ca.crt --ssl-no-revoke https://localhost:<p>/index.tx
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -90,3 +90,8 @@ curl -sS -v --cacert E\pki\ca.crt --ssl-no-revoke https://localhost:<p>/index.tx
 - Left: store-cache reuse, close_notify, shutdown and `{ [0 bytes data]` lines, filed as BL-4067 (needs a new read-side event).
 - 2026-10-29: Doing -> Backlog. Handshake-time Schannel lines done; remaining close_notify/shutdown/store-cache lines are BL-4067
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+## Notes (2026-10-29 lane 8 finish)
+
+- BL-4067 (Done) added the close_notify, shutdown, store-cache and 0-byte-read lines (ADR-0996); with the handshake-time lines above, every line the report lists is written. Real curl command and results are in the earlier note; focused tests: Cgr225Tests.cs, Cgr225RemainderTests.cs (Networking), SchannelVerificationTextTests/SchannelRenegotiationTextTests (Output). Build clean; Networking and Output fast tests green. CI on Linux/macOS: change is platform-neutral (Windows-only lines behind the Schannel route).
+- 2026-10-29: Doing -> Done. Every CGR-225 line now written (handshake lines here, close_notify/shutdown/store-cache via BL-4067)
