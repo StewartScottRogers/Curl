@@ -32,3 +32,4 @@ Follow-up of BL-4121 (ADR-1076): `KafkaRecordBatch.Decompressed` reads codecs 0 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 5d9d18fd 855c0fa4 0dc0e836 dc514177.
