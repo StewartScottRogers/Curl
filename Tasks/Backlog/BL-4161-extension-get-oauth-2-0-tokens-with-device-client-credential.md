@@ -4,8 +4,8 @@ title: Extension: Get OAuth 2.0 tokens with device, client-credentials and PKCE 
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.OAuth2.UnitLibrary, Curl.Extension.OAuth2.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4206, BL-4207, BL-4208, BL-4209, BL-4210]
+touches: [Curl.Extension.OAuth2.UnitLibrary, Curl.Extension.OAuth2.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.OAuth2.UnitLibrary/Options, Curl.Extension.OAuth2.UnitTests/Options]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 2): Split for size before any code, following BL-4124. The first pass found that a transfer hook has no connector, no listener and only synchronous request headers (`ITransferHook.RequestHeadersFor`, the `Func<ExtensionOptionValues, ITransferHook?>` activators), so it cannot fetch a token before the transfer: filed BL-4206 for that hook. Filed BL-4207 (project and wire format: PKCE, token and device messages), BL-4208 (HTTP/1.1 client over IConnection, as ADR-1018 did for S3), BL-4209 (token cache and refresh) and BL-4210 (the three flows). This task keeps the options, the hook registration, the descriptions and the ADR. Touches widened to the option, description and transfer hook catalogue files (shared list files, one line each) and the library's Options folder, which this task's criteria need; no task in Doing on origin/work/dark-factory names those catalogue files beside its shared list line.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: de6a06ef 7a283adc 6cc92b01 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size and a missing hook: waits on BL-4206 (transfer hook connector, listener and async headers), BL-4207 (project and wire format), BL-4208 (HTTP client), BL-4209 (token cache and refresh) and BL-4210 (flows)

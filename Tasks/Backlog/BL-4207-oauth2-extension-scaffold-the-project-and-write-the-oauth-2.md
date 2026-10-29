@@ -1,0 +1,43 @@
+---
+id: BL-4207
+title: OAuth2 extension: scaffold the project and write the OAuth 2.0, PKCE and device authorization wire format
+priority: Normal
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Extension.OAuth2.UnitLibrary/Wire, Curl.Extension.OAuth2.UnitLibrary/Curl.Extension.OAuth2.UnitLibrary.csproj, Curl.Extension.OAuth2.UnitLibrary/CLAUDE.md, Curl.Extension.OAuth2.UnitTests, Curl.slnx]
+requirement: none
+created: 2026-10-29
+completed:
+---
+# BL-4207 — OAuth2 extension: scaffold the project and write the OAuth 2.0, PKCE and device authorization wire format
+
+## Goal
+
+`Curl.Extension.OAuth2.UnitLibrary` and `Curl.Extension.OAuth2.UnitTests` exist in `/Extensions/OAuth2/` in `Curl.slnx`, and the library builds and reads every OAuth 2.0 message the three flows exchange.
+
+## Context
+
+First part of BL-4161 (split for size). Use the `new-project` skill; add the single-line `<Folder Name="/Extensions/OAuth2/">` under the marker comment in `Curl.slnx` (ADR-1003); it references only `Curl.Protocol.Abstractions`, `Curl.Extension.Abstractions` and the BCL (JSON with `System.Text.Json`'s `JsonDocument`, AOT-safe). Follow `Curl.Extension.S3.UnitLibrary`'s shape. Not registered in any catalogue yet (BL-4161 does that).
+
+Write, in `Wire/`:
+- PKCE: `code_verifier` from injected random bytes and `code_challenge` by `S256` (RFC 7636 §4.1, §4.2), reproducing Appendix B.
+- Token request bodies, `application/x-www-form-urlencoded` (RFC 6749 Appendix B): client credentials (§4.4.2), authorization code with `code_verifier` (§4.1.3, RFC 7636 §4.5), refresh (§6), device code (RFC 8628 §3.4); client authentication by HTTP Basic or body parameters (§2.3.1).
+- Device authorization request and response (RFC 8628 §3.1, §3.2), with `interval` defaulting to 5.
+- Authorization request URL (RFC 6749 §4.1.1, RFC 7636 §4.3) with `state`.
+- Token response (RFC 6749 §5.1) and error response (§5.2, RFC 8628 §3.5 `authorization_pending`, `slow_down`, `expired_token`, `access_denied`); a malformed body is a failure with its reason, never an exception.
+
+## Acceptance criteria
+
+- [ ] Both projects exist in `/Extensions/OAuth2/` in `Curl.slnx` and the build's `VerifyExtensionIsolation` passes.
+- [ ] Unit tests check each message above against the named RFC sections, including RFC 7636 Appendix B's verifier and challenge.
+- [ ] The library meets the four quality gates by `Measure-CodeQuality.ps1`.
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+- Filed by BL-4161's lane 2 run (split for size).
+
+## Log
+
+- 2026-10-29: Created.
