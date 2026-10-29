@@ -35,7 +35,7 @@ Split from BL-4115 (`mqtt5://`, `mqtt5s://`, `mqtt5+ws://`, extension 14 of 63) 
 
 - Filed by BL-4115's lane 6 prerequisite pass. BL-4243 then adds the client flow, BL-4244 the WebSocket transport, BL-4115 the registration, description, ADR and `CURL_EXTENSIONS=0` test.
 - Lane 5 ran the `feature` stages itself rather than through sub-agents, to stay inside the cost cap: plan, tests,
-  code, verify. Decisions in ADR-1037: one `Mqtt5MalformedPacketException` carrying the reason code for every wire
+  code, verify. Decisions in ADR-1044: one `Mqtt5MalformedPacketException` carrying the reason code for every wire
   fault, read or about to be written; the receiver's section 1.5.4 MUSTs only; properties checked against table 2-4
   per packet and for the Will Properties; shortened reason/property forms written short.
 - `Encoding/` holds the data types (`Mqtt5Writer`, `Mqtt5Reader`, `Mqtt5VariableByteInteger`, `Mqtt5Utf8String`);

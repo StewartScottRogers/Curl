@@ -1,4 +1,4 @@
-# ADR-1037 — The MQTT 5 codec checks the wire format both ways with one exception
+# ADR-1044 — The MQTT 5 codec checks the wire format both ways with one exception
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

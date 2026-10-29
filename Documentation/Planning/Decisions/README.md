@@ -1076,4 +1076,4 @@ Each option and the specific reason it lost.
 | [1041](ADR-1041-a-ws-upload-can-give-whole-messages-one-frame-each.md) | A ws upload can give whole messages, one frame each (BL-4253) | Accepted | 2026-10-29 |
 | [1042](ADR-1042-the-coap-extension-frames-dtls-1-2-itself-on-curl-tls-types.md) | The CoAP extension frames DTLS 1.2 itself, on Curl.Tls's types (BL-4250) | Accepted | 2026-10-29 |
 | [1043](ADR-1043-quic-datagram-frames-are-opt-in-through-the-transport-parameters-and-go-one-per-packet.md) | QUIC DATAGRAM frames are opt-in through the transport parameters and go one per packet (BL-4222) | Accepted | 2026-10-29 |
-| [1037](ADR-1037-the-mqtt5-codec-checks-the-wire-format-both-ways-with-one-exception.md) | The MQTT 5 codec checks the wire format both ways with one exception (BL-4242) | Accepted | 2026-10-29 |
+| [1044](ADR-1044-the-mqtt5-codec-checks-the-wire-format-both-ways-with-one-exception.md) | The MQTT 5 codec checks the wire format both ways with one exception (BL-4242) | Accepted | 2026-10-29 |
