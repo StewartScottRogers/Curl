@@ -1,0 +1,39 @@
+---
+id: BL-4058
+title: Skip ignored HTTP/2 content-length fields instead of throwing FormatException
+priority: Normal
+assignee: Claude
+pipeline: direct
+depends-on: []
+touches: [Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs, Curl.Protocol.Http.UnitTests]
+requirement: none
+created: 2026-10-29
+completed:
+---
+# BL-4058 — Skip ignored HTTP/2 content-length fields instead of throwing FormatException
+
+## Goal
+
+An HTTP/2 response whose `content-length` value contains CR, LF or NUL ends with a curl exit code, not an unhandled `FormatException`.
+
+## Context
+
+Found by the shift-end review of 2026-10-28 (code-reviewer, ADR-0710), in the diff `354cb7711...c4b167258`.
+
+- `Curl.Protocol.Http.UnitLibrary/Http2StreamConnection.cs:633-634`: `ContentLengthOf` takes the first `content-length` field and calls `long.Parse` on it. Its doc says the field was "already checked by `Http2ResponseHead.IndexOfInvalidField`".
+- That check is not done for this field. `Http2ResponseHead.cs:60/77` (`IsIgnoredRegularField`) skips any regular field whose value holds CR, LF or NUL, so such a field is never validated.
+- A server can send `content-length: 1\0` (HPACK allows it). `long.Parse` then throws `FormatException`, which no handler maps to an exit code.
+
+## Acceptance criteria
+
+- [ ] `ContentLengthOf` skips the fields `Http2ResponseHead` ignores, or no longer throws on them.
+- [ ] Its behaviour on such a head matches what curl 8.22.0 with nghttp2 does, measured, or the reason it is left unmeasured is recorded in Notes.
+- [ ] A test in `Curl.Protocol.Http.UnitTests` sends a HEADERS frame with a NUL in `content-length`. It checks that the transfer ends with a `CurlExitCode`, not `FormatException`.
+- [ ] The doc comment on `ContentLengthOf` says what it does.
+- [ ] `dotnet build` is clean and the fast tests pass.
+
+## Notes
+
+## Log
+
+- 2026-10-29: Created.
