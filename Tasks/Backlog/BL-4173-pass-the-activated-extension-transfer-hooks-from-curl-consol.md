@@ -1,5 +1,5 @@
 ---
-id: BL-4172
+id: BL-4173
 title: Pass the activated extension transfer hooks from Curl.Console to the engine
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4172 — Pass the activated extension transfer hooks from Curl.Console to the engine
+# BL-4173 — Pass the activated extension transfer hooks from Curl.Console to the engine
 
 ## Goal
 

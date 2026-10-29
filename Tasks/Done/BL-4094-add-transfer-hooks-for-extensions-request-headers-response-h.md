@@ -36,7 +36,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - Criterion 2: `ActivatedBy_WithNoExtensionOptionGiven_HoldsNoHookAndGivesTheHandlerBack` and `CreateProtocolHandlers_WithoutExtensionTransferHooks_RunsEveryHandlerWithoutAHook`.
 - Quality: `CreateProtocolHandlers` measured complexity 12 (the report folds lambdas in), so the two null checks moved to `ThroughTransferHooks` and `ExtensionHandlersOver`; Measure-CodeQuality.ps1 then gave Curl.Engine.UnitLibrary and Curl.Extension.Abstractions.UnitLibrary 100/100, 0 failing members.
 - Fast tests: 50 test projects passed, 0 failed. Change is platform-neutral (no path, OS error or certificate).
-- Hosts' wiring (building `TransferHooks` from each option group in Curl.Console, Curl.Api, Curl.Mcp) is not in this task's touches and is filed as BL-4172 (Console; it builds on BL-4171).
+- Hosts' wiring (building `TransferHooks` from each option group in Curl.Console, Curl.Api, Curl.Mcp) is not in this task's touches and is filed as BL-4173 (Console; it builds on BL-4171).
 
 
 ## Log
