@@ -35,3 +35,4 @@ Split from BL-4148 (extension 48 of 63; ADR-0999, CLAUDE.md "Extensions"). Creat
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 647a5b2b 38a52064 6f7257e7 4d42ce69 3d836d5e.
