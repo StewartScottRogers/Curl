@@ -18,13 +18,13 @@ completed:
 
 ## Context
 
-Follow-up of BL-4121 (ADR-1062): the client sends Produce and Fetch to the URL's broker, which answers NOT_LEADER_OR_FOLLOWER (6) when it does not lead the partition. Send Metadata (the oldest version Kafka 4.0 accepts, non-flexible) first, read the partition's leader and its host and port, and reconnect through the connector to the leader when it is another broker.
+Follow-up of BL-4121 (ADR-1066): the client sends Produce and Fetch to the URL's broker, which answers NOT_LEADER_OR_FOLLOWER (6) when it does not lead the partition. Send Metadata (the oldest version Kafka 4.0 accepts, non-flexible) first, read the partition's leader and its host and port, and reconnect through the connector to the leader when it is another broker.
 
 ## Acceptance criteria
 
 - [ ] With the URL's broker not the leader, the transfer connects to the leader Metadata names and succeeds; unit test over scripted connections.
 - [ ] An unknown topic in Metadata ends with exit 8 naming UNKNOWN_TOPIC_OR_PARTITION.
-- [ ] ADR-1062's "Left out" is updated or superseded.
+- [ ] ADR-1066's "Left out" is updated or superseded.
 - [ ] The library meets the four quality gates and the fast tests pass.
 
 ## Notes

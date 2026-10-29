@@ -1,4 +1,4 @@
-# ADR-1062: Kafka produces one record with a body and consumes to the high watermark without one
+# ADR-1066: Kafka produces one record with a body and consumes to the high watermark without one
 
 - Status: Accepted
 - Date: 2026-10-29
@@ -40,7 +40,7 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
 ## Left out, and why
 
 - Snappy, lz4 and zstd batches end with exit 8: the BCL has none of the three, and each is a decoder of its own to
-  write by hand, filed as BL-4267.
+  write by hand, filed as BL-4270.
 - Metadata and leader routing: the request goes to the URL's broker, which answers NOT_LEADER_OR_FOLLOWER when it does
   not lead the partition; filed as BL-4268.
 - SASL authentication (`--user`): filed as BL-4269, after BL-4268 since both change the connection flow.

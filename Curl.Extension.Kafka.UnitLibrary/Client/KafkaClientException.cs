@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Kafka.Client;
 
-/// <summary>Ends a Kafka transfer with the exit code ADR-1062 gives the failure.</summary>
+/// <summary>Ends a Kafka transfer with the exit code ADR-1066 gives the failure.</summary>
 internal sealed class KafkaClientException(CurlExitCode exitCode, string message) : Exception(message)
 {
     /// <summary>The exit code the transfer ends with.</summary>

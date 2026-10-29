@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Kafka.Client;
 
 /// <summary>
-/// What a <c>kafka://host[:port]/topic[/partition][?offset=N]</c> URL names (ADR-1062): the URL-decoded topic, the
+/// What a <c>kafka://host[:port]/topic[/partition][?offset=N]</c> URL names (ADR-1066): the URL-decoded topic, the
 /// partition (0 when the path names none) and the offset a consume starts at (0 when the query names none).
 /// </summary>
 internal sealed record KafkaAddress(string Topic, int Partition, long Offset)
