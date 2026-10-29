@@ -1,5 +1,6 @@
 using Curl.Api.Info;
 using Curl.Api.Options;
+using Curl.Protocol.Abstractions;
 
 namespace Libcurl.Info;
 
@@ -33,11 +34,15 @@ internal static partial class EasyInfoReaders
         readers[CurlInfo.TlsSession] = new EasyInfoReader(ReadTlsSessionInfo);
     }
 
-    private static object? ReadEffectiveUrl(TransferInfo info, EasyOptions options) => info.EffectiveUrl;
+    private static object? ReadEffectiveUrl(TransferInfo info, EasyOptions options) => AsUrlByteText(info.EffectiveUrl);
 
     private static object? ReadEffectiveMethod(TransferInfo info, EasyOptions options) => options.Transfer.CustomRequest ?? info.EffectiveMethod;
 
-    private static object? ReadRedirectUrl(TransferInfo info, EasyOptions options) => info.RedirectUrl;
+    private static object? ReadRedirectUrl(TransferInfo info, EasyOptions options) => AsUrlByteText(info.RedirectUrl);
+
+    // A URL carrying a Location's marked header bytes is handed out as libcurl 8.22.0's byte text (BL-3871).
+    private static string? AsUrlByteText(string? url) =>
+        url is null || !HeaderByteText.HasMarks(url) ? url : UrlByteText.ToText(System.Text.Encoding.Latin1.GetBytes(HeaderByteText.Unmark(url)));
 
     private static object? ReadContentType(TransferInfo info, EasyOptions options) => info.ContentType;
 

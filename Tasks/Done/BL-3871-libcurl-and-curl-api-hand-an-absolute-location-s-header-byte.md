@@ -8,7 +8,7 @@ depends-on: [BL-3867]
 touches: [Libcurl/Info/Strings/EasyInfoReaders.Strings.cs, Libcurl.UnitTests/Info/RedirectUrlHeaderByteTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3871 — Libcurl and Curl.Api hand an absolute Location's header bytes out as libcurl byte text, not HeaderByteText marks
 
@@ -22,13 +22,16 @@ ADR-0923 (BL-3867) carries an absolute `Location`'s bytes from 0x80 marked as U+
 
 ## Acceptance criteria
 
-- [ ] A Libcurl unit test reads `CURLINFO_REDIRECT_URL` after a transfer whose report holds a marked byte and gets U+DCE9 (byte text for E9).
-- [ ] BL-3867's repro still writes E9 in `%{redirect_url}` and `%{url_effective}` through the console.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A Libcurl unit test reads `CURLINFO_REDIRECT_URL` after a transfer whose report holds a marked byte and gets U+DCE9 (byte text for E9).
+- [x] BL-3867's repro still writes E9 in `%{redirect_url}` and `%{url_effective}` through the console.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Libcurl readers now convert marked header bytes to UrlByteText (U+DCxx); Console reads via these readers and the renderer writes U+DC80..DCFF as its byte (ADR-0822), so -w keeps E9. Curl.Api is outside touches and unchanged. Libcurl quality run: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 52c00312 4b1d76f6 779790c0.
+- 2026-10-28: Doing -> Done. Libcurl REDIRECT_URL and EFFECTIVE_URL give marked header bytes as UrlByteText
