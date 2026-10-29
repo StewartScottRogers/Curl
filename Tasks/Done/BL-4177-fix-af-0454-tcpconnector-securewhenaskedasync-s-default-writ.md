@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Networking.UnitLibrary]
+touches: [Curl.Networking.UnitLibrary, Curl.Networking.UnitTests/TcpConnectorTests.Http2ProxyTunnel.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4177 — Fix AF-0454: TcpConnector.SecureWhenAskedAsync's default writesSslFilterAdded = false can become true with no test failing, adding an SSL-filter line to -v output after every CONNECT tunnel
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Only the HTTP/2 CONNECT tunnel (OpenHttp2TunnelAsync, the h2 proxy under --proxy-http2) relies on the default; no test drove it to a TLS origin. Added ConnectAsync_ThroughAnH2TunnelToAnHttpsOriginWithoutSetupTracing_WritesNoSslFilterAddedLine in Curl.Networking.UnitTests/TcpConnectorTests.Http2ProxyTunnel.cs (added to touches; no other Doing task names it). Production code unchanged, so no quality run was needed.
+- Reproduction: a lane may not run the audit office mutation tool, so the mutant was applied by hand (line 2169 default flipped to true): the new test fails (killed), and passes with the code restored. Build clean; all 50 fast test projects green; the test is platform-neutral (fakes only).
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. A test through the h2 CONNECT tunnel to an HTTPS origin without setup tracing now kills AF-0454's mutant
