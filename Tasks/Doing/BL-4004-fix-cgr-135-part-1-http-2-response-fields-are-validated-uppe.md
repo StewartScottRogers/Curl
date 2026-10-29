@@ -36,3 +36,4 @@ First half of BL-3664 (split). Its Notes hold REF-LINUX measurements and the pla
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: d634e8c6 1a07f34e 5d3dc6df 50ac746f.
