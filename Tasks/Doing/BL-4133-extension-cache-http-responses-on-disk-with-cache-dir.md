@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: c2489ee9 e75d06bf b9bb7e59 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4204 (transfer hook that can answer or replace a response, needed for RFC 9111 4.2 and 4.3.4) and BL-4203 (HttpCache projects and RFC 9111 core, split for size)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c2489ee9 e75d06bf b9bb7e59 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
