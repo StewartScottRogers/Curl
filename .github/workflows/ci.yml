@@ -62,6 +62,29 @@ jobs:
           & $guard -Base origin/master -Head HEAD
           exit $LASTEXITCODE
 
+  # The guard files work on every platform (BL-3926, ADR-1015): each hook command in
+  # .claude/settings.json starts through sh and the audit guard hook refuses a lane, and the
+  # audit guard's own self-test passes.
+  guard-hooks:
+    name: Guard hooks (${{ matrix.os }})
+    if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hook commands start and the audit guard hook refuses a lane
+        shell: pwsh
+        run: ./Audit/Guard/Test-GuardHooks.ps1
+
+      - name: Audit guard self-test
+        shell: pwsh
+        run: ./Audit/Guard/Test-AuditPathsUntouched.ps1 -SelfTest
+
   test:
     name: Build and test (${{ matrix.os }})
     if: ${{ !startsWith(github.head_ref, 'factory/merge-') }}
