@@ -1,4 +1,4 @@
-# ADR-0983: A wrapped transfer runs on its wrapped engine transfer's socket wait, and a computing one asks for timer 0
+# ADR-0986: A wrapped transfer runs on its wrapped engine transfer's socket wait, and a computing one asks for timer 0
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4038, for CGR-034).
 

@@ -28,8 +28,8 @@ Prerequisite of BL-3990 (CGR-034), found by its 2026-10-28 run. `ManagedMultiTra
 
 ## Notes
 
-- Decided (ADR-0983): `IEasyTransfer.PerformingTransfer` (default: the handle itself) names the handle whose perform does the transfer; `StoreBoundEasyTransfer` forwards it, and `ManagedMultiTransfer.Start` gives the socket wait and multi callbacks to the `PerformingTransfer` when it is a `ManagedEasyTransfer`. The seam names the handle, not the wait, because `TransferSocketWait` is internal to the engine. A fake that wraps no engine transfer keeps the synthetic `FirstTransferSocket` number (it has no socket to tell).
-- Decided (ADR-0983): while a running transfer on a socket wait waits on nothing after the settle, the timer is 0 (libcurl's `Curl_expire(data, 0)`), also for one whose perform ended and waits to be reported; the 10 ms interval stays only for transfers with no socket wait.
+- Decided (ADR-0986): `IEasyTransfer.PerformingTransfer` (default: the handle itself) names the handle whose perform does the transfer; `StoreBoundEasyTransfer` forwards it, and `ManagedMultiTransfer.Start` gives the socket wait and multi callbacks to the `PerformingTransfer` when it is a `ManagedEasyTransfer`. The seam names the handle, not the wait, because `TransferSocketWait` is internal to the engine. A fake that wraps no engine transfer keeps the synthetic `FirstTransferSocket` number (it has no socket to tell).
+- Decided (ADR-0986): while a running transfer on a socket wait waits on nothing after the settle, the timer is 0 (libcurl's `Curl_expire(data, 0)`), also for one whose perform ended and waits to be reported; the 10 ms interval stays only for transfers with no socket wait.
 - Added `Curl.Api.UnitTests/Stores/StoreBoundEasyTransferTests.cs` to touches: Curl.Api's 100% coverage gate needs the forwarder tested; no task in Doing on origin/work/dark-factory names it.
 - `RunningTimerMilliseconds` went past the complexity gate (cached method-group delegates count); split into `CheckIntervalMilliseconds`. Measure-CodeQuality for Curl.Engine.UnitLibrary, Curl.Api, Curl.Api.UnitLibrary: 0 failing members. Fast tests green on Windows; the tests use no path, OS error or certificate and wait on the transfer's own events, so they are platform-neutral.
 
@@ -37,4 +37,4 @@ Prerequisite of BL-3990 (CGR-034), found by its 2026-10-28 run. `ManagedMultiTra
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 46b14221 05bdc202 779790c0.
-- 2026-10-28: Doing -> Done. A wrapped engine transfer (StoreBoundEasyTransfer) on a socket-action handle is told its real socket via IEasyTransfer.PerformingTransfer, and a computing socket-wait transfer asks for timer 0 (ADR-0983)
+- 2026-10-28: Doing -> Done. A wrapped engine transfer (StoreBoundEasyTransfer) on a socket-action handle is told its real socket via IEasyTransfer.PerformingTransfer, and a computing socket-wait transfer asks for timer 0 (ADR-0986)

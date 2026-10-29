@@ -20,7 +20,7 @@ namespace Curl.Engine;
 /// <see cref="PollAsync" /> and <see cref="Wakeup" /> run on the engine's <see cref="TimeProvider" />
 /// (ADR-0597). <see cref="SocketActionAsync" /> moves the transfers on as <see cref="PerformAsync" /> does, and
 /// both tell <see cref="MultiOptions.Socket" /> and <see cref="MultiOptions.Timer" /> what to wait for: a
-/// <see cref="ManagedEasyTransfer" />, or a handle whose <see cref="IEasyTransfer.PerformingTransfer" /> is one (ADR-0983),
+/// <see cref="ManagedEasyTransfer" />, or a handle whose <see cref="IEasyTransfer.PerformingTransfer" /> is one (ADR-0986),
 /// started while the socket callback is set runs on a
 /// <see cref="TransferSocketWait" />, its real socket told with <see cref="CurlPoll.Out" /> or
 /// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0973), and one started without it records
@@ -1063,7 +1063,7 @@ internal sealed class ManagedMultiTransfer(
     /// earliest deadline of the transfers when every running one waits on its real socket (-1 when none has one,
     /// as libcurl's), 0 while one on a socket wait still computes, waiting on nothing after
     /// <see cref="SocketWaitSettleLimit" />, as libcurl's <c>Curl_expire(data, 0)</c> for a transfer that can run on
-    /// (ADR-0983), else at most <see cref="RunningTransferCheckInterval" />, for transfers the application cannot
+    /// (ADR-0986), else at most <see cref="RunningTransferCheckInterval" />, for transfers the application cannot
     /// poll a socket for (ADR-0973).
     /// </summary>
     private long TimerMilliseconds()
@@ -1085,7 +1085,7 @@ internal sealed class ManagedMultiTransfer(
         return CheckIntervalMilliseconds(handleTimeout, running);
     }
 
-    // 0 while a running transfer on a socket wait computes (ADR-0983), else the check interval within the handle's timeout.
+    // 0 while a running transfer on a socket wait computes (ADR-0986), else the check interval within the handle's timeout.
     private static long CheckIntervalMilliseconds(long handleTimeout, List<MultiEntry> running)
     {
         if (running.Exists(IsComputing))
