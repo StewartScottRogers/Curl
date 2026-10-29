@@ -4,7 +4,7 @@ title: CGR-265 remainder: Libcurl accepts DNS_*, HTTPSIG_*, ECH, CAPATH, TLS13_C
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4027]
+depends-on: [BL-4029]
 touches: [Libcurl/Options/Tls/EasyTlsOptionSetters.cs, Libcurl/Options/Network/EasyNetworkOptionSetters.cs, Libcurl/Options/Authentication/EasyAuthenticationOptionSetters.cs, Libcurl.UnitTests/Cgr265RemainderTests.cs, Libcurl.UnitTests/Options/Tls/TlsPeerOptionSettersTests.cs]
 requirement: none
 created: 2026-10-28
@@ -38,5 +38,5 @@ completed:
 - Setting an option with a SetOption unit test needs the per-platform answer pinned (OSCondition) or an injectable flag like `SrpIsBuiltIn`; 100% branch coverage is measured on Windows only.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
 - 2026-10-28 (lane 5): Measured curl 8.22.0 Schannel through the tool (`curl <opt> http://127.0.0.1:1/`, warnings read without `-s`). libcurl answers NOT_BUILT_IN for `PROXY_CAPATH` ("ignoring setting the CA path for the proxy"), `TLS13_CIPHERS` and `PROXY_TLS13_CIPHERS` ("ignoring --tls13-ciphers, not supported by libcurl with Schannel"). `--capath` alone gives only the proxy warning, so `CAPATH` itself appears to answer OK. The tool takes `--curves`, `--sigalgs`, `--cert-status`, `--doh-cert-status`, `--tcp-fastopen` and `--engine` with no warning, so the tool cannot show libcurl's answer for those; they need a libcurl-level measurement. The tool itself rejects `--crlfile`, `--proxy-crlfile`, `--proxy-issuercert`, `--ech`, `--dns-*`, `--http3` and `--http3-only` (exit 2), so it never calls setopt for them. `--krb` is deprecated and does nothing.
-- Requeued for BL-4027 before any edit. Gating `PROXY_CAPATH`/`TLS13_CIPHERS` in Libcurl alone would break the curl tool on Windows: `ToolEasyHandle.SetOptions` fails the transfer on any setopt error, and `--capath` always sets `PROXY_CAPATH` too. Plan for the next claim: add `Tls13CiphersIsBuiltIn` and `ProxyCaPathIsBuiltIn` (default `!OperatingSystem.IsWindows()`, like `SrpIsBuiltIn`) in `EasyTlsOptionSetters`. Move the Capath/Tls13Ciphers twin tests out of `TlsPeerOptionSettersTests` (added to touches) into the `[DoNotParallelize]` `Cgr265RemainderTests`, with both flag values. Then write an ADR.
-- 2026-10-28: Doing -> Backlog. Waits for BL-4027: the curl tool must tolerate CURLE_NOT_BUILT_IN for --capath/--tls13-ciphers before Libcurl gates PROXY_CAPATH and TLS13_CIPHERS on Windows
+- Requeued for BL-4029 before any edit. Gating `PROXY_CAPATH`/`TLS13_CIPHERS` in Libcurl alone would break the curl tool on Windows: `ToolEasyHandle.SetOptions` fails the transfer on any setopt error, and `--capath` always sets `PROXY_CAPATH` too. Plan for the next claim: add `Tls13CiphersIsBuiltIn` and `ProxyCaPathIsBuiltIn` (default `!OperatingSystem.IsWindows()`, like `SrpIsBuiltIn`) in `EasyTlsOptionSetters`. Move the Capath/Tls13Ciphers twin tests out of `TlsPeerOptionSettersTests` (added to touches) into the `[DoNotParallelize]` `Cgr265RemainderTests`, with both flag values. Then write an ADR.
+- 2026-10-28: Doing -> Backlog. Waits for BL-4029: the curl tool must tolerate CURLE_NOT_BUILT_IN for --capath/--tls13-ciphers before Libcurl gates PROXY_CAPATH and TLS13_CIPHERS on Windows

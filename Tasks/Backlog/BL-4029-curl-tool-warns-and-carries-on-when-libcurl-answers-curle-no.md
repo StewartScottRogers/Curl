@@ -1,5 +1,5 @@
 ---
-id: BL-4027
+id: BL-4029
 title: curl tool warns and carries on when libcurl answers CURLE_NOT_BUILT_IN for --capath, --proxy-capath, --tls13-ciphers and --proxy-tls13-ciphers
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4027 — curl tool warns and carries on when libcurl answers CURLE_NOT_BUILT_IN for --capath, --proxy-capath, --tls13-ciphers and --proxy-tls13-ciphers
+# BL-4029 — curl tool warns and carries on when libcurl answers CURLE_NOT_BUILT_IN for --capath, --proxy-capath, --tls13-ciphers and --proxy-tls13-ciphers
 
 ## Goal
 
