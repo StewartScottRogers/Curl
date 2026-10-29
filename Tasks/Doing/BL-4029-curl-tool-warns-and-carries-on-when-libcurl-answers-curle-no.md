@@ -38,3 +38,4 @@ When libcurl answers `CURLE_NOT_BUILT_IN` for `CURLOPT_CAPATH`, `CURLOPT_PROXY_C
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 56d8db24 763fefc2 b55127cc.
