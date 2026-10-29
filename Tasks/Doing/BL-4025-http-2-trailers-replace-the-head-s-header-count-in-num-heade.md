@@ -36,3 +36,4 @@ Write-out's `num_headers` is `TransferReport.ResponseHeaders.Count + PseudoHeade
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: ccc02e86 d6a2a0b6 3bf8be13 779790c0.
