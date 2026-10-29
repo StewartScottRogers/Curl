@@ -316,6 +316,7 @@
     <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
+  <Folder Name="/Extensions/WebSocketRepl/"><Project Path="Curl.Extension.WebSocketRepl.UnitLibrary/Curl.Extension.WebSocketRepl.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebSocketRepl.UnitTests/Curl.Extension.WebSocketRepl.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/SignalR/"><Project Path="Curl.Extension.SignalR.UnitLibrary/Curl.Extension.SignalR.UnitLibrary.csproj" /><Project Path="Curl.Extension.SignalR.UnitTests/Curl.Extension.SignalR.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/SocketIo/"><Project Path="Curl.Extension.SocketIo.UnitLibrary/Curl.Extension.SocketIo.UnitLibrary.csproj" /><Project Path="Curl.Extension.SocketIo.UnitTests/Curl.Extension.SocketIo.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/OAuth2/"><Project Path="Curl.Extension.OAuth2.UnitLibrary/Curl.Extension.OAuth2.UnitLibrary.csproj" /><Project Path="Curl.Extension.OAuth2.UnitTests/Curl.Extension.OAuth2.UnitTests.csproj" /></Folder>

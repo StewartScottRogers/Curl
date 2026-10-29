@@ -1069,3 +1069,4 @@ Each option and the specific reason it lost.
 | [1034](ADR-1034-the-oauth2-extension-keeps-tokens-in-a-json-cache-file-beside-curls-per-user-files.md) | The OAuth2 extension keeps tokens in a JSON cache file beside curl's per-user files (BL-4209) | Accepted | 2026-10-29 |
 | [1035](ADR-1035-socket-io-is-a-scheme-extension-over-the-websocket-transport.md) | Socket.IO is a scheme extension over the WebSocket transport (BL-4109) | Accepted | 2026-10-29 |
 | [1036](ADR-1036-the-curl-tool-carries-on-past-curle-not-built-in-for-crlfile-curves-sigalgs-and-tcp-fastopen.md) | The curl tool carries on past CURLE_NOT_BUILT_IN for CRL file, curves, signature algorithms and TCP Fast Open (BL-4182) | Accepted | 2026-10-29 |
+| [1033](ADR-1033-the-websocket-repl-sends-typed-lines-and-shows-messages-one-per-line.md) | The WebSocket REPL sends typed lines and shows messages one per line (BL-4221) | Accepted | 2026-10-29 |
