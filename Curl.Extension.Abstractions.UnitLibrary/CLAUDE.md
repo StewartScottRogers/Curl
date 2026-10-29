@@ -35,6 +35,12 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   `TlsProviderOver` to the engine's `extensionCertificateConnector` and `extensionTlsProvider` (ADR-1016).
   A chain curl refused, a reused connection and a connection without TLS pass through unchecked, so a
   check can only add a refusal.
+- `Arguments/IArgumentExpander` turns one extension option's value into curl command-line arguments (URLs, `-X`,
+  `-H`, `--data-binary`, `--next`), so an extension can supply whole requests. `ArgumentExpansion.Expand` replaces
+  each expander's `--name value` or `--name=value` in the top-level arguments with them (not after a bare `--`, not in
+  `-K` files, and not again in an expansion); a host calls it before parsing (ADR-1037). The expander reads files and
+  the environment through `ArgumentExpansionContext`'s delegates, and throws `ArgumentExpansionException` to end the
+  run with `curl: <message>` and its `CurlExitCode` before any transfer.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
 `Curl.Extension.Abstractions.UnitTests`.
