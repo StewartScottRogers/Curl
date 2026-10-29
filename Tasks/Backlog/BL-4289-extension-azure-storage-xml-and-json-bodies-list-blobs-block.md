@@ -1,16 +1,16 @@
 ---
-id: BL-4285
+id: BL-4289
 title: Extension: Azure Storage XML and JSON bodies (List Blobs, Block List, Error, ADLS Gen2 path list)
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4284]
+depends-on: [BL-4288]
 touches: [Curl.Extension.AzureStorage.UnitLibrary/Bodies, Curl.Extension.AzureStorage.UnitTests/Bodies]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4285 — Extension: Azure Storage XML and JSON bodies (List Blobs, Block List, Error, ADLS Gen2 path list)
+# BL-4289 — Extension: Azure Storage XML and JSON bodies (List Blobs, Block List, Error, ADLS Gen2 path list)
 
 ## Goal
 

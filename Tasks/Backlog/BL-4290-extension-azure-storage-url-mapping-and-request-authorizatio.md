@@ -1,16 +1,16 @@
 ---
-id: BL-4286
+id: BL-4290
 title: Extension: Azure Storage URL mapping and request authorization (SAS, Entra ID bearer, x-ms-version)
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4284]
+depends-on: [BL-4288]
 touches: [Curl.Extension.AzureStorage.UnitLibrary/Requests, Curl.Extension.AzureStorage.UnitTests/Requests]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4286 — Extension: Azure Storage URL mapping and request authorization (SAS, Entra ID bearer, x-ms-version)
+# BL-4290 — Extension: Azure Storage URL mapping and request authorization (SAS, Entra ID bearer, x-ms-version)
 
 ## Goal
 

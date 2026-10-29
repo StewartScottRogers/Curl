@@ -1,5 +1,5 @@
 ---
-id: BL-4284
+id: BL-4288
 title: Extension: Azure Storage project scaffold and HTTP/1.1 exchange over IConnection
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4284 — Extension: Azure Storage project scaffold and HTTP/1.1 exchange over IConnection
+# BL-4288 — Extension: Azure Storage project scaffold and HTTP/1.1 exchange over IConnection
 
 ## Goal
 
