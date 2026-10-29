@@ -32,3 +32,4 @@ Libcurl.UnitTests passes every run on every platform: no test changes `EasyAuthe
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: dca8ce74 bba61989.
