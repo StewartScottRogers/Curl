@@ -1,4 +1,4 @@
-# ADR-1022: EngineComposition keeps one unit per partial file
+# ADR-1023: EngineComposition keeps one unit per partial file
 
 - Status: Accepted
 - Date: 2026-10-29
