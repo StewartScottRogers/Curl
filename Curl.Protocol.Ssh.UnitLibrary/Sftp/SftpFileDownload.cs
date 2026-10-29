@@ -92,7 +92,7 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 Trace.Enter("SSH_SFTP_DOWNLOAD_INIT");
                 if (await OpenUnlessTheConnectionEndsAsync(session, path, createFileMode, cancellationToken).ConfigureAwait(false) is not { } handle)
                 {
-                    return await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false);
+                    return ReportingEntryPath(await quotes.FinishAsync(session, null, homeDirectory, TransferResult.Success(0), cancellationToken).ConfigureAwait(false), homeDirectory);
                 }
 
                 Trace.Enter("SSH_SFTP_DOWNLOAD_STAT");
@@ -102,11 +102,16 @@ internal sealed class SftpFileDownload(SshTransport transport)
                 result = result with { SourceLastWriteUnixSeconds = modifyTime };
                 Trace.Enter("SSH_SFTP_CLOSE");
                 result = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
+                result = ReportingEntryPath(result, homeDirectory);
                 Trace.EndSftpDonePhase();
                 return result;
             },
             cancellationToken).ConfigureAwait(false);
     }
+
+    // curl reports the home directory REALPATH found as %{ftp_entry_path} (CGR-267).
+    internal static TransferResult ReportingEntryPath(TransferResult result, byte[] homeDirectory) =>
+        result with { Report = (result.Report ?? new TransferReport { DownloadSize = result.BytesTransferred }) with { FtpEntryPath = System.Text.Encoding.UTF8.GetString(homeDirectory) } };
 
     // Curl's -I asks for the file time, so libssh2 sends STAT for the path and curl ignores
     // the answer (CGR-030), as it does for a directory (BL-1207).

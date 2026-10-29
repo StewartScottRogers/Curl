@@ -35,8 +35,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadWithTextAsync(script, text);
 
-        Diagnostics.AssertResult(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
-        Assert.AreEqual(TransferResult.Failure(CurlExitCode.RangeError, message), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.RangeError, message)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Failure(CurlExitCode.RangeError, message)), outcome.Result);
         Diagnostics.AssertBytes("output", [], outcome.Output);
         Assert.IsEmpty(outcome.Output);
         Diagnostics.AssertProgress([], outcome.Progress);
@@ -84,8 +84,8 @@ public sealed partial class SftpFileDownloadTests
 
         Outcome outcome = await DownloadWithTextAsync(script, "5-2");
 
-        Diagnostics.AssertResult(TransferResult.Success(0), outcome.Result);
-        Assert.AreEqual(TransferResult.Success(0), outcome.Result);
+        Diagnostics.AssertResult(HomeReportingResult.Of(TransferResult.Success(0)), outcome.Result);
+        Assert.AreEqual(HomeReportingResult.Of(TransferResult.Success(0)), outcome.Result);
         byte[][] reads = [.. Enumerable.Range(0, 14).Select(index => SftpServerScript.ReadRequest((uint)(3 + index), (ulong)(index * 30000), 30000))];
         AssertReadsThenClose(outcome, [.. reads, SftpServerScript.CloseRequest(17)]);
     }

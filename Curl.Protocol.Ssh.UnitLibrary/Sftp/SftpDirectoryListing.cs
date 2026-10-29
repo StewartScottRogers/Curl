@@ -117,7 +117,7 @@ internal sealed class SftpDirectoryListing(SshTransport transport)
     {
         TransferResult finished = await quotes.FinishAsync(session, handle, homeDirectory, result, cancellationToken).ConfigureAwait(false);
         Trace.EndSftpDonePhase();
-        return finished;
+        return SftpFileDownload.ReportingEntryPath(finished, homeDirectory);
     }
 
     // curl copies each name into a C string, so a NUL byte ends what it prints.
