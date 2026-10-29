@@ -34,3 +34,4 @@ Builds on BL-4246's client and BL-4245's block option codec. RFC 7959 sections 2
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 4d9c8de0 d39fb701 54cafd17 3d836d5e.
