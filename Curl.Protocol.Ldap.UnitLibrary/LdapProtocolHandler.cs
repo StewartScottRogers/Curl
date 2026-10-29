@@ -183,13 +183,20 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
     {
         await using (curlConnection.ConfigureAwait(false))
         {
-            ConnectResult winLdap = await connector.ConnectAsync(target, context.CancellationToken).ConfigureAwait(false);
+            ConnectResult winLdap = await connector.ConnectAsync(WinLdapTargetOf(target), context.CancellationToken).ConfigureAwait(false);
             return winLdap.Connection is { } connection
                 ? await SearchOnAsync(connection, context).ConfigureAwait(false)
                 : ConnectFailure(winLdap);
         }
     }
 
+    /// <summary>
+    /// The target of WinLDAP's own connection: for <c>ldaps</c> the handshake sends the machine name
+    /// as its server name and trusts only the Windows certificate store, whatever <c>--cacert</c>
+    /// or <c>-k</c> say (CGR-289, ADR-0979); a plaintext target is unchanged.
+    /// </summary>
+    private static ConnectTarget WinLdapTargetOf(ConnectTarget target) =>
+        target.UseTls ? target with { TlsServerName = Environment.MachineName, TrustsSystemStoreOnly = true } : target;
     /// <summary>Reads the URL, then binds and searches on <paramref name="connection" />, which it disposes.</summary>
     /// <remarks>The WinLDAP dialect first names the library and the URL, and once the URL is read, the kind of connection.</remarks>
     private async ValueTask<TransferResult> SearchOnAsync(IConnection connection, ITransferContext context)
