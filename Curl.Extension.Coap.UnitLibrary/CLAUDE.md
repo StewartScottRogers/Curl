@@ -6,7 +6,7 @@ against curl. It references only `Curl.Extension.Abstractions` (and through it
 `HandshakeType`, ADR-1042) and the base class library. `Client/` holds the `coap://` handler,
 registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDescriptionCatalogue.cs`.
 
-`Client/` (namespace `Curl.Extension.Coap.Client`, ADR-1045) makes requests over UDP:
+`Client/` (namespace `Curl.Extension.Coap.Client`, ADR-1047) makes requests over UDP:
 
 - `CoapExtension` is the description `curl --extensions` lists and the handler factory, over
   `ProtocolHandlerServices.DatagramConnector`.

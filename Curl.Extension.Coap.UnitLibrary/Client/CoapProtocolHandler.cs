@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Coap.Client;
 
 /// <summary>
-/// Serves <c>coap://host[:port]/path[?query]</c> (ADR-1045): sends one confirmable request over UDP,
+/// Serves <c>coap://host[:port]/path[?query]</c> (ADR-1047): sends one confirmable request over UDP,
 /// GET, or POST, PUT or DELETE as <c>-X</c> and <c>-d</c> choose, with the <c>-d</c> data as its payload,
 /// and writes the response payload. A 4.xx or 5.xx response ends with exit 0 as an HTTP error status
 /// does, or with exit 22 under <c>-f</c> or <c>--fail-with-body</c>. <c>-i</c> writes the response code

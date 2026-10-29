@@ -1,4 +1,4 @@
-# ADR-1045 — The CoAP extension follows RFC 7252 and maps 4.xx and 5.xx codes as HTTP error statuses are mapped
+# ADR-1047 — The CoAP extension follows RFC 7252 and maps 4.xx and 5.xx codes as HTTP error statuses are mapped
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -1079,4 +1079,4 @@ Each option and the specific reason it lost.
 | [1044](ADR-1044-the-mqtt5-codec-checks-the-wire-format-both-ways-with-one-exception.md) | The MQTT 5 codec checks the wire format both ways with one exception (BL-4242) | Accepted | 2026-10-29 |
 | [1045](ADR-1045-the-oauth2-flows-print-their-instructions-to-stderr-and-fail-with-curl-exit-codes.md) | The OAuth 2.0 flows print their instructions to standard error and fail with curl's exit codes (BL-4210) | Accepted | 2026-10-29 |
 | [1046](ADR-1046-a-one-task-shift-proves-the-factory-loop-on-linux-ci.md) | A one-task shift proves the dark factory loop on Linux CI (BL-3933) | Accepted | 2026-10-29 |
-| [1045](ADR-1045-the-coap-extension-follows-rfc-7252-and-maps-error-codes-as-http-does.md) | The CoAP extension follows RFC 7252 and maps 4.xx and 5.xx codes as HTTP error statuses are mapped (BL-4246) | Accepted | 2026-10-29 |
+| [1047](ADR-1047-the-coap-extension-follows-rfc-7252-and-maps-error-codes-as-http-does.md) | The CoAP extension follows RFC 7252 and maps 4.xx and 5.xx codes as HTTP error statuses are mapped (BL-4246) | Accepted | 2026-10-29 |

@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Coap.Client;
 
-/// <summary>The <c>coap://</c> extension's description and handler factory (ADR-1045).</summary>
+/// <summary>The <c>coap://</c> extension's description and handler factory (ADR-1047).</summary>
 public static class CoapExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
