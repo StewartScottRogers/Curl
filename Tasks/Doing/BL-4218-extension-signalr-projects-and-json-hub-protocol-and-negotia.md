@@ -36,3 +36,4 @@ Split from BL-4108 for size (its Notes: wire format, then the client flow, then 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 69fdd394 68289cfc 1e4dadaf 98f0e16d f10f2877 3d836d5e.
