@@ -25,6 +25,8 @@ internal static class CurlUrlHostNameMapping
         "­͏᠋᠌᠍᠎᠏​‌‍⁠"
         + "︀︁︂︃︄︅︆︇︈︉︊︋︌︍︎️﻿";
 
+    private const string ReplacementCharacterText = "�";
+
     private const int HangulSyllableBase = 0xAC00;
 
     private const int HangulLeadingBase = 0x1100;
@@ -64,7 +66,7 @@ internal static class CurlUrlHostNameMapping
 
             if (Mappings.TryGetValue(character.Value, out string? mapping))
             {
-                mapped.Append(mapping);
+                mapped.Append(HasCharacterOutsideStd3Rules(mapping) ? ReplacementCharacterText : mapping);
             }
             else
             {
@@ -74,6 +76,14 @@ internal static class CurlUrlHostNameMapping
 
         return Compose(Decompose(mapped.ToString()));
     }
+
+    /// <summary>
+    /// Whether <paramref name="mapping" /> holds an ASCII character other than a letter, digit, hyphen
+    /// or dot (U+2100 maps to <c>a/c</c>, U+FDFA to text with spaces): libidn2 applies the STD3 rules
+    /// (<c>IDN2_USE_STD3_ASCII_RULES</c>) to what a character maps to and refuses the host (BL-4076).
+    /// </summary>
+    private static bool HasCharacterOutsideStd3Rules(string mapping) =>
+        mapping.Any(character => character < 0x80 && !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '.'));
 
     private static List<int> Decompose(string mapped)
     {

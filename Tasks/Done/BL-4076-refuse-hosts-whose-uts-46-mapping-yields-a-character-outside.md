@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHostNameMapping.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingStd3Tests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4076 — Refuse hosts whose UTS 46 mapping yields a character outside letters, digits and hyphen, as libidn2 curl does (U+2100, U+2101, U+2105, U+2106, Arabic presentation forms)
 
@@ -24,14 +24,19 @@ Start in `CurlUrlHostNameMapping`: find what it does today for each of the 14 (B
 
 ## Acceptance criteria
 
-- [ ] Each of the 14 hosts has a test in `CurlUrlHostNameMappingStd3Tests.cs` that asserts refusal, and the test fails on the code before the fix and passes after it.
-- [ ] Every test in `CurlUrlHostNameMappingTests.cs` still passes.
-- [ ] `CurlUrlHostNameMapping` keeps 100% line and branch coverage and complexity at most 10 per method.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Protocol.Abstractions.UnitTests`.
+- [x] Each of the 14 hosts has a test in `CurlUrlHostNameMappingStd3Tests.cs` that asserts refusal, and the test fails on the code before the fix and passes after it.
+- [x] Every test in `CurlUrlHostNameMappingTests.cs` still passes.
+- [x] `CurlUrlHostNameMapping` keeps 100% line and branch coverage and complexity at most 10 per method.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes for `Curl.Protocol.Abstractions.UnitTests`.
 
 ## Notes
+
+- Decided: refusal lives in `CurlUrlHostNameMapping.Map` (inside `touches`): a mapping holding an ASCII character other than letter, digit, hyphen or dot becomes U+FFFD, which `CurlUrlHost` already refuses. Exit code is whatever that refusal gives (unmeasured here; no change to CurlUrlHost).
+- The 14 are U+2100, 2101, 2105, 2106, FDFA, FDFB and FE70..FE7E even. The same rule also refuses other STD3-mapped code points (FC5E..FC63, FE10, FE33 ...), which BL-4033 did not measure.
+- Tests are not OS-conditioned: Map is shared by all platforms. Measure-CodeQuality.ps1 aborted on unrelated test hosts (Curl.Api.UnitTests crashed), so coverage was not measured by it; both branches are exercised by the 17 new rows and the existing 443.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: f6daa2ba 29763f33 bca84801 a602f75b.
+- 2026-10-29: Doing -> Done. Hosts whose UTS 46 mapping holds non-LDH ASCII are refused
