@@ -2022,7 +2022,7 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static void ReportAuthorizationLines(HttpRequestPlan plan)
     {
-        bool headerNamesAuthorization = HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
+        bool headerNamesAuthorization = plan.Options.AuthorizationHeaderWithheld || HttpRequestHeadFormatter.CustomHeadersOf(plan.Options.Headers, plan.Options).Any(header => header.Names("Authorization"));
         if (plan.ProxyAuthRequest is { } proxyRequest)
         {
             ReportInfoLines(plan.Context.Events, plan.ProxyAuthorizationInfoLines);

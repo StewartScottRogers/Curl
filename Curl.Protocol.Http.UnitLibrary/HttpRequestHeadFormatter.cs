@@ -144,7 +144,7 @@ internal static class HttpRequestHeadFormatter
         string? hostLine = FormatHostLine(url, options.FollowedToAnotherHost ? [] : customHeaders);
         AppendHostLine(head, hostLine);
         AppendUnlessOverridden(head, proxyHeaders, "Proxy-Authorization", proxyAuthorization);
-        AppendAuthorization(head, customHeaders, authorization, options.HttpSignature is not null);
+        AppendAuthorization(head, customHeaders, authorization, options);
         AppendUnlessOverridden(head, customHeaders, "Range", range);
         AppendUnlessOverridden(head, customHeaders, "Content-Range", framing.ContentRange);
         AppendClientHeaders(head, customHeaders, options);
@@ -421,11 +421,13 @@ internal static class HttpRequestHeadFormatter
     /// libcurl's <c>output_auth_headers</c> checks the custom headers for Basic and Bearer alone
     /// (measured, BL-986 Notes). An <c>--httpsig-*</c> request's value is whole header lines,
     /// <c>Signature-Input</c> then <c>Signature</c>, written in the same slot whatever the
-    /// <c>-H</c> values are, as curl 8.22.0's <c>output_auth_headers</c> does (BL-2182).
+    /// <c>-H</c> values are, as curl 8.22.0's <c>output_auth_headers</c> does (BL-2182). An
+    /// <c>-H</c> <c>Authorization</c> value withheld from a redirect to another host still
+    /// counts (<see cref="HttpRequestOptions.AuthorizationHeaderWithheld" />, CGR-076).
     /// </summary>
-    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization, bool isHttpSignature)
+    private static void AppendAuthorization(StringBuilder head, HttpCustomHeader[] customHeaders, string? authorization, HttpRequestOptions options)
     {
-        if (isHttpSignature)
+        if (options.HttpSignature is not null)
         {
             AppendLines(head, authorization);
         }
@@ -433,7 +435,7 @@ internal static class HttpRequestHeadFormatter
         {
             AppendAlways(head, "Authorization", authorization);
         }
-        else
+        else if (!options.AuthorizationHeaderWithheld)
         {
             AppendUnlessOverridden(head, customHeaders, "Authorization", authorization);
         }
