@@ -1,8 +1,8 @@
 # Curl.Extension.S3.UnitLibrary
 
-The S3 extension (ADR-0999, ADR-1013). Namespace `Curl.Extension.S3`. It references nothing but the base
-class library so far, and never `Curl.Protocol.Http` (whose `--aws-sigv4` code is curl's, not
-this extension's). The client flow (`Http/`, BL-4199) and the options arrive in later tasks.
+The S3 extension (ADR-0999, ADR-1013, ADR-1016). Namespace `Curl.Extension.S3`. It references the
+base class library and `Curl.Protocol.Abstractions` (for `IConnection`), and never `Curl.Protocol.Http`
+(whose `--aws-sigv4` code is curl's, not this extension's). The options arrive in later tasks.
 
 - `Xml/S3ListBucketResultParser`, `Xml/S3InitiateMultipartUploadResultParser` and
   `Xml/S3ErrorResponseParser` read the ListObjectsV2, CreateMultipartUpload and error response
@@ -12,6 +12,12 @@ this extension's). The client flow (`Http/`, BL-4199) and the options arrive in 
   its reason, never an exception. `Xml/S3XmlBody` holds the shared reading.
 - `Xml/S3CompleteMultipartUploadWriter` writes the CompleteMultipartUpload request body, parts in
   ascending part number, in the S3 namespace, with no declaration or indentation.
+
+- `Http/S3HttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection` (RFC 9112)
+  and returns an `S3HttpResponse` whose body is a stream framed by `Content-Length`, chunked or the
+  close; `ConnectionPersists` says whether the caller may mark the connection reusable once the body
+  is read. Every failure is an `S3HttpException` naming an `S3HttpFailure`. `Expect: 100-continue`
+  is not sent (ADR-1016).
 
 - `Signing/S3RequestSigner` signs a request with AWS Signature Version 4 as the Amazon S3 API
   reference "Authenticating Requests (AWS Signature Version 4)" says, for a payload in a single
