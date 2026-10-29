@@ -4,7 +4,7 @@ title: Extension: Open WebTransport sessions over HTTP/3
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4101]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4101, BL-4222, BL-4223]
 touches: [Curl.Extension.WebTransport.UnitLibrary, Curl.Extension.WebTransport.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- Lane 7 sizing pass (2026-10-29), before any code: an extension may use Curl.Quic, Curl.Http3 and Curl.HttpDatagram (shared layers) and dial QUIC through IConnector as DnsOverQuicResolver does, and Http3ClientSession already sends extra SETTINGS and reports SETTINGS_ENABLE_CONNECT_PROTOCOL; but Curl.Quic has no DATAGRAM frames (RFC 9221), so no HTTP/3 datagrams, and neither QuicConnection nor Http3ClientSession hands server-opened bidirectional or unknown-type unidirectional streams to a caller (draft-ietf-webtrans-http3 sections 4.2-4.3). Filed BL-4222 (QUIC datagrams) and BL-4223 (peer streams to the caller; depends on BL-4222) and requeued. BL-4144 (MASQUE) will need BL-4222 too.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 3b935d4c e17cc91f 35ce08fa bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4222 (QUIC DATAGRAM frames) and BL-4223 (HTTP/3 session hands server-opened streams to its caller)
