@@ -30,7 +30,7 @@ BL-4222 (ADR-1043) added the optional interface `IDatagramCarryingConnection` in
 ## Notes
 
 - Filed by BL-4222's lane 7 run, which checked the connector wrappers as its Context asked.
-- Chose the wrapper that always implements `IDatagramCarryingConnection` (ADR-1045): every real QUIC connection is a `QuicConnection`, which always implements it, so the wrapper answers as the bare connection does, and `SocketCallbackConnector` needs no change. Over a connection without datagrams it answers 0 and `InvalidOperationException` for send and receive.
+- Chose the wrapper that always implements `IDatagramCarryingConnection` (ADR-1050): every real QUIC connection is a `QuicConnection`, which always implements it, so the wrapper answers as the bare connection does, and `SocketCallbackConnector` needs no change. Over a connection without datagrams it answers 0 and `InvalidOperationException` for send and receive.
 - `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members. `dotnet build` clean; fast tests green on Windows. Tests use no file system, path or platform-specific text, so they are platform-neutral.
 
 ## Log

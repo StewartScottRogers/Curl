@@ -11,7 +11,7 @@ namespace Curl.Engine;
 /// libcurl's <c>Curl_socket_close</c> does for <c>cf-ngtcp2</c>'s socket (ADR-0610, BL-2474). It
 /// carries datagrams as <paramref name="inner" /> does: over an <see cref="IDatagramCarryingConnection" /> it forwards
 /// to it, and over any other connection it answers as a peer that accepts none, so a caller cannot tell it apart from
-/// the bare QUIC connection (ADR-1045, BL-4254).
+/// the bare QUIC connection (ADR-1050, BL-4254).
 /// </summary>
 /// <param name="inner">The QUIC connection opened.</param>
 /// <param name="closer">Calls the close-socket callback once for the socket.</param>

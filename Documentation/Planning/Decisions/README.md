@@ -1082,4 +1082,4 @@ Each option and the specific reason it lost.
 | [1047](ADR-1047-the-coap-extension-follows-rfc-7252-and-maps-error-codes-as-http-does.md) | The CoAP extension follows RFC 7252 and maps 4.xx and 5.xx codes as HTTP error statuses are mapped (BL-4246) | Accepted | 2026-10-29 |
 | [1048](ADR-1048-an-extension-scheme-hook-serves-curls-own-schemes-in-place-of-curls-handler.md) | An extension scheme hook serves curl's own schemes in place of curl's handler (BL-4195) | Accepted | 2026-10-29 |
 | [1049](ADR-1049-the-mqtt5-client-follows-curls-mqtt-flow-and-ends-a-failure-reason-code-as-a-weird-server-reply.md) | The MQTT 5 client follows curl's mqtt:// flow and ends a failure reason code as a weird server reply (BL-4243) | Accepted | 2026-10-29 |
-| [1045](ADR-1045-the-socket-callback-quic-wrapper-always-carries-datagrams.md) | The socket-callback QUIC wrapper always carries datagrams (BL-4254) | Accepted | 2026-10-29 |
+| [1050](ADR-1050-the-socket-callback-quic-wrapper-always-carries-datagrams.md) | The socket-callback QUIC wrapper always carries datagrams (BL-4254) | Accepted | 2026-10-29 |

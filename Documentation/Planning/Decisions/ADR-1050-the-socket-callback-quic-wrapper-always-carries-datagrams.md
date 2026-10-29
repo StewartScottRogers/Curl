@@ -1,4 +1,4 @@
-# ADR-1045: The socket-callback QUIC wrapper always carries datagrams
+# ADR-1050: The socket-callback QUIC wrapper always carries datagrams
 
 - Status: Accepted
 - Date: 2026-10-29
