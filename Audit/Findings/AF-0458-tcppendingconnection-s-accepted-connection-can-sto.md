@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpPendingConnection.cs:NetworkStream-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpPendingConnection.cs:99:true
-task: none
-tasks:
+task: BL-4181
+tasks: BL-4181
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md

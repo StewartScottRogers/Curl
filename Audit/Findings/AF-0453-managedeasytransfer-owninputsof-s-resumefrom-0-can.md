@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:OwnInputsOf-gt:surviving-mutant
 reproduction: mutation Curl.Engine.UnitLibrary/ManagedEasyTransfer.SetUp.cs:150:>
-task: none
-tasks:
+task: BL-4176
+tasks: BL-4176
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md

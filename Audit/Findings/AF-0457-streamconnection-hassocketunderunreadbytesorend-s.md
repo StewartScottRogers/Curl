@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Networking.UnitLibrary/StreamConnection.cs:HasSocketUnderUnreadBytesOrEnd-or:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/StreamConnection.cs:77:||
-task: none
-tasks:
+task: BL-4180
+tasks: BL-4180
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md

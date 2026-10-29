@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: conformance:Curl.Console/ToolEasyHandle.cs:IgnoredWhenNotBuiltIn:exit-code
 reproduction: none
-task: none
-tasks:
+task: BL-4182
+tasks: BL-4182
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
