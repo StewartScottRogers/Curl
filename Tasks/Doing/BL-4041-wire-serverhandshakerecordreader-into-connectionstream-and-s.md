@@ -33,3 +33,4 @@ Split from BL-3997 (over its cost cap). BL-3997's design: the reader sees bytes 
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 155a8ca0 fffcbc05 3d836d5e.
