@@ -105,7 +105,9 @@ public sealed partial class Cgr034Tests
         (_, running) = await multi.SocketActionAsync(socket!.Value, CurlSocketSelect.Out, CancellationToken.None);
         for (int step = 0; running > 0 && step < 100; step++)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(timer, 10)));
+            // Past the deadline the timer named, not on it (BL-4082): a Windows timer can wake a few milliseconds early,
+            // and the engine then tells the few left as a fresh short timeout before the transfer times out.
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(timer, 0) + 100));
             (_, running) = await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
         }
 
