@@ -9,7 +9,7 @@ namespace Curl.Networking;
 /// <summary>
 /// Turns what a hand-built handshake's <see cref="TlsHandshakeMessageObserver" /> is told into
 /// the OpenSSL build's <see cref="TlsMessageEvent" />s, which <c>-v</c> words as OpenSSL's
-/// message callback trace (ADR-0982, BL-4009). OpenSSL's callback carries the connection's
+/// message callback trace (ADR-0983, BL-4009). OpenSSL's callback carries the connection's
 /// version, not the record's: the highest version offered until the server answers, the
 /// negotiated one from the server's first message on. That version is known only once the
 /// handshake ends, so the messages are held until <see cref="ReportHeld" />, and every message

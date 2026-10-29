@@ -413,7 +413,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     }
 
     // The ClientHello's highest version, which OpenSSL's message callback names until the
-    // server answers (ADR-0982).
+    // server answers (ADR-0983).
     private int OfferedWireVersion => OffersTls13 ? 0x0304 : (int)ClientSettings.Tls12Maximum(_options);
 
     private IReadOnlyList<string> OfferedApplicationProtocols(IReadOnlyList<string> applicationProtocols) =>

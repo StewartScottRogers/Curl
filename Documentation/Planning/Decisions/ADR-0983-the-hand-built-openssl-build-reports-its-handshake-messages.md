@@ -1,4 +1,4 @@
-# ADR-0982: The hand-built client's OpenSSL build reports every handshake message, its group and the peer signature type
+# ADR-0983: The hand-built client's OpenSSL build reports every handshake message, its group and the peer signature type
 
 - Status: Accepted
 - Date: 2026-10-28

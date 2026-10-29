@@ -8,7 +8,7 @@ namespace Curl.Networking;
 /// Names a hand-built handshake's negotiated group and the server's signature type as curl's
 /// OpenSSL build prints them on its <c>SSL connection using</c> line: the group as
 /// <c>SSL_get0_group_name</c> names it, the signature type as
-/// <c>OBJ_nid2sn(SSL_get_peer_signature_type_nid)</c> does (ADR-0982, BL-4009).
+/// <c>OBJ_nid2sn(SSL_get_peer_signature_type_nid)</c> does (ADR-0983, BL-4009).
 /// </summary>
 internal static class OpenSslHandshakeNames
 {

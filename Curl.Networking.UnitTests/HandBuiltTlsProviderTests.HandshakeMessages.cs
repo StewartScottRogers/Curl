@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Networking;
 
 /// <summary>
-/// The OpenSSL build's handshake message trace (BL-4009, ADR-0982): one
+/// The OpenSSL build's handshake message trace (BL-4009, ADR-0983): one
 /// <see cref="TlsMessageEvent" /> per handshake message and change_cipher_spec the hand-built
 /// client sends or receives, in wire order, and the negotiated group and peer signature type
 /// on the <see cref="TlsHandshakeEvent" />.
