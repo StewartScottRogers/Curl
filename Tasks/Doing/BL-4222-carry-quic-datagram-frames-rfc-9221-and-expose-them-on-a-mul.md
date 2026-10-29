@@ -34,3 +34,4 @@ Found by BL-4113 (WebTransport extension), which needs HTTP/3 datagrams (RFC 929
 ## Log
 
 - 2026-10-29: Created by BL-4113's lane 7 run as its prerequisite.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 7c3a7b75 b0eb394b ffb316e0 7751c039 478f867b 3d836d5e.
