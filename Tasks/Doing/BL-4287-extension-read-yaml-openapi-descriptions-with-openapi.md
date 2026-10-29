@@ -32,3 +32,4 @@ BL-4107 added `Curl.Extension.OpenApi.UnitLibrary` (ADR-1083), which reads JSON 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: f2752b60 6fb3b176 6543a87b 3d836d5e.
