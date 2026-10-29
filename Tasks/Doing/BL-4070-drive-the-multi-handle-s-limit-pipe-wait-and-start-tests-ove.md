@@ -36,3 +36,4 @@ Drive them over a wrapped `ManagedEasyTransfer` (as `ManagedMultiTransferTests.S
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a082df36 779790c0.
