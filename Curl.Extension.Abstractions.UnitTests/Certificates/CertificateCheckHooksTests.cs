@@ -134,6 +134,16 @@ public sealed class CertificateCheckHooksTests
     }
 
     [TestMethod]
+    public void TlsProviderOver_VerifyServerCertificateChain_ReturnsTheInnerProvidersVerdict()
+    {
+        ITlsProvider checking = HooksOf(new ExampleHook(Dane, null)).TlsProviderOver(new FixedTlsProvider(ConnectResult.Connected(new TrackedConnection())));
+
+        ServerCertificateChainVerdict verdict = checking.VerifyServerCertificateChain([new byte[] { 1 }], "mail.example.com");
+
+        Assert.AreSame(FixedTlsProvider.ChainVerdict, verdict);
+    }
+
+    [TestMethod]
     public async Task TlsProviderOver_WithAHookRefusingAnUpgradeCurlAccepted_FailsWithExit60()
     {
         TrackedConnection connection = new();
@@ -218,6 +228,10 @@ public sealed class CertificateCheckHooksTests
 
     private sealed class FixedTlsProvider(ConnectResult result) : ITlsProvider
     {
+        public static ServerCertificateChainVerdict ChainVerdict { get; } = ServerCertificateChainVerdict.Rejected(CurlExitCode.PeerFailedVerification, "inner verdict");
+
+        public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) => ChainVerdict;
+
         public bool GivenEvents { get; private set; }
 
         public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) => ValueTask.FromResult(result);

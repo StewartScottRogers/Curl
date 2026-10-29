@@ -19,4 +19,8 @@ internal sealed class CertificateCheckingTlsProvider(ITlsProvider inner, Certifi
     /// <inheritdoc />
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, IReadOnlyList<string> applicationProtocols, CancellationToken cancellationToken) =>
         await hooks.CheckedAsync(await inner.AuthenticateAsClientAsync(plaintext, targetHost, events, applicationProtocols, cancellationToken).ConfigureAwait(false), targetHost, handshook: true, cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public ServerCertificateChainVerdict VerifyServerCertificateChain(IReadOnlyList<ReadOnlyMemory<byte>> certificates, string targetHost) =>
+        inner.VerifyServerCertificateChain(certificates, targetHost);
 }

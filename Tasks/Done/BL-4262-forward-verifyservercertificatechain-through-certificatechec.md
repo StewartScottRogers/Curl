@@ -8,7 +8,7 @@ depends-on: [BL-4249]
 touches: [Curl.Extension.Abstractions.UnitLibrary/Certificates/CertificateCheckingTlsProvider.cs, Curl.Extension.Abstractions.UnitTests/Certificates]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4262 — Forward VerifyServerCertificateChain through CertificateCheckingTlsProvider
 
@@ -22,12 +22,15 @@ Found by BL-4249 (ADR-1052): CertificateCheckingTlsProvider wraps the engine's p
 
 ## Acceptance criteria
 
-- [ ] CertificateCheckingTlsProvider.VerifyServerCertificateChain returns the inner provider's verdict, shown by a unit test.
-- [ ] dotnet build is clean and the fast tests pass.
+- [x] CertificateCheckingTlsProvider.VerifyServerCertificateChain returns the inner provider's verdict, shown by a unit test.
+- [x] dotnet build is clean and the fast tests pass.
 
 ## Notes
+
+Decision: the hooks do not judge a chain handed to VerifyServerCertificateChain; they check handshakes only (ADR-1016), so the method forwards inner's verdict unchanged.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: e36dcc8b 5ea3895a.
+- 2026-10-29: Doing -> Done. Forwarded VerifyServerCertificateChain to the inner provider, with a unit test
