@@ -8,14 +8,16 @@ namespace Curl.Http3;
 /// peer's unidirectional streams in the background (SETTINGS and GOAWAY from its control
 /// stream, its QPACK encoder and decoder instructions), and opens request streams. The QPACK
 /// encoder and decoder use a dynamic table of capacity zero. It writes no text: a peer stream
-/// failure is kept as <see cref="ConnectionError" />, and every frame read from the peer's
-/// control stream is handed to the caller's callback.
+/// failure is kept as <see cref="ConnectionError" />, every frame read from the peer's
+/// control stream is handed to the caller's callback, and so, when the caller asks for them,
+/// is every stream the peer opens that HTTP/3 itself does not use.
 /// </summary>
 public sealed class Http3ClientSession : IAsyncDisposable
 {
     private const int QpackStreamBufferSize = 4096;
     private readonly IReadOnlyList<Http3Setting> localSettings;
     private readonly Action<Http3Frame>? controlFrameReceived;
+    private readonly Func<Http3UnknownPeerStream, bool>? unknownPeerStreamReceived;
     private readonly List<IMultiplexedStream> openedStreams = [];
     private readonly List<IMultiplexedStream> acceptedStreams = [];
     private readonly Http3PeerUnidirectionalStreams peerStreamTypes = new();
@@ -39,13 +41,23 @@ public sealed class Http3ClientSession : IAsyncDisposable
     /// Called with every frame read from the peer's control stream (SETTINGS, GOAWAY and the
     /// rest), on the reading task; <see langword="null" /> when the caller needs none.
     /// </param>
-    public Http3ClientSession(IMultiplexedConnection connection, IReadOnlyList<Http3Setting> localSettings, Action<Http3Frame>? controlFrameReceived = null)
+    /// <param name="unknownPeerStreamReceived">
+    /// Called, on the reading task, with every unidirectional stream of an unknown or grease type
+    /// the peer opens and, when <paramref name="connection" /> is an
+    /// <see cref="IPeerBidirectionalStreamAccepting" />, every bidirectional stream it opens; it
+    /// returns whether it took the stream, which the session otherwise stops with
+    /// <c>H3_STREAM_CREATION_ERROR</c>. The session disposes every such stream with itself.
+    /// <see langword="null" />, the default, discards unknown unidirectional streams as RFC 9114
+    /// section 6.2 allows and accepts no bidirectional streams.
+    /// </param>
+    public Http3ClientSession(IMultiplexedConnection connection, IReadOnlyList<Http3Setting> localSettings, Action<Http3Frame>? controlFrameReceived = null, Func<Http3UnknownPeerStream, bool>? unknownPeerStreamReceived = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(localSettings);
         Connection = connection;
         this.localSettings = localSettings;
         this.controlFrameReceived = controlFrameReceived;
+        this.unknownPeerStreamReceived = unknownPeerStreamReceived;
         PeerStreamsReading = ReadPeerStreamsAsync(stopReadingPeerStreams.Token);
     }
 
@@ -58,7 +70,7 @@ public sealed class Http3ClientSession : IAsyncDisposable
     /// <summary>Gets the QPACK decoder for response field sections (dynamic table capacity zero).</summary>
     public QpackDecoder Decoder { get; } = new(maximumTableCapacity: 0, maximumBlockedStreams: 0);
 
-    /// <summary>Gets the task reading the peer's unidirectional streams; it ends when the session is disposed or fails.</summary>
+    /// <summary>Gets the task reading the streams the peer opens; it ends when the session is disposed or fails.</summary>
     public Task PeerStreamsReading { get; }
 
     /// <summary>Gets the peer's SETTINGS, or <see langword="null" /> before they arrive.</summary>
@@ -188,14 +200,31 @@ public sealed class Http3ClientSession : IAsyncDisposable
 
     private async Task ReadPeerStreamsAsync(CancellationToken cancellationToken)
     {
+        Task bidirectional = unknownPeerStreamReceived is not null && Connection is IPeerBidirectionalStreamAccepting accepting
+            ? AcceptPeerStreamsAsync(accepting.AcceptBidirectionalStreamAsync, OfferPeerBidirectionalStreamAsync, cancellationToken)
+            : Task.CompletedTask;
+        await AcceptPeerStreamsAsync(Connection.AcceptUnidirectionalStreamAsync, ReadPeerStreamAsync, cancellationToken).ConfigureAwait(false);
+        await bidirectional.ConfigureAwait(false);
+        if (ConnectionError is not null)
+        {
+            await CloseAsync(connectionErrorCode).ConfigureAwait(false);
+        }
+    }
+
+    private async Task AcceptPeerStreamsAsync(Func<CancellationToken, ValueTask<IMultiplexedStream>> accept, Func<IMultiplexedStream, CancellationToken, Task> read, CancellationToken cancellationToken)
+    {
         List<Task> readers = [];
         try
         {
             while (true)
             {
-                IMultiplexedStream stream = await Connection.AcceptUnidirectionalStreamAsync(cancellationToken).ConfigureAwait(false);
-                acceptedStreams.Add(stream);
-                readers.Add(ReadPeerStreamAsync(stream, cancellationToken));
+                IMultiplexedStream stream = await accept(cancellationToken).ConfigureAwait(false);
+                lock (gate)
+                {
+                    acceptedStreams.Add(stream);
+                }
+
+                readers.Add(read(stream, cancellationToken));
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -212,19 +241,50 @@ public sealed class Http3ClientSession : IAsyncDisposable
         }
 
         await Task.WhenAll(readers).ConfigureAwait(false);
-        if (ConnectionError is not null)
+    }
+
+    private async Task OfferPeerBidirectionalStreamAsync(IMultiplexedStream stream, CancellationToken cancellationToken)
+    {
+        try
         {
-            await CloseAsync(connectionErrorCode).ConfigureAwait(false);
+            long? signal = await Http3StreamReading.ReadVariableLengthIntegerAsync(new Http3MultiplexedStreamAdapter(stream), cancellationToken).ConfigureAwait(false);
+            OfferOrStop(stream, isBidirectional: true, signal);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The session is disposed, or a connection error stopped it.
+        }
+        catch (MultiplexedConnectionFailedException)
+        {
+            // The connection is lost; the request stream reports it.
+        }
+        catch (MultiplexedStreamResetException)
+        {
+            // Before its first integer arrived there is nothing to offer.
+        }
+        catch (EndOfStreamException)
+        {
+            // It ended inside its first integer.
+            stream.Abort((long)Http3ErrorCode.StreamCreationError);
+        }
+    }
+
+    // Hands a stream HTTP/3 does not use to the caller, or stops it when nobody takes it.
+    private void OfferOrStop(IMultiplexedStream stream, bool isBidirectional, long? type)
+    {
+        if (type is not { } known || unknownPeerStreamReceived?.Invoke(new Http3UnknownPeerStream(stream, isBidirectional, known)) != true)
+        {
+            stream.Abort((long)Http3ErrorCode.StreamCreationError);
         }
     }
 
     private async Task ReadPeerStreamAsync(IMultiplexedStream stream, CancellationToken cancellationToken)
     {
         Http3MultiplexedStreamAdapter peer = new(stream);
-        Http3UnidirectionalStreamType? type = null;
+        long? type = null;
         try
         {
-            type = await peerStreamTypes.AcceptAsync(peer, cancellationToken).ConfigureAwait(false);
+            type = await peerStreamTypes.ReadTypeAsync(peer, cancellationToken).ConfigureAwait(false);
             await ReadPeerStreamOfTypeAsync(stream, peer, type, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -241,7 +301,7 @@ public sealed class Http3ClientSession : IAsyncDisposable
         }
         catch (MultiplexedStreamResetException)
         {
-            Fail(new Http3Exception(Http3ErrorCode.ClosedCriticalStream, $"the server reset its {type} stream"), (long)Http3ErrorCode.ClosedCriticalStream);
+            Fail(new Http3Exception(Http3ErrorCode.ClosedCriticalStream, $"the server reset its {(Http3UnidirectionalStreamType)type.GetValueOrDefault()} stream"), (long)Http3ErrorCode.ClosedCriticalStream);
         }
         catch (Http3Exception error)
         {
@@ -253,21 +313,21 @@ public sealed class Http3ClientSession : IAsyncDisposable
         }
     }
 
-    private Task ReadPeerStreamOfTypeAsync(IMultiplexedStream stream, Stream peer, Http3UnidirectionalStreamType? type, CancellationToken cancellationToken)
+    private Task ReadPeerStreamOfTypeAsync(IMultiplexedStream stream, Stream peer, long? type, CancellationToken cancellationToken)
     {
         byte[] buffer = new byte[QpackStreamBufferSize];
         switch (type)
         {
-            case Http3UnidirectionalStreamType.Control:
+            case (long)Http3UnidirectionalStreamType.Control:
                 Http3ControlStreamReader reader = new(peer);
                 controlStream = reader;
                 return ReadUntilFailureAsync(async () => ReportControlFrame(await reader.ReadFrameAsync(cancellationToken).ConfigureAwait(false)));
-            case Http3UnidirectionalStreamType.QpackEncoder:
+            case (long)Http3UnidirectionalStreamType.QpackEncoder:
                 return ReadUntilFailureAsync(async () => await Http3PeerQpackStreams.ReadEncoderStreamAsync(peer, Decoder, buffer, cancellationToken).ConfigureAwait(false));
-            case Http3UnidirectionalStreamType.QpackDecoder:
+            case (long)Http3UnidirectionalStreamType.QpackDecoder:
                 return ReadUntilFailureAsync(async () => await Http3PeerQpackStreams.ReadDecoderStreamAsync(peer, Encoder, buffer, cancellationToken).ConfigureAwait(false));
-            default: // unknown or grease: RFC 9114 section 6.2 lets the client stop reading it
-                stream.Abort((long)Http3ErrorCode.StreamCreationError);
+            default: // unknown or grease: the caller may take it, or RFC 9114 section 6.2 lets the client stop reading it
+                OfferOrStop(stream, isBidirectional: false, type);
                 return Task.CompletedTask;
         }
     }

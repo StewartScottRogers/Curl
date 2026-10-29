@@ -208,6 +208,89 @@ public sealed class Http3ClientSessionTests
     }
 
     [TestMethod]
+    public async Task PeerStreams_UnknownTypesWithCallback_TakenReachItAfterTheirTypeAndDeclinedAreStopped()
+    {
+        InMemoryMultiplexedConnection connection = new();
+        InMemoryMultiplexedStream webTransport = connection.AddPeerStream(0x40, 0x54, 0x07);
+        InMemoryMultiplexedStream grease = connection.AddPeerStream(0x21);
+        connection.FailAccepting(new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "lost"));
+        List<Http3UnknownPeerStream> offered = [];
+        Http3ClientSession session = new(connection, LocalSettings, unknownPeerStreamReceived: stream => Offer(offered, stream, takenType: 0x54));
+
+        await session.PeerStreamsReading;
+        byte[] next = new byte[1];
+        int read = await webTransport.ReadAsync(next, CancellationToken.None);
+        await session.DisposeAsync();
+
+        CollectionAssert.AreEqual(new (IMultiplexedStream, bool, long)[] { (grease, false, 0x21L), (webTransport, false, 0x54L) }, Sorted(offered));
+        Assert.AreEqual((1, (byte)0x07), (read, next[0]));
+        Assert.IsNull(webTransport.AbortedWith);
+        Assert.AreEqual((long)Http3ErrorCode.StreamCreationError, grease.AbortedWith);
+        Assert.IsTrue(webTransport.IsDisposed);
+        Assert.IsNull(session.ConnectionError);
+    }
+
+    [TestMethod]
+    public async Task PeerStreams_WithoutCallback_StopsUnknownTypeAndAcceptsNoBidirectionalStream()
+    {
+        InMemoryPeerBidirectionalConnection connection = new();
+        InMemoryMultiplexedStream webTransport = connection.Inner.AddPeerStream(0x40, 0x54);
+        InMemoryMultiplexedStream bidirectional = connection.AddPeerBidirectionalStream(0x40, 0x41);
+        connection.Inner.FailAccepting(new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "lost"));
+        Http3ClientSession session = new(connection, LocalSettings);
+
+        await session.PeerStreamsReading;
+        await session.DisposeAsync();
+
+        Assert.AreEqual((long)Http3ErrorCode.StreamCreationError, webTransport.AbortedWith);
+        Assert.AreEqual(0, connection.BidirectionalAccepts);
+        Assert.IsFalse(bidirectional.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task PeerStreams_BidirectionalWithCallback_TakenReachItAfterTheirSignalAndOthersAreStopped()
+    {
+        InMemoryPeerBidirectionalConnection connection = new();
+        InMemoryMultiplexedStream signalled = connection.AddPeerBidirectionalStream(0x40, 0x41, 0x00);
+        InMemoryMultiplexedStream declined = connection.AddPeerBidirectionalStream(0x05);
+        InMemoryMultiplexedStream empty = connection.AddPeerBidirectionalStream();
+        empty.EndReceiving();
+        InMemoryMultiplexedStream cutShort = connection.AddPeerBidirectionalStream(0x40);
+        cutShort.EndReceiving();
+        connection.AddPeerBidirectionalStream().FailReceiving(new MultiplexedStreamResetException(0x100, "reset"));
+        connection.AddPeerBidirectionalStream().FailReceiving(new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "lost"));
+        connection.FailAcceptingBidirectional(new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "lost"));
+        connection.Inner.FailAccepting(new MultiplexedConnectionFailedException(CurlExitCode.RecvError, "lost"));
+        List<Http3UnknownPeerStream> offered = [];
+        Http3ClientSession session = new(connection, LocalSettings, unknownPeerStreamReceived: stream => Offer(offered, stream, takenType: 0x41));
+
+        await session.PeerStreamsReading;
+        await session.DisposeAsync();
+
+        CollectionAssert.AreEqual(new (IMultiplexedStream, bool, long)[] { (declined, true, 0x05L), (signalled, true, 0x41L) }, Sorted(offered));
+        Assert.IsNull(signalled.AbortedWith);
+        CollectionAssert.AreEqual(Enumerable.Repeat<long?>((long)Http3ErrorCode.StreamCreationError, 3).ToArray(), new[] { declined.AbortedWith, empty.AbortedWith, cutShort.AbortedWith });
+        Assert.IsTrue(signalled.IsDisposed);
+        Assert.IsNull(session.ConnectionError);
+    }
+
+    [TestMethod]
+    public async Task DisposeAsync_BidirectionalStreamWaitingForItsSignal_StopsReadingIt()
+    {
+        InMemoryPeerBidirectionalConnection connection = new();
+        InMemoryMultiplexedStream waiting = connection.AddPeerBidirectionalStream();
+        List<Http3UnknownPeerStream> offered = [];
+        Http3ClientSession session = new(connection, LocalSettings, unknownPeerStreamReceived: stream => Offer(offered, stream, takenType: 0x41));
+
+        await session.DisposeAsync();
+
+        Assert.IsEmpty(offered);
+        Assert.IsNull(waiting.AbortedWith);
+        Assert.IsTrue(waiting.IsDisposed);
+        Assert.AreEqual((long)Http3ErrorCode.NoError, connection.Inner.ClosedWith);
+    }
+
+    [TestMethod]
     public async Task DisposeAsync_WhileReading_StopsAndClosesWithNoError()
     {
         InMemoryMultiplexedConnection connection = new();
@@ -221,6 +304,19 @@ public sealed class Http3ClientSessionTests
         Assert.IsTrue(connection.BidirectionalStreams[0].IsDisposed);
         Assert.IsTrue(connection.UnidirectionalStreams[0].IsDisposed);
     }
+
+    private static bool Offer(List<Http3UnknownPeerStream> offered, Http3UnknownPeerStream stream, long takenType)
+    {
+        lock (offered)
+        {
+            offered.Add(stream);
+        }
+
+        return stream.Type == takenType;
+    }
+
+    private static (IMultiplexedStream Stream, bool IsBidirectional, long Type)[] Sorted(List<Http3UnknownPeerStream> offered) =>
+        [.. offered.OrderBy(stream => stream.Type).Select(stream => (stream.Stream, stream.IsBidirectional, stream.Type))];
 
     private static async Task<(Http3ClientSession Session, List<Http3Frame> Frames)> SessionWithControlStreamAsync(string controlHex, int frameCount = 1)
     {
