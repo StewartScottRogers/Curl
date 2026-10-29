@@ -5,7 +5,7 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests/StandardInputUploadEarlyResponseTests.cs, Curl.Console.UnitTests/StandardInputUploadTwiceAcrossNextTests.cs]
+touches: [Record-CurlExchange.ps1, Curl.Protocol.Http.UnitLibrary, Curl.Protocol.Http.UnitTests/StandardInputUploadEarlyResponseTests.cs, Curl.Console.UnitTests/StandardInputUploadTwiceAcrossNextTests.cs]
 requirement: none
 created: 2026-10-26
 completed:
@@ -19,6 +19,8 @@ completed:
 ## Context
 
 Found by BL-3546 (CGR-017) while measuring stdin repros with Record-CurlExchange.ps1 (-Response twice, Connection: close, -StandardInput abc). Real curl sends both PUT heads (chunked, Expect: 100-continue); the server answers /a before the body, curl does not consume stdin there, and the second PUT carries `3\r\nabc\r\n0\r\n\r\n`. Curl sends both heads and no body at all: stdin appears consumed (or the upload abandoned) by the first transfer. Exit codes and stdout match (0). The report notes `-T -` twice as not failing; this is a bytes-on-the-wire difference only. Where the stdin upload is read and abandoned on an early final response is not yet pinned: start in Curl.Protocol.Http.UnitLibrary and narrow `touches` once found.
+
+Unblocked 2026-10-29 (decided by Claude under Stewart's delegation): the first attempt stopped because real curl's answer varied with timing. Start by making the repro deterministic: extend `Record-CurlExchange.ps1` with a mode that holds the early `200` until curl's `Expect: 100-continue` wait has expired (curl's default is 1 s), so curl has begun sending the body before the answer arrives, then measure real curl several times in that mode. If real curl then gives one stable answer, pin it and fix Curl to match. If it still varies, record the runs in Notes and complete the task as not reproducible: a byte difference that curl itself does not hold steady is not a drop-in gap.
 
 ## Acceptance criteria
 
@@ -35,3 +37,4 @@ Found by BL-3546 (CGR-017) while measuring stdin repros with Record-CurlExchange
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 84b47d48 0ee60237 779790c0.
 - 2026-10-28: Doing -> Blocked. Stewart: BL-3827 does not reproduce: real curl 8.22.0 varies run to run on the early-response -T - PUT, and Curl matches it where it is stable; can it be closed as not reproducible?
+- 2026-10-29: Blocked -> Backlog. Unblocked by Stewart; first make the repro deterministic with a held-200 recorder mode, else close as not reproducible
