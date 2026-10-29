@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.HttpCache;
 
 /// <summary>
-/// The <c>--cache-dir</c> transfer hook (ADR-1063), a private cache (RFC 9111 §1). A cacheable GET whose
+/// The <c>--cache-dir</c> transfer hook (ADR-1069), a private cache (RFC 9111 §1). A cacheable GET whose
 /// stored response is fresh (§4.2) is answered from the directory without contacting the origin. Otherwise
 /// the request goes out, conditional on the stored response's validators when there is one (§4.3.1); a 304
 /// that selects it (§4.3.3) updates it (§4.3.4) and the stored response is written in the 304's place; any

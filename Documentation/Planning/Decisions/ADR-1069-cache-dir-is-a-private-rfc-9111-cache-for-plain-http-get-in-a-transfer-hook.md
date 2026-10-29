@@ -1,4 +1,4 @@
-# ADR-1063 — `--cache-dir` is a private RFC 9111 cache for plain HTTP GET, in a transfer hook
+# ADR-1069 — `--cache-dir` is a private RFC 9111 cache for plain HTTP GET, in a transfer hook
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

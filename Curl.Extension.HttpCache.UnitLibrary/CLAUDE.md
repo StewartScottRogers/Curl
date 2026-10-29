@@ -4,7 +4,7 @@ The HTTP cache extension's RFC 9111 core (ADR-0999, ADR-1020). Namespace `Curl.E
 It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings.
 
 - `HttpCacheExtension` gives the `--cache-dir <dir>` option, its description and its hook activator, which
-  `Curl.Extension.Composition` registers (ADR-1063).
+  `Curl.Extension.Composition` registers (ADR-1069).
 - `HttpCacheTransferHook` answers a fresh stored response without the origin (§4.2), revalidates a stale one
   and writes it in place of a 304 that selects it (§4.3), and stores what §3 allows; `CacheableRequest`
   decides which transfers it handles (plain GET of the whole resource) and `StoredResponseOutput` writes a

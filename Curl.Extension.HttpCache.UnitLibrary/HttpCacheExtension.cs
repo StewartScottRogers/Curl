@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.HttpCache;
 
 /// <summary>
-/// The <c>--cache-dir</c> extension (ADR-1063): a private HTTP cache on disk (RFC 9111) that stores responses,
+/// The <c>--cache-dir</c> extension (ADR-1069): a private HTTP cache on disk (RFC 9111) that stores responses,
 /// answers from a fresh one and revalidates a stale one with its <c>ETag</c> and <c>Last-Modified</c>.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>
