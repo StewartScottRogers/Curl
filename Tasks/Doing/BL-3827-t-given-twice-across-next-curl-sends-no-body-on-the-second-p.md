@@ -38,3 +38,4 @@ Unblocked 2026-10-29 (decided by Claude under Stewart's delegation): the first a
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 84b47d48 0ee60237 779790c0.
 - 2026-10-28: Doing -> Blocked. Stewart: BL-3827 does not reproduce: real curl 8.22.0 varies run to run on the early-response -T - PUT, and Curl matches it where it is stable; can it be closed as not reproducible?
 - 2026-10-29: Blocked -> Backlog. Unblocked by Stewart; first make the repro deterministic with a held-200 recorder mode, else close as not reproducible
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 84b47d48 0ee60237 779790c0.
