@@ -1,5 +1,5 @@
 ---
-id: BL-4022
+id: BL-4026
 title: Let a ConnectTarget name its TLS SNI host and ask for system-store-only trust (needed by CGR-289)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4022 — Let a ConnectTarget name its TLS SNI host and ask for system-store-only trust (needed by CGR-289)
+# BL-4026 — Let a ConnectTarget name its TLS SNI host and ask for system-store-only trust (needed by CGR-289)
 
 ## Goal
 
