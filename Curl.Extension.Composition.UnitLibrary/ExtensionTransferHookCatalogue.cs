@@ -21,5 +21,6 @@ public static class ExtensionTransferHookCatalogue
         Coap.Observe.CoapObserveTransferHook.ActivatedBy,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.HookFor,
         Curl.Extension.HttpCache.HttpCacheExtension.HookFor,
+        OAuth2.Options.OAuth2Options.ActivatedBy,
     ];
 }

@@ -25,5 +25,15 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverQuicOption,
         HttpFile.HttpFileOptions.File,
         HttpFile.HttpFileOptions.Environment,
+        OAuth2.Options.OAuth2Options.ClientCredentials,
+        OAuth2.Options.OAuth2Options.Device,
+        OAuth2.Options.OAuth2Options.Pkce,
+        OAuth2.Options.OAuth2Options.ClientId,
+        OAuth2.Options.OAuth2Options.ClientSecret,
+        OAuth2.Options.OAuth2Options.Scope,
+        OAuth2.Options.OAuth2Options.DeviceUrl,
+        OAuth2.Options.OAuth2Options.AuthorizeUrl,
+        OAuth2.Options.OAuth2Options.RedirectPort,
+        OAuth2.Options.OAuth2Options.TokenCache,
     ];
 }

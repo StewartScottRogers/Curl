@@ -1,8 +1,9 @@
 # Curl.Extension.OAuth2.UnitLibrary
 
-The OAuth2 extension (ADR-0999, ADR-1025). Namespace `Curl.Extension.OAuth2`. It references the
-base class library and `Curl.Protocol.Abstractions`. Not registered in the extension catalogue yet:
-the options and the transfer hook arrive in BL-4161.
+The OAuth2 extension (ADR-0999, ADR-1025, ADR-1066). Namespace `Curl.Extension.OAuth2`. It references
+the base class library, `Curl.Protocol.Abstractions` and `Curl.Extension.Abstractions`. It adds no URL
+scheme, so it has no line in `ExtensionCatalogue.cs`; its options, description and transfer hook have
+lines in the option, description and transfer hook catalogues.
 
 `Wire/` writes and reads every message of the client credentials, authorization code with PKCE and
 device authorization flows:
@@ -51,6 +52,16 @@ a token, a refusal or `expires_in` (RFC 8628). `OAuth2AuthorizationCodeFlow` lis
 redirect (`OAuth2RedirectReceiver`, `OAuth2Redirect`), checks its `state` and exchanges the code
 with the verifier (RFC 6749 §4.1, RFC 7636, RFC 8252 §7.3). `OAuth2CachedTokenSource` tries the
 cache and its refresh first, runs the flow only when they give nothing, and caches the new token.
+
+`Options/` turns it on (ADR-1066). `OAuth2Options` holds the long options: one flow option,
+`--oauth2-client-credentials`, `--oauth2-device` or `--oauth2-pkce`, names the token endpoint, and
+`--oauth2-client-id`, `--oauth2-client-secret`, `--oauth2-scope`, `--oauth2-device-url`,
+`--oauth2-authorize-url`, `--oauth2-redirect-port` and `--oauth2-token-cache` complete it.
+`OAuth2Configuration` reads them (a missing or wrong one is an `OAuth2OptionException`, which fails
+the transfer with exit 2) and makes the flow. `OAuth2TransferHook` gets the token through
+`TransferHookServices`' connector and listener, from the cache by default, and sends the transfer
+with `Authorization: Bearer <token>` added after curl's own headers; a failed flow fails the
+transfer with its exit code, and the request is never sent.
 
 Tested against the RFCs, not against curl. Held to the four quality gates in the root `CLAUDE.md`.
 Its tests are in `Curl.Extension.OAuth2.UnitTests`.
