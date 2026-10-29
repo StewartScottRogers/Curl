@@ -31,3 +31,4 @@ BL-4015's `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary` run (2026-1
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: b8ad5499 277d69a5 ca28a660.
