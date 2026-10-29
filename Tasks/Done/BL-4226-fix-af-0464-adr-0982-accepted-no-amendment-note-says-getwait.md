@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4226 — Fix AF-0464: ADR-0982 (Accepted, no amendment note) says GetWaitSockets keeps the FirstTransferSocket number for a transfer without a dialled socket; that number no longer exists
 
@@ -41,12 +41,16 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- ADR-0982's status line and its Decision point now say the no-dialled-socket case is replaced in part by ADR-0997 (told no socket, left out of `GetWaitSockets`; `FirstTransferSocket` is gone), as BL-4225 did for ADR-0986; its README row says the same. The reproduction no longer finds "`FirstTransferSocket` number" in ADR-0982.
+- Build clean; fast tests green: 63 test projects passed, 0 failed.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. ADR-0982 marks its no-dialled-socket point replaced in part by ADR-0997; FirstTransferSocket number gone from it
