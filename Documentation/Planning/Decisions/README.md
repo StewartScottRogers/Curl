@@ -1108,3 +1108,4 @@ Each option and the specific reason it lost.
 | [1072](ADR-1072-async-quic-tests-time-out-cooperatively.md) | Asynchronous QUIC tests time out cooperatively (BL-4269) | Accepted | 2026-10-29 |
 | [1073](ADR-1073-http-file-expands-a-dot-http-file-into-curl-arguments-with-http-env-choosing-the-environment.md) | --http-file expands a .http file into curl arguments, with --http-env choosing the environment (BL-4154) | Accepted | 2026-10-29 |
 | [1074](ADR-1074-mcp-urls-list-tools-without-data-and-call-one-with-a-json-data-body.md) | MCP URLs list tools without data and call one with a JSON data body (BL-4159) | Accepted | 2026-10-29 |
+| [1075](ADR-1075-s3-urls-download-upload-in-parts-and-list-signed-with-sigv4.md) | s3:// URLs download, upload in parts and list, signed with SigV4 (BL-4124) | Accepted | 2026-10-29 |

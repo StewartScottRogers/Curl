@@ -25,5 +25,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.Description,
         McpClient.Client.McpClientExtension.Description,
+        S3.Client.S3Extension.Description,
     ];
 }
