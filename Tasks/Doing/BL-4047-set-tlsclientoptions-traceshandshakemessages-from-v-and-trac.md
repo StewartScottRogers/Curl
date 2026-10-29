@@ -30,3 +30,4 @@ BL-4010 (ADR-0985) added `TlsClientOptions.TracesHandshakeMessages` and the `Tls
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 5731c438 3d836d5e.
