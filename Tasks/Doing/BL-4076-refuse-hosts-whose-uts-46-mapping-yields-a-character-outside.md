@@ -34,3 +34,4 @@ Start in `CurlUrlHostNameMapping`: find what it does today for each of the 14 (B
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: f6daa2ba 29763f33 bca84801 a602f75b.
