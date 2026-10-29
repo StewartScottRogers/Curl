@@ -4,7 +4,7 @@ title: Fix CGR-282: XFERINFOFUNCTION returning CURL_PROGRESSFUNC_CONTINUE does n
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4054, BL-4055]
+depends-on: [BL-4057, BL-4058]
 touches: [Curl.Api.UnitLibrary/Callbacks/TransferInfoCallback.cs, Curl.Api.UnitTests/Cgr282Tests.cs, Libcurl.UnitTests/Cgr282Tests.cs, Libcurl/Callbacks/Progress/EasyProgressCallbackSetters.cs]
 model: sonnet
 requirement: none

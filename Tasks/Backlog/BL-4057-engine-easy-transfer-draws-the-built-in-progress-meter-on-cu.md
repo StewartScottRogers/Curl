@@ -1,5 +1,5 @@
 ---
-id: BL-4054
+id: BL-4057
 title: Engine easy transfer draws the built-in progress meter on CURLOPT_STDERR when progress continues, passing the Engine quality gates
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4054 — Engine easy transfer draws the built-in progress meter on CURLOPT_STDERR when progress continues, passing the Engine quality gates
+# BL-4057 — Engine easy transfer draws the built-in progress meter on CURLOPT_STDERR when progress continues, passing the Engine quality gates
 
 ## Goal
 
