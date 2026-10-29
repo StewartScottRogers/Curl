@@ -34,3 +34,4 @@ Split from BL-4115 (extension 14 of 63) for size by its first pass. Specificatio
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 1ad396c3 931c9c48 9f4106c9 14de81cc.
