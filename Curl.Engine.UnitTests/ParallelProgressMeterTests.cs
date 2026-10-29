@@ -166,6 +166,27 @@ public sealed class ParallelProgressMeterTests
     }
 
     [TestMethod]
+    public void DrawIfDue_UploadOfKnownSizeUpdatedTwice_CountsItsSizeOnce()
+    {
+        Diagnostics.Arrange("transfer", "50 of 100 bytes uploaded after 1 s, all 100 after 1.6 s");
+        using ParallelProgressMeter meter = NewMeter();
+        ParallelTransferProgress transfer = meter.AddTransfer();
+        transfer.MarkLive();
+        clock.Advance(1000);
+        transfer.ReportUploaded(50, 100);
+
+        clock.Advance(600);
+        transfer.ReportUploaded(100, 100);
+        string output = written.ToString();
+        string lastLine = Neutral(output[output.LastIndexOf('\r')..]);
+        Diagnostics.Act("last meter line", lastLine);
+
+        // A total counted on every update would be 200 bytes, so the line would read 50%.
+        Diagnostics.Assert("last meter line starts with", "\\r--  100   ", lastLine);
+        StringAssert.StartsWith(lastLine, "\\r--  100   ");
+    }
+
+    [TestMethod]
     public void DrawIfDue_TenSamplesTaken_MeasuresTheSpeedOverTheLastTen()
     {
         Diagnostics.Arrange("samples", "ten draws 600 ms apart, then 6000 bytes of unknown size");

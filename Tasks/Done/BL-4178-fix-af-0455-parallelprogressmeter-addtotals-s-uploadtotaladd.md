@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: feature
 depends-on: []
-touches: [Curl.Engine.UnitLibrary]
+touches: [Curl.Engine.UnitLibrary/ParallelProgressMeter.cs, Curl.Engine.UnitTests/ParallelProgressMeterTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4178 — Fix AF-0455: ParallelProgressMeter.AddTotals's UploadTotalAdded = true can become false with no test failing, so the -Z meter adds an upload's size again on every update
 
@@ -41,12 +41,18 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Narrowed touches from the whole Curl.Engine.UnitLibrary to ParallelProgressMeter.cs and its test file (ADR-0694): the fix is a test in ParallelProgressMeterTests.cs pinning that an upload of known size updated twice counts its size once. The test file was not in touches; no task in Doing names it. Publishing the narrowed touches at once was refused in this session, so it lands with the work.
+- Fix: `DrawIfDue_UploadOfKnownSizeUpdatedTwice_CountsItsSizeOnce` reports 50 of 100 bytes at 1 s, then 100 of 100 at 1.6 s (inside the idle timer's next draw), and pins the line's UL% at 100. The production code was right; only the test was missing.
+- Reproduction: a lane may not run `Audit/Tools/Invoke-MutationTest.ps1`, so the mutant was applied by hand (line 266 `true` -> `false`): the new test failed (`--   50     0   100 ...`, the total counted twice), the other ten passed; the line was restored and all 11 pass. The re-audit confirms with the tool itself.
+- No production code changed, so no Measure-CodeQuality.ps1 run was needed. Fast tests: 59 test projects passed, Curl.Engine.UnitTests 2928 passed, 7 skipped.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. A -Z meter test now fails when an upload's known size is counted more than once (AF-0455 mutant killed)
