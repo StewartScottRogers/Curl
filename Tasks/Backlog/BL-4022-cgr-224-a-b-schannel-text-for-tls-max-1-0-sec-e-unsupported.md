@@ -1,5 +1,5 @@
 ---
-id: BL-4015
+id: BL-4022
 title: CGR-224 (a)(b): Schannel text for --tls-max 1.0 (SEC_E_UNSUPPORTED_FUNCTION) and --tlsv1.0 --tls-max 1.1 (SEC_E_ILLEGAL_MESSAGE) against curl 8.22.0
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4015 — CGR-224 (a)(b): Schannel text for --tls-max 1.0 (SEC_E_UNSUPPORTED_FUNCTION) and --tlsv1.0 --tls-max 1.1 (SEC_E_ILLEGAL_MESSAGE) against curl 8.22.0
+# BL-4022 — CGR-224 (a)(b): Schannel text for --tls-max 1.0 (SEC_E_UNSUPPORTED_FUNCTION) and --tlsv1.0 --tls-max 1.1 (SEC_E_ILLEGAL_MESSAGE) against curl 8.22.0
 
 ## Goal
 
