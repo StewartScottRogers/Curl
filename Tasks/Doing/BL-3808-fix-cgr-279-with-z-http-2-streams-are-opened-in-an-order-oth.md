@@ -77,3 +77,4 @@ curl -s -Z --http2-prior-knowledge http://127.0.0.1:P/1 http://127.0.0.1:P/2 htt
 - 2026-10-26: Created from CGR-279 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Networking.UnitLibrary (PoolingConnector, MultiplexingNegotiation) held by BL-4006; depends-on BL-4006
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
