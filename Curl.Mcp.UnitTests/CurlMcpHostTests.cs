@@ -97,4 +97,15 @@ public sealed class CurlMcpHostTests
             Environment.SetEnvironmentVariable(McpResponseCap.VariableName, before);
         }
     }
+
+    [TestMethod]
+    public void Build_OverTheProcessTwice_BuildsTwoSeparateHosts()
+    {
+        // The second call reuses the delegate the compiler cached for the environment reader on the first.
+        using McpStdioHost first = CurlMcpHost.Build();
+
+        using McpStdioHost second = CurlMcpHost.Build();
+
+        Assert.AreNotSame(first, second);
+    }
 }
