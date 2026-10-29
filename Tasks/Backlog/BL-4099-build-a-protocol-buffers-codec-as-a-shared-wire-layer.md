@@ -4,7 +4,7 @@ title: Build a Protocol Buffers codec as a shared Wire layer
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091]
+depends-on: [BL-4091, BL-4164, BL-4165, BL-4166]
 touches: [Curl.Protobuf.UnitLibrary, Curl.Protobuf.UnitTests, Curl.slnx]
 requirement: none
 created: 2026-10-29
@@ -32,7 +32,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 Split if larger than one run: wire format first, then `.proto` parsing, then JSON mapping.
 
+- 2026-10-29 (lane 4): Split for size, as the Notes above anticipated: a hand-built wire codec, a proto3 parser and the JSON mapping, each to 100% coverage, are three runs. Filed BL-4164 (create the project and the wire format codec), BL-4165 (`.proto` to descriptors, depends on BL-4164) and BL-4166 (JSON mapping, depends on both). Each subtask names its own subfolder (`Wire/`, `Descriptors/`, `Json/`) in touches. Once all three are Done, this task only verifies its criteria against the finished library and closes.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 20879125 8627716d 72bc5ee6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size into BL-4164, BL-4165 and BL-4166; waits on them
