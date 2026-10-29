@@ -1,8 +1,9 @@
 # Curl.Extension.EncryptedDns.UnitLibrary
 
-Encrypted DNS lookups (ADR-0999, ADR-1024): a DNS message codec and an `IDnsResolver` that asks a DNS-over-TLS
-server (RFC 7858). Namespaces `Curl.Extension.EncryptedDns.Wire` and `Curl.Extension.EncryptedDns.DnsOverTls`.
-Tested against RFC 1035 and RFC 7858, not against curl. Not yet registered in any catalogue: BL-4148 adds the
+Encrypted DNS lookups (ADR-0999, ADR-1024): a DNS message codec and `IDnsResolver`s that ask a DNS-over-TLS
+server (RFC 7858) or a DNS-over-QUIC server (RFC 9250). Namespaces `Curl.Extension.EncryptedDns.Wire`,
+`Curl.Extension.EncryptedDns.DnsOverTls` and `Curl.Extension.EncryptedDns.DnsOverQuic`. Tested against RFC 1035,
+RFC 7858 and RFC 9250, not against curl. Not yet registered in any catalogue: BL-4148 adds the
 options, the resolver hook and the `ExtensionCatalogue` line.
 
 - `Wire/`: `DnsQueryEncoder` writes an A or AAAA query (`DnsRecordType`) as RFC 1035 section 4.1 lays it out
@@ -17,5 +18,12 @@ options, the resolver hook and the `ExtensionCatalogue` line.
   the two-octet length prefix, and reads two answers matched by ID, returning AAAA addresses then A. A name that
   cannot be encoded, a failed connect or handshake, or a server that closes inside a message gives no addresses,
   which a connector reports as exit 6.
+- `DnsOverQuic/` (ADR-1025): `DnsOverQuicResolver` takes an `IDatagramConnector`, an `IServerCertificateVerifier`,
+  a `DnsOverQuicServer` (port 853 by default, an optional TLS server name) and a `TimeProvider`, and runs
+  `Curl.Quic.UnitLibrary`'s client offering only the ALPN token `doq` (RFC 9250 section 4.1.1). It sends the AAAA
+  and the A query each on its own client bidirectional stream with Message ID 0, the two-octet length prefix and
+  FIN, reads the answers in that order, and closes with DOQ_NO_ERROR, or with DOQ_PROTOCOL_ERROR when an answer
+  lacks its prefix or carries another Message ID. Any failure gives no addresses. Its tests run the real client
+  against a copy of `Curl.Quic.UnitTests`' in-memory `QuicTestServer`.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.EncryptedDns.UnitTests`.
