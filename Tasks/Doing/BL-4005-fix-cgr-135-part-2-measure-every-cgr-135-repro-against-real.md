@@ -34,3 +34,4 @@ Second half of BL-3664 (split); BL-4004 lands the fix first. BL-3664's Notes hol
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 7cb8fe79 b61262fc e58d9009 779790c0.
