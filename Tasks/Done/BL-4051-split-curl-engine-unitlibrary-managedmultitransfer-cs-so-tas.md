@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4051 — Split Curl.Engine.UnitLibrary/ManagedMultiTransfer.cs so tasks touching it can run in parallel
 
@@ -36,3 +36,4 @@ Split by concern into partial-class files ManagedMultiTransfer.{Entries,Perform,
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 3043325a 73dcc4ad a0b49a29.
+- 2026-10-28: Doing -> Done. ManagedMultiTransfer split into partial files; touches narrowed; build, tests and quality green
