@@ -93,10 +93,10 @@ curl -sv --resolve ex.test:20600:127.0.0.1 http://ex.test:20600/x
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr221Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
-- Measured curl 8.22.0: `--resolve foo.test:9:127.0.0.1` gives `* [DNS] added foo.test:9:127.0.0.1 to cache`; Curl now equal. IPv6 literal host is bracketed in Established connection (from the report; the refused connect could not show it). ADR-0969. Existing tests pinning the old wording in Console, Engine and Networking test projects were updated (added to touches). Linux CI: change is platform-neutral.
+- Measured curl 8.22.0: `--resolve foo.test:9:127.0.0.1` gives `* [DNS] added foo.test:9:127.0.0.1 to cache`; Curl now equal. IPv6 literal host is bracketed in Established connection (from the report; the refused connect could not show it). ADR-0970. Existing tests pinning the old wording in Console, Engine and Networking test projects were updated (added to touches). Linux CI: change is platform-neutral.
 
 ## Log
 
 - 2026-10-26: Created from CGR-221 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
-- 2026-10-28: Doing -> Done. Verbose output now writes the 8.22 DNS cache line and brackets an IPv6 literal host (ADR-0969)
+- 2026-10-28: Doing -> Done. Verbose output now writes the 8.22 DNS cache line and brackets an IPv6 literal host (ADR-0970)

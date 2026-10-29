@@ -1,4 +1,4 @@
-# ADR-0969: `-v` writes `[DNS] added H:P:A to cache` and brackets an IPv6 literal host in `Established connection`
+# ADR-0970: `-v` writes `[DNS] added H:P:A to cache` and brackets an IPv6 literal host in `Established connection`
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-3750, CGR-221).
 
