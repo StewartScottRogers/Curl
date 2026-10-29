@@ -323,6 +323,7 @@
   <Folder Name="/Extensions/S3/"><Project Path="Curl.Extension.S3.UnitLibrary/Curl.Extension.S3.UnitLibrary.csproj" /><Project Path="Curl.Extension.S3.UnitTests/Curl.Extension.S3.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/NamedPipe/"><Project Path="Curl.Extension.NamedPipe.UnitLibrary/Curl.Extension.NamedPipe.UnitLibrary.csproj" /><Project Path="Curl.Extension.NamedPipe.UnitTests/Curl.Extension.NamedPipe.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/EncryptedDns/"><Project Path="Curl.Extension.EncryptedDns.UnitLibrary/Curl.Extension.EncryptedDns.UnitLibrary.csproj" /><Project Path="Curl.Extension.EncryptedDns.UnitTests/Curl.Extension.EncryptedDns.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/McpClient/"><Project Path="Curl.Extension.McpClient.UnitLibrary/Curl.Extension.McpClient.UnitLibrary.csproj" /><Project Path="Curl.Extension.McpClient.UnitTests/Curl.Extension.McpClient.UnitTests.csproj" /></Folder>
 
   <!-- The shared projects sit together in /Shared/ (ADR-0731). -->
   <Folder Name="/Shared/">
