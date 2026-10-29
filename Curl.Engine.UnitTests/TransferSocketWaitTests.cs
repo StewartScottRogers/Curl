@@ -24,6 +24,76 @@ public sealed class TransferSocketWaitTests
     }
 
     [TestMethod]
+    public void WaitingPredicates_NoSocketAndNoWait_AreAllFalse()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+
+        Assert.IsFalse(wait.IsWaitingOnItsSocket);
+        Assert.IsFalse(wait.IsWaitingWithoutSocket);
+        Assert.IsFalse(wait.IsWaitingOnAnEngineSocket);
+    }
+
+    [TestMethod]
+    public void WaitingPredicates_ReadWaitingWithNoSocket_IsWaitingWithoutSocketOnly()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        _ = wait.WaitUntilReadableAsync(CancellationToken.None);
+
+        Assert.IsTrue(wait.IsWaitingWithoutSocket);
+        Assert.IsFalse(wait.IsWaitingOnItsSocket);
+        Assert.IsFalse(wait.IsWaitingOnAnEngineSocket);
+        wait.StopGating();
+    }
+
+    [TestMethod]
+    public void IsWaitingWithoutSocket_ConnectingWithNoSocket_IsFalse()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+
+        wait.BeginConnect();
+
+        Assert.AreEqual(CurlPoll.Out, wait.Waiting);
+        Assert.IsFalse(wait.IsWaitingWithoutSocket);
+    }
+
+    [TestMethod]
+    public void WaitingPredicates_EngineSocketNotWaiting_AreAllFalse()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+
+        wait.TakeSocket(null);
+
+        Assert.IsFalse(wait.IsWaitingOnItsSocket);
+        Assert.IsFalse(wait.IsWaitingWithoutSocket);
+        Assert.IsFalse(wait.IsWaitingOnAnEngineSocket);
+    }
+
+    [TestMethod]
+    public void WaitingPredicates_ReadWaitingOnAnEngineSocket_IsWaitingOnItsSocketAndOnAnEngineSocket()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        wait.TakeSocket(null);
+        _ = wait.WaitUntilReadableAsync(CancellationToken.None);
+
+        Assert.IsTrue(wait.IsWaitingOnItsSocket);
+        Assert.IsTrue(wait.IsWaitingOnAnEngineSocket);
+        Assert.IsFalse(wait.IsWaitingWithoutSocket);
+        wait.StopGating();
+    }
+
+    [TestMethod]
+    public void WaitingPredicates_ReadWaitingOnAnOperatingSystemSocket_IsWaitingOnItsSocketButNotOnAnEngineSocket()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        wait.TakeSocket(42);
+        _ = wait.WaitUntilReadableAsync(CancellationToken.None);
+
+        Assert.IsTrue(wait.IsWaitingOnItsSocket);
+        Assert.IsFalse(wait.IsWaitingOnAnEngineSocket);
+        wait.StopGating();
+    }
+
+    [TestMethod]
     public void TakeSocket_NoOperatingSystemSocket_GivesAnEngineNumberAboveFirstEngineSocket()
     {
         TransferSocketWait wait = new(TimeProvider.System);

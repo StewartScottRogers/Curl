@@ -100,6 +100,21 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
         }
     }
 
+    /// <summary>Gets whether the transfer waits in some direction on a socket it knows.</summary>
+    internal bool IsWaitingOnItsSocket => Socket is not null && Waiting != CurlPoll.None;
+
+    /// <summary>
+    /// Gets whether the transfer waits in some direction with no socket known and no dial in progress: I/O over a
+    /// connection with no operating system socket before <see cref="TakeSocket" /> numbers it.
+    /// </summary>
+    internal bool IsWaitingWithoutSocket => Socket is null && !IsConnecting && Waiting != CurlPoll.None;
+
+    /// <summary>
+    /// Gets whether the transfer waits in some direction on an engine socket number <see cref="TakeSocket" /> gave
+    /// a connection with no operating system socket (above <see cref="FirstEngineSocket" />, ADR-0955).
+    /// </summary>
+    internal bool IsWaitingOnAnEngineSocket => Socket > FirstEngineSocket && Waiting != CurlPoll.None;
+
     /// <summary>
     /// Starts the transfer's clock: the connect deadline when <c>CURLOPT_CONNECTTIMEOUT_MS</c> is set, the
     /// whole-transfer deadline when <c>CURLOPT_TIMEOUT_MS</c> is set, as curl 8.22.0's <c>Curl_pretransfer</c> arms

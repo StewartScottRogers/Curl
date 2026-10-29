@@ -933,12 +933,18 @@ internal sealed class ManagedMultiTransfer(
     private static int TellWaitedSocket(MultiSocketCallback callback, MultiEntry entry, TransferSocketWait wait)
     {
         CurlPoll waiting = wait.Waiting;
-        if (WaitedSocketOf(entry, wait, waiting) is not { } socket || (entry.Socket == socket && entry.ReportedPoll == waiting))
+        return WaitedSocketOf(entry, wait, waiting) is { } socket ? TellChangedSocket(callback, entry, socket, waiting) : 0;
+    }
+
+    private static int TellChangedSocket(MultiSocketCallback callback, MultiEntry entry, CurlSocket socket, CurlPoll waiting)
+    {
+        bool sameSocket = entry.Socket == socket;
+        if (sameSocket && entry.ReportedPoll == waiting)
         {
             return 0;
         }
 
-        entry.SocketState = entry.Socket == socket ? entry.SocketState : null;
+        entry.SocketState = sameSocket ? entry.SocketState : null;
         entry.Socket = socket;
         entry.ReportedPoll = waiting;
         return callback(entry.Transfer, socket, waiting, entry.SocketState);
@@ -1004,11 +1010,9 @@ internal sealed class ManagedMultiTransfer(
         entry.Perform!.IsCompleted
         || ((IsWaitingOnItsSocket(entry) || IsWaitingWithoutSocket(entry)) && !(entry.SocketWait!.EarliestDeadline <= timeProvider.GetUtcNow()));
 
-    private static bool IsWaitingWithoutSocket(MultiEntry entry) =>
-        entry.SocketWait is { Socket: null, IsConnecting: false } wait && wait.Waiting != CurlPoll.None;
+    private static bool IsWaitingWithoutSocket(MultiEntry entry) => entry.SocketWait!.IsWaitingWithoutSocket;
 
-    private static bool IsWaitingOnItsSocket(MultiEntry entry) =>
-        entry.SocketWait is { Socket: not null } wait && wait.Waiting != CurlPoll.None;
+    private static bool IsWaitingOnItsSocket(MultiEntry entry) => entry.SocketWait is { IsWaitingOnItsSocket: true };
 
     /// <summary>
     /// Tells the timer callback the next timeout when it changed, or, with <paramref name="tellsAgain" />, whenever
@@ -1058,21 +1062,23 @@ internal sealed class ManagedMultiTransfer(
     {
         long handleTimeout = TimeoutMilliseconds();
         List<MultiEntry> running = entries.FindAll(entry => !entry.Done);
-        if (running.Count == 0 || Options.Socket is null)
-        {
-            return handleTimeout;
-        }
+        return running.Count == 0 || Options.Socket is null ? handleTimeout : RunningTimerMilliseconds(handleTimeout, running);
+    }
 
-        if (handleTimeout != 0 && running.TrueForAll(IsRunningAndWaitingOnItsSocket))
+    // A handle timeout other than 0 means no transfer waits to start or to be reported (TimeoutMilliseconds), so
+    // every running one has a perform in progress.
+    private long RunningTimerMilliseconds(long handleTimeout, List<MultiEntry> running)
+    {
+        if (handleTimeout != 0 && running.TrueForAll(IsWaitingOnItsSocket))
         {
-            return MillisecondsUntil(running.Min(entry => entry.SocketWait!.EarliestDeadline));
+            return MillisecondsUntil(running.Min(EarliestDeadlineOf));
         }
 
         long check = (long)RunningTransferCheckInterval.TotalMilliseconds;
         return handleTimeout < 0 ? check : Math.Min(handleTimeout, check);
     }
 
-    private static bool IsRunningAndWaitingOnItsSocket(MultiEntry entry) => entry.Perform is { IsCompleted: false } && IsWaitingOnItsSocket(entry);
+    private static DateTimeOffset? EarliestDeadlineOf(MultiEntry entry) => entry.SocketWait!.EarliestDeadline;
 
     private long MillisecondsUntil(DateTimeOffset? deadline) =>
         deadline is { } due ? Math.Max(0, (long)Math.Ceiling((due - timeProvider.GetUtcNow()).TotalMilliseconds)) : -1;
@@ -1209,7 +1215,7 @@ internal sealed class ManagedMultiTransfer(
     /// has its data returns, and the application's action on it lets the transfer go on (ADR-0973).
     /// </summary>
     private static bool IsWaitingOnAnEngineSocket(MultiEntry entry) =>
-        entry.Perform is { IsCompleted: false } && IsWaitingOnItsSocket(entry) && entry.SocketWait!.Socket > TransferSocketWait.FirstEngineSocket;
+        entry.Perform is { IsCompleted: false } && entry.SocketWait is { IsWaitingOnAnEngineSocket: true };
 
     private TimeSpan WaitLimit(TimeSpan timeout)
     {
