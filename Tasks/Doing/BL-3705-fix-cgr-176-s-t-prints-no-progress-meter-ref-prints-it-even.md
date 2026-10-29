@@ -98,3 +98,4 @@ echo a | curl -s -T . http://127.0.0.1:21200/echo
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Found in the first pass: the meter is decided in `Curl.Console/CurlCommandRunner.cs` `ShowsProgress` (line ~4640, `!options.Silent && !options.ProgressMeterOff`), not in Curl.Cli.UnitLibrary. Real curl draws the meter under `-s` when `-T .` uploads stdin without blocking (`Running.UploadsFromStandardInputWithoutBlocking`, line ~3885). Fix: let that case ignore `Silent` in `ShowsProgress`, with a focused test in `Curl.Console.UnitTests/Cgr176Tests.cs`. BL-3823 (Doing) holds CurlCommandRunner.cs, so touches was extended and BL-3823 added to depends-on; requeued before any edit.
 - 2026-10-28: Doing -> Backlog. Needs Curl.Console/CurlCommandRunner.cs, held by BL-3823; depends-on BL-3823
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
