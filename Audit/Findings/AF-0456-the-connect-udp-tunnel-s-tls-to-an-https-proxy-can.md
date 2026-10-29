@@ -3,8 +3,8 @@ id: AF-0456
 title: The CONNECT-UDP tunnel's TLS to an HTTPS proxy can drop isProxy: true with no test failing
 auditor: quality
 severity: Medium
-status: proposed
-reason:
+status: accepted
+reason: 
 key: quality:Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:ConnectTimings-true:surviving-mutant
 reproduction: mutation Curl.Networking.UnitLibrary/TcpConnector.UdpTunnel.cs:166:true
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Invoke-MutationTest.ps1 -Site Curl.Netwo
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
