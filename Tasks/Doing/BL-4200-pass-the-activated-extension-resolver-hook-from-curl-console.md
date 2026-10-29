@@ -33,3 +33,4 @@ BL-4096 added `ResolverHooks` in `Curl.Extension.Abstractions/Resolution` and th
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: bd441ce9 a3da5757 d406d9b7 478f867b 3d836d5e.
