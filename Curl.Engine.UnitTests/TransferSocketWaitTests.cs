@@ -8,6 +8,22 @@ public sealed class TransferSocketWaitTests
     private static readonly TimeSpan LongestWait = TimeSpan.FromSeconds(30);
 
     [TestMethod]
+    public async Task StopGating_ReadInProgress_ReleasesItAndEveryLaterWait()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        ValueTask reading = wait.WaitUntilReadableAsync(CancellationToken.None);
+        bool heldBefore = !reading.IsCompleted;
+
+        wait.StopGating();
+
+        Assert.IsTrue(heldBefore);
+        await reading.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.IsTrue(wait.WaitUntilWritableAsync(CancellationToken.None).IsCompleted);
+        Assert.IsTrue(wait.WaitUntilWritableAsync(CancellationToken.None).IsCompleted);
+        Assert.IsTrue(wait.WaitUntilReadableAsync(CancellationToken.None).IsCompleted);
+    }
+
+    [TestMethod]
     public void TakeSocket_NoOperatingSystemSocket_GivesAnEngineNumberAboveFirstEngineSocket()
     {
         TransferSocketWait wait = new(TimeProvider.System);

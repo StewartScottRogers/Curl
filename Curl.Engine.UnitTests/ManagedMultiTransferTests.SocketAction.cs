@@ -52,7 +52,7 @@ public sealed partial class ManagedMultiTransferTests
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
 
         CollectionAssert.AreEqual(
-            new[] { "timer 0", $"socket {FirstSocket.Handle} In null", $"socket {FirstSocket.Handle + 1} In null", "timer 10" },
+            new[] { "timer 0", "timer 0", $"socket {FirstSocket.Handle} In null", $"socket {FirstSocket.Handle + 1} In null", "timer 10" },
             calls);
     }
 

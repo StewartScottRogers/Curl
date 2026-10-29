@@ -27,6 +27,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     private CurlSocketSelect keptSignals;
     private bool connecting;
     private bool connectSignalled;
+    private bool gatingStopped;
     private TimeSpan lowSpeedTime;
     private DateTimeOffset? connectDeadline;
     private DateTimeOffset? transferDeadline;
@@ -192,6 +193,17 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     }
 
     /// <summary>
+    /// Stops holding the connection's reads and writes for a socket action, once the transfer that owned this wait
+    /// has finished or left its multi handle: the waits now in progress return and every later one returns at once,
+    /// so a kept connection closed by cleanup never waits for an action the application will not send (ADR-0970).
+    /// </summary>
+    internal void StopGating()
+    {
+        Update(() => gatingStopped = true);
+        Signal(CurlSocketSelect.In | CurlSocketSelect.Out);
+    }
+
+    /// <summary>
     /// Signals the socket ready (<see cref="Signal" />) when <paramref name="socket" /> is the transfer's
     /// <see cref="Socket" />, as the multi handle does for <c>curl_multi_socket_action</c> naming a socket.
     /// </summary>
@@ -265,7 +277,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     {
         lock (sync)
         {
-            if ((keptSignals & direction) != 0)
+            if (gatingStopped || (keptSignals & direction) != 0)
             {
                 keptSignals &= ~direction;
                 return null;
