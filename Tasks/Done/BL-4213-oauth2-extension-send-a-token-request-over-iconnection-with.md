@@ -30,7 +30,7 @@ Second part of BL-4161 (split for size). An extension may not reference `Curl.Pr
 ## Notes
 
 - Filed by BL-4161's lane 2 run (split for size).
-- Plan: Http/ holds OAuth2HttpClient (connects through IConnector, TLS from ConnectTarget.UseTls), OAuth2HttpRequestWriter, OAuth2HttpExchange and a reader, head parser and body reader adapted from the S3 extension's client (ADR-1018), reading the whole body (at most 1 MiB) whatever the status. ADR-1028 records why the extension carries its own client and the exit code each failure maps to.
+- Plan: Http/ holds OAuth2HttpClient (connects through IConnector, TLS from ConnectTarget.UseTls), OAuth2HttpRequestWriter, OAuth2HttpExchange and a reader, head parser and body reader adapted from the S3 extension's client (ADR-1018), reading the whole body (at most 1 MiB) whatever the status. ADR-1030 records why the extension carries its own client and the exit code each failure maps to.
 - Default taken: Connection: close on every request, since a token exchange is one request; interim 1xx responses are skipped.
 - touches widened to Curl.Extension.OAuth2.UnitLibrary/CLAUDE.md so the project doc describes Http/; no task in Doing on origin/work/dark-factory names it.
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.OAuth2.UnitLibrary gives 100% line, 100% branch, 0 failing members, worst CRAP 10. Solution build clean; fast tests 46652 passed, 0 failed. Tests are platform-neutral (no paths, OS text or certificates), so CI on Linux and macOS is expected green.

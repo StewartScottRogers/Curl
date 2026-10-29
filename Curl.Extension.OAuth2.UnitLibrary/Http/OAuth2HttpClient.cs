@@ -6,7 +6,7 @@ namespace Curl.Extension.OAuth2.Http;
 /// <summary>
 /// POSTs a form to a token or device authorization endpoint over a connection the <see cref="IConnector"/> opens, with TLS
 /// for <c>https</c>, and reads the JSON response whole, whatever its status, so a 400 or 401 error response (RFC 6749
-/// §5.2) can be read (ADR-1028).
+/// §5.2) can be read (ADR-1030).
 /// </summary>
 /// <remarks>
 /// One request per connection, sent with <c>Connection: close</c>; the connection is never marked reusable. Every failure

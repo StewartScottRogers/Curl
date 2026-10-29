@@ -23,7 +23,7 @@ device authorization flows:
   body that is not a JSON object, lacks a required member or has a member of the wrong type is a
   failure with its reason, never an exception. `OAuth2JsonBody` holds the shared reading.
 
-`Http/` sends those requests (ADR-1028): `OAuth2HttpClient.PostFormAsync` opens a connection through
+`Http/` sends those requests (ADR-1030): `OAuth2HttpClient.PostFormAsync` opens a connection through
 the injected `IConnector` (TLS for `https`), `OAuth2HttpRequestWriter` writes one HTTP/1.1 form POST
 with `Accept: application/json` and `Connection: close`, and `OAuth2HttpExchange` skips interim 1xx
 responses and reads the final one whole through `OAuth2HttpConnectionReader`,

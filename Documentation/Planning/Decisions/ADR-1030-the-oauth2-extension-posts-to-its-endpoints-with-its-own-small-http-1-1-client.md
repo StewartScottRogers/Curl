@@ -1,4 +1,4 @@
-# ADR-1028: The OAuth2 extension posts to its endpoints with its own small HTTP/1.1 client
+# ADR-1030: The OAuth2 extension posts to its endpoints with its own small HTTP/1.1 client
 
 - Status: Accepted
 - Date: 2026-10-29
