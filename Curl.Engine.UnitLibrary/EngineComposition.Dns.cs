@@ -150,12 +150,22 @@ internal static partial class EngineComposition
     /// </returns>
     internal static Uri? DohUrlOf(string dohUrl)
     {
+        // curl's URL parser refuses a space or control character, so the lookup fails with exit 6 (CGR-283).
+        if (HasSpaceOrControlCharacter(dohUrl))
+        {
+            return null;
+        }
+
         string withScheme = dohUrl.Contains("://", StringComparison.Ordinal) ? dohUrl : "https://" + dohUrl;
         return Uri.TryCreate(withScheme, UriKind.Absolute, out Uri? url)
             && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
             ? url
             : null;
     }
+
+    // Whether the --doh-url value holds a space, a TAB or another control character, which curl's URL parser refuses.
+    private static bool HasSpaceOrControlCharacter(string dohUrl) =>
+        dohUrl.Any(character => character <= ' ' || character == '\u007f');
 
     /// <summary>
     /// Whether <see cref="DohUrlOf" /> makes an <c>https</c> URL of a <c>--doh-url</c> value, the only DoH URL curl

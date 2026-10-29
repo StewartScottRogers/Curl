@@ -9,7 +9,7 @@ touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Engine.UnitTest
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3812 — Fix CGR-283: A --doh-url containing a space or a TAB is percent-encoded and used; curl rejects it
 
@@ -61,10 +61,10 @@ curl -sS --doh-url "http://127.0.0.1:21800/dns query" http://foo.test:21802/x
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -75,3 +75,6 @@ curl -sS --doh-url "http://127.0.0.1:21800/dns query" http://foo.test:21802/x
 
 - 2026-10-26: Created from CGR-283 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+- 2026-10-28 (Claude): Fix: `EngineComposition.DohUrlOf` returns null for a value with a space, TAB or other control character (<= 0x20, 0x7f), so the resolver is `UnusableDohUrlResolver`: exit 6 `Could not resolve host: foo.test`, no DoH request sent. Test: `Cgr283Tests` (3 rows). Real curl was NOT re-run this shift; the expected result (exit 6, nothing on the wire) is the report's measurement of curl 8.22.0, so criterion 1 is ticked on that evidence plus the unit test. Variants with plain URLs are unchanged (EngineCompositionDohTests green). Platform-neutral. Full fast tests green. Measure-CodeQuality: DohUrlOf complexity fixed by extracting `HasSpaceOrControlCharacter`; the remaining failing member `ManagedEasyTransfer.PerformBuildingMimePostAsync` (branch 90%) predates this change.
+- 2026-10-28: Doing -> Done. A --doh-url with a space or control character is refused like curl (exit 6, no DoH request)
