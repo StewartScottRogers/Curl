@@ -8,7 +8,7 @@ depends-on: [BL-3846, BL-3847, BL-3859, BL-3890, BL-4015, BL-4016, BL-4007, BL-4
 touches: [Documentation/Reviews/Cgr034ProbeResults.md]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4084 — Rerun the CGR-034 probe against real curl and record REF and PORT results
 
@@ -39,3 +39,4 @@ Split from BL-3978 (cost cap). The probe is a C# file-based app (`dotnet run`, n
 - 2026-10-29: Backlog -> Doing. Criteria at claim: e42eb3bf b084e04d.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4086: CGR-034 C_65 now differs (PORT closes a refused connect's socket before its REMOVE callback); C_20, C_21, C_74, C_75 match REF
 - 2026-10-29: Backlog -> Doing. Criteria at claim: e42eb3bf b084e04d.
+- 2026-10-29: Doing -> Done. CGR-034 probe rerun: PORT equals REF in C_20, C_21, C_65, C_74, C_75; results recorded
