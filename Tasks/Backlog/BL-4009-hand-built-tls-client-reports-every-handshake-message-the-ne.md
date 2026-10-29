@@ -1,5 +1,5 @@
 ---
-id: BL-4006
+id: BL-4009
 title: Hand-built TLS client reports every handshake message, the negotiated group and the peer signature type (OpenSSL -v trace source)
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4006 — Hand-built TLS client reports every handshake message, the negotiated group and the peer signature type (OpenSSL -v trace source)
+# BL-4009 — Hand-built TLS client reports every handshake message, the negotiated group and the peer signature type (OpenSSL -v trace source)
 
 ## Goal
 

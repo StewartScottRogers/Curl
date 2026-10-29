@@ -18,7 +18,7 @@ On Linux, `-v` over the SslStream path prints `SSL connection using TLSv1.3 / TL
 
 ## Context
 
-`OpenSslHandshakeText.ConnectionLine` already prints `TlsHandshakeEvent.NegotiatedGroupName` and `PeerSignatureTypeName`, but `SslStreamTlsProvider.DescribeHandshake` never sets them (the test pins them null), so Linux prints `[blank] / UNDEF`. SslStream does not expose them, but the plaintext handshake records cross `ConnectionStream` under it. The handshake message trace this task first also asked for is BL-4006 and BL-4007: SslStream decrypts the TLS 1.3 messages after ServerHello out of sight, so no honest trace can come from this path.
+`OpenSslHandshakeText.ConnectionLine` already prints `TlsHandshakeEvent.NegotiatedGroupName` and `PeerSignatureTypeName`, but `SslStreamTlsProvider.DescribeHandshake` never sets them (the test pins them null), so Linux prints `[blank] / UNDEF`. SslStream does not expose them, but the plaintext handshake records cross `ConnectionStream` under it. The handshake message trace this task first also asked for is BL-4009 and BL-4010: SslStream decrypts the TLS 1.3 messages after ServerHello out of sight, so no honest trace can come from this path.
 
 ## Acceptance criteria
 
@@ -40,4 +40,4 @@ Design worked out by the 2026-10-28 claim (lane 3), before any edit; record it a
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
-- 2026-10-28: Doing -> Backlog. Split before any edit: SslStream cannot expose the encrypted TLS 1.3 handshake messages, so the trace criterion moves to BL-4006 and BL-4007; criteria and touches narrowed to the group and signature names
+- 2026-10-28: Doing -> Backlog. Split before any edit: SslStream cannot expose the encrypted TLS 1.3 handshake messages, so the trace criterion moves to BL-4009 and BL-4010; criteria and touches narrowed to the group and signature names
