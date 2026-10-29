@@ -33,3 +33,4 @@ Split from BL-3978 (cost cap). The probe is a C# file-based app (`dotnet run`, n
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: e42eb3bf b084e04d.
