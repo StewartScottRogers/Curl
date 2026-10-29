@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Connection;
 
 /// <summary>
-/// What an activated extension supplies in place of curl's transports (ADR-1008): the connector, and
+/// What an activated extension supplies in place of curl's transports (ADR-1010): the connector, and
 /// optionally the datagram connector, every transfer of its option group runs over - a named pipe, vsock,
 /// an SSH jump host or a tunnel - as <c>--unix-socket</c> replaces curl's connector.
 /// </summary>

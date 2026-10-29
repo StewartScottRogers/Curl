@@ -30,7 +30,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Notes
 
-- Plan: `IConnectionHook` and `ConnectionHooks` in `Curl.Extension.Abstractions/Connection`; the engine takes `extensionConnector` and `extensionDatagramConnector` on `CreateProtocolHandlers` and applies them to its `connector` and `datagramConnector` before anything else, as `--unix-socket` replaces the connector a host passes (ADR-1008).
+- Plan: `IConnectionHook` and `ConnectionHooks` in `Curl.Extension.Abstractions/Connection`; the engine takes `extensionConnector` and `extensionDatagramConnector` on `CreateProtocolHandlers` and applies them to its `connector` and `datagramConnector` before anything else, as `--unix-socket` replaces the connector a host passes (ADR-1010).
 - Decided: one hook per transfer, not a chain; two activated hooks throw an `ArgumentException` naming every option, which the host reports as an option error. A hook receives curl's connector so a jump host or tunnel can reach its first hop through it. Datagram connector defaults to curl's.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary,Curl.Engine.UnitLibrary` reported 0 failing members.
 - Added `Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md` to touches so the project document names the connection hooks; no other task in Doing names it.

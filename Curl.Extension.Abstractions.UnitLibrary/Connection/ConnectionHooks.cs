@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Connection;
 
 /// <summary>
-/// The connection hook of the extension one option group activated (ADR-1008). A host builds it from the
+/// The connection hook of the extension one option group activated (ADR-1010). A host builds it from the
 /// group's <see cref="ExtensionOptionValues" /> and passes <see cref="ConnectorOver" /> and
 /// <see cref="DatagramConnectorOver" /> to the engine; with no extension option given it holds no hook and
 /// gives curl's connectors back unchanged.

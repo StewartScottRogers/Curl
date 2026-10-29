@@ -18,7 +18,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   transfer runs over in place of curl's, given curl's so it can reach a first hop through it.
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an
   `ArgumentException` naming every option when two or more were; a host passes `ConnectorOver` and
-  `DatagramConnectorOver` to the engine (ADR-1008), which keep curl's connectors when no hook is active.
+  `DatagramConnectorOver` to the engine (ADR-1010), which keep curl's connectors when no hook is active.
 
 Later groundwork adds resolver and certificate hooks in their own subfolders.
 

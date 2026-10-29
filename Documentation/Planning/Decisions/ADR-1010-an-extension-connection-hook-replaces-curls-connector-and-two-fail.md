@@ -1,4 +1,4 @@
-# ADR-1008: An extension connection hook replaces curl's connector, and two claiming one transfer fail
+# ADR-1010: An extension connection hook replaces curl's connector, and two claiming one transfer fail
 
 - Status: Accepted
 - Date: 2026-10-29

@@ -18,7 +18,7 @@ Giving an extension's option on the curl command line makes that extension's `IC
 
 ## Context
 
-BL-4095 added `ConnectionHooks` in `Curl.Extension.Abstractions/Connection` and the engine seam `extensionConnector` / `extensionDatagramConnector` on `EngineComposition.CreateProtocolHandlers` (ADR-1008). No host passes them yet. Mirror how BL-4173 wires the transfer hooks: a one-line-per-extension catalogue of connection-hook activators in `Curl.Extension.Composition`, `ConnectionHooks.ActivatedBy` over the option group's `ExtensionOptionValues`, and its `ConnectorOver` / `DatagramConnectorOver` passed in `CurlComposition`. The `ArgumentException` from two hooks becomes curl's option error (exit 2) with its message.
+BL-4095 added `ConnectionHooks` in `Curl.Extension.Abstractions/Connection` and the engine seam `extensionConnector` / `extensionDatagramConnector` on `EngineComposition.CreateProtocolHandlers` (ADR-1010). No host passes them yet. Mirror how BL-4173 wires the transfer hooks: a one-line-per-extension catalogue of connection-hook activators in `Curl.Extension.Composition`, `ConnectionHooks.ActivatedBy` over the option group's `ExtensionOptionValues`, and its `ConnectorOver` / `DatagramConnectorOver` passed in `CurlComposition`. The `ArgumentException` from two hooks becomes curl's option error (exit 2) with its message.
 
 ## Acceptance criteria
 
