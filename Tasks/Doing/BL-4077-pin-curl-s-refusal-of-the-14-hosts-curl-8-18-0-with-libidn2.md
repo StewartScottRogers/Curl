@@ -32,3 +32,4 @@ BL-4033 did not pin 14 hosts curl refused: U+2100, U+2101, U+2105, U+2106 and te
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 013ec147 779790c0.
