@@ -34,3 +34,4 @@ Split from BL-3989 (cost cap). BL-4008 lands the socket-gated wait; with it test
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 92f70f8a 951ec1ef 84dfbe80 31c325b2.
