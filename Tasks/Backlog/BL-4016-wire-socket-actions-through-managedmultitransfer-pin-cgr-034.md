@@ -32,7 +32,7 @@ Split from BL-4008 (cost cap); read its Notes, including the test582 trace. Expe
 ## Notes
 
 - Split from BL-4008 (cost cap). Continues the stashed work of BL-4008.
-- Apply the stash's `ManagedMultiTransfer.cs`, `Cgr034Tests.cs` and `ManagedMultiTransferTests.SocketAction.cs` hunks (BL-4015 lands the other files). Keep CGR-150's `CloseIdleConnectionsForRoomAsync` beside the wiring. The fallbacks (`FirstTransferSocket`, the 10 ms timer) stay until BL-3990.
+- The stash is 2ed39938f4b4211d07f28f1ceb009eede15f0c36; BL-4015 landed its `TransferSocketWait.cs` and test hunks (take `git show 2ed39938f4:<path>` or `git diff` against it for the rest). Apply the stash's `ManagedMultiTransfer.cs`, `Cgr034Tests.cs` and `ManagedMultiTransferTests.SocketAction.cs` hunks (BL-4015 lands the other files). Keep CGR-150's `CloseIdleConnectionsForRoomAsync` beside the wiring. The fallbacks (`FirstTransferSocket`, the 10 ms timer) stay until BL-3990.
 - Write the stash's ADR with a free number (ADR-0969 last run; check), "Decided by Claude under Stewart's delegation", with its README row and citations in `ManagedMultiTransfer.cs` and `Cgr034Tests.cs`.
 - The test582 hang: a `SocketActionAsync(0x50000001, In)` never returns after ~30 actions (~1.1 s). Re-trace inside `MoveTransfersOnAsync` (before and after `RunQueuedCallbacks`, `MoveEveryTransferOn`, `SettleSocketWaitingTransfers`); suspects are the upload read callback run under `Settle`'s synchronous `Task.WaitAny`, or in-memory continuations running inline on the caller's thread. `Settle` is bounded by `SocketWaitSettleLimit` (200 ms). BL-4007 keeps any remaining test582 work and the quality gates.
 
