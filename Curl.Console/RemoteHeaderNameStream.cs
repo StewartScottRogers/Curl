@@ -24,7 +24,7 @@ namespace Curl.Console;
 /// The encoding the <c>Content-Disposition</c> name's bytes are read in; <see langword="null" />
 /// for the platform's, as <see cref="ContentDispositionFileName.EncodingFor" /> gives it (the ANSI
 /// code page on Windows; elsewhere UTF-8 that keeps each byte outside a valid sequence as that raw
-/// byte; ADR-0912, ADR-0972).
+/// byte; ADR-0912, ADR-0977).
 /// </param>
 /// <remarks>
 /// <para>

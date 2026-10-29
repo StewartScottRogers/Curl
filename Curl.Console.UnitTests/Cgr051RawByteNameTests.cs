@@ -6,7 +6,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins the Linux half of CGR-051 (BL-3858, ADR-0972): off Windows a <c>-J</c> name's bytes that
+/// Pins the Linux half of CGR-051 (BL-3858, ADR-0977): off Windows a <c>-J</c> name's bytes that
 /// are not valid UTF-8 are kept as their raw bytes. Measured with curl 8.18.0 OpenSSL on Linux
 /// (WSL) on 2026-10-28: <c>curl -sS -OJ -w "%{filename_effective}"</c> against
 /// <c>Content-Disposition: attachment; filename="caf\xE9.txt"</c> creates the file named

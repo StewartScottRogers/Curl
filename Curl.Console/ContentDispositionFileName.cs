@@ -32,7 +32,7 @@ namespace Curl.Console;
 /// each byte outside a valid UTF-8 sequence is kept as its <see cref="InvalidUtf8ByteEscape" />
 /// surrogate, so the output file opens under the raw bytes (<see cref="RawByteFileName" />), as
 /// curl 8.18.0 OpenSSL on Linux does: <c>filename="caf\xE9.txt"</c> creates the file named
-/// 63 61 66 E9 2E 74 78 74 (BL-3858 Notes, ADR-0972).
+/// 63 61 66 E9 2E 74 78 74 (BL-3858 Notes, ADR-0977).
 /// </para>
 /// </remarks>
 internal static class ContentDispositionFileName

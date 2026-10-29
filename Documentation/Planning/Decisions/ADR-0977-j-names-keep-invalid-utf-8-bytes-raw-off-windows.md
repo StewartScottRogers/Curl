@@ -1,4 +1,4 @@
-# ADR-0972: `-J` names keep bytes that are not valid UTF-8 as their raw bytes off Windows
+# ADR-0977: `-J` names keep bytes that are not valid UTF-8 as their raw bytes off Windows
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-3858).
 

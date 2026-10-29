@@ -18,7 +18,7 @@ On Linux and macOS, `curl -sS -OJ -w "%{filename_effective}"` against `filename=
 
 ## Context
 
-Left over from BL-3858 (ADR-0972). Off Windows an output name holding a byte that is not valid UTF-8 carries it as its `InvalidUtf8ByteEscape` surrogate (U+DC00 + byte, ADR-0920); `RawByteFileName` opens the file under the raw bytes, but write-out and warnings print the surrogate through the normal UTF-8 encoder (U+FFFD bytes). Measure the Linux build through WSL with `Record-CurlExchange.ps1` (`-Curl wsl.exe`) before pinning anything. Start at `Curl.Output.UnitLibrary/TransferWriteOutVariables.cs` and the warning text in `Curl.Console/RunningTransferState.cs`; the output writer that encodes write-out text may be the narrower place (check `CurlComposition.cs`'s `InvalidUtf8ByteEscape.Encoding` use).
+Left over from BL-3858 (ADR-0977). Off Windows an output name holding a byte that is not valid UTF-8 carries it as its `InvalidUtf8ByteEscape` surrogate (U+DC00 + byte, ADR-0920); `RawByteFileName` opens the file under the raw bytes, but write-out and warnings print the surrogate through the normal UTF-8 encoder (U+FFFD bytes). Measure the Linux build through WSL with `Record-CurlExchange.ps1` (`-Curl wsl.exe`) before pinning anything. Start at `Curl.Output.UnitLibrary/TransferWriteOutVariables.cs` and the warning text in `Curl.Console/RunningTransferState.cs`; the output writer that encodes write-out text may be the narrower place (check `CurlComposition.cs`'s `InvalidUtf8ByteEscape.Encoding` use).
 
 ## Acceptance criteria
 
