@@ -32,3 +32,4 @@ Measured in BL-4077's run (WSL Ubuntu, `LC_ALL=C.utf8`): with a socat fake proxy
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 68b26c89 779790c0.
