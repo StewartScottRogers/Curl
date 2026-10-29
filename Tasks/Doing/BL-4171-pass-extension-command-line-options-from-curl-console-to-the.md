@@ -32,3 +32,4 @@ BL-4092 built the pieces (ADR-1006): `ExtensionCommandLineOptions.For(readEnviro
 ## Log
 
 - 2026-10-29: Created (from BL-4092).
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 092399cc 5c185e4f f77def69 dc71d5d9.
