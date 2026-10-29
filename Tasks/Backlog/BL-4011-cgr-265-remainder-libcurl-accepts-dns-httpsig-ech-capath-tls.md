@@ -1,5 +1,5 @@
 ---
-id: BL-4000
+id: BL-4011
 title: CGR-265 remainder: Libcurl accepts DNS_*, HTTPSIG_*, ECH, CAPATH, TLS13_CIPHERS and other options the advertised build lacks
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4000 — CGR-265 remainder: Libcurl accepts DNS_*, HTTPSIG_*, ECH, CAPATH, TLS13_CIPHERS and other options the advertised build lacks
+# BL-4011 — CGR-265 remainder: Libcurl accepts DNS_*, HTTPSIG_*, ECH, CAPATH, TLS13_CIPHERS and other options the advertised build lacks
 
 ## Goal
 
