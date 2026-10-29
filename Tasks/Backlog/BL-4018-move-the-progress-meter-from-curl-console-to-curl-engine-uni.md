@@ -1,5 +1,5 @@
 ---
-id: BL-4013
+id: BL-4018
 title: Move the progress meter from Curl.Console to Curl.Engine.UnitLibrary so Libcurl can draw it
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4013 — Move the progress meter from Curl.Console to Curl.Engine.UnitLibrary so Libcurl can draw it
+# BL-4018 — Move the progress meter from Curl.Console to Curl.Engine.UnitLibrary so Libcurl can draw it
 
 ## Goal
 
