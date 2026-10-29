@@ -9,6 +9,9 @@ internal static class QuicTest
     /// The <c>[Timeout]</c> of every asynchronous QUIC test: a test whose wait is never answered
     /// fails after two minutes instead of hanging the run (BL-1067). Longer than
     /// <see cref="QuicTestLiveChannel.HangGuard" />, so a guarded wait fails first with its own message.
+    /// Always cooperative, with every wait on <c>TestContext.CancellationToken</c> or the guard: a
+    /// non-cooperative timeout blocks a thread-pool thread for the whole test, and under the full
+    /// fast run those blocked threads starved the connection loops they waited on (BL-4269).
     /// </summary>
     public const int HangTimeoutMilliseconds = 120_000;
 

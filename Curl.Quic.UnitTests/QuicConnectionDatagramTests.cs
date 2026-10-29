@@ -16,7 +16,7 @@ public sealed class QuicConnectionDatagramTests
     private TestDiagnostics Diagnostics => TestDiagnostics.For(TestContext);
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task SendAndReceiveDatagramAsync_BothAdvertise_CarriesDatagramsBothWays()
     {
         Diagnostics.Arrange("datagrams", "'ping' to the server, 'pong' back");
@@ -28,9 +28,9 @@ public sealed class QuicConnectionDatagramTests
             Diagnostics.Assert("max datagram payload length", QuicClientConnectionState.MaximumDatagramPayloadLength, datagrams.MaxDatagramPayloadLength);
             Assert.AreEqual(QuicClientConnectionState.MaximumDatagramPayloadLength, datagrams.MaxDatagramPayloadLength);
 
-            await datagrams.SendDatagramAsync("ping"u8.ToArray(), CancellationToken.None);
+            await datagrams.SendDatagramAsync("ping"u8.ToArray(), TestContext.CancellationToken);
             await channel.WaitUntilSentAsync(() => channel.Sent<QuicDatagramFrame>().Count > 0);
-            Task<ReadOnlyMemory<byte>> received = datagrams.ReceiveDatagramAsync(CancellationToken.None).AsTask();
+            Task<ReadOnlyMemory<byte>> received = datagrams.ReceiveDatagramAsync(TestContext.CancellationToken).AsTask();
             channel.FromServer(new QuicDatagramFrame("pong"u8.ToArray()));
             ReadOnlyMemory<byte> pong = await received;
 
@@ -43,7 +43,7 @@ public sealed class QuicConnectionDatagramTests
     }
 
     [TestMethod]
-    [Timeout(QuicTest.HangTimeoutMilliseconds)]
+    [Timeout(QuicTest.HangTimeoutMilliseconds, CooperativeCancellation = true)]
     public async Task SendDatagramAsync_Cancelled_QueuesNothing()
     {
         Diagnostics.Arrange("cancellation", "already requested");
@@ -68,7 +68,7 @@ public sealed class QuicConnectionDatagramTests
         object? handshakeFailure;
         using (Diagnostics.Phase("handshake"))
         {
-            handshakeFailure = await new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, CancellationToken.None);
+            handshakeFailure = await new QuicClientConnector(clock).RunHandshakeAsync(handshake, channel, null, TestContext.CancellationToken);
         }
 
         Diagnostics.Act("handshake failure", handshakeFailure?.ToString() ?? "none");
