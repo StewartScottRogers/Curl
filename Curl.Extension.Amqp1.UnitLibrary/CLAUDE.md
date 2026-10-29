@@ -8,7 +8,7 @@ including `Curl.Extension.Amqp0.UnitLibrary` (AMQP 0-9-1, which owns `amqp://` a
   `Amqp1Reader` reads every encoding; `Amqp1FormatCode` names the constructors of section 1.6. The value types are
   in `Amqp1Values.cs`: `Amqp1Symbol`, `Amqp1Timestamp`, `Amqp1Decimal`, `Amqp1Map`, `Amqp1Array` and
   `Amqp1Described` (section 1.3).
-- `Frames/`: the transport of Part 2, the message sections of Part 3 and the SASL frames of Part 5 (ADR-1054).
+- `Frames/`: the transport of Part 2, the message sections of Part 3 and the SASL frames of Part 5 (ADR-1058).
   `Amqp1ProtocolHeader` writes and checks the `AMQP 0 1.0.0` and `AMQP 3 1.0.0` headers; `Amqp1FrameCodec` the frame
   layout and `Amqp1Frame` one frame and its performative and payload. `Amqp1CompositeType` catalogues every
   performative, error, delivery state, source, target, header, properties and SASL frame body with its descriptor

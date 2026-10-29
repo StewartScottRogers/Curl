@@ -1090,4 +1090,4 @@ Each option and the specific reason it lost.
 | [1055](ADR-1055-a-connection-hook-layers-curls-tls-over-its-own-stream.md) | A connection hook layers curl's TLS over its own stream (BL-4206) | Accepted | 2026-10-29 |
 | [1056](ADR-1056-the-amqp0-codec-maps-each-wire-fault-to-one-amqp-reply-code.md) | The AMQP 0-9-1 codec maps each wire fault to one AMQP reply code (BL-4259) | Accepted | 2026-10-29 |
 | [1057](ADR-1057-the-coap-extension-sends-1024-byte-blocks-and-follows-the-servers-size.md) | The CoAP extension sends 1024-byte blocks, follows the server's size, and writes a block-wise body whole (BL-4247) | Accepted | 2026-10-29 |
-| [1054](ADR-1054-amqp1-frames-carry-composites-through-one-catalogue-of-descriptor-codes-and-field-names.md) | AMQP 1.0 frames carry composites through one catalogue of descriptor codes and field names (BL-4256) | Accepted | 2026-10-29 |
+| [1058](ADR-1058-amqp1-frames-carry-composites-through-one-catalogue-of-descriptor-codes-and-field-names.md) | AMQP 1.0 frames carry composites through one catalogue of descriptor codes and field names (BL-4256) | Accepted | 2026-10-29 |

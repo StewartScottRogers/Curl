@@ -1,4 +1,4 @@
-# ADR-1054 — AMQP 1.0 frames carry composites through one catalogue of descriptor codes and field names
+# ADR-1058 — AMQP 1.0 frames carry composites through one catalogue of descriptor codes and field names
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
