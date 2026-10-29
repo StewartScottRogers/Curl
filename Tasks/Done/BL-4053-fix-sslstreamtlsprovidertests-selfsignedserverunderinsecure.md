@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitTests/SslStreamTlsProviderTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4053 — Fix SslStreamTlsProviderTests SelfSignedServerUnderInsecure NegotiatedGroupName null under the coverage run
 
@@ -22,11 +22,14 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] <!-- A statement someone else can check from the repository without asking a question. -->
 
 ## Notes
+
+The test shared host name with earlier tests, so a resumed session reported no key share and NegotiatedGroupName was null; it now uses its own host like the TLS 1.2 test. Fast tests in Curl.Networking.UnitTests pass.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-29: Doing -> Done. Own target host so no resumed session hides the key share

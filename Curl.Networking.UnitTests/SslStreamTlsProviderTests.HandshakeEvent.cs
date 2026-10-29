@@ -16,7 +16,8 @@ public sealed partial class SslStreamTlsProviderTests
     {
         var events = new RecordingTransferEvents();
 
-        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events);
+        // A host of its own, so no earlier test's session is resumed without the server's key share (BL-4053).
+        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, targetHost: $"{Guid.NewGuid():N}.test");
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
@@ -165,7 +166,8 @@ public sealed partial class SslStreamTlsProviderTests
         // before the handshake lines (curl 8.21.0 OpenSSL, measured, BL-405).
         var events = new RecordingTransferEvents();
 
-        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events);
+        // A host of its own, so no earlier test's session is resumed without the server's key share (BL-4053).
+        var result = await ReportingHandshakeAsync(new TlsClientOptions(Insecure: true), events, targetHost: $"{Guid.NewGuid():N}.test");
 
         Diagnostics.Assert("exit code", CurlExitCode.Ok, result.ExitCode);
         Diagnostics.Assert("TLS event count", 2, events.TlsEvents.Count);
