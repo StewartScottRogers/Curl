@@ -34,3 +34,4 @@ completed:
 
 - `ConnectTarget` gains an optional `TlsServerName` (the SNI and certificate-name host when it differs from `Host`) and an optional switch that makes the TLS provider trust only the system store (ignoring `--cacert`, `--capath` and `-k`), both honoured by the Schannel-style provider and the hand-built one. Unit tests in Curl.Networking.UnitTests.
 - Why: BL-3818 (CGR-289) needs the Windows ldaps:// path to open WinLDAP's second connection with the machine name as SNI and system-store trust.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
