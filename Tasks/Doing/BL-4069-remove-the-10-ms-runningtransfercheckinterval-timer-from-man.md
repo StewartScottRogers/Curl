@@ -35,3 +35,4 @@ Part 2 of 2 of BL-3990 (CGR-034); runs after BL-4068. Remove `RunningTransferChe
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 0c6694c6 7953220b 3b4ad1dc 18d43fff 779790c0.
