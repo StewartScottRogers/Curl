@@ -31,3 +31,4 @@ ADR-0923 (BL-3867) carries an absolute `Location`'s bytes from 0x80 marked as U+
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 52c00312 4b1d76f6 779790c0.
