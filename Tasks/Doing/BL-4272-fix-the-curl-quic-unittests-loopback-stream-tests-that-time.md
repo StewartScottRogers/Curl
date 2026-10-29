@@ -30,3 +30,4 @@ Found by BL-4194 (lane 5, 2026-10-29), whose change does not reach Curl.Quic: in
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 4fb887a9 3d836d5e.
