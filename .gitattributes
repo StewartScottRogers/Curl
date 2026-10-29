@@ -10,6 +10,10 @@
 # lanes add to it at once: a merge or rebase keeps both sides' lines (ADR-0689).
 Curl.Conformance.UnitTests/PassingUpstreamCases.txt merge=union
 
+# Extension projects are added to Curl.slnx as one order-free line each under one marker comment; two
+# branches adding a line at once keep both (ADR-1003).
+Curl.slnx merge=union
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

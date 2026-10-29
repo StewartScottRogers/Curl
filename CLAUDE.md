@@ -357,6 +357,10 @@ What Curl adds beyond upstream curl - a scheme or feature curl does not have - i
 
 - Each is `Curl.Extension.<Name>.UnitLibrary` with its `.UnitTests`, registered by one line in
   `Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs` (a shared list file).
+- It joins the solution with exactly one line in `Curl.slnx`, directly under the marker comment in the
+  Extensions section: a single-line `<Folder Name="/Extensions/<Name>/">` holding both `<Project/>`
+  elements (`merge=union`, ADR-1003). Composition references every extension by wildcard, so no csproj
+  is edited and `Curl.slnx` and that csproj need not be in the task's `touches`.
 - Only the hosts (`Curl.Console`, `Curl.Api`, `Curl.Mcp`) and the extensions reference an
   extension. An extension references `Curl.Protocol.Abstractions` and the shared layers, never a
   `Curl.Protocol.*` library and never another extension but `Curl.Extension.Abstractions`.

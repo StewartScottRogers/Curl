@@ -9,3 +9,4 @@ Curl.Conformance.UnitLibrary/UpstreamPlatformFeatureTable.cs
 Curl.Conformance.UnitProgram.UnitLibrary/UnitPrograms.*.cs
 Documentation/Planning/Decisions/README.md
 Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs
+Curl.slnx

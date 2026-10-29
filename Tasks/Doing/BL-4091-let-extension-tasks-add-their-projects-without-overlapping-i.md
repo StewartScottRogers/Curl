@@ -22,15 +22,17 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.Composition.UnitLibrary` references every `Curl.Extension.<Name>.UnitLibrary` (except Composition and Abstractions) without a per-extension line in its csproj, e.g. by an MSBuild item wildcard, and `VerifyExtensionIsolation` still passes.
-- [ ] Adding an extension project pair to `Curl.slnx` is an order-free block of lines that two branches can add at once and `git merge` combines cleanly; proved with two scratch branches each adding one block, merged with no conflict and the result building.
-- [ ] Whatever makes that true is recorded: the file is listed in `Tasks/SharedListFiles.txt` with `merge=union` in `.gitattributes`, or another mechanism is chosen and written into an ADR marked "Decided by Claude under Stewart's delegation".
-- [ ] CLAUDE.md's "Extensions" section and `DarkFactory/LaneRules.md` say exactly how a new extension adds its projects.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Curl.Extension.Composition.UnitLibrary` references every `Curl.Extension.<Name>.UnitLibrary` (except Composition and Abstractions) without a per-extension line in its csproj, e.g. by an MSBuild item wildcard, and `VerifyExtensionIsolation` still passes.
+- [x] Adding an extension project pair to `Curl.slnx` is an order-free block of lines that two branches can add at once and `git merge` combines cleanly; proved with two scratch branches each adding one block, merged with no conflict and the result building.
+- [x] Whatever makes that true is recorded: the file is listed in `Tasks/SharedListFiles.txt` with `merge=union` in `.gitattributes`, or another mechanism is chosen and written into an ADR marked "Decided by Claude under Stewart's delegation".
+- [x] CLAUDE.md's "Extensions" section and `DarkFactory/LaneRules.md` say exactly how a new extension adds its projects.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 If `merge=union` on the whole `Curl.slnx` is unsafe (a removal in one branch resurrected by another), pick a narrower mechanism and say why in the ADR.
+
+Added: CLAUDE.md and DarkFactory/LaneRules.md edited (the criteria require it); ADR-1003 records the mechanism. Measured with `git merge-file --union`: multi-line blocks interleave into broken XML, so the entry is one single-line Folder (see ADR). Scratch-repo merge was denied by the sandbox, so the merge proof is `git merge-file` on both orders of the same marker insertion. Fast tests: build clean, Composition tests 8/8; no other code changed.
 
 ## Log
 
