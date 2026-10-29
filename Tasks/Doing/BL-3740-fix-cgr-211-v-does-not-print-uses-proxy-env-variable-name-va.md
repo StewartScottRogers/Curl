@@ -87,3 +87,4 @@ http_proxy=http://127.0.0.1:21211 ~/curlnet/curl -sv -o /dev/null http://127.0.0
 ## Log
 
 - 2026-10-26: Created from CGR-211 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
