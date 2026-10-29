@@ -26,6 +26,9 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <summary>Cancelled by the first failure under <c>--fail-early</c>, aborting every running transfer.</summary>
     private readonly CancellationTokenSource abort = new();
 
+    /// <summary>Cancelled at once by the first failure under <c>--fail-early</c>, so no waiting transfer starts.</summary>
+    private readonly CancellationTokenSource stopStarts = new();
+
     /// <summary>The reports left for the end of the run, with the transfer number they are ordered by.</summary>
     private readonly List<(long TransferId, Func<Task> Report)> deferredReports = [];
 
@@ -71,8 +74,21 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
     /// <summary>Gets the token every transfer of the run is aborted through.</summary>
     internal CancellationToken AbortToken => abort.Token;
 
-    /// <summary>Gets a value indicating whether <c>--fail-early</c> has aborted the run.</summary>
+    /// <summary>
+    /// How long after the first failure under <c>--fail-early</c> the running transfers are aborted: curl
+    /// 8.22.0 checks for the abort about once a second, so a transfer whose response arrives first completes
+    /// (CGR-294).
+    /// </summary>
+    internal static readonly TimeSpan AbortDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>Gets a value indicating whether <c>--fail-early</c> has aborted the running transfers.</summary>
     internal bool IsAborted => abort.IsCancellationRequested;
+
+    /// <summary>Gets a value indicating whether <c>--fail-early</c> has seen its first failure, so no transfer starts.</summary>
+    internal bool HasFailedEarly => stopStarts.IsCancellationRequested;
+
+    /// <summary>Gets the token that ends a wait to start, cancelled at the first failure under <c>--fail-early</c>.</summary>
+    internal CancellationToken StopStartsToken => stopStarts.Token;
 
     /// <summary>
     /// Gets a value indicating whether a result that ends the run without <c>--fail-early</c>, such as
@@ -185,7 +201,8 @@ internal sealed class ParallelRun(int maxRunning, int maxPerHost, bool parallelI
 
         if (failEarly)
         {
-            abort.Cancel();
+            stopStarts.Cancel();
+            abort.CancelAfter(AbortDelay);
         }
         else
         {

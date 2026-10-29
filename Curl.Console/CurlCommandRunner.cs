@@ -2038,7 +2038,7 @@ internal sealed class CurlCommandRunner(
             return true;
         }
 
-        if (run.IsAborted)
+        if (run.HasFailedEarly)
         {
             run.DeferReport(transfer.TransferId, () => ReportSkippedAsync(dispatch, options, transfer, state, run.FirstFailure!));
             return false;
@@ -2071,18 +2071,20 @@ internal sealed class CurlCommandRunner(
     {
         runningTransfer.Value = state;
         (TransferResult Result, string GivenUrl, string TransferUrl) ended;
+        bool cancelledWhileWaiting = false;
         try
         {
-            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, state.AbortToken).ConfigureAwait(false);
+            ended = await TransferOnceHostIsFreeAsync(run, dispatch, options, transfer, run.StopStartsToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (state.AbortToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (run.HasFailedEarly)
         {
+            cancelledWhileWaiting = true;
             ended = (AbortedResultOf(state), transfer.Url, UrlSchemeGuesser.AddScheme(transfer.Url, options.DefaultProtocol));
         }
 
         LogParallelScheduler("finished", transfer);
 
-        await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended))
+        await writeGate.RunExclusiveAsync(() => EndParallelTransferAsync(run, dispatch, options, transfer, state, ended, cancelledWhileWaiting))
             .ConfigureAwait(false);
         state.ParallelProgress?.End();
     }
@@ -2111,7 +2113,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="dispatch">Performs the transfer with the handler for its scheme, after its warning lines.</param>
     /// <param name="options">The transfer's option group.</param>
     /// <param name="transfer">The transfer.</param>
-    /// <param name="abortToken">Ends the wait for the host when <c>--fail-early</c> aborts the run.</param>
+    /// <param name="abortToken">Ends the wait for the host when <c>--fail-early</c> sees its first failure.</param>
     /// <returns>The transfer's result and URLs, as <see cref="TransferUrlAsync" /> gives them.</returns>
     private async Task<(TransferResult Result, string GivenUrl, string TransferUrl)> TransferOnceHostIsFreeAsync(
         ParallelRun run,
@@ -2216,6 +2218,7 @@ internal sealed class CurlCommandRunner(
     /// <param name="transfer">The transfer.</param>
     /// <param name="state">The transfer's state.</param>
     /// <param name="ended">The transfer's result and URLs, as <see cref="TransferUrlAsync" /> gives them.</param>
+    /// <param name="cancelledWhileWaiting">Whether <c>--fail-early</c> ended its wait to start, so it is reported as aborted.</param>
     /// <returns>A task that completes when the report is written or left.</returns>
     private Task EndParallelTransferAsync(
         ParallelRun run,
@@ -2223,14 +2226,15 @@ internal sealed class CurlCommandRunner(
         CommandLineOptions options,
         UrlTransfer transfer,
         RunningTransferState state,
-        (TransferResult Result, string GivenUrl, string TransferUrl) ended)
+        (TransferResult Result, string GivenUrl, string TransferUrl) ended,
+        bool cancelledWhileWaiting)
     {
         if (NotesSkippedTransfer(options, ended.Result))
         {
             return Task.CompletedTask;
         }
 
-        if (run.IsAborted)
+        if (run.IsAborted || cancelledWhileWaiting)
         {
             run.DeferReport(
                 transfer.TransferId,

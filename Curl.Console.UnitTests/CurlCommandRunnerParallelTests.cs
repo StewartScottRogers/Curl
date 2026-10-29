@@ -271,7 +271,7 @@ public sealed class CurlCommandRunnerParallelTests
     }
 
     [TestMethod]
-    public async Task RunAsync_FailEarlyAndATransferEndingAfterTheFailure_ReportsItAsAborted()
+    public async Task RunAsync_FailEarlyAndATransferEndingBeforeTheAbortLands_CompletesIt()
     {
         HeldTransferHandler http = new(observesCancellation: false);
 
@@ -283,9 +283,9 @@ public sealed class CurlCommandRunnerParallelTests
 
         int exitCode = await run;
         Diagnostics.Assert("exit code", 37, exitCode);
-        Diagnostics.Diff("stdout", "1 37\n0 42\n", Lf(standardOutput.Text));
+        Diagnostics.Diff("stdout", "1 37\n0 0\n", Lf(standardOutput.Text));
         Assert.AreEqual(37, exitCode);
-        Assert.AreEqual("1 37\n0 42\n", standardOutput.Text);
+        Assert.AreEqual("1 37\n0 0\n", standardOutput.Text);
     }
 
     [TestMethod]
