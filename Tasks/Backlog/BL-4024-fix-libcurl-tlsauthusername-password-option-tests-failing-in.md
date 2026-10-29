@@ -1,5 +1,5 @@
 ---
-id: BL-4019
+id: BL-4024
 title: Fix Libcurl TlsauthUsername/Password option tests failing intermittently with NotBuiltIn under Measure-CodeQuality
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4019 — Fix Libcurl TlsauthUsername/Password option tests failing intermittently with NotBuiltIn under Measure-CodeQuality
+# BL-4024 — Fix Libcurl TlsauthUsername/Password option tests failing intermittently with NotBuiltIn under Measure-CodeQuality
 
 ## Goal
 

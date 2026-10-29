@@ -32,7 +32,7 @@ Prerequisite of BL-4012 (Libcurl draws the meter under `CURLOPT_NOPROGRESS=0`). 
 - Filed by BL-4012's run (lane 11, 2026-10-28) as the move that task needs first.
 - ParallelTransferProgress needs ParallelProgressMeter, which needs WriteGate: both (and their tests) moved too, added to touches; Console files that use them get `using Curl.Engine;`.
 - WriteGateStream moved too (WriteGate needs it). Engine tests link ManualTimerTimeProvider and WriteAndFlushRecordingStream from Curl.Console.UnitTests; WriteGateStreamTests uses a local ThrowingWriteStream in place of Console-only ClosedStandardOutputStream.
-- Measure-CodeQuality: moved types and Curl.Console all pass. One Engine member fails on branch coverage, ManagedEasyTransfer.PerformBuildingMimePostAsync (ManagedEasyTransfer.PostBody.cs:43, 90%), not a moved type and untouched here. Libcurl TLS-auth option tests failed intermittently under the measure run (filed BL-4019).
+- Measure-CodeQuality: moved types and Curl.Console all pass. One Engine member fails on branch coverage, ManagedEasyTransfer.PerformBuildingMimePostAsync (ManagedEasyTransfer.PostBody.cs:43, 90%), not a moved type and untouched here. Libcurl TLS-auth option tests failed intermittently under the measure run (filed BL-4024).
 
 ## Log
 
