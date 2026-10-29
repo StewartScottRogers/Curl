@@ -1,5 +1,5 @@
 ---
-id: BL-4039
+id: BL-4044
 title: Finish CGR-289: measure ldaps:// WinLDAP against real curl and match the NTLM flags and single bind
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4039 — Finish CGR-289: measure ldaps:// WinLDAP against real curl and match the NTLM flags and single bind
+# BL-4044 — Finish CGR-289: measure ldaps:// WinLDAP against real curl and match the NTLM flags and single bind
 
 ## Goal
 
