@@ -348,6 +348,24 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
         AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy, [], cancellationToken);
 
     /// <summary>
+    /// Performs the origin's client handshake, offering <paramref name="applicationProtocols" /> through ALPN, as
+    /// the six-argument overload does with <c>isProxy</c> <see langword="false" /> (ADR-1056).
+    /// </summary>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the trust and the completed handshake are reported.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>The same result the three-argument overload describes.</returns>
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, isProxy: false, applicationProtocols, cancellationToken);
+
+    /// <summary>
     /// Performs the client handshake as
     /// <see cref="AuthenticateAsClientAsync(IConnection, string, ITransferEvents, bool, CancellationToken)" />
     /// does, offering <paramref name="applicationProtocols" /> through ALPN unless

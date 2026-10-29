@@ -161,6 +161,18 @@ public sealed class CertificateCheckHooksTests
     }
 
     [TestMethod]
+    public async Task TlsProviderOver_WithApplicationProtocols_OffersThemThroughCurlsProviderAndChecksTheUpgrade()
+    {
+        string[] h2ThenHttp11 = ["h2", "http/1.1"];
+        FixedTlsProvider curls = new(ConnectResult.Connected(new TrackedConnection(), null, peerCertificates: Chain));
+
+        ConnectResult result = await HooksOf(new ExampleHook(Dane, "DANE: no TLSA record matches")).TlsProviderOver(curls).AuthenticateAsClientAsync(new TrackedConnection(), "mail.example.com", NoTransferEvents.Instance, h2ThenHttp11, CancellationToken.None);
+
+        Assert.AreSame(h2ThenHttp11, curls.GivenApplicationProtocols);
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+    }
+
+    [TestMethod]
     public async Task TlsProviderOver_WithAnUpgradeCurlRefused_GivesCurlsRefusalBack()
     {
         ConnectResult refused = ConnectResult.Failed(CurlExitCode.PeerFailedVerification, "SSL certificate problem: self-signed certificate");
@@ -210,10 +222,18 @@ public sealed class CertificateCheckHooksTests
 
         public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) => ValueTask.FromResult(result);
 
+        public IReadOnlyList<string>? GivenApplicationProtocols { get; private set; }
+
         public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, CancellationToken cancellationToken)
         {
             GivenEvents = true;
             return ValueTask.FromResult(result);
+        }
+
+        public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, IReadOnlyList<string> applicationProtocols, CancellationToken cancellationToken)
+        {
+            GivenApplicationProtocols = applicationProtocols;
+            return AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken);
         }
     }
 

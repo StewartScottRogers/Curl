@@ -482,6 +482,32 @@ public sealed partial class HandBuiltTlsProviderTests
         await IgnoreFailureAsync(serverTask);
     }
 
+    [TestMethod]
+    public async Task AuthenticateAsClientAsync_ThroughITlsProvidersAlpnOverload_OffersTheProtocolsAsTheOrigin()
+    {
+        var (client, server) = InMemoryDuplexStream.CreatePair();
+        var serverTask = RunEchoServerAsync(server, SslProtocols.Tls12, Http11);
+        var events = new RecordingTransferEvents();
+        ITlsProvider provider = Provider(Tls12Only(new TlsClientOptions(Insecure: true)), OpenSslBuild);
+        Diagnostics.Arrange("application protocols passed in", string.Join(",", Http11));
+
+        ConnectResult result;
+        using (Diagnostics.Phase("TLS handshake"))
+        {
+            result = await provider.AuthenticateAsClientAsync(new StreamConnection(client, ServerEndPoint), CertificateHost, events, Http11, CancellationToken.None);
+        }
+
+        ActConnectResult(result);
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode, result.ErrorMessage);
+        var handshake = Assert.ContainsSingle(events.Handshakes);
+        Diagnostics.Assert("offered application protocols", "http/1.1", string.Join(",", handshake.OfferedApplicationProtocols));
+        CollectionAssert.AreEqual(Http11, handshake.OfferedApplicationProtocols.ToArray());
+        Assert.IsFalse(handshake.IsProxy);
+        Assert.AreEqual("http/1.1", result.ApplicationProtocol);
+        await result.Connection!.DisposeAsync();
+        await IgnoreFailureAsync(serverTask);
+    }
+
     // BL-708's criterion: a self-signed chain fails with the exit and message the SslStream
     // provider gives against the same server, for each build and each name.
     [TestMethod]
