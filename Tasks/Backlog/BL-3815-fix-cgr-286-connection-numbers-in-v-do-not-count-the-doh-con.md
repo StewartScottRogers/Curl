@@ -4,8 +4,8 @@ title: Fix CGR-286: Connection numbers in -v do not count the DoH connections
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Engine.UnitLibrary/EngineConnectionIdTransferEvents.cs, Curl.Engine.UnitTests/Cgr286Tests.cs]
+depends-on: [BL-3814]
+touches: [Curl.Engine.UnitLibrary/EngineComposition.Dns.cs, Curl.Engine.UnitLibrary/EngineComposition.Transports.cs, Curl.Engine.UnitLibrary/EngineConnectionIdTransferEvents.cs, Curl.Engine.UnitLibrary/ManagedCurlEngine.cs, Curl.Networking.UnitLibrary/DohDnsResolver.cs, Curl.Networking.UnitLibrary/DohDnsResolver.Exchange.cs, Curl.Console/CurlComposition.cs, Curl.Engine.UnitTests/Cgr286Tests.cs, Curl.Networking.UnitTests/Cgr286Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -71,7 +71,10 @@ curl -v -sS -L --doh-url http://127.0.0.1:21800/dns-query http://foo.test:21802/
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr286Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Analysis (2026-10-29, no code edited): the DoH resolver (`Curl.Networking.UnitLibrary/DohDnsResolver.Exchange.cs`) opens one connection per query with its own `_connectionCount` and never takes a `%{conn_id}` from the run's `TransferPerformer`, so the -v number of the first real connection is #0 where curl 8.22.0 prints #2 for foo (DoH A and AAAA took #0 and #1) and #3 for bar (DoH connections reused, so no new ids). Fix plan: give `DohDnsResolver` an optional id-taker that is told when a query finds no idle DoH connection (active queries >= ids taken), plumbed from `TransferPerformer.TakeConnectionId` through `EngineComposition.CreateTransports`/`CreateDnsResolver` (Curl.Console/CurlComposition.cs, ManagedCurlEngine.cs call it); unit tests in Curl.Networking.UnitTests/Cgr286Tests.cs and Curl.Engine.UnitTests/Cgr286Tests.cs. Needs EngineComposition.Dns.cs, which live task BL-3814 holds, so requeued behind it.
+
 ## Log
 
 - 2026-10-26: Created from CGR-286 of the third-party gap report.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-29: Doing -> Backlog. Needs EngineComposition.Dns.cs held by BL-3814 (DoH connection ids); depends-on BL-3814
