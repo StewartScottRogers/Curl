@@ -38,3 +38,4 @@ Split from BL-4115 (`mqtt5://`, `mqtt5s://`, `mqtt5+ws://`, extension 14 of 63) 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: e8baf0a7 c0741cb9 1a5c5a50 7f96b952 d5bed3a7 8be0418c f4f7f560 3d836d5e.
