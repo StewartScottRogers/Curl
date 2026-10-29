@@ -1099,3 +1099,4 @@ Each option and the specific reason it lost.
 | [1064](ADR-1064-coap-observe-writes-each-notification-then-a-newline.md) | `--coap-observe` follows a CoAP resource and writes each notification, then a newline (BL-4248) | Accepted | 2026-10-29 |
 | [1062](ADR-1062-nats-subscribes-without-data-publishes-with-it-and-requests-with-a-query-field.md) | NATS subscribes without data, publishes with it, and requests with a query field (BL-4120) | Accepted | 2026-10-29 |
 | [1065](ADR-1065-nats-subscribes-without-data-publishes-with-it-and-requests-with-a-query-field.md) | NATS subscribes without data, publishes with it, and requests with a query field (BL-4120) | Accepted | 2026-10-29 |
+| [1056](ADR-1056-a-connection-hooks-tls-offers-curls-alpn-list.md) | A connection hook's TLS offers curl's ALPN list (BL-4263) | Accepted | 2026-10-29 |

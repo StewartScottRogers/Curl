@@ -74,6 +74,34 @@ public interface ITlsProvider
         AuthenticateAsClientAsync(plaintext, targetHost, cancellationToken);
 
     /// <summary>
+    /// Performs the client handshake as
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, ITransferEvents, CancellationToken)" /> does,
+    /// offering <paramref name="applicationProtocols" /> through ALPN as curl's own origin handshake offers them
+    /// (none under <c>--no-alpn</c>), so a connector outside <c>Curl.Networking</c> - an extension's, such as
+    /// <c>--npipe</c>'s - can run an <c>https://</c> transfer that negotiates HTTP/2 (ADR-1056).
+    /// </summary>
+    /// <remarks>
+    /// By default nothing is offered and the handshake is the four-argument overload's; a provider that offers
+    /// ALPN overrides this.
+    /// </remarks>
+    /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
+    /// <param name="targetHost">The host name to validate the server certificate against.</param>
+    /// <param name="events">Where the handshake is reported.</param>
+    /// <param name="applicationProtocols">The protocols to offer through ALPN, in preference order.</param>
+    /// <param name="cancellationToken">Cancels the handshake.</param>
+    /// <returns>
+    /// The same result
+    /// <see cref="AuthenticateAsClientAsync(IConnection, string, CancellationToken)" /> returns.
+    /// </returns>
+    ValueTask<ConnectResult> AuthenticateAsClientAsync(
+        IConnection plaintext,
+        string targetHost,
+        ITransferEvents events,
+        IReadOnlyList<string> applicationProtocols,
+        CancellationToken cancellationToken) =>
+        AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken);
+
+    /// <summary>
     /// Verifies a server certificate chain for <paramref name="targetHost" /> with the
     /// transfer's trust settings (<c>-k</c>, <c>--cacert</c>, <c>--capath</c>,
     /// <c>--crlfile</c>, <c>--pinnedpubkey</c>) without opening a TLS stream, so a protocol
