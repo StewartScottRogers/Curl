@@ -20,7 +20,7 @@ runs the same upgrade as `ExecuteAsync` but stops after the `101`, returning a
 `WsFrameEncoder.Encode(opcode, isFinal, ...)` writes any masked client frame;
 `WsFrameMetadataDecoder` decodes incrementally into `WsFrameRun`s (opcode, FIN, offset, bytes
 left) with the completed ping and the tool decoder's own violation messages. These types live in the shared
-`Curl.WebSocket.UnitLibrary` (ADR-1013), `WsOpcode` included: this library must not reference `Curl.Api`.
+`Curl.WebSocket.UnitLibrary` (ADR-1017), `WsOpcode` included: this library must not reference `Curl.Api`.
 
 Never construct a `Socket`, `SslStream` or `HttpClient` here. Take `IConnector`
 so the tests in the matching `.UnitTests` project can drive this code from a

@@ -1048,4 +1048,4 @@ Each option and the specific reason it lost.
 | [1014](ADR-1014-two-extension-connection-hook-options-are-a-command-line-error-with-exit-2.md) | Two extension connection-hook options are a command-line error with exit 2 (BL-4192) | Accepted | 2026-10-29 |
 | [1015](ADR-1015-a-fast-test-accepts-a-silent-loopback-peer-to-see-the-accepted-sockets-fin.md) | A fast test accepts a silent loopback peer to see the accepted socket's FIN (BL-4181) | Accepted | 2026-10-29 |
 | [1016](ADR-1016-an-extension-certificate-check-can-only-refuse-a-chain-curl-accepted.md) | An extension certificate check can only refuse a chain curl accepted, failing with exit 60 (BL-4097) | Accepted | 2026-10-29 |
-| [1013](ADR-1013-the-websocket-frame-codec-is-a-shared-layer-with-a-decode-observer.md) | The WebSocket frame codec is a shared layer, and its decoder reports to an observer (BL-4196) | Accepted | 2026-10-29 |
+| [1017](ADR-1017-the-websocket-frame-codec-is-a-shared-layer-with-a-decode-observer.md) | The WebSocket frame codec is a shared layer, and its decoder reports to an observer (BL-4196) | Accepted | 2026-10-29 |

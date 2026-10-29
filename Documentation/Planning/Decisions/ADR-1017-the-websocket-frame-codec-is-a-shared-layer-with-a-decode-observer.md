@@ -1,4 +1,4 @@
-# ADR-1013 — The WebSocket frame codec is a shared layer, and its decoder reports to an observer
+# ADR-1017 — The WebSocket frame codec is a shared layer, and its decoder reports to an observer
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
