@@ -4,7 +4,7 @@ title: Fix CGR-226: Linux -v: no OpenSSL handshake trace, '[blank] / UNDEF' grou
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-3997]
+depends-on: [BL-3997, BL-4007]
 touches: [Curl.Output.UnitLibrary/OpenSslHandshakeText.cs, Curl.Output.UnitTests/Cgr226Tests.cs]
 model: sonnet
 requirement: none
