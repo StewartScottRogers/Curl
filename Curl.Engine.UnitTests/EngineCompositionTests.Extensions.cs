@@ -160,6 +160,77 @@ public sealed partial class EngineCompositionTests
         public ValueTask<TransferResult> ExecuteAsync(ITransferContext context) => inner.ExecuteAsync(context);
     }
 
+    [TestMethod]
+    public async Task CreateProtocolHandlers_WithAnExtensionResolver_AnswersATransfersLookupWithIt()
+    {
+        LoopbackDnsResolver curls = new();
+        FixedAddressResolver extensions = new(System.Net.IPAddress.Parse("192.0.2.7"));
+        IDnsResolver? given = null;
+        ResolvingSchemeHandler handler = new("example-lookup");
+        Diagnostics.Arrange("extension resolver", "fixed address");
+        ProtocolDispatcher dispatcher = new(EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            curls,
+            extensionHandlers: services => { handler.Resolver = services.DnsResolver; return [handler]; },
+            extensionResolver: resolver => { given = resolver; return extensions; }));
+
+        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("example-lookup://example.com/"), Output = new MemoryStream() });
+        Diagnostics.Act("resolved", string.Join(",", handler.Resolved));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("192.0.2.7", handler.Resolved.Single().ToString());
+        Assert.AreEqual("example.com", extensions.Hosts.Single());
+        Assert.AreSame(curls, given);
+    }
+
+    [TestMethod]
+    public async Task CreateProtocolHandlers_WithoutAnExtensionResolver_AnswersATransfersLookupWithCurls()
+    {
+        FixedAddressResolver curls = new(System.Net.IPAddress.Parse("192.0.2.8"));
+        ResolvingSchemeHandler handler = new("example-lookup");
+        Diagnostics.Arrange("extension resolver", "none");
+        ProtocolDispatcher dispatcher = new(EngineComposition.CreateProtocolHandlers(
+            new RecordingConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new RecordingDatagramConnector(CurlExitCode.CouldntConnect, ConnectFailure),
+            new PassThroughTlsProvider(),
+            curls,
+            extensionHandlers: services => { handler.Resolver = services.DnsResolver; return [handler]; }));
+
+        TransferResult result = await dispatcher.DispatchAsync(new TransferContext { Url = CurlUrl.Parse("example-lookup://example.com/"), Output = new MemoryStream() });
+        Diagnostics.Act("resolved", string.Join(",", handler.Resolved));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual("192.0.2.8", handler.Resolved.Single().ToString());
+    }
+
+    private sealed class FixedAddressResolver(System.Net.IPAddress address) : IDnsResolver
+    {
+        public List<string> Hosts { get; } = [];
+
+        public ValueTask<IReadOnlyList<System.Net.IPAddress>> ResolveAsync(string host, CancellationToken cancellationToken)
+        {
+            Hosts.Add(host);
+            return ValueTask.FromResult<IReadOnlyList<System.Net.IPAddress>>([address]);
+        }
+    }
+
+    private sealed class ResolvingSchemeHandler(string scheme) : IProtocolHandler
+    {
+        public IReadOnlyCollection<string> SupportedSchemes { get; } = [scheme];
+
+        public IDnsResolver? Resolver { get; set; }
+
+        public IReadOnlyList<System.Net.IPAddress> Resolved { get; private set; } = [];
+
+        public async ValueTask<TransferResult> ExecuteAsync(ITransferContext context)
+        {
+            Resolved = await Resolver!.ResolveAsync(context.Url.Host, CancellationToken.None);
+            return TransferResult.Success(0);
+        }
+    }
+
     private sealed class ExtensionSchemeHandler(string scheme) : IProtocolHandler
     {
         public IReadOnlyCollection<string> SupportedSchemes { get; } = [scheme];

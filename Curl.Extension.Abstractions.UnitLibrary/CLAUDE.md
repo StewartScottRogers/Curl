@@ -1,7 +1,7 @@
 # Curl.Extension.Abstractions.UnitLibrary
 
 The contract for extensions that need more than a URL scheme (ADR-0999). Namespace
-`Curl.Extension.Abstractions`. Every extension may reference it; it references only `Curl.Protocol.Abstractions`, whose types its transfer and connection hooks use.
+`Curl.Extension.Abstractions`. Every extension may reference it; it references only `Curl.Protocol.Abstractions`, whose types its transfer, connection and resolver hooks use.
 
 - `ExtensionOption` is one long command-line option an extension adds: its name without `--`, its
   `ExtensionOptionArgument` (`None` for a flag, `Value` for one value) and its one-line help. An
@@ -19,8 +19,13 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an
   `ArgumentException` naming every option when two or more were; a host passes `ConnectorOver` and
   `DatagramConnectorOver` to the engine (ADR-1010), which keep curl's connectors when no hook is active.
+- `Resolution/IResolverHook` supplies the `IDnsResolver` a transfer looks host names up with in place
+  of curl's (DNS-over-TLS, DNS-over-QUIC, Oblivious DoH), given curl's. `ResolverHooks.ActivatedBy`
+  keeps the one hook whose option was given and throws an `ArgumentException` naming every option when
+  two or more were, or one was beside `--doh-url`; a host passes `ResolverOver` to the engine's
+  `extensionResolver` (ADR-1011), which keeps curl's resolver when no hook is active.
 
-Later groundwork adds resolver and certificate hooks in their own subfolders.
+Later groundwork adds certificate hooks in their own subfolder.
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in
 `Curl.Extension.Abstractions.UnitTests`.

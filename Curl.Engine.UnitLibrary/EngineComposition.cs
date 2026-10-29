@@ -123,6 +123,7 @@ internal static partial class EngineComposition
     /// <param name="extensionTransferHooks">Puts each handler's transfers through the hooks of the extensions a host's options activated (ADR-1007); <see langword="null" /> runs no hook. The engine never references an extension.</param>
     /// <param name="extensionConnector">Gives the connector of the extension a host's options activated in place of <paramref name="connector" /> (ADR-1010), as <c>--unix-socket</c> replaces curl's; <see langword="null" /> keeps <paramref name="connector" />.</param>
     /// <param name="extensionDatagramConnector">Gives that extension's datagram connector in place of <paramref name="datagramConnector" /> (ADR-1010); <see langword="null" /> keeps <paramref name="datagramConnector" />.</param>
+    /// <param name="extensionResolver">Gives the resolver of the extension a host's options activated in place of <paramref name="dnsResolver" /> (ADR-1011), as <c>--doh-url</c> replaces curl's; <see langword="null" /> keeps <paramref name="dnsResolver" />.</param>
     internal static IReadOnlyList<IProtocolHandler> CreateProtocolHandlers(
         IConnector connector,
         IDatagramConnector datagramConnector,
@@ -157,8 +158,10 @@ internal static partial class EngineComposition
         Func<ProtocolHandlerServices, IEnumerable<IProtocolHandler>>? extensionHandlers = null,
         Func<IProtocolHandler, IProtocolHandler>? extensionTransferHooks = null,
         Func<IConnector, IConnector>? extensionConnector = null,
-        Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null)
+        Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null,
+        Func<IDnsResolver, IDnsResolver>? extensionResolver = null)
     {
+        dnsResolver = ThroughExtension(dnsResolver, extensionResolver);
         connector = ThroughExtension(connector, extensionConnector);
         datagramConnector = ThroughExtension(datagramConnector, extensionDatagramConnector);
         Func<RtspRequestSettings?> rtspSettingsOf = rtspRequestSettings ?? (() => null);
