@@ -74,3 +74,4 @@ curl -sS -k -v https://localhost:21900/ https://localhost:21900/
 ## Log
 
 - 2026-10-26: Created from CGR-290 of the third-party gap report.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
