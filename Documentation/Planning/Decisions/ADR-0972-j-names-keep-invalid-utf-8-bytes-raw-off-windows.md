@@ -20,7 +20,7 @@ holding such a byte does, with no new native call. Windows keeps the ANSI code p
 
 `%{filename_effective}` and the `File exists` warning print the name as every other escaped
 output name prints today; making write-out and warnings give the raw byte back is the same gap
-for `-o $'\xff'` and is left to BL-4027.
+for `-o $'\xff'` and is left to BL-4032.
 
 ## Consequences
 

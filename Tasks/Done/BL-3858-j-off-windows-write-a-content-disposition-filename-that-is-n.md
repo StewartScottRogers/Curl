@@ -32,11 +32,11 @@ Left over from BL-3580 (CGR-051, `Documentation/Reviews/Curl-Gap-Report-2026-10-
 - Measured (previous claim of this task, 2026-10-28, `Record-CurlExchange.ps1 -Curl wsl.exe`): curl 8.18.0 OpenSSL on Linux, `curl -sS -OJ -w "%{filename_effective}"` against `Content-Disposition: attachment; filename="caf�.txt"`, creates the file named 63 61 66 E9 2E 74 78 74 and prints those raw bytes.
 - Decision (ADR-0972): off Windows `ContentDispositionFileName.EncodingFor` gives `InvalidUtf8ByteEscape.Encoding`, so the invalid byte rides as its U+DC00 + byte surrogate and the existing `RawByteFileName` path (already used for `-o` names, via `DeferredOutputFileStream`) opens the file under the raw bytes; no new native call, so `DeferredOutputFileStream.cs` needed no change. Windows keeps the ANSI code page (`Cgr051Tests` unchanged and green).
 - `Cgr051RawByteNameTests` pins the raw-byte name, the valid UTF-8 name and the Windows encoding without touching the disk; the tests are pure byte checks, so platform-neutral.
-- Printing the raw byte in `%{filename_effective}` and the `File exists` warning (same gap as `-o $'�'`) filed as BL-4027.
+- Printing the raw byte in `%{filename_effective}` and the `File exists` warning (same gap as `-o $'�'`) filed as BL-4032.
 - Build clean, fast tests green (Curl.Console.UnitTests 3006 passed), Measure-CodeQuality.ps1 -Library Curl.Console: 0 failing members.
 
 ## Log
 
 - 2026-10-26: Created by BL-3580's run for the Linux half of CGR-051.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: e2d9f1a6 b2b7d797 d75021b2 779790c0.
-- 2026-10-28: Doing -> Done. Off Windows a -J name's invalid UTF-8 bytes open the file under the raw bytes (ADR-0972); write-out printing left to BL-4027.
+- 2026-10-28: Doing -> Done. Off Windows a -J name's invalid UTF-8 bytes open the file under the raw bytes (ADR-0972); write-out printing left to BL-4032.

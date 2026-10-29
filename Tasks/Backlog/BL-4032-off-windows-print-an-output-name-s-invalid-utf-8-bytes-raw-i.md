@@ -1,5 +1,5 @@
 ---
-id: BL-4027
+id: BL-4032
 title: Off Windows, print an output name's invalid UTF-8 bytes raw in %{filename_effective} and the File exists warning, as curl on Linux does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4027 — Off Windows, print an output name's invalid UTF-8 bytes raw in %{filename_effective} and the File exists warning, as curl on Linux does
+# BL-4032 — Off Windows, print an output name's invalid UTF-8 bytes raw in %{filename_effective} and the File exists warning, as curl on Linux does
 
 ## Goal
 
