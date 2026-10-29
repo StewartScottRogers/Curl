@@ -41,3 +41,4 @@ host setup from BL-3932 where it fits.
 ## Log
 
 - 2026-10-27: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 66a24898 371f6b50 ed5482f5 daf71697.
