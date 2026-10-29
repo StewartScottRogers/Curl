@@ -3,8 +3,8 @@ id: AF-0461
 title: --curves, --sigalgs, --crlfile, --proxy-crlfile and --tcp-fastopen fail with exit 4 'setopt 0x... got bad argument' on Windows where curl 8.22.0 Schannel carries on and exits 0
 auditor: conformance
 severity: High
-status: proposed
-reason:
+status: accepted
+reason: 
 key: conformance:Curl.Console/ToolEasyHandle.cs:IgnoredWhenNotBuiltIn:exit-code
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ dotnet build Curl.Console -c Release -nologo -v q | Out-Null; foreach ($c in @('
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
