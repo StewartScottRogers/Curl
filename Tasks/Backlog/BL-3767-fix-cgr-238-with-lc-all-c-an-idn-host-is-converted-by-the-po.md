@@ -4,8 +4,8 @@ title: Fix CGR-238: With LC_ALL=C, an IDN host is converted by the port and reje
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: []
-touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests/Cgr238Tests.cs]
+depends-on: [BL-3945]
+touches: [Curl.Core.UnitLibrary, Curl.Core.UnitTests/Cgr238Tests.cs, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/Cgr238Tests.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
@@ -71,7 +71,10 @@ export LC_ALL=C.UTF-8
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr238Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- 2026-10-28 (lane 7): The IDN conversion lives in `Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs` (`NormalizeName`/`ToPunycode`; the `HostAsWindows1252` flag is the platform switch to extend), not in Curl.Core. Fix plan: off Windows, when LC_ALL / LC_CTYPE / LANG (first non-empty wins) names a non-UTF-8 charset (C, POSIX), a non-ASCII host is `IdnConversionFailed` (exit 3), as libidn2 rejects it; read the variable through an injected seam, test per platform. BL-3945 names CurlUrlHost.cs, so depends-on BL-3945 added; measure real curl 8.x on Linux/WSL if available, else pin from the report. Test goes in Curl.Protocol.Abstractions.UnitTests/Cgr238Tests.cs.
+
 ## Log
 
 - 2026-10-26: Created from CGR-238 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Backlog. Needs Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, which BL-3945 holds; depends-on BL-3945
