@@ -15,11 +15,20 @@ internal sealed class RecordedHandshakeTlsProvider(byte[] clientHello, int serve
     /// <summary>Gets the events the handshake was reported on.</summary>
     public ITransferEvents? Events { get; private set; }
 
+    /// <summary>Gets what the handshake was asked to offer through ALPN, or <see langword="null" /> when it was run through an overload offering none.</summary>
+    public IReadOnlyList<string>? ApplicationProtocols { get; private set; }
+
     /// <summary>Gets the server's handshake bytes read from the connection.</summary>
     public byte[] ServerHello { get; private set; } = [];
 
     public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, CancellationToken cancellationToken) =>
         AuthenticateAsClientAsync(plaintext, targetHost, NoTransferEvents.Instance, cancellationToken);
+
+    public ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, IReadOnlyList<string> applicationProtocols, CancellationToken cancellationToken)
+    {
+        ApplicationProtocols = applicationProtocols;
+        return AuthenticateAsClientAsync(plaintext, targetHost, events, cancellationToken);
+    }
 
     public async ValueTask<ConnectResult> AuthenticateAsClientAsync(IConnection plaintext, string targetHost, ITransferEvents events, CancellationToken cancellationToken)
     {

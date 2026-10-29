@@ -96,6 +96,57 @@ public sealed class NamedPipeConnectorTests
     }
 
     [TestMethod]
+    public async Task ConnectAsync_HttpsTarget_OffersCurlsHttpOverTlsListThroughAlpn()
+    {
+        string[] h2ThenHttp11 = ["h2", "http/1.1"];
+        RecordedHandshakeTlsProvider tls = new([0x16], 0);
+        NamedPipeConnector connector = new(Pipe, new FakeNamedPipeOpener(), tls, h2ThenHttp11);
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+        await result.Connection!.DisposeAsync();
+
+        CollectionAssert.AreEqual(h2ThenHttp11, tls.ApplicationProtocols!.ToArray());
+        Assert.AreSame(h2ThenHttp11, connector.HttpOverTlsApplicationProtocols);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_HttpsTargetNamingItsOwnList_OffersThatList()
+    {
+        string[] h2Only = ["h2"];
+        RecordedHandshakeTlsProvider tls = new([0x16], 0);
+
+        ConnectResult result = await new NamedPipeConnector(Pipe, new FakeNamedPipeOpener(), tls, ["h2", "http/1.1"]).ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { PoolScheme = "HTTPS", ApplicationProtocols = h2Only }, CancellationToken.None);
+        await result.Connection!.DisposeAsync();
+
+        CollectionAssert.AreEqual(h2Only, tls.ApplicationProtocols!.ToArray());
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_HttpsTargetWithoutCurlsList_OffersHttp11Alone()
+    {
+        RecordedHandshakeTlsProvider tls = new([0x16], 0);
+        NamedPipeConnector connector = new(Pipe, new FakeNamedPipeOpener(), tls);
+
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("localhost", 443, UseTls: true) { PoolScheme = "https" }, CancellationToken.None);
+        await result.Connection!.DisposeAsync();
+
+        CollectionAssert.AreEqual(new[] { "http/1.1" }, tls.ApplicationProtocols!.ToArray());
+    }
+
+    [TestMethod]
+    [DataRow("imaps", DisplayName = "another TLS scheme")]
+    [DataRow(null, DisplayName = "no pool scheme")]
+    public async Task ConnectAsync_TlsTargetThatIsNotHttps_OffersNothingThroughAlpn(string? poolScheme)
+    {
+        RecordedHandshakeTlsProvider tls = new([0x16], 0);
+
+        ConnectResult result = await new NamedPipeConnector(Pipe, new FakeNamedPipeOpener(), tls, ["h2", "http/1.1"]).ConnectAsync(new ConnectTarget("localhost", 993, UseTls: true) { PoolScheme = poolScheme, ApplicationProtocols = ["h2"] }, CancellationToken.None);
+        await result.Connection!.DisposeAsync();
+
+        Assert.IsEmpty(tls.ApplicationProtocols!);
+    }
+
+    [TestMethod]
     public async Task ConnectAsync_TlsTargetNamingATlsServerName_VerifiesThatName()
     {
         RecordedHandshakeTlsProvider tls = new([0x16], 0);

@@ -12,7 +12,7 @@ against curl.
 - `NamedPipeConnectionHook` gives a `NamedPipeConnector`, which opens the pipe through an `INamedPipeOpener`
   for every connect, whatever host and port the URL names, and wraps it in a `NamedPipeConnection`. For a TLS
   target it runs the handshake over the pipe with the TLS provider the host hands the hook (curl's, built from the
-  group's `-k`, `--cacert` and the rest); without one a TLS target is refused with exit 4 (ADR-1021, ADR-1055). `SystemNamedPipeOpener` is the thin `NamedPipeClientStream`
+  group's `-k`, `--cacert` and the rest); without one a TLS target is refused with exit 4 (ADR-1021, ADR-1055). An `https` target offers its own `ConnectTarget.ApplicationProtocols` through ALPN, or else the `IConnector.HttpOverTlsApplicationProtocols` of the connector curl would have used, so the HTTP version options and `--no-alpn` hold over the pipe and HTTP/2 can be negotiated (ADR-1056). `SystemNamedPipeOpener` is the thin `NamedPipeClientStream`
   adapter, excluded from coverage (ADR-0083).
 
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.NamedPipe.UnitTests`.
