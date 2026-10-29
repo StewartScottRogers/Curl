@@ -41,13 +41,13 @@ internal sealed class SftpSessionSlot(bool keepsSession)
     {
         if (session is { } started)
         {
-            started.HasDeferredChannelClose = false;
             return started;
         }
 
         trace.Enter("SSH_SFTP_INIT");
         session = await SftpSession.StartAsync(transport, cancellationToken).ConfigureAwait(false);
         session.DefersChannelClose = keepsSession;
+        session.HasDeferredChannelClose = keepsSession;
         return session;
     }
 

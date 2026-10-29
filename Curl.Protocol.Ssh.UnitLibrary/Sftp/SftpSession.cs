@@ -525,8 +525,10 @@ internal sealed class SftpSession
     internal bool DefersChannelClose { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the last transfer reached the point where it
-    /// would have closed the channel and left that to <see cref="SftpSessionSlot" />.
+    /// Gets or sets a value indicating whether the channel is open and its close is left to
+    /// <see cref="SftpSessionSlot" />: set when a deferring session starts and when a transfer
+    /// reaches the point where it would have closed the channel, so a transfer stopped part way
+    /// by <c>--max-time</c> still has its channel closed before <c>DISCONNECT</c> (CGR-270).
     /// </summary>
     internal bool HasDeferredChannelClose { get; set; }
 

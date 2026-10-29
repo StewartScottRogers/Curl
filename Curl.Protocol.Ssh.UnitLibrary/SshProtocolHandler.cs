@@ -261,6 +261,8 @@ public sealed class SshProtocolHandler : IProtocolHandler
         return RunSessionAsync(context, target, connectionNumber, connectPhase, trace, _ => TransferAndKeepOrDisconnectAsync(context, connection, kept, () => TransferAsync(context, kept.Transport, context.Url.Scheme == ScpScheme, trace, kept.Sftp, target.Clock)));
     }
 
+    private static readonly TimeSpan ShutDownTimeout = TimeSpan.FromSeconds(5);
+
     // Runs the transfer, then leaves the session on the connection for the run's connection
     // cache after a success, and otherwise closes the SFTP channel and ends the session with
     // DISCONNECT, as it ends when the connection cannot be kept (ADR-0865).
@@ -285,7 +287,11 @@ public sealed class SshProtocolHandler : IProtocolHandler
             return result;
         }
 
-        await session.ShutDownAsync(context.CancellationToken).ConfigureAwait(false);
+        // A transfer stopped by --max-time or --speed-limit has a cancelled token, yet curl still closes
+        // the SFTP channel and sends DISCONNECT, so the close runs on a fresh token bounded by a few
+        // seconds (CGR-270).
+        using CancellationTokenSource shutDown = new(ShutDownTimeout, context.TimeProvider);
+        await session.ShutDownAsync(shutDown.Token).ConfigureAwait(false);
         failure?.Throw();
         return result!;
     }
