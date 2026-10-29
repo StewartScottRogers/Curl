@@ -30,7 +30,11 @@ public sealed class Cgr228Tests
     [ClassCleanup]
     public static void DisposeCertificate() => s_serverCertificate.Dispose();
 
+    // Held back is a TLS 1.3 client's final flight, which follows the certificate's judgement.
+    // macOS's SslStream negotiates TLS 1.2 at most, whose client sends its final flight before
+    // the server's Finished and judges the certificate after it, so the server completes there.
     [TestMethod]
+    [OSCondition(ConditionMode.Exclude, OperatingSystems.OSX)]
     public async Task AuthenticateAsClientAsync_ServerCertificateRefused_ServerHandshakeNeverCompletes()
     {
         var (client, server) = InMemoryDuplexStream.CreatePair();
