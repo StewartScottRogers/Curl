@@ -14,6 +14,7 @@ public sealed partial class DohDnsResolver
     // keep the queries' order (ADR-0380, BL-2973).
     private async Task<DohQueryResult[]> RunAddressQueriesAsync(List<(byte[] Query, DnsRecordType Type)> queries, CancellationToken cancellationToken)
     {
+        TakeConnectionIdsFor(queries.Count);
         DohQueryResult[] results;
         if (ReferenceEquals(SubTransferEvents, NoTransferEvents.Instance))
         {

@@ -45,6 +45,11 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
     // first is #1 (ADR-0380).
     private long _connectionCount;
 
+    // The run's %{conn_id}s the DoH connections have taken: curl reuses an idle DoH connection, so a
+    // query takes a new number only when more queries run at once than numbers were taken (CGR-286).
+    private readonly object _connectionIdsLock = new();
+    private int _connectionIdsTaken;
+
     /// <summary>Initializes a new instance of the <see cref="DohDnsResolver" /> class.</summary>
     /// <param name="connector">
     /// Opens each DoH connection: a <see cref="TcpConnector" /> of its own, built with the system
@@ -100,6 +105,26 @@ public sealed partial class DohDnsResolver : IHttpsOriginDnsResolver, IDnsResolv
     /// (BL-939); any other value, the default, sends both.
     /// </summary>
     public AddressFamily AddressFamily { get; init; } = AddressFamily.Unspecified;
+
+    /// <summary>
+    /// Gets the function that takes the run's next <c>%{conn_id}</c>, called once for each DoH connection
+    /// curl opens (one per query running at once, reused by later queries) so the connection numbers
+    /// <c>-v</c> prints for the transfer's own connections count them (CGR-286); <see langword="null" /> to take none.
+    /// </summary>
+    public Func<long>? TakeConnectionId { get; init; }
+
+    // Takes a connection number for each of the queries running at once that no taken number covers.
+    private void TakeConnectionIdsFor(int queriesAtOnce)
+    {
+        lock (_connectionIdsLock)
+        {
+            while (_connectionIdsTaken < queriesAtOnce)
+            {
+                _connectionIdsTaken++;
+                TakeConnectionId?.Invoke();
+            }
+        }
+    }
 
     /// <summary>
     /// Gets the events each DoH sub-transfer reports its own <c>-v</c> lines on, as curl 8.21.0

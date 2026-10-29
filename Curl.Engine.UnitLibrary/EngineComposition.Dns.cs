@@ -28,18 +28,19 @@ internal static partial class EngineComposition
     /// </param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the DoH connector's DNS filter lines; <see langword="null" /> for none.</param>
+    /// <param name="takeDohConnectionId">Takes the run's next <c>%{conn_id}</c> for each DoH connection (CGR-286); <see langword="null" /> to take none.</param>
     /// <param name="allowsPlainHttpDohUrl">
     /// Whether a DoH URL that is not <c>https</c> is used, as curl's debug build allows; <see langword="false" />, as curl
     /// 8.22.0's release build, makes such a URL an <see cref="UnusableDohUrlResolver" /> (CGR-163, ADR-0859).
     /// </param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, bool allowsPlainHttpDohUrl = false)
+    internal static IDnsResolver CreateDnsResolver(EasyNetworkOptions network, EasyTlsOptions tls, TimeProvider timeProvider, ITcpDialer tcpDialer, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, bool allowsPlainHttpDohUrl = false, Func<long>? takeDohConnectionId = null)
     {
         if (network.DohUrl is { } dohUrl)
         {
             return !allowsPlainHttpDohUrl && !IsHttpsDohUrl(dohUrl)
                 ? new UnusableDohUrlResolver()
-                : CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider, resolveOverrides: ResolveOverrides.Parse(network.Resolve)), AddressFamilyOf(network), dohTrace, easyErrorText, traces);
+                : CreateDohResolver(dohUrl, CreateDohConnector(traces ?? EngineTraceComponents.None, tls, tcpDialer, timeProvider, resolveOverrides: ResolveOverrides.Parse(network.Resolve)), AddressFamilyOf(network), dohTrace, easyErrorText, traces, takeConnectionId: takeDohConnectionId);
         }
 
         DnsServerResolverOptions resolverOptions = new(
@@ -84,10 +85,11 @@ internal static partial class EngineComposition
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, which gate the HTTPS query's trace lines (<see cref="HttpsRecordTraceOf" />); <see langword="null" /> to write them all.</param>
     /// <param name="readEnvironmentVariable">Reads the proxy environment variables the DoH requests go through (<see cref="DohProxyOf" />); <see langword="null" /> for the process's environment.</param>
+    /// <param name="takeConnectionId">Takes the run's next <c>%{conn_id}</c> for each DoH connection (CGR-286); <see langword="null" /> to take none.</param>
     /// <returns>The resolver.</returns>
-    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, Func<string, string?>? readEnvironmentVariable = null) =>
+    internal static IDnsResolver CreateDohResolver(string dohUrl, IConnector connector, AddressFamily addressFamily, ITransferEvents? dohTrace = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, Func<string, string?>? readEnvironmentVariable = null, Func<long>? takeConnectionId = null) =>
         DohUrlOf(dohUrl) is { } url && DohProxyOf(url, readEnvironmentVariable ?? Environment.GetEnvironmentVariable, out ProxyEndpoint? proxy)
-            ? NewDohResolver(connector, url, proxy, addressFamily, dohTrace, easyErrorText, traces)
+            ? NewDohResolver(connector, url, proxy, addressFamily, dohTrace, easyErrorText, traces, takeConnectionId)
             : new UnusableDohUrlResolver();
 
     // curl writes the [DNS] filter lines under the dns component and the sub-transfers' own lines under doh (BL-3814); no components given writes both.
@@ -102,13 +104,14 @@ internal static partial class EngineComposition
         traces.Components.Contains(component) || traces.Components.Contains("all") || traces.Components.Contains("network");
 
     // The DoH resolver CreateDohResolver makes of a usable DoH URL and the proxy chosen for it.
-    private static DohDnsResolver NewDohResolver(IConnector connector, Uri url, ProxyEndpoint? proxy, AddressFamily addressFamily, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces) =>
+    private static DohDnsResolver NewDohResolver(IConnector connector, Uri url, ProxyEndpoint? proxy, AddressFamily addressFamily, ITransferEvents? dohTrace, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<long>? takeConnectionId) =>
         new(connector, url, dohTrace ?? NoTransferEvents.Instance, easyErrorText ?? NoEasyErrorText)
         {
             AddressFamily = addressFamily,
             SubTransferEvents = dohTrace is null ? NoTransferEvents.Instance : DohSubTransferEventsOf(dohTrace, traces),
             HttpsRecordTrace = HttpsRecordTraceOf(traces),
             Proxy = proxy,
+            TakeConnectionId = takeConnectionId,
         };
 
     /// <summary>

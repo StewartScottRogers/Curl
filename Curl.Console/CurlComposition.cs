@@ -57,7 +57,7 @@ internal static class CurlComposition
     /// the real disk, the real network and the given standard streams, wrapping warnings at
     /// the width <see cref="TerminalColumns.Resolve()" /> gives. The network
     /// transports are built for each option group by
-    /// <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?)" /> once the
+    /// <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?, Func{long}?)" /> once the
     /// command line is parsed, because their TLS settings come from it, over one
     /// <see cref="ConnectionCache" /> the runner closes when the run ends, so a later group reuses
     /// an earlier group's connection when their settings match (ADR-0285, BL-754).
@@ -85,8 +85,9 @@ internal static class CurlComposition
         TlsSessionCache tlsSessions = new(TimeProvider.System);
         DnsCache runDnsCache = new();
         LateBoundDiagnosticLog runLog = new();
+        TransferPerformer performer = new(TimeProvider.System, EasyErrorText);
         return new(
-            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options)), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)))),
+            SharingRunCookies((options, cookies) => CreateTransferDispatch(CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), performer.TakeConnectionId), cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)))),
             new PhysicalFileSystem(),
             new PhysicalFileSystem(),
             standardOutput,
@@ -107,7 +108,7 @@ internal static class CurlComposition
             tlsSessions: tlsSessions,
             extendedAttributeWriter: NativeExtendedAttributeWriter.ForCurrentPlatform(),
             lateBoundDiagnosticLog: runLog,
-            transferPerformer: new TransferPerformer(TimeProvider.System, EasyErrorText),
+            transferPerformer: performer,
             curlEngine: new ManagedCurlEngine(TimeProvider.System, null, EasyErrorText));
     }
 

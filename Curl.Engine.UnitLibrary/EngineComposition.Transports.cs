@@ -87,8 +87,9 @@ internal static partial class EngineComposition
     /// <param name="runDnsCache">The run's DNS cache, which every option group's TCP connector answers from and adds to as curl 8.21.0 shares its cache (BL-1053); <see langword="null" /> for a cache of the group's own.</param>
     /// <param name="easyErrorText">Curl's easy error text for each exit code, which the DoH resolver's <c>--trace-config doh</c> lines carry (BL-1102): <c>CurlEasyErrorText.Of</c> (in <c>Libcurl/Misc/ErrorText</c>) passed in by <c>Curl.Console</c> in production; <see langword="null" /> for an empty text.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components; <see langword="null" /> for none.</param>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null) =>
-        CreateTransports(tool, network, tls, http, proxy, authentication, timeProvider, runConnections, tlsSessions, diagnosticLog, runDnsCache, easyErrorText, traces, static resolver => resolver);
+    /// <param name="takeDohConnectionId">Takes the run's next <c>%{conn_id}</c> for each DoH connection (CGR-286); <see langword="null" /> to take none.</param>
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections = null, TlsSessionCache? tlsSessions = null, IDiagnosticLog? diagnosticLog = null, DnsCache? runDnsCache = null, Func<CurlExitCode, string>? easyErrorText = null, EngineTraceComponents? traces = null, Func<long>? takeDohConnectionId = null) =>
+        CreateTransports(tool, network, tls, http, proxy, authentication, timeProvider, runConnections, tlsSessions, diagnosticLog, runDnsCache, easyErrorText, traces, static resolver => resolver, takeDohConnectionId: takeDohConnectionId);
 
     /// <summary>
     /// Creates the network transports as the overload without <paramref name="wrapLookUps" /> does, with the
@@ -124,14 +125,15 @@ internal static partial class EngineComposition
     /// look-up waits readable on its wakeup socket (ADR-0984); <see langword="null" />,
     /// outside socket-action mode, for the dialer as it is.
     /// </param>
+    /// <param name="takeDohConnectionId">Takes the run's next <c>%{conn_id}</c> for each DoH connection (CGR-286); <see langword="null" /> to take none.</param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null, Func<long>? takeDohConnectionId = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
         FlowScopedTransferEvents? resolverEvents = TracesDns(traces) ? new() : null;
         IDnsResolver dnsResolver = dialing is null
-            ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces)
+            ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces, takeDohConnectionId: takeDohConnectionId)
             : DialingResolverOf(dialing, network, tls, timeProvider, resolverEvents, easyErrorText, traces);
         IDnsResolver lookUps = LookUpsOf(dnsResolver, network, resolver => wrapLookUps(SocketActionGatedResolver.Over(resolver, socketWait)));
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile, tracesHandshakeMessages: tool.TracesTransfer);
@@ -225,7 +227,7 @@ internal static partial class EngineComposition
     /// The QUIC dialer of an option group of the dialing runner: its <c>--http3</c> and
     /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
     /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
-    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?)" />
+    /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?, Func{long}?)" />
     /// keeps the socket-opening dialer.
     /// </summary>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
