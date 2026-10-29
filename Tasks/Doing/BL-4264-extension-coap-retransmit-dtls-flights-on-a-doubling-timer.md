@@ -34,3 +34,4 @@ Namespace `Curl.Extension.Coap.Dtls.Retransmission`. A flight is the list of dat
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6670888c 7951e05f 54cafd17 3d836d5e.
