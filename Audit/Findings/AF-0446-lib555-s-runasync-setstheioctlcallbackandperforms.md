@@ -3,8 +3,8 @@ id: AF-0446
 title: Lib555's RunAsync_SetsTheIoctlCallbackAndPerforms never checks that the ioctl callback is set
 auditor: quality
 severity: Medium
-status: accepted
-reason: Stewart accepted it on 2026-10-25.
+status: closed
+reason: Re-audit 2026-10-29_0606.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_1944.md, 2026-10-29_0606.md).
 key: quality:Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs:RunAsync_SetsTheIoctlCallbackAndPerforms:name-lies
 reproduction: none
 task: BL-3523
@@ -13,9 +13,9 @@ found: 2026-10-25
 found-at: cb96798969fdc083bbbf245bc653f5fc69cb8acf
 scorecard: 2026-10-25_1542.md
 duplicate-of:
-closed:
-closed-how:
-closed-by:
+closed: 2026-10-29
+closed-how: consecutive
+closed-by: 2026-10-25_1944.md, 2026-10-29_0606.md
 ---
 # AF-0446 - Lib555's RunAsync_SetsTheIoctlCallbackAndPerforms never checks that the ioctl callback is set
 
@@ -43,8 +43,10 @@ Select-String -Path Curl.Conformance.LibTest.UnitTests/Lib554To566Tests.cs -Patt
 ## Re-audits
 
 - 2026-10-25 | 2026-10-25_1944.md | reproduces: no | Lib554To566Tests.cs:119-121 reads the Ioctl callback off the added handle's options, asserts IsNotNull, then calls it: Assert.AreEqual(IoctlResult.Ok, ioctl(IoctlCommand.RestartRead)), and checks the exit code is Ok.
+- 2026-10-29 | 2026-10-29_0606.md | reproduces: no | Ran the Select-String reproduction. RunAsync_SetsTheIoctlCallbackAndPerforms (Lib554To566Tests.cs:112) now calls the callback and asserts its answer: `Assert.AreEqual(IoctlResult.Ok, ioctl(IoctlCommand.RestartRead));` (line 121), plus the exit code and program name.
 
 ## Log
 
 - 2026-10-25: filed proposed.
 - 2026-10-25: proposed -> accepted.
+- 2026-10-29: accepted -> closed. Re-audit 2026-10-29_0606.md: a second consecutive re-audit by its own auditor found the reproduction no longer reproduces (2026-10-25_1944.md, 2026-10-29_0606.md).
