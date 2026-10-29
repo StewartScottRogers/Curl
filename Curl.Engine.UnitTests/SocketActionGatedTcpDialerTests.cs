@@ -37,7 +37,7 @@ public sealed class SocketActionGatedTcpDialerTests
         await using ManagedEasyTransfer easy = (ManagedEasyTransfer)engine.CreateEasy();
         TransferSocketWait wait = new(TimeProvider.System);
         easy.SocketWait = wait;
-        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/" } };
+        easy.Options = new EasyOptions { Network = new EasyNetworkOptions { Url = "http://127.0.0.1:9000/", ConnectTimeout = TimeSpan.FromSeconds(30) } };
 
         Task<CurlCode> perform = easy.PerformAsync(CancellationToken.None).AsTask();
         await dialer.Started.Task.WaitAsync(LongestWait);
