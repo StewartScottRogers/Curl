@@ -75,3 +75,4 @@ curl -sSL -H 'Authorization: Bearer xyz' -H 'Cookie: c=1' -H 'X-Custom: 1' http:
 - 2026-10-26: Created from CGR-076 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Waits on BL-3723, which holds Curl.Core.UnitLibrary/RedirectFollower.cs; the fix is written and left for the stash
+- 2026-10-28: Backlog -> Deferred. Split into BL-4002 and BL-4003 (over its cost cap)
