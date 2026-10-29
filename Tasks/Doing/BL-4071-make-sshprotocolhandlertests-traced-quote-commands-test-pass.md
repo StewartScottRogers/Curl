@@ -30,3 +30,4 @@ Found by BL-4070's lane on 2026-10-29: the test failed once (after 6 s) in a ful
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: f4d39644 779790c0.
