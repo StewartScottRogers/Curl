@@ -2,7 +2,7 @@
 
 Hand-built Protocol Buffers for the gRPC, gRPC-Web and Connect extensions (ADR-0999). The
 base class library has no Protocol Buffers codec and extensions may not reference one
-another, so it is a shared Wire layer, as `Curl.Zstandard` is (ADR-1004).
+another, so it is a shared Wire layer, as `Curl.Zstandard` is (ADR-1005).
 
 Namespace `Curl.Protobuf.Wire` (folder `Wire/`): the wire format codec (BL-4164).
 

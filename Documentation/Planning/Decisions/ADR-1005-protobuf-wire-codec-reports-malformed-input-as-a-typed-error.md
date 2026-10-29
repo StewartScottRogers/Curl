@@ -1,4 +1,4 @@
-# ADR-1004: The Protocol Buffers wire codec reports malformed input as a typed error
+# ADR-1005: The Protocol Buffers wire codec reports malformed input as a typed error
 
 - Status: Accepted
 - Date: 2026-10-29

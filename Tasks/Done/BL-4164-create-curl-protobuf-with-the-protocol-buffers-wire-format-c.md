@@ -30,7 +30,7 @@ First of three parts split from BL-4099 (wire format, then `.proto` parsing BL-4
 
 ## Notes
 
-- Pipeline `feature` run directly by this lane (one library, one codec; no architect stage needed). API: `ProtobufReader` (`TryRead...` returning `ProtobufDecodeError`), `ProtobufWriter`, `ProtobufField` (unknown fields and groups, written back byte for byte), `ProtobufZigZag`, `ProtobufWireType`, namespace `Curl.Protobuf.Wire`. Decisions in ADR-1004: bits past the 64th on a tenth varint byte are discarded (the specification), only a continuation bit there is `VarintTooLong`; nesting limit 100 (reference default), a depth-100 reader reads its fields but opens no deeper level.
+- Pipeline `feature` run directly by this lane (one library, one codec; no architect stage needed). API: `ProtobufReader` (`TryRead...` returning `ProtobufDecodeError`), `ProtobufWriter`, `ProtobufField` (unknown fields and groups, written back byte for byte), `ProtobufZigZag`, `ProtobufWireType`, namespace `Curl.Protobuf.Wire`. Decisions in ADR-1005: bits past the 64th on a tenth varint byte are discarded (the specification), only a continuation bit there is `VarintTooLong`; nesting limit 100 (reference default), a depth-100 reader reads its fields but opens no deeper level.
 - Vectors from protobuf.dev encoding guide: 08 96 01, 12 07 "testing", 1a 03 08 96 01, packed 22 06 03 8e 02 9e a7 05, int32 -1 as ten bytes, the ZigZag table.
 - Measure-CodeQuality.ps1 -Library Curl.Protobuf.UnitLibrary: 100% line, 100% branch, 45 members, 0 failing, worst CRAP 10. Build clean, fast tests green (48 new). Tests are pure byte computation, platform-neutral, so CI on Linux and macOS is met by that.
 
