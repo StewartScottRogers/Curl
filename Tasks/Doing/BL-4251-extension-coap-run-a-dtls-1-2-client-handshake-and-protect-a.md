@@ -36,3 +36,4 @@ Builds on BL-4250's framing. Use `Curl.Tls.UnitLibrary`'s public TLS 1.2 pieces 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: b5945eb1 9c67082b 4ee129e3 a7e33c4b 54cafd17 3d836d5e.
