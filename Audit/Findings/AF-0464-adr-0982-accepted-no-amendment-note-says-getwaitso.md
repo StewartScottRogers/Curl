@@ -3,8 +3,8 @@ id: AF-0464
 title: ADR-0982 (Accepted, no amendment note) says GetWaitSockets keeps the FirstTransferSocket number for a transfer without a dialled socket; that number no longer exists
 auditor: truthfulness
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0982-waitfds-names-each-transfers-real-socket.md:FirstTransferSocket:stale-adr
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ Select-String -Path Documentation/Planning/Decisions/ADR-0982-*.md, Curl.Engine.
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
