@@ -185,6 +185,12 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// <param name="wakeup">What owns the wakeup socket.</param>
     internal void BeginResolve(nint wakeupSocket, IDisposable wakeup) => Update(() =>
     {
+        if (gatingStopped)
+        {
+            wakeup.Dispose();
+            return;
+        }
+
         resolveWakeup?.Dispose();
         resolveWakeup = wakeup;
         Socket = wakeupSocket;

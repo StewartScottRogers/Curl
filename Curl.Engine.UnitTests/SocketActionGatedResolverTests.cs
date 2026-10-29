@@ -45,6 +45,42 @@ public sealed class SocketActionGatedResolverTests
     }
 
     [TestMethod]
+    public async Task ResolveAsync_GatingStoppedDuringTheLookup_ReturnsTheLookupsResultWithoutThrowing()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        HeldResolver inner = new();
+        SocketActionGatedResolver resolver = new(inner, wait);
+
+        Task<IReadOnlyList<IPAddress>> resolving = resolver.ResolveAsync("h", CancellationToken.None).AsTask();
+        await inner.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        wait.StopGating();
+        inner.Answer.SetResult();
+        IReadOnlyList<IPAddress> addresses = await resolving.WaitAsync(TimeSpan.FromSeconds(10));
+
+        CollectionAssert.AreEqual(new[] { Address }, addresses.ToArray());
+    }
+
+    [TestMethod]
+    public void BeginResolve_GatingAlreadyStopped_DisposesTheWakeupItIsGiven()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        DisposeCounter wakeup = new();
+        wait.StopGating();
+
+        wait.BeginResolve(1, wakeup);
+
+        Assert.AreEqual(1, wakeup.Disposed);
+        Assert.IsNull(wait.Socket);
+    }
+
+    private sealed class DisposeCounter : IDisposable
+    {
+        public int Disposed { get; private set; }
+
+        public void Dispose() => Disposed++;
+    }
+
+    [TestMethod]
     public async Task ResolveWithFailureReasonAsync_InnerGivesAReason_PassesItThroughAndEndsTheLookup()
     {
         TransferSocketWait wait = new(TimeProvider.System);
@@ -70,13 +106,13 @@ public sealed class SocketActionGatedResolverTests
     }
 
     [TestMethod]
-    public void Dispose_NeverSignalled_ClosesTheListener()
+    public void Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing()
     {
         LoopbackLookupWakeup wakeup = LoopbackLookupWakeup.Open();
 
         wakeup.Dispose();
 
-        Assert.ThrowsExactly<ObjectDisposedException>(wakeup.Signal);
+        wakeup.Signal();
     }
 
     private static bool IsReadable(nint handle, TimeSpan timeout)
