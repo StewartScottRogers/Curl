@@ -26,6 +26,9 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     private TaskCompletionSource? writableWait;
     private CurlSocketSelect keptSignals;
     private bool connecting;
+    private bool resolving;
+    private bool socketIsResolveWakeup;
+    private IDisposable? resolveWakeup;
     private bool connectSignalled;
     private bool gatingStopped;
     private TimeSpan lowSpeedTime;
@@ -50,7 +53,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
 
     /// <summary>
     /// Gets what the transfer waits for on its socket: <see cref="CurlPoll.Out" /> while it connects or a write
-    /// waits, <see cref="CurlPoll.In" /> while a read waits, both when both do, and <see cref="CurlPoll.None" />
+    /// waits, <see cref="CurlPoll.In" /> while a read waits or a look-up runs (<see cref="BeginResolve" />), both when both do, and <see cref="CurlPoll.None" />
     /// while it waits on neither.
     /// </summary>
     internal CurlPoll Waiting
@@ -60,7 +63,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
             lock (sync)
             {
                 CurlPoll output = (connecting && !connectSignalled) || writableWait is not null ? CurlPoll.Out : CurlPoll.None;
-                return readableWait is null ? output : output | CurlPoll.In;
+                return readableWait is null && !resolving ? output : output | CurlPoll.In;
             }
         }
     }
@@ -152,6 +155,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     internal void ConnectingOn(nint socket) => Update(() =>
     {
         Socket = socket;
+        socketIsResolveWakeup = false;
         connectSignalled = false;
     });
 
@@ -162,7 +166,34 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// naming it wakes the transfer (<see cref="SignalOn" />, ADR-0955).
     /// </summary>
     /// <param name="socketHandle">The connection's operating system socket (<c>IConnection.SocketHandle</c>), or <see langword="null" /> when it has none.</param>
-    internal void TakeSocket(nint? socketHandle) => Update(() => Socket ??= socketHandle ?? (nint)Interlocked.Increment(ref nextEngineSocket));
+    internal void TakeSocket(nint? socketHandle) => Update(() =>
+    {
+        Socket = socketIsResolveWakeup ? null : Socket;
+        Socket ??= socketHandle ?? (nint)Interlocked.Increment(ref nextEngineSocket);
+        socketIsResolveWakeup = false;
+    });
+
+    /// <summary>
+    /// Marks the transfer as resolving its host: it waits readable on <paramref name="wakeupSocket" />, the socket the
+    /// look-up makes readable as it ends, as curl 8.22.0 tells the socket callback its threaded resolver's wakeup
+    /// socket with <c>CURL_POLL_IN</c>, so the application is brought back by a socket rather than a timer (BL-4036,
+    /// ADR-0983). The wakeup stays the transfer's <see cref="Socket" /> until the dial gives it another; an action
+    /// on it keeps no signal for the transfer's reads and writes. <paramref name="wakeup" /> is disposed when a
+    /// later look-up replaces it or <see cref="StopGating" /> runs.
+    /// </summary>
+    /// <param name="wakeupSocket">The handle of the wakeup socket.</param>
+    /// <param name="wakeup">What owns the wakeup socket.</param>
+    internal void BeginResolve(nint wakeupSocket, IDisposable wakeup) => Update(() =>
+    {
+        resolveWakeup?.Dispose();
+        resolveWakeup = wakeup;
+        Socket = wakeupSocket;
+        socketIsResolveWakeup = true;
+        resolving = true;
+    });
+
+    /// <summary>Marks the look-up as over, so the transfer no longer waits readable on its wakeup socket.</summary>
+    internal void EndResolve() => Update(() => resolving = false);
 
     /// <summary>Marks the connect as over, so it no longer waits writable for it and the connect deadline ends.</summary>
     internal void EndConnect() => Update(() =>
@@ -198,8 +229,8 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
         TaskCompletionSource? writable;
         lock (sync)
         {
-            readable = Release(ref readableWait, CurlSocketSelect.In, readyIn);
-            writable = Release(ref writableWait, CurlSocketSelect.Out, readyOut);
+            readable = Release(ref readableWait, CurlSocketSelect.In, readyIn && !socketIsResolveWakeup);
+            writable = Release(ref writableWait, CurlSocketSelect.Out, readyOut && !socketIsResolveWakeup);
             connectSignalled |= connecting && readyOut;
         }
 
@@ -214,7 +245,13 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// </summary>
     internal void StopGating()
     {
-        Update(() => gatingStopped = true);
+        Update(() =>
+        {
+            gatingStopped = true;
+            socketIsResolveWakeup = false;
+            resolveWakeup?.Dispose();
+            resolveWakeup = null;
+        });
         Signal(CurlSocketSelect.In | CurlSocketSelect.Out);
     }
 

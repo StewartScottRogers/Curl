@@ -118,7 +118,9 @@ internal static partial class EngineComposition
     /// <param name="socketWait">
     /// What a transfer a multi handle drives by <c>curl_multi_socket_action</c> waits for on its socket: the
     /// <see cref="TcpConnector" /> then dials through a <see cref="SocketActionGatedTcpDialer" /> over it, so each
-    /// dialed connection reads and writes only once the multi handle signals it (ADR-0917); <see langword="null" />,
+    /// dialed connection reads and writes only once the multi handle signals it (ADR-0917), and the connectors look
+    /// names up through a <see cref="SocketActionGatedResolver" /> beneath <paramref name="wrapLookUps" />, so a
+    /// look-up waits readable on its wakeup socket (ADR-0983); <see langword="null" />,
     /// outside socket-action mode, for the dialer as it is.
     /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>
@@ -130,7 +132,7 @@ internal static partial class EngineComposition
         IDnsResolver dnsResolver = dialing is null
             ? CreateDnsResolver(network, tls, timeProvider, tcpDialer, resolverEvents, easyErrorText, traces)
             : DialingResolverOf(dialing, network, tls, timeProvider, resolverEvents, easyErrorText, traces);
-        IDnsResolver lookUps = LookUpsOf(dnsResolver, network, wrapLookUps);
+        IDnsResolver lookUps = LookUpsOf(dnsResolver, network, resolver => wrapLookUps(SocketActionGatedResolver.Over(resolver, socketWait)));
         TlsClientOptions tlsClientOptions = TlsClientOptionsMapping.Of(tls, http.SslEnableAlpn, tool.SslSessionsFile);
         ITlsProviderWithWarnings tlsProvider = CreateTlsProvider(tlsClientOptions, timeProvider, tlsSessions, dnsResolver as IEchConfigListLookup);
         TlsClientOptions proxyTlsClientOptions = TlsClientOptionsMapping.ProxyOf(tls, http.SslEnableAlpn);

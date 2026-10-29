@@ -180,4 +180,49 @@ public sealed class TransferSocketWaitTests
         Assert.AreEqual(CurlPoll.Out, wait.Waiting);
         wait.Signal(CurlSocketSelect.Out);
     }
+
+    [TestMethod]
+    public void BeginResolve_ActionOnTheWakeup_KeepsNoSignalAndTheDialReplacesIt()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        DisposalCounter first = new();
+        DisposalCounter second = new();
+        wait.BeginResolve(7, first);
+        wait.BeginResolve(8, second);
+
+        bool signalled = wait.SignalOn(8, CurlSocketSelect.In);
+        wait.EndResolve();
+        ValueTask read = wait.WaitUntilReadableAsync(CancellationToken.None);
+        bool readHeld = !read.IsCompleted;
+        wait.TakeSocket(null);
+
+        Assert.IsTrue(signalled);
+        Assert.IsTrue(readHeld);
+        Assert.AreEqual(1, first.Disposals);
+        Assert.AreEqual(0, second.Disposals);
+        Assert.IsTrue(wait.IsWaitingOnAnEngineSocket);
+        wait.StopGating();
+        Assert.AreEqual(1, second.Disposals);
+    }
+
+    [TestMethod]
+    public void ConnectingOn_AfterAResolve_MakesTheDialedSocketTheTransfersAndTakeSocketKeepsIt()
+    {
+        TransferSocketWait wait = new(TimeProvider.System);
+        wait.BeginResolve(7, new DisposalCounter());
+        wait.EndResolve();
+
+        wait.ConnectingOn(9);
+        wait.TakeSocket(10);
+
+        Assert.AreEqual((nint)9, wait.Socket);
+        wait.StopGating();
+    }
+
+    private sealed class DisposalCounter : IDisposable
+    {
+        internal int Disposals { get; private set; }
+
+        public void Dispose() => Disposals++;
+    }
 }
