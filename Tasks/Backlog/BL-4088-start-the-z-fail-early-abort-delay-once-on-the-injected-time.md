@@ -1,5 +1,5 @@
 ---
-id: BL-4086
+id: BL-4088
 title: Start the -Z --fail-early abort delay once, on the injected TimeProvider (production)
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4086 — Start the -Z --fail-early abort delay once, on the injected TimeProvider (production)
+# BL-4088 — Start the -Z --fail-early abort delay once, on the injected TimeProvider (production)
 
 ## Goal
 

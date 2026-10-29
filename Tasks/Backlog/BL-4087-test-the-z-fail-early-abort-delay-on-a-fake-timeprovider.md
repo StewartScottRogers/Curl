@@ -4,7 +4,7 @@ title: Test the -Z --fail-early abort delay on a fake TimeProvider
 priority: Normal
 assignee: Claude
 pipeline: direct
-depends-on: [BL-4086]
+depends-on: [BL-4088]
 touches: [Curl.Console.UnitTests]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ A unit test proves `-Z --fail-early` aborts 1 s after the first failure, however
 
 ## Context
 
-Split from BL-4062. Depends on BL-4086, which injects the `TimeProvider` into `ParallelRun`'s abort source. Tests live in `Curl.Console.UnitTests`.
+Split from BL-4062. Depends on BL-4088, which injects the `TimeProvider` into `ParallelRun`'s abort source. Tests live in `Curl.Console.UnitTests`.
 
 ## Acceptance criteria
 
