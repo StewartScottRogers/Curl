@@ -45,11 +45,11 @@ public sealed class HttpProtocolHandlerAbsoluteFormHostTests
     }
 
     [TestMethod]
-    [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     [DataRow("http://a℀b.test/", DisplayName = "account of, aa/cb.test")]
     [DataRow("http://a℆b.test/", DisplayName = "cada una, ac/ub.test")]
     public async Task ExecuteAsync_ProxiedHostHoldingASlash_FailsWithOutOfMemoryAndSendsNothing(string url)
     {
+        using IDisposable utf8Host = CurlUrlHost.ReadingHostAs(hostAsWindows1252: false);
         (TransferResult result, string written) = await RunThroughProxyAsync(url);
 
         Assert.AreEqual(CurlExitCode.OutOfMemory, result.ExitCode);

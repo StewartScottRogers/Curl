@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Protocol.Http.UnitTests/HttpProtocolHandlerAbsoluteFormHostTests.cs, Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj]
+touches: [Curl.Protocol.Http.UnitTests/HttpProtocolHandlerAbsoluteFormHostTests.cs, Curl.Protocol.Abstractions.UnitLibrary/Curl.Protocol.Abstractions.UnitLibrary.csproj, Curl.Protocol.Abstractions.UnitLibrary/CurlUrlHost.cs, Curl.Protocol.Abstractions.UnitTests/CurlUrlHostTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4090 — Cover HttpProtocolHandler's absolute-form host refusal on Windows
 
@@ -22,14 +22,16 @@ BL-4080 made a proxied transfer whose wire host holds a character `curl_url_set`
 
 ## Acceptance criteria
 
-- [ ] On Windows, `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no uncovered line in `AbsoluteFormTargetUnbuilt` or `ExchangeOnConnectionAsync`.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] On Windows, `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports no uncovered line in `AbsoluteFormTargetUnbuilt` or `ExchangeOnConnectionAsync`.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Filed by BL-4080's run.
+- Added CurlUrlHost.cs and its test file to touches: the seam is an internal AsyncLocal scope, CurlUrlHost.ReadingHostAs, that lets a test read hosts with the UTF-8 rule on Windows; the slash test now runs on every platform. Measured: Measure-CodeQuality.ps1 reports 0 failing members for Abstractions and Http libraries, no uncovered line in AbsoluteFormTargetUnbuilt or ExchangeOnConnectionAsync. CI Linux/macOS: the test no longer depends on the platform.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: cdff5f48 779790c0.
+- 2026-10-29: Doing -> Done. Absolute-form host refusal covered on Windows via CurlUrlHost.ReadingHostAs

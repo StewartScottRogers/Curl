@@ -49,7 +49,27 @@ internal static class CurlUrlHost
     /// byte and not only those that are not UTF-8, as the Windows curl 8.22.0 build's
     /// <c>idn2_lookup_ul</c> reads the name in the ANSI code page (CGR-059, ADR-0939).
     /// </summary>
-    private static readonly bool HostAsWindows1252 = OperatingSystem.IsWindows();
+    private static bool HostAsWindows1252 => HostRuleChoice.Value ?? OperatingSystem.IsWindows();
+
+    private static readonly AsyncLocal<bool?> HostRuleChoice = new();
+
+    /// <summary>
+    /// Reads every host this flow parses with the Windows-1252 rule when <paramref name="hostAsWindows1252" />
+    /// is set and the UTF-8 rule otherwise, until the result is disposed, so a test can build the
+    /// <see cref="CurlUrl" /> the other platform's curl reads on any platform.
+    /// </summary>
+    internal static IDisposable ReadingHostAs(bool hostAsWindows1252)
+    {
+        bool? previous = HostRuleChoice.Value;
+        HostRuleChoice.Value = hostAsWindows1252;
+
+        return new HostRuleRestorer(previous);
+    }
+
+    private sealed class HostRuleRestorer(bool? previous) : IDisposable
+    {
+        public void Dispose() => HostRuleChoice.Value = previous;
+    }
 
     /// <summary>
     /// Whether a host name that is not ASCII is refused because the locale is not UTF-8: off Windows,
