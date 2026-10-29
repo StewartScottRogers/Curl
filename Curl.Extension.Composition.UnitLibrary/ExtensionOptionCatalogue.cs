@@ -18,5 +18,6 @@ internal static class ExtensionOptionCatalogue
         GraphQl.GraphQlOptions.Operation,
         GraphQl.GraphQlOptions.Introspect,
         Curl.Extension.JsonRpc.JsonRpcExtension.Option,
+        Coap.Observe.CoapObserveTransferHook.Option,
     ];
 }

@@ -20,6 +20,17 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
   by token (sections 5.2 and 5.3), acknowledges a confirmable separate response, and fails with exit 56
   on a Reset.
 
+`Observe/` (namespace `Curl.Extension.Coap.Observe`, ADR-1064) observes a resource (RFC 7641):
+
+- `CoapObserveTransferHook` declares `--coap-observe`, registered in `ExtensionOptionCatalogue.cs` and
+  `ExtensionTransferHookCatalogue.cs`, and hands a `coap://` transfer on as a `CoapObserveContext`, which
+  forwards the transfer's own context and tells `CoapProtocolHandler` to observe.
+- `CoapObservation` adds Observe 0 to the GET; when the answer is a 2.xx with Observe, writes it and each later
+  notification (payload, then a newline; under `-i` a `CoAP/1.0 c.dd` line first), drops one
+  `CoapNotificationOrder` calls older (section 3.4), acknowledges confirmable ones, resets other messages,
+  ends after a notification without Observe or not a 2.xx, and on cancellation (`--max-time`, interruption)
+  sends a GET with Observe 1 and the registration's token. An answer without Observe is written as a plain GET's.
+
 `Blockwise/` (namespace `Curl.Extension.Coap.Blockwise`, ADR-1057) carries large bodies (RFC 7959):
 
 - `CoapBlockwiseTransfer` sends a payload over 1024 bytes in Block1 blocks, the next after each 2.31
@@ -73,6 +84,6 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
 `TimeProvider`, stops when the peer's next flight starts, and throws `TimeoutException` after 12 resends
 (the handshake's caller turns it into exit 35).
 
-Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`,
+Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`, `Curl.Extension.Coap.UnitTests/Observe`,
 `Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client`, `Curl.Extension.Coap.UnitTests/Dtls/Wire`,
 `Curl.Extension.Coap.UnitTests/Dtls/Record` and `Curl.Extension.Coap.UnitTests/Dtls/Retransmission`.

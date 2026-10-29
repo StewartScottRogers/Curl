@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Curl.Extension.Abstractions.Description;
+using Curl.Extension.Coap.Observe;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Coap.Client;
@@ -10,9 +11,9 @@ public static class CoapExtension
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
     public static ExtensionDescription Description { get; } = new(
         "coap",
-        "Makes CoAP requests over UDP (RFC 7252): a confirmable GET, or POST, PUT or DELETE with -X, the -d data as the payload, retransmitted until acknowledged, and writes the response payload; -i shows the response code.",
+        "Makes CoAP requests over UDP (RFC 7252): a confirmable GET, or POST, PUT or DELETE with -X, the -d data as the payload, retransmitted until acknowledged, and writes the response payload; -i shows the response code; --coap-observe follows the resource's notifications (RFC 7641).",
         ["coap"],
-        [],
+        [CoapObserveTransferHook.Option],
         new Uri("https://www.rfc-editor.org/rfc/rfc7252"));
 
     /// <summary>Creates the handler over curl's datagram connector, with system randomness for Message IDs, tokens and timeouts.</summary>

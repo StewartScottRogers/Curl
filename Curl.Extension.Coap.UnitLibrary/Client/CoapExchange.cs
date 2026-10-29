@@ -73,7 +73,6 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
             }
 
             CoapMessage? message = Decoded(buffer.AsSpan(0, (await receive.ConfigureAwait(false)).Length));
-            receive = channel.ReceiveAsync(buffer, stop).AsTask();
             Reply reply = Classify(request, message);
             await AnswerAsync(message, reply, stop).ConfigureAwait(false);
             switch (reply)
@@ -87,6 +86,9 @@ internal sealed class CoapExchange(IDatagramChannel channel, TimeProvider timePr
                 case Reply.Reset:
                     throw new CoapException(CurlExitCode.RecvError, "CoAP server reset the request");
             }
+
+            // Receives the next datagram only when the exchange goes on, so none after the response is taken here (RFC 7641 notifications).
+            receive = channel.ReceiveAsync(buffer, stop).AsTask();
         }
     }
 

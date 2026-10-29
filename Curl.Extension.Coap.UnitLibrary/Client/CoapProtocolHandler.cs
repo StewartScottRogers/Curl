@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Extension.Coap.Blockwise;
+using Curl.Extension.Coap.Observe;
 using Curl.Extension.Coap.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -10,7 +11,8 @@ namespace Curl.Extension.Coap.Client;
 /// GET, or POST, PUT or DELETE as <c>-X</c>, <c>-d</c> and <c>-T</c> choose, with the <c>-d</c> data or the <c>-T</c>
 /// file as its payload, block-wise when either needs more than one block (RFC 7959), and writes the whole response payload. A 4.xx or 5.xx response ends with exit 0 as an HTTP error status
 /// does, or with exit 22 under <c>-f</c> or <c>--fail-with-body</c>. <c>-i</c> writes the response code
-/// as a header line before the payload, and <c>-v</c> reports it.
+/// as a header line before the payload, and <c>-v</c> reports it. Under <c>--coap-observe</c> the request
+/// registers an observation and the handler writes each notification (RFC 7641, ADR-1064).
 /// </summary>
 /// <param name="connector">Opens the datagram channel to the server.</param>
 /// <param name="randomBytes">Gives the given number of random bytes, for the Message ID, the token and the timeout's random factor.</param>
@@ -61,10 +63,28 @@ internal sealed class CoapProtocolHandler(IDatagramConnector connector, Func<int
             context.Progress.ReportTransferStarted();
             var exchange = new CoapExchange(channel, context.TimeProvider);
             TimeSpan initialTimeout = InitialTimeoutOf(randomBytes(1)[0]);
+            if (context is CoapObserveContext)
+            {
+                CoapMessage registration = CoapObservation.RegistrationOf(request);
+                return await ObserveAsync(context, channel, registration, exchange.RunAsync(registration, initialTimeout, context.CancellationToken)).ConfigureAwait(false);
+            }
+
             CoapMessage response = await new CoapBlockwiseTransfer((message, stop) => exchange.RunAsync(message, initialTimeout, stop))
                 .RunAsync(request, context.CancellationToken).ConfigureAwait(false);
             return await WriteResponseAsync(context, response).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Registers an observation (RFC 7641 section 3.1, ADR-1064) and follows its notifications, or writes the
+    /// response as a plain GET's when the server answers without an Observe option.
+    /// </summary>
+    private static async ValueTask<TransferResult> ObserveAsync(ITransferContext context, IDatagramChannel channel, CoapMessage registration, ValueTask<CoapMessage> exchange)
+    {
+        CoapMessage response = await exchange.ConfigureAwait(false);
+        return CoapObservation.IsNotification(response)
+            ? await new CoapObservation(channel, context.TimeProvider).FollowAsync(context, registration, response).ConfigureAwait(false)
+            : await WriteResponseAsync(context, response).ConfigureAwait(false);
     }
 
     private async ValueTask<CoapMessage> RequestOfAsync(ITransferContext context)
