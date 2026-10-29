@@ -4,7 +4,9 @@ using Libcurl.Options;
 
 namespace Libcurl.UnitTests;
 
+// Flips the process-wide EasyAuthenticationOptionSetters.SrpIsBuiltIn, so it must not run beside another test that reads it (BL-4020).
 [TestClass]
+[DoNotParallelize]
 public sealed class Cgr265Tests
 {
     [TestMethod]
