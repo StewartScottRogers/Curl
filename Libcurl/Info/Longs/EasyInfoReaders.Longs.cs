@@ -91,7 +91,7 @@ internal static partial class EasyInfoReaders
 
     private static object? ReadPrimaryPort(TransferInfo info, EasyOptions options) => info.PrimaryPort == 0 ? -1 : info.PrimaryPort;
 
-    private static object? ReadLocalPort(TransferInfo info, EasyOptions options) => info.LocalPort;
+    private static object? ReadLocalPort(TransferInfo info, EasyOptions options) => info.LocalPort == 0 ? -1 : info.LocalPort;
 
     private static object? ReadConditionUnmet(TransferInfo info, EasyOptions options) => info.ConditionUnmet;
 
