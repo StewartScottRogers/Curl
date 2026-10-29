@@ -1029,3 +1029,4 @@ Each option and the specific reason it lost.
 | [0995](ADR-0995-libcurl-answers-the-platform-builds-setopt-codes-for-cgr-265s-last-options.md) | Libcurl answers the platform build's setopt codes for CGR-265's last options (BL-4066) | Accepted |
 | [0994](ADR-0994-winldap-ldaps-handshake-failure-is-bind-server-down.md) | A failed handshake on WinLDAP's own `ldaps://` connection ends as the bind's `Server Down` (exit 38), as curl 8.22.0 does (measured; BL-4056, CGR-289) | Accepted | 2026-10-29 |
 | [0997](ADR-0997-a-transfer-with-no-known-socket-is-told-none-and-left-out-of-waitfds.md) | A multi transfer with no socket the handle knows is told no socket and left out of GetWaitSockets (BL-4073, CGR-034) | Accepted | 2026-10-29 |
+| [0998](ADR-0998-a-running-transfer-with-no-known-socket-makes-the-timer-0.md) | A running multi transfer with no socket the handle knows makes the timer 0, replacing the 10 ms check interval (BL-4069, CGR-034) | Accepted | 2026-10-29 |

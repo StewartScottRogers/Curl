@@ -1,6 +1,6 @@
 # ADR-0997: A multi transfer with no socket the handle knows is told no socket and is left out of GetWaitSockets
 
-Status: Accepted. Decided by Claude under Stewart's delegation (BL-4068, BL-4072, BL-4073, CGR-034).
+Status: Accepted. Decided by Claude under Stewart's delegation (BL-4068, BL-4072, BL-4073, CGR-034). Its timer point is replaced by ADR-0998: the timer is now 0 while such a transfer runs.
 
 ## Context
 
