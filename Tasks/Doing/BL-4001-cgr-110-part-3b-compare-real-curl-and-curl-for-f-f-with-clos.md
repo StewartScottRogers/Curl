@@ -34,3 +34,4 @@ Split from BL-3974. BL-4000 makes the library abort; BL-3985 made the tool's `-F
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 1bac223e e5faf1f9 c259902e.
