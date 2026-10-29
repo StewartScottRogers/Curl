@@ -70,6 +70,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     private bool isPrefaceSent;
 
     private bool isUpgradeSettingsDue;
+    private bool isUpgradedStreamOpened;
 
     private ExceptionDispatchInfo? connectionFailure;
 
@@ -239,6 +240,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             isUpgradeSettingsDue = true;
             int streamId = Register(Frames.OpenUpgradedStream(), receiver);
             await SendStreamWindowUpdatesAsync(streamId, cancellationToken).ConfigureAwait(false);
+            isUpgradedStreamOpened = true;
             return streamId;
         }
         finally
@@ -252,7 +254,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     /// window to <see cref="StreamReceiveWindowSize" /> from the initial size in force: the
     /// default 65535 until the peer acknowledges this client's SETTINGS, 65536 after, as
     /// nghttp2 counts it - 10420225 on the first stream of a prior-knowledge connection,
-    /// 10420224 on the next (measured, BL-817 Notes).
+    /// 10420224 on the next (measured, BL-817 Notes). After an h2c upgrade the settings count as acknowledged once stream 1 is open, so later streams get 10420224 (CGR-277).
     /// </summary>
     /// <param name="streamId">The stream whose window grows.</param>
     /// <param name="cancellationToken">Cancels the writes.</param>
@@ -272,7 +274,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
 
     private async ValueTask SendStreamWindowUpdatesAsync(int streamId, CancellationToken cancellationToken)
     {
-        int initialWindowSize = Frames.IsClientSettingsAcknowledged ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
+        int initialWindowSize = Frames.IsClientSettingsAcknowledged || isUpgradedStreamOpened ? Http2Connection.ClientInitialWindowSize : Http2Settings.DefaultInitialWindowSize;
         for (int sent = 0; sent < StreamWindowUpdateCount; sent++)
         {
             await Frames.IncreaseStreamReceiveWindowAsync(streamId, StreamReceiveWindowSize - initialWindowSize, cancellationToken).ConfigureAwait(false);

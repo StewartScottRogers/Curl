@@ -30,8 +30,8 @@ public sealed partial class HttpProtocolHandlerTests
     /// <summary>The SETTINGS INITIAL_WINDOW_SIZE 65536 curl sends before the first stream it opens after the upgrade (BL-970 Notes).</summary>
     private const string UpgradedStreamSettings = "000006040000000000000400010000";
 
-    /// <summary>curl's WINDOW_UPDATE growing stream 3 to 10 MiB from the default 65535, sent twice (BL-970 Notes).</summary>
-    private const string Stream3WindowUpdate = "000004080000000003009F0001";
+    /// <summary>curl's WINDOW_UPDATE growing stream 3 to 10 MiB from 65536 (the upgrade settings count as acknowledged), sent twice (BL-970 Notes, CGR-277 corrects the increment to 10420224).</summary>
+    private const string Stream3WindowUpdate = "000004080000000003009F0000";
 
     /// <summary>The RST_STREAM with STREAM_CLOSED curl sends on stream 1 when it ignores that stream's body (BL-970 Notes).</summary>
     private const string Stream1ClosedReset = "00000403000000000100000005";
