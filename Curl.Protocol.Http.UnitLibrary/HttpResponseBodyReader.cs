@@ -71,6 +71,12 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
         passesChunks ? ReadOnlyMemory<byte>.Empty : decoder?.TrailerBytes ?? ReadOnlyMemory<byte>.Empty;
 
     /// <summary>
+    /// Gets or sets the trailers of an HTTP/2 or HTTP/3 stream as header pairs, which count
+    /// as response headers for <c>%{num_headers}</c> (CGR-273). Empty by default.
+    /// </summary>
+    internal IReadOnlyList<KeyValuePair<string, string>> StreamTrailers { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets how many response headers the transfer has stored before a chunked body's
     /// trailers, which leave the trailers what is left of
     /// <see cref="HttpResponseHeadReader.MaximumHeaderCount" /> (<see cref="HttpChunkedDecoder.TrailerLimit" />,

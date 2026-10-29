@@ -2559,6 +2559,7 @@ public sealed class HttpProtocolHandler(
         ReadOnlyMemory<byte> trailers = await TrailersOfAsync(body, requestStream, cancellationToken).ConfigureAwait(false);
         int storedLength = StoredLengthOf(trailers.Span, requestStream is null ? int.MaxValue : HttpResponseHeadReader.MaximumHeaderCount - body.HeadersStored);
         await WriteHeadersAsync(context.HeaderOutput, trailers[..storedLength], cancellationToken).ConfigureAwait(false);
+        ReportStreamTrailers(body, requestStream, context.Events, trailers.Span[..storedLength]);
         if (storedLength < trailers.Length)
         {
             throw new HttpTransferException(CurlExitCode.TooLarge, HttpTransferMessages.TooManyResponseHeaders)
@@ -2566,6 +2567,29 @@ public sealed class HttpProtocolHandler(
                 InfoLines = [HttpTransferMessages.TooManyResponseHeaders],
             };
         }
+    }
+
+    /// <summary>
+    /// Reports each line of an HTTP/2 or HTTP/3 stream's stored trailers as a received header, as curl does for
+    /// the headers its HTTP/2 layer hands on (CGR-273), and keeps them as header pairs for <c>%{num_headers}</c>;
+    /// does nothing for a body that is not a stream's.
+    /// </summary>
+    private static void ReportStreamTrailers(HttpResponseBodyReader body, IHttpStreamConnection? requestStream, ITransferEvents events, ReadOnlySpan<byte> trailers)
+    {
+        if (requestStream is null)
+        {
+            return;
+        }
+
+        List<KeyValuePair<string, string>> pairs = [];
+        foreach (string line in System.Text.Encoding.Latin1.GetString(trailers).Split("\r\n", StringSplitOptions.RemoveEmptyEntries))
+        {
+            events.ReportResponseHeader(System.Text.Encoding.Latin1.GetBytes(line + "\r\n"));
+            int colon = line.IndexOf(": ", StringComparison.Ordinal);
+            pairs.Add(KeyValuePair.Create(line[..colon], line[(colon + 2)..]));
+        }
+
+        body.StreamTrailers = pairs;
     }
 
     /// <summary>
@@ -3492,7 +3516,7 @@ public sealed class HttpProtocolHandler(
                 RemoteEndPoint = connection.RemoteEndPoint as IPEndPoint,
                 Timings = TimingsNow(),
             };
-            return Head is null ? report : WithHead(report, Head) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
+            return Head is null ? report : WithHead(report, Head, body.StreamTrailers) with { RedirectUrl = RedirectUrl, DigestStaysAvailable = DigestStaysAvailableAfter(HeldDigestNonce, SentNtlmAuthorization, Head) };
         }
 
         private long RequestSizeSoFar() => earlier?.RequestSize ?? 0;
@@ -3508,12 +3532,12 @@ public sealed class HttpProtocolHandler(
                 ResponseConnection.FirstByteReceived,
                 TimeProvider.GetTimestamp());
 
-        private static TransferReport WithHead(TransferReport report, HttpResponseHead head) =>
+        private static TransferReport WithHead(TransferReport report, HttpResponseHead head, IReadOnlyList<KeyValuePair<string, string>> streamTrailers) =>
             report with
             {
                 ResponseCode = head.StatusLine.StatusCode,
                 HttpVersion = head.StatusLine.Version,
-                ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value))],
+                ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value)), .. streamTrailers],
                 ContentType = head.Headers.LastOrDefault(IsContentType)?.Value,
                 HeaderSize = report.HeaderSize + head.HeadBytes.Length,
             };
