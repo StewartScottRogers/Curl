@@ -768,6 +768,12 @@ public sealed class HttpProtocolHandler(
         ConnectResult connect = await ConnectAsync(plan, target).ConfigureAwait(false);
         if (connect.Connection is not { } connection)
         {
+            if (connect.ProxyConnectResponseCode != 0)
+            {
+                // The proxy answered the CONNECT, so curl is past connect and still draws the meter (CGR-242).
+                ReportRequestStarted(plan, earlier, resentAfterConnectionDied);
+            }
+
             plan.Context.Events.ReportInfo(HttpConnectionInfoLines.Closing(connect.ConnectionNumber));
             return TransferResult.Failure(connect.ExitCode, connect.ErrorMessage!) with
             {
