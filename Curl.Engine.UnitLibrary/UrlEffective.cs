@@ -124,7 +124,7 @@ internal static class UrlEffective
             return parsed.Host[..^1] + zone + "]";
         }
 
-        return IsDottedQuad(parsed.Host) ? parsed.Host : typedHost;
+        return IsDottedQuad(parsed.Host) || typedHost.Contains('%') ? parsed.Host : typedHost;
     }
 
     private static bool IsDottedQuad(string host) =>
