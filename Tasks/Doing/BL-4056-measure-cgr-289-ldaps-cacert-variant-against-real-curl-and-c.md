@@ -33,3 +33,4 @@ CGR-289, part 3 of 3 of BL-4044. With a non-issuing CA (Curl.Output.UnitTests/Fi
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 08162493 8cf8d85c 779790c0.
