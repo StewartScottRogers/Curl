@@ -540,6 +540,15 @@
     Default none.
     Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2HeaderField 'transfer-encoding: chunked' -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-resp-te
 
+.PARAMETER Http2Frames
+    With -Http2Origin, answer the request with these frames instead of the HEADERS frame
+    -ProxyStatus gives, so a malformed response can be measured (BL-3664). Each entry is one
+    frame: 'H' for HEADERS or 'D' for DATA, then '!' when it ends the stream, a blank, and the
+    content. A HEADERS frame's content is fields separated by '|', each 'name: value', sent
+    as literals with a new name exactly as written (so upper case reaches curl); a DATA
+    frame's content is text, with \r and \n as CR and LF.
+    Example: pwsh -File .\Record-CurlExchange.ps1 -Http2Origin prior-knowledge -Http2Frames 'H :status: 200|X-Upper: v','D! hello h2\n' -Port 18080 -Response 'HTTP/1.1 200 OK\r\n\r\n' -Curl <nghttp2 curl> -CurlArgs '--http2-prior-knowledge','-sS','-i','http://127.0.0.1:18080/x' -OutDirectory fixtures\h2-upper
+
 .PARAMETER ProxyAlpn
     With -Http2, the one protocol the proxy accepts by ALPN: h2 (the default) or http/1.1,
     to measure curl falling back to an HTTP/1.1 CONNECT when the proxy will not speak
@@ -728,6 +737,7 @@ param(
     [ValidatePattern('^(|push|nostatus|status:.*)$')] [string] $Http2Answer = '',
     [switch] $Http2NoSettings,
     [string[]] $Http2HeaderField = @(),
+    [string[]] $Http2Frames = @(),
     [string] $Curl,
     [System.Net.IPAddress] $ListenAddress = [System.Net.IPAddress]::Loopback,
     [switch] $NoServer,
@@ -2251,6 +2261,7 @@ public sealed class RecorderHttp2Proxy
     public bool OmitSettings { get; set; }
     public string Answer { get; set; } = "";
     private readonly string[] _headerFields;
+    public string[] Frames { get; set; } = new string[0];
 
     public RecorderHttp2Proxy(TcpListener listener, X509Certificate2 certificate, string alpn, int status, byte[] tunnelResponse, string origin, int resetCode, string[] headerFields)
     {
@@ -2537,6 +2548,7 @@ public sealed class RecorderHttp2Proxy
             return;
         }
         if (Answer.Length > 0 && !connect) { AnswerScenario(stream, streamId); return; }
+        if (Frames.Length > 0) { SendFrames(stream, streamId); return; }
         var block = new List<byte> { 0x08 };
         AppendLiteral(block, _status.ToString());
         bool refused = _status / 100 != 2 || !connect;
@@ -2586,6 +2598,38 @@ public sealed class RecorderHttp2Proxy
         Note("< HEADERS stream " + streamId + " flags 0x05");
         Note(status != null ? "<   :status: " + status : "<   (no :status)");
         Note("<   content-length: 0");
+    }
+
+    // The -Http2Frames answer: each HEADERS field a literal without indexing with a new name.
+    private void SendFrames(Stream stream, int streamId)
+    {
+        foreach (string entry in Frames)
+        {
+            int blank = entry.IndexOf(' ');
+            string kind = entry.Substring(0, blank);
+            string content = entry.Substring(blank + 1);
+            byte endStream = (byte)(kind.EndsWith("!") ? 0x01 : 0x00);
+            if (kind.StartsWith("H"))
+            {
+                var block = new List<byte>();
+                foreach (string field in content.Split('|'))
+                {
+                    int colon = field.IndexOf(": ", 1, StringComparison.Ordinal);
+                    block.Add(0x00);
+                    AppendLiteral(block, field.Substring(0, colon));
+                    AppendLiteral(block, field.Substring(colon + 2));
+                    Note("<   " + field);
+                }
+                WriteFrame(stream, 1, (byte)(0x04 | endStream), streamId, block.ToArray());
+                Note("< HEADERS stream " + streamId + " flags 0x" + (0x04 | endStream).ToString("x2"));
+            }
+            else
+            {
+                byte[] data = Encoding.Latin1.GetBytes(content.Replace("\\r", "\r").Replace("\\n", "\n"));
+                WriteFrame(stream, 0, endStream, streamId, data);
+                Note("< DATA stream " + streamId + " flags 0x" + endStream.ToString("x2") + " " + data.Length + " bytes: " + Escape(data, 0, data.Length));
+            }
+        }
     }
 
     private static void AppendLiteral(List<byte> block, string value)
@@ -2715,6 +2759,7 @@ public sealed class RecorderHttp2Proxy
     $http2Proxy = New-Object RecorderHttp2Proxy($listener, $tlsCertificate, $ProxyAlpn, $ProxyStatus, $responseBytes[0], $(if ($Http2Origin) { $Http2Origin } else { '' }), $Http2ResetCode, [string[]] $Http2HeaderField)
     $http2Proxy.OmitSettings = [bool]$Http2NoSettings
     $http2Proxy.Answer = $Http2Answer
+    $http2Proxy.Frames = [string[]] $Http2Frames
 }
 $dnsResponder = $null
 if ($DnsPort.Count -gt 0 -or $DohPort.Count -gt 0) {
