@@ -1,5 +1,5 @@
 ---
-id: BL-4045
+id: BL-4046
 title: WinLDAP NTLM bind over ldaps:// asks for no signing or sealing (flags 07B208A2) as curl 8.22.0 does
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4045 — WinLDAP NTLM bind over ldaps:// asks for no signing or sealing (flags 07B208A2) as curl 8.22.0 does
+# BL-4046 — WinLDAP NTLM bind over ldaps:// asks for no signing or sealing (flags 07B208A2) as curl 8.22.0 does
 
 ## Goal
 
