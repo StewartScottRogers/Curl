@@ -1,5 +1,5 @@
 ---
-id: BL-4174
+id: BL-4192
 title: Pass the activated extension connection hook from Curl.Console to the engine
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4174 — Pass the activated extension connection hook from Curl.Console to the engine
+# BL-4192 — Pass the activated extension connection hook from Curl.Console to the engine
 
 ## Goal
 

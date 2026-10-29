@@ -34,7 +34,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 - Decided: one hook per transfer, not a chain; two activated hooks throw an `ArgumentException` naming every option, which the host reports as an option error. A hook receives curl's connector so a jump host or tunnel can reach its first hop through it. Datagram connector defaults to curl's.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary,Curl.Engine.UnitLibrary` reported 0 failing members.
 - Added `Curl.Extension.Abstractions.UnitLibrary/CLAUDE.md` to touches so the project document names the connection hooks; no other task in Doing names it.
-- Filed BL-4174 for the Console wiring (passing the activated hook from the parsed extension options), mirroring BL-4173 for transfer hooks.
+- Filed BL-4192 for the Console wiring (passing the activated hook from the parsed extension options), mirroring BL-4173 for transfer hooks.
 
 
 
