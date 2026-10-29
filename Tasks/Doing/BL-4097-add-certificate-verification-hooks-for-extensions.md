@@ -34,3 +34,4 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 7348d087 76b0814b e35aff77 3d836d5e.
