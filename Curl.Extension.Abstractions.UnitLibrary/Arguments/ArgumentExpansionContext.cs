@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Arguments;
 
 /// <summary>
-/// What an <see cref="IArgumentExpander" /> reads through the host (ADR-1037), so its tests need no disk and no
+/// What an <see cref="IArgumentExpander" /> reads through the host (ADR-1040), so its tests need no disk and no
 /// process environment.
 /// </summary>
 /// <param name="ReadEnvironmentVariable">Gives an environment variable's value, or <see langword="null" /> when it is not set.</param>

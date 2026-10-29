@@ -39,7 +39,7 @@ Namespace `Curl.Extension.Composition`.
 - `ExtensionArgumentExpanderCatalogue.Entries` holds each extension's `IArgumentExpander`, one line each, also
   `merge=union` and a shared list file. `CurlCommandRunner.RunAsync` hands them to `ArgumentExpansion.Expand`, which
   replaces each expander's option and value with the expander's curl arguments before the command line is parsed,
-  none under `CURL_EXTENSIONS=0`; an expander's option is also listed in `ExtensionOptionCatalogue` (ADR-1037).
+  none under `CURL_EXTENSIONS=0`; an expander's option is also listed in `ExtensionOptionCatalogue` (ADR-1040).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

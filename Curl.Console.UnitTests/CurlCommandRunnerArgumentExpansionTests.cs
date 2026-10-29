@@ -10,7 +10,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins an extension's argument expander end to end through the runner (ADR-1037): its option and value replaced by
+/// Pins an extension's argument expander end to end through the runner (ADR-1040): its option and value replaced by
 /// the expander's arguments before the parse, a failure ending the run before any transfer, and nothing expanded
 /// under <c>CURL_EXTENSIONS=0</c>.
 /// </summary>

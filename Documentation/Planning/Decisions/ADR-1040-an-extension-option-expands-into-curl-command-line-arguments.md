@@ -1,4 +1,4 @@
-# ADR-1037: An extension option expands into curl command-line arguments
+# ADR-1040: An extension option expands into curl command-line arguments
 
 - Status: Accepted
 - Date: 2026-10-29

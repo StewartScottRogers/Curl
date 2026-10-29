@@ -297,7 +297,7 @@ namespace Curl.Console;
 /// </param>
 /// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>
 /// <param name="extensionOptions">The extensions' long options the parser reads where curl has no option of that name (ADR-1006); <see langword="null" />, the default, reads every registered extension's (<see cref="ExtensionCommandLineOptions.For" />). None is read under <c>CURL_EXTENSIONS=0</c>. Tests pass their own to reach an option no extension registers yet.</param>
-/// <param name="argumentExpanders">The extensions' argument expanders, each replacing its option and value with curl arguments before the command line is parsed (ADR-1037); <see langword="null" />, the default, uses every registered one (<see cref="ExtensionArgumentExpanderCatalogue.Entries" />). None is used under <c>CURL_EXTENSIONS=0</c>. Tests pass their own to reach an expander no extension registers yet.</param>
+/// <param name="argumentExpanders">The extensions' argument expanders, each replacing its option and value with curl arguments before the command line is parsed (ADR-1040); <see langword="null" />, the default, uses every registered one (<see cref="ExtensionArgumentExpanderCatalogue.Entries" />). None is used under <c>CURL_EXTENSIONS=0</c>. Tests pass their own to reach an expander no extension registers yet.</param>
 /// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -845,7 +845,7 @@ internal sealed class CurlCommandRunner(
         }
         catch (ArgumentExpansionException failure)
         {
-            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1037).
+            // An extension could not turn its option into arguments: the run ends before any transfer (ADR-1040).
             await WriteErrorLinesAsync(["curl: " + failure.Message]).ConfigureAwait(false);
             return (int)failure.ExitCode;
         }
@@ -1543,7 +1543,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// Gives <paramref name="arguments" /> with each extension expander's option and value replaced by the
-    /// expander's arguments (ADR-1037): unchanged under <c>CURL_EXTENSIONS=0</c>, so the parser then refuses the
+    /// expander's arguments (ADR-1040): unchanged under <c>CURL_EXTENSIONS=0</c>, so the parser then refuses the
     /// option as curl refuses an unknown one. The expanders read files through the runner's reader.
     /// </summary>
     /// <param name="arguments">The command-line arguments, without the program name.</param>

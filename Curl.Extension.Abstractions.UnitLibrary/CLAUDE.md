@@ -38,7 +38,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
 - `Arguments/IArgumentExpander` turns one extension option's value into curl command-line arguments (URLs, `-X`,
   `-H`, `--data-binary`, `--next`), so an extension can supply whole requests. `ArgumentExpansion.Expand` replaces
   each expander's `--name value` or `--name=value` in the top-level arguments with them (not after a bare `--`, not in
-  `-K` files, and not again in an expansion); a host calls it before parsing (ADR-1037). The expander reads files and
+  `-K` files, and not again in an expansion); a host calls it before parsing (ADR-1040). The expander reads files and
   the environment through `ArgumentExpansionContext`'s delegates, and throws `ArgumentExpansionException` to end the
   run with `curl: <message>` and its `CurlExitCode` before any transfer.
 

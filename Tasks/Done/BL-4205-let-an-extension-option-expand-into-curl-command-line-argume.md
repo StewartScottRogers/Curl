@@ -32,11 +32,11 @@ Found by BL-4154 (`--http-file`, the VS Code / Visual Studio REST Client .http f
 
 ## Notes
 - Added `.gitattributes` and `Tasks/SharedListFiles.txt` to `touches` to make the new catalogue a `merge=union` shared list file like its siblings; no task in Doing on origin/work/dark-factory names either.
-- Decided (ADR-1037): the contract and the expansion pass (`ArgumentExpansion.Expand`) live in `Curl.Extension.Abstractions.UnitLibrary/Arguments`, so the runner only calls it before `CommandLineParser.Parse`. `--name value` and `--name=value` are expanded, nothing after a bare `--`, not inside `-K` files, and an expansion is not expanded again. A failure prints `curl: <message>` with no try-help line and exits with the expander's code.
+- Decided (ADR-1040): the contract and the expansion pass (`ArgumentExpansion.Expand`) live in `Curl.Extension.Abstractions.UnitLibrary/Arguments`, so the runner only calls it before `CommandLineParser.Parse`. `--name value` and `--name=value` are expanded, nothing after a bare `--`, not inside `-K` files, and an expansion is not expanded again. A failure prints `curl: <message>` with no try-help line and exits with the expander's code.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.Abstractions.UnitLibrary,Curl.Extension.Composition.UnitLibrary,Curl.Console` reports 0 failing members; `dotnet build` clean, fast tests green (62 test projects). The tests are platform-neutral (in-memory files, no paths or OS text).
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: f03ab138 83f8b8c3 45e1ff2e e21923fb acf65c74 478f867b 3d836d5e.
-- 2026-10-29: Doing -> Done. An extension's IArgumentExpander replaces its option and value with curl arguments before Curl.Console parses the command line (ADR-1037)
+- 2026-10-29: Doing -> Done. An extension's IArgumentExpander replaces its option and value with curl arguments before Curl.Console parses the command line (ADR-1040)

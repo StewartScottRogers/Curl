@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Arguments;
 namespace Curl.Extension.Composition;
 
 /// <summary>
-/// Every extension's argument expander, one entry per line (ADR-1037): each replaces its option and value with curl
+/// Every extension's argument expander, one entry per line (ADR-1040): each replaces its option and value with curl
 /// command-line arguments before the host parses the command line (<see cref="ArgumentExpansion.Expand" />). Each
 /// extension task adds its own line and nothing else here; the file is marked <c>merge=union</c> in
 /// <c>.gitattributes</c> and listed in <c>Tasks/SharedListFiles.txt</c>, so lanes adding different extensions do not

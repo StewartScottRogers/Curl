@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Arguments;
 
 /// <summary>
-/// Turns one extension option's value into curl command-line arguments (ADR-1037), so an extension can supply
+/// Turns one extension option's value into curl command-line arguments (ADR-1040), so an extension can supply
 /// whole requests: URLs, <c>-X</c>, <c>-H</c>, <c>--data-binary</c> and <c>--next</c>. A host replaces the option
 /// and its value with <see cref="ArgumentsFor" />'s arguments before it parses the command line
 /// (<see cref="ArgumentExpansion.Expand" />). An extension declares it in one file and registers it with one line in

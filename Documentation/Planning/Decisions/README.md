@@ -1072,4 +1072,4 @@ Each option and the specific reason it lost.
 | [1037](ADR-1037-the-websocket-repl-sends-typed-lines-and-shows-messages-one-per-line.md) | The WebSocket REPL sends typed lines and shows messages one per line (BL-4221) | Accepted | 2026-10-29 |
 | [1038](ADR-1038-the-signalr-transport-speaks-its-own-http-1-1-and-websocket-handshake-over-iconnection.md) | The SignalR transport speaks its own HTTP/1.1 and WebSocket handshake over IConnection (BL-4219) | Accepted | 2026-10-29 |
 | [1039](ADR-1039-a-transfer-hook-gets-curls-connector-and-a-loopback-listener-through-an-execute-overload.md) | A transfer hook gets curl's connector and a loopback listener through an ExecuteAsync overload (BL-4211) | Accepted | 2026-10-29 |
-| [1037](ADR-1037-an-extension-option-expands-into-curl-command-line-arguments.md) | An extension option expands into curl command-line arguments (BL-4205) | Accepted | 2026-10-29 |
+| [1040](ADR-1040-an-extension-option-expands-into-curl-command-line-arguments.md) | An extension option expands into curl command-line arguments (BL-4205) | Accepted | 2026-10-29 |

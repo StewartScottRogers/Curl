@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Arguments;
 
 /// <summary>
 /// Replaces each expander's option and its value in a command line with the expander's arguments, before the host
-/// parses it (ADR-1037). An option is read as the parser reads a long option: <c>--name value</c>, or
+/// parses it (ADR-1040). An option is read as the parser reads a long option: <c>--name value</c>, or
 /// <c>--name=value</c>; a flag takes no value. Nothing after a bare <c>--</c> is expanded, an option with no value
 /// after it is left for the parser to refuse, and the arguments an expander gives are not expanded again.
 /// </summary>
