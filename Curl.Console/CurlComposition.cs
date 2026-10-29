@@ -12,6 +12,7 @@ using Curl.Cookies;
 using Curl.Core;
 using Curl.Core.FileSystem;
 using Curl.Engine;
+using Curl.Extension.Abstractions;
 using Curl.Extension.Composition;
 using Curl.Kerberos;
 using Curl.Networking;
@@ -587,6 +588,15 @@ internal static class CurlComposition
 
         return lines;
     }
+
+    /// <summary>
+    /// Gives the extension options one option group gave, as its extensions' transfer hooks read them
+    /// (ADR-1006, ADR-1007): each option's value, or the empty string for a flag.
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <returns>The group's extension option values, holding none when it gave none.</returns>
+    internal static ExtensionOptionValues ExtensionOptionValuesOf(CommandLineOptions options) =>
+        new(options.ExtensionOptionValues);
 
     // The tool's warning for an option curl's Schannel build ignores.
     private static string SchannelIgnoredOptionWarning(string option) =>

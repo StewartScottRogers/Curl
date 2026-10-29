@@ -12,6 +12,7 @@ using Curl.Core.Globbing;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
 using Curl.Engine;
+using Curl.Extension.Abstractions;
 using Curl.Extension.Composition;
 using Curl.Networking;
 using Curl.Output;
@@ -294,6 +295,7 @@ namespace Curl.Console;
 /// harness turn it on to reach the hand-built ECH.
 /// </param>
 /// <param name="debugWriteOut">What <c>-w</c> prints in place of the clock, the measured values and the library version under curl's debug-build test variables; <see langword="null" />, the default, prints them as measured (ADR-0732, BL-2909).</param>
+/// <param name="extensionOptions">The extensions' long options the parser reads where curl has no option of that name (ADR-1006); <see langword="null" />, the default, reads every registered extension's (<see cref="ExtensionCommandLineOptions.For" />). None is read under <c>CURL_EXTENSIONS=0</c>. Tests pass their own to reach an option no extension registers yet.</param>
 /// <param name="parsesAsWindowsBuild">Whether the command line is read as curl's Windows Schannel build reads it (<see cref="CommandLineOptions.ActsAsWindowsSchannelBuild" />); <see langword="null" />, the default, reads it as this process's platform's build does. Tests pass <see langword="false" /> to reach the HTTP/2 options and <c>--ssl-sessions</c> on any platform.</param>
 internal sealed class CurlCommandRunner(
     Func<CommandLineOptions, TransferDispatch> createTransferDispatch,
@@ -329,7 +331,8 @@ internal sealed class CurlCommandRunner(
     ICurlEngine? curlEngine = null,
     Func<Api.Options.EasyOptions, IReadOnlyList<EasySetopt>>? easySetoptsOf = null,
     DebugWriteOutStandIn? debugWriteOut = null,
-    bool parsesAsEchBuild = false)
+    bool parsesAsEchBuild = false,
+    IReadOnlyList<ExtensionOption>? extensionOptions = null)
 {
     /// <summary>
     /// The line curl 8.21.0's own write callback prints, with no <c>(23)</c>, when standard
@@ -1519,7 +1522,37 @@ internal sealed class CurlCommandRunner(
             parsesAsWindowsBuild ?? OperatingSystem.IsWindows(),
             EnvironmentVariables,
             parsesAsQuicBuild,
-            parsesAsEchBuild);
+            parsesAsEchBuild,
+            actsAsCAresBuild: false,
+            ParsedExtensionOptions);
+
+    /// <summary>
+    /// Gets the extension options the parser reads where curl has no option of that name (ADR-1006): none under
+    /// <c>CURL_EXTENSIONS=0</c>, so the parser refuses each as curl refuses an unknown option; otherwise the options
+    /// the runner was given, else every registered extension's.
+    /// </summary>
+    private IReadOnlyList<CommandLineExtensionOption> ParsedExtensionOptions =>
+        EnvironmentVariables(ExtensionProtocolHandlers.SwitchVariable) == "0"
+            ? []
+            : [.. (extensionOptions ?? ExtensionCommandLineOptions.For(EnvironmentVariables, IsCurlLongOption)).Select(ToCommandLineExtensionOption)];
+
+    /// <summary>
+    /// Reports whether a long name is one of curl's own options, created once with <see langword="new" /> so no
+    /// use of it carries the compiler's method-group cache.
+    /// </summary>
+    private static readonly Func<string, bool> IsCurlLongOption = new(CommandLineParser.IsCurlLongOption);
+
+    /// <summary>
+    /// Gives the parser's form of an extension's option (<see cref="ToParserOption" />), created once with
+    /// <see langword="new" /> so no use of it carries the compiler's method-group cache.
+    /// </summary>
+    private static readonly Func<ExtensionOption, CommandLineExtensionOption> ToCommandLineExtensionOption = new(ToParserOption);
+
+    /// <summary>Gives the parser's form of an extension's option: its long name, and whether it takes a value.</summary>
+    /// <param name="option">The extension's option.</param>
+    /// <returns>The option, taking a value when its argument is <see cref="ExtensionOptionArgument.Value" />.</returns>
+    private static CommandLineExtensionOption ToParserOption(ExtensionOption option) =>
+        new(option.Name, option.Argument == ExtensionOptionArgument.Value);
 
     /// <summary>
     /// Transfers every URL of one option group in order, each command-line URL once for every URL
