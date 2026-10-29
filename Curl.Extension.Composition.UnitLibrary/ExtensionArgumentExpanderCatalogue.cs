@@ -16,5 +16,6 @@ public static class ExtensionArgumentExpanderCatalogue
     public static IReadOnlyList<IArgumentExpander> Entries { get; } =
     [
         new HttpFile.HttpFileArgumentExpander(),
+        new OpenApi.OpenApiArgumentExpander(),
     ];
 }

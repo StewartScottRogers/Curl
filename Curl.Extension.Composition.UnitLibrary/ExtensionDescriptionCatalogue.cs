@@ -16,6 +16,7 @@ internal static class ExtensionDescriptionCatalogue
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
         HttpFile.HttpFileOptions.Description,
+        OpenApi.OpenApiOptions.Description,
         SocketIo.SocketIoExtension.Description,
         Coap.Client.CoapExtension.Description,
         Stomp.Client.StompExtension.Description,
