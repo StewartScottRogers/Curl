@@ -30,7 +30,7 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 ## Notes
 
-- Split (ADR-1020): `EngineComposition.cs` keeps only `CreateProtocolHandlers`, the handler list (one handler per entry, the registration point). Each other unit moved to its own partial file: `EngineComposition.Extensions.cs` (`ThroughExtension`, `ThroughTransferHooks`, `ExtensionHandlersOver`, the code BL-4094 to BL-4097 changed), `.ContinueWait.cs`, `.PlatformBuilds.cs` (LDAP dialect, SSH algorithms), `.Ftp.cs` (`CreateFtpProtocolHandler`, `FtpDataConnectorOf`) and `.ConnectionNumbering.cs`. Code moved only; no behaviour change. Self-registering handlers (module initializers) were not taken: a static mutable registry is a service locator and each handler needs different services; an options record in place of the parameters would change every caller outside this task's touches. Recorded in ADR-1020.
+- Split (ADR-1022): `EngineComposition.cs` keeps only `CreateProtocolHandlers`, the handler list (one handler per entry, the registration point). Each other unit moved to its own partial file: `EngineComposition.Extensions.cs` (`ThroughExtension`, `ThroughTransferHooks`, `ExtensionHandlersOver`, the code BL-4094 to BL-4097 changed), `.ContinueWait.cs`, `.PlatformBuilds.cs` (LDAP dialect, SSH algorithms), `.Ftp.cs` (`CreateFtpProtocolHandler`, `FtpDataConnectorOf`) and `.ConnectionNumbering.cs`. Code moved only; no behaviour change. Self-registering handlers (module initializers) were not taken: a static mutable registry is a service locator and each handler needs different services; an options record in place of the parameters would change every caller outside this task's touches. Recorded in ADR-1022.
 - `touches` gained the five new partial files, which only this task creates.
 - Waiting tasks: BL-4083 and BL-4094 to BL-4097 were all Done (archived, so their front matter is final and was not edited). `hotspots -Min 1` after the split: `Hotspot 3 Curl.Engine.UnitLibrary/EngineComposition.cs: BL-4172, BL-4176, BL-4178` (the last two name the whole project), fewer than 5.
 - Verified: `dotnet build` clean; fast tests 53 projects passed, 0 failed (Curl.Engine.UnitTests 2926 passed); `dotnet format --verify-no-changes` on the files clean; `Measure-CodeQuality.ps1 -Library Curl.Engine.UnitLibrary`: 0 failing members.
@@ -39,4 +39,4 @@ Filed by the dark factory's coordinator (ADR-0130, 2026-10-21 amendment): the bo
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 522718da 5cd5c6a4 a0b49a29.
-- 2026-10-29: Doing -> Done. EngineComposition.cs holds only the handler list; each other unit has its own partial file (ADR-1020)
+- 2026-10-29: Doing -> Done. EngineComposition.cs holds only the handler list; each other unit has its own partial file (ADR-1022)
