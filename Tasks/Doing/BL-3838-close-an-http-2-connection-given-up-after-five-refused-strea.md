@@ -31,3 +31,4 @@ Found by BL-3560 (CGR-031, ADR-0900). A scenario server that answers every HEADE
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 664244f6 a4d0ee71 779790c0.
