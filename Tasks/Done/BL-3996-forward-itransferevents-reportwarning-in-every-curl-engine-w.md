@@ -28,7 +28,7 @@ BL-3986 added `ITransferEvents.ReportWarning` (default no-op) and the console wr
 ## Notes
 
 - Eight wrappers forward `ReportWarning` to their inner events. `DebugCallbackTransferEvents` has no inner events, so it hands the warning to the debug callback as one `CURLINFO_TEXT` line, the way libcurl's own infof text reaches that callback (ADR-0974).
-- Libcurl has no wrapper that forwards every member. The sweep found ten wrappers in Curl.Networking and Curl.Output that drop the warning. They are outside this task's touches, so I filed them as BL-4027.
+- Libcurl has no wrapper that forwards every member. The sweep found ten wrappers in Curl.Networking and Curl.Output that drop the warning. They are outside this task's touches, so I filed them as BL-4031.
 - Measure-CodeQuality for Curl.Engine.UnitLibrary: line coverage is 100%, and every member of the files this task touched is inside the gates. Five members of ManagedMultiTransfer.cs fail complexity or branch coverage. They come from BL-4016, this task did not touch them, and BL-4030 on the shared branch covers them.
 - The new tests make in-memory calls only, so they do not depend on the platform. With the fast tests green here, that meets the Linux and macOS CI criterion.
 

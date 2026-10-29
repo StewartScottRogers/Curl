@@ -25,4 +25,4 @@ added when it writes to stderr.
 - A library's warning reaches the console's `WarningWritingTransferEvents` through the engine, and a `Libcurl`
   application with a verbose debug callback sees it as libcurl's own info text.
 - `Curl.Engine.UnitTests/EngineTransferEventWarningTests.cs` pins both. The Curl.Networking and Curl.Output
-  wrappers get the same forward under BL-4027.
+  wrappers get the same forward under BL-4031.

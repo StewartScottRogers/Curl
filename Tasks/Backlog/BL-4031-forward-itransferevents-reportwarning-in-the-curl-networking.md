@@ -1,5 +1,5 @@
 ---
-id: BL-4027
+id: BL-4031
 title: Forward ITransferEvents.ReportWarning in the Curl.Networking and Curl.Output wrappers that forward every member
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-28
 completed:
 ---
-# BL-4027 — Forward ITransferEvents.ReportWarning in the Curl.Networking and Curl.Output wrappers that forward every member
+# BL-4031 — Forward ITransferEvents.ReportWarning in the Curl.Networking and Curl.Output wrappers that forward every member
 ## Goal
 
 A warning a library reports through `ITransferEvents.ReportWarning` under a Curl.Networking or Curl.Output wrapper reaches the console's `WarningWritingTransferEvents` instead of the interface's default no-op.
