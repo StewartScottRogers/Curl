@@ -11,7 +11,7 @@ Namespace `Curl.Extension.Composition`.
 - `ExtensionOptionCatalogue.Entries` holds each extension's long command-line option (`ExtensionOption`),
   one line each, also `merge=union` and a shared list file. `ExtensionCommandLineOptions.For(readEnvironmentVariable,
   isCurlLongOption)` gives them (none when `CURL_EXTENSIONS` is `0`) and fails, naming both, when one has the
-  name of a curl option or of another extension option (ADR-1004).
+  name of a curl option or of another extension option (ADR-1006).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

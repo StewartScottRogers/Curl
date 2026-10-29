@@ -328,12 +328,12 @@ public sealed class CommandLineOptions
     /// </summary>
     internal Func<string, string?> ReadEnvironmentVariable { get => globals.ReadEnvironmentVariable; set => globals.ReadEnvironmentVariable = value; }
 
-    /// <summary>The extensions' long options <see cref="CommandLineParser"/> reads beyond curl's own, by name (ADR-1004).</summary>
+    /// <summary>The extensions' long options <see cref="CommandLineParser"/> reads beyond curl's own, by name (ADR-1006).</summary>
     internal IReadOnlyDictionary<string, CommandLineExtensionOption> ExtensionOptions { get => globals.ExtensionOptions; set => globals.ExtensionOptions = value; }
 
     /// <summary>
     /// The value this group gave each extension option (<see cref="CommandLineExtensionOption"/>), by long name:
-    /// the last value given, or the empty string for a flag (ADR-1004).
+    /// the last value given, or the empty string for a flag (ADR-1006).
     /// </summary>
     public IReadOnlyDictionary<string, string> ExtensionOptionValues => extensionOptionValues;
 

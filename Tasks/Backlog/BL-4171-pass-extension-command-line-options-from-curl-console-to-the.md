@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-BL-4092 built the pieces (ADR-1004): `ExtensionCommandLineOptions.For(readEnvironmentVariable, CommandLineParser.IsCurlLongOption)` in `Curl.Extension.Composition`, the `CommandLineParser.Parse` overload that takes `IReadOnlyList<CommandLineExtensionOption>`, `CommandLineOptions.ExtensionOptionValues`, and `ExtensionOptionValues` in `Curl.Extension.Abstractions`. The Console's parse call is in `Curl.Console/CurlCommandRunner.cs` (about line 1512), which BL-4088 held when BL-4092 ran.
+BL-4092 built the pieces (ADR-1006): `ExtensionCommandLineOptions.For(readEnvironmentVariable, CommandLineParser.IsCurlLongOption)` in `Curl.Extension.Composition`, the `CommandLineParser.Parse` overload that takes `IReadOnlyList<CommandLineExtensionOption>`, `CommandLineOptions.ExtensionOptionValues`, and `ExtensionOptionValues` in `Curl.Extension.Abstractions`. The Console's parse call is in `Curl.Console/CurlCommandRunner.cs` (about line 1512), which BL-4088 held when BL-4092 ran.
 
 ## Acceptance criteria
 

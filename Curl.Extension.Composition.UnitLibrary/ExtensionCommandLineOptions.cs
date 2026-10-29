@@ -4,7 +4,7 @@ namespace Curl.Extension.Composition;
 
 /// <summary>
 /// The one place a host learns which long command-line options Curl's extensions add beyond
-/// upstream curl's (ADR-1004). The host hands <see cref="For" />'s options to the parser, which reads
+/// upstream curl's (ADR-1006). The host hands <see cref="For" />'s options to the parser, which reads
 /// them only where curl has no option of that name; none when extensions are off, so the parser then
 /// refuses every such name exactly as curl refuses an unknown option.
 /// </summary>

@@ -1,4 +1,4 @@
-# ADR-1004: Extension command-line options are read only where curl has no option of that name
+# ADR-1006: Extension command-line options are read only where curl has no option of that name
 
 - Status: Accepted
 - Date: 2026-10-29

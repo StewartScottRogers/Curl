@@ -17,7 +17,7 @@ internal sealed class CommandLineGlobalState
 
     public List<string> WarningLines { get; } = [];
 
-    /// <summary>The extensions' long options the parser reads beyond curl's own, by name (ADR-1004).</summary>
+    /// <summary>The extensions' long options the parser reads beyond curl's own, by name (ADR-1006).</summary>
     public IReadOnlyDictionary<string, CommandLineExtensionOption> ExtensionOptions { get; set; } = new Dictionary<string, CommandLineExtensionOption>();
 
     public List<StandardErrorRedirect> StandardErrorRedirects { get; } = [];

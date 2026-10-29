@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions;
 
 /// <summary>
-/// One long command-line option an extension adds beyond upstream curl's (ADR-1004). An extension
+/// One long command-line option an extension adds beyond upstream curl's (ADR-1006). An extension
 /// declares it in one file and registers it with one line in <c>Curl.Extension.Composition</c>'s
 /// <c>ExtensionOptionCatalogue</c>; the parser accepts it only when curl has no option of that name
 /// and extensions are on.

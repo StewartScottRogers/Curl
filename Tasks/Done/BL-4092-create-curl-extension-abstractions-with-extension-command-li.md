@@ -32,7 +32,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Notes
 
-- Decisions in ADR-1004. `Curl.Cli` may not reference an extension project, so it has its own
+- Decisions in ADR-1006. `Curl.Cli` may not reference an extension project, so it has its own
   `CommandLineExtensionOption`; the host maps `ExtensionOption` to it. Extension options are looked up only
   after curl's table misses, so curl's options always win, and with extensions off the host passes none, so
   the refusal is the ordinary unknown-option path (exit 2, same bytes) with no special case.

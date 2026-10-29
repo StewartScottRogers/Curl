@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions;
 
 /// <summary>
 /// The extension options one option group of a command line gave, which an extension reads at
-/// transfer time: the value of each option given, or the empty string for a flag (ADR-1004).
+/// transfer time: the value of each option given, or the empty string for a flag (ADR-1006).
 /// </summary>
 /// <param name="valuesByName">Each given option's value by its long name; the last one given wins.</param>
 public sealed class ExtensionOptionValues(IReadOnlyDictionary<string, string> valuesByName)

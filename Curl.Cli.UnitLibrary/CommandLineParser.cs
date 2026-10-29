@@ -206,7 +206,7 @@ public static class CommandLineParser
 
     /// <summary>
     /// Parses <paramref name="arguments"/> as the overload without <paramref name="extensionOptions"/> does, also
-    /// reading each of <paramref name="extensionOptions"/> where curl has no option of its name (ADR-1004). A host
+    /// reading each of <paramref name="extensionOptions"/> where curl has no option of its name (ADR-1006). A host
     /// passes none when extensions are off, so every such name is then refused as curl refuses an unknown option.
     /// </summary>
     /// <param name="arguments">The arguments; a <see langword="null"/> element reads as an empty argument.</param>
@@ -429,7 +429,7 @@ public static class CommandLineParser
     }
 
     /// <summary>
-    /// Records an extension's long option (ADR-1004) in <see cref="CommandLineOptions.ExtensionOptionValues"/>:
+    /// Records an extension's long option (ADR-1006) in <see cref="CommandLineOptions.ExtensionOptionValues"/>:
     /// a flag as the empty string (any attached value ignored, as for curl's own flags), and an option that
     /// takes a value with the attached value or else the next argument, refused as curl refuses a missing one.
     /// </summary>
@@ -453,7 +453,7 @@ public static class CommandLineParser
 
     /// <summary>
     /// Reports whether <paramref name="longName"/> (without its <c>--</c>) is the long name of one of curl's own
-    /// options, which an extension option may not take (ADR-1004).
+    /// options, which an extension option may not take (ADR-1006).
     /// </summary>
     /// <param name="longName">The long name.</param>
     /// <returns><see langword="true"/> when curl has an option of that name.</returns>
