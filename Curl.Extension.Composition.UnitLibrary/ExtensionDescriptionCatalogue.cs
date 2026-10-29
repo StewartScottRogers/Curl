@@ -13,5 +13,6 @@ internal static class ExtensionDescriptionCatalogue
     internal static IReadOnlyList<ExtensionDescription> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
+        GraphQl.GraphQlOptions.Description,
     ];
 }

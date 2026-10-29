@@ -13,5 +13,9 @@ internal static class ExtensionOptionCatalogue
     internal static IReadOnlyList<ExtensionOption> Entries { get; } =
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Option,
+        GraphQl.GraphQlOptions.Document,
+        GraphQl.GraphQlOptions.Variables,
+        GraphQl.GraphQlOptions.Operation,
+        GraphQl.GraphQlOptions.Introspect,
     ];
 }

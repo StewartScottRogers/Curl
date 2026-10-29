@@ -317,6 +317,7 @@
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
   <Folder Name="/Extensions/OAuth2/"><Project Path="Curl.Extension.OAuth2.UnitLibrary/Curl.Extension.OAuth2.UnitLibrary.csproj" /><Project Path="Curl.Extension.OAuth2.UnitTests/Curl.Extension.OAuth2.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/GraphQl/"><Project Path="Curl.Extension.GraphQl.UnitLibrary/Curl.Extension.GraphQl.UnitLibrary.csproj" /><Project Path="Curl.Extension.GraphQl.UnitTests/Curl.Extension.GraphQl.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/HttpCache/"><Project Path="Curl.Extension.HttpCache.UnitLibrary/Curl.Extension.HttpCache.UnitLibrary.csproj" /><Project Path="Curl.Extension.HttpCache.UnitTests/Curl.Extension.HttpCache.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/ServerSentEvents/"><Project Path="Curl.Extension.ServerSentEvents.UnitLibrary/Curl.Extension.ServerSentEvents.UnitLibrary.csproj" /><Project Path="Curl.Extension.ServerSentEvents.UnitTests/Curl.Extension.ServerSentEvents.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/S3/"><Project Path="Curl.Extension.S3.UnitLibrary/Curl.Extension.S3.UnitLibrary.csproj" /><Project Path="Curl.Extension.S3.UnitTests/Curl.Extension.S3.UnitTests.csproj" /></Folder>
