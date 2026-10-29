@@ -1,4 +1,4 @@
-# ADR-0970: A socket-action transfer reports its real socket, OUT then IN, and its deadline as the timer
+# ADR-0973: A socket-action transfer reports its real socket, OUT then IN, and its deadline as the timer
 
 - Status: Accepted
 - Date: 2026-10-28

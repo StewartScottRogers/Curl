@@ -16,7 +16,7 @@ namespace Curl.Engine;
 /// <summary>
 /// CGR-034: a multi handle driven by <c>curl_multi_socket_action</c> gives the socket callback the transfer's real
 /// socket, <c>CURL_POLL_OUT</c> before <c>CURL_POLL_IN</c>, and the timer callback libcurl's timeouts, not a 10 ms
-/// polling timer, so an application's own event loop drives the transfer (ADR-0970).
+/// polling timer, so an application's own event loop drives the transfer (ADR-0973).
 /// </summary>
 [TestClass]
 public sealed class Cgr034Tests

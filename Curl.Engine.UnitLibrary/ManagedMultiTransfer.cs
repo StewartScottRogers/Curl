@@ -22,7 +22,7 @@ namespace Curl.Engine;
 /// both tell <see cref="MultiOptions.Socket" /> and <see cref="MultiOptions.Timer" /> what to wait for: a
 /// <see cref="ManagedEasyTransfer" /> started while the socket callback is set runs on a
 /// <see cref="TransferSocketWait" />, its real socket told with <see cref="CurlPoll.Out" /> or
-/// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0970); any other running transfer is
+/// <see cref="CurlPoll.In" /> and the timer with its earliest deadline (ADR-0973); any other running transfer is
 /// one engine-numbered socket, and while one runs the timer asks to be called back every
 /// <see cref="RunningTransferCheckInterval" /> (ADR-0599). <see cref="GetHandles" />,
 /// <see cref="GetWaitSockets" />, <see cref="GetInfo" />, the notifications and
@@ -928,7 +928,7 @@ internal sealed class ManagedMultiTransfer(
     /// <summary>
     /// Tells the socket callback of the transfer's real socket and what it waits for there, when either changed:
     /// <see cref="CurlPoll.Out" /> while a write waits, <see cref="CurlPoll.In" /> while a read does, as libcurl
-    /// does; a transfer that waits on neither keeps what it was told last (ADR-0970).
+    /// does; a transfer that waits on neither keeps what it was told last (ADR-0973).
     /// </summary>
     private static int TellWaitedSocket(MultiSocketCallback callback, MultiEntry entry, TransferSocketWait wait)
     {
@@ -963,7 +963,7 @@ internal sealed class ManagedMultiTransfer(
     /// Lets each running transfer whose socket the application polls go on until it waits on that socket again or
     /// ends, running the callbacks it asks for meanwhile, for at most <see cref="SocketWaitSettleLimit" />: libcurl's
     /// action does a transfer's work on the calling thread up to its next wait, so the socket and timer callbacks
-    /// that follow say what it waits for next (ADR-0970).
+    /// that follow say what it waits for next (ADR-0973).
     /// </summary>
     /// <returns><see langword="true" /> when any transfer was let go on.</returns>
     private bool SettleSocketWaitingTransfers()
@@ -1052,7 +1052,7 @@ internal sealed class ManagedMultiTransfer(
     /// The timer callback's value: the handle's timeout with no transfer running or no socket callback set, the
     /// earliest deadline of the transfers when every running one waits on its real socket (-1 when none has one,
     /// as libcurl's), else at most <see cref="RunningTransferCheckInterval" />, for transfers the application cannot
-    /// poll a socket for (ADR-0970).
+    /// poll a socket for (ADR-0973).
     /// </summary>
     private long TimerMilliseconds()
     {
@@ -1122,7 +1122,7 @@ internal sealed class ManagedMultiTransfer(
 
     /// <summary>
     /// The socket wait a transfer of this engine runs on while the application has a socket callback, so its I/O
-    /// waits for the application's poll (ADR-0821, ADR-0970); none without one, where perform and wait drive it.
+    /// waits for the application's poll (ADR-0821, ADR-0973); none without one, where perform and wait drive it.
     /// </summary>
     private TransferSocketWait? SocketWaitFor(MultiEntry entry)
     {
@@ -1206,7 +1206,7 @@ internal sealed class ManagedMultiTransfer(
     /// Whether a running transfer waits on the engine socket number its connection with no operating system socket
     /// was given (<see cref="TransferSocketWait.TakeSocket" />, ADR-0955): no poll can tell when an in-memory
     /// connection is ready, so a wait counts it ready at once, as a <c>select()</c> on a level-triggered socket that
-    /// has its data returns, and the application's action on it lets the transfer go on (ADR-0970).
+    /// has its data returns, and the application's action on it lets the transfer go on (ADR-0973).
     /// </summary>
     private static bool IsWaitingOnAnEngineSocket(MultiEntry entry) =>
         entry.Perform is { IsCompleted: false } && IsWaitingOnItsSocket(entry) && entry.SocketWait!.Socket > TransferSocketWait.FirstEngineSocket;

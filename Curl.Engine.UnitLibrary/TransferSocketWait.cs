@@ -195,7 +195,7 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// <summary>
     /// Stops holding the connection's reads and writes for a socket action, once the transfer that owned this wait
     /// has finished or left its multi handle: the waits now in progress return and every later one returns at once,
-    /// so a kept connection closed by cleanup never waits for an action the application will not send (ADR-0970).
+    /// so a kept connection closed by cleanup never waits for an action the application will not send (ADR-0973).
     /// </summary>
     internal void StopGating()
     {
