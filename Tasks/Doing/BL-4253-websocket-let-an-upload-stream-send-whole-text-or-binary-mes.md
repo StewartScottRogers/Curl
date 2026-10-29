@@ -34,3 +34,4 @@ Found by BL-4114 (the graphql-transport-ws, WAMP and STOMP subprotocols extensio
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 4fe5696f aa5cf62a 5b6103f7 42825a71 679cdc1e 3d836d5e.
