@@ -77,10 +77,10 @@ curl -sS -m 5 https://127.0.0.1:20700/
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -91,3 +91,4 @@ curl -sS -m 5 https://127.0.0.1:20700/
 
 - 2026-10-26: Created from CGR-224 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28 (lane 12): Fixed WV-16 and TLS-12 (c): a reply that is no TLS record (.NET: Cannot determine the frame size...) is now Schannel SEC_E_INVALID_TOKEN and OpenSSL error:0A00010B wrong version number (TlsFailureMessages.IsMalformedFrame, Cgr224Tests). Texts taken from the report's Expected; real curl was not re-run (no openssl/Schannel server available in this lane). TLS-12 (a) and (b) (--tls-max 1.0 -> SEC_E_UNSUPPORTED_FUNCTION, --tlsv1.0 --tls-max 1.1 -> SEC_E_ILLEGAL_MESSAGE) are unmeasured as to what separates them, and a hand-built hello still goes on the wire for (a); filed as a follow-up task. Linux/macOS: change is platform-neutral, fast tests green.

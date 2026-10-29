@@ -70,6 +70,16 @@ internal static class TlsFailureMessages
 
     // What the OpenSSL build reports when it refuses the version a ServerHello picked and sends
     // protocol_version itself (measured with curl 8.21.0 on OpenSSL 4.0.0, BL-1950).
+    // What OpenSSL 3 reports when the server answers the ClientHello with bytes that are no TLS record.
+    private const string OpenSslWrongVersionNumber = "error:0A00010B:SSL routines::wrong version number";
+
+    // What curl 8.22.0 Schannel reports for the same bytes (CGR-224).
+    private const string SchannelInvalidToken =
+        "schannel: next InitializeSecurityContext failed: SEC_E_INVALID_TOKEN (0x80090308) - The token supplied to the function is invalid";
+
+    // How SslStream words a first record that is no TLS record, in the message of the exception chain.
+    private const string MalformedFrameNamed = "Cannot determine the frame size or a corrupted frame was received.";
+
     private const string OpenSslUnsupportedProtocol = "error:0A000102:SSL routines::unsupported protocol";
 
     /// <summary>
@@ -426,6 +436,11 @@ internal static class TlsFailureMessages
             return recvFailure;
         }
 
+        if (IsMalformedFrame(exception))
+        {
+            return SchannelInvalidToken;
+        }
+
         var securityStatus = FindInnerException<Win32Exception>(exception);
         if (securityStatus is null || offersOnlyVersionsBelowTls12)
         {
@@ -482,6 +497,11 @@ internal static class TlsFailureMessages
         if (RecvFailure(exception, OpenSslSocketErrorTexts) is { } recvFailure)
         {
             return recvFailure;
+        }
+
+        if (IsMalformedFrame(exception))
+        {
+            return $"TLS connect error: {OpenSslWrongVersionNumber}";
         }
 
         var innermost = exception;
@@ -900,6 +920,10 @@ internal static class TlsFailureMessages
             ? null
             : $"Recv failure: {socketErrorTexts.GetValueOrDefault(socketError.SocketErrorCode, socketError.Message)}";
     }
+
+    private static bool IsMalformedFrame(Exception exception) =>
+        exception.Message.Contains(MalformedFrameNamed, StringComparison.Ordinal)
+        || (exception.InnerException is { } inner && IsMalformedFrame(inner));
 
     private static T? FindInnerException<T>(Exception exception)
         where T : Exception
