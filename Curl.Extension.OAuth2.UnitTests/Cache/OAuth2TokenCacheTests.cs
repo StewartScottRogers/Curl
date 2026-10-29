@@ -5,7 +5,7 @@ using Curl.Extension.OAuth2.Wire;
 namespace Curl.Extension.OAuth2.Cache;
 
 /// <summary>
-/// Pins the token cache (ADR-1031): storing and reading, expiry by <c>expires_in</c> (RFC 6749 §5.1) less the safety
+/// Pins the token cache (ADR-1034): storing and reading, expiry by <c>expires_in</c> (RFC 6749 §5.1) less the safety
 /// margin by a set <see cref="TimeProvider"/>, and refresh (§6) with its failures.
 /// </summary>
 [TestClass]

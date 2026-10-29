@@ -1,7 +1,7 @@
 namespace Curl.Extension.OAuth2.Cache;
 
 /// <summary>
-/// Pins the cache file (ADR-1031): what it stores reads back, it is replaced whole, a missing or corrupt file reads as
+/// Pins the cache file (ADR-1034): what it stores reads back, it is replaced whole, a missing or corrupt file reads as
 /// empty, a failed write leaves no temporary file, and it is created owner-only where the OS has Unix permissions.
 /// </summary>
 [TestClass]

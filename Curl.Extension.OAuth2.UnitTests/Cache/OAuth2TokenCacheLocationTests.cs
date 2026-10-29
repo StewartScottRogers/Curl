@@ -1,6 +1,6 @@
 namespace Curl.Extension.OAuth2.Cache;
 
-/// <summary>Pins the default cache directory search (ADR-1031): curl's own per-user file variables, first set one wins.</summary>
+/// <summary>Pins the default cache directory search (ADR-1034): curl's own per-user file variables, first set one wins.</summary>
 [TestClass]
 public sealed class OAuth2TokenCacheLocationTests
 {

@@ -31,7 +31,7 @@ Third part of BL-4161 (split for size). Expiry comes from `expires_in` (RFC 6749
 
 - Filed by BL-4161's lane 2 run (split for size).
 - Added `Curl.Extension.OAuth2.UnitLibrary/CLAUDE.md` to touches so the library document describes the new `Cache/` folder; no task in Doing on work/dark-factory named it.
-- Plan (ADR-1031): `OAuth2TokenCache` (find, store, remove; refresh through `OAuth2HttpClient`), `OAuth2TokenCacheFile` (whole read, atomic temp-file-and-move write, `0600` off Windows), `OAuth2TokenCacheFormat` (versioned JSON by `Utf8JsonWriter`/`JsonDocument`), `OAuth2TokenCacheKey`, `OAuth2CachedToken`, `OAuth2TokenCacheLocation`.
+- Plan (ADR-1034): `OAuth2TokenCache` (find, store, remove; refresh through `OAuth2HttpClient`), `OAuth2TokenCacheFile` (whole read, atomic temp-file-and-move write, `0600` off Windows), `OAuth2TokenCacheFormat` (versioned JSON by `Utf8JsonWriter`/`JsonDocument`), `OAuth2TokenCacheKey`, `OAuth2CachedToken`, `OAuth2TokenCacheLocation`.
 - Defaults taken: 30-second expiry safety margin; a token with no `expires_in` never expires until removed; `expires_in` capped at 100 years; a refresh failure other than `invalid_grant` keeps the entry and gives no token; a failed write returns `false` rather than throwing, as a cache never fails a transfer.
 - Owner-only mode follows `PhysicalFileSystem`'s seam (`UnsupportedOSPlatformGuard` field, Windows test expecting `PlatformNotSupportedException`), so both branches are covered on every platform; the `0600` check runs off Windows only.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.OAuth2.UnitLibrary` 100% line, 100% branch, max complexity 10, 0 failing members (first run found `RefreshAsync` at 12; response reading split into two helpers). Fast tests green across the solution; CI on Linux and macOS is covered by keeping tests platform-neutral (temporary directories, `OSCondition` for the mode checks).
@@ -40,4 +40,4 @@ Third part of BL-4161 (split for size). Expiry comes from `expires_in` (RFC 6749
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: a6c4aafc 4e3ca97b 3180db99 3d836d5e.
-- 2026-10-29: Doing -> Done. The OAuth2 extension keeps tokens in an on-disk cache and refreshes an expired one (ADR-1031)
+- 2026-10-29: Doing -> Done. The OAuth2 extension keeps tokens in an on-disk cache and refreshes an expired one (ADR-1034)

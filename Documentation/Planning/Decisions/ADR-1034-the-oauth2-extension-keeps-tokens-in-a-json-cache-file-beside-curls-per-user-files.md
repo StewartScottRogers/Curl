@@ -1,4 +1,4 @@
-# ADR-1031: The OAuth2 extension keeps tokens in a JSON cache file beside curl's per-user files
+# ADR-1034: The OAuth2 extension keeps tokens in a JSON cache file beside curl's per-user files
 
 - Status: Accepted
 - Date: 2026-10-29

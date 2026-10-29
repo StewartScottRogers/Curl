@@ -2,7 +2,7 @@ namespace Curl.Extension.OAuth2.Cache;
 
 /// <summary>
 /// Finds the directory the token cache file lives in by default: the first of the environment variables curl searches
-/// for its own per-user <c>.curlrc</c> that is set and not empty (ADR-1031).
+/// for its own per-user <c>.curlrc</c> that is set and not empty (ADR-1034).
 /// </summary>
 public static class OAuth2TokenCacheLocation
 {

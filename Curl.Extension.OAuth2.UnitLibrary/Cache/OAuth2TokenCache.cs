@@ -4,7 +4,7 @@ using Curl.Extension.OAuth2.Wire;
 namespace Curl.Extension.OAuth2.Cache;
 
 /// <summary>
-/// Keeps tokens in the <see cref="OAuth2TokenCacheFile"/> by <see cref="OAuth2TokenCacheKey"/> (ADR-1031): gives back an
+/// Keeps tokens in the <see cref="OAuth2TokenCacheFile"/> by <see cref="OAuth2TokenCacheKey"/> (ADR-1034): gives back an
 /// unexpired one, and refreshes an expired one with its refresh token (RFC 6749 §6).
 /// </summary>
 /// <remarks>

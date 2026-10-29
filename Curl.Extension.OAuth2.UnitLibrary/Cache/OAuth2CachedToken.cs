@@ -1,6 +1,6 @@
 namespace Curl.Extension.OAuth2.Cache;
 
-/// <summary>A token kept in the cache (RFC 6749 §5.1, ADR-1031).</summary>
+/// <summary>A token kept in the cache (RFC 6749 §5.1, ADR-1034).</summary>
 /// <param name="AccessToken">The access token.</param>
 /// <param name="TokenType">The token type, such as <c>Bearer</c>.</param>
 /// <param name="ExpiresAt">When the token expires, from <c>expires_in</c>, or <see langword="null"/> when the server did not say.</param>

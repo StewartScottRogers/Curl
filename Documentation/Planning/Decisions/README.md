@@ -1066,4 +1066,4 @@ Each option and the specific reason it lost.
 | [1031](ADR-1031-the-mcp-client-stdio-transport-sits-behind-a-process-seam.md) | The MCP client's stdio transport sits behind a process seam (BL-4216) | Accepted | 2026-10-29 |
 | [1032](ADR-1032-the-signalr-codec-speaks-the-json-hub-protocol-version-1-over-websockets.md) | The SignalR codec speaks the JSON hub protocol, version 1, over WebSockets (BL-4218) | Accepted | 2026-10-29 |
 | [1033](ADR-1033-the-mcp-client-carries-streamable-http-over-its-own-http-1-1-client.md) | The MCP client carries Streamable HTTP over its own HTTP/1.1 client (BL-4215) | Accepted | 2026-10-29 |
-| [1031](ADR-1031-the-oauth2-extension-keeps-tokens-in-a-json-cache-file-beside-curls-per-user-files.md) | The OAuth2 extension keeps tokens in a JSON cache file beside curl's per-user files (BL-4209) | Accepted | 2026-10-29 |
+| [1034](ADR-1034-the-oauth2-extension-keeps-tokens-in-a-json-cache-file-beside-curls-per-user-files.md) | The OAuth2 extension keeps tokens in a JSON cache file beside curl's per-user files (BL-4209) | Accepted | 2026-10-29 |

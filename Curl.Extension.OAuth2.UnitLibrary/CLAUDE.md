@@ -31,7 +31,7 @@ responses and reads the final one whole through `OAuth2HttpConnectionReader`,
 1 MiB). Any status, a 400 or 401 included, is an `OAuth2HttpResponse` with its UTF-8 body; every
 failure is an `OAuth2HttpResult` with an `OAuth2HttpFailure` and curl's exit code for it.
 
-`Cache/` keeps tokens on disk (ADR-1031): `OAuth2TokenCache` finds a token by `OAuth2TokenCacheKey`
+`Cache/` keeps tokens on disk (ADR-1034): `OAuth2TokenCache` finds a token by `OAuth2TokenCacheKey`
 (token endpoint, client ID, scope asked for), gives back an unexpired one, refreshes an expired one
 (RFC 6749 §6) through `OAuth2HttpClient`, and drops it on `invalid_grant` or when it has no refresh
 token. Expiry is `expires_in` by the injected `TimeProvider`, 30 seconds early. `OAuth2TokenCacheFile`

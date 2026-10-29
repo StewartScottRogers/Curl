@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Curl.Extension.OAuth2.Cache;
 
 /// <summary>
-/// Writes and reads the token cache file's JSON (ADR-1031): <c>{"version":1,"entries":[...]}</c>, each entry holding its
+/// Writes and reads the token cache file's JSON (ADR-1034): <c>{"version":1,"entries":[...]}</c>, each entry holding its
 /// key and token with every member present, <c>null</c> where it has no value, and <c>expires_at</c> in Unix seconds.
 /// </summary>
 internal static class OAuth2TokenCacheFormat

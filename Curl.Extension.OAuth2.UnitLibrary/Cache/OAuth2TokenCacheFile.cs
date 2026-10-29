@@ -3,7 +3,7 @@ using System.Runtime.Versioning;
 namespace Curl.Extension.OAuth2.Cache;
 
 /// <summary>
-/// The token cache file, <see cref="FileName"/> in a directory the caller names (ADR-1031): read whole, a missing,
+/// The token cache file, <see cref="FileName"/> in a directory the caller names (ADR-1034): read whole, a missing,
 /// unreadable or corrupt file reading as empty, and written whole and atomically, to a temporary file beside it that
 /// then replaces it, created owner-only (<c>0600</c>) where the operating system has Unix permissions.
 /// </summary>
