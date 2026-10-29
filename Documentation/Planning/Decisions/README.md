@@ -1109,3 +1109,4 @@ Each option and the specific reason it lost.
 | [1073](ADR-1073-http-file-expands-a-dot-http-file-into-curl-arguments-with-http-env-choosing-the-environment.md) | --http-file expands a .http file into curl arguments, with --http-env choosing the environment (BL-4154) | Accepted | 2026-10-29 |
 | [1074](ADR-1074-mcp-urls-list-tools-without-data-and-call-one-with-a-json-data-body.md) | MCP URLs list tools without data and call one with a JSON data body (BL-4159) | Accepted | 2026-10-29 |
 | [1075](ADR-1075-oauth2-options-name-the-flow-by-its-token-endpoint-and-send-a-bearer-token.md) | The OAuth2 options name the flow by its token endpoint and send a Bearer token (BL-4161) | Accepted | 2026-10-29 |
+| [1062](ADR-1062-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
