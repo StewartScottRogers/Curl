@@ -33,3 +33,4 @@ Split from BL-3563 (CGR-034). Depends on BL-3976 for the multi wiring. Real curl
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: f153c03a 60788fbd 779790c0.
