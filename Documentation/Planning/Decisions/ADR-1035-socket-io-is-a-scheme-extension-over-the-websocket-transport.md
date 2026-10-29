@@ -1,4 +1,4 @@
-# ADR-1027 — Socket.IO is a scheme extension over the WebSocket transport
+# ADR-1035 — Socket.IO is a scheme extension over the WebSocket transport
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

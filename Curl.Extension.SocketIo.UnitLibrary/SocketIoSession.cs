@@ -61,7 +61,7 @@ internal sealed class SocketIoSession(WebSocketMessageChannel channel, string na
     private ValueTask AcceptPacketAsync(SocketIoPacket? packet, CancellationToken cancellationToken) =>
         packet is not null && packet.Namespace == namespaceName ? AcceptOwnPacketAsync(packet, cancellationToken) : ValueTask.CompletedTask;
 
-    // Acknowledgements and binary packets are ignored (ADR-1027).
+    // Acknowledgements and binary packets are ignored (ADR-1035).
     private ValueTask AcceptOwnPacketAsync(SocketIoPacket packet, CancellationToken cancellationToken)
     {
         if (packet.Type == SocketIoPacketType.Connect)

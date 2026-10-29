@@ -1,6 +1,6 @@
 # Curl.Extension.SocketIo.UnitLibrary
 
-The `socketio://` and `socketios://` extension (ADR-0999, ADR-1027). Namespace `Curl.Extension.SocketIo`.
+The `socketio://` and `socketios://` extension (ADR-0999, ADR-1035). Namespace `Curl.Extension.SocketIo`.
 It references only `Curl.Protocol.Abstractions`, `Curl.Extension.Abstractions` and the shared frame
 codec `Curl.WebSocket.UnitLibrary`, never a `Curl.Protocol.*` library or another extension.
 

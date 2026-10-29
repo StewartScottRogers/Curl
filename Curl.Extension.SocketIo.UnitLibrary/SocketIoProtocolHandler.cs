@@ -4,7 +4,7 @@ using Curl.WebSocket;
 namespace Curl.Extension.SocketIo;
 
 /// <summary>
-/// Serves <c>socketio://host[:port]/namespace[?query]</c> and its TLS form <c>socketios://</c> (ADR-1027):
+/// Serves <c>socketio://host[:port]/namespace[?query]</c> and its TLS form <c>socketios://</c> (ADR-1035):
 /// connects to the host's Engine.IO v4 WebSocket transport at <c>/socket.io/</c>, the URL's query
 /// appended to the handshake's, joins the namespace the URL's path names, emits the <c>-d</c> JSON array
 /// as an event, and writes each event received as one JSON array per line until the server disconnects.

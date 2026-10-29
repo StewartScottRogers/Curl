@@ -4,7 +4,7 @@ using Curl.WebSocket;
 
 namespace Curl.Extension.SocketIo;
 
-/// <summary>The <c>socketio://</c> and <c>socketios://</c> extension's description and handler factory (ADR-1027).</summary>
+/// <summary>The <c>socketio://</c> and <c>socketios://</c> extension's description and handler factory (ADR-1035).</summary>
 public static class SocketIoExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>
