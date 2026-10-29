@@ -1,0 +1,51 @@
+---
+id: BL-4240
+title: Fix AF-0459: Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone asserts only that CallbackTransferProgress.Of returned something
+priority: Low
+assignee: Claude
+pipeline: feature
+depends-on: []
+touches: [Curl.Engine.UnitTests]
+requirement: none
+created: 2026-10-29
+completed:
+---
+# BL-4240 — Fix AF-0459: Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone asserts only that CallbackTransferProgress.Of returned something
+
+## Goal
+
+The defect the audit office reported as AF-0459 is fixed: its reproduction no longer reproduces, so a re-audit can close the finding.
+
+## Context
+
+Filed from audit finding AF-0459 (Low, quality auditor), which Stewart accepted. The finding is `Audit/Findings/AF-0459-of-neithercallbackset-givesthebuiltinmeteralone-as.md`.
+
+Location: `Curl.Engine.UnitTests/CallbackTransferProgressTests.cs:46`
+
+Location: `Curl.Engine.UnitTests/CallbackTransferProgressTests.cs:46`
+
+Found by Find-WeakTests.ps1 (weak-assertion, only Assert.IsNotNull). The whole body is `Assert.IsNotNull(CallbackTransferProgress.Of(noProgress: false, new EasyCallbackOptions(), abort, () => Stream.Null, TimeProvider.System));`. CallbackTransferProgress.Of (Curl.Engine.UnitLibrary/CallbackTransferProgress.cs:54-68) returns a callback-calling progress when TransferInfo or Progress is set, and the built-in meter otherwise. The test would also pass if the no-callback branch returned a callback-wrapping progress, so `the built-in meter alone` is never checked.
+
+Reproduction, from the finding:
+
+Run from the repository root:
+
+```powershell
+Select-String -Path Curl.Engine.UnitTests/CallbackTransferProgressTests.cs -Pattern 'Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone' -Context 0,5
+```
+
+- Expected: The test asserts the result is the built-in meter with no callback (for example, that reporting progress calls nothing and draws the meter).
+- Actual: Its only assertion is Assert.IsNotNull(CallbackTransferProgress.Of(...)).
+
+The finding closes only when a later re-audit by the quality auditor confirms the fix, never because this task reaches Done.
+
+## Acceptance criteria
+
+- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+
+## Notes
+
+## Log
+
+- 2026-10-29: Created.
