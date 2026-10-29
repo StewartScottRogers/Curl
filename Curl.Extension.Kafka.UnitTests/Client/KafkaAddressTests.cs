@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Kafka.Client;
 
-/// <summary>Checks how a <c>kafka://</c> URL names a topic, a partition and an offset (ADR-1069).</summary>
+/// <summary>Checks how a <c>kafka://</c> URL names a topic, a partition and an offset (ADR-1075).</summary>
 [TestClass]
 public sealed class KafkaAddressTests
 {
