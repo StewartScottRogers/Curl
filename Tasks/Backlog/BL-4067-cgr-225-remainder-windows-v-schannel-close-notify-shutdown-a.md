@@ -1,5 +1,5 @@
 ---
-id: BL-4054
+id: BL-4067
 title: CGR-225 remainder: Windows -v schannel close_notify, shutdown and certificate-store-cache lines
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4054 — CGR-225 remainder: Windows -v schannel close_notify, shutdown and certificate-store-cache lines
+# BL-4067 — CGR-225 remainder: Windows -v schannel close_notify, shutdown and certificate-store-cache lines
 
 ## Goal
 

@@ -4,7 +4,7 @@ title: Fix CGR-225: Windows -v leaves out the Schannel certificate-verification 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4031, BL-4022, BL-4054]
+depends-on: [BL-4031, BL-4022, BL-4067]
 touches: [Curl.Protocol.Abstractions.UnitLibrary/ITransferEvents.cs, Curl.Protocol.Abstractions.UnitLibrary/TlsHandshakeEvent.cs, Curl.Output.UnitLibrary, Curl.Output.UnitTests, Curl.Networking.UnitLibrary/HandBuiltTlsProvider.cs, Curl.Networking.UnitLibrary/SslStreamTlsProvider.cs, Curl.Networking.UnitTests/Cgr225Tests.cs]
 model: sonnet
 requirement: none
@@ -87,5 +87,5 @@ curl -sS -v --cacert E\pki\ca.crt --ssl-no-revoke https://localhost:<p>/index.tx
 
 - Measured real curl 8.22.0 (Schannel, debug libcurl) against `openssl s_server -accept 14443 -cert srv.crt -key srv.key -WWW` with `curl -sS -v --cacert srv.crt --ssl-no-revoke https://localhost:14443/index.txt`: exit 0, stdout `hello tls`; stderr has the report's lines. Curl before the fix lacked all of them.
 - Done: `added N certificate(s) from CA file '<path>'` and `connection hostname (H) validated against certificate name (N)` after the first ALPN line, from new `TlsHandshakeEvent.CaCertificateFile`/`CaCertificateCount` (SslStreamTlsProvider) and `SchannelVerificationText` (Output). Tests: `Cgr225Tests.cs` (Networking), `SchannelVerificationTextTests.cs` (Output). Quality gates green for Output, Networking, Abstractions. `TlsHandshakeEvent.cs` added to touches (no other Doing task names it). HandBuiltTlsProvider does not set the new CA fields (the default Windows route is SslStream).
-- Left: store-cache reuse, close_notify, shutdown and `{ [0 bytes data]` lines, filed as BL-4054 (needs a new read-side event).
-- 2026-10-29: Doing -> Backlog. Handshake-time Schannel lines done; remaining close_notify/shutdown/store-cache lines are BL-4054
+- Left: store-cache reuse, close_notify, shutdown and `{ [0 bytes data]` lines, filed as BL-4067 (needs a new read-side event).
+- 2026-10-29: Doing -> Backlog. Handshake-time Schannel lines done; remaining close_notify/shutdown/store-cache lines are BL-4067
