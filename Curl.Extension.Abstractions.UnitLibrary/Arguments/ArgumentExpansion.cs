@@ -6,7 +6,7 @@ namespace Curl.Extension.Abstractions.Arguments;
 /// <c>--name=value</c>; a flag takes no value. Nothing after a bare <c>--</c> is expanded, an option with no value
 /// after it is left for the parser to refuse, and the arguments an expander gives are not expanded again. An
 /// <see cref="ITrailingArgumentExpander" /> also takes, from the rest of its <c>--next</c> group, its companion
-/// options with their values and the positional arguments it claims (ADR-1043); a positional argument right after
+/// options with their values and the positional arguments it claims (ADR-1051); a positional argument right after
 /// an option that may take it as its value is never claimed.
 /// </summary>
 public static class ArgumentExpansion

@@ -1,4 +1,4 @@
-# ADR-1043: An argument expander takes its companion options and claimed positional arguments
+# ADR-1051: An argument expander takes its companion options and claimed positional arguments
 
 - Status: Accepted
 - Date: 2026-10-29

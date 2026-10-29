@@ -10,7 +10,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins a trailing argument expander end to end through the runner (ADR-1043): its companion option and the
+/// Pins a trailing argument expander end to end through the runner (ADR-1051): its companion option and the
 /// positional arguments it claims taken from its <c>--next</c> group before the parse, the rest of the command line
 /// parsed as before, and nothing taken under <c>CURL_EXTENSIONS=0</c>.
 /// </summary>

@@ -42,7 +42,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   the environment through `ArgumentExpansionContext`'s delegates, and throws `ArgumentExpansionException` to end the
   run with `curl: <message>` and its `CurlExitCode` before any transfer.
 - `Arguments/ITrailingArgumentExpander` is an `IArgumentExpander` that also takes what follows its option in the same
-  `--next` group (ADR-1043): the values of its `CompanionOptions` and the positional arguments its
+  `--next` group (ADR-1051): the values of its `CompanionOptions` and the positional arguments its
   `ClaimsPositionalArgument` accepts, such as `--openapi s --operation getPet petId=5`. `ArgumentExpansion.Expand`
   holds its option until the group ends, removes those arguments, and hands them to
   `ArgumentsFor(ClaimedArguments, ...)` beside the value, each list in command-line order (`CompanionOptionValue`s

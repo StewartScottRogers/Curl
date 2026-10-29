@@ -32,7 +32,7 @@ Found by BL-4107 (`--openapi <spec> --operation <id> name=value...`) in its prer
 
 ## Notes
 
-- Shape (ADR-1043): `ITrailingArgumentExpander : IArgumentExpander` adds `CompanionOptions`,
+- Shape (ADR-1051): `ITrailingArgumentExpander : IArgumentExpander` adds `CompanionOptions`,
   `ClaimsPositionalArgument(string)` and `ArgumentsFor(ClaimedArguments, ...)` (`ClaimedArguments` = value,
   `CompanionOptionValue`s, positional arguments, each in command-line order); a default implementation of the plain
   `ArgumentsFor(string, ...)` passes nothing claimed, so BL-4205's plain expanders are unchanged.
@@ -53,4 +53,4 @@ Found by BL-4107 (`--openapi <spec> --operation <id> name=value...`) in its prer
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b3a7311c 7bceb261 4ead31c2 73b4c612 ce42cc94 478f867b 3d836d5e.
-- 2026-10-29: Doing -> Done. An ITrailingArgumentExpander takes its companion options and claimed positional arguments from its --next group (ADR-1043)
+- 2026-10-29: Doing -> Done. An ITrailingArgumentExpander takes its companion options and claimed positional arguments from its --next group (ADR-1051)

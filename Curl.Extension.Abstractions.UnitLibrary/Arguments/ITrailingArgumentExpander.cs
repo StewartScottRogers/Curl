@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Arguments;
 
 /// <summary>
 /// An <see cref="IArgumentExpander" /> that also takes what follows its option in the same <c>--next</c> group
-/// (ADR-1043): the values of its <see cref="CompanionOptions" />, and the positional arguments
+/// (ADR-1051): the values of its <see cref="CompanionOptions" />, and the positional arguments
 /// <see cref="ClaimsPositionalArgument" /> accepts, such as <c>--openapi spec.json --operation getPet petId=5</c>.
 /// <see cref="ArgumentExpansion.Expand" /> removes them from the command line and hands them to
 /// <see cref="ArgumentsFor(ClaimedArguments, ArgumentExpansionContext)" /> beside the option's value; a positional

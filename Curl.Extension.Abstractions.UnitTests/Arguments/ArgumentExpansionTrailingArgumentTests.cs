@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Arguments;
 
 /// <summary>
-/// Pins what an <see cref="ITrailingArgumentExpander" /> takes from its <c>--next</c> group (ADR-1043): its companion
+/// Pins what an <see cref="ITrailingArgumentExpander" /> takes from its <c>--next</c> group (ADR-1051): its companion
 /// options and the positional arguments it claims, each in command-line order, and nothing outside its group.
 /// </summary>
 [TestClass]

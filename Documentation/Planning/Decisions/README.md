@@ -1083,4 +1083,4 @@ Each option and the specific reason it lost.
 | [1048](ADR-1048-an-extension-scheme-hook-serves-curls-own-schemes-in-place-of-curls-handler.md) | An extension scheme hook serves curl's own schemes in place of curl's handler (BL-4195) | Accepted | 2026-10-29 |
 | [1049](ADR-1049-the-mqtt5-client-follows-curls-mqtt-flow-and-ends-a-failure-reason-code-as-a-weird-server-reply.md) | The MQTT 5 client follows curl's mqtt:// flow and ends a failure reason code as a weird server reply (BL-4243) | Accepted | 2026-10-29 |
 | [1050](ADR-1050-the-socket-callback-quic-wrapper-always-carries-datagrams.md) | The socket-callback QUIC wrapper always carries datagrams (BL-4254) | Accepted | 2026-10-29 |
-| [1043](ADR-1043-an-argument-expander-takes-its-companion-options-and-claimed-positional-arguments.md) | An argument expander takes its companion options and claimed positional arguments (BL-4217) | Accepted | 2026-10-29 |
+| [1051](ADR-1051-an-argument-expander-takes-its-companion-options-and-claimed-positional-arguments.md) | An argument expander takes its companion options and claimed positional arguments (BL-4217) | Accepted | 2026-10-29 |
