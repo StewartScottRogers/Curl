@@ -32,3 +32,4 @@ Left over from BL-3858 (ADR-0977). Off Windows an output name holding a byte tha
 ## Log
 
 - 2026-10-28: Created by BL-3858's run.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 2e354f2f 00ab634f cf95e9a9 779790c0.
