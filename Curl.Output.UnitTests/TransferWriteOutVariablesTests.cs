@@ -415,6 +415,20 @@ public sealed class TransferWriteOutVariablesTests
     }
 
     [TestMethod]
+    public void TryGetVariableText_TrailerCount_ReplacesTheHeaderCountInNumHeaders()
+    {
+        var diagnostics = TestDiagnostics.For(TestContext);
+        // HTTP/2 head x-a, x-b then trailer x-t: curl 8.18.0 (nghttp2 1.68) printed num_headers 1 (BL-4025).
+        TransferReport report = new() { ResponseHeaders = [new("x-a", "1"), new("x-b", "2"), new("x-t", "1")], TrailerCount = 1 };
+        diagnostics.Arrange("response headers, trailers", "3, 1");
+        TransferWriteOutVariables variables = WithReport(report);
+
+        Variable(diagnostics, variables, "num_headers", "1");
+
+        Assert.AreEqual("1", Get(variables, "num_headers"));
+        Assert.AreEqual("1", variables.FindFirstHeaderValue("x-a"));
+    }
+    [TestMethod]
     public void TryGetVariableText_PseudoHeaders_CountTowardsNumHeadersButAreNeverFound()
     {
         var diagnostics = TestDiagnostics.For(TestContext);

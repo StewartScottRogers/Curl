@@ -3559,6 +3559,7 @@ public sealed class HttpProtocolHandler(
                 ResponseCode = head.StatusLine.StatusCode,
                 HttpVersion = head.StatusLine.Version,
                 ResponseHeaders = [.. head.Headers.Select(header => KeyValuePair.Create(header.Name, header.Value)), .. streamTrailers],
+                TrailerCount = streamTrailers.Count,
                 ContentType = head.Headers.LastOrDefault(IsContentType)?.Value,
                 HeaderSize = report.HeaderSize + head.HeadBytes.Length,
             };

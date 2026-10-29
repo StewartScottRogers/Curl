@@ -61,6 +61,13 @@ public sealed record TransferReport
     public IReadOnlyList<KeyValuePair<string, string>> PseudoHeaders { get; init; } = [];
 
     /// <summary>
+    /// Gets how many trailer fields an HTTP/2 response ended with, already in <see cref="ResponseHeaders" />;
+    /// zero when there were none. When above zero, <c>%{num_headers}</c> is this count alone, as curl 8.18.0
+    /// with nghttp2 1.68 replaces the head's header count with the trailers' (BL-4025).
+    /// </summary>
+    public int TrailerCount { get; init; }
+
+    /// <summary>
     /// Gets every header of every response before the last one in a <c>-L</c> chain, hop by
     /// hop and in the order received, duplicates kept; empty when no redirect was followed.
     /// <c>%header{name:all:separator}</c> writes these values before the last response's.

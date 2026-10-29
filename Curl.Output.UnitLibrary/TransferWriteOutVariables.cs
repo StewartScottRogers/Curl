@@ -142,7 +142,7 @@ public sealed class TransferWriteOutVariables : IWriteOutVariableSource
         ["size_upload"] = variables => WriteOutValue.FromNumber(variables.info.SizeUpload),
         ["num_connects"] = variables => WriteOutValue.FromNumber(variables.info.NumConnects),
         ["num_headers"] = variables => WriteOutValue.FromNumber(
-            variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
+            variables.report.TrailerCount > 0 ? variables.report.TrailerCount : variables.report.ResponseHeaders.Count + variables.report.PseudoHeaders.Count),
         ["local_ip"] = variables => WriteOutValue.FromText(variables.info.LocalIp),
         ["local_port"] = variables => WriteOutValue.FromNumber(FindLocalPort(variables.info)),
         ["remote_ip"] = variables => WriteOutValue.FromText(variables.info.PrimaryIp),

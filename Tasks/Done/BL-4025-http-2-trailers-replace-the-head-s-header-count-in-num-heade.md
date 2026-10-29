@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/Http2TrailerNumHeadersTests.cs]
+touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitTests/Http2TrailerNumHeadersTests.cs, Curl.Protocol.Abstractions.UnitLibrary/TransferReport.cs, Curl.Output.UnitLibrary/TransferWriteOutVariables.cs, Curl.Output.UnitTests/TransferWriteOutVariablesTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4025 — HTTP/2 trailers replace the head's header count in num_headers, as curl 8.18.0 does
 
@@ -26,14 +26,18 @@ Write-out's `num_headers` is `TransferReport.ResponseHeaders.Count + PseudoHeade
 
 ## Acceptance criteria
 
-- [ ] The four frame sets above give REF's `num_headers` through Curl; the measurement is recorded in Notes.
-- [ ] A focused unit test in `Curl.Protocol.Http.UnitTests/Http2TrailerNumHeadersTests.cs` fails before the fix and passes after it.
-- [ ] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The four frame sets above give REF's `num_headers` through Curl; the measurement is recorded in Notes.
+- [x] A focused unit test in `Curl.Protocol.Http.UnitTests/Http2TrailerNumHeadersTests.cs` fails before the fix and passes after it.
+- [x] `Measure-CodeQuality.ps1 -Library Curl.Protocol.Http.UnitLibrary` reports 0 failing members.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Measured (REF-LINUX curl 8.18.0, in the Context above): the four frame sets give num_headers 1, 1, 2, 1. Curl now matches, pinned by Http2TrailerNumHeadersTests (four DataRows). Added TransferReport.TrailerCount; num_headers prints it when above zero, ResponseHeaders keeps head and trailers so %header{} and header_json are unchanged. touches widened to TransferReport.cs and the write-out variables (no other Doing task holds them).
+- CI criteria met by platform-neutral tests; Measure-CodeQuality Curl.Protocol.Http.UnitLibrary: 0 failing members.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: ccc02e86 d6a2a0b6 3bf8be13 779790c0.
+- 2026-10-28: Doing -> Done. HTTP/2 trailers now replace the head count in num_headers, matching curl 8.18.0
