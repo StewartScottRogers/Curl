@@ -33,3 +33,4 @@ Documentation half of BL-4068 (CGR-034). Real libcurl has no such transfer, so t
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6b40543d 2201ed3c 23a3c95f.
