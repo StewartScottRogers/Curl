@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.slnx, Curl.Extension.Composition.UnitLibrary/Curl.Extension.Composition.UnitLibrary.csproj, .gitattributes, Tasks/SharedListFiles.txt, Directory.Build.props]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4091 — Let extension tasks add their projects without overlapping in touches
 
@@ -38,3 +38,4 @@ Added: CLAUDE.md and DarkFactory/LaneRules.md edited (the criteria require it); 
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 9a728cc4 35d05a05 cebd48ba 6ab83a52 3d836d5e.
+- 2026-10-29: Doing -> Done. Composition references extensions by wildcard; Curl.slnx takes one single-line Folder per extension (merge=union); ADR-1003; docs updated; build clean
