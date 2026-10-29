@@ -4,7 +4,7 @@ namespace Curl.Protocol.Abstractions;
 
 /// <summary>
 /// Pins <see cref="IConnector.HttpOverTlsApplicationProtocols" />'s default, which a connector that does not say
-/// what it offers through ALPN keeps (ADR-1056).
+/// what it offers through ALPN keeps (ADR-1066).
 /// </summary>
 [TestClass]
 public sealed class IConnectorTests

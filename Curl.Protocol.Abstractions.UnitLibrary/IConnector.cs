@@ -94,7 +94,7 @@ public interface IConnector
     /// Gets what this connector's handshake for HTTP over TLS to an origin offers through ALPN when the target
     /// names no list of its own (<see cref="ConnectTarget.ApplicationProtocols" />): the list the option group's
     /// HTTP version options leave (ADR-0141), which an extension's connector layering curl's TLS over its own
-    /// stream offers in turn (ADR-1056).
+    /// stream offers in turn (ADR-1066).
     /// </summary>
     /// <remarks>
     /// The default is <c>http/1.1</c> alone, curl's offer with no version option on Windows;

@@ -1,4 +1,4 @@
-# ADR-1056: A connection hook's TLS offers curl's ALPN list
+# ADR-1066: A connection hook's TLS offers curl's ALPN list
 
 - Status: Accepted
 - Date: 2026-10-29

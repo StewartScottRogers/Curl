@@ -112,7 +112,7 @@ public sealed class PoolingConnector : IConnector, IAsyncDisposable
         new(innerConnector, _cache, _configuration, _connectTo) { WaitsForMultiplexing = WaitsForMultiplexing, PlainTcpMayMultiplex = PlainTcpMayMultiplex, MaximumConnectionLifetime = MaximumConnectionLifetime, FreshConnect = FreshConnect, ForbidReuse = ForbidReuse };
 
     /// <summary>
-    /// Gets what the inner connector's handshake for HTTP over TLS to an origin offers through ALPN (ADR-1056).
+    /// Gets what the inner connector's handshake for HTTP over TLS to an origin offers through ALPN (ADR-1066).
     /// </summary>
     public IReadOnlyList<string> HttpOverTlsApplicationProtocols => _innerConnector.HttpOverTlsApplicationProtocols;
 

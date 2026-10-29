@@ -20,7 +20,7 @@ internal sealed class NamedPipeConnectionHook(NamedPipeName name, INamedPipeOpen
 
     /// <summary>
     /// Gives the connector that opens the pipe and runs curls TLS handshake over it for a TLS target (ADR-1055),
-    /// offering what <paramref name="curlConnector" /> offers through ALPN (ADR-1056).
+    /// offering what <paramref name="curlConnector" /> offers through ALPN (ADR-1066).
     /// </summary>
     /// <param name="curlConnector">The connector curl would use; set aside but for its ALPN list.</param>
     /// <param name="curlTlsProvider">The TLS provider curl built from the option groups TLS options.</param>

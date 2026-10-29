@@ -78,7 +78,7 @@ public interface ITlsProvider
     /// <see cref="AuthenticateAsClientAsync(IConnection, string, ITransferEvents, CancellationToken)" /> does,
     /// offering <paramref name="applicationProtocols" /> through ALPN as curl's own origin handshake offers them
     /// (none under <c>--no-alpn</c>), so a connector outside <c>Curl.Networking</c> - an extension's, such as
-    /// <c>--npipe</c>'s - can run an <c>https://</c> transfer that negotiates HTTP/2 (ADR-1056).
+    /// <c>--npipe</c>'s - can run an <c>https://</c> transfer that negotiates HTTP/2 (ADR-1066).
     /// </summary>
     /// <remarks>
     /// By default nothing is offered and the handshake is the four-argument overload's; a provider that offers

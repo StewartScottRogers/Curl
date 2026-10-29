@@ -28,7 +28,7 @@ BL-4206 (ADR-1055) runs curl's TLS handshake over the pipe through the public `I
 
 ## Notes
 
-- 2026-10-29: Added a public ALPN-offering default overload to `ITlsProvider` (by default it calls the four-argument one and offers nothing) and `IConnector.HttpOverTlsApplicationProtocols` (default `http/1.1` alone, what curl offers on Windows with no version option; `TcpConnector` already had the property, and `PoolingConnector` now forwards it). `NamedPipeConnectionHook` passes the list from curl's connector, and `NamedPipeConnector` offers the target's own list, or else that one, for an `https` pool scheme, and nothing for other TLS schemes, as `TcpConnector.ApplicationProtocolsFor` does. The decision is in ADR-1056.
+- 2026-10-29: Added a public ALPN-offering default overload to `ITlsProvider` (by default it calls the four-argument one and offers nothing) and `IConnector.HttpOverTlsApplicationProtocols` (default `http/1.1` alone, what curl offers on Windows with no version option; `TcpConnector` already had the property, and `PoolingConnector` now forwards it). `NamedPipeConnectionHook` passes the list from curl's connector, and `NamedPipeConnector` offers the target's own list, or else that one, for an `https` pool scheme, and nothing for other TLS schemes, as `TcpConnector.ApplicationProtocolsFor` does. The decision is in ADR-1066.
 - 2026-10-29: `Measure-CodeQuality.ps1` over Curl.Protocol.Abstractions, Curl.Networking, Curl.Extension.Abstractions and Curl.Extension.NamedPipe found 0 failing members. Build clean and fast tests green. The tests use a fake pipe and a fake TLS provider and do not depend on the platform, so this also covers CI on Linux and macOS.
 
 ## Log

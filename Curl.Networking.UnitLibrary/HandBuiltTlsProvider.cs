@@ -226,7 +226,7 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
 
     /// <summary>
     /// Performs the origin's client handshake, offering <paramref name="applicationProtocols" /> through ALPN, as
-    /// the six-argument overload does with <c>isProxy</c> <see langword="false" /> (ADR-1056).
+    /// the six-argument overload does with <c>isProxy</c> <see langword="false" /> (ADR-1066).
     /// </summary>
     /// <param name="plaintext">The connection to upgrade; ownership transfers to the provider.</param>
     /// <param name="targetHost">The host name to validate the server certificate against.</param>
