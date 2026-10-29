@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Arguments;
 namespace Curl.Extension.HttpFile;
 
 /// <summary>
-/// The variables a .http file's requests use (ADR-1064): an environment's, then the file's own <c>@name = value</c>
+/// The variables a .http file's requests use (ADR-1073): an environment's, then the file's own <c>@name = value</c>
 /// lines, a later definition replacing an earlier one; <see cref="Substitute" /> replaces each <c>{{name}}</c> and
 /// <c>{{$processEnv NAME}}</c> in a text.
 /// </summary>

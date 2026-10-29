@@ -1,6 +1,6 @@
 # Curl.Extension.HttpFile.UnitLibrary
 
-The .http request file extension (ADR-0999, ADR-1064), tested against the Visual Studio .http file format
+The .http request file extension (ADR-0999, ADR-1073), tested against the Visual Studio .http file format
 (learn.microsoft.com/aspnet/core/test/http-files) and the VS Code REST Client format it shares. Namespace
 `Curl.Extension.HttpFile`. It references only `Curl.Extension.Abstractions` (and through it
 `Curl.Protocol.Abstractions`) and the base class library; `http-client.env.json` is read with

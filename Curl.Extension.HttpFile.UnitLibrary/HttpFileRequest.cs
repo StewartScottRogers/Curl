@@ -1,6 +1,6 @@
 namespace Curl.Extension.HttpFile;
 
-/// <summary>One request of a .http file, its variables substituted, and the curl arguments that send it (ADR-1064).</summary>
+/// <summary>One request of a .http file, its variables substituted, and the curl arguments that send it (ADR-1073).</summary>
 /// <param name="Method">The request line's method, such as <c>GET</c>.</param>
 /// <param name="Url">The URL, with any <c>?</c> and <c>&amp;</c> continuation lines appended.</param>
 /// <param name="Headers">Each header line, as <c>Name: value</c>.</param>

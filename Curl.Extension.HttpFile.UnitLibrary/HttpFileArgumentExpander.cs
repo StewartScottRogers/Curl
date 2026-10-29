@@ -6,7 +6,7 @@ namespace Curl.Extension.HttpFile;
 
 /// <summary>
 /// Expands <c>--http-file &lt;file&gt;</c> into the curl arguments of every request in the .http file, one
-/// <c>--next</c> group each (ADR-1040, ADR-1064). A <c>--http-env &lt;name&gt;</c> in the same group first sets the
+/// <c>--next</c> group each (ADR-1040, ADR-1073). A <c>--http-env &lt;name&gt;</c> in the same group first sets the
 /// variables of that environment in <c>http-client.env.json</c> beside the file.
 /// </summary>
 public sealed class HttpFileArgumentExpander : ITrailingArgumentExpander

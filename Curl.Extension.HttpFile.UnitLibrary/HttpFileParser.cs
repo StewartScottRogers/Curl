@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Arguments;
 namespace Curl.Extension.HttpFile;
 
 /// <summary>
-/// Reads the requests of a .http file (ADR-1064), as the Visual Studio and VS Code REST Client formats write them:
+/// Reads the requests of a .http file (ADR-1073), as the Visual Studio and VS Code REST Client formats write them:
 /// requests separated by lines starting with <c>###</c>; before a request line, blank lines, <c>#</c> and <c>//</c>
 /// comments and <c>@name = value</c> file variables; the request line <c>[METHOD] URL [HTTP/version]</c>; <c>?</c> and
 /// <c>&amp;</c> query lines right after it; header lines up to the first blank line; and the body up to the next

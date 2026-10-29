@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Description;
 
 namespace Curl.Extension.HttpFile;
 
-/// <summary>The command-line options the .http file extension adds, and its description (ADR-1064).</summary>
+/// <summary>The command-line options the .http file extension adds, and its description (ADR-1073).</summary>
 public static class HttpFileOptions
 {
     /// <summary>Gets <c>--http-file &lt;file&gt;</c>: runs every request in the .http file, one <c>--next</c> group each.</summary>

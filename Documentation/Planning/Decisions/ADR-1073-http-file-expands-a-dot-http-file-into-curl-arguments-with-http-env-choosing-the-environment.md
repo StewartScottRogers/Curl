@@ -1,4 +1,4 @@
-# ADR-1064 — --http-file expands a .http file into curl arguments, with --http-env choosing the environment
+# ADR-1073 — --http-file expands a .http file into curl arguments, with --http-env choosing the environment
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

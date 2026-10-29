@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Arguments;
 namespace Curl.Extension.HttpFile;
 
 /// <summary>
-/// Reads a named environment from an <c>http-client.env.json</c> file (ADR-1064): a JSON object whose properties are
+/// Reads a named environment from an <c>http-client.env.json</c> file (ADR-1073): a JSON object whose properties are
 /// environments, each an object of variables. The <c>$shared</c> environment's variables are set first, then the named
 /// one's, so a named environment replaces a shared value.
 /// </summary>
