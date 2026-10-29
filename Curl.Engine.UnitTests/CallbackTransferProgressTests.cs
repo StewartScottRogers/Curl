@@ -11,7 +11,7 @@ public sealed class CallbackTransferProgressTests
     {
         using CancellationTokenSource abort = new();
 
-        Assert.IsNull(CallbackTransferProgress.Of(noProgress: true, new EasyCallbackOptions { TransferInfo = (_, _, _, _) => 0 }, abort));
+        Assert.IsNull(CallbackTransferProgress.Of(noProgress: true, new EasyCallbackOptions { TransferInfo = (_, _, _, _) => 0 }, abort, () => Stream.Null, TimeProvider.System));
     }
 
     [TestMethod]
@@ -39,11 +39,11 @@ public sealed class CallbackTransferProgressTests
     }
 
     [TestMethod]
-    public void Of_NeitherCallbackSet_GivesNone()
+    public void Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone()
     {
         using CancellationTokenSource abort = new();
 
-        Assert.IsNull(CallbackTransferProgress.Of(noProgress: false, new EasyCallbackOptions(), abort));
+        Assert.IsNotNull(CallbackTransferProgress.Of(noProgress: false, new EasyCallbackOptions(), abort, () => Stream.Null, TimeProvider.System));
     }
 
     [TestMethod]
@@ -65,7 +65,7 @@ public sealed class CallbackTransferProgressTests
             },
         };
 
-        CallbackTransferProgress.Of(noProgress: false, callbacks, abort)!.ReportDownloaded(3, 10);
+        CallbackTransferProgress.Of(noProgress: false, callbacks, abort, () => Stream.Null, TimeProvider.System)!.ReportDownloaded(3, 10);
 
         CollectionAssert.AreEqual(new[] { "xferinfo 10 3 0 0" }, calls);
     }
@@ -84,7 +84,7 @@ public sealed class CallbackTransferProgressTests
             },
         };
 
-        CallbackTransferProgress.Of(noProgress: false, callbacks, abort)!.ReportUploaded(4, 8);
+        CallbackTransferProgress.Of(noProgress: false, callbacks, abort, () => Stream.Null, TimeProvider.System)!.ReportUploaded(4, 8);
 
         CollectionAssert.AreEqual(new[] { 0d, 0d, 8d, 4d }, calls.Single());
     }
