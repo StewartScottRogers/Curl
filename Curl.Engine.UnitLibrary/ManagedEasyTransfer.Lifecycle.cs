@@ -91,12 +91,17 @@ internal sealed partial class ManagedEasyTransfer
 
         SaveHstsToCallback();
         await SaveAltSvcAsync().ConfigureAwait(false);
+        await SaveCookieJarAsync().ConfigureAwait(false);
         optionShare?.LockCookies(this, 1);
         optionShare = ManagedShareHandle.Reattach(optionShare, named: null, this);
         await (connectOnly?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (webSocket?.CloseAsync() ?? ValueTask.CompletedTask).ConfigureAwait(false);
         await (ToolSettings is not null ? shared.EngineWide : shared).Connections.CloseIdleOwnedByAsync(this).ConfigureAwait(false);
     }
+
+    /// <summary>Writes the cookies of the last HTTP perform to its <c>CURLOPT_COOKIEJAR</c> file, as libcurl does at cleanup (CGR-258, BL-3787); nothing when no perform had a jar.</summary>
+    /// <returns>A task that completes once the file is written.</returns>
+    private Task SaveCookieJarAsync() => handleCookieJar?.WriteCookieJarAsync(Host.FileSystem, Host.JarPrintTarget(), shared.TimeProvider.GetUtcNow()) ?? Task.CompletedTask;
 
     /// <summary>Writes the handle's alt-svc cache to its <c>CURLOPT_ALTSVC</c> file, as libcurl does at cleanup (BL-2671); nothing when no perform opened one.</summary>
     /// <returns>A task that completes once the file is written.</returns>

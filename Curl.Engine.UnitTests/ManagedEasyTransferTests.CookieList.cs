@@ -121,6 +121,7 @@ public sealed partial class ManagedEasyTransferTests
         await using IEasyTransfer disposed = easy;
 
         CurlCode code = await easy.PerformAsync(CancellationToken.None);
+        await disposed.DisposeAsync();
 
         Assert.AreEqual(CurlCode.Ok, code);
         string jars = Encoding.ASCII.GetString(printed.ToArray());
