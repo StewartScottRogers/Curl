@@ -32,4 +32,4 @@ BL-4044 measured it (2026-10-28) with `Record-CurlExchange.ps1 -Port 21909 -Tls 
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 4a3a8bb2 db97300f 779790c0.
-- 2026-10-28: Doing -> Done. WinLDAP NTLM bind over ldaps asks for no signing or sealing (07 b2 08 a2), starts no security layer, and a close during it is Unavailable (ADR-0985)
+- 2026-10-28: Doing -> Done. WinLDAP NTLM bind over ldaps asks for no signing or sealing (07 b2 08 a2), starts no security layer, and a close during it is Unavailable (ADR-0988)

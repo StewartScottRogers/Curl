@@ -1,4 +1,4 @@
-# ADR-0985: WinLDAP's bind as the logged-on user asks for no signing or sealing over ldaps
+# ADR-0988: WinLDAP's bind as the logged-on user asks for no signing or sealing over ldaps
 
 - Status: Accepted
 - Date: 2026-10-28
