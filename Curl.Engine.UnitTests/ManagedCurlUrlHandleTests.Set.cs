@@ -269,7 +269,7 @@ public sealed partial class ManagedCurlUrlHandleTests
 
         Assert.AreEqual(CurlUrlCode.Ok, url.Set(CurlUrlPart.Host, "[fe80::1%25eth0]", CurlUrlFlags.None));
 
-        Assert.AreEqual("[fe80::1]", GetOk(url, CurlUrlPart.Host));
+        Assert.AreEqual("[fe80::1%25eth0]", GetOk(url, CurlUrlPart.Host));
         Assert.AreEqual("eth0", GetOk(url, CurlUrlPart.ZoneId));
     }
 

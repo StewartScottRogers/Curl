@@ -155,7 +155,10 @@ internal static class UrlPartSetter
             return UrlSetResult.Refused(CurlUrlCode.BadHostname);
         }
 
-        return UrlSetResult.Set(bracketed ? parts with { Host = url.Host, ZoneId = url.ZoneId } : parts with { Host = host, ZoneId = null });
+        // Upstream keeps the typed host (zone included) as the host text and the zone id apart (CGR-256).
+        string bracketedHost = url.ZoneId is null ? url.Host : host;
+
+        return UrlSetResult.Set(bracketed ? parts with { Host = bracketedHost, ZoneId = url.ZoneId } : parts with { Host = host, ZoneId = null });
     }
 
     /// <summary>A port: decimal digits up to 65535 and nothing else, kept without leading zeros.</summary>

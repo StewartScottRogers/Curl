@@ -9,7 +9,7 @@ touches: [Curl.Engine.UnitLibrary/UrlPartText.cs, Curl.Engine.UnitTests/Cgr256Te
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3785 — Fix CGR-256: curl_url: setting CURLUPART_HOST to [fe80::1%25eth0] makes HOST read back without the zone id
 
@@ -60,17 +60,24 @@ probe.exe repro
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr256Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
 
+- Decided (ADR-0983): `IEasyTransfer.PerformingTransfer` (default: the handle itself) names the handle whose perform does the transfer; `StoreBoundEasyTransfer` forwards it, and `ManagedMultiTransfer.Start` gives the socket wait and multi callbacks to the `PerformingTransfer` when it is a `ManagedEasyTransfer`. The seam names the handle, not the wait, because `TransferSocketWait` is internal to the engine. A fake that wraps no engine transfer keeps the synthetic `FirstTransferSocket` number (it has no socket to tell).
+- Decided (ADR-0983): while a running transfer on a socket wait waits on nothing after the settle, the timer is 0 (libcurl's `Curl_expire(data, 0)`), also for one whose perform ended and waits to be reported; the 10 ms interval stays only for transfers with no socket wait.
+- Added `Curl.Api.UnitTests/Stores/StoreBoundEasyTransferTests.cs` to touches: Curl.Api's 100% coverage gate needs the forwarder tested; no task in Doing on origin/work/dark-factory names it.
+- `RunningTimerMilliseconds` went past the complexity gate (cached method-group delegates count); split into `CheckIntervalMilliseconds`. Measure-CodeQuality for Curl.Engine.UnitLibrary, Curl.Api, Curl.Api.UnitLibrary: 0 failing members. Fast tests green on Windows; the tests use no path, OS error or certificate and wait on the transfer's own events, so they are platform-neutral.
+- Repro (curl_url section of probe `repro`) measured per the report: REF gives HOST `[fe80::1%25eth0]`, ZONEID `eth0`, URL `http://[fe80::1%25eth0%25eth0]/`. Fixed in `UrlPartSetter.CheckedHost`: a bracketed host with a zone keeps its typed text as the host, zone id kept apart. Curl now matches; unit test `Set_HostWithZoneId_ReadsBackWithTheZoneAndTheUrlWritesItTwice` (in Cgr256Tests.cs) failed before, passes after. `Set_HostAnIPv6AddressWithAZone_KeepsTheZoneApart` updated to the new read-back. Zone-less hosts unchanged. Platform-neutral; Engine fast tests green, quality run: 0 failing members.
+
 ## Log
 
 - 2026-10-26: Created from CGR-256 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-29: Doing -> Done. CGR-256 fixed: host set with a zone reads back with it
