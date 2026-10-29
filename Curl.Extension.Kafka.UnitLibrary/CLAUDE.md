@@ -1,6 +1,6 @@
 # Curl.Extension.Kafka.UnitLibrary
 
-The Kafka extension (ADR-0999, ADR-1075), tested against the Apache Kafka protocol guide
+The Kafka extension (ADR-0999, ADR-1076), tested against the Apache Kafka protocol guide
 (<https://kafka.apache.org/protocol>), not against curl. It references only `Curl.Extension.Abstractions` (and through
 it `Curl.Protocol.Abstractions`) and the base class library. The handler is registered by one line in
 `ExtensionCatalogue.cs` and described in `ExtensionDescriptionCatalogue.cs`.

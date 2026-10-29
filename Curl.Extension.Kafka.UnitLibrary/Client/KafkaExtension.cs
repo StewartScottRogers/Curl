@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Kafka.Client;
 
-/// <summary>The <c>kafka://</c> and <c>kafkas://</c> extension's description and handler factory (ADR-1075).</summary>
+/// <summary>The <c>kafka://</c> and <c>kafkas://</c> extension's description and handler factory (ADR-1076).</summary>
 public static class KafkaExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

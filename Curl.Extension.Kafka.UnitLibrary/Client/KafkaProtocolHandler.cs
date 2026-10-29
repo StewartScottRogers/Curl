@@ -4,7 +4,7 @@ namespace Curl.Extension.Kafka.Client;
 
 /// <summary>
 /// Serves <c>kafka://host[:port]/topic[/partition][?offset=N]</c> (port 9092) and <c>kafkas://</c> (port 9093, TLS
-/// from the connector) with the Kafka protocol (ADR-1075): with a body (<c>-d</c>) it produces one record whose value
+/// from the connector) with the Kafka protocol (ADR-1076): with a body (<c>-d</c>) it produces one record whose value
 /// is the body, otherwise it consumes the partition from the offset to its end. The exchange itself is
 /// <see cref="KafkaClientFlow"/>.
 /// </summary>

@@ -1,4 +1,4 @@
-# ADR-1075: Kafka produces one record with a body and consumes to the high watermark without one
+# ADR-1076: Kafka produces one record with a body and consumes to the high watermark without one
 
 - Status: Accepted
 - Date: 2026-10-29

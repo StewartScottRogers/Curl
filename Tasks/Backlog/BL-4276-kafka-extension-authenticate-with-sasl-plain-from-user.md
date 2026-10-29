@@ -18,13 +18,13 @@ completed:
 
 ## Context
 
-Follow-up of BL-4121 (ADR-1075): no SASL is offered, so a broker that demands it closes the connection. Kafka's SASL PLAIN is RFC 4616 inside SaslAuthenticate; `--user` maps onto it as STOMP's `--user` maps onto login and passcode. Depends on BL-4275 since both change the handler's connection flow.
+Follow-up of BL-4121 (ADR-1076): no SASL is offered, so a broker that demands it closes the connection. Kafka's SASL PLAIN is RFC 4616 inside SaslAuthenticate; `--user` maps onto it as STOMP's `--user` maps onto login and passcode. Depends on BL-4275 since both change the handler's connection flow.
 
 ## Acceptance criteria
 
 - [ ] With `--user`, the client sends SaslHandshake naming PLAIN and SaslAuthenticate with the RFC 4616 message before its first request; unit test over a scripted connection.
 - [ ] A failed authentication ends with exit 67 (CURLE_LOGIN_DENIED) and the broker's error message.
-- [ ] ADR-1075's "Left out" is updated or superseded.
+- [ ] ADR-1076's "Left out" is updated or superseded.
 - [ ] The library meets the four quality gates and the fast tests pass.
 
 ## Notes
