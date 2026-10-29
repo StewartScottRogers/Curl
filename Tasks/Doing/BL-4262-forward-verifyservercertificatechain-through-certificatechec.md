@@ -30,3 +30,4 @@ Found by BL-4249 (ADR-1052): CertificateCheckingTlsProvider wraps the engine's p
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: e36dcc8b 5ea3895a.
