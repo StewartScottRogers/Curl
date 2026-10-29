@@ -39,6 +39,19 @@ public interface ITransferHook
     ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next) => next(context);
 
     /// <summary>
+    /// Runs the transfer as <see cref="ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" />
+    /// does, given what the host lends a hook to make its own requests first (ADR-1037): curl's connector and a
+    /// loopback listener. A hook that fetched something, an OAuth 2.0 token, sends it by calling
+    /// <paramref name="next" /> with <see cref="TransferContextRequestHeaders.WithRequestHeaders" />. The host calls
+    /// this overload when it gave the hooks services, and the other one when it gave none.
+    /// </summary>
+    /// <param name="context">The transfer, with the hooks' request headers and body streams in place.</param>
+    /// <param name="services">Curl's connector and a loopback listener.</param>
+    /// <param name="next">Runs the inner hooks and curl's handler on the context it is given.</param>
+    /// <returns>The transfer's result; by default, the other overload's.</returns>
+    ValueTask<TransferResult> ExecuteAsync(ITransferContext context, TransferHookServices services, Func<ITransferContext, ValueTask<TransferResult>> next) => ExecuteAsync(context, next);
+
+    /// <summary>
     /// Reads the finished transfer: its exit code and its <see cref="TransferResult.Report" />, with the
     /// response code, response headers and <see cref="TransferReport.Timings" />. Called before curl reports
     /// the transfer (<c>-w</c>, exit code).

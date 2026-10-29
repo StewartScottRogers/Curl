@@ -1,7 +1,7 @@
 namespace Curl.Extension.Abstractions.Transfer;
 
 /// <summary>
-/// Lets a transfer hook's <see cref="ITransferHook.ExecuteAsync" /> run curl's handler with the response
+/// Lets a transfer hook's <see cref="ITransferHook.ExecuteAsync(ITransferContext, Func{ITransferContext, ValueTask{TransferResult}})" /> run curl's handler with the response
 /// written somewhere of its choosing (ADR-1019), such as a buffer it keeps to answer from later.
 /// </summary>
 public static class TransferContextOutputs
