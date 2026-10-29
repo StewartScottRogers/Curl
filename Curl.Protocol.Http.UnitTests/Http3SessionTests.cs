@@ -172,7 +172,7 @@ public sealed class Http3SessionTests
         FakeMultiplexedConnection quic = new(new FakeMultiplexedStream(0, []), new FakeMultiplexedStream(4, []), new FakeMultiplexedStream(8, []));
         await using Http3Session session = new(quic);
 
-        IMultiplexedStream[] opened = await Task.WhenAll(
+        Http3ClientRequestStream[] opened = await Task.WhenAll(
             Enumerable.Range(0, 3).Select(_ => Task.Run(async () => await session.OpenRequestStreamAsync(HttpFrameLog.Silent, CancellationToken.None))));
 
         Diagnostics.Act("opened stream ids, sorted", string.Join(", ", opened.Select(stream => stream.StreamId).Order()));
