@@ -8,7 +8,7 @@ namespace Curl.Console;
 /// Pins that <see cref="ToolEasyHandle.SetOptions(IEnumerable{EasySetopt}, Func{EasySetopt, CurlCode})" /> carries on
 /// past a <c>CURLE_NOT_BUILT_IN</c> answer to <c>CURLOPT_CAPATH</c>, <c>CURLOPT_PROXY_CAPATH</c>,
 /// <c>CURLOPT_TLS13_CIPHERS</c> and <c>CURLOPT_PROXY_TLS13_CIPHERS</c>, as curl 8.22.0's <c>config2setopts</c> does,
-/// and still stops at any other refusal (BL-4029, ADR-0974).
+/// and still stops at any other refusal (BL-4029, ADR-0975).
 /// </summary>
 [TestClass]
 public sealed class NotBuiltInTlsSetoptWarningTests

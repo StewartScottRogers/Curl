@@ -1,4 +1,4 @@
-# ADR-0974: The curl tool carries on past CURLE_NOT_BUILT_IN for the CA path and TLS 1.3 cipher setopts
+# ADR-0975: The curl tool carries on past CURLE_NOT_BUILT_IN for the CA path and TLS 1.3 cipher setopts
 
 - Status: Accepted
 - Date: 2026-10-28
