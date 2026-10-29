@@ -38,3 +38,4 @@ BL-4033 did not pin 14 hosts curl refused: U+2100, U+2101, U+2105, U+2106 and te
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 013ec147 779790c0.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4079 and BL-4080: curl converts U+2100/2101/2105/2106 to slash text (exit 27 only via a proxy), but BL-4076 makes Curl refuse them with exit 3
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 013ec147 779790c0.
