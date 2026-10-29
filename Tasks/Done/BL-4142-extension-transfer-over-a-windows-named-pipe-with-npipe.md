@@ -40,7 +40,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - Criterion 4: `NamedPipeExtensionTests` checks that `ExtensionCommandLineOptions.For` leaves `npipe` out under `CURL_EXTENSIONS=0` (so the parser refuses it as unknown) and that the connection-hook catalogue keeps curl's connector without the option. Measured on the built curl.exe: `curl: option --npipe: is unknown`, exit 2; a missing pipe gives exit 7; a value that is not a pipe name gives exit 2; a live `NamedPipeServerStream` in PowerShell received `GET /_ping HTTP/1.1` and curl printed its 5-byte body, exit 0. `curl --extensions` and `curl --ai-help extensions` list `npipe`.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Extension.NamedPipe.UnitLibrary,Curl.Extension.Composition.UnitLibrary` found `NamedPipeName.TryParse` at complexity 12; split into `TrySplit`, then the NamedPipe re-run gave 0 failing members, 100/100; Composition had 0 failing members.
 - Platform: the tests use no OS pipe, path or error text, so they are platform-neutral; CI on Linux and macOS is covered by that.
-- Left out: TLS over the pipe (exit 4) and HTTP/3; TLS is filed as BL-4202.
+- Left out: TLS over the pipe (exit 4) and HTTP/3; TLS is filed as BL-4206.
 - Fast tests: 53 test projects passed, 0 failed; the new project has 34 tests.
 
 ## Log

@@ -1,5 +1,5 @@
 ---
-id: BL-4202
+id: BL-4206
 title: Extension: TLS over a --npipe named pipe
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4202 — Extension: TLS over a --npipe named pipe
+# BL-4206 — Extension: TLS over a --npipe named pipe
 
 ## Goal
 
