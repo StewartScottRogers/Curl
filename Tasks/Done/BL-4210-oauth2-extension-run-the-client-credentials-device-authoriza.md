@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4211, BL-4212, BL-4213, BL-4209]
-touches: [Curl.Extension.OAuth2.UnitLibrary/Flows, Curl.Extension.OAuth2.UnitTests/Flows]
+touches: [Curl.Extension.OAuth2.UnitLibrary/Flows, Curl.Extension.OAuth2.UnitTests/Flows, Curl.Extension.OAuth2.UnitLibrary/CLAUDE.md]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4210 — OAuth2 extension: run the client-credentials, device authorization and PKCE authorization code flows
 
@@ -22,10 +22,10 @@ Fourth part of BL-4161 (split for size). Builds on BL-4212 (wire format), BL-421
 
 ## Acceptance criteria
 
-- [ ] Unit tests with fake connections, a fake listener and a fake `TimeProvider` check each flow against the named RFC sections, including polling, `slow_down` and a wrong `state`.
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records the exit codes and what the flows print.
-- [ ] The library meets the four quality gates by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Unit tests with fake connections, a fake listener and a fake `TimeProvider` check each flow against the named RFC sections, including polling, `slow_down` and a wrong `state`.
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records the exit codes and what the flows print.
+- [x] The library meets the four quality gates by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -35,3 +35,4 @@ Fourth part of BL-4161 (split for size). Builds on BL-4212 (wire format), BL-421
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 5bc17d39 e1c80d50 3180db99 3d836d5e.
+- 2026-10-29: Doing -> Done. The OAuth2 extension gets a token by client credentials, device authorization and PKCE authorization code flows, cache and refresh first
