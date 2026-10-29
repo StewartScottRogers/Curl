@@ -1,5 +1,5 @@
 ---
-id: BL-4255
+id: BL-4259
 title: Extension Amqp0: projects and AMQP 0-9-1 frame and method wire format
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4255 — Extension Amqp0: projects and AMQP 0-9-1 frame and method wire format
+# BL-4259 — Extension Amqp0: projects and AMQP 0-9-1 frame and method wire format
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4117 (`amqp://`, `amqps://`, extension 16 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: AMQP 0-9-1 (amqp0-9-1.pdf, 2008-11-13, with RabbitMQ's errata and its `amqp0-9-1.extended.xml` class/method numbers). Reference only `Curl.Protocol.Abstractions.UnitLibrary` and the shared layers; never a `Curl.Protocol.*` library or another extension (in particular not `Curl.Extension.Amqp1.*` from BL-4118). Use the `new-project` skill; the slnx line is one single-line `<Folder Name="/Extensions/Amqp0/">` directly under the marker comment (ADR-1003). Pattern to follow: BL-4242 (Mqtt5 wire format). Put the code in `Wire/` (frames, data types, field tables) and `Methods/` (one class per method), so BL-4256 (`Client/`) works in a disjoint folder. Do not register the extension in any catalogue here: BL-4117 does that.
+Split from BL-4117 (`amqp://`, `amqps://`, extension 16 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: AMQP 0-9-1 (amqp0-9-1.pdf, 2008-11-13, with RabbitMQ's errata and its `amqp0-9-1.extended.xml` class/method numbers). Reference only `Curl.Protocol.Abstractions.UnitLibrary` and the shared layers; never a `Curl.Protocol.*` library or another extension (in particular not `Curl.Extension.Amqp1.*` from BL-4118). Use the `new-project` skill; the slnx line is one single-line `<Folder Name="/Extensions/Amqp0/">` directly under the marker comment (ADR-1003). Pattern to follow: BL-4242 (Mqtt5 wire format). Put the code in `Wire/` (frames, data types, field tables) and `Methods/` (one class per method), so BL-4260 (`Client/`) works in a disjoint folder. Do not register the extension in any catalogue here: BL-4117 does that.
 
 ## Acceptance criteria
 
@@ -32,7 +32,7 @@ Split from BL-4117 (`amqp://`, `amqps://`, extension 16 of 63) for size by its f
 
 ## Notes
 
-- Filed by BL-4117's lane 9 prerequisite pass. BL-4256 then adds the client flow, BL-4117 the registration, description, ADR and `CURL_EXTENSIONS=0` test.
+- Filed by BL-4117's lane 9 prerequisite pass. BL-4260 then adds the client flow, BL-4117 the registration, description, ADR and `CURL_EXTENSIONS=0` test.
 
 ## Log
 

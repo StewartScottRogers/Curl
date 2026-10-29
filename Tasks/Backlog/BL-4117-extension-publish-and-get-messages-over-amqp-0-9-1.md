@@ -4,7 +4,7 @@ title: Extension: Publish and get messages over AMQP 0-9-1
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4255, BL-4256]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4259, BL-4260]
 touches: [Curl.Extension.Amqp0.UnitLibrary, Curl.Extension.Amqp0.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs]
 requirement: none
 created: 2026-10-29
@@ -35,10 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- 2026-10-29, lane 9 prerequisite pass (before any code): too large for one run, so it is split like BL-4115 (Mqtt5) into BL-4255 (projects and AMQP 0-9-1 wire format: protocol header, frames, data types, field tables, the connection/channel/queue/basic methods and content header, in `Wire/` and `Methods/`) and BL-4256 (handler over `IConnection` for `amqp://` and `amqps://`: negotiation, queue.declare, basic.publish with `-d`, basic.get otherwise, in `Client/`). What is left here once they are Done: the `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs` lines (the latter added to `touches`, needed for the `--extensions` criterion; it is a shared list file, one line per entry), the ADR for the scheme names, specification version and omissions, the `CURL_EXTENSIONS=0` test and the quality run.
+- 2026-10-29, lane 9 prerequisite pass (before any code): too large for one run, so it is split like BL-4115 (Mqtt5) into BL-4259 (projects and AMQP 0-9-1 wire format: protocol header, frames, data types, field tables, the connection/channel/queue/basic methods and content header, in `Wire/` and `Methods/`) and BL-4260 (handler over `IConnection` for `amqp://` and `amqps://`: negotiation, queue.declare, basic.publish with `-d`, basic.get otherwise, in `Client/`). What is left here once they are Done: the `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs` lines (the latter added to `touches`, needed for the `--extensions` criterion; it is a shared list file, one line per entry), the ADR for the scheme names, specification version and omissions, the `CURL_EXTENSIONS=0` test and the quality run.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b94d997c 6b67e8fd 8f94f79e bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4255 (wire format) and BL-4256 (amqp/amqps client)
+- 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4259 (wire format) and BL-4260 (amqp/amqps client)

@@ -1,16 +1,16 @@
 ---
-id: BL-4256
+id: BL-4260
 title: Extension Amqp0: publish, basic.get and queue declare client over IConnection for amqp and amqps
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4255]
+depends-on: [BL-4259]
 touches: [Curl.Extension.Amqp0.UnitLibrary/Client, Curl.Extension.Amqp0.UnitTests/Client]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4256 — Extension Amqp0: publish, basic.get and queue declare client over IConnection for amqp and amqps
+# BL-4260 — Extension Amqp0: publish, basic.get and queue declare client over IConnection for amqp and amqps
 
 ## Goal
 
@@ -18,7 +18,7 @@ An `IProtocolHandler` in `Curl.Extension.Amqp0.UnitLibrary` serves `amqp://` (po
 
 ## Context
 
-Split from BL-4117 (extension 16 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: AMQP 0-9-1 (RabbitMQ). Builds on BL-4255's frame and method codec. URL form follows RabbitMQ's URI specification (`amqp://user:pass@host:port/vhost`, the first path segment URL-decoded is the virtual host, an empty one is `/`); choose and record how the queue (and an optional exchange and routing key) is named in the URL, and its exit codes, in an ADR marked "Decided by Claude under Stewart's delegation". Never reference a `Curl.Protocol.*` library other than Abstractions, or another extension. Do not register the handler in any catalogue here: BL-4117 does that.
+Split from BL-4117 (extension 16 of 63) for size by its first pass. Extension rules: ADR-0999 and CLAUDE.md "Extensions". Specification: AMQP 0-9-1 (RabbitMQ). Builds on BL-4259's frame and method codec. URL form follows RabbitMQ's URI specification (`amqp://user:pass@host:port/vhost`, the first path segment URL-decoded is the virtual host, an empty one is `/`); choose and record how the queue (and an optional exchange and routing key) is named in the URL, and its exit codes, in an ADR marked "Decided by Claude under Stewart's delegation". Never reference a `Curl.Protocol.*` library other than Abstractions, or another extension. Do not register the handler in any catalogue here: BL-4117 does that.
 
 ## Acceptance criteria
 
