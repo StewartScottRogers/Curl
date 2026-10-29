@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests/ManagedMultiTransferTests.Limits.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.cs, Curl.Engine.UnitTests/ManagedMultiTransferTests.RealSockets.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4070 — Drive the multi handle's limit, pipe-wait and start tests over transfers holding real sockets for CGR-034
 
@@ -27,13 +27,21 @@ Drive them over a wrapped `ManagedEasyTransfer` (as `ManagedMultiTransferTests.S
 
 ## Acceptance criteria
 
-- [ ] The three tests above count only real sockets and pass on the current code.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] The three tests above count only real sockets and pass on the current code.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+- Done directly, without the full `/feature` stages: the task changes tests only, and the Context already gives the design.
+- `ManagedMultiTransferTests.RealSockets.cs` adds `SocketHoldingTransfer`, which wraps a `ManagedEasyTransfer`, takes a given socket number on its `TransferSocketWait`, sets `SocketTaken` and then waits (`UntilReadable`, `UntilCancelled` or `NotAtAll`). It also adds `HoldingSocket`, which sets the URL, HTTP version and `PipeWait` on the inner handle. It is a separate type from SocketAction.cs's private `WrappingEasyTransfer` because this task may not touch that file.
+- The three tests now also assert which socket they saw: the told list pairs each transfer with its socket (0x1001, 0x1002), and the wait sockets begin with the transfer's real socket. So they fail if a synthetic `FirstTransferSocket` number is counted. The transfers are declared before the multi handle, so the handle is disposed first and cancels the waits that run until cancelled. The told test finishes the first transfer with a socket action on its socket, with `SocketWaitSettleLimit` raised to 30 s as in the SocketAction test (BL-4050). `PipeWaiting` lost its last caller and was removed.
+- The test changes are platform-neutral: they use no paths, OS errors or certificates, and the pipe-wait test waits for `SocketTaken` before it reads the wait sockets.
+- One full fast run failed in Curl.Protocol.Ssh.UnitTests (`ExecuteAsync_TracedQuoteCommandsBeforeAndAfter_WritesTheQuoteStates`, a project this task does not touch), and the next full run passed everywhere. Filed as BL-4071.
+- `dotnet format --verify-no-changes` reports import ordering only in files this task does not touch; the files it changed are clean.
 
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: a082df36 779790c0.
+- 2026-10-29: Doing -> Done. The multi handle's limit, pipe-wait and start tests drive transfers holding real sockets
