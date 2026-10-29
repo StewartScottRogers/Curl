@@ -1,3 +1,4 @@
+using System.Net.Security;
 using Curl.Protocol.Ldap.Fakes;
 using Curl.Testing;
 
@@ -76,7 +77,7 @@ public sealed class LdapSaslSecurityLayerTests
     {
         var tokens = new FakeLogonTokenSource(0);
         var connection = new ScriptedConnection();
-        var layer = new LdapSaslSecurityLayer(connection, tokens.Start(LdapLogonPackage.Ntlm, "ldap/x"));
+        var layer = new LdapSaslSecurityLayer(connection, tokens.Start(LdapLogonPackage.Ntlm, "ldap/x", ProtectionLevel.EncryptAndSign));
 
         Diagnostics.Arrange("package", LdapLogonPackage.Ntlm);
 
@@ -90,5 +91,5 @@ public sealed class LdapSaslSecurityLayerTests
         Assert.IsFalse(connection.IsDisposed);
     }
 
-    private static ILdapLogonAuthentication Authenticated() => new FakeLogonTokenSource(0).Start(LdapLogonPackage.Ntlm, "ldap/x");
+    private static ILdapLogonAuthentication Authenticated() => new FakeLogonTokenSource(0).Start(LdapLogonPackage.Ntlm, "ldap/x", ProtectionLevel.EncryptAndSign);
 }

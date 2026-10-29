@@ -304,7 +304,7 @@ public sealed class LdapProtocolHandler(IConnector connector, LdapDialect dialec
         }
 
         return bindsAsLogonUser
-            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.CancellationToken).ConfigureAwait(false)
+            ? await WinLdapLogonBind.BindAsync(exchange, logonTokenSource, context.Url.IdnHost, context.Url.Scheme == TlsScheme, context.CancellationToken).ConfigureAwait(false)
             : await BindWithCredentialsAsync(exchange, context).ConfigureAwait(false);
     }
 

@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Text;
 using Curl.Protocol.Abstractions;
 
@@ -23,7 +24,8 @@ namespace Curl.Protocol.Ldap;
 /// UnbindRequest and fails with exit 38 and WinLDAP's text for the second attempt's result
 /// code. A server that closes, or answers a bind with something that is not a BindResponse,
 /// fails at once without an UnbindRequest: <c>Timeout</c>, except while the second attempt
-/// reads the rootDSE, which is <c>Server Down</c>. A package that cannot produce a token,
+/// reads the rootDSE, which is <c>Server Down</c>, and a close during an <c>ldaps</c> bind, which
+/// is <c>Unavailable</c> (measured by BL-4044). A package that cannot produce a token,
 /// or a <c>success</c> before the authentication is complete, fails the attempt with
 /// <c>Local Error</c>.
 /// </para>
@@ -56,14 +58,18 @@ internal static class WinLdapLogonBind
     /// <param name="exchange">The session to bind on.</param>
     /// <param name="tokenSource">Starts the logged-on user's authentication.</param>
     /// <param name="host">The URL's host, for the service principal name <c>ldap/</c><paramref name="host" />.</param>
+    /// <param name="overTls">Whether the session is <c>ldaps</c>: the authentication then asks for no signing or sealing and
+    /// the session gets no security layer, as WinLDAP does (NTLM flags <c>07 b2 08 a2</c>, measured by BL-4044).</param>
     /// <param name="cancellationToken">Cancels the bind.</param>
     /// <returns><see langword="null" /> once bound; otherwise the failed transfer's result.</returns>
     public static async ValueTask<TransferResult?> BindAsync(
         LdapExchange exchange,
         ILdapLogonTokenSource tokenSource,
         string host,
+        bool overTls,
         CancellationToken cancellationToken)
     {
+        ProtectionLevel protection = overTls ? ProtectionLevel.None : ProtectionLevel.EncryptAndSign;
         bool offersSpnego = false;
         int resultCode = 0;
         for (int attempt = 1; attempt <= Attempts; attempt++)
@@ -74,10 +80,10 @@ internal static class WinLdapLogonBind
             }
 
             offersSpnego = offers;
-            LdapBindReply reply = await BindOnceAsync(exchange, tokenSource, offers, "ldap/" + host, cancellationToken).ConfigureAwait(false);
+            LdapBindReply reply = await BindOnceAsync(exchange, tokenSource, offers, "ldap/" + host, protection, cancellationToken).ConfigureAwait(false);
             if (reply.Status != LdapBindReplyStatus.Answered)
             {
-                return LdapBind.WinLdapBindFailed(WinLdapResultText.Timeout);
+                return LdapBind.WinLdapBindFailed(LostBindResultCode(reply.Status, overTls));
             }
 
             if (reply.IsSuccess)
@@ -90,6 +96,13 @@ internal static class WinLdapLogonBind
 
         return await LdapBind.UnbindAndFailAsync(exchange, LdapBind.WinLdapBindFailed(resultCode), cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// WinLDAP's result code for a bind the server did not answer: <c>Unavailable</c> when an
+    /// <c>ldaps</c> server closed, <c>Timeout</c> otherwise.
+    /// </summary>
+    private static int LostBindResultCode(LdapBindReplyStatus status, bool overTls) =>
+        overTls && status == LdapBindReplyStatus.Closed ? WinLdapResultText.Unavailable : WinLdapResultText.Timeout;
 
     /// <summary>
     /// Reads the rootDSE as one attempt does and says whether to bind with <c>GSS-SPNEGO</c>;
@@ -149,17 +162,18 @@ internal static class WinLdapLogonBind
 
     /// <summary>
     /// Makes one attempt's bind with a fresh authentication, SASL or Sicily. A bind that
-    /// succeeds starts the session's security layer with the authentication's keys; any other
-    /// disposes it.
+    /// succeeds with <paramref name="protection" /> asked for starts the session's security layer
+    /// with the authentication's keys; any other disposes it.
     /// </summary>
     private static async ValueTask<LdapBindReply> BindOnceAsync(
         LdapExchange exchange,
         ILdapLogonTokenSource tokenSource,
         bool offersSpnego,
         string targetName,
+        ProtectionLevel protection,
         CancellationToken cancellationToken)
     {
-        ILdapLogonAuthentication authentication = tokenSource.Start(offersSpnego ? LdapLogonPackage.Negotiate : LdapLogonPackage.Ntlm, targetName);
+        ILdapLogonAuthentication authentication = tokenSource.Start(offersSpnego ? LdapLogonPackage.Negotiate : LdapLogonPackage.Ntlm, targetName, protection);
         LdapBindReply reply = LocalError;
         try
         {
@@ -169,7 +183,7 @@ internal static class WinLdapLogonBind
         }
         finally
         {
-            if (reply.IsSuccess)
+            if (reply.IsSuccess && protection != ProtectionLevel.None)
             {
                 exchange.StartSecurityLayer(authentication);
             }
