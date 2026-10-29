@@ -32,3 +32,4 @@ Found by BL-4113 (WebTransport extension, draft-ietf-webtrans-http3 sections 4.2
 ## Log
 
 - 2026-10-29: Created by BL-4113's lane 7 run as its prerequisite.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: cc7d0326 f50c33e2 478f867b 3d836d5e.
