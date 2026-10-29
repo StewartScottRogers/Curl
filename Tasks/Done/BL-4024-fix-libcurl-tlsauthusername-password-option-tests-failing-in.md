@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl.UnitTests/Options/Authentication/EasyAuthenticationOptionSettersTests.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4024 — Fix Libcurl TlsauthUsername/Password option tests failing intermittently with NotBuiltIn under Measure-CodeQuality
 
@@ -32,3 +32,6 @@ Already fixed by BL-4020 (3f3c6209a, DoNotParallelize on the classes that flip S
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: fbecace0.
+- 2026-10-28: Doing -> Backlog. criteria were an empty template; filling them in
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 483f1706.
+- 2026-10-28: Doing -> Done. already fixed by BL-4020's DoNotParallelize; Libcurl fast tests green
