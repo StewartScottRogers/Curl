@@ -36,3 +36,4 @@ Builds on BL-4245's `Wire` codec. The handler gets `ProtocolHandlerServices.Data
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 8489097a 22060ce0 75389724 70db4a03 478f867b 3d836d5e.
