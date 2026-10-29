@@ -8,7 +8,7 @@ depends-on: []
 touches: [Documentation]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4224 — Fix AF-0462: Requirements.md coverage note lists SMB among protocols the code implements and registers, but smb/smbs are registered only as a refusing DisabledProtocolHandler
 
@@ -41,12 +41,15 @@ The finding closes only when a later re-audit by the truthfulness auditor confir
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Requirements.md coverage note now lists only SFTP and SCP as registered, and says SMB is registered only as disabled (exit 1, `Protocol "<scheme>" is disabled`), citing ADR-0835. The reproduction no longer matches the Requirements line. Build clean, fast tests green (no Failed! project). Delegation to align-and-document skipped: a one-sentence edit costs less done directly.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. Requirements.md coverage note says SMB is registered only as disabled, matching ADR-0835 and the engine
