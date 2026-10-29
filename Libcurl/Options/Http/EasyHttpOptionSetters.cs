@@ -82,7 +82,7 @@ internal static class EasyHttpOptionSetters
 
     private static CurlCode SetCopyPostFields(ref EasyOptions o, object? v) => SetPostBody(ref o, v, copy: true);
 
-    private static CurlCode SetPostFieldSize(ref EasyOptions o, object? v) => SetAtLeastMinusOne(ref o, v, (h, n) => h with { PostFieldSize = n, PostFields = h.PostFieldsAreCopy ? null : h.PostFields, PostFieldsAreCopy = false });
+    private static CurlCode SetPostFieldSize(ref EasyOptions o, object? v) => SetAtLeastMinusOne(ref o, v, (h, n) => n > h.PostFieldSize && h.PostFieldsAreCopy ? h with { PostFieldSize = n, PostFields = null, PostFieldsAreCopy = false } : h with { PostFieldSize = n });
 
     private static CurlCode SetMimeOptions(ref EasyOptions o, object? v) => Set(ref o, h => h with { MimeOptions = (MimeOptions)(NumberOf(v) & (long)MimeOptions.FormEscape) });
 

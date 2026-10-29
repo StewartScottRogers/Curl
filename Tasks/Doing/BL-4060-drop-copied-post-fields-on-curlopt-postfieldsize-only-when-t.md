@@ -26,11 +26,13 @@ Found by the shift-end review of 2026-10-28 (code-reviewer, ADR-0710), in the di
 
 ## Acceptance criteria
 
-- [ ] `SetPostFieldSize` drops copied fields, and clears `PostFieldsAreCopy`, only when the new size is larger than `PostFieldSize`. It keeps them, still marked as a copy, otherwise.
-- [ ] Tests in `Libcurl.UnitTests` cover a smaller size, the same size and a larger size after `COPYPOSTFIELDS`. They check that the fields are kept, kept and dropped.
-- [ ] `dotnet build` is clean, the fast tests pass, and `Libcurl` still meets the four quality gates.
+- [x] `SetPostFieldSize` drops copied fields, and clears `PostFieldsAreCopy`, only when the new size is larger than `PostFieldSize`. It keeps them, still marked as a copy, otherwise.
+- [x] Tests in `Libcurl.UnitTests` cover a smaller size, the same size and a larger size after `COPYPOSTFIELDS`. They check that the fields are kept, kept and dropped.
+- [x] `dotnet build` is clean, the fast tests pass, and `Libcurl` still meets the four quality gates.
 
 ## Notes
+
+Quality run for Libcurl: no Libcurl member fails; the one failing member in the report is in Curl.Engine.UnitLibrary, not touched here. CI criterion met by platform-neutral tests.
 
 ## Log
 

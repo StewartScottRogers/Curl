@@ -25,6 +25,23 @@ public sealed class Cgr251Tests
     }
 
     [TestMethod]
+    [DataRow(5L, true)]
+    [DataRow(10L, true)]
+    [DataRow(11L, false)]
+    public void SetOption_PostFieldSizeAfterSizedCopyPostFields_DropsTheCopyOnlyWhenTheSizeGrows(long size, bool kept)
+    {
+        var options = new EasyOptions();
+        EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Postfieldsize, 10L);
+        EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Copypostfields, "abcdefghij");
+
+        EasyOptionDispatch.Default.SetOption(ref options, CurlOption.Postfieldsize, size);
+
+        Assert.AreEqual(kept, options.Http.PostFields is not null);
+        Assert.AreEqual(kept, options.Http.PostFieldsAreCopy);
+        Assert.AreEqual(size, options.Http.PostFieldSize);
+    }
+
+    [TestMethod]
     public void SetOption_PostFieldSizeAfterPostFields_KeepsTheBuffer()
     {
         var options = new EasyOptions();
