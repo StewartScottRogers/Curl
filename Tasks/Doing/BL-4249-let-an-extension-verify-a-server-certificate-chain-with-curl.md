@@ -33,3 +33,4 @@ Found by BL-4116 (CoAP over DTLS): an extension that runs its own handshake over
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 320878b9 66862af5 16000991 478f867b 3d836d5e.
