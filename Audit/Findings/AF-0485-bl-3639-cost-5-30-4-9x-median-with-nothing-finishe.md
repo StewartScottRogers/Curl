@@ -3,8 +3,8 @@ id: AF-0485
 title: BL-3639 cost $5.30 (4.9x median) with nothing finished: a requeue on held files, then 81 turns in 14 min at the cap
 auditor: process
 severity: Low
-status: proposed
-reason:
+status: accepted
+reason: 
 key: process:logs:BL-3639:cost-outlier
 reproduction: none
 task: none
@@ -45,3 +45,4 @@ powershell -NoProfile -File Audit/Tools/Measure-FactoryProcess.ps1 -Since 2026-1
 ## Log
 
 - 2026-10-29: filed proposed.
+- 2026-10-29: proposed -> accepted.
