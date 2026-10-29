@@ -36,3 +36,4 @@ Builds on BL-4251's DTLS client and BL-4248's complete `coap://` client: run the
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 2db89dcf dd0657e0 13785854 da731085 478f867b 3d836d5e.
