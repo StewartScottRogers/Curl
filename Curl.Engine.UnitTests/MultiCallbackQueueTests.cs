@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace Curl.Engine;
 
 [TestClass]
@@ -83,27 +85,46 @@ public sealed class MultiCallbackQueueTests
         MultiCallbackQueue queue = new();
         using CancellationTokenSource cancellation = new();
         using ManualResetEventSlim started = new();
-        using ManualResetEventSlim release = new();
+        using ManualResetEventSlim callerCancelled = new();
         int runs = 0;
-        Task<int> caller = Task.Run(() => queue.Run(
-            () =>
+
+        // The callback must not finish before the caller's wait has thrown, or the caller wakes to a run
+        // already done and never reaches the cancelled-after-taken path; the throw is the event it waits for.
+        void SignalCallerCancelled(object? sender, FirstChanceExceptionEventArgs e)
+        {
+            if (e.Exception is OperationCanceledException thrown && thrown.CancellationToken == cancellation.Token)
             {
-                started.Set();
-                release.Wait(Limit);
-                return Interlocked.Increment(ref runs);
-            },
-            cancellation.Token));
-        await WaitUntilQueuedAsync(queue);
-        Task perform = Task.Run(queue.RunQueued);
-        Assert.IsTrue(started.Wait(Limit));
+                callerCancelled.Set();
+            }
+        }
 
-        await cancellation.CancelAsync();
-        release.Set();
-        int result = await caller.WaitAsync(Limit);
-        await perform.WaitAsync(Limit);
+        AppDomain.CurrentDomain.FirstChanceException += SignalCallerCancelled;
+        try
+        {
+            Task<int> caller = Task.Run(() => queue.Run(
+                () =>
+                {
+                    started.Set();
+                    callerCancelled.Wait(Limit);
+                    return Interlocked.Increment(ref runs);
+                },
+                cancellation.Token));
+            await WaitUntilQueuedAsync(queue);
+            Task perform = Task.Run(queue.RunQueued);
+            Assert.IsTrue(started.Wait(Limit));
 
-        Assert.AreEqual(1, result);
-        Assert.AreEqual(1, runs);
+            await cancellation.CancelAsync();
+            int result = await caller.WaitAsync(Limit);
+            await perform.WaitAsync(Limit);
+
+            Assert.IsTrue(callerCancelled.IsSet);
+            Assert.AreEqual(1, result);
+            Assert.AreEqual(1, runs);
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= SignalCallerCancelled;
+        }
     }
 
     [TestMethod]
