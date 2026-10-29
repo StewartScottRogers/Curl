@@ -37,3 +37,4 @@ Split from BL-4117 (`amqp://`, `amqps://`, extension 16 of 63) for size by its f
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 71074988 6ea580bf f0cd5c18 b210128f 54704e52 f4f7f560 3d836d5e.
