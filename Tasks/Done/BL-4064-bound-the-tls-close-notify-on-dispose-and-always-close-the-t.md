@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary/SslStreamConnection.cs, Curl.Networking.UnitLibrary/HandBuiltTlsConnection.cs, Curl.Networking.UnitTests]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4064 — Bound the TLS close_notify on dispose and always close the transport
 
@@ -42,3 +42,4 @@ Found by the shift-end review of 2026-10-28 (silent-failure-hunter, ADR-0710), i
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 9fba8f25 3a28e2c3 2d682041 3d836d5e.
+- 2026-10-29: Doing -> Done. close_notify bounded, transport always closed, tests added
