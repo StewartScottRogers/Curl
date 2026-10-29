@@ -31,7 +31,7 @@ Found by BL-4113 (WebTransport extension), which needs HTTP/3 datagrams (RFC 929
 
 ## Notes
 
-- Decisions in ADR-1041: opt-in is `QuicClientSettings.TransportParameters` with a non-zero `MaxDatagramFrameSize` (default 0, never written), not a second setting that would duplicate it; one datagram per packet, held by the congestion window; at most 1100 payload bytes per datagram; receive and send checks as RFC 9221 section 3 gives.
+- Decisions in ADR-1043: opt-in is `QuicClientSettings.TransportParameters` with a non-zero `MaxDatagramFrameSize` (default 0, never written), not a second setting that would duplicate it; one datagram per packet, held by the congestion window; at most 1100 payload bytes per datagram; receive and send checks as RFC 9221 section 3 gives.
 - `QuicConnection` implements the new `IDatagramCarryingConnection` (Curl.Protocol.Abstractions.UnitLibrary/IDatagramCarryingConnection.cs).
 - Connector wrappers: `PoolingConnector.ConnectMultiplexedAsync` passes the inner connection through and `CertificateCheckingConnector` does not wrap it; Engine's `SocketCallbackMultiplexedConnection` hides the interface, filed as BL-4254.
 - `QuicAdversarialTests.Decode_UnknownFrameType_IsAFrameEncodingError` had a row for 0x30 as unknown; 0x30 is now a known frame (refused by the connection when not negotiated, covered by `QuicClientDatagramTests`), so that row is now 0x32.

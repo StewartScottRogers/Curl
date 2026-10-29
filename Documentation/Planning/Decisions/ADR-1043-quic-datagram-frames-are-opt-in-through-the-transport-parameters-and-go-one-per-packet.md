@@ -1,4 +1,4 @@
-# ADR-1041: QUIC DATAGRAM frames are opt-in through the transport parameters and go one per packet
+# ADR-1043: QUIC DATAGRAM frames are opt-in through the transport parameters and go one per packet
 
 - Status: Accepted
 - Date: 2026-10-29
