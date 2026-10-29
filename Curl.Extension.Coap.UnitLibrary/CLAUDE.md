@@ -73,7 +73,6 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
 `TimeProvider`, stops when the peer's next flight starts, and throws `TimeoutException` after 12 resends
 (the handshake's caller turns it into exit 35).
 
-
 Held to the four quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Coap.UnitTests/Blockwise`,
 `Curl.Extension.Coap.UnitTests/Wire`, `Curl.Extension.Coap.UnitTests/Client`, `Curl.Extension.Coap.UnitTests/Dtls/Wire`,
 `Curl.Extension.Coap.UnitTests/Dtls/Record` and `Curl.Extension.Coap.UnitTests/Dtls/Retransmission`.
