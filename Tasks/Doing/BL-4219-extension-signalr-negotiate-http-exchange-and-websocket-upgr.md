@@ -33,3 +33,4 @@ Split from BL-4108 for size. Builds on BL-4218's codec. Specification: dotnet/as
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c6a7a5c5 76c86a79 4642107f f10f2877 3d836d5e.
