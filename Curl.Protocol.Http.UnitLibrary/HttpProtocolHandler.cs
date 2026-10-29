@@ -1087,6 +1087,7 @@ public sealed class HttpProtocolHandler(
         Http2Session? unheldSession = UnheldHttp2Session(streams, connection);
         (HttpAttemptOutcome outcome, Http2Session? upgradedSession) = await ExchangeWithRetriesAsync(plan, connect, connection, earlier, streams).ConfigureAwait(false);
         unheldSession ??= UnheldHttp2Session(upgradedSession, connection);
+        SkipClosingGoAwayWhenGivenUp(outcome, streams ?? upgradedSession);
         SettleConnection(plan, connection, streams ?? upgradedSession, outcome);
         await ShutDownAsync(unheldSession).ConfigureAwait(false);
         return outcome;
@@ -1114,6 +1115,15 @@ public sealed class HttpProtocolHandler(
     /// </summary>
     private static Http2Session? UnheldHttp2Session(IHttpStreamSession? streams, IConnection connection) =>
         streams is Http2Session http2 && !connection.TryHoldSession(http2) ? http2 : null;
+
+    /// <summary>Has an HTTP/2 session on a connection given up after five refused streams close without its GOAWAY (BL-3838).</summary>
+    private static void SkipClosingGoAwayWhenGivenUp(HttpAttemptOutcome outcome, IHttpStreamSession? session)
+    {
+        if (outcome.GaveUpOnRefusedStream && session is Http2Session http2)
+        {
+            http2.SkipClosingGoAway();
+        }
+    }
 
     /// <summary>Sends the closing GOAWAY of a session no connection holds, if there is one.</summary>
     private static ValueTask ShutDownAsync(Http2Session? unheldSession) =>
@@ -2239,7 +2249,7 @@ public sealed class HttpProtocolHandler(
         plan.Context.Events.ReportInfo(HttpConnectionInfoLines.RefusedStreamRetrying);
         return plan.StreamRefusedRetries < MaximumStreamRefusedRetries
             ? new HttpAttemptOutcome(refused, plan.AfterStreamRefused(RewindUploadFailure(plan.Framing.Body, upload)), KeepsAlive: false) { DiedBeforeResponse = true, RetryCount = plan.StreamRefusedRetries + 1 }
-            : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false);
+            : new HttpAttemptOutcome(refused with { ErrorMessage = HttpTransferMessages.ConnectionDiedGivingUp(MaximumStreamRefusedRetries) }, null, KeepsAlive: false) { GaveUpOnRefusedStream = true };
     }
 
     /// <summary>
@@ -4054,6 +4064,11 @@ public sealed class HttpProtocolHandler(
         /// before its response began, so <see cref="Retry" /> resends the request on a fresh one.
         /// </summary>
         public bool DiedBeforeResponse { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether the exchange is the sixth refused one, given up on, whose HTTP/2 connection curl closes without a GOAWAY.
+        /// </summary>
+        public bool GaveUpOnRefusedStream { get; init; }
 
         /// <summary>
         /// Gets the transfer's retries on a fresh connection so far, this one included, as

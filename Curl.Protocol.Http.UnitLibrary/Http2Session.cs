@@ -68,6 +68,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
     private uint peerHeaderTableSize = HpackEncoder.DefaultMaximumTableSize;
 
     private bool isPrefaceSent;
+    private bool isClosingGoAwaySkipped;
 
     private bool isUpgradeSettingsDue;
     private bool isUpgradedStreamOpened;
@@ -151,9 +152,14 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         new Http2StreamConnection(this, scheme, bodyLength, openedLines, HttpFrameLog.For(diagnosticLog, VersionName), traceEvents is null ? null : new Http2FrameTrace(traceEvents));
 
     /// <summary>
+    /// Makes <see cref="ShutDownAsync" /> send nothing, as curl closes a connection it gave up on after five refused streams without a GOAWAY (BL-3838).
+    /// </summary>
+    public void SkipClosingGoAway() => isClosingGoAwaySkipped = true;
+
+    /// <summary>
     /// Sends GOAWAY with NO_ERROR, last stream 0 and debug data <c>shutdown</c> and a NUL, as
     /// curl 8.18.0 does when it closes an HTTP/2 connection (measured, BL-817 Notes); nothing
-    /// when no preface went out, when a GOAWAY already has, or when the peer closed the
+    /// when no preface went out, when a GOAWAY already has, after <see cref="SkipClosingGoAway" />, or when the peer closed the
     /// connection. A connection that fails the write is closing anyway, so that is not an error.
     /// </summary>
     /// <param name="cancellationToken">Cancels the write.</param>
@@ -163,7 +169,7 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         await frameLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (!isPrefaceSent || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
+            if (!isPrefaceSent || isClosingGoAwaySkipped || Frames.IsGoAwaySent || Frames.IsClosedByPeer)
             {
                 return;
             }

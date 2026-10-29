@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Protocol.Http.UnitLibrary/HttpProtocolHandler.cs, Curl.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Protocol.Http.UnitTests/Cgr031GiveUpTests.cs]
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3838 — Close an HTTP/2 connection given up after five REFUSED_STREAM retries without the closing GOAWAY
 
@@ -22,13 +22,16 @@ Found by BL-3560 (CGR-031, ADR-0900). A scenario server that answers every HEADE
 
 ## Acceptance criteria
 
-- [ ] A unit test pins that the handler, given six connections that each refuse stream 1 with REFUSED_STREAM, writes the closing GOAWAY on the first five and not on the sixth.
-- [ ] Exit 56 with `Connection died, tried 5 times before giving up` and the five GOAWAYs on the retried connections are unchanged.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] A unit test pins that the handler, given six connections that each refuse stream 1 with REFUSED_STREAM, writes the closing GOAWAY on the first five and not on the sixth.
+- [x] Exit 56 with `Connection died, tried 5 times before giving up` and the five GOAWAYs on the retried connections are unchanged.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
+
+Decision: Http2Session.SkipClosingGoAway makes ShutDownAsync a no-op (held or unheld session); set from the give-up outcome (GaveUpOnRefusedStream). Pinned by Cgr031GiveUpTests; the existing Cgr031Tests pin exit 56. Quality run: 0 failing.
 
 ## Log
 
 - 2026-10-26: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 664244f6 a4d0ee71 779790c0.
+- 2026-10-28: Doing -> Done. HTTP/2 connection given up after five REFUSED_STREAM retries closes without GOAWAY
