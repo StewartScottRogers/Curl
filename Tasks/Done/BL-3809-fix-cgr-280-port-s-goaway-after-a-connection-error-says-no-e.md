@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Http.UnitLibrary/Http2Session.cs, Curl.Protocol.Http.Uni
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3809 — Fix CGR-280: PORT's GOAWAY after a connection error says NO_ERROR shutdown or has no debug data, and RST_STREAM is emitted differently
 
@@ -91,3 +91,4 @@ z_post301
 - Measurement limits: Windows curl 8.22 has no HTTP/2 and WSL's curl 8.18 could not reach a Windows loopback server, so the wire bytes were not re-measured; code 9 comes from the report, and the debug data is empty as nghttp2 passes no reason for a failed inflate (from nghttp2's source, unverified). The other named variants (r_clshort, r_cllong, r_data0, r_bigframe, r_push, u_head, u_auth, m_locabs, z_post301) are not reproduced here; the report gives no per-case expectation beyond the GOAWAY code, so only the r_hpackbad GOAWAY is fixed.
 - Linux/macOS CI: the test is platform-neutral (in-memory connection).
 - Quality: Measure-CodeQuality.ps1 for Curl.Protocol.Http.UnitLibrary 100%/100%, no failing member. Build clean, fast tests green.
+- 2026-10-28: Doing -> Done. HTTP/2 header-block decode failure now sends GOAWAY COMPRESSION_ERROR before exit 16; Cgr280Tests
