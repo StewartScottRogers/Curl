@@ -1,4 +1,4 @@
-# ADR-1025: The DNS-over-QUIC resolver uses one stream per query on the hand-built QUIC client
+# ADR-1029: The DNS-over-QUIC resolver uses one stream per query on the hand-built QUIC client
 
 - Status: Accepted
 - Date: 2026-10-29

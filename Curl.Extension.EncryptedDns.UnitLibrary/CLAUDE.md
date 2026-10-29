@@ -18,7 +18,7 @@ options, the resolver hook and the `ExtensionCatalogue` line.
   the two-octet length prefix, and reads two answers matched by ID, returning AAAA addresses then A. A name that
   cannot be encoded, a failed connect or handshake, or a server that closes inside a message gives no addresses,
   which a connector reports as exit 6.
-- `DnsOverQuic/` (ADR-1025): `DnsOverQuicResolver` takes an `IDatagramConnector`, an `IServerCertificateVerifier`,
+- `DnsOverQuic/` (ADR-1029): `DnsOverQuicResolver` takes an `IDatagramConnector`, an `IServerCertificateVerifier`,
   a `DnsOverQuicServer` (port 853 by default, an optional TLS server name) and a `TimeProvider`, and runs
   `Curl.Quic.UnitLibrary`'s client offering only the ALPN token `doq` (RFC 9250 section 4.1.1). It sends the AAAA
   and the A query each on its own client bidirectional stream with Message ID 0, the two-octet length prefix and

@@ -34,7 +34,7 @@ Split from BL-4148; builds on BL-4207's codec. Use the hand-built QUIC client in
   in-memory `QuicTestServer` (as `Curl.Networking.UnitTests` does), which needs Curl.Quic's internals, so that
   csproj grants `InternalsVisibleTo` to `Curl.Extension.EncryptedDns.UnitTests`. No task in Doing on
   origin/work/dark-factory named it.
-- Decisions (ADR-1025): OpenSSL's QUIC hello profile with ALPN `["doq"]` only on every platform (no curl behaviour
+- Decisions (ADR-1029): OpenSSL's QUIC hello profile with ALPN `["doq"]` only on every platform (no curl behaviour
   to match, and one profile keeps tests platform-neutral); AAAA then A, each on its own stream, answers read in
   query order; a bad answer closes with DOQ_PROTOCOL_ERROR and gives no addresses.
 - Verified: 12 DoQ tests drive the real QUIC client over a fake `IDatagramChannel` (no network); the build (which
