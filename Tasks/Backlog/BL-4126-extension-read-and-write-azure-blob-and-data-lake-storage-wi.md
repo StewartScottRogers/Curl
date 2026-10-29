@@ -4,8 +4,8 @@ title: Extension: Read and write Azure Blob and Data Lake storage with az://
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092]
-touches: [Curl.Extension.AzureStorage.UnitLibrary, Curl.Extension.AzureStorage.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4284, BL-4285, BL-4286]
+touches: [Curl.Extension.AzureStorage.UnitLibrary, Curl.Extension.AzureStorage.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 5): Split for size before any code, following the S3 split (BL-4197, BL-4198, BL-4199). Filed BL-4284 (project scaffold and HTTP/1.1 exchange over IConnection, written here because an extension may not reference Curl.Protocol.Http or another extension), BL-4285 (List Blobs, Block List, Error XML and ADLS Gen2 Path List JSON bodies) and BL-4286 (az:// and abfs:// URL mapping, SAS and Entra ID bearer authorization, x-ms-version). This task keeps the handler (GET, -T PUT with Put Block above a block size, listing for an empty path or trailing slash), registration, description, ADR and the CURL_EXTENSIONS=0 test. Added ExtensionDescriptionCatalogue.cs to touches for the `--extensions` description (a union-merged shared list file in Tasks/SharedListFiles.txt).
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: ca1336b9 cd2f5c62 96b0df1b bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4284 (project and HTTP/1.1 exchange), BL-4285 (XML and JSON bodies) and BL-4286 (URL mapping and authorization)
