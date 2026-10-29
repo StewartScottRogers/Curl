@@ -1,4 +1,4 @@
-# ADR-0969: The hand-built TLS client's handshake message observer sits on the connections
+# ADR-0971: The hand-built TLS client's handshake message observer sits on the connections
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-4014).
 
