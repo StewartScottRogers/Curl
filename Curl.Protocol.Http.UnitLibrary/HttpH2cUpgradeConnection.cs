@@ -30,6 +30,9 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
 
     private bool isWatching = true;
 
+    /// <summary>The read that watches for the <c>101</c>, started once the request head is written (BL-3910).</summary>
+    private Task? watch;
+
     private int handedOut;
 
     private int switchingHeadLength;
@@ -77,7 +80,7 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
 
         if (isWatching)
         {
-            await WatchAsync(cancellationToken).ConfigureAwait(false);
+            await StartWatching(cancellationToken).ConfigureAwait(false);
         }
 
         if (handedOut < HandOutLength)
@@ -94,16 +97,26 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
         return await transport.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Writes to the transport, and starts watching for the <c>101</c> once the first write, the
+    /// request head, is out. Later writes go in pieces of curl's upload buffer, and the pieces
+    /// left once the whole <c>101</c> head has arrived are dropped: curl
+    /// 8.18.0 stops sending the HTTP/1.1 body when the upgrade is answered before the body has
+    /// gone, and goes on in HTTP/2 (measured, BL-3910 Notes).
+    /// </summary>
+    /// <param name="buffer">The bytes to write.</param>
+    /// <param name="cancellationToken">Cancels the write, and the watch the first write starts.</param>
+    /// <returns>The write.</returns>
     public ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
     {
-        if (!isRequestWritten)
+        if (isRequestWritten)
         {
-            isRequestWritten = true;
-            isHeadRequest = buffer.Span.StartsWith("HEAD "u8);
+            return WriteUntilSwitchingAsync(buffer, cancellationToken);
         }
 
-        return transport.WriteAsync(buffer, cancellationToken);
+        isRequestWritten = true;
+        isHeadRequest = buffer.Span.StartsWith("HEAD "u8);
+        return WriteRequestHeadAsync(buffer, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -138,6 +151,33 @@ internal sealed class HttpH2cUpgradeConnection(IConnection transport, ITransferE
         int index = bytes.IndexOf(terminator);
         return index < 0 ? 0 : index + terminator.Length;
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the watch has ended on a whole <c>101</c> head, so the
+    /// connection is switching to HTTP/2.
+    /// </summary>
+    private bool HasSwitchingHeadArrived => watch is { IsCompletedSuccessfully: true } && switchingHeadLength > 0;
+
+    private async ValueTask WriteUntilSwitchingAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+    {
+        for (int sent = 0; sent < buffer.Length && !HasSwitchingHeadArrived; sent += HttpRequestBodyWriter.UploadBufferSize)
+        {
+            int length = Math.Min(HttpRequestBodyWriter.UploadBufferSize, buffer.Length - sent);
+            await transport.WriteAsync(buffer.Slice(sent, length), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask WriteRequestHeadAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+    {
+        await transport.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+        _ = StartWatching(cancellationToken);
+    }
+
+    /// <summary>
+    /// Gives the watch for the <c>101</c>, starting it the first time, so the body can be sent
+    /// while the response is read.
+    /// </summary>
+    private Task StartWatching(CancellationToken cancellationToken) => watch ??= WatchAsync(cancellationToken).AsTask();
 
     /// <summary>
     /// Reads the transport until the bytes cannot begin <c>HTTP/1.1 101</c>, or the whole of
