@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: ff504e0d c18cbc4b 6af91697 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits for BL-4205: no extension hook can supply a transfer's URL, method or body, which a .http file needs
+- 2026-10-29: Backlog -> Doing. Criteria at claim: ff504e0d c18cbc4b 6af91697 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
