@@ -1,4 +1,4 @@
-# ADR-1033 — The WebSocket REPL sends typed lines and shows messages one per line
+# ADR-1037 — The WebSocket REPL sends typed lines and shows messages one per line
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

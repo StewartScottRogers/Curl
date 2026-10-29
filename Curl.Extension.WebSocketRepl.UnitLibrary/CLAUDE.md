@@ -1,6 +1,6 @@
 # Curl.Extension.WebSocketRepl.UnitLibrary
 
-The interactive WebSocket session extension behind `--ws-repl` (ADR-0999, ADR-1033). Namespace
+The interactive WebSocket session extension behind `--ws-repl` (ADR-0999, ADR-1037). Namespace
 `Curl.Extension.WebSocketRepl`. Tested against RFC 6455, not against curl.
 
 - `Handshake/`: the client's opening handshake. `WebSocketHandshakeKey` makes the `Sec-WebSocket-Key` and its

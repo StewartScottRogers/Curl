@@ -31,7 +31,7 @@ Split from BL-4111 (`--ws-repl`, extension 10 of 63) for size by its first pass.
 ## Notes
 
 - Filed by BL-4111's lane 2 prerequisite pass. BL-4111 then adds the transfer hook that takes over a `ws://`/`wss://` transfer when `--ws-repl` is given (through BL-4211's connector seam), the option, description and hook catalogue lines, the ADR, the `CURL_EXTENSIONS=0` test and its quality run.
-- Line commands (ADR-1033): `/binary <text>` sends the text's UTF-8 bytes as binary, `/ping [text]` a ping (cut to
+- Line commands (ADR-1037): `/binary <text>` sends the text's UTF-8 bytes as binary, `/ping [text]` a ping (cut to
   125 bytes), `/close` a close with code 1000 and stops reading lines, `//...` sends the line without its first `/`
   as text; every other line is sent as text. End of input also sends close 1000. Received text is shown as it is,
   binary as lowercase hex, one line per message; control frames are not shown.
