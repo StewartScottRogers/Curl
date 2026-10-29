@@ -1367,7 +1367,7 @@ internal sealed class CurlCommandRunner(
     /// <returns>The run.</returns>
     private ParallelRun NewParallelRun(CommandLineOptions options)
     {
-        ParallelRun run = new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate)
+        ParallelRun run = new(options.ParallelMax, options.ParallelMaxHost, options.ParallelImmediate, timeProvider)
         {
             Transfers = new ParallelTransferMulti(engine.MultiInit()),
             ProgressMeter = writesProgressMeter && !options.Silent && !options.ProgressMeterOff
