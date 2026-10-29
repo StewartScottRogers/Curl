@@ -67,7 +67,9 @@ internal static class Http2RequestHeaders
     internal static byte[] WithRequestLineVersion(byte[] head, string versionName)
     {
         int lineEnd = head.AsSpan().IndexOf(Http11LineEnd);
-        return [.. head.AsSpan(0, lineEnd), .. Encoding.Latin1.GetBytes($" {versionName}\r\n"), .. head.AsSpan(lineEnd + Http11LineEnd.Length)];
+        string[] lines = Encoding.Latin1.GetString(head, lineEnd + Http11LineEnd.Length, head.Length - lineEnd - Http11LineEnd.Length).Split("\r\n");
+        string kept = string.Join("\r\n", lines.Where(line => !line.StartsWith("transfer-encoding:", StringComparison.OrdinalIgnoreCase)));
+        return [.. head.AsSpan(0, lineEnd), .. Encoding.Latin1.GetBytes($" {versionName}\r\n{kept}")];
     }
 
     private static (string Name, string Value) Split(string line)
