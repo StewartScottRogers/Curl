@@ -1,4 +1,4 @@
-# ADR-1068: Asynchronous QUIC tests time out cooperatively
+# ADR-1072: Asynchronous QUIC tests time out cooperatively
 
 - Status: Accepted
 - Date: 2026-10-29
