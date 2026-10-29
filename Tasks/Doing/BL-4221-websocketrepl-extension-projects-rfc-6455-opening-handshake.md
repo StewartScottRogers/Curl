@@ -35,3 +35,4 @@ Split from BL-4111 (`--ws-repl`, extension 10 of 63) for size by its first pass.
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 7ea3c216 6019acf2 ddd0c956 3180db99 3d836d5e.
