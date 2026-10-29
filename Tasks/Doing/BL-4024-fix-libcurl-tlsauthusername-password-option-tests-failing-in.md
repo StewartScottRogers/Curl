@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+The TlsauthUsername and TlsauthPassword option tests stop failing intermittently with NotBuiltIn.
 
 ## Context
 
@@ -22,9 +22,11 @@ completed:
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] The Libcurl.UnitTests fast tests pass (1504 passed): BL-4020 made the SrpIsBuiltIn-flipping classes [DoNotParallelize], which was the cause.
 
 ## Notes
+
+Already fixed by BL-4020 (3f3c6209a, DoNotParallelize on the classes that flip SrpIsBuiltIn), as with BL-4023. Fast tests green here.
 
 ## Log
 
