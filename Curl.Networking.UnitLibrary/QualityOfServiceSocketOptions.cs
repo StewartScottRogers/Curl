@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
+using Curl.Protocol.Abstractions;
 
 namespace Curl.Networking;
 
@@ -103,15 +104,31 @@ internal static class QualityOfServiceSocketOptions
     /// </summary>
     /// <param name="socket">A socket not yet connected.</param>
     /// <param name="option">The option to set.</param>
-    internal static void TrySet(Socket socket, RawSocketOption option)
+    /// <param name="events">
+    /// Where the <c>Warning: VLAN priority</c> line goes when the refused option is <c>SO_PRIORITY</c>, as
+    /// libcurl prints that failure with or without <c>-v</c>.
+    /// </param>
+    internal static void TrySet(Socket socket, RawSocketOption option, ITransferEvents events)
     {
         try
         {
             socket.SetRawSocketOption(option.Level, option.Name, BitConverter.GetBytes(option.Value));
+        }
+        catch (SocketException refused) when (option.Level == LinuxSolSocket && option.Name == LinuxSoPriority)
+        {
+            events.ReportWarning(VlanPriorityFailure(option.Value, refused.NativeErrorCode, refused.Message));
         }
         catch (SocketException)
         {
             // libcurl logs the failed setsockopt and connects anyway.
         }
     }
+
+    /// <summary>Words the warning libcurl prints when <c>SO_PRIORITY</c> is refused.</summary>
+    /// <param name="priority">The priority asked for.</param>
+    /// <param name="errno">The operating system's error number.</param>
+    /// <param name="errorText">The operating system's text for that error.</param>
+    /// <returns>The warning, without the <c>Warning: </c> prefix.</returns>
+    internal static string VlanPriorityFailure(int priority, int errno, string errorText) =>
+        $"VLAN priority {priority} failed with errno {errno}: {errorText}";
 }

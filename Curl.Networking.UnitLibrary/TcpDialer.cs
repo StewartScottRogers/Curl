@@ -52,9 +52,10 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// hands its handle to the hook <see cref="PublishingSocketsTo" /> gave, if any.
     /// </summary>
     /// <param name="socket">A TCP socket not yet connected.</param>
-    internal void PrepareToConnect(Socket socket)
+    /// <param name="events">Where a refused <c>--vlan-priority</c> is warned of; none by default.</param>
+    internal void PrepareToConnect(Socket socket, ITransferEvents? events = null)
     {
-        ApplySocketOptions(socket);
+        ApplySocketOptions(socket, events);
         PublishCreated(socket);
     }
 
@@ -141,7 +142,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
-            PrepareToConnect(socket);
+            PrepareToConnect(socket, events);
             await BindDeviceOrLocalEndAsync(
                 deviceName,
                 bindsAddressAfterDevice,
@@ -209,7 +210,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var socket = new Socket(endPoint.AddressFamily, SocketType.Stream, SocketOptions.SocketProtocol);
         try
         {
-            PrepareToConnect(socket);
+            PrepareToConnect(socket, events);
             if (bindTo is not null)
             {
                 BindLocalEnd(socket, bindTo, localPortCount, events);
@@ -491,8 +492,10 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     /// time past 32767 seconds or more than 127 probes, and Windows more than 255 probes.
     /// </remarks>
     /// <param name="socket">A TCP socket not yet connected.</param>
-    internal void ApplySocketOptions(Socket socket)
+    /// <param name="events">Where a refused <c>--vlan-priority</c> is warned of; none by default.</param>
+    internal void ApplySocketOptions(Socket socket, ITransferEvents? events = null)
     {
+        events ??= NoTransferEvents.Instance;
         socket.NoDelay = SocketOptions.NoDelay;
         if (socket.AddressFamily == AddressFamily.InterNetworkV6)
         {
@@ -502,7 +505,7 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
         var platform = QualityOfServiceSocketOptions.CurrentPlatform;
         foreach (RawSocketOption option in QualityOfServiceSocketOptions.For(SocketOptions, socket.AddressFamily, platform).Concat(FastOpenSocketOption.For(SocketOptions, platform)))
         {
-            QualityOfServiceSocketOptions.TrySet(socket, option);
+            QualityOfServiceSocketOptions.TrySet(socket, option, events);
         }
 
         socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, SocketOptions.KeepAlive);
