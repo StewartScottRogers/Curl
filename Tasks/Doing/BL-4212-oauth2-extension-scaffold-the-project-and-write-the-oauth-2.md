@@ -41,3 +41,4 @@ Write, in `Wire/`:
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 500f0dea 4459e577 3180db99 3d836d5e.
