@@ -31,3 +31,4 @@ Found by BL-3672 (CGR-143). With a scripted h2c server that answers `101`, an em
 ## Log
 
 - 2026-10-26: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: a52ab161 266903ce 779790c0.
