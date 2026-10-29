@@ -16,7 +16,7 @@ namespace Curl.Console;
 /// <param name="Hooks">The engine transfer the handle wraps.</param>
 internal sealed record ToolEasyHandle(CurlEasy Easy, IToolEasyTransfer Hooks) : IAsyncDisposable
 {
-    // The calls whose CURLE_NOT_BUILT_IN curl's config2setopts ignores and carries on past (ADR-0975, ADR-1031).
+    // The calls whose CURLE_NOT_BUILT_IN curl's config2setopts ignores and carries on past (ADR-0975, ADR-1036).
     private static readonly HashSet<CurlOption> IgnoredWhenNotBuiltIn =
     [
         CurlOption.Capath,
@@ -47,7 +47,7 @@ internal sealed record ToolEasyHandle(CurlEasy Easy, IToolEasyTransfer Hooks) : 
     /// (<see cref="CurlComposition.WarningLinesBeforeEachTransfer" />), so it is not written here (ADR-0975). curl
     /// also carries on, silently, past a <c>CURLE_NOT_BUILT_IN</c> answer to <c>CURLOPT_CRLFILE</c>,
     /// <c>CURLOPT_PROXY_CRLFILE</c>, <c>CURLOPT_SSL_EC_CURVES</c>, <c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c> or
-    /// <c>CURLOPT_TCP_FASTOPEN</c>, so this does too (ADR-1031).
+    /// <c>CURLOPT_TCP_FASTOPEN</c>, so this does too (ADR-1036).
     /// </summary>
     /// <param name="setopts">The calls to make.</param>
     /// <param name="setOption">Makes one call and answers its code.</param>

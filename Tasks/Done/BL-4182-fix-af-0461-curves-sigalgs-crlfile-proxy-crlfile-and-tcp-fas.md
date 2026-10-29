@@ -46,7 +46,7 @@ The finding closes only when a later re-audit by the conformance auditor confirm
 
 ## Notes
 
-- Fix: `ToolEasyHandle.IgnoredWhenNotBuiltIn` now also holds `CURLOPT_CRLFILE`, `CURLOPT_PROXY_CRLFILE`, `CURLOPT_SSL_EC_CURVES`, `CURLOPT_SSL_SIGNATURE_ALGORITHMS` and `CURLOPT_TCP_FASTOPEN`, so a `CURLE_NOT_BUILT_IN` answer to them (Libcurl on Windows, ADR-0995) is passed over silently, as curl 8.22.0 Schannel does. Decision recorded in ADR-1031.
+- Fix: `ToolEasyHandle.IgnoredWhenNotBuiltIn` now also holds `CURLOPT_CRLFILE`, `CURLOPT_PROXY_CRLFILE`, `CURLOPT_SSL_EC_CURVES`, `CURLOPT_SSL_SIGNATURE_ALGORITHMS` and `CURLOPT_TCP_FASTOPEN`, so a `CURLE_NOT_BUILT_IN` answer to them (Libcurl on Windows, ADR-0995) is passed over silently, as curl 8.22.0 Schannel does. Decision recorded in ADR-1036.
 - Touches: added `Curl.Console.UnitTests/NotBuiltInTlsSetoptWarningTests.cs`, the existing test class for this list (five new DataRows); no task in Doing on origin/work/dark-factory names it.
 - Measured: the finding's reproduction, extended to `--crlfile global.json` and `--proxy-crlfile global.json`, gives exit 0, no `curl:` or `Warning` line and 472 bytes of stderr (progress meter only) for reference curl 8.22.0 and Curl alike.
 - Build clean; fast tests green (0 failures); Measure-CodeQuality.ps1 -Library Curl.Console: 0 failing members.

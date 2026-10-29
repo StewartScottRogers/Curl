@@ -10,7 +10,7 @@ namespace Curl.Console;
 /// <c>CURLOPT_TLS13_CIPHERS</c>, <c>CURLOPT_PROXY_TLS13_CIPHERS</c>, <c>CURLOPT_CRLFILE</c>,
 /// <c>CURLOPT_PROXY_CRLFILE</c>, <c>CURLOPT_SSL_EC_CURVES</c>, <c>CURLOPT_SSL_SIGNATURE_ALGORITHMS</c> and
 /// <c>CURLOPT_TCP_FASTOPEN</c>, as curl 8.22.0's <c>config2setopts</c> does, and still stops at any other refusal
-/// (BL-4029, ADR-0975, BL-4182, ADR-1031).
+/// (BL-4029, ADR-0975, BL-4182, ADR-1036).
 /// </summary>
 [TestClass]
 public sealed class NotBuiltInTlsSetoptWarningTests

@@ -1,4 +1,4 @@
-# ADR-1031: The curl tool carries on past CURLE_NOT_BUILT_IN for CRL file, curves, signature algorithms and TCP Fast Open
+# ADR-1036: The curl tool carries on past CURLE_NOT_BUILT_IN for CRL file, curves, signature algorithms and TCP Fast Open
 
 - Status: Accepted
 - Date: 2026-10-29
