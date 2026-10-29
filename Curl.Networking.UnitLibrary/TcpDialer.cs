@@ -267,14 +267,24 @@ public sealed class TcpDialer(TcpSocketOptions socketOptions) : ITcpDialer
     }
 
     /// <summary>
-    /// On Windows, stops the SYN retransmissions of a connect to a loopback address (SIO_TCP_INITIAL_RTO with
+    /// Gets whether Windows answers a refused connect to <paramref name="address" /> at once: only <c>127.0.0.1</c>
+    /// and <c>::1</c> do. Any other address in <c>127.0.0.0/8</c> retransmits its SYN for about two seconds, as
+    /// curl 8.22.0 sees it, so a short <c>--connect-timeout</c> is exit 28 there (CGR-189, BL-3718).
+    /// </summary>
+    /// <param name="address">The address connected to.</param>
+    /// <returns><see langword="true" /> for <c>127.0.0.1</c> and <c>::1</c>.</returns>
+    internal static bool RefusesAtOnceOnWindows(IPAddress address) =>
+        address.Equals(IPAddress.Loopback) || address.Equals(IPAddress.IPv6Loopback);
+
+    /// <summary>
+    /// On Windows, stops the SYN retransmissions of a connect to <c>127.0.0.1</c> or <c>::1</c> (SIO_TCP_INITIAL_RTO with
     /// no retransmissions), so a refused port fails at once with exit 7 as in curl 8.22.0 rather than after
     /// about two seconds, which a short <c>--connect-timeout</c> reports as exit 28 (BL-3182).
     /// </summary>
     [ExcludeFromCodeCoverage(Justification = "ADR-0083: a thin socket adapter, measured by the Integration run.")]
     private static void FailRefusedLoopbackAtOnce(Socket socket, IPEndPoint endPoint)
     {
-        if (!OperatingSystem.IsWindows() || !IPAddress.IsLoopback(endPoint.Address))
+        if (!OperatingSystem.IsWindows() || !RefusesAtOnceOnWindows(endPoint.Address))
         {
             return;
         }
