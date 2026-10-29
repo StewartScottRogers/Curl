@@ -1,5 +1,5 @@
 ---
-id: BL-4205
+id: BL-4207
 title: Add Curl.Extension.EncryptedDns with a DNS message codec and a DNS-over-TLS resolver
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4205 — Add Curl.Extension.EncryptedDns with a DNS message codec and a DNS-over-TLS resolver
+# BL-4207 — Add Curl.Extension.EncryptedDns with a DNS message codec and a DNS-over-TLS resolver
 
 ## Goal
 
