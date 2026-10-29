@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: de6a06ef 7a283adc 6cc92b01 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size and a missing hook: waits on BL-4211 (transfer hook connector, listener and async headers), BL-4212 (project and wire format), BL-4213 (HTTP client), BL-4209 (token cache and refresh) and BL-4210 (flows)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: de6a06ef 7a283adc 6cc92b01 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
