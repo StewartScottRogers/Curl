@@ -36,3 +36,4 @@ fake `TimeProvider`.
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d6801968 3d836d5e.
