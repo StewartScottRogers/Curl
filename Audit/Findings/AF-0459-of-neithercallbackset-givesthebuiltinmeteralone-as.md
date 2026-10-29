@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitTests/CallbackTransferProgressTests.cs:Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone:weak-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4240
+tasks: BL-4240
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md

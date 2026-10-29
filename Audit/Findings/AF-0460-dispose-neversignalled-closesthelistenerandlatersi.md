@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: quality:Curl.Engine.UnitTests/SocketActionGatedResolverTests.cs:Dispose_NeverSignalled_ClosesTheListenerAndLaterSignalsDoNothing:no-assertion
 reproduction: none
-task: none
-tasks:
+task: BL-4241
+tasks: BL-4241
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md

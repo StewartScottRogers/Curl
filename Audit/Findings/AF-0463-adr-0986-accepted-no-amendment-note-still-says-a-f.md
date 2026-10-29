@@ -7,8 +7,8 @@ status: accepted
 reason: 
 key: truthfulness:Documentation/Planning/Decisions/ADR-0986-wrapped-transfers-run-on-a-socket-wait-and-computing-ones-ask-for-timer-0.md:FirstTransferSocket:stale-adr
 reproduction: none
-task: none
-tasks:
+task: BL-4225
+tasks: BL-4225
 found: 2026-10-29
 found-at: ce4fb84772365b99da350fd339cc0c2e9cb2ce30
 scorecard: 2026-10-29_0606.md
