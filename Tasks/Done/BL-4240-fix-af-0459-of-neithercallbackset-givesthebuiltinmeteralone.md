@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Engine.UnitTests]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4240 — Fix AF-0459: Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone asserts only that CallbackTransferProgress.Of returned something
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- The test now draws a download through the meter onto a MemoryStream and asserts the header lines, the closing newline (which only the no-callback meter writes: the callback-wrapping progress has EndsWithNewLine false) and that nothing aborted. Test-only change, so no Measure-CodeQuality run was needed. The reproduction now shows those assertions, not Assert.IsNotNull.
+- Narrowing touches to the file (ADR-0694) was skipped: the push to work/dark-factory was refused in this run, and too broad is safe.
+- dotnet build clean; fast tests green (64 test projects, 0 failed; Curl.Engine.UnitTests 2928 passed). Platform-neutral: Environment.NewLine and a MemoryStream only.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone now checks the built-in meter draws its header and closing newline with nothing aborted
