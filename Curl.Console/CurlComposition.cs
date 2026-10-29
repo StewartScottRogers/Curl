@@ -193,7 +193,7 @@ internal static class CurlComposition
     /// <param name="extensionTransferHookActivators">The extensions' transfer hook activators (ADR-1007); <see langword="null" /> for <see cref="ExtensionTransferHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <param name="extensionConnectionHookActivators">The extensions' connection hook activators (ADR-1010); <see langword="null" /> for <see cref="ExtensionConnectionHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <param name="extensionCertificateCheckHookActivators">The extensions' certificate check hook activators (ADR-1016); <see langword="null" /> for <see cref="ExtensionCertificateCheckHookCatalogue.Entries" />. Tests pass their own.</param>
-    /// <param name="extensionSchemeHookActivators">The extensions' scheme hook activators (ADR-1045); <see langword="null" /> for <see cref="ExtensionSchemeHookCatalogue.Entries" />. Tests pass their own.</param>
+    /// <param name="extensionSchemeHookActivators">The extensions' scheme hook activators (ADR-1048); <see langword="null" /> for <see cref="ExtensionSchemeHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -681,7 +681,7 @@ internal static class CurlComposition
 
     /// <summary>
     /// Gives what the engine puts each of an option group's protocol handlers through: the scheme hook
-    /// <see cref="ExtensionSchemeHookCatalogue.Entries" /> activate for the group's extension options (ADR-1045),
+    /// <see cref="ExtensionSchemeHookCatalogue.Entries" /> activate for the group's extension options (ADR-1048),
     /// inside the transfer hooks <see cref="ExtensionTransferHookCatalogue.Entries" /> activate (ADR-1007).
     /// </summary>
     /// <param name="options">The option group.</param>
@@ -694,7 +694,7 @@ internal static class CurlComposition
 
     /// <summary>
     /// Gives what the engine puts each of an option group's protocol handlers through: the scheme hook
-    /// <paramref name="schemeActivators" /> activate for the group's extension options (ADR-1045), inside the
+    /// <paramref name="schemeActivators" /> activate for the group's extension options (ADR-1048), inside the
     /// transfer hooks <paramref name="transferActivators" /> activate (ADR-1007).
     /// </summary>
     /// <param name="options">The option group.</param>
@@ -709,7 +709,7 @@ internal static class CurlComposition
 
     /// <summary>
     /// Gives the scheme hook <paramref name="activators" /> activate for an option group's extension options
-    /// (ADR-1045), turning two hooks into the command-line error the runner reports with exit 2.
+    /// (ADR-1048), turning two hooks into the command-line error the runner reports with exit 2.
     /// </summary>
     /// <param name="options">The option group.</param>
     /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>

@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Abstractions.Scheme;
 
 /// <summary>
-/// The scheme hook of the extension one option group activated (ADR-1045). A host builds it from the group's
+/// The scheme hook of the extension one option group activated (ADR-1048). A host builds it from the group's
 /// <see cref="ExtensionOptionValues" /> and puts each of curl's handlers through <see cref="Over" />; with no
 /// extension option given it holds no hook and gives curl's handlers back unchanged.
 /// </summary>

@@ -12,7 +12,7 @@ namespace Curl.Console;
 
 /// <summary>
 /// Pins that the Console passes the scheme hook an option group's extension options activate down to the engine
-/// (ADR-1045): with the option given the hook's handler serves its schemes and curl's handlers the rest, two such
+/// (ADR-1048): with the option given the hook's handler serves its schemes and curl's handlers the rest, two such
 /// options are a command-line error with exit 2, and without one curl's handler serves every scheme.
 /// </summary>
 [TestClass]

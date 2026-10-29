@@ -2,7 +2,7 @@ namespace Curl.Extension.Abstractions.Scheme;
 
 /// <summary>
 /// Serves an extension's schemes with its handler in place of curl's, and every other scheme of curl's handler with
-/// curl's (ADR-1045).
+/// curl's (ADR-1048).
 /// </summary>
 /// <param name="curlHandler">Curl's handler.</param>
 /// <param name="hookSchemes">The schemes the extension serves, in lower case.</param>

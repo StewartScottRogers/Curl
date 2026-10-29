@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Abstractions.Scheme;
 
 /// <summary>
-/// What an activated extension supplies in place of curl's handler for some of curl's own schemes (ADR-1045):
+/// What an activated extension supplies in place of curl's handler for some of curl's own schemes (ADR-1048):
 /// the schemes it serves and the handler that serves them, as an extension's option runs <c>ws://</c> and
 /// <c>wss://</c> as RFC 8441 extended CONNECT. Every other scheme stays curl's.
 /// </summary>

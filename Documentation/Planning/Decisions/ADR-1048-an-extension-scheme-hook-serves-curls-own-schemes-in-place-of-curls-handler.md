@@ -1,4 +1,4 @@
-# ADR-1045: An extension scheme hook serves curl's own schemes in place of curl's handler
+# ADR-1048: An extension scheme hook serves curl's own schemes in place of curl's handler
 
 - Status: Accepted
 - Date: 2026-10-29
