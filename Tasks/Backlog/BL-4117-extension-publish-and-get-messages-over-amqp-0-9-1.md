@@ -35,6 +35,8 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29, lane 9 prerequisite pass (before any code): too large for one run, so it is split like BL-4115 (Mqtt5) into BL-4255 (projects and AMQP 0-9-1 wire format: protocol header, frames, data types, field tables, the connection/channel/queue/basic methods and content header, in `Wire/` and `Methods/`) and BL-4256 (handler over `IConnection` for `amqp://` and `amqps://`: negotiation, queue.declare, basic.publish with `-d`, basic.get otherwise, in `Client/`). What is left here once they are Done: the `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs` lines (the latter added to `touches`, needed for the `--extensions` criterion; it is a shared list file, one line per entry), the ADR for the scheme names, specification version and omissions, the `CURL_EXTENSIONS=0` test and the quality run.
+
 ## Log
 
 - 2026-10-29: Created.
