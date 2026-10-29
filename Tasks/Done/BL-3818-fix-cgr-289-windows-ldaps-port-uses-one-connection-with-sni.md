@@ -9,7 +9,7 @@ touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.L
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-29
 ---
 # BL-3818 — Fix CGR-289: Windows ldaps://: PORT uses one connection with SNI localhost and honours --cacert; curl's WinLDAP makes a second connection with the mac...
 
@@ -62,15 +62,17 @@ curl -sS --cacert TP\ca.crt --ssl-no-revoke ldaps://localhost:21900/dc=test
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
 - Put the focused unit test (ADR-0482) in the new file named in `touches` (`Cgr289Tests.cs`), so tasks on the same library run in parallel. Production files not in `touches` may need changing too; if the fix needs a file another live task names, that is fine, but keep the change to this issue.
 - If the issue is not reproducible at the current commit, record the commands and output in Notes and finish the task with that evidence; the gap analysis office's re-measurement closes the matching GF finding, not this task.
+
+Notes (2026-10-29 lane 2, closing): Criteria ticked from BL-4044, BL-4055 and BL-4056. -k: both curl 8.22.0 and Curl make 2 TLS connections, send the same 3 searches and sicilyNegotiate (flags 07 b2 08 a2) and exit 38 Unavailable when the server stops; with a full server both bind once, search, unbind and exit 0 (BL-4055). Trusted --cacert --ssl-no-revoke: both exit 38 `LDAP local: bind via ldap_win_bind Server Down`, 0 request bytes (BL-4056, ADR-0994). Non-issuing --cacert: both exit 60 with the same stderr (BL-4044). Focused tests in Cgr289Tests.cs fail before each fix and pass after. Build clean; fast tests 0 failed.
 
 ## Log
 
@@ -85,3 +87,5 @@ Notes (2026-10-28 lane 8, requeue): The fix needs ConnectTarget to carry an SNI 
 Notes (2026-10-28 lane 4): Code done: LdapProtocolHandler.WinLdapTargetOf gives the WinLDAP second ldaps connection TlsServerName = Environment.MachineName and TrustsSystemStoreOnly; Cgr289Tests.cs pins it; Ldap fast tests pass (638); Measure-CodeQuality for the library reports 0 failing members. Not done: real-curl measurement, NTLM flags and single bind; filed BL-4044. Once BL-4044 is Done, tick the criteria here from its Notes.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-29: Doing -> Backlog. Code and -k measurement done (BL-4054, BL-4055); the --cacert variant is BL-4056's work, which closes this task
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-29: Doing -> Done. ldaps:// -k and trusted --cacert through Curl match curl 8.22.0's WinLDAP exit, stderr and request bytes
