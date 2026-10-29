@@ -50,7 +50,7 @@ public sealed class SignalRNegotiatorTests
     [TestMethod]
     public async Task NegotiateAsync_SecondRedirect_Throws_TransportProtocolsNegotiateRedirect()
     {
-        string redirect = "{\"url\":\"https://other.example/hub\",\"accessToken\":\"t\"}";
+        string redirect = "{\"url\":\"http://other.example/hub\",\"accessToken\":\"t\"}";
 
         SignalRTransportException failure = await NegotiateFailureAsync(Answer("200 OK", redirect), Answer("200 OK", redirect));
 
@@ -63,6 +63,16 @@ public sealed class SignalRNegotiatorTests
         SignalRTransportException failure = await NegotiateFailureAsync(Answer("200 OK", "{\"url\":\"/elsewhere\"}"));
 
         StringAssert.Contains(failure.Message, "not absolute: /elsewhere");
+    }
+
+    [TestMethod]
+    [DataRow("file:///elsewhere")]
+    [DataRow("ftp://other.example/hub")]
+    public async Task NegotiateAsync_RedirectUrlNotHttp_Throws_TransportProtocolsNegotiateRedirect(string redirectUrl)
+    {
+        SignalRTransportException failure = await NegotiateFailureAsync(Answer("200 OK", $"{{\"url\":\"{redirectUrl}\"}}"));
+
+        StringAssert.Contains(failure.Message, "not absolute: " + redirectUrl);
     }
 
     [TestMethod]

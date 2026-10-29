@@ -25,14 +25,18 @@ internal sealed class SignalRNegotiator(Func<Uri, CancellationToken, ValueTask<I
             return WebSocketEndpoint(endpointUrl, response, null);
         }
 
-        Uri redirectUrl = Uri.TryCreate(response.Url, UriKind.Absolute, out Uri? url)
-            ? url
-            : throw new SignalRTransportException($"The negotiate response redirected to a URL that is not absolute: {response.Url}");
+        Uri redirectUrl = TryReadHttpUrl(response.Url) ?? throw new SignalRTransportException($"The negotiate response redirected to a URL that is not absolute: {response.Url}");
         NegotiateResponse redirected = await ExchangeAsync(redirectUrl, response.AccessToken, cancellationToken);
         return redirected.IsRedirect
             ? throw new SignalRTransportException("The negotiate response redirected a second time.")
             : WebSocketEndpoint(redirectUrl, redirected, response.AccessToken);
     }
+
+    // On Linux and macOS Uri reads a rooted path such as "/elsewhere" as an absolute file URL, so the scheme decides.
+    private static Uri? TryReadHttpUrl(string? text) =>
+        Uri.TryCreate(text, UriKind.Absolute, out Uri? url) && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
+            ? url
+            : null;
 
     private static NegotiatedWebSocketEndpoint WebSocketEndpoint(Uri endpointUrl, NegotiateResponse response, string? accessToken) =>
         response.OffersWebSockets
