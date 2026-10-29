@@ -35,3 +35,4 @@ a test that waits for a timer or a background loop instead of the event it needs
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3b34ea0b 172eee31.
