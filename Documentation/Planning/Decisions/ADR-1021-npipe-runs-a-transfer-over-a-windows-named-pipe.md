@@ -1,4 +1,4 @@
-# ADR-1017: --npipe runs a transfer over a Windows named pipe
+# ADR-1021: --npipe runs a transfer over a Windows named pipe
 
 - Status: Accepted
 - Date: 2026-10-29

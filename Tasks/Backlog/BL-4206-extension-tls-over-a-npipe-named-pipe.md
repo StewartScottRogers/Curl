@@ -18,12 +18,12 @@ completed:
 
 ## Context
 
-BL-4142 (ADR-1017) added `--npipe` as the extension `Curl.Extension.NamedPipe.UnitLibrary`. Its `NamedPipeConnector` replaces curl's whole connector through `IConnectionHook` (ADR-1010), and curl's TLS handshake lives inside curl's connector, which an extension cannot reach, so a TLS target is refused with exit 4. This needs a seam in `Curl.Extension.Abstractions` (for example a hook that supplies only the byte stream a connection runs over, with curl's connector layering TLS, proxies and the HTTP version on top), wired by `Curl.Console`'s `CurlComposition` and the engine's connector factory.
+BL-4142 (ADR-1021) added `--npipe` as the extension `Curl.Extension.NamedPipe.UnitLibrary`. Its `NamedPipeConnector` replaces curl's whole connector through `IConnectionHook` (ADR-1010), and curl's TLS handshake lives inside curl's connector, which an extension cannot reach, so a TLS target is refused with exit 4. This needs a seam in `Curl.Extension.Abstractions` (for example a hook that supplies only the byte stream a connection runs over, with curl's connector layering TLS, proxies and the HTTP version on top), wired by `Curl.Console`'s `CurlComposition` and the engine's connector factory.
 
 ## Acceptance criteria
 
 - [ ] An `https://` transfer under `--npipe` completes its TLS handshake over the pipe with the group's TLS options; unit tests over a fake pipe with recorded bytes.
-- [ ] `NamedPipeConnector` no longer refuses a TLS target, and ADR-1017's "Left out" item is updated by a new or amended ADR marked "Decided by Claude under Stewart's delegation".
+- [ ] `NamedPipeConnector` no longer refuses a TLS target, and ADR-1021's "Left out" item is updated by a new or amended ADR marked "Decided by Claude under Stewart's delegation".
 - [ ] The changed libraries meet the four quality gates by `Measure-CodeQuality.ps1`.
 - [ ] `dotnet build` is clean and the fast tests pass.
 

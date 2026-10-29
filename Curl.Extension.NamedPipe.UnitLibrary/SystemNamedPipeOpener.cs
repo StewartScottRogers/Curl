@@ -15,7 +15,7 @@ public sealed class SystemNamedPipeOpener : INamedPipeOpener
         NamedPipeClientStream pipe = new(name.ServerName, name.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         try
         {
-            // No wait for a pipe that is not there, as --unix-socket fails at once on a missing socket (ADR-1017).
+            // No wait for a pipe that is not there, as --unix-socket fails at once on a missing socket (ADR-1021).
             await pipe.ConnectAsync(0, cancellationToken).ConfigureAwait(false);
             return pipe;
         }

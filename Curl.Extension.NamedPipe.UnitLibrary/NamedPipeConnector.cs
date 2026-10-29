@@ -4,7 +4,7 @@ namespace Curl.Extension.NamedPipe;
 
 /// <summary>
 /// Opens every connection of a transfer over one named pipe, whatever host and port its URL names, as
-/// <c>--unix-socket</c> does over a socket (ADR-1017).
+/// <c>--unix-socket</c> does over a socket (ADR-1021).
 /// </summary>
 /// <param name="name">The pipe.</param>
 /// <param name="opener">Opens the pipe.</param>

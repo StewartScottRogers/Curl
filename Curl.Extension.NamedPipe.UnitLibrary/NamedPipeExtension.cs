@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Description;
 
 namespace Curl.Extension.NamedPipe;
 
-/// <summary>The <c>--npipe</c> extension's option, description and connection hook activator (ADR-1017).</summary>
+/// <summary>The <c>--npipe</c> extension's option, description and connection hook activator (ADR-1021).</summary>
 public static class NamedPipeExtension
 {
     /// <summary>Gets <c>--npipe &lt;\\.\pipe\name&gt;</c>.</summary>
