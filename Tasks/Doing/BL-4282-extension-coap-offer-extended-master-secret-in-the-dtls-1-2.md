@@ -32,3 +32,4 @@ ADR-1078 (BL-4251) left it out because `Dtls/TestServer/DtlsTestServer` ignores 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 80613338 54477d71 cf4c1338 3d836d5e.
