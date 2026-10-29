@@ -12,6 +12,7 @@ using Curl.Core.Globbing;
 using Curl.Core.Hsts;
 using Curl.Core.Multipart;
 using Curl.Engine;
+using Curl.Extension.Composition;
 using Curl.Networking;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
@@ -5704,8 +5705,19 @@ internal sealed class CurlCommandRunner(
         { ManualRequested: true } => CurlManual.Lines(),
         { HelpRequested: true, HelpSubject: var subject } when !CurlHelpText.IsOptionSubject(subject) =>
             CurlHelpText.Lines(subject, terminalColumns),
-        _ => TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested),
+        _ => ExtensionsOrBuildInformationLines(options),
     };
+
+    /// <summary>
+    /// The lines <see cref="InformationLines" /> gives for the rest: <see cref="ExtensionListing" />'s for
+    /// <c>--extensions</c>, Curl's own option (ADR-1007), otherwise <see cref="TlsBuildInformation" />'s.
+    /// </summary>
+    /// <param name="options">The parsed options.</param>
+    /// <returns>The lines, or <see langword="null" /> when no such option was given.</returns>
+    private IReadOnlyList<string>? ExtensionsOrBuildInformationLines(CommandLineOptions options) =>
+        options.ExtensionsRequested
+            ? ExtensionListing.Lines(EnvironmentVariables)
+            : TlsBuildInformation.Lines(EasyOptionsFromCommandLine.TlsOf(options), options.CaEmbedDumpRequested);
 
     /// <summary>
     /// Writes the page each <c>help</c> / <c>-h</c> line of a <c>-K</c> or default config file asked for,
@@ -5757,7 +5769,12 @@ internal sealed class CurlCommandRunner(
     /// <returns>A task that completes when the output is flushed.</returns>
     private async Task WriteAiHelpAsync(string? subject)
     {
-        if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))
+        if (CurlAiHelpText.IsExtensionsSubject(subject))
+        {
+            await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(ExtensionListing.Markdown(EnvironmentVariables))).ConfigureAwait(false);
+            await standardOutput.FlushAsync().ConfigureAwait(false);
+        }
+        else if (CurlAiHelpText.TryGetMarkdown(subject, out string markdown))
         {
             await standardOutput.WriteAsync(Encoding.UTF8.GetBytes(markdown)).ConfigureAwait(false);
             await standardOutput.FlushAsync().ConfigureAwait(false);
