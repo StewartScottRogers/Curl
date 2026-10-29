@@ -1,4 +1,4 @@
-# ADR-1025: A one-task shift proves the dark factory loop on Linux CI
+# ADR-1046: A one-task shift proves the dark factory loop on Linux CI
 
 - Status: Accepted
 - Date: 2026-10-29
