@@ -73,9 +73,14 @@ public sealed class Cgr145Tests
     {
         using Socket listener = Listen();
         List<string> calls = [];
+        nint seen = 0;
         SocketCallbackConnector connector = Create(new EasyCallbackOptions
         {
-            SocketOption = (_, _) => SocketOptionResult.AlreadyConnected,
+            SocketOption = (socket, _) =>
+            {
+                seen = socket.Handle;
+                return SocketOptionResult.AlreadyConnected;
+            },
             CloseSocket = socket =>
             {
                 calls.Add("close");
@@ -88,8 +93,14 @@ public sealed class Cgr145Tests
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         IConnection connection = result.Connection!;
         await Assert.ThrowsAsync<Exception>(async () => await connection.WriteAsync("GET / HTTP/1.1\r\n\r\n"u8.ToArray(), CancellationToken.None));
+        // The socket the callback saw, not the listener: on Linux a parallel test's connect to a port just freed can
+        // land on this listener's port, so a connection waiting there says nothing about this socket (BL-4268).
+        using (Socket view = new(new SafeSocketHandle(seen, ownsHandle: false)))
+        {
+            Assert.IsFalse(view.Connected, "the socket the callback saw is connected");
+        }
+
         await connection.DisposeAsync();
-        Assert.IsFalse(listener.Poll(100_000, SelectMode.SelectRead), "the listener has a connection waiting");
         CollectionAssert.AreEqual(new[] { "close" }, calls);
     }
 
