@@ -14,15 +14,16 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+`EasyTransferOptions.MaxReceiveSpeed` (from `--limit-rate`) reaches the HTTP protocol handler as `HttpRequestOptions.ReceiveBytesPerSecond`, the way `MaxSendSpeed` already reaches it as `SendBytesPerSecond`.
 
 ## Context
 
-<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+Prerequisite of BL-3810 (CGR-281): Http2Session cannot size the HTTP/2 stream receive window from `--limit-rate` because the receive speed stops in `Curl.Api.UnitLibrary` and never reaches the Http library. See `Curl.Engine.UnitLibrary/HttpRequestOptionsMapping.cs:140` for the send-side mapping to copy.
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [ ] `HttpRequestOptions` has `ReceiveBytesPerSecond` (null when `MaxReceiveSpeed` is not positive), set by `HttpRequestOptionsMapping` from `MaxReceiveSpeed`, with a unit test in Curl.Engine.UnitTests.
+- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
