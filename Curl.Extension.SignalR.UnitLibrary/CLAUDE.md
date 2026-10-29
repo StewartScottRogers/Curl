@@ -9,7 +9,13 @@ The SignalR client extension (ADR-0999, ADR-1032). Namespace `Curl.Extension.Sig
 - `Negotiate/`: `NegotiateResponseReader` reads a negotiate response (version 0 or 1, redirect, error) into
   `NegotiateResponse`; `SignalRUrls` builds the negotiate URL and the WebSocket URL with its `id`.
 - `Json/`: `JsonFieldReading` and `JsonObjectFields` read JSON with `Utf8JsonReader`, keeping each value's text.
-- `Transport/` is BL-4219's client flow. No option, handler or registration yet: BL-4108 adds them.
+- `Transport/`: the client flow over `IConnection` (ADR-1033). `SignalRNegotiator` posts the negotiate request,
+  follows one redirect and gives a `NegotiatedWebSocketEndpoint`; `SignalRWebSocketUpgrade` sends RFC 6455's client
+  handshake and checks the `101`; `SignalRWebSocketSession` sends records as masked text frames and reads them back,
+  answering Ping and Close. `HttpRequestWriter`, `HttpResponseReader` and `BufferedConnectionReader` are its own
+  HTTP/1.1 (Content-Length, chunked, read to close); every failure is a `SignalRTransportException`. No option,
+  handler or registration yet: BL-4108 adds them.
 
-References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`). Held to the four
+References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`) and the shared frame
+codec `Curl.WebSocket.UnitLibrary`. Held to the four
 quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.SignalR.UnitTests`.
