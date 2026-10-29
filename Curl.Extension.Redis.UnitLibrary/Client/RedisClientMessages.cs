@@ -1,6 +1,6 @@
 namespace Curl.Extension.Redis.Client;
 
-/// <summary>The error messages a Redis transfer ends with (ADR-1066).</summary>
+/// <summary>The error messages a Redis transfer ends with (ADR-1075).</summary>
 internal static class RedisClientMessages
 {
     /// <summary>The URL names no command.</summary>
