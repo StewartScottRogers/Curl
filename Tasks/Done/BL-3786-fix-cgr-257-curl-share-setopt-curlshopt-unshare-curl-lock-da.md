@@ -9,7 +9,7 @@ touches: [Libcurl.UnitTests/Cgr257Tests.cs, Libcurl/Share/CurlShare.cs]
 model: sonnet
 requirement: none
 created: 2026-10-26
-completed:
+completed: 2026-10-28
 ---
 # BL-3786 — Fix CGR-257: curl_share_setopt(CURLSHOPT_UNSHARE, CURL_LOCK_DATA_PSL) returns CURLSHE_OK; libcurl returns CURLSHE_BAD_OPTION
 
@@ -76,3 +76,4 @@ probe.exe repro
 
 - 2026-10-26: Created from CGR-257 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-28: Doing -> Done. Fixed; tests green
