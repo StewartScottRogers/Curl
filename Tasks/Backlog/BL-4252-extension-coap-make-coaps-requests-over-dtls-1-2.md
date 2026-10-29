@@ -4,8 +4,8 @@ title: Extension CoAP: make coaps:// requests over DTLS 1.2
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4251, BL-4248]
-touches: [Curl.Extension.Coap.UnitLibrary/Client, Curl.Extension.Coap.UnitTests/Client, Curl.Extension.Coap.UnitLibrary/Secure, Curl.Extension.Coap.UnitTests/Secure]
+depends-on: [BL-4251, BL-4248, BL-4282]
+touches: [Curl.Extension.Coap.UnitLibrary/Client, Curl.Extension.Coap.UnitTests/Client, Curl.Extension.Coap.UnitLibrary/Secure, Curl.Extension.Coap.UnitTests/Secure, Curl.Extension.Coap.UnitTests/Dtls/TestServer/DtlsTestServer.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -33,7 +33,10 @@ Builds on BL-4251's DTLS client and BL-4248's complete `coap://` client: run the
 
 ## Notes
 
+- 2026-10-29 (lane 1, first pass, no code edited): the GET and block-wise tests need `Dtls/TestServer/DtlsTestServer.cs` to answer application data with a CoAP response; today it only echoes the plaintext back (an echoed CON GET is not a response, and the test channel cannot decrypt it without the server's keys). Add a settable `Func<byte[], byte[]>` answering application data there (default: echo). BL-4282 (Doing) holds that file, so it is added to `touches` and `depends-on`. Plan for the next claim: a `Secure/` `IDatagramChannel` over `DtlsClientSession` (runs `DtlsClientHandshake` with `ProtocolHandlerServices.TlsProvider`, then carries each CoAP datagram as one application data record), so `CoapExchange`, `CoapBlockwiseTransfer` and `CoapObservation` run unchanged; `CoapProtocolHandler` serves `coap` and `coaps`, port 5684 for `coaps`; the description lists both schemes; ADR-1042 or ADR-1078 gets the DTLS 1.2 and left-out (PSK, raw public keys) note.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 2db89dcf dd0657e0 13785854 da731085 478f867b 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4282, which holds Curl.Extension.Coap.UnitTests/Dtls/TestServer/DtlsTestServer.cs; the coaps tests need it to answer application data with a CoAP response
