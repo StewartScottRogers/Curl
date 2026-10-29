@@ -1,5 +1,5 @@
 ---
-id: BL-4268
+id: BL-4270
 title: Extension: close out XMPP extension quality gates
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4268 — Extension: close out XMPP extension quality gates
+# BL-4270 — Extension: close out XMPP extension quality gates
 
 ## Goal
 

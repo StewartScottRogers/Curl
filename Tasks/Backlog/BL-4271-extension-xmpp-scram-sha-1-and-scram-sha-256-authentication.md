@@ -1,16 +1,16 @@
 ---
-id: BL-4269
+id: BL-4271
 title: Extension: XMPP SCRAM-SHA-1 and SCRAM-SHA-256 authentication
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4268]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4270]
 touches: [Curl.Extension.Xmpp.UnitLibrary/Client, Curl.Extension.Xmpp.UnitTests, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4269 — Extension: XMPP SCRAM-SHA-1 and SCRAM-SHA-256 authentication
+# BL-4271 — Extension: XMPP SCRAM-SHA-1 and SCRAM-SHA-256 authentication
 
 ## Goal
 
