@@ -1,6 +1,6 @@
 # ADR-0999: A host character mapping outside the STD3 rules is refused only in a label that stays outside ASCII
 
-Status: Accepted. Decided by Claude under Stewart's delegation (BL-4079, after BL-4076 and BL-4077).
+Status: Accepted. Decided by Claude under Stewart's delegation (BL-4081, after BL-4076 and BL-4077).
 
 ## Context
 

@@ -1,5 +1,5 @@
 ---
-id: BL-4079
+id: BL-4081
 title: Map U+2100 U+2101 U+2105 U+2106 to their slash text as libidn2 does instead of refusing them
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed: 2026-10-29
 ---
-# BL-4079 — Map U+2100 U+2101 U+2105 U+2106 to their slash text as libidn2 does instead of refusing them
+# BL-4081 — Map U+2100 U+2101 U+2105 U+2106 to their slash text as libidn2 does instead of refusing them
 
 ## Goal
 
