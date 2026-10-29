@@ -3,6 +3,7 @@ using Curl.Cli;
 using Curl.Engine;
 using Curl.Extension.Abstractions;
 using Curl.Extension.Abstractions.Transfer;
+using Curl.Networking;
 using Curl.Protocol.Abstractions;
 using Curl.Testing;
 
@@ -37,6 +38,17 @@ public sealed class ExtensionTransferHookTests
     }
 
     [TestMethod]
+    public async Task RunAsync_ExtensionOptionGiven_LendsTheHookCurlsConnectorAndALoopbackListener()
+    {
+        int exitCode = await RunAsync("-sS", "--test-hook", "on", "http://127.0.0.1:20601/");
+
+        Assert.AreEqual(0, exitCode, Encoding.UTF8.GetString(standardError.ToArray()));
+        Assert.AreSame(server, hook.Services?.Connector);
+        Assert.IsInstanceOfType<TcpConnectionListener>(hook.Services?.Listener);
+        Assert.Contains("X-Test-Hook: on\r\nX-Test-Token: fetched\r\n", RequestText);
+    }
+
+    [TestMethod]
     public async Task RunAsync_ExtensionOptionNotGiven_RunsNoTransferHook()
     {
         int exitCode = await RunAsync("-sS", "http://127.0.0.1:20601/");
@@ -44,13 +56,14 @@ public sealed class ExtensionTransferHookTests
         Assert.AreEqual(0, exitCode, Encoding.UTF8.GetString(standardError.ToArray()));
         Assert.DoesNotContain("X-Test-Hook", RequestText);
         Assert.AreEqual(0, hook.FinishedTransfers);
+        Assert.IsNull(hook.Services);
     }
 
     [TestMethod]
     public void ExtensionTransferHooksOf_NoExtensionOptionGiven_PassesNoHookToTheEngine()
     {
-        Assert.IsNull(CurlComposition.ExtensionTransferHooksOf(new CommandLineOptions(), [ActivatedByTheTestOption]));
-        Assert.IsNull(CurlComposition.ExtensionTransferHooksOf(new CommandLineOptions()));
+        Assert.IsNull(CurlComposition.ExtensionTransferHooksOf(new CommandLineOptions(), [ActivatedByTheTestOption], server, new TcpConnectionListener()));
+        Assert.IsNull(CurlComposition.ExtensionTransferHooksOf(new CommandLineOptions(), server, new TcpConnectionListener()));
     }
 
     private ITransferHook? ActivatedByTheTestOption(ExtensionOptionValues values) =>
@@ -82,5 +95,13 @@ public sealed class ExtensionTransferHookTests
         public IEnumerable<string> RequestHeadersFor(ITransferContext context) => [$"X-Test-Hook: {value}"];
 
         public void TransferFinished(TransferResult result) => FinishedTransfers++;
+
+        public TransferHookServices? Services { get; private set; }
+
+        public ValueTask<TransferResult> ExecuteAsync(ITransferContext context, TransferHookServices services, Func<ITransferContext, ValueTask<TransferResult>> next)
+        {
+            Services = services;
+            return next(context.WithRequestHeaders(["X-Test-Token: fetched"]));
+        }
     }
 }
