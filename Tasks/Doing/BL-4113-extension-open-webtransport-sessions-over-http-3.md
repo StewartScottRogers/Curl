@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 3b935d4c e17cc91f 35ce08fa bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4222 (QUIC DATAGRAM frames) and BL-4223 (HTTP/3 session hands server-opened streams to its caller)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3b935d4c e17cc91f 35ce08fa bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
