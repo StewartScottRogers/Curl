@@ -35,3 +35,4 @@ Split from BL-4115 (extension 14 of 63) for size by its first pass. Extension ru
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 2ec72062 fc4e9290 b32bcc34 b030ffdd 14de81cc.
