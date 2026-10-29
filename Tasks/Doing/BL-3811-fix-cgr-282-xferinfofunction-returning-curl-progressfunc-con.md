@@ -80,3 +80,4 @@ probe.exe C_57 1 2> c57_PORT.err
 - 2026-10-26: Created from CGR-282 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
 - 2026-10-28: Doing -> Backlog. Needs BL-4012: the progress meter lives only in Curl.Console and must move to a library the Engine can use
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
