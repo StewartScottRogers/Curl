@@ -264,7 +264,7 @@ public sealed partial class ManagedMultiTransferTests
     public async Task PollAsync_EngineNumberedExtraSockets_ReportNoEventWithoutAskingThePoller()
     {
         ScriptedWaitSocketPoller poller = new();
-        CurlSocket transferSocket = new(ManagedMultiTransfer.FirstTransferSocket);
+        CurlSocket transferSocket = new((nint)(TransferSocketWait.FirstEngineSocket + 1));
         CurlSocket wakeupSocket = new(ManagedMultiTransfer.ResolverWakeupSocket);
         poller.Ready[transferSocket] = CurlWaitEvents.PollIn;
         poller.Ready[wakeupSocket] = CurlWaitEvents.PollIn;

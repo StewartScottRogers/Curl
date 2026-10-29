@@ -31,8 +31,6 @@ internal sealed partial class ManagedMultiTransfer
 
         public bool SocketReadyUntilNextPerform { get; set; }
 
-        public CurlSocket? Number { get; set; }
-
         public CurlSocket? Socket { get; set; }
 
         public object? SocketState { get; set; }

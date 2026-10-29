@@ -48,83 +48,66 @@ public sealed partial class ManagedMultiTransferTests
     }
 
     [TestMethod]
-    public async Task GetWaitSockets_TransfersStartedAndNotDone_AreOnePollInSocketEachNumberedAsTheSocketCallbackIsToldThenTheResolverWakeup()
+    public async Task GetWaitSockets_TransfersRunningWithNoSocket_GiveNoSocketAndNoResolverWakeup()
     {
         await using ManagedCurlEngine engine = new();
         await using IMultiTransfer multi = engine.CreateMulti();
         List<CurlSocket> told = [];
-        multi.Options = new MultiOptions { Socket = (_, socket, what, _) => { told.Add(socket); return 0; } };
-        ControlledEasyTransfer first = new(), second = new();
-        multi.Add(first);
-        multi.Add(second);
-        CurlWaitSocket[] sockets = new CurlWaitSocket[4];
-
-        CurlMultiCode beforePerform = multi.GetWaitSockets(sockets, out int countBeforePerform);
-        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        CurlMultiCode running = multi.GetWaitSockets(sockets, out int countRunning);
-        CurlWaitSocket[] runningSockets = [.. sockets];
-        first.Finish(CurlCode.Ok);
-        await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-        CurlWaitSocket[] afterFirst = new CurlWaitSocket[3];
-        multi.GetWaitSockets(afterFirst, out int countAfterFirst);
-
-        Assert.AreEqual(CurlMultiCode.Ok, beforePerform);
-        Assert.AreEqual(0, countBeforePerform);
-        Assert.AreEqual(CurlMultiCode.Ok, running);
-        Assert.AreEqual(3, countRunning);
-        CurlSocket firstSocket = new(ManagedMultiTransfer.FirstTransferSocket);
-        CurlSocket secondSocket = new(ManagedMultiTransfer.FirstTransferSocket + 1);
-        Assert.AreEqual(new CurlWaitSocket(firstSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None), runningSockets[0]);
-        Assert.AreEqual(new CurlWaitSocket(secondSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None), runningSockets[1]);
-        CurlWaitSocket wakeup = new(new CurlSocket(ManagedMultiTransfer.ResolverWakeupSocket), CurlWaitEvents.PollIn, CurlWaitEvents.None);
-        Assert.AreEqual(wakeup, runningSockets[2]);
-        Assert.AreEqual(default, runningSockets[3]);
-        CollectionAssert.AreEqual(new[] { firstSocket, secondSocket, firstSocket }, told);
-        Assert.AreEqual(2, countAfterFirst);
-        Assert.AreEqual(new CurlWaitSocket(secondSocket, CurlWaitEvents.PollIn, CurlWaitEvents.None), afterFirst[0]);
-        Assert.AreEqual(wakeup, afterFirst[1]);
-    }
-
-    [TestMethod]
-    public async Task GetWaitSockets_NoSocketCallback_NumbersTheSocketsOnceAndTheCallbackSetLaterIsToldTheSameNumbers()
-    {
-        await using ManagedCurlEngine engine = new();
-        await using IMultiTransfer multi = engine.CreateMulti();
-        ControlledEasyTransfer transfer = new();
-        multi.Add(transfer);
-        await multi.PerformAsync(CancellationToken.None);
-        CurlWaitSocket[] first = new CurlWaitSocket[1], second = new CurlWaitSocket[1];
-        List<CurlSocket> told = [];
-
-        multi.GetWaitSockets(first, out _);
-        multi.GetWaitSockets(second, out _);
         multi.Options = new MultiOptions { Socket = (_, socket, _, _) => { told.Add(socket); return 0; } };
+        multi.Add(new ControlledEasyTransfer());
+        multi.Add(new ControlledEasyTransfer());
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);
-
-        CurlSocket expected = new(ManagedMultiTransfer.FirstTransferSocket);
-        Assert.AreEqual(expected, first[0].Socket);
-        Assert.AreEqual(expected, second[0].Socket);
-        CollectionAssert.AreEqual(new[] { expected }, told);
-    }
-
-    [TestMethod]
-    public async Task GetWaitSockets_ArrayTooShort_FillsWhatFitsCountsEveryOneAndIsOutOfMemory()
-    {
-        await using ManagedCurlEngine engine = new();
-        await using IMultiTransfer multi = engine.CreateMulti();
-        multi.Add(new ControlledEasyTransfer());
-        multi.Add(new ControlledEasyTransfer());
-        await multi.PerformAsync(CancellationToken.None);
         CurlWaitSocket[] sockets = new CurlWaitSocket[1];
 
         CurlMultiCode code = multi.GetWaitSockets(sockets, out int count);
+
+        Assert.AreEqual(CurlMultiCode.Ok, code);
+        Assert.AreEqual(0, count);
+        Assert.AreEqual(default, sockets[0]);
+        Assert.IsEmpty(told);
+    }
+
+    [TestMethod]
+    public async Task GetWaitSockets_TransfersHoldingRealSockets_AreOnePollInSocketEachThenTheResolverWakeupAndATooShortArrayIsOutOfMemory()
+    {
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
+        await using WrappingEasyTransfer first = TransferHoldingSocketUntilCancelled(engine, 0x1234, out Task firstHolds);
+        await using WrappingEasyTransfer second = TransferHoldingSocketUntilCancelled(engine, 0x1235, out Task secondHolds);
+        multi.Add(first);
+        multi.Add(second);
+        await multi.PerformAsync(CancellationToken.None);
+        await Task.WhenAll(firstHolds, secondHolds);
+        CurlWaitSocket[] sockets = new CurlWaitSocket[4];
+        CurlWaitSocket[] tooShort = new CurlWaitSocket[1];
+
+        CurlMultiCode code = multi.GetWaitSockets(sockets, out int count);
+        CurlMultiCode tooShortCode = multi.GetWaitSockets(tooShort, out int tooShortCount);
         CurlMultiCode emptyCode = multi.GetWaitSockets([], out int emptyCount);
 
-        Assert.AreEqual(CurlMultiCode.OutOfMemory, code);
-        Assert.AreEqual(3, count);
-        Assert.AreEqual(new CurlSocket(ManagedMultiTransfer.FirstTransferSocket), sockets[0].Socket);
-        Assert.AreEqual(CurlMultiCode.OutOfMemory, emptyCode);
-        Assert.AreEqual(3, emptyCount);
+        Assert.AreEqual((CurlMultiCode.Ok, 3), (code, count));
+        Assert.AreEqual(new CurlWaitSocket(new CurlSocket(0x1234), CurlWaitEvents.PollIn, CurlWaitEvents.None), sockets[0]);
+        Assert.AreEqual(new CurlWaitSocket(new CurlSocket(0x1235), CurlWaitEvents.PollIn, CurlWaitEvents.None), sockets[1]);
+        Assert.AreEqual(new CurlWaitSocket(new CurlSocket(ManagedMultiTransfer.ResolverWakeupSocket), CurlWaitEvents.PollIn, CurlWaitEvents.None), sockets[2]);
+        Assert.AreEqual(default, sockets[3]);
+        Assert.AreEqual((CurlMultiCode.OutOfMemory, 3), (tooShortCode, tooShortCount));
+        Assert.AreEqual(sockets[0], tooShort[0]);
+        Assert.AreEqual((CurlMultiCode.OutOfMemory, 3), (emptyCode, emptyCount));
+    }
+
+    /// <summary>A wrapped managed transfer that takes <paramref name="socket" /> and holds it until cancelled.</summary>
+    private static WrappingEasyTransfer TransferHoldingSocketUntilCancelled(ManagedCurlEngine engine, nint socket, out Task holding)
+    {
+        TaskCompletionSource holds = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        holding = holds.Task;
+        return new WrappingEasyTransfer((ManagedEasyTransfer)engine.CreateEasy(), async (wait, token) =>
+        {
+            wait.TakeSocket(socket);
+            holds.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            return CurlCode.Ok;
+        });
     }
 
     [TestMethod]
@@ -271,15 +254,17 @@ public sealed partial class ManagedMultiTransferTests
     [TestMethod]
     public async Task EnableNotification_AbortedByCallback_SendsEasyDoneForEachTransferItEnds()
     {
-        await using ManagedCurlEngine engine = new();
-        await using IMultiTransfer multi = engine.CreateMulti();
+        TimerManualTimeProvider time = new();
+        await using ManagedCurlEngine engine = new(time, null);
+        await using ManagedMultiTransfer multi = NewMulti(time);
         List<(CurlMultiNotification, IEasyTransfer)> sent = [];
-        ControlledEasyTransfer transfer = new();
+        await using WrappingEasyTransfer transfer = ReadableWaitingTransfer(engine);
         multi.Options = new MultiOptions
         {
             Socket = (_, _, _, _) => -1,
             Notify = (notification, easy) => sent.Add((notification, easy)),
         };
+        multi.SocketWaitSettleLimit = TimeSpan.FromSeconds(30);
         multi.EnableNotification(CurlMultiNotification.EasyDone);
         multi.Add(transfer);
         await multi.SocketActionAsync(CurlMultiSockets.Timeout, CurlSocketSelect.None, CancellationToken.None);

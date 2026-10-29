@@ -46,8 +46,8 @@ internal sealed class TransferSocketWait(TimeProvider timeProvider)
     /// Gets the socket number the engine's own numbering for connections with no operating system socket (an
     /// in-memory one) starts from; the first such transfer is given <c>FirstEngineSocket + 1</c>, the next
     /// <c>FirstEngineSocket + 2</c> and so on. The range lies far above any descriptor or handle the operating
-    /// system gives a process and apart from <see cref="ConnectOnlyConnection.FirstSocket" />'s and
-    /// <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers (ADR-0955).
+    /// system gives a process and apart from <see cref="ConnectOnlyConnection.FirstSocket" />'s numbers and
+    /// above <see cref="ManagedMultiTransfer.ResolverWakeupSocket" /> (ADR-0955).
     /// </summary>
     internal const long FirstEngineSocket = 0x5000_0000;
 

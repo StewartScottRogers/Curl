@@ -49,7 +49,7 @@ internal sealed class ConnectOnlyConnection(Func<bool> isConnectOnly) : IConnect
     /// Gets the socket number the numbering starts from; the first connection is given <c>FirstSocket + 1</c>, the
     /// next <c>FirstSocket + 2</c> and so on. Only a connection with no operating system socket (an in-memory one)
     /// is numbered, each opened one with a number of the engine's own, above any descriptor a process is likely to
-    /// hold and apart from <see cref="ManagedMultiTransfer.FirstTransferSocket" />'s numbers.
+    /// hold and apart from <see cref="TransferSocketWait.FirstEngineSocket" />'s numbers.
     /// </summary>
     internal const long FirstSocket = 0x6000_0000;
 

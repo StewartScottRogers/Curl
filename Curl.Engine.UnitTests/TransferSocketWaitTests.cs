@@ -103,7 +103,7 @@ public sealed class TransferSocketWaitTests
         Assert.IsNotNull(wait.Socket);
         Assert.IsGreaterThan(TransferSocketWait.FirstEngineSocket, (long)wait.Socket.Value);
         Assert.IsLessThan(ConnectOnlyConnection.FirstSocket, (long)wait.Socket.Value);
-        Assert.IsGreaterThan((long)ManagedMultiTransfer.FirstTransferSocket, (long)wait.Socket.Value);
+        Assert.IsGreaterThan((long)ManagedMultiTransfer.ResolverWakeupSocket, (long)wait.Socket.Value);
     }
 
     [TestMethod]

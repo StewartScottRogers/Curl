@@ -64,9 +64,7 @@ internal sealed partial class ManagedMultiTransfer
             && earlier.Any(other => other.Origin == entry.Origin);
     }
 
-    private CurlSocket SocketNumberOf(MultiEntry entry) => entry.Number ??= new CurlSocket(nextTransferSocket++);
-
-    private CurlSocket WaitSocketOf(MultiEntry entry) => entry.SocketRecord?.Socket is { } handle ? new CurlSocket(handle) : SocketNumberOf(entry);
+    private static CurlSocket? WaitSocketOf(MultiEntry entry) => entry.SocketRecord?.Socket is { } handle ? new CurlSocket(handle) : null;
 
     private static TaskCompletionSource NewWakeupSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 

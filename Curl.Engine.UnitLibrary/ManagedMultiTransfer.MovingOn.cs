@@ -178,12 +178,6 @@ internal sealed partial class ManagedMultiTransfer
             return TellWaitedSocket(callback, entry, wait);
         }
 
-        if (NeedsSocket(entry))
-        {
-            entry.Socket = WaitSocketOf(entry);
-            return callback(entry.Transfer, entry.Socket.Value, CurlPoll.In, null);
-        }
-
         return 0;
     }
 
@@ -214,8 +208,6 @@ internal sealed partial class ManagedMultiTransfer
 
     private static CurlSocket? WaitedSocketOf(MultiEntry entry, TransferSocketWait wait, CurlPoll waiting) =>
         entry.Done || wait.Socket is not { } handle || waiting == CurlPoll.None ? null : new CurlSocket(handle);
-
-    private static bool NeedsSocket(MultiEntry entry) => !entry.Done && entry.Perform is not null && entry.Socket is null;
 
     /// <summary>
     /// Whether an action on <paramref name="socket" /> wakes <paramref name="wait" />: an action on its own socket,
