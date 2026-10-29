@@ -3,12 +3,15 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// <summary>
 /// The context an extension's <see cref="TransferHookingProtocolHandler" /> gives curl's handler: the
 /// transfer's own context, but with the hooks' request headers after curl's and the response body
-/// written through the hooks' streams (ADR-1007).
+/// written through the hooks' streams (ADR-1007); also the context a hook's
+/// <see cref="TransferContextOutputs.WithOutputs" /> gives, with the response written where the hook chose (ADR-1017).
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>
 /// <param name="output">Where the handler writes the response body: the outermost hook's stream.</param>
+/// <param name="headerOutput">Where the handler writes the headers <c>-i</c> shows.</param>
+/// <param name="dumpHeaderOutput">Where the handler writes the headers <c>-D</c> saves.</param>
 /// <param name="http">The HTTP options with the hooks' request headers added, or <see langword="null" /> for a transfer that has none.</param>
-internal sealed class HookedTransferContext(ITransferContext inner, Stream output, HttpRequestOptions? http) : ITransferContext
+internal sealed class HookedTransferContext(ITransferContext inner, Stream output, Stream? headerOutput, Stream? dumpHeaderOutput, HttpRequestOptions? http) : ITransferContext
 {
     public CurlUrl Url => inner.Url;
     public Stream Output => output;
@@ -21,8 +24,8 @@ internal sealed class HookedTransferContext(ITransferContext inner, Stream outpu
     public bool NoBody => inner.NoBody;
     public TimeCondition? TimeCondition => inner.TimeCondition;
     public bool RemoteTime => inner.RemoteTime;
-    public Stream? HeaderOutput => inner.HeaderOutput;
-    public Stream? DumpHeaderOutput => inner.DumpHeaderOutput;
+    public Stream? HeaderOutput => headerOutput;
+    public Stream? DumpHeaderOutput => dumpHeaderOutput;
     public ReadOnlyMemory<byte>? PostData => inner.PostData;
     public bool PostWithoutData => inner.PostWithoutData;
     public System.Net.NetworkCredential? Credentials => inner.Credentials;

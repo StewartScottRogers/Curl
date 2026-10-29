@@ -1050,3 +1050,4 @@ Each option and the specific reason it lost.
 | [1016](ADR-1016-an-extension-certificate-check-can-only-refuse-a-chain-curl-accepted.md) | An extension certificate check can only refuse a chain curl accepted, failing with exit 60 (BL-4097) | Accepted | 2026-10-29 |
 | [1017](ADR-1017-the-websocket-frame-codec-is-a-shared-layer-with-a-decode-observer.md) | The WebSocket frame codec is a shared layer, and its decoder reports to an observer (BL-4196) | Accepted | 2026-10-29 |
 | [1018](ADR-1018-the-s3-extension-speaks-http-1-1-over-iconnection-with-its-own-small-client.md) | The S3 extension speaks HTTP/1.1 over IConnection with its own small client (BL-4199) | Accepted | 2026-10-29 |
+| [1017](ADR-1017-a-transfer-hook-may-answer-a-transfer-or-replace-curls-response.md) | A transfer hook may answer a transfer itself or replace curl's response (BL-4204) | Accepted | 2026-10-29 |

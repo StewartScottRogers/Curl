@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.Abstractions.Transfer;
 
 [TestClass]
-public sealed class TransferHookingProtocolHandlerTests
+public sealed partial class TransferHookingProtocolHandlerTests
 {
     [TestMethod]
     public async Task ExecuteAsync_WithNoHookAskingToRepeat_RunsTheHandlerOnceAndWaitsForNothing()

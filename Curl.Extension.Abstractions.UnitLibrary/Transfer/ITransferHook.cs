@@ -23,6 +23,22 @@ public interface ITransferHook
     Stream ResponseBodyOver(Stream output) => output;
 
     /// <summary>
+    /// Runs the transfer (ADR-1017). The hooks run outermost first, in request order, each given the rest of
+    /// the hooks and curl's handler as <paramref name="next" />. A hook may skip <paramref name="next" /> and
+    /// answer itself (a fresh cached response), writing the body to <paramref name="context" />'s
+    /// <see cref="ITransferContext.Output" /> and the headers to its <see cref="ITransferContext.HeaderOutput" />
+    /// and <see cref="ITransferContext.DumpHeaderOutput" />; or call <paramref name="next" /> with
+    /// <see cref="TransferContextOutputs.WithOutputs" /> to capture the response curl's handler received and
+    /// then write a different one (a stored response in place of a 304). The body written to
+    /// <paramref name="context" />'s output still passes through every hook's <see cref="ResponseBodyOver" />,
+    /// and the result returned is the one <see cref="TransferFinished" /> and <see cref="RepeatAfter" /> read.
+    /// </summary>
+    /// <param name="context">The transfer, with the hooks' request headers and body streams in place.</param>
+    /// <param name="next">Runs the inner hooks and curl's handler on the context it is given.</param>
+    /// <returns>The transfer's result; by default, <paramref name="next" />'s on <paramref name="context" />.</returns>
+    ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next) => next(context);
+
+    /// <summary>
     /// Reads the finished transfer: its exit code and its <see cref="TransferResult.Report" />, with the
     /// response code, response headers and <see cref="TransferReport.Timings" />. Called before curl reports
     /// the transfer (<c>-w</c>, exit code).

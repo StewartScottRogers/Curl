@@ -3,7 +3,8 @@ namespace Curl.Extension.Abstractions.Transfer;
 /// <summary>
 /// Runs an extension's <see cref="ITransferHook" />s around one of curl's protocol handlers (ADR-1007):
 /// the hooks' request headers go after curl's own, the handler writes the body through the hooks' streams
-/// before curl's output, and each hook reads the result before curl reports it. When a hook asks for the
+/// before curl's output, each hook may answer the transfer itself or replace the response the handler
+/// received (ADR-1017), and each hook reads the result before curl reports it. When a hook asks for the
 /// transfer to be repeated (ADR-1009), it waits that long on the transfer's <see cref="TimeProvider" /> and
 /// runs the handler again, asking the hooks' request headers afresh.
 /// </summary>
@@ -43,7 +44,8 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
         HttpRequestOptions? http = context.Http is null
             ? null
             : context.Http with { Headers = [.. context.Http.Headers, .. hooks.SelectMany(hook => hook.RequestHeadersFor(context))] };
-        TransferResult result = await handler.ExecuteAsync(new HookedTransferContext(context, output, http)).ConfigureAwait(false);
+        ITransferContext hooked = new HookedTransferContext(context, output, context.HeaderOutput, context.DumpHeaderOutput, http);
+        TransferResult result = await ExecuteThroughHooksAsync(0, hooked).ConfigureAwait(false);
         await output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
         foreach (ITransferHook hook in hooks)
         {
@@ -52,6 +54,15 @@ internal sealed class TransferHookingProtocolHandler(IProtocolHandler handler, I
 
         return result;
     }
+
+    /// <summary>
+    /// Runs the hooks' <see cref="ITransferHook.ExecuteAsync" /> from <paramref name="index" /> on, the first
+    /// outermost, each given the rest as its next step, and curl's handler innermost (ADR-1017).
+    /// </summary>
+    private ValueTask<TransferResult> ExecuteThroughHooksAsync(int index, ITransferContext context) =>
+        index == hooks.Count
+            ? handler.ExecuteAsync(context)
+            : hooks[index].ExecuteAsync(context, next => ExecuteThroughHooksAsync(index + 1, next));
 
     /// <summary>Gives the delay the first hook asking for a repeat names, or <see langword="null" /> when none asks.</summary>
     private TimeSpan? RepeatAfter(TransferResult result) =>
