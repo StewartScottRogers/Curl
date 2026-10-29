@@ -1517,8 +1517,27 @@ public sealed class HttpProtocolHandler(
                 HttpVersion = statusLine.Version,
                 HeaderSize = report.HeaderSize + failure.HeadBytesBeforeFailure.Length,
                 ResponseHeadersStored = Math.Max(report.ResponseHeadersStored, failure.HeadersStoredBeforeFailure),
+                ResponseHeaders = HeadersBeforeFailure(failure.HeadBytesBeforeFailure),
                 ContentType = failure.ContentTypeBeforeFailure ?? report.ContentType,
             };
+
+    /// <summary>
+    /// Gives the whole header lines a failure let through before it cut the head short, from the
+    /// head's bytes after its status line: curl stores each header line as it writes it, so
+    /// <c>%{num_headers}</c> counts them (CGR-135 <c>cltwo</c>, curl 8.18.0 with nghttp2 1.68
+    /// measured, BL-4005 Notes). A line cut off before its end is not one of them.
+    /// </summary>
+    private static KeyValuePair<string, string>[] HeadersBeforeFailure(byte[] headBytes) =>
+        [.. System.Text.Encoding.Latin1.GetString(headBytes).Split('\n').Skip(1).SkipLast(1)
+            .Select(line => line.TrimEnd('\r'))
+            .Where(line => line.Length > 0)
+            .Select(HeaderOfLine)];
+
+    private static KeyValuePair<string, string> HeaderOfLine(string line)
+    {
+        string name = line.Split(':')[0];
+        return KeyValuePair.Create(name, line[Math.Min(name.Length + 1, line.Length)..].Trim());
+    }
 
     /// <summary>
     /// Puts the socket error number of a failed receive on <paramref name="report" /> as its

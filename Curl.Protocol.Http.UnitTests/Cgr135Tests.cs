@@ -69,6 +69,21 @@ public sealed class Cgr135Tests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_Http2HeadWithContentLengthTwice_ReportsTheHeaderLineWrittenBeforeTheFailure()
+    {
+        ScriptedConnection connection = new(Response(["H! :status: 200|content-length: 9|content-length: 9"]), 65536);
+        Diagnostics.Arrange("frames", "H! :status: 200|content-length: 9|content-length: 9 (cltwo)");
+
+        TransferResult result = await new HttpProtocolHandler(QueueConnector.For(connection), new SilentAuthenticator())
+            .ExecuteAsync(Context(new MemoryStream(), new MemoryStream()));
+
+        Diagnostics.Act("exit code, response headers", $"{result.ExitCode}, {string.Join("; ", result.Report!.ResponseHeaders)}");
+        Diagnostics.Assert("response headers, the source of num_headers", "[content-length, 9]", string.Join("; ", result.Report.ResponseHeaders));
+        Assert.AreEqual(CurlExitCode.Http2, result.ExitCode);
+        CollectionAssert.AreEqual(new[] { KeyValuePair.Create("content-length", "9") }, result.Report.ResponseHeaders.ToArray());
+    }
+
+    [TestMethod]
     [DataRow("H :status: 200|te: trailers", "D! hello h2\n", "", "HTTP/2 200 \r\nte: trailers\r\n\r\n", DisplayName = "te: trailers")]
     [DataRow("H :status: 200|x-a: 1", "D hello h2\n", "H! x-t: 1", "HTTP/2 200 \r\nx-a: 1\r\n\r\nx-t: 1\r\n", DisplayName = "trailers ending the stream")]
     public async Task ExecuteAsync_Http2ResponseWithValidFields_Succeeds(string head, string data, string trailer, string expectedHeaders)
