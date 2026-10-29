@@ -1,4 +1,4 @@
-# ADR-0969: The Schannel build holds the client's final handshake flight until the server certificate is judged
+# ADR-0972: The Schannel build holds the client's final handshake flight until the server certificate is judged
 
 Status: Accepted. Decided by Claude under Stewart's delegation (BL-3757, CGR-228).
 
