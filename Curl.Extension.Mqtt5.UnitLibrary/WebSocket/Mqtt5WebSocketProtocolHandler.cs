@@ -75,7 +75,7 @@ public sealed class Mqtt5WebSocketProtocolHandler : IProtocolHandler
         {
             Mqtt5WebSocketConnection upgraded = await UpgradeAsync(context, connection).ConfigureAwait(false);
             context.Progress.ReportTransferStarted();
-            var flow = new Mqtt5ClientFlow(upgraded, context.Output, context.Progress, context.CancellationToken);
+            var flow = new Mqtt5ClientFlow(upgraded, context.Output, context.Progress, context.TimeProvider, context.CancellationToken);
             try
             {
                 Mqtt5Connect connectPacket = Mqtt5ProtocolHandler.ConnectFor(Mqtt5ProtocolHandler.ClientIdentifierPrefix + clientIdentifierSuffixSource(), context.Credentials);
