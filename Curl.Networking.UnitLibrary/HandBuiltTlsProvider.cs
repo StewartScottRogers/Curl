@@ -44,7 +44,7 @@ namespace Curl.Networking;
 /// <see cref="CertificateStatusFailureMessages" /> gives (ADR-0191).
 /// </para>
 /// </remarks>
-public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
+public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings, ISystemStoreTrustTlsProvider
 {
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.HandBuilt;
@@ -141,6 +141,23 @@ public sealed class HandBuiltTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// <see cref="SslStreamTlsProvider.Warnings" /> gives them.
     /// </summary>
     public IReadOnlyList<string> Warnings { get; }
+
+    /// <summary>
+    /// Gets the settings its handshakes run with, once the build's range and security level
+    /// have adjusted them; adjusting them again changes nothing.
+    /// </summary>
+    internal TlsClientOptions Options => _options;
+
+    /// <inheritdoc />
+    public ITlsProvider WithSystemStoreOnlyTrust() =>
+        new HandBuiltTlsProvider(
+            ISystemStoreTrustTlsProvider.SystemStoreOnly(_options),
+            _matchesSchannelBuild,
+            _timeProvider,
+            _certificateStore,
+            _random,
+            _sessions,
+            _echConfigs);
 
     // A range that reaches TLS 1.3 offers it, and one whose minimum is below TLS 1.3 offers
     // TLS 1.2 and below; a range doing both offers them in one ClientHello (ADR-0162, ADR-0205).

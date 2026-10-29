@@ -2395,13 +2395,26 @@ public sealed partial class TcpConnector(
         ConnectTarget target,
         CancellationToken cancellationToken) =>
         AuthenticateAsync(
-            target.IsForwardProxy ? _proxyTlsProvider : tlsProvider,
+            TrustedAs(target, target.IsForwardProxy ? _proxyTlsProvider : tlsProvider),
             plaintext,
-            target.Host,
+            target.TlsServerName ?? target.Host,
             target,
             target.IsForwardProxy,
             ApplicationProtocolsFor(target, HttpOverTlsApplicationProtocols),
             cancellationToken);
+
+    /// <summary>
+    /// Returns the provider whose trust <paramref name="target" /> asks for: one trusting only the
+    /// system store when <see cref="ConnectTarget.TrustsSystemStoreOnly" /> is set and the provider
+    /// can make one, otherwise <paramref name="provider" /> itself (CGR-289, ADR-0974).
+    /// </summary>
+    /// <param name="target">The target whose handshake is about to run.</param>
+    /// <param name="provider">The provider the target's handshake would otherwise run through.</param>
+    /// <returns>The provider to run the handshake through.</returns>
+    internal static ITlsProvider TrustedAs(ConnectTarget target, ITlsProvider provider) =>
+        target.TrustsSystemStoreOnly && provider is ISystemStoreTrustTlsProvider systemStoreTrust
+            ? systemStoreTrust.WithSystemStoreOnlyTrust()
+            : provider;
 
     /// <summary>
     /// Returns the protocols the handshake with <paramref name="target" /> offers through ALPN:

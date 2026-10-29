@@ -25,7 +25,7 @@ namespace Curl.Networking;
 /// <see cref="TlsClientOptions.CaCertificateDirectory" />, which the OpenSSL build honours
 /// and the Schannel build ignores with <see cref="Warnings" />.
 /// </remarks>
-public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings
+public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsProviderWithWarnings, ISystemStoreTrustTlsProvider
 {
     /// <inheritdoc />
     TlsClientRoute IHandshakeReportingTlsProvider.Route => TlsClientRoute.SslStream;
@@ -197,6 +197,20 @@ public sealed class SslStreamTlsProvider : IHandshakeReportingTlsProvider, ITlsP
     /// </summary>
     internal Func<SslStream, SslClientAuthenticationOptions, CancellationToken, Task> AuthenticateSslStreamAsClientAsync { get; init; } =
         SslStreamAuthenticateAsClientAsync;
+
+    /// <summary>
+    /// Gets the settings the provider was built with.
+    /// </summary>
+    internal TlsClientOptions Options => _options;
+
+    /// <inheritdoc />
+    public ITlsProvider WithSystemStoreOnlyTrust() =>
+        new SslStreamTlsProvider(ISystemStoreTrustTlsProvider.SystemStoreOnly(_options), _matchesSchannelBuild, _timeProvider, _certificateStore)
+        {
+            SessionPartitions = SessionPartitions,
+            CipherSuitesPolicyFactory = CipherSuitesPolicyFactory,
+            AuthenticateSslStreamAsClientAsync = AuthenticateSslStreamAsClientAsync,
+        };
 
     /// <inheritdoc />
     /// <remarks>

@@ -161,6 +161,30 @@ public sealed record ConnectTarget(string Host, int Port, bool UseTls)
     /// </summary>
     public ITcpSocketOpener? SocketOpener { get; init; }
 
+    /// <summary>
+    /// Gets the host the TLS handshake sends as its server name (SNI) and checks the server
+    /// certificate against in place of <see cref="Host" />, or <see langword="null" />, the
+    /// default, to use <see cref="Host" />.
+    /// </summary>
+    /// <remarks>
+    /// The connector still resolves and dials <see cref="Host" />. The LDAP handler sets it for
+    /// the second connection curl's WinLDAP opens to an <c>ldaps://</c> server, which names the
+    /// machine rather than the URL's host (CGR-289, ADR-0974).
+    /// </remarks>
+    public string? TlsServerName { get; init; }
+
+    /// <summary>
+    /// Gets whether the TLS handshake trusts only the system certificate store, ignoring
+    /// <c>--cacert</c>, <c>--capath</c>, a CA blob and <c>-k</c>; <see langword="false" />, the
+    /// default, to trust as the transfer's options say.
+    /// </summary>
+    /// <remarks>
+    /// A TLS provider that cannot trust otherwise than its options say ignores it. Set for the
+    /// same WinLDAP connection as <see cref="TlsServerName" />, which Windows verifies against its
+    /// own store whatever curl was told (CGR-289, ADR-0974).
+    /// </remarks>
+    public bool TrustsSystemStoreOnly { get; init; }
+
     private static string RequireHost(string host)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host, nameof(Host));

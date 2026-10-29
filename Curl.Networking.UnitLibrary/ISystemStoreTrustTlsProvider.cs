@@ -1,0 +1,34 @@
+using Curl.Protocol.Abstractions;
+
+namespace Curl.Networking;
+
+/// <summary>
+/// An <see cref="ITlsProvider" /> that can hand out a copy of itself trusting only the system
+/// certificate store, for a <see cref="ConnectTarget" /> whose
+/// <see cref="ConnectTarget.TrustsSystemStoreOnly" /> is set (CGR-289, ADR-0974).
+/// </summary>
+internal interface ISystemStoreTrustTlsProvider : ITlsProvider
+{
+    /// <summary>
+    /// Returns a provider of the same build and settings, except that it ignores
+    /// <c>--cacert</c>, <c>--capath</c>, a CA blob and <c>-k</c>, so the server certificate must
+    /// verify against the system store and the host name must match.
+    /// </summary>
+    /// <returns>The provider that trusts only the system store.</returns>
+    ITlsProvider WithSystemStoreOnlyTrust();
+
+    /// <summary>
+    /// Returns <paramref name="options" /> with every trust setting beside the system store
+    /// removed: no CA file, CA directory or CA blob, and not insecure.
+    /// </summary>
+    /// <param name="options">The settings a provider was built with.</param>
+    /// <returns>The settings that trust only the system store.</returns>
+    static TlsClientOptions SystemStoreOnly(TlsClientOptions options) =>
+        options with
+        {
+            Insecure = false,
+            CaCertificateFile = null,
+            CaCertificateDirectory = null,
+            CaCertificateBlob = null,
+        };
+}
