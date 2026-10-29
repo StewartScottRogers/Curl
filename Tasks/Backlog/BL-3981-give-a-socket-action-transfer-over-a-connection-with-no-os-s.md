@@ -4,7 +4,7 @@ title: Give a socket-action transfer over a connection with no OS socket a socke
 priority: High
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4015, BL-4016, BL-4007]
+depends-on: [BL-4015, BL-4016, BL-4007, BL-3990]
 touches: [Curl.Engine.UnitLibrary/TransferSocketWait.cs, Curl.Engine.UnitLibrary/SocketActionGatedTcpDialer.cs, Curl.Engine.UnitTests/TransferSocketWaitTests.cs, Curl.Conformance.LibTest.UnitLibrary/Lib530Run.cs, Curl.Conformance.LibTest.UnitLibrary/Lib582Run.cs]
 requirement: none
 created: 2026-10-28
@@ -33,6 +33,7 @@ Prerequisite of BL-3976 (CGR-034, ADR-0948). BL-3976's stash (kept by the shift;
 
 - 2026-10-28 run (lane 4): `TransferSocketWait.TakeSocket(nint?)` sets `Socket` once a dial gives a connection: its OS handle, or with none the engine's next number from `FirstEngineSocket` (`0x50000000`, apart from ConnectOnly's `0x60000000` and `FirstTransferSocket`'s `0x40000000`); `SignalOn(socket, events)` signals the wait when an action names its socket (ADR-0955). `SocketActionGatedTcpDialer` calls `TakeSocket` after each dial (added to `touches`; no task in Doing on origin/work/dark-factory names it). Seven tests in `TransferSocketWaitTests`. Build clean, fast tests green, Measure-CodeQuality for Curl.Engine.UnitLibrary 0 failing members. `Lib530Run` and `Lib582Run` act on every socket in their sets each turn (ADR-0663), so they need no change.
 - Criterion 2 cannot be checked here: `ManagedMultiTransfer` in this tree does not use `TransferSocketWait` at all - the wiring and the removal of the 10 ms timer are BL-3976's stashed work, and BL-3976 listed this task in its `depends-on`, a cycle. Broken by committing this run's finished code (criteria 1, 3, 4 met, so BL-3976 finds it in the tree, not in a stash only this task's claim restores), removing BL-3981 from BL-3976's `depends-on`, and requeueing this task on BL-3976. Once BL-3976 is Done, the next claim only runs the upstream cases of `Lib530Run` and `Lib582Run` to tick criterion 2.
+- 2026-10-28 run (lane 3): BL-4016 is Done (socket actions wired through `ManagedMultiTransfer`; test530 and test582 pass), but `RunningTransferCheckInterval` (10 ms) is still in `ManagedMultiTransfer.cs:106`; removing it is BL-3990, in Doing on lane 6 (BL-3976 is Deferred, its work split to BL-3990). Added BL-3990 to `depends-on` and requeued before any edit. Once BL-3990 is Done, the next claim runs the upstream cases of `Lib530Run` and `Lib582Run` (`CURL_UPSTREAM_CASE` 530, 582) to tick criterion 2.
 
 ## Log
 
@@ -40,3 +41,4 @@ Prerequisite of BL-3976 (CGR-034, ADR-0948). BL-3976's stash (kept by the shift;
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 3d275639 25a722b8 a00c97c3 779790c0.
 - 2026-10-28: Doing -> Backlog. Criteria 1, 3, 4 met and committed; criterion 2 needs BL-3976's ManagedMultiTransfer wiring (cycle broken: BL-3976 no longer waits on BL-3981)
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 3d275639 25a722b8 a00c97c3 779790c0.
+- 2026-10-28: Doing -> Backlog. Criterion 2 needs the 10 ms timer removed from ManagedMultiTransfer: BL-3990 (Doing on lane 6)
