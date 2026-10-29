@@ -4,7 +4,7 @@ title: Fix CGR-289: Windows ldaps://: PORT uses one connection with SNI localhos
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4026, BL-4054, BL-4055]
+depends-on: [BL-4026, BL-4054, BL-4055, BL-4056]
 touches: [Curl.Protocol.Ldap.UnitLibrary/LdapProtocolHandler.cs, Curl.Protocol.Ldap.UnitLibrary/WinLdapResultText.cs, Curl.Protocol.Ldap.UnitTests/Cgr289Tests.cs]
 model: sonnet
 requirement: none
@@ -84,3 +84,4 @@ Notes (2026-10-28 lane 8, requeue): The fix needs ConnectTarget to carry an SNI 
 
 Notes (2026-10-28 lane 4): Code done: LdapProtocolHandler.WinLdapTargetOf gives the WinLDAP second ldaps connection TlsServerName = Environment.MachineName and TrustsSystemStoreOnly; Cgr289Tests.cs pins it; Ldap fast tests pass (638); Measure-CodeQuality for the library reports 0 failing members. Not done: real-curl measurement, NTLM flags and single bind; filed BL-4044. Once BL-4044 is Done, tick the criteria here from its Notes.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+- 2026-10-29: Doing -> Backlog. Code and -k measurement done (BL-4054, BL-4055); the --cacert variant is BL-4056's work, which closes this task
