@@ -31,13 +31,15 @@ Found by the shift-end review of 2026-10-28 (code-reviewer and silent-failure-hu
 
 ## Acceptance criteria
 
-- [ ] The `Resolving timed out` result is returned only when the `-m` / connect deadline has been reached. Other cancellations still propagate as `OperationCanceledException`.
-- [ ] A test in `Curl.Networking.UnitTests` cancels the caller's token during a lookup that has not reached the deadline. It checks that the connect throws `OperationCanceledException` and writes no `Resolving timed out` info line.
-- [ ] The existing CGR-284 tests still pass.
-- [ ] The comment at the catch says what the code does.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The `Resolving timed out` result is returned only when the `-m` / connect deadline has been reached. Other cancellations still propagate as `OperationCanceledException`.
+- [x] A test in `Curl.Networking.UnitTests` cancels the caller's token during a lookup that has not reached the deadline. It checks that the connect throws `OperationCanceledException` and writes no `Resolving timed out` info line.
+- [x] The existing CGR-284 tests still pass.
+- [x] The comment at the catch says what the code does.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+The Resolving catch now tests the elapsed time against the connect limit (as the Connection timed out catch does) and comes first, since it is the more specific type. The old CGR-284 test cancelled the caller token at time 0; it now advances the clock past the limit. CI Linux/macOS: tests are platform-neutral.
 
 ## Log
 
