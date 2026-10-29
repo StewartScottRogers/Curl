@@ -16,5 +16,7 @@ public static class ExtensionResolverHookCatalogue
     /// <summary>Gets the activators; at most one may activate for an option group, and none beside <c>--doh-url</c>.</summary>
     public static IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> Entries { get; } =
     [
+        Curl.Extension.EncryptedDns.EncryptedDnsExtension.ActivateDnsOverTls,
+        Curl.Extension.EncryptedDns.EncryptedDnsExtension.ActivateDnsOverQuic,
     ];
 }

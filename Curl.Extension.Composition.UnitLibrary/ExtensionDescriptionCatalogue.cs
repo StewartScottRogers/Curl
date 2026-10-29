@@ -22,5 +22,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
         Xmpp.Client.XmppExtension.Description,
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
+        Curl.Extension.EncryptedDns.EncryptedDnsExtension.Description,
     ];
 }
