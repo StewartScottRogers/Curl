@@ -29,7 +29,7 @@ Split from BL-4124 for size (its Notes ask for "wire format, then the client flo
 
 ## Notes
 
-- Delivered directly rather than through the full `/feature` stages: one small, specification-pinned library whose design is recorded in ADR-1012, and the run's cost cap is $3.
+- Delivered directly rather than through the full `/feature` stages: one small, specification-pinned library whose design is recorded in ADR-1013, and the run's cost cap is $3.
 - `Signing/S3RequestSigner` returns the three headers to add; `S3CanonicalRequest` and `S3UriEncoder` are public so their rules are tested on their own. The four reference examples (GET Object, PUT Object, GET Bucket Lifecycle, GET Bucket list objects) reproduce their published signatures.
 - The first quality run failed only on `[GeneratedRegex]` code, measured as the library's own; replaced by split and join.
 - Measure-CodeQuality.ps1 -Library Curl.Extension.S3.UnitLibrary: 100% line, 100% branch, 0 failing members, worst CRAP 10. `dotnet build` clean (VerifyExtensionIsolation runs in it), fast tests green (exit 0). The code is platform-neutral (no paths, OS text or certificates), which meets the CI criterion on Linux and macOS.

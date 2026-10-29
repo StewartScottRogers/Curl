@@ -1,6 +1,6 @@
 # Curl.Extension.S3.UnitLibrary
 
-The S3 extension (ADR-0999, ADR-1012). Namespace `Curl.Extension.S3`. It references nothing but the base
+The S3 extension (ADR-0999, ADR-1013). Namespace `Curl.Extension.S3`. It references nothing but the base
 class library so far, and never `Curl.Protocol.Http` (whose `--aws-sigv4` code is curl's, not
 this extension's). The XML wire format (`Xml/`, BL-4198), the client flow (`Http/`, BL-4199) and
 the options arrive in later tasks.

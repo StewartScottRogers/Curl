@@ -1,4 +1,4 @@
-# ADR-1012: The S3 extension signs with its own SigV4 signer, which returns the headers to add
+# ADR-1013: The S3 extension signs with its own SigV4 signer, which returns the headers to add
 
 - Status: Accepted
 - Date: 2026-10-29
