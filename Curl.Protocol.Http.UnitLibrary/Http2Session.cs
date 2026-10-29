@@ -446,13 +446,47 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
             return;
         }
 
+        IReadOnlyList<HeaderField>? fields = await DecodeHeaderBlockAsync(frame, cancellationToken).ConfigureAwait(false);
         if (frame.Type == Http2FrameType.PushPromise)
         {
-            await OfferPushAsync(frame, Decode(frame.Content), cancellationToken).ConfigureAwait(false);
+            await OfferPushAsync(frame, fields!, cancellationToken).ConfigureAwait(false);
             return;
         }
 
-        Route(frame);
+        Route(frame, fields);
+    }
+
+    /// <summary>
+    /// Decodes the header block of a HEADERS or PUSH_PROMISE frame, or gives <see langword="null" /> for any
+    /// other frame. A block that does not decode closes the connection with GOAWAY COMPRESSION_ERROR and no
+    /// debug data, as nghttp2 does after a failed inflate (CGR-280), and fails the transfer with exit 16.
+    /// </summary>
+    private async ValueTask<IReadOnlyList<HeaderField>?> DecodeHeaderBlockAsync(Http2StreamFrame frame, CancellationToken cancellationToken)
+    {
+        if (frame.Type is not (Http2FrameType.Headers or Http2FrameType.PushPromise))
+        {
+            return null;
+        }
+
+        try
+        {
+            return decoder.Decode(frame.Content.Span);
+        }
+        catch (HpackDecodingException)
+        {
+            HttpTransferException failure = new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.CompressionError));
+            connectionFailure = ExceptionDispatchInfo.Capture(failure);
+            try
+            {
+                await Frames.SendGoAwayAsync(Http2ErrorCode.CompressionError, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                // The transport is already gone; the compression error is still what the transfer reports.
+            }
+
+            throw failure;
+        }
     }
 
     /// <summary>
@@ -530,9 +564,8 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         }
     }
 
-    private void Route(Http2StreamFrame frame)
+    private void Route(Http2StreamFrame frame, IReadOnlyList<HeaderField>? fields)
     {
-        IReadOnlyList<HeaderField>? fields = frame.Type == Http2FrameType.Headers ? Decode(frame.Content) : null;
         if (!openStreams.TryGetValue(frame.StreamId, out Http2StreamConnection? owner))
         {
             return;
@@ -544,24 +577,6 @@ internal sealed class Http2Session : IHttpStreamSession, IConnectionSession
         {
             _ = openStreams.Remove(frame.StreamId);
             owner.FrameTrace?.StreamClosed(frame.StreamId);
-        }
-    }
-
-    /// <summary>
-    /// Decodes a header block; one that does not decode fails the connection with exit 16, as
-    /// curl reports nghttp2's COMPRESSION_ERROR.
-    /// </summary>
-    private IReadOnlyList<HeaderField> Decode(ReadOnlyMemory<byte> block)
-    {
-        try
-        {
-            return decoder.Decode(block.Span);
-        }
-        catch (HpackDecodingException)
-        {
-            HttpTransferException failure = new(CurlExitCode.Http2, HttpTransferMessages.Http2ShutsDownConnection(Http2ErrorCode.CompressionError));
-            connectionFailure = ExceptionDispatchInfo.Capture(failure);
-            throw failure;
         }
     }
 

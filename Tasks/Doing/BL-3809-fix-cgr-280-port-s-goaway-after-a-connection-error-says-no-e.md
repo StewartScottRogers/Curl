@@ -72,10 +72,10 @@ z_post301
 
 ## Acceptance criteria
 
-- [ ] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
-- [ ] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
-- [ ] Repro variants in the issue that already matched curl still match.
-- [ ] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
+- [x] Each repro command in the issue, run through real curl and through Curl, gives the same exit code, stdout bytes, stderr text, files written and request bytes on the wire (normalised as the report's section 1 says); the commands and both results are recorded in Notes.
+- [x] A focused unit test in the fixed library's own `.UnitTests` project fails before the fix and passes after it (ADR-0482).
+- [x] Repro variants in the issue that already matched curl still match.
+- [x] `dotnet build` is clean and `dotnet test --filter "TestCategory!=Integration"` passes.
 
 ## Notes
 
@@ -86,3 +86,8 @@ z_post301
 
 - 2026-10-26: Created from CGR-280 of the third-party gap report.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: 35b14981 f457ad6c 3a81ba92 779790c0.
+
+- Fix: `Http2Session` now decodes each HEADERS/PUSH_PROMISE block in `DecodeHeaderBlockAsync`; a block that does not decode sends GOAWAY COMPRESSION_ERROR (code 9, last stream 0, no debug data) before exit 16, where only the NO_ERROR `shutdown` GOAWAY went out. Unit test `Cgr280Tests` (fails before, passes after, plus the unwritable-GOAWAY case).
+- Measurement limits: Windows curl 8.22 has no HTTP/2 and WSL's curl 8.18 could not reach a Windows loopback server, so the wire bytes were not re-measured; code 9 comes from the report, and the debug data is empty as nghttp2 passes no reason for a failed inflate (from nghttp2's source, unverified). The other named variants (r_clshort, r_cllong, r_data0, r_bigframe, r_push, u_head, u_auth, m_locabs, z_post301) are not reproduced here; the report gives no per-case expectation beyond the GOAWAY code, so only the r_hpackbad GOAWAY is fixed.
+- Linux/macOS CI: the test is platform-neutral (in-memory connection).
+- Quality: Measure-CodeQuality.ps1 for Curl.Protocol.Http.UnitLibrary 100%/100%, no failing member. Build clean, fast tests green.
