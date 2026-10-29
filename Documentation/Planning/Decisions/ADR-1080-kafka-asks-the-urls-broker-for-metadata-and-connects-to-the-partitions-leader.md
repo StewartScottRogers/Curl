@@ -1,4 +1,4 @@
-# ADR-1077: Kafka asks the URL's broker for Metadata and connects to the partition's leader
+# ADR-1080: Kafka asks the URL's broker for Metadata and connects to the partition's leader
 
 - Status: Accepted
 - Date: 2026-10-29

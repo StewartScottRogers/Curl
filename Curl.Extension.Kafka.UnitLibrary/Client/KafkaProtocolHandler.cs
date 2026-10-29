@@ -7,7 +7,7 @@ namespace Curl.Extension.Kafka.Client;
 /// Serves <c>kafka://host[:port]/topic[/partition][?offset=N]</c> (port 9092) and <c>kafkas://</c> (port 9093, TLS
 /// from the connector) with the Kafka protocol (ADR-1076): with a body (<c>-d</c>) it produces one record whose value
 /// is the body, otherwise it consumes the partition from the offset to its end. It asks the URL's broker for Metadata
-/// first and, when another broker leads the partition, connects to that leader instead (ADR-1077). The exchange
+/// first and, when another broker leads the partition, connects to that leader instead (ADR-1080). The exchange
 /// itself is <see cref="KafkaClientFlow"/>.
 /// </summary>
 /// <param name="connector">Opens the connection to the broker.</param>

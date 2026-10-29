@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Kafka.Client;
 
 /// <summary>
-/// The Kafka exchange over any byte transport (ADR-1076, ADR-1077): Metadata v4 to find the partition's leader, then
+/// The Kafka exchange over any byte transport (ADR-1076, ADR-1080): Metadata v4 to find the partition's leader, then
 /// Produce v3 of one record and its acknowledgement, or Fetch v4 from an offset, writing each record's value and a line
 /// feed to the output and fetching again until the partition's high watermark. A topic or partition error, a malformed
 /// response or a wrong correlation id ends with exit 8.

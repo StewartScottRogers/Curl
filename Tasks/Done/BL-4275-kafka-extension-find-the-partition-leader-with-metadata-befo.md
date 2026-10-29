@@ -29,7 +29,7 @@ Follow-up of BL-4121 (ADR-1076): the client sends Produce and Fetch to the URL's
 
 ## Notes
 
-- Plan: Metadata v4 (oldest Kafka 4.0 accepts, non-flexible) for the URL topic on the URL broker, `allow_auto_topic_creation` false; same host and port continues on that connection, otherwise the handler reconnects through the connector to the advertised leader with the URL TLS choice and the transfer proxy and logs. Decided in ADR-1077; ADR-1076 "Left out" now points to it.
+- Plan: Metadata v4 (oldest Kafka 4.0 accepts, non-flexible) for the URL topic on the URL broker, `allow_auto_topic_creation` false; same host and port continues on that connection, otherwise the handler reconnects through the connector to the advertised leader with the URL TLS choice and the transfer proxy and logs. Decided in ADR-1080; ADR-1076 "Left out" now points to it.
 - Touches widened (no Doing task on origin held them): KafkaRequests.cs (the Metadata request beside Produce and Fetch), KafkaTestBytes.cs (Metadata response builder), ScriptedKafkaConnector.cs (several connections in turn), the library CLAUDE.md and ADR-1076 (criterion 3).
 - Measured: Measure-CodeQuality for Curl.Extension.Kafka.UnitLibrary 100% line, 100% branch, 0 failing members, worst CRAP 8. Full build clean, fast tests green (72 test assemblies passed). Tests use scripted connections only, no paths or OS text, so they are platform-neutral.
 

@@ -11,7 +11,7 @@ it `Curl.Protocol.Abstractions`) and the base class library. The handler is regi
   `ProtocolHandlerServices.Connector`.
 - `KafkaProtocolHandler` serves `kafka://` (port 9092) and `kafkas://` (port 9093, TLS); `KafkaAddress` reads the
   topic, partition and `?offset=N` from the URL.
-- `KafkaClientFlow` first finds the partition's leader with Metadata (ADR-1077; the handler reconnects to it when it is
+- `KafkaClientFlow` first finds the partition's leader with Metadata (ADR-1080; the handler reconnects to it when it is
   another broker), then produces one record with a body, or fetches from the offset to the high watermark and writes each
   record value and a line feed. `KafkaClientMessages` holds the error texts and `KafkaClientException` carries the exit
   code.
