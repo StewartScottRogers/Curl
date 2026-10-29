@@ -1,5 +1,5 @@
 ---
-id: BL-4164
+id: BL-4171
 title: Pass extension command-line options from Curl.Console to the parser and to transfers
 priority: High
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4164 — Pass extension command-line options from Curl.Console to the parser and to transfers
+# BL-4171 — Pass extension command-line options from Curl.Console to the parser and to transfers
 
 ## Goal
 

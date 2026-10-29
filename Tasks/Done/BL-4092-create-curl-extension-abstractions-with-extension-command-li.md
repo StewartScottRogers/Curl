@@ -42,7 +42,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
   `ExtensionCommandLineOptions.cs`, a reference to Abstractions in its csproj, and its CLAUDE.md.
 - Criterion 2 is met across three tests: the catalogue path in `ExtensionCommandLineOptionsTests`, the parse in
   `CommandLineExtensionOptionTests`, and the read in `ExtensionOptionValuesTests`. Wiring the Console's parse
-  call (in `CurlCommandRunner.cs`, held by BL-4088) is filed as BL-4164; `CurlComposition.cs` needed no change.
+  call (in `CurlCommandRunner.cs`, held by BL-4088) is filed as BL-4171; `CurlComposition.cs` needed no change.
 - Measure-CodeQuality.ps1: Curl.Cli, Curl.Extension.Composition and Curl.Extension.Abstractions all 100% line
   and branch, 0 failing (the private `Parse` reached complexity 12; `CreateOptions` was extracted).
 - Tests are platform-neutral (no paths read, no OS text), so CI on Linux and macOS is covered by the fast tests here.
@@ -53,4 +53,4 @@ Keep the contract minimal: later groundwork tasks add transfer, connection, reso
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: a1784791 6733a932 33e4531e 38c80764 51538dbb e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Done. Extension options parse where curl has none, are checked at composition and are refused as unknown with extensions off; Console wiring filed as BL-4164.
+- 2026-10-29: Doing -> Done. Extension options parse where curl has none, are checked at composition and are refused as unknown with extensions off; Console wiring filed as BL-4171.
