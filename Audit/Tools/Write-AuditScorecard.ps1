@@ -89,6 +89,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on Windows, PowerShell 7 elsewhere (BL-3927).
+$PowerShellExe = if ($PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows) { 'powershell' } else { 'pwsh' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 # RunAudit.ps1 passes -ChangedTree through powershell -File as one comma-joined argument,
 # which arrives as a single string: split it, or an auditor that changed the tree is not
@@ -410,7 +412,7 @@ if ($SelfTest) {
         $full = [pscustomobject]@{ metrics = [pscustomobject]@{ 'method.rulesChecked' = 8 } }
         Check 'a report without its method counts is a skipped method' ((@(Get-MissingMethodCounts 'truthfulness' $reauditOnly).Count -eq 5) -and (@(Get-MissingMethodCounts 'process' $partial).Count -eq 1) -and (@(Get-MissingMethodCounts 'process' $full).Count -eq 0)) 'truthfulness 5 missing, process 0 counts as missing, 8 does not'
         Check 'a catch by the wrong auditor does not count' ($state.Auditors['security'].Caught -eq 0 -and $state.Auditors['truthfulness'].Caught -eq 1) "security caught $($state.Auditors['security'].Caught)"
-        $only = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -ReliabilityOnly -ReportDirectory $ReportDirectory -Manifest $Manifest -FindingsDirectory $FindingsDirectory) -join ','
+        $only = @(& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -ReliabilityOnly -ReportDirectory $ReportDirectory -Manifest $Manifest -FindingsDirectory $FindingsDirectory) -join ','
         Check '-ReliabilityOnly prints exactly the two names' ($only -eq 'security,conformance') $only
         $first = Write-Scorecard $state 'fp-new'
         $ScorecardsDirectory = Join-Path $work 'b'
@@ -421,13 +423,13 @@ if ($SelfTest) {
         Check 'no placeholder left' ($text -notmatch '\{\{') 'none'
         Check 'the fingerprint is in the header' ($text -match '\| Auditor fingerprint \| fp-new \|') 'fp-new'
         Check 'previous scorecard and fingerprint change' ($text -match '\| Previous scorecard \| \[2026-10-07_0900\]\(2026-10-07_0900\.md\) \|' -and $text -match '\| Auditor fingerprint \| changed \|') 'linked, changed'
-        Check 'a delta: tasksDone 18 -> 20 is +2' ((($text -split '## Change since')[1]) -match '(?m)^\| `tasksDone` \| \+2 \|$') 'tasksDone delta'
+        Check 'a delta: tasksDone 18 -> 20 is +2' ((($text -split '## Change since')[1]) -match '(?m)^\| `tasksDone` \| \+2 \|\r?$') 'tasksDone delta'
         Check 'no performance auditor row or table' ($text -notmatch '(?m)^\| performance \|' -and $text -notmatch '(?m)^#+ Performance$') 'none'
         $old = Join-Path $work 'old-scorecard.md'
         [IO.File]::WriteAllText($old, "| quality | opus | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 100% | yes |`n| performance | sonnet | 2 | 0 | 0 | 0 | 0 | 0 | 2 | 1 | 1 | 100% | yes |`n## Performance`n`n| large-get | 60.0 | 80.0 | 9000000 | 70.0 | 90.0 | 9000000 |`n| Curl native AOT | 16021504 |`n")
         $oldValues = Read-PreviousValues $old
         Check 'a scorecard from before the performance auditor''s retirement is read past its row and table' ($oldValues['QUALITY_NEW_CRITICAL'] -eq '1' -and -not @($oldValues.Keys | Where-Object { $_ -like 'PERFORMANCE_*' -or $_ -like 'LARGE_GET_*' -or $_ -eq 'CANDIDATE_BINARY_BYTES' }).Count) "$(@($oldValues.Keys) -join ',')"
-        Check 'a catch-rate delta in points: quality 0% -> 100% is +100' ((($text -split '## Change since')[1]) -match '(?m)^\| quality \|( [^|]+ \|){9} \+100 \|$') 'quality +100'
+        Check 'a catch-rate delta in points: quality 0% -> 100% is +100' ((($text -split '## Change since')[1]) -match '(?m)^\| quality \|( [^|]+ \|){9} \+100 \|\r?$') 'quality +100'
         Check 'unreliable numbers are marked' ($text -match '\| security \| opus \| 0 \(unreliable\) \|') 'security row'
         Check 'the model column comes from -Models' ($text -match '\| process \| sonnet \|' -and $text -match '\| security \| opus \|') 'process sonnet, security opus'
         Check 'new findings listed' ($text -match '- \[AF-0002\]\(\.\./Findings/AF-0002-x\.md\) - High - quality - New quality finding') 'AF-0002'
@@ -463,5 +465,5 @@ if (-not $ScorecardsDirectory) { $ScorecardsDirectory = Join-Path $repo 'Audit\S
 $state = Get-AuditState
 if ($ReliabilityOnly) { Get-UnreliableNames $state | ForEach-Object { Write-Output $_ }; exit 0 }
 if (-not $Commit) { throw 'Give -Commit.' }
-if (-not $Fingerprint) { $Fingerprint = "$(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Get-AuditorFingerprint.ps1') -Root $repo)".Trim() }
+if (-not $Fingerprint) { $Fingerprint = "$(& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Get-AuditorFingerprint.ps1') -Root $repo)".Trim() }
 Write-Output (Write-Scorecard $state $Fingerprint)

@@ -93,7 +93,9 @@
     Audit/Findings and the Tasks folder at -Ref as it stands before the fetch.
 
 .PARAMETER NewTab
-    Start the audit in a new herdr tab (a console window outside herdr) and return at once.
+    Start the audit in a new herdr tab and return at once. Outside herdr it starts in a new
+    console window on Windows, and off Windows as a detached pwsh writing
+    <repo>.audit/RunAudit-<stamp>.log (and .log.err).
     Whatever way that run ends, its tab's caption ends in "read" (BL-2133): "done, read" when it
     finishes (a -DryRun included), "FAILED, read" on any error (seeding, an auditor, the scorecard,
     anything thrown), "REFUSED, read" when it refuses to start (a running shift, the lane marker,
@@ -113,6 +115,9 @@
     Audit\RunAudit.cmd -Auditors truthfulness,process -Planted 2
 .EXAMPLE
     Audit\RunAudit.cmd -NewTab -ReauditOnly -AlongsideShift
+.EXAMPLE
+    Audit/RunAudit.sh -NewTab -DryRun
+    On Linux and macOS: the same script under pwsh, with the same arguments (BL-3927).
 #>
 param(
     [string]$Ref = 'origin/work/dark-factory',
@@ -127,10 +132,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 on Windows, PowerShell 7 elsewhere (BL-3927).
+$OnWindows = $PSVersionTable.PSVersion.Major -lt 6 -or $IsWindows
+$PowerShellExe = if ($OnWindows) { 'powershell' } else { 'pwsh' }
 # <repo> is the main checkout, whichever worktree this copy runs from: the folder holding the
 # shared .git, beside which the factory keeps <repo>.logs and the audit keeps <repo>.audit.
 $commonGit = "$(& git -C $PSScriptRoot rev-parse --path-format=absolute --git-common-dir 2>$null)".Trim()
-$repo = if ($commonGit) { Split-Path ($commonGit -replace '/', '\') -Parent } else { (Resolve-Path (Join-Path $PSScriptRoot '..')).Path }
+if ($OnWindows) { $commonGit = $commonGit -replace '/', '\' }
+$repo = if ($commonGit) { Split-Path $commonGit -Parent } else { (Resolve-Path (Join-Path $PSScriptRoot '..')).Path }
 $Order = @('quality', 'security', 'conformance', 'truthfulness', 'process')
 # quality, truthfulness and process moved from Sonnet to Opus (Stewart, 2026-10-03, BL-1364): on Sonnet they
 # cut their methods short in three audits running, even when told to run every step.
@@ -217,8 +226,16 @@ function Invoke-Agent([string]$Name, [string]$Model, [string]$Prompt, [string]$W
     # One headless agent run; writes its final reply to $ReplyPath and adds its cost.
     $stream = [IO.Path]::ChangeExtension($ReplyPath, '.jsonl')
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $env:ComSpec
-    $psi.Arguments = "/d /c claude -p --agent $Name --model $Model --dangerously-skip-permissions --output-format stream-json --verbose > `"$stream`" 2> `"$stream.err`""
+    $claude = "claude -p --agent $Name --model $Model --dangerously-skip-permissions --output-format stream-json --verbose > `"$stream`" 2> `"$stream.err`""
+    if ($OnWindows) {
+        $psi.FileName = $env:ComSpec
+        $psi.Arguments = "/d /c $claude"
+    }
+    else {
+        $psi.FileName = '/bin/sh'
+        $psi.ArgumentList.Add('-c')
+        $psi.ArgumentList.Add("exec $claude")
+    }
     $psi.WorkingDirectory = $WorkingDirectory
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
@@ -513,14 +530,23 @@ if ($NewTab) {
         $pane = $created.result.root_pane.pane_id
         if ($pane) {
             & $herdr pane wait-output $pane --match '>' --timeout 15000 2>&1 | Out-Null
-            $line = "powershell -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" " + ($forward -join ' ')
+            $line = "$PowerShellExe -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" " + ($forward -join ' ')
             & $herdr pane run $pane $line.Replace('"', '\"') 2>&1 | Out-Null
             Write-Host "Audit started in herdr tab $($created.result.tab.tab_id)."
             exit 0
         }
     }
-    $p = Start-Process -FilePath 'powershell.exe' -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"") + $forward) -WorkingDirectory $repo -PassThru
-    Write-Host "Audit started in a new console window (pid $($p.Id))."
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"") + $forward
+    if ($OnWindows) {
+        $p = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WorkingDirectory $repo -PassThru
+        Write-Host "Audit started in a new console window (pid $($p.Id))."
+        exit 0
+    }
+    # No console windows off Windows: a detached pwsh writing its output beside the run folders.
+    New-Item -ItemType Directory -Force $AuditRoot | Out-Null
+    $out = Join-Path $AuditRoot "RunAudit-$Stamp.log"
+    $p = Start-Process -FilePath 'pwsh' -ArgumentList $arguments -WorkingDirectory $repo -RedirectStandardOutput $out -RedirectStandardError "$out.err" -PassThru
+    Write-Host "Audit started as pid $($p.Id), writing $out."
     exit 0
 }
 
@@ -528,7 +554,8 @@ if ($NewTab) {
 
 $script:CaptionsOn = $true
 if ($env:CURL_RUNAUDIT_FAULT -eq '1') { throw 'Injected fault (CURL_RUNAUDIT_FAULT, the self-test''s).' }
-$processes = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine)
+$processes = if ($OnWindows) { @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object CommandLine) }
+else { @(& ps -axo 'args=' | ForEach-Object { [pscustomobject]@{ CommandLine = "$_".Trim() } }) }
 $refusal = Get-RefusalReason $processes $env:CURL_DARK_FACTORY_LANE $AlongsideShift.IsPresent
 if ($refusal) { Write-Host $refusal; Exit-Audit 'refused' 1 }
 
@@ -538,15 +565,21 @@ $Selected = @($Order | Where-Object { $Auditors -contains $_ })
 if (-not $ReauditOnly -and $Planted -lt $Selected.Count) { Write-Host "-Planted $Planted is fewer than the $($Selected.Count) auditors selected; each needs at least one."; Exit-Audit 'refused' 1 }
 if ($Seed -lt 0) { $Seed = [int]($Started.Ticks % 1000000007) }
 
+# The dry runs' paths, with this platform's separator.
+$DryPlanted = Join-Path $RunDir 'planted'
+$DryManifest = Join-Path $RunDir 'manifest.json'
+$DryReports = Join-Path $RunDir 'reports'
+$DryLogs = Join-Path $RunDir 'logs'
+
 if ($DryRun -and $ReauditOnly) {
     Write-Host "Re-audit-only dry run, $Stamp. Would run, from ${repo}:"
     Write-Host "  2. git fetch origin; the audit branch's worktree; git merge origin/master there"
-    Write-Host "  3. git worktree add --detach $RunDir\planted $Ref (clean: nothing is planted); overlay the audit definitions; copy the logs"
-    Write-Host "  4. no seeder: $RunDir\manifest.json with no planted defects"
+    Write-Host "  3. git worktree add --detach $DryPlanted $Ref (clean: nothing is planted); overlay the audit definitions; copy the logs"
+    Write-Host "  4. no seeder: $DryManifest with no planted defects"
     $taskPaths = @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $Ref, '--', 'Tasks') -AllowFailure)
     foreach ($a in $Selected) {
         $open = @(Get-OpenFindings (Join-Path $PSScriptRoot 'Findings') $a $taskPaths)
-        if ($open.Count) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... re-audits only, $($open.Count) findings; findings emptied in $RunDir\reports\$a.md" } else { Write-Host "  5. $a skipped: no open findings to re-audit" }
+        if ($open.Count) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... re-audits only, $($open.Count) findings; findings emptied in $(Join-Path $DryReports "$a.md")" } else { Write-Host "  5. $a skipped: no open findings to re-audit" }
     }
     Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -RerunReproductions; Write-AuditScorecard.ps1"
     Write-Host "  7. git commit -m 'audit: re-audit $Stamp'; git push origin audit; gh pr create (unless one is open)"
@@ -556,16 +589,16 @@ if ($DryRun -and $ReauditOnly) {
 if ($DryRun) {
     Write-Host "Audit dry run, $Stamp. Would run, from ${repo}:"
     Get-SkippedAuditorWarnings (Join-Path $PSScriptRoot 'Findings') $Selected | ForEach-Object { Write-Host "  $_" }
-    Write-Host "  2. git fetch origin; the worktree that has branch audit checked out, or git worktree add $AuditRoot\audit-branch audit (from origin/audit, else origin/master); git merge origin/master there"
-    Write-Host "  3. git worktree add --detach $RunDir\planted $Ref; overlay Audit/Instructions, Audit/Tools, Audit/PlantedDefects and .claude/agents/audit-*.md from the audit branch; copy logs changed since the last scorecard from $repo.logs to $RunDir\logs; gh run list ... > $RunDir\logs\ci-runs.json"
+    Write-Host "  2. git fetch origin; the worktree that has branch audit checked out, or git worktree add $(Join-Path $AuditRoot 'audit-branch') audit (from origin/audit, else origin/master); git merge origin/master there"
+    Write-Host "  3. git worktree add --detach $DryPlanted $Ref; overlay Audit/Instructions, Audit/Tools, Audit/PlantedDefects and .claude/agents/audit-*.md from the audit branch; copy logs changed since the last scorecard from $repo.logs to $DryLogs; gh run list ... > $(Join-Path $DryLogs 'ci-runs.json')"
     $awaited = @(Get-ReauditAwaitedFiles (Join-Path $PSScriptRoot 'Findings') @(Invoke-Git @('-C', $repo, 'ls-tree', '-r', '--name-only', $Ref, '--', 'Tasks') -AllowFailure))
-    Write-Host "  4. claude -p --agent audit-seeder --model sonnet ... (seed $Seed, $Planted defects, manifest $RunDir\manifest.json), avoiding $(@($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique).Count) files named by $($awaited.Count) findings awaiting a re-audit (findings here, tasks at $Ref before the fetch):"
+    Write-Host "  4. claude -p --agent audit-seeder --model sonnet ... (seed $Seed, $Planted defects, manifest $DryManifest), avoiding $(@($awaited | ForEach-Object { $_.Files } | Sort-Object -Unique).Count) files named by $($awaited.Count) findings awaiting a re-audit (findings here, tasks at $Ref before the fetch):"
     Get-AvoidPromptLines $awaited | ForEach-Object { Write-Host "       $_" }
     Write-Host "     then check the manifest: every auditor seeded, no defect in an avoided file"
-    foreach ($a in $Selected) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... > $RunDir\reports\$a.md (scratch $RunDir\scratch\$a)" }
-    Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -Tree $RunDir\planted -RerunReproductions (mechanical reruns on the clean, unplanted $Ref commit); Write-AuditScorecard.ps1 (into the audit branch)"
+    foreach ($a in $Selected) { Write-Host "  5. claude -p --agent audit-$a --model $($Models[$a]) ... > $(Join-Path $DryReports "$a.md") (scratch $(Join-Path (Join-Path $RunDir 'scratch') $a))" }
+    Write-Host "  6. Write-AuditScorecard.ps1 -ReliabilityOnly; Write-AuditFindings.ps1 -Tree $DryPlanted -RerunReproductions (mechanical reruns on the clean, unplanted $Ref commit); Write-AuditScorecard.ps1 (into the audit branch)"
     Write-Host "  7. git commit -m 'audit: scorecard $Stamp'; git push origin audit; gh pr create --base master --head audit (unless one is open; never merged here)"
-    Write-Host "  8. git worktree remove --force $RunDir\planted"
+    Write-Host "  8. git worktree remove --force $DryPlanted"
     Exit-Audit 'done' 0
 }
 
@@ -605,7 +638,7 @@ try {
     }
     Get-ChildItem -LiteralPath (Join-Path $plantedTree '.claude\agents') -Filter 'audit-*.md' -ErrorAction SilentlyContinue | Remove-Item -Force
     Copy-Item -Path (Join-Path $auditTree '.claude\agents\audit-*.md') -Destination (Join-Path $plantedTree '.claude\agents')
-    $fingerprint = "$(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $auditTree 'Audit\Tools\Get-AuditorFingerprint.ps1') -Root $auditTree)".Trim()
+    $fingerprint = "$(& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $auditTree 'Audit\Tools\Get-AuditorFingerprint.ps1') -Root $auditTree)".Trim()
     $scorecards = @(Get-ChildItem -LiteralPath (Join-Path $auditTree 'Audit\Scorecards') -Filter '????-??-??_????.md' -ErrorAction SilentlyContinue | Sort-Object Name)
     $since = if ($scorecards.Count) { [datetime]::ParseExact($scorecards[-1].BaseName, 'yyyy-MM-dd_HHmm', $null) } else { $Started.AddDays(-7) }
     $logRoot = "$repo.logs"
@@ -679,13 +712,13 @@ try {
     $scorecardName = $Started.ToString('yyyy-MM-dd_HHmm') + '.md'
     $common = @('-ReportDirectory', $reports, '-Manifest', $manifest, '-FindingsDirectory', (Join-Path $auditTree 'Audit\Findings'))
     $changedArg = if ($changedTree.Count) { @('-ChangedTree', ($changedTree -join ',')) } else { @() }
-    $unreliable = @(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ReliabilityOnly | Where-Object { $_ })
+    $unreliable = @(& $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ReliabilityOnly | Where-Object { $_ })
     $unreliableArg = if ($unreliable.Count) { @('-Unreliable', ($unreliable -join ',')) } else { @() }
-    $findingsLine = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditFindings.ps1') -ReportDirectory $reports -Manifest $manifest -FindingsDirectory (Join-Path $auditTree 'Audit\Findings') -Scorecard $scorecardName -Commit $auditedCommit -Date $Started.ToString('yyyy-MM-dd') -Tree $plantedTree -RerunReproductions @unreliableArg
+    $findingsLine = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditFindings.ps1') -ReportDirectory $reports -Manifest $manifest -FindingsDirectory (Join-Path $auditTree 'Audit\Findings') -Scorecard $scorecardName -Commit $auditedCommit -Date $Started.ToString('yyyy-MM-dd') -Tree $plantedTree -RerunReproductions @unreliableArg
     Write-Step "$findingsLine; unreliable: $(if ($unreliable.Count) { $unreliable -join ', ' } else { 'none' })"
     $finished = Get-Date
     $modelList = ($Selected | ForEach-Object { "$_=$($Models[$_])" }) -join ','
-    $scorecard = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ScorecardsDirectory (Join-Path $auditTree 'Audit\Scorecards') -Commit $auditedCommit -Branch ($Ref -replace '^origin/', '') -Started $Started -Finished $finished -CostUsd $script:CostUsd -Models $modelList -Fingerprint $fingerprint
+    $scorecard = & $PowerShellExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $tools 'Write-AuditScorecard.ps1') @common @changedArg -ScorecardsDirectory (Join-Path $auditTree 'Audit\Scorecards') -Commit $auditedCommit -Branch ($Ref -replace '^origin/', '') -Started $Started -Finished $finished -CostUsd $script:CostUsd -Models $modelList -Fingerprint $fingerprint
     Write-Step "scorecard $scorecard"
 
     # 7. commit, push, pull request
