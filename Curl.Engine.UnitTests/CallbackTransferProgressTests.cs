@@ -42,8 +42,19 @@ public sealed class CallbackTransferProgressTests
     public void Of_NeitherCallbackSet_GivesTheBuiltInMeterAlone()
     {
         using CancellationTokenSource abort = new();
+        using MemoryStream standardError = new();
+        CallbackTransferProgress progress = CallbackTransferProgress.Of(noProgress: false, new EasyCallbackOptions(), abort, () => standardError, TimeProvider.System)!;
 
-        Assert.IsNotNull(CallbackTransferProgress.Of(noProgress: false, new EasyCallbackOptions(), abort, () => Stream.Null, TimeProvider.System));
+        progress.ReportTransferStarted();
+        progress.ReportDownloaded(10, 10);
+        progress.ReportTransferDone();
+        progress.FinishMeter(succeeded: true);
+
+        string written = System.Text.Encoding.UTF8.GetString(standardError.ToArray());
+        Assert.StartsWith("  % Total    % Received % Xferd  Average Speed", written);
+        Assert.EndsWith(Environment.NewLine, written);
+        Assert.IsFalse(progress.Aborted);
+        Assert.IsFalse(abort.IsCancellationRequested);
     }
 
     [TestMethod]
