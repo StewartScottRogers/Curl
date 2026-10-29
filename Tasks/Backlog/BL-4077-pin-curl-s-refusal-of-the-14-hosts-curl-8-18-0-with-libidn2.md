@@ -4,7 +4,7 @@ title: Pin Curl's refusal of the 14 hosts curl 8.18.0 with libidn2 refused
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4033, BL-4078]
+depends-on: [BL-4033, BL-4078, BL-4079, BL-4080]
 touches: [Curl.Protocol.Abstractions.UnitTests/CurlUrlHostNameMappingTests.cs]
 requirement: none
 created: 2026-10-29
@@ -29,7 +29,12 @@ BL-4033 did not pin 14 hosts curl refused: U+2100, U+2101, U+2105, U+2106 and te
 
 - Split from BL-3829 (completing its measured-host coverage); the 14 refused hosts are BL-4033's unpinned remainder.
 
+- Measured 2026-10-29 in WSL Ubuntu (curl 8.18.0, libidn2 2.3.8, OpenSSL 3.5.5), `LC_ALL=C.utf8`, host `a<char>b.test`, socat fake proxy listening, `curl -s -m 3 -x http://127.0.0.1:18089 http://HOST/`: U+2100, U+2101, U+2105, U+2106 exit 27 (`Out of memory`); U+FDFA, U+FDFB, U+FE70, U+FE72, U+FE74, U+FE76, U+FE78, U+FE7A, U+FE7C, U+FE7E exit 3 (`URL using bad/illegal format or missing URL`), direct as well as proxied. No request reached the proxy for any of the 14.
+- The four letterlike hosts are not refused by libidn2: `a℀b.test` converts to `aa/cb.test`. With the proxy port closed curl exits 7 (`Failed to connect to aa/cb.test port 80 via 127.0.0.1`); direct it exits 6 (resolve); with `--connect-to` it sends `GET / HTTP/1.1` and `Host: aa/cb.test`. So the 27 comes only from building the proxy request. BL-4076 refuses all four in `CurlUrlHostNameMapping.Map` (exit 3 in Curl), which is wrong for direct transfers.
+- Requeued, nothing edited but the board: BL-4079 (map the four to their slash text instead of refusing them) and BL-4080 (exit 27 for a proxied transfer to such a host) must land first. Then this task pins the ten exit-3 hosts as refused and the four as converting to the slash text that leads to exit 27 through a proxy (the exit 27 itself is pinned by BL-4080 in the engine's tests).
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 013ec147 779790c0.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4079 and BL-4080: curl converts U+2100/2101/2105/2106 to slash text (exit 27 only via a proxy), but BL-4076 makes Curl refuse them with exit 3
