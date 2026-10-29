@@ -4,7 +4,7 @@ title: Extension: Run WebSocket over HTTP/2 and HTTP/3
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4193, BL-4194, BL-4195]
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitLibrary, Curl.Extension.WebSocketExtendedConnect.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -33,9 +33,12 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Notes
 
+- 2026-10-29 (lane 3, first pass, no code written): three prerequisites found and filed. (1) BL-4193: the WebSocket frame codec is only in Curl.Protocol.Ws.UnitLibrary, which an extension may not reference (ADR-0999). (2) BL-4194: the HTTP/3 client session (Http3Session, Http3StreamConnection) is only in Curl.Protocol.Http.UnitLibrary; HTTP/2 needs no move, Http2Connection is already in the shared Curl.Http2.UnitLibrary. (3) BL-4195: no extension hook lets an option-activated extension serve ws/wss in place of curl's handler (only transfer and connection hooks exist). Also learned: Curl.Http3 has EnableConnectProtocol (0x08) but Http2SettingIdentifier has no SETTINGS_ENABLE_CONNECT_PROTOCOL (0x8, RFC 8441 section 3); unknown settings are allowed, so this task can send and read 0x8 itself or add the member then.
+
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 80dd9d14 7bdf3437 50d813ce e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4193 (shared WebSocket codec), BL-4194 (HTTP/3 client session in Curl.Http3) and BL-4195 (extension scheme hook)
