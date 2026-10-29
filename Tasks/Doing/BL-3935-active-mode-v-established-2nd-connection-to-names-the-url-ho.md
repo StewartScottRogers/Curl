@@ -40,3 +40,4 @@ The host part is the URL host, not the server's data address. Curl builds the li
 ## Log
 
 - 2026-10-28: Created.
+- 2026-10-28: Backlog -> Doing. Criteria at claim: 121f4756 92074e78 779790c0.
