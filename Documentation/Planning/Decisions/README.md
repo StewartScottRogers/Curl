@@ -1111,3 +1111,4 @@ Each option and the specific reason it lost.
 | [1075](ADR-1075-oauth2-options-name-the-flow-by-its-token-endpoint-and-send-a-bearer-token.md) | The OAuth2 options name the flow by its token endpoint and send a Bearer token (BL-4161) | Accepted | 2026-10-29 |
 | [1062](ADR-1062-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
 | [1066](ADR-1066-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |
+| [1069](ADR-1069-kafka-produces-one-record-with-a-body-and-consumes-to-the-high-watermark-without-one.md) | Kafka produces one record with a body and consumes to the high watermark without one (BL-4121) | Accepted | 2026-10-29 |

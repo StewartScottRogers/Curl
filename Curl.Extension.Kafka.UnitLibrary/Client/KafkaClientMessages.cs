@@ -1,6 +1,6 @@
 namespace Curl.Extension.Kafka.Client;
 
-/// <summary>The error messages a Kafka transfer ends with (ADR-1066).</summary>
+/// <summary>The error messages a Kafka transfer ends with (ADR-1069).</summary>
 internal static class KafkaClientMessages
 {
     /// <summary>The URL names no topic.</summary>
