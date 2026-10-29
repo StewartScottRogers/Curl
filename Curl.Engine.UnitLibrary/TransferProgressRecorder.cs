@@ -2,7 +2,7 @@ using System.Text;
 using Curl.Output;
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The <see cref="ITransferProgress" /> sink one transfer's handler reports to. It records

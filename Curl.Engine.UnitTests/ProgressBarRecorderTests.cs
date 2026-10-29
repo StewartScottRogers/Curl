@@ -1,6 +1,7 @@
+using Curl.Console;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins <see cref="ProgressBarRecorder" /> against curl 8.21.0's <c>tool_progress_cb</c> and

@@ -1,4 +1,4 @@
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// A write-only stream that writes and flushes the stream it wraps holding a <see cref="WriteGate" />,

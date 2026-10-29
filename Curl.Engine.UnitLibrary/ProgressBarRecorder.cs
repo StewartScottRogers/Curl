@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Draws curl 8.21.0's <c>-#</c>/<c>--progress-bar</c> bar from one transfer's progress
@@ -105,7 +105,7 @@ internal sealed class ProgressBarRecorder
     /// </summary>
     /// <param name="timeProvider">The clock every call reads.</param>
     /// <param name="initialSize">The <c>-C</c> offset the transfer resumes from, or 0.</param>
-    /// <param name="terminalColumns">The terminal width, from <see cref="TerminalColumns" />.</param>
+    /// <param name="terminalColumns">The terminal width, from <c>TerminalColumns</c>.</param>
     internal ProgressBarRecorder(TimeProvider timeProvider, long initialSize, int terminalColumns)
     {
         this.timeProvider = timeProvider;

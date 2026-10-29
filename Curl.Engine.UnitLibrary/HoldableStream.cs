@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// A write-only stream that writes to the stream it wraps, except while it is held: from
@@ -9,7 +9,7 @@ namespace Curl.Console;
 /// </summary>
 /// <param name="inner">The stream written to.</param>
 /// <remarks>
-/// <see cref="CurlCommandRunner" /> writes <c>-v</c> and trace lines to standard error through
+/// <c>CurlCommandRunner</c> writes <c>-v</c> and trace lines to standard error through
 /// this stream, and holds it from the handler's "transfer done" report until it has written the
 /// progress meter's done status lines, so the connection-end <c>-v</c> line the handler reports in
 /// between comes after the meter, as curl 8.21.0 writes it (task BL-411, ADR-0116).

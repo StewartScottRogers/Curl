@@ -1,7 +1,8 @@
+using Curl.Console;
 using System.Text;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the combined progress meter of a <c>-Z</c> run against curl 8.21.0 (Schannel), measured on

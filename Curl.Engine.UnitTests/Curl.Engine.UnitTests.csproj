@@ -19,7 +19,9 @@
     <Compile Include="..\Curl.Cli.UnitTests\OpenSslBuildParser.cs" Link="CliFakes\OpenSslBuildParser.cs" />
     <Compile Include="..\Curl.Console.UnitTests\InMemoryDataFileReader.cs" Link="ConsoleFakes\InMemoryDataFileReader.cs" />
     <Compile Include="..\Curl.Console.UnitTests\ManualTimeProvider.cs" Link="ConsoleFakes\ManualTimeProvider.cs" />
+    <Compile Include="..\Curl.Console.UnitTests\ManualTimerTimeProvider.cs" Link="ConsoleFakes\ManualTimerTimeProvider.cs" />
     <Compile Include="..\Curl.Console.UnitTests\SteppingTimeProvider.cs" Link="ConsoleFakes\SteppingTimeProvider.cs" />
+    <Compile Include="..\Curl.Console.UnitTests\WriteAndFlushRecordingStream.cs" Link="ConsoleFakes\WriteAndFlushRecordingStream.cs" />
   </ItemGroup>
 
 </Project>

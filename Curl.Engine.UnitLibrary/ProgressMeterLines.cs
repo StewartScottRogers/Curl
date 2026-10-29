@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The lines curl 8.21.0 writes to standard error for its progress meter, measured on

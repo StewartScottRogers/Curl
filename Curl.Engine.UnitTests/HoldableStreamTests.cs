@@ -1,6 +1,6 @@
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the holdable stream: write-only, writes passed straight through until it is held, kept

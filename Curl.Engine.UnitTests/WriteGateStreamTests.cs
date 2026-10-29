@@ -1,6 +1,7 @@
+using Curl.Console;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins the gated stream: write-only, every write and flush passed through unchanged, and none of
@@ -100,8 +101,8 @@ public sealed class WriteGateStreamTests
     public async Task WriteAsync_InnerWriteThrows_LetsTheGateGo()
     {
         WriteGate gate = new();
-        await using Stream stream = gate.Guard(new ClosedStandardOutputStream());
-        Diagnostics.Arrange("inner stream", nameof(ClosedStandardOutputStream));
+        await using Stream stream = gate.Guard(new ThrowingWriteStream());
+        Diagnostics.Arrange("inner stream", nameof(ThrowingWriteStream));
 
         await Assert.ThrowsExactlyAsync<IOException>(() => stream.WriteAsync("x"u8.ToArray()).AsTask());
         Diagnostics.Act("write threw", nameof(IOException));
@@ -123,4 +124,37 @@ public sealed class WriteGateStreamTests
         Diagnostics.Assert("inner can write", true, inner.CanWrite);
         Assert.IsTrue(inner.CanWrite);
     }
+}
+
+/// <summary>A write-only stream whose every write throws an <see cref="IOException" />.</summary>
+internal sealed class ThrowingWriteStream : Stream
+{
+    public override bool CanRead => false;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => true;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    public override void Flush()
+    {
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new IOException("closed");
+
+    public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+        throw new IOException("closed");
 }

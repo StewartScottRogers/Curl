@@ -1,6 +1,6 @@
 using Curl.Protocol.Abstractions;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// One transfer's share of a <c>-Z</c> run's <see cref="ParallelProgressMeter" />: the bytes and sizes
@@ -41,7 +41,7 @@ internal sealed class ParallelTransferProgress(ParallelProgressMeter meter, obje
 
     /// <summary>
     /// Marks the transfer running, once it may connect. Nothing is drawn: curl draws once it has added
-    /// every transfer it can, which the runner says (<see cref="ParallelRun.WaitForFreeSlotAsync" />).
+    /// every transfer it can, which the runner says (<c>ParallelRun.WaitForFreeSlotAsync</c>).
     /// </summary>
     /// <param name="bindsInterface">
     /// Whether <c>--interface</c> was given, so the transfer holds the meter's draws until it is past

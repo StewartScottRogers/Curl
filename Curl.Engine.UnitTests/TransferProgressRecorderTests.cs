@@ -1,6 +1,7 @@
+using Curl.Console;
 using Curl.Testing;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// Pins what <see cref="TransferProgressRecorder" /> records: whether the transfer started (task

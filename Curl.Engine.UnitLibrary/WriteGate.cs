@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// The run-wide gate every write to standard output and standard error goes through, so that two

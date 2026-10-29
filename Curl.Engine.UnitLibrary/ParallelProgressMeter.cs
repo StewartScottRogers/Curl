@@ -1,6 +1,6 @@
 using Curl.Output;
 
-namespace Curl.Console;
+namespace Curl.Engine;
 
 /// <summary>
 /// curl 8.21.0's combined progress meter for a <c>-Z</c> run, in place of each transfer's own
