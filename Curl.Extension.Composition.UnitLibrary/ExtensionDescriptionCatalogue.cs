@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Description;
 namespace Curl.Extension.Composition;
 
 /// <summary>
-/// Every extension's description, one entry per line (ADR-1007). Each extension adds its own line and
+/// Every extension's description, one entry per line (ADR-1008). Each extension adds its own line and
 /// nothing else here; the file is marked <c>merge=union</c> in <c>.gitattributes</c> and listed in
 /// <c>Tasks/SharedListFiles.txt</c>, so lanes adding different extensions do not overlap.
 /// </summary>

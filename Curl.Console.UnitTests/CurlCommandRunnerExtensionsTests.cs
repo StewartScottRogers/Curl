@@ -9,7 +9,7 @@ using Curl.Testing;
 namespace Curl.Console;
 
 /// <summary>
-/// Pins <c>--extensions</c> and <c>--ai-help extensions</c> end to end (ADR-1007): <see cref="ExtensionListing"/>'s
+/// Pins <c>--extensions</c> and <c>--ai-help extensions</c> end to end (ADR-1008): <see cref="ExtensionListing"/>'s
 /// lines and Markdown on standard output, with extensions on and with <c>CURL_EXTENSIONS=0</c>, no transfer and exit 0.
 /// </summary>
 [TestClass]

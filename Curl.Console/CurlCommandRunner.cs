@@ -5710,7 +5710,7 @@ internal sealed class CurlCommandRunner(
 
     /// <summary>
     /// The lines <see cref="InformationLines" /> gives for the rest: <see cref="ExtensionListing" />'s for
-    /// <c>--extensions</c>, Curl's own option (ADR-1007), otherwise <see cref="TlsBuildInformation" />'s.
+    /// <c>--extensions</c>, Curl's own option (ADR-1008), otherwise <see cref="TlsBuildInformation" />'s.
     /// </summary>
     /// <param name="options">The parsed options.</param>
     /// <returns>The lines, or <see langword="null" /> when no such option was given.</returns>

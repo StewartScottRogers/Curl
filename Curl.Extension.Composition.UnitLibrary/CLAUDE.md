@@ -14,7 +14,7 @@ Namespace `Curl.Extension.Composition`.
   name of a curl option or of another extension option (ADR-1006).
 - `ExtensionDescriptionCatalogue.Entries` holds each extension's `ExtensionDescription`, one line each, also `merge=union`
   and a shared list file. `ExtensionListing` builds `curl --extensions`' lines and `curl --ai-help extensions`' Markdown
-  from them, or says extensions are off when `CURL_EXTENSIONS` is `0` (ADR-1007).
+  from them, or says extensions are off when `CURL_EXTENSIONS` is `0` (ADR-1008).
 
 Rules (enforced by `VerifyExtensionIsolation` in `Directory.Build.props`):
 

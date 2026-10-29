@@ -5,7 +5,7 @@ namespace Curl.Extension.Composition;
 
 /// <summary>
 /// What <c>curl --extensions</c> and <c>curl --ai-help extensions</c> print, built from every registered
-/// extension's <see cref="ExtensionDescription" /> (ADR-1007). With
+/// extension's <see cref="ExtensionDescription" /> (ADR-1008). With
 /// <see cref="ExtensionProtocolHandlers.SwitchVariable" /> set to <c>0</c> both say that extensions are off.
 /// </summary>
 public static class ExtensionListing

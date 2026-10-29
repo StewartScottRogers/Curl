@@ -17,7 +17,7 @@ public static class CurlAiHelpText
     private const string AllSubject = "all";
 
     /// <summary>
-    /// The subject whose Markdown the console builds from Curl's extensions (ADR-1007); the index lists it
+    /// The subject whose Markdown the console builds from Curl's extensions (ADR-1008); the index lists it
     /// beside the categories, and <see cref="IsExtensionsSubject"/> recognises it in any case.
     /// </summary>
     public const string ExtensionsSubject = "extensions";
@@ -45,12 +45,12 @@ public static class CurlAiHelpText
 
     /// <summary>
     /// The rows <c>--ai-help</c> documents that curl's <c>--help</c> does not: Curl's own diagnostic-log
-    /// options and <c>--extensions</c>, which <c>--help</c> leaves out so curl's help pages stay byte for byte (ADR-1007). <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
+    /// options and <c>--extensions</c>, which <c>--help</c> leaves out so curl's help pages stay byte for byte (ADR-1008). <c>--ai-help</c> itself is in <see cref="CurlHelpTable"/>, so <c>--help</c> names it (BL-2985).
     /// </summary>
     private static readonly CurlHelpEntry[] CurlOnlyEntries =
     [
         new("    --log-level <level>", "Curl's own diagnostic log, not curl's -v: none (the default), error, warning, info or verbose, to standard error or the --log-file", CurlHelpCategories.Curl),
-        new("    --extensions", "List Curl's own extensions beyond upstream curl, one per line: each one's schemes and options (ADR-1007); `--ai-help extensions` documents them", CurlHelpCategories.Curl),
+        new("    --extensions", "List Curl's own extensions beyond upstream curl, one per line: each one's schemes and options (ADR-1008); `--ai-help extensions` documents them", CurlHelpCategories.Curl),
         new("    --log-file <file>", "Write Curl's own diagnostic log, not curl's -v, to this file instead of standard error; at info level unless --log-level says otherwise", CurlHelpCategories.Curl),
     ];
 

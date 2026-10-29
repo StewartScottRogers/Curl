@@ -1,4 +1,4 @@
-# ADR-1007: Extensions describe themselves for `--extensions` and `--ai-help extensions`
+# ADR-1008: Extensions describe themselves for `--extensions` and `--ai-help extensions`
 
 - Status: Accepted
 - Date: 2026-10-29

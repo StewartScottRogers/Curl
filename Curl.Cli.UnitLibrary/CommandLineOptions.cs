@@ -239,7 +239,7 @@ public sealed class CommandLineOptions
     }
 
     /// <summary>
-    /// <see langword="true"/> when <c>--extensions</c>, Curl's own option (ADR-1007), was given on the command
+    /// <see langword="true"/> when <c>--extensions</c>, Curl's own option (ADR-1008), was given on the command
     /// line. Parsing stops there, as it does for <c>--help</c>; the console lists Curl's extensions and exits 0
     /// instead of transferring. An <c>extensions</c> line in a <c>-K</c> file does not set it.
     /// </summary>
