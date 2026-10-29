@@ -33,3 +33,4 @@ Split from BL-4194 by its first pass. `Curl.Protocol.Http.UnitLibrary/Http3Sessi
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 51dea306 ca563086 efbb1cff bea20647 3d836d5e.
