@@ -8,8 +8,15 @@ including `Curl.Extension.Amqp0.UnitLibrary` (AMQP 0-9-1, which owns `amqp://` a
   `Amqp1Reader` reads every encoding; `Amqp1FormatCode` names the constructors of section 1.6. The value types are
   in `Amqp1Values.cs`: `Amqp1Symbol`, `Amqp1Timestamp`, `Amqp1Decimal`, `Amqp1Map`, `Amqp1Array` and
   `Amqp1Described` (section 1.3).
-- Every fault in the encoding, read or about to be written, raises `Amqp1MalformedEncodingException`.
-- `Frames/` (BL-4256, frames and performatives) and `Client/` (BL-4257, the client flow) are still to come. No option, handler or
+- `Frames/`: the transport of Part 2, the message sections of Part 3 and the SASL frames of Part 5 (ADR-1054).
+  `Amqp1ProtocolHeader` writes and checks the `AMQP 0 1.0.0` and `AMQP 3 1.0.0` headers; `Amqp1FrameCodec` the frame
+  layout and `Amqp1Frame` one frame and its performative and payload. `Amqp1CompositeType` catalogues every
+  performative, error, delivery state, source, target, header, properties and SASL frame body with its descriptor
+  code and fields, and `Amqp1Composite` is one such value. `Amqp1MessageCodec` writes and reads message sections
+  (`Amqp1Section`, `Amqp1SectionType`); `Amqp1SaslInitialResponse` the PLAIN and ANONYMOUS initial responses.
+- Every fault in the encoding, a frame or a header, read or about to be written, raises
+  `Amqp1MalformedEncodingException`.
+- `Client/` (BL-4257, the client flow) is still to come. No option, handler or
   registration yet: BL-4118 adds them.
 
 References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`). Held to the four

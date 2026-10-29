@@ -80,6 +80,9 @@ internal sealed class Amqp1Reader
         this.depth = depth;
     }
 
+    /// <summary>How many bytes have been read.</summary>
+    public int Position => position;
+
     /// <summary>Whether every byte has been read.</summary>
     public bool IsAtEnd => position == bytes.Length;
 
