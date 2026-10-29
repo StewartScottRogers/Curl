@@ -552,14 +552,14 @@ internal sealed class HttpResponseBodyReader(IConnection connection)
 
     /// <summary>
     /// Reports the bytes read along with the head of a 204 or 304 as received and as excess
-    /// (<see cref="ReportExcess" />), as curl 8.22.0 does; nothing for <c>-I</c>, whose body is
-    /// left unread (measured, BL-3530 Notes).
+    /// (<see cref="ReportExcess" />), as curl 8.22.0 does; for <c>-I</c>, whose body is
+    /// left unread, only as received (measured, BL-3530 Notes, CGR-222).
     /// </summary>
     private void ReportBytesAfterBodilessHead(HttpResponseHead head, bool noBody)
     {
-        ReadOnlyMemory<byte> excess = noBody ? default : head.BodyPrefix;
+        ReadOnlyMemory<byte> excess = head.BodyPrefix;
         ReportReceived(excess);
-        ReportExcess(excess.Length);
+        ReportExcess(noBody ? 0 : excess.Length);
     }
 
     /// <summary>
