@@ -34,3 +34,4 @@ Split from BL-4148; builds on BL-4207's codec. Use the hand-built QUIC client in
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 31a70c7c b1942f80 4d42ce69 3d836d5e.
