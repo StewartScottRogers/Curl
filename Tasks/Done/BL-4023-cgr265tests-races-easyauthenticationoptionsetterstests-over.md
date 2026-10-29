@@ -8,7 +8,7 @@ depends-on: []
 touches: [Libcurl.UnitTests/Cgr265Tests.cs, Libcurl.UnitTests/Options/Authentication/EasyAuthenticationOptionSettersTests.cs, Libcurl/Options/Authentication/EasyAuthenticationOptionSetters.cs]
 requirement: none
 created: 2026-10-28
-completed:
+completed: 2026-10-28
 ---
 # BL-4023 — Cgr265Tests races EasyAuthenticationOptionSettersTests over the static SrpIsBuiltIn
 
@@ -22,14 +22,17 @@ Libcurl.UnitTests passes every run on every platform: no test changes `EasyAuthe
 
 ## Acceptance criteria
 
-- [ ] No test in Libcurl.UnitTests assigns `EasyAuthenticationOptionSetters.SrpIsBuiltIn` (or its replacement) as shared static state while tests run in parallel.
-- [ ] `dotnet test Libcurl.UnitTests --filter "TestCategory!=Integration"` passes, and Libcurl stays at 100% line and branch coverage.
+- [x] No test in Libcurl.UnitTests assigns `EasyAuthenticationOptionSetters.SrpIsBuiltIn` (or its replacement) as shared static state while tests run in parallel.
+- [x] `dotnet test Libcurl.UnitTests --filter "TestCategory!=Integration"` passes, and Libcurl stays at 100% line and branch coverage.
 
 ## Notes
 
 - Filed by BL-4017's run, which met the failure while measuring Curl.Core and Curl.Engine coverage.
+- Already met when claimed: BL-4020 (3f3c6209a) marked Cgr265Tests and EasyAuthenticationOptionSettersTests `[DoNotParallelize]`. MSTest runs those after the parallel tests, one at a time, so no assignment to SrpIsBuiltIn overlaps a read of it. No other Libcurl.UnitTests source sets the TLSAUTH options. No code changed. Kept the attribute rather than injecting a flag: it is the simpler fix and the task names it as an option.
+- Verified 2026-10-28: Libcurl.UnitTests fast tests gave 1504 passed and 1 skipped. Measure-CodeQuality -Library Libcurl gave line 100%, branch 100% and 0 failing members.
 
 ## Log
 
 - 2026-10-28: Created.
 - 2026-10-28: Backlog -> Doing. Criteria at claim: dca8ce74 bba61989.
+- 2026-10-28: Doing -> Done. Already fixed by BL-4020's [DoNotParallelize]; Libcurl.UnitTests green, Libcurl at 100% line and branch
