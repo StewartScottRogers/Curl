@@ -8,7 +8,7 @@ depends-on: []
 touches: [Curl.Networking.UnitLibrary]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4181 — Fix AF-0458: TcpPendingConnection's accepted connection can stop owning its socket (ownsSocket: true -> false) with no test failing, so an accepted data connection is never closed
 
@@ -41,12 +41,17 @@ The finding closes only when a later re-audit by the quality auditor confirms th
 
 ## Acceptance criteria
 
-- [ ] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
-- [ ] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
+- [x] The finding's reproduction, run from the repository root, gives the expected result, not the actual one it recorded.
+- [x] `dotnet build` and the fast tests (`dotnet test --filter "TestCategory!=Integration"`) pass.
 
 ## Notes
+
+- Fix: a fast test, `TcpPendingConnectionTests.AcceptAsync_AcceptedConnectionDisposed_ClosesTheAcceptedSocket`. A loopback peer that sends nothing is accepted through the production accept step, the accepted connection is disposed, and the peer must read 0 (the FIN) within 10 s. Production code is unchanged. ADR-1015 records why it is a unit test, not an Integration one: the mutation run reaches only the fast tests, and no byte of payload crosses the socket.
+- Reproduction: lanes may not run `Audit/Tools`, so I ran the same mutant by hand. With line 99 set to `ownsSocket: false`, the new test failed after its 10 s wait (killed). With the line restored, it passes. The re-audit runs the tool itself.
+- I ran no Measure-CodeQuality.ps1, because no production code changed (only a test, the project CLAUDE.md and the ADR). `dotnet build` is clean, and all 52 fast test projects pass on Windows. The test uses only IPv4 loopback and a FIN, so it is platform-neutral.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b49d23ab 9742157d.
+- 2026-10-29: Doing -> Done. A fast test sees the accepted socket's FIN on dispose, killing AF-0458's ownsSocket mutant
