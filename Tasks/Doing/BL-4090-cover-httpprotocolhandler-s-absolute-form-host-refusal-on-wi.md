@@ -32,3 +32,4 @@ BL-4080 made a proxied transfer whose wire host holds a character `curl_url_set`
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: cdff5f48 779790c0.
