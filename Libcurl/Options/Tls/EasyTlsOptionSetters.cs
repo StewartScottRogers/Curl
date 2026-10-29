@@ -19,6 +19,18 @@ internal static class EasyTlsOptionSetters
     /// <summary>The whole-string <c>CURLOPT_ECH</c> values that set the mode; the <c>ecl:</c> and <c>pn:</c> forms are matched by prefix.</summary>
     private static readonly HashSet<string> EncryptedClientHelloModes = new(StringComparer.Ordinal) { "false", "grease", "true", "hard" };
 
+    /// <summary>
+    /// Whether this platform's curl takes <c>CURLOPT_TLS13_CIPHERS</c> and <c>CURLOPT_PROXY_TLS13_CIPHERS</c>: a Schannel
+    /// build (Windows) has no TLS 1.3 cipher suite selection and answers <see cref="CurlCode.NotBuiltIn"/> (ADR-0991).
+    /// </summary>
+    internal static bool Tls13CiphersIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Whether this platform's curl takes <c>CURLOPT_PROXY_CAPATH</c>: a Schannel build (Windows) answers
+    /// <see cref="CurlCode.NotBuiltIn"/> for it while taking <c>CURLOPT_CAPATH</c> (ADR-0991).
+    /// </summary>
+    internal static bool ProxyCaPathIsBuiltIn { get; set; } = !OperatingSystem.IsWindows();
+
     /// <summary>Adds the TLS rows to <paramref name="setters"/>.</summary>
     /// <param name="setters">The rows to add to.</param>
     internal static void AddTo(Dictionary<CurlOption, EasyOptionSetter> setters)
@@ -49,7 +61,7 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.IssuercertBlob] = new(peer.SetIssuerCertificateBlob);
         setters[CurlOption.Pinnedpublickey] = new(peer.SetPinnedPublicKey);
         setters[CurlOption.SslCipherList] = new(peer.SetCipherList);
-        setters[CurlOption.Tls13Ciphers] = new(peer.SetTls13Ciphers);
+        setters[CurlOption.Tls13Ciphers] = new(SetOriginTls13Ciphers);
         setters[CurlOption.SslOptions] = new(peer.SetSslOptions);
     }
 
@@ -68,13 +80,13 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.ProxySslVerifyhost] = new(peer.SetVerifyHost);
         setters[CurlOption.ProxyCainfo] = new(peer.SetCertificateAuthorityFile);
         setters[CurlOption.ProxyCainfoBlob] = new(peer.SetCertificateAuthorityBlob);
-        setters[CurlOption.ProxyCapath] = new(peer.SetCertificateAuthorityPath);
+        setters[CurlOption.ProxyCapath] = new(SetProxyCertificateAuthorityPath);
         setters[CurlOption.ProxyCrlfile] = new(peer.SetRevocationListFile);
         setters[CurlOption.ProxyIssuercert] = new(peer.SetIssuerCertificate);
         setters[CurlOption.ProxyIssuercertBlob] = new(peer.SetIssuerCertificateBlob);
         setters[CurlOption.ProxyPinnedpublickey] = new(peer.SetPinnedPublicKey);
         setters[CurlOption.ProxySslCipherList] = new(peer.SetCipherList);
-        setters[CurlOption.ProxyTls13Ciphers] = new(peer.SetTls13Ciphers);
+        setters[CurlOption.ProxyTls13Ciphers] = new(SetProxyTls13Ciphers);
         setters[CurlOption.ProxySslOptions] = new(peer.SetSslOptions);
     }
 
@@ -98,6 +110,16 @@ internal static class EasyTlsOptionSetters
         setters[CurlOption.Egdsocket] = new(IgnoreDeprecated);
         setters[CurlOption.RandomFile] = new(IgnoreDeprecated);
     }
+
+    /// <summary><c>CURLOPT_TLS13_CIPHERS</c>: the origin's TLS 1.3 cipher suites, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="Tls13CiphersIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetOriginTls13Ciphers(ref EasyOptions o, object? v) => Tls13CiphersIsBuiltIn ? Origin.SetTls13Ciphers(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_TLS13_CIPHERS</c>: the proxy's TLS 1.3 cipher suites, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="Tls13CiphersIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyTls13Ciphers(ref EasyOptions o, object? v) => Tls13CiphersIsBuiltIn ? Proxy.SetTls13Ciphers(ref o, v) : CurlCode.NotBuiltIn;
+
+    /// <summary><c>CURLOPT_PROXY_CAPATH</c>: the proxy's CA directory, or <see cref="CurlCode.NotBuiltIn"/> where <see cref="ProxyCaPathIsBuiltIn"/> is off.</summary>
+    private static CurlCode SetProxyCertificateAuthorityPath(ref EasyOptions o, object? v) =>
+        ProxyCaPathIsBuiltIn ? Proxy.SetCertificateAuthorityPath(ref o, v) : CurlCode.NotBuiltIn;
 
     /// <summary>
     /// <c>CURLOPT_SSLENGINE</c>: Curl has no crypto engines, so a name is <see cref="CurlCode.NotBuiltIn"/>,

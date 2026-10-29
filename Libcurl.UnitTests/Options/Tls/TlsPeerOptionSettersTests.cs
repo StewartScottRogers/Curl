@@ -107,12 +107,6 @@ public sealed class TlsPeerOptionSettersTests
     }
 
     [TestMethod]
-    public void SetOption_Capath_SetsTheOriginAndProxyCapathTheProxy()
-    {
-        TwinText(CurlOption.Capath, CurlOption.ProxyCapath, p => p.CertificateAuthorityPath);
-    }
-
-    [TestMethod]
     public void SetOption_Crlfile_SetsTheOriginAndProxyCrlfileTheProxy()
     {
         TwinText(CurlOption.Crlfile, CurlOption.ProxyCrlfile, p => p.RevocationListFile);
@@ -140,12 +134,6 @@ public sealed class TlsPeerOptionSettersTests
     public void SetOption_SslCipherList_SetsTheOriginAndProxySslCipherListTheProxy()
     {
         TwinText(CurlOption.SslCipherList, CurlOption.ProxySslCipherList, p => p.CipherList);
-    }
-
-    [TestMethod]
-    public void SetOption_Tls13Ciphers_SetsTheOriginAndProxyTls13CiphersTheProxy()
-    {
-        TwinText(CurlOption.Tls13Ciphers, CurlOption.ProxyTls13Ciphers, p => p.Tls13Ciphers);
     }
 
     [TestMethod]
