@@ -30,3 +30,4 @@ BL-4098's Measure-CodeQuality.ps1 run (Curl.Engine.UnitLibrary, Curl.Api, Curl.M
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: f4190bab 3d836d5e.
