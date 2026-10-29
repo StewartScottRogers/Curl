@@ -33,3 +33,4 @@ BL-4095 added `ConnectionHooks` in `Curl.Extension.Abstractions/Connection` and 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 5b7c3c09 ee312362 a8420816 478f867b 3d836d5e.
