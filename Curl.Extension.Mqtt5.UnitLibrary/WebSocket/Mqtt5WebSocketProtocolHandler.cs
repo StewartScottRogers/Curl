@@ -9,7 +9,7 @@ namespace Curl.Extension.Mqtt5.WebSocket;
 /// Serves <c>mqtt5+ws://</c> (port 80): the WebSocket opening handshake to <c>/mqtt</c> with the <c>mqtt</c>
 /// subprotocol (<see cref="Mqtt5WebSocketUpgrade"/>), then <see cref="Mqtt5ClientFlow"/>'s publish or subscribe to the
 /// URL path's topic in binary frames (<see cref="Mqtt5WebSocketConnection"/>), as OASIS MQTT Version 5.0 section 6
-/// describes and ADR-1050 decides.
+/// describes and ADR-1054 decides.
 /// </summary>
 public sealed class Mqtt5WebSocketProtocolHandler : IProtocolHandler
 {

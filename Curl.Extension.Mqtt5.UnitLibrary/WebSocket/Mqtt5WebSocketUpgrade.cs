@@ -13,7 +13,7 @@ namespace Curl.Extension.Mqtt5.WebSocket;
 /// </summary>
 internal static class Mqtt5WebSocketUpgrade
 {
-    /// <summary>The request path every <c>mqtt5+ws://</c> upgrade asks for (ADR-1050).</summary>
+    /// <summary>The request path every <c>mqtt5+ws://</c> upgrade asks for (ADR-1054).</summary>
     internal const string RequestPath = "/mqtt";
 
     /// <summary>The subprotocol section 6 requires.</summary>

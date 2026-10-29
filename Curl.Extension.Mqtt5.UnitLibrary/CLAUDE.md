@@ -16,7 +16,7 @@ The MQTT 5 client extension (ADR-0999), for `mqtt5://`, `mqtt5s://` and `mqtt5+w
   reason code.
 - `Client/`: `Mqtt5ProtocolHandler` serves `mqtt5://` and `mqtt5s://` with curl's `mqtt://` behaviour (ADR-1049);
   `Mqtt5ClientFlow` runs CONNECT, then PUBLISH or SUBSCRIBE, over any `IConnection` through `Mqtt5PacketChannel`.
-- `WebSocket/`: `Mqtt5WebSocketProtocolHandler` serves `mqtt5+ws://` (ADR-1050): `Mqtt5WebSocketUpgrade` sends the
+- `WebSocket/`: `Mqtt5WebSocketProtocolHandler` serves `mqtt5+ws://` (ADR-1054): `Mqtt5WebSocketUpgrade` sends the
   RFC 6455 opening handshake to `/mqtt` offering the `mqtt` subprotocol and checks the reply selects it, then
   `Mqtt5WebSocketConnection` carries the same `Mqtt5ClientFlow` in binary frames as an `IConnection` (section 6).
   No option or registration yet: BL-4115 adds them.

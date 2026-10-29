@@ -1,4 +1,4 @@
-# ADR-1050 — MQTT 5 over WebSocket upgrades to /mqtt on port 80 and takes the topic from the URL path
+# ADR-1054 — MQTT 5 over WebSocket upgrades to /mqtt on port 80 and takes the topic from the URL path
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

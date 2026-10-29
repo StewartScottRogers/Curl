@@ -1,6 +1,6 @@
 namespace Curl.Extension.Mqtt5.WebSocket;
 
-/// <summary>The error messages of <c>mqtt5+ws://</c>'s WebSocket opening handshake and frames (ADR-1050).</summary>
+/// <summary>The error messages of <c>mqtt5+ws://</c>'s WebSocket opening handshake and frames (ADR-1054).</summary>
 internal static class Mqtt5WebSocketMessages
 {
     internal const string EmptyReply = "Empty reply from server";
