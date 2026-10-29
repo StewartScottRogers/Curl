@@ -20,5 +20,6 @@ internal static class ExtensionCatalogue
         Nats.NatsExtension.CreateHandler,
         Xmpp.Client.XmppExtension.CreateHandler,
         McpClient.Client.McpClientExtension.CreateHandler,
+        Kafka.Client.KafkaExtension.CreateHandler,
     ];
 }
