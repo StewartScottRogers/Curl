@@ -50,6 +50,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Description,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Description,
+        Curl.Extension.CodeGeneration.CodeGenerationExtension.Description,
         Curl.Extension.RateLimit.RateLimitExtension.Description,
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Description,
         GoogleCloudStorage.Client.GcsExtension.Description,

@@ -56,6 +56,8 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.ClientHints.ClientHintsExtension.Option,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Option,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Option,
+        Curl.Extension.CodeGeneration.CodeGenerationExtension.CSharpOption,
+        Curl.Extension.CodeGeneration.CodeGenerationExtension.PowerShellOption,
         Curl.Extension.RateLimit.RateLimitExtension.Option,
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Option,
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.Option,
