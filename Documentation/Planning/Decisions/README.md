@@ -1172,3 +1172,4 @@ Each option and the specific reason it lost.
 | [1125](ADR-1125-privacy-pass-token-type-1-builds-p384-voprf-by-hand-on-biginteger.md) | Privacy Pass token type 1 builds the P-384 VOPRF by hand on BigInteger (BL-4321) | Accepted | 2026-10-29 |
 | [1126](ADR-1126-mldsa-verify-requires-and-verifies-ml-dsa-certificate-signatures.md) | --mldsa-verify requires and verifies ML-DSA certificate signatures (BL-4153) | Accepted | 2026-10-29 |
 | [1127](ADR-1127-oblivious-doh-extension-follows-rfc-9230-with-proxy-and-target-options.md) | The Oblivious DoH extension follows RFC 9230, named by `--odoh-proxy` and `--odoh-target` (BL-4149) | Accepted | 2026-10-29 |
+| [1126](ADR-1126-dane-tlsa-matcher-compares-records-with-the-chain-as-sent.md) | The DANE TLSA matcher compares records with the chain as the server sent it (BL-4334) | Accepted | 2026-10-29 |
