@@ -40,7 +40,8 @@ public sealed partial class TcpConnectorTests
     [OSCondition(ConditionMode.Exclude, OperatingSystems.Windows)]
     public async Task ConnectAsync_ToARealRefusedLoopbackPortOffWindows_FailsWithExit7InUnder500Milliseconds()
     {
-        var port = ClosedLoopbackPort();
+        using var unlistened = BoundUnlistenedSocket();
+        var port = ((IPEndPoint)unlistened.LocalEndPoint!).Port;
         var connector = new TcpConnector(new FakeDnsResolver(Loopback), new TcpDialer(), new FakeTlsProvider(), TimeProvider.System);
 
         // One untimed connect first, so the timed ones measure the refusal, not the first use's
@@ -84,11 +85,15 @@ public sealed partial class TcpConnectorTests
         Assert.AreEqual("Failed to connect to 127.0.0.1:9 after 0 ms: Could not connect to server", result.ErrorMessage);
     }
 
-    /// <summary>A loopback port nothing listens on: one the system just handed a listener, now closed.</summary>
-    private static int ClosedLoopbackPort()
+    /// <summary>
+    /// A loopback socket bound to a port the system handed it and never listening, so a connect to that port is
+    /// refused; held for the whole test, so a test running beside it cannot be handed the port and accept the
+    /// connect (BL-4368).
+    /// </summary>
+    private static Socket BoundUnlistenedSocket()
     {
-        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return ((IPEndPoint)listener.LocalEndPoint!).Port;
+        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return socket;
     }
 }
