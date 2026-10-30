@@ -32,3 +32,4 @@ Third of three parts split from BL-4165. Code under `DynamicMessages/` in the li
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c2d40f59 53f6b82b 7ae6d7ff 3d836d5e.
