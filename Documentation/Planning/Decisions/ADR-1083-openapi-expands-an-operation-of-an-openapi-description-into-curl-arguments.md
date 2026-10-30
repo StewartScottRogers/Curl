@@ -50,8 +50,10 @@ option parser and transfers do the rest, and no transfer changes.
 
 ## Left out, and why
 
-- **YAML descriptions.** The base class library has no YAML reader; BL-4287 writes one. Until then a YAML file
-  fails with "is not a JSON OpenAPI description", exit 2.
+- **YAML anchors, aliases and tags.** A YAML description (OpenAPI §4.3) is read by `OpenApiYaml`, a hand-written
+  reader (BL-4287) of the YAML 1.2.2 constructs descriptions use; a file whose first character that is not white space
+  is not `{` is read as YAML. Anchors, aliases and tags fail with exit 2, and so does YAML it cannot read ("is not a
+  YAML OpenAPI description"). Decided by Claude under Stewart's delegation.
 - **Remote descriptions and non-local `$ref`s.** An expander runs before any transfer and reads only files
   (ADR-1040); fetching first is `curl -o spec.json <url>`. A `$ref` to another document fails with exit 2.
 - **`deepObject` and object-valued parameters.** A `name=value` argument gives a primitive or an array; a style
