@@ -15,15 +15,15 @@ namespace Curl.Extension.PrivacyPass.Options;
 /// The first response is held back, so the 401 that is answered never reaches the output; any other first response,
 /// including a 401 with no challenge this extension can answer, is written out as curl received it.
 /// </remarks>
-/// <param name="issuerRequestUrl">The issuer's request URL, or <see langword="null"/> when <c>--privacy-pass</c>'s value is not an absolute URL.</param>
+/// <param name="issuerUrl">The issuer's request URL or origin (discovered through its directory, RFC 9578 §4), or <see langword="null"/> when <c>--privacy-pass</c>'s value is not an absolute URL.</param>
 /// <param name="randomBytes">Gives cryptographically random octets.</param>
-internal sealed class PrivacyPassTransferHook(Uri? issuerRequestUrl, Func<int, byte[]> randomBytes) : ITransferHook
+internal sealed class PrivacyPassTransferHook(Uri? issuerUrl, Func<int, byte[]> randomBytes) : ITransferHook
 {
     /// <summary>The failure when the host gives no connector.</summary>
     public const string NoServicesMessage = "--privacy-pass needs curl's connector, which this transfer was not given.";
 
     /// <summary>The failure when <c>--privacy-pass</c>'s value is not an absolute URL.</summary>
-    public const string NotAUrlMessage = "--privacy-pass needs the issuer's absolute request URL.";
+    public const string NotAUrlMessage = "--privacy-pass needs the issuer's absolute request URL or origin.";
 
     /// <inheritdoc/>
     public ValueTask<TransferResult> ExecuteAsync(ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next) =>
@@ -36,7 +36,7 @@ internal sealed class PrivacyPassTransferHook(Uri? issuerRequestUrl, Func<int, b
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(next);
-        if (issuerRequestUrl is null)
+        if (issuerUrl is null)
         {
             return TransferResult.Failure(CurlExitCode.FailedInit, NotAUrlMessage);
         }
@@ -55,7 +55,9 @@ internal sealed class PrivacyPassTransferHook(Uri? issuerRequestUrl, Func<int, b
 
         try
         {
-            var issuance = new PrivacyPassIssuance(new PrivacyPassHttpClient(services.Connector), issuerRequestUrl, randomBytes);
+            var client = new PrivacyPassHttpClient(services.Connector);
+            var requestUrl = await IssuerRequestUrlAsync(client, issuerUrl, challenge, context.CancellationToken);
+            var issuance = new PrivacyPassIssuance(client, requestUrl, randomBytes);
             var authorization = await issuance.RedeemAsync(challenge, context.CancellationToken);
             return await next(context.WithRequestHeaders([$"Authorization: {authorization}"]));
         }
@@ -75,6 +77,21 @@ internal sealed class PrivacyPassTransferHook(Uri? issuerRequestUrl, Func<int, b
                 .SelectMany(field => PrivateTokenChallengeHeader.FindAll(field.Value))
                 .FirstOrDefault(header => header.Challenge.TokenType == PrivacyPassIssuance.BlindRsaTokenType)
             : null;
+
+    // An issuer origin is discovered through its directory (RFC 9578 §4), which must list the challenge's key; any other URL is the request URL.
+    private static async Task<Uri> IssuerRequestUrlAsync(
+        PrivacyPassHttpClient client, Uri url, PrivateTokenChallengeHeader challenge, CancellationToken cancellationToken)
+    {
+        if (!PrivacyPassIssuerDirectory.IsIssuerOrigin(url))
+        {
+            return url;
+        }
+
+        var directory = await PrivacyPassIssuerDirectory.FetchAsync(client, url, cancellationToken);
+        return directory.Lists(challenge.TokenKey)
+            ? directory.RequestUrl
+            : throw new PrivacyPassException(CurlExitCode.WeirdServerReply, "The PrivateToken challenge's token-key is not one the issuer directory lists.");
+    }
 
     private static async Task WriteHeldBackAsync(MemoryStream held, Stream? output, ITransferContext context)
     {

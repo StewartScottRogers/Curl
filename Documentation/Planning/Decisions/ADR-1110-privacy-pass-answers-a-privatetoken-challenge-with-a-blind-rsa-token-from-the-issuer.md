@@ -38,4 +38,4 @@ extension is tested against the RFCs, not against curl.
 ## Not yet done (filed as tasks, not left out)
 
 - Token type `0x0001` (VOPRF on P-384, RFC 9578 §5) needs a hand-built P-384 and hash-to-curve.
-- Discovering the request URL and keys from the issuer directory (RFC 9578 §4) from the challenge's issuer name.
+- Discovering the request URL and keys from the issuer directory (RFC 9578 §4): done by ADR-1111, from the issuer origin given to `--privacy-pass`.

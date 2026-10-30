@@ -99,6 +99,36 @@ public sealed class PrivacyPassTransferHookTests
     }
 
     [TestMethod]
+    public async Task ExecuteAsync_IssuerOriginWhoseDirectoryListsTheKey_IssuesAtTheDirectorysRequestUrl()
+    {
+        var directory = new RecordedConnection(PrivacyPassIssuerDirectoryTests.Answer(200, Directory(TestIssuer.Spki)));
+        var issuer = new SigningIssuerConnection();
+        var connector = new SequenceConnector(directory, issuer);
+        List<ITransferContext> sent = [];
+
+        var result = await OriginHook().ExecuteAsync(Context(), Services(connector), Answering(sent, Challenged()));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.HasCount(2, sent);
+        StringAssert.StartsWith(directory.Written, "GET /.well-known/private-token-issuer-directory HTTP/1.1\r\nHost: issuer.example\r\n");
+        StringAssert.StartsWith(issuer.Head, "POST /issue HTTP/1.1\r\nHost: issuer.example\r\n");
+        Assert.AreEqual("issuer.example", connector.Targets[1].Host);
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_IssuerOriginWhoseDirectoryOmitsTheKey_FailsAsAWeirdReplyWithoutIssuing()
+    {
+        var connector = new SequenceConnector(new RecordedConnection(PrivacyPassIssuerDirectoryTests.Answer(200, Directory([1, 2, 3]))));
+        List<ITransferContext> sent = [];
+
+        var result = await OriginHook().ExecuteAsync(Context(), Services(connector), Answering(sent, Challenged()));
+
+        Assert.AreEqual(CurlExitCode.WeirdServerReply, result.ExitCode);
+        Assert.HasCount(1, sent);
+        Assert.HasCount(1, connector.Targets);
+    }
+
+    [TestMethod]
     public async Task ExecuteAsync_WithoutServicesOrUrl_FailsInit()
     {
         var withoutServices = await Hook().ExecuteAsync(Context(), _ => throw new AssertFailedException("sent"));
@@ -127,6 +157,11 @@ public sealed class PrivacyPassTransferHookTests
     }
 
     private static PrivacyPassTransferHook Hook() => new(new Uri(IssuerUrl), RandomNumberGenerator.GetBytes);
+
+    private static PrivacyPassTransferHook OriginHook() => new(new Uri("https://issuer.example"), RandomNumberGenerator.GetBytes);
+
+    private static string Directory(byte[] tokenKey) =>
+        $$"""{"issuer-request-uri": "/issue", "token-keys": [{"token-type": 2, "token-key": "{{Base64Url.Encode(tokenKey)}}"}]}""";
 
     private static ExtensionOptionValues Values(string value) => new(new Dictionary<string, string> { [PrivacyPassOptions.Issuer.Name] = value });
 
@@ -163,6 +198,18 @@ public sealed class PrivacyPassTransferHookTests
 
         return first;
     };
+
+    // Opens the given connections in turn and records each target.
+    private sealed class SequenceConnector(params IConnection[] connections) : IConnector
+    {
+        public List<ConnectTarget> Targets { get; } = [];
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            Targets.Add(target);
+            return ValueTask.FromResult(ConnectResult.Connected(connections[Targets.Count - 1]));
+        }
+    }
 
     private sealed class NoListener : IConnectionListener
     {
