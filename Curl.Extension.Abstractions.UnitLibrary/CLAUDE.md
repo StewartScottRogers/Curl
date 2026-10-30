@@ -23,7 +23,7 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   variables by returning a `TransferResult` whose `Report` carries `ExtensionWriteOutValues` (name to
   text, `result with { Report = result.Report with { ExtensionWriteOutValues = ... } }`): `%{name}` prints
   the value only for a name curl has no variable of, so a curl variable is never shadowed, and a name
-  given no value stays unknown (ADR-1115).
+  given no value stays unknown (ADR-1130).
 - `Connection/IConnectionHook` supplies the connector (and optionally the datagram connector) a
   transfer runs over in place of curl's, given curl's so it can reach a first hop through it.
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an

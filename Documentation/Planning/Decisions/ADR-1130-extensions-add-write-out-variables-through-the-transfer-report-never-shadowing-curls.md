@@ -1,4 +1,4 @@
-# ADR-1115 — Extensions add -w write-out variables through the transfer report, never shadowing curl's
+# ADR-1130 — Extensions add -w write-out variables through the transfer report, never shadowing curl's
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

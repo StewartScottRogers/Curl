@@ -31,7 +31,7 @@ Found by BL-4140 (Structured Field Values extension, ADR-0999), whose option mus
 
 ## Notes
 
-- Pipeline `feature` done directly: the change is one property and one fallback lookup, so it needed no separate planning stage. The design is in ADR-1115: `TransferReport.ExtensionWriteOutValues` (empty by default), which `TransferWriteOutVariables.TryGetVariableText` checks only after every curl name has missed. The values are not added to `%{json}`, so curl's JSON stays identical.
+- Pipeline `feature` done directly: the change is one property and one fallback lookup, so it needed no separate planning stage. The design is in ADR-1130: `TransferReport.ExtensionWriteOutValues` (empty by default), which `TransferWriteOutVariables.TryGetVariableText` checks only after every curl name has missed. The values are not added to `%{json}`, so curl's JSON stays identical.
 - Tests: `TransferWriteOutVariablesTests` (value printed, curl names including json and header_json not shadowed, unknown name still unknown) and `TransferReportTests` (empty default, carried).
 - `Measure-CodeQuality.ps1 -Library Curl.Protocol.Abstractions.UnitLibrary,Curl.Output.UnitLibrary`: 0 failing members. `dotnet build` is clean and the fast tests are green on Windows. The change is platform-neutral (no paths, OS text or certificates), so CI on Linux and macOS should stay green.
 

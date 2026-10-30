@@ -30,7 +30,7 @@ namespace Curl.Output;
 /// <c>url.&lt;part&gt;</c> and <c>urle.&lt;part&gt;</c> for the parts <c>scheme</c>,
 /// <c>user</c>, <c>password</c>, <c>options</c>, <c>host</c>, <c>port</c>, <c>path</c>,
 /// <c>query</c>, <c>fragment</c> and <c>zoneid</c>. Any other name prints the value an extension's
-/// transfer hook gave it in <see cref="TransferReport.ExtensionWriteOutValues"/> (ADR-1115), and is
+/// transfer hook gave it in <see cref="TransferReport.ExtensionWriteOutValues"/> (ADR-1130), and is
 /// reported unknown when none did.
 /// </para>
 /// <para>

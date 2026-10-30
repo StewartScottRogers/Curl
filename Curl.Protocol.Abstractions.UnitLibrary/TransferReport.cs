@@ -317,7 +317,7 @@ public sealed record TransferReport
 
     /// <summary>
     /// Gets the write-out values an extension's transfer hook gave this transfer, by variable name
-    /// (ADR-1115): <c>-w</c> prints the value given under <c>name</c> for <c>%{name}</c> only when
+    /// (ADR-1130): <c>-w</c> prints the value given under <c>name</c> for <c>%{name}</c> only when
     /// curl itself has no variable of that name, so an extension can add variables but never
     /// change one of curl's. Empty, the default, for every transfer no extension reported on.
     /// </summary>
