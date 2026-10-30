@@ -126,8 +126,14 @@ internal static partial class EngineComposition
     /// outside socket-action mode, for the dialer as it is.
     /// </param>
     /// <param name="takeDohConnectionId">Takes the run's next <c>%{conn_id}</c> for each DoH connection (CGR-286); <see langword="null" /> to take none.</param>
+    /// <param name="extensionDatagramConnector">
+    /// An activated extension connection hook's datagram connector over curl's UDP connector (ADR-1010): when it
+    /// replaces curl's, QUIC opens its channels through it (<see cref="QuicDatagramConnectorOf" />, BL-4318);
+    /// <see langword="null" />, or one that keeps curl's, for the socket QUIC dialer. Unused under <paramref name="dialing" />.
+    /// <see cref="CurlTransports.UdpDatagramConnector" /> stays curl's, which the dispatch hands the hook again for the datagram protocols.
+    /// </param>
     /// <returns>The connectors and the pieces they were built from.</returns>
-    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null, Func<long>? takeDohConnectionId = null)
+    internal static CurlTransports CreateTransports(EngineToolOptions tool, EasyNetworkOptions network, EasyTlsOptions tls, EasyHttpOptions http, EasyProxyOptions proxy, EasyAuthenticationOptions authentication, TimeProvider timeProvider, ConnectionCache? runConnections, TlsSessionCache? tlsSessions, IDiagnosticLog? diagnosticLog, DnsCache? runDnsCache, Func<CurlExitCode, string>? easyErrorText, EngineTraceComponents? traces, Func<IDnsResolver, IDnsResolver> wrapLookUps, EngineDialing? dialing = null, TransferSocketWait? socketWait = null, Func<long>? takeDohConnectionId = null, Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector = null)
     {
         traces ??= EngineTraceComponents.None;
         TcpDialer tcpDialer = new(TcpSocketOptionsOf(network));
@@ -142,7 +148,7 @@ internal static partial class EngineComposition
         ITlsProviderWithWarnings proxyTlsProvider = CreateTlsProvider(proxyTlsClientOptions, timeProvider);
         LateBoundSecurityContextFactory proxyContexts = new();
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
-        (QuicDialer quicDialer, ITcpDialer connectorDialer, IDatagramConnector udpDatagramConnector) = DialersOf(dialing, tcpDialer, tlsClientOptions, traces, timeProvider, () => CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog));
+        (QuicDialer quicDialer, ITcpDialer connectorDialer, IDatagramConnector udpDatagramConnector) = DialersOf(dialing, tcpDialer, tlsClientOptions, traces, timeProvider, () => CreateUdpDatagramConnector(network, lookUps, timeProvider, diagnosticLog), extensionDatagramConnector);
         TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, lookUps, SocketActionGatedTcpDialer.Over(connectorDialer, socketWait), tlsProvider, timeProvider, proxyTunnelOptions, proxyTlsProvider, quicDialer, proxyContexts, runDnsCache, resolverEvents);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, timeProvider, runConnections);
 
@@ -174,16 +180,17 @@ internal static partial class EngineComposition
 
     /// <summary>
     /// The QUIC dialer, the dialer the <see cref="TcpConnector" /> dials through and the datagram connector the transports
-    /// use: without <paramref name="dialing" />, a socket <see cref="QuicDialer" />, <paramref name="tcpDialer" /> and the
-    /// connector <paramref name="createDatagramConnector" /> builds; with one, a QUIC dialer over its datagram connector,
+    /// use: without <paramref name="dialing" />, the QUIC dialer <see cref="NetworkDialersOf" /> picks, <paramref name="tcpDialer" />
+    /// and the connector <paramref name="createDatagramConnector" /> builds; with one, a QUIC dialer over its datagram connector,
     /// its dialer and its datagram connector (ADR-0658).
     /// </summary>
     /// <param name="dialing">What the harness's engine dials through, or <see langword="null" />.</param>
     /// <param name="tcpDialer">The socket dialer built from the options.</param>
     /// <param name="tlsClientOptions">The origin's TLS options, for the QUIC dialer.</param>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
-    /// <param name="timeProvider">The clock the socket QUIC dialer times on.</param>
+    /// <param name="timeProvider">The clock the network QUIC dialer times on.</param>
     /// <param name="createDatagramConnector">Builds the UDP datagram connector the options pick.</param>
+    /// <param name="extensionDatagramConnector">An activated connection hook's datagram connector over curl's, or <see langword="null" />.</param>
     /// <returns>The three.</returns>
     private static (QuicDialer QuicDialer, ITcpDialer TcpDialer, IDatagramConnector DatagramConnector) DialersOf(
         EngineDialing? dialing,
@@ -191,10 +198,47 @@ internal static partial class EngineComposition
         TlsClientOptions tlsClientOptions,
         EngineTraceComponents traces,
         TimeProvider timeProvider,
-        Func<IDatagramConnector> createDatagramConnector) =>
+        Func<IDatagramConnector> createDatagramConnector,
+        Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector) =>
         dialing is null
-            ? (new QuicDialer(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) }, tcpDialer, createDatagramConnector())
+            ? NetworkDialersOf(tcpDialer, tlsClientOptions, traces, timeProvider, createDatagramConnector(), extensionDatagramConnector)
             : (CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, dialing.DatagramConnector), dialing.TcpDialer, dialing.DatagramConnector);
+
+    /// <summary>
+    /// The dialers on the real network: a QUIC dialer that opens its channels through the connection hook's datagram
+    /// connector when <see cref="QuicDatagramConnectorOf" /> gives one (BL-4318), otherwise the socket
+    /// <see cref="QuicDialer" />; <paramref name="tcpDialer" />; and curl's own <paramref name="udpDatagramConnector" />.
+    /// </summary>
+    /// <param name="tcpDialer">The socket dialer built from the options.</param>
+    /// <param name="tlsClientOptions">The origin's TLS options, for the QUIC dialer.</param>
+    /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
+    /// <param name="timeProvider">The clock the QUIC dialer times on.</param>
+    /// <param name="udpDatagramConnector">Curl's UDP datagram connector.</param>
+    /// <param name="extensionDatagramConnector">An activated connection hook's datagram connector over curl's, or <see langword="null" />.</param>
+    /// <returns>The three.</returns>
+    private static (QuicDialer QuicDialer, ITcpDialer TcpDialer, IDatagramConnector DatagramConnector) NetworkDialersOf(
+        TcpDialer tcpDialer,
+        TlsClientOptions tlsClientOptions,
+        EngineTraceComponents traces,
+        TimeProvider timeProvider,
+        IDatagramConnector udpDatagramConnector,
+        Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector) =>
+        (QuicDatagramConnectorOf(udpDatagramConnector, extensionDatagramConnector) is { } hooked
+            ? new QuicDialer(new DatagramConnectorUdpChannelOpener(hooked), tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) }
+            : new QuicDialer(tlsClientOptions, timeProvider) { WritesHttp3ConnectionLines = TracesHttp3(traces) },
+            tcpDialer,
+            udpDatagramConnector);
+
+    /// <summary>
+    /// The datagram connector QUIC opens its channels through in place of its own sockets: the one
+    /// <paramref name="extensionDatagramConnector" /> gives over <paramref name="udpDatagramConnector" /> when it is
+    /// another connector (BL-4318).
+    /// </summary>
+    /// <param name="udpDatagramConnector">Curl's UDP datagram connector, handed to the hook.</param>
+    /// <param name="extensionDatagramConnector">An activated connection hook's datagram connector over curl's, or <see langword="null" />.</param>
+    /// <returns>The hook's connector, or <see langword="null" /> without a hook or when the hook keeps curl's, so QUIC keeps its sockets.</returns>
+    internal static IDatagramConnector? QuicDatagramConnectorOf(IDatagramConnector udpDatagramConnector, Func<IDatagramConnector, IDatagramConnector>? extensionDatagramConnector) =>
+        extensionDatagramConnector?.Invoke(udpDatagramConnector) is { } hooked && !ReferenceEquals(hooked, udpDatagramConnector) ? hooked : null;
 
     /// <summary>
     /// The socket options each TCP connection is given: <c>TCP_NODELAY</c>, keepalive with its idle time and
@@ -228,7 +272,7 @@ internal static partial class EngineComposition
     /// <c>--http3-only</c> datagrams go through <paramref name="datagramConnector" />
     /// (<see cref="DatagramConnectorUdpChannelOpener" />), not a real UDP socket, so an in-process
     /// HTTP/3 server answers them (BL-2260). The executable's <see cref="CreateTransports(EngineToolOptions, EasyNetworkOptions, EasyTlsOptions, EasyHttpOptions, EasyProxyOptions, EasyAuthenticationOptions, TimeProvider, ConnectionCache?, TlsSessionCache?, IDiagnosticLog?, DnsCache?, Func{CurlExitCode, string}?, EngineTraceComponents?, Func{long}?)" />
-    /// keeps the socket-opening dialer.
+    /// keeps the socket-opening dialer unless an extension connection hook supplies a datagram connector (BL-4318).
     /// </summary>
     /// <param name="traces">The run's <c>--trace-config</c> components, for the HTTP/3 connection lines.</param>
     /// <param name="tlsClientOptions">The origin's TLS options.</param>

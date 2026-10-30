@@ -140,9 +140,27 @@ internal static class CurlComposition
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateNetworkTransferDispatch(CommandLineOptions options, CookieEngine? cookies, ResolverHooks resolverHooks, ConnectionCache runConnections, TlsSessionCache tlsSessions, IDiagnosticLog runLog, DnsCache runDnsCache, TransferPerformer performer)
     {
-        CurlTransports transports = CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), resolverHooks.ResolverOver, takeDohConnectionId: performer.TakeConnectionId);
-        return CreateTransferDispatch(transports, cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), ExtensionHandlerHooksOf(options, transports.PoolingConnector, new TcpConnectionListener()), ExtensionConnectionHooksOf(options), resolverHooks, ExtensionCertificateCheckHooksOf(options));
+        ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options);
+        CurlTransports transports = CreateNetworkTransports(options, resolverHooks, connectionHooks, runConnections, tlsSessions, runLog, runDnsCache, performer);
+        return CreateTransferDispatch(transports, cookies, NegotiateOptionsMapping.Of(EasyOptionsFromCommandLine.AuthenticationOf(options)), ExtensionHandlerHooksOf(options, transports.PoolingConnector, new TcpConnectionListener()), connectionHooks, resolverHooks, ExtensionCertificateCheckHooksOf(options));
     }
+
+    /// <summary>
+    /// Builds one option group's transports over the real network: the TCP and UDP connectors look names up through
+    /// <paramref name="resolverHooks" /> (ADR-1012), and QUIC opens its channels through the datagram connector
+    /// <paramref name="connectionHooks" />' hook supplies, when it supplies one (BL-4318).
+    /// </summary>
+    /// <param name="options">The option group.</param>
+    /// <param name="resolverHooks">The resolver hook the group's extension options activated, or <see cref="ResolverHooks.None" />.</param>
+    /// <param name="connectionHooks">The connection hook the group's extension options activated, or <see cref="ConnectionHooks.None" />.</param>
+    /// <param name="runConnections">The run's connection cache.</param>
+    /// <param name="tlsSessions">The run's <c>--ssl-sessions</c> cache.</param>
+    /// <param name="runLog">The run's diagnostic log.</param>
+    /// <param name="runDnsCache">The run's DNS cache.</param>
+    /// <param name="performer">Takes the run's next <c>%{conn_id}</c> for each DoH connection.</param>
+    /// <returns>The transports.</returns>
+    internal static CurlTransports CreateNetworkTransports(CommandLineOptions options, ResolverHooks resolverHooks, ConnectionHooks connectionHooks, ConnectionCache runConnections, TlsSessionCache tlsSessions, IDiagnosticLog runLog, DnsCache runDnsCache, TransferPerformer performer) =>
+        CreateTransports(EasyOptionsFromCommandLine.ToolOptionsOf(options), EasyOptionsFromCommandLine.NetworkOf(options), EasyOptionsFromCommandLine.TlsOf(options), EasyOptionsFromCommandLine.HttpOf(options), EasyOptionsFromCommandLine.ProxyOf(options), EasyOptionsFromCommandLine.AuthenticationOf(options), TimeProvider.System, runConnections, tlsSessions, runLog, runDnsCache, EasyErrorText, EasyOptionsFromCommandLine.TraceComponentsOf(options), resolverHooks.ResolverOver, takeDohConnectionId: performer.TakeConnectionId, extensionDatagramConnector: ExtensionDatagramConnectorOf(connectionHooks));
 
     /// <summary>
     /// Creates the runner with the production handler set built around the given

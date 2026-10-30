@@ -1162,3 +1162,4 @@ Each option and the specific reason it lost.
 | [1115](ADR-1115-masque-wire-format-follows-rfc-9298-and-rfc-9484-over-http-1-1-upgrade.md) | The MASQUE extension's wire format follows RFC 9298 and RFC 9484 over an HTTP/1.1 upgrade (BL-4319) | Accepted | 2026-10-29 |
 | [1116](ADR-1116-virtual-machine-socket-end-point-writes-its-own-family-bytes.md) | The virtual machine socket end point writes its own family bytes (BL-4322) | Accepted | 2026-10-29 |
 | [1117](ADR-1117-wireguard-configuration-parser-ignores-wg-quick-host-keys-and-names-the-line.md) | The WireGuard configuration parser ignores wg-quick's host-side keys and names the line of every error (BL-4326) | Accepted | 2026-10-29 |
+| [1115](ADR-1115-quic-dials-through-an-extension-connection-hooks-datagram-connector.md) | QUIC dials through an extension connection hook's datagram connector (BL-4318) | Accepted | 2026-10-29 |
