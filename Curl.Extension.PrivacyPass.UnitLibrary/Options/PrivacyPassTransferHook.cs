@@ -9,7 +9,7 @@ namespace Curl.Extension.PrivacyPass.Options;
 /// <summary>
 /// Runs the transfer and, when it is answered 401 with a <c>PrivateToken</c> challenge of token type <c>0x0002</c>
 /// (RFC 9577 §2.1), gets a token for it from the issuer (<see cref="PrivacyPassIssuance"/>) and runs the transfer again
-/// with <c>Authorization: PrivateToken</c> (RFC 9577 §2.2) after curl's own request headers (ADR-1095).
+/// with <c>Authorization: PrivateToken</c> (RFC 9577 §2.2) after curl's own request headers (ADR-1110).
 /// </summary>
 /// <remarks>
 /// The first response is held back, so the 401 that is answered never reaches the output; any other first response,

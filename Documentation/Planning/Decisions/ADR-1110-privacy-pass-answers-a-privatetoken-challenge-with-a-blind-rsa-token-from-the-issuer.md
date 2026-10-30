@@ -1,4 +1,4 @@
-# ADR-1095: --privacy-pass answers a PrivateToken challenge with a Blind RSA token from the issuer
+# ADR-1110: --privacy-pass answers a PrivateToken challenge with a Blind RSA token from the issuer
 
 - Status: Accepted
 - Date: 2026-10-29

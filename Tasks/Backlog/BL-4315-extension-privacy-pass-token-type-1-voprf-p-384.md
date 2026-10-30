@@ -14,7 +14,7 @@ completed:
 
 ## Goal
 
-`--privacy-pass` also answers a PrivateToken challenge of token type 0x0001 (privately verifiable, VOPRF(P-384, SHA-384), RFC 9578 §5, RFC 9497), with P-384 and hash-to-curve built by hand in the extension. See ADR-1095.
+`--privacy-pass` also answers a PrivateToken challenge of token type 0x0001 (privately verifiable, VOPRF(P-384, SHA-384), RFC 9578 §5, RFC 9497), with P-384 and hash-to-curve built by hand in the extension. See ADR-1110.
 
 <!-- One sentence: the observable outcome once this task is done. -->
 

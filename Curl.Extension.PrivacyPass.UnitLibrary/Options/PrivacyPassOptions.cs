@@ -6,7 +6,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.PrivacyPass.Options;
 
 /// <summary>
-/// The Privacy Pass extension's option, its description and its transfer hook activator (ADR-1095):
+/// The Privacy Pass extension's option, its description and its transfer hook activator (ADR-1110):
 /// <c>--privacy-pass &lt;issuer request URL&gt;</c> answers a <c>PrivateToken</c> challenge with a token from that issuer.
 /// </summary>
 public static class PrivacyPassOptions

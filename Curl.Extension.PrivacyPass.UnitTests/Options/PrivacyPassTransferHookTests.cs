@@ -12,7 +12,7 @@ namespace Curl.Extension.PrivacyPass.Options;
 
 /// <summary>
 /// Pins the redemption flow (RFC 9577 §2.1, §2.2; RFC 9578 §5, §6.1, §6.2, §6.3): a 401 <c>PrivateToken</c> challenge is
-/// answered with a token from the issuer and the transfer sent again, anything else passes through unchanged (ADR-1095).
+/// answered with a token from the issuer and the transfer sent again, anything else passes through unchanged (ADR-1110).
 /// </summary>
 [TestClass]
 public sealed class PrivacyPassTransferHookTests
