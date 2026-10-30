@@ -1,4 +1,4 @@
-# ADR-1132: The Dane extension's TLSA lookup walks DS from the root itself and leaves out what it cannot prove
+# ADR-1137: The Dane extension's TLSA lookup walks DS from the root itself and leaves out what it cannot prove
 
 - Status: Accepted
 - Date: 2026-10-29

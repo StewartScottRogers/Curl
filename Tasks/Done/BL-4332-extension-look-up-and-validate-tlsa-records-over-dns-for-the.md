@@ -31,7 +31,7 @@ Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333'
 ## Notes
 
 - Filed by BL-4151's run on 2026-10-29 when it split that task for size. Document the folder in XML comments; BL-4151 adds it to the library's CLAUDE.md.
-- Plan as built (ADR-1132): `DnssecQueryTransport` (UDP with DO+CD, TCP retry on TC with a length prefix, one
+- Plan as built (ADR-1137): `DnssecQueryTransport` (UDP with DO+CD, TCP retry on TC with a length prefix, one
   `TimeProvider` timeout, null on any failure); `TlsaLookup` walks DS top down from the trust anchors (a constructor
   parameter, `RootTrustAnchors.DelegationSigners` in production) through every ancestor, anchors each zone's DNSKEY
   RRset by DS, then judges the TLSA RRset, a CNAME (up to eight) or the NSEC/NSEC3 denial (`DenialOfExistence`,
