@@ -9,6 +9,15 @@ registered in any Composition catalogue (BL-4137 does that).
   encapsulated key, `Seal` and `Export`; `HpkeReceiver.SetUp` gives `Open` and `Export`. `HpkeSuite` names the KEM,
   KDF and AEAD. An unusable peer key throws `HpkeSetupException`, a message that does not authenticate
   `HpkeOpenException`, both `CryptographicException`s.
+- `BinaryHttp/` is Binary HTTP (RFC 9292), the message format Oblivious HTTP encapsulates:
+  `BinaryHttpRequestEncoder.EncodeKnownLength` writes a `BinaryHttpRequest` as a known-length request (framing
+  indicator 0, field names in lower case, empty trailers); `BinaryHttpResponseDecoder.Decode` reads a known-length (1)
+  or indeterminate-length (3) response into a `BinaryHttpResponse` with its informational responses, headers, content
+  and trailers, treating truncated content and trailers as empty and checking padding is zero. Field names and values
+  are Latin-1 strings. `QuicVariableLengthInteger` writes RFC 9000 section 16 integers and `BinaryHttpReader` reads
+  them, here rather than taken from a protocol library. An invalid message throws `BinaryHttpFormatException`, a
+  `FormatException`.
 
-Tested against the specifications, not against curl, with RFC 9180 Appendix A.1.1 and A.2.1. Held to the four quality
+Tested against the specifications, not against curl, with RFC 9180 Appendix A.1.1 and A.2.1 and the RFC 9292
+section 5 examples. Held to the four quality
 gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.ObliviousHttp.UnitTests`.
