@@ -24,6 +24,7 @@ internal static class ExtensionDescriptionCatalogue
         Stomp.Client.StompExtension.Description,
         Nats.NatsExtension.Description,
         WebTransport.WebTransportExtension.Description,
+        Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.Description,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
         Xmpp.Client.XmppExtension.Description,
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
