@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Description;
 
 namespace Curl.Extension.VirtualMachineSocket;
 
-/// <summary>The <c>--vm-socket</c> extension's option, description and connection hook activator (ADR-1104).</summary>
+/// <summary>The <c>--vm-socket</c> extension's option, description and connection hook activator (ADR-1109).</summary>
 public static class VirtualMachineSocketExtension
 {
     /// <summary>Gets <c>--vm-socket &lt;cid:port | vm:service&gt;</c>.</summary>

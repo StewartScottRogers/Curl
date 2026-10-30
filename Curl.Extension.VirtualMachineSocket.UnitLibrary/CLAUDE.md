@@ -1,6 +1,6 @@
 # Curl.Extension.VirtualMachineSocket.UnitLibrary
 
-The `--vm-socket <cid:port | vm:service>` extension (ADR-0999, ADR-1104): every transfer of its option group runs
+The `--vm-socket <cid:port | vm:service>` extension (ADR-0999, ADR-1109): every transfer of its option group runs
 over a vsock (`AF_VSOCK`) or Hyper-V (`AF_HYPERV`) stream socket, as `--unix-socket` runs it over a Unix domain
 socket. Namespace `Curl.Extension.VirtualMachineSocket`. Tested against vsock(7) and Microsoft's "Make your own
 integration services" (Hyper-V sockets), not against curl.

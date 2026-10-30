@@ -1,4 +1,4 @@
-# ADR-1104: --vm-socket runs a transfer over a vsock or Hyper-V socket
+# ADR-1109: --vm-socket runs a transfer over a vsock or Hyper-V socket
 
 - Status: Accepted
 - Date: 2026-10-29

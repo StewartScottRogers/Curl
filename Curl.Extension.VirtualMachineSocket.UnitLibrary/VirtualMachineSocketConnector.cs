@@ -6,7 +6,7 @@ namespace Curl.Extension.VirtualMachineSocket;
 /// <summary>
 /// Opens every connection of a transfer over one vsock or Hyper-V socket, whatever host and port its URL names, as
 /// <c>--unix-socket</c> does over a Unix domain socket, and runs curl's TLS handshake over it for a TLS target, offering
-/// curl's ALPN list for an <c>https://</c> one (ADR-1104).
+/// curl's ALPN list for an <c>https://</c> one (ADR-1109).
 /// </summary>
 /// <param name="address">The socket's address.</param>
 /// <param name="opener">Opens the socket.</param>
