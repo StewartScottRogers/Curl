@@ -35,3 +35,4 @@ Second part of BL-4112. Uses the wire layer from BL-4298, `Http2Connection` in t
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: a2f1a684 d6cf6ff8 db287935 e35aff77 3d836d5e.
