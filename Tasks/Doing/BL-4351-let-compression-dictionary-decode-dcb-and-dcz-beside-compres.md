@@ -33,3 +33,4 @@ ADR-1149 (BL-4132): the hook advertises nothing under `--compressed`, because cu
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: e6421b98 6b6a8222 4d3f4f7d 478f867b 3d836d5e.
