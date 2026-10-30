@@ -168,6 +168,16 @@ public sealed class ProtobufReader
             return error;
         }
 
+        return TryReadFieldValue(fieldNumber, wireType, out field);
+    }
+
+    /// <summary>
+    /// Reads the value of a field whose tag <see cref="TryReadTag" /> has just read, a group
+    /// with every field inside it: how a message reader keeps a field it does not recognise.
+    /// </summary>
+    public ProtobufDecodeError TryReadFieldValue(int fieldNumber, ProtobufWireType wireType, out ProtobufField? field)
+    {
+        field = null;
         return wireType == ProtobufWireType.EndGroup
             ? ProtobufDecodeError.UnmatchedEndGroup
             : TryReadFieldValue(fieldNumber, wireType, Depth, out field);

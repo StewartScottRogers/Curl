@@ -32,4 +32,7 @@ public enum ProtobufDecodeError
 
     /// <summary>Groups or messages are nested deeper than <see cref="ProtobufReader.MaximumDepth" />.</summary>
     NestingTooDeep,
+
+    /// <summary>A <c>string</c> field's bytes are not valid UTF-8, which proto3 requires.</summary>
+    InvalidUtf8,
 }
