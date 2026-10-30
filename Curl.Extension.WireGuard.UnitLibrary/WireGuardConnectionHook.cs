@@ -33,7 +33,7 @@ internal sealed class WireGuardConnectionHook(WireGuardConfiguration configurati
         return new WireGuardConnector(configuration, opener, timeProvider, random, curlTlsProvider, curlConnector.HttpOverTlsApplicationProtocols, curlConnector);
     }
 
-    /// <summary>Gives a datagram connector that opens each UDP socket inside its own tunnel, so nothing leaves outside it (ADR-1162).</summary>
+    /// <summary>Gives a datagram connector that opens each UDP socket inside its own tunnel, so nothing leaves outside it (ADR-1163).</summary>
     /// <param name="curlDatagramConnector">The datagram connector curl would use; set aside.</param>
     /// <returns>The tunnel's datagram connector.</returns>
     public IDatagramConnector DatagramConnectorOver(IDatagramConnector curlDatagramConnector) =>

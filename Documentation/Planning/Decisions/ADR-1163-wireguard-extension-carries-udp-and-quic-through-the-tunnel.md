@@ -1,4 +1,4 @@
-# ADR-1162: The WireGuard extension carries UDP, and so QUIC, through the tunnel
+# ADR-1163: The WireGuard extension carries UDP, and so QUIC, through the tunnel
 
 - Status: Accepted
 - Date: 2026-10-30

@@ -10,7 +10,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.WireGuard.Tunnel;
 
 /// <summary>
-/// Stands in for curl's datagram connector under <c>--wireguard</c> (ADR-1162): each channel is a UDP socket of the
+/// Stands in for curl's datagram connector under <c>--wireguard</c> (ADR-1163): each channel is a UDP socket of the
 /// user-space IP stack inside its own tunnel - the peer cryptokey routing picks, a new UDP socket and handshake to it -
 /// so QUIC for HTTP/3 travels sealed as transport data and no datagram leaves outside the tunnel. A host name is
 /// resolved by <paramref name="resolver" />'s DNS over TCP through the tunnel (ADR-1161).

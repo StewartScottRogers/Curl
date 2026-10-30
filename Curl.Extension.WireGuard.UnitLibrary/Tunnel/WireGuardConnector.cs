@@ -22,7 +22,7 @@ namespace Curl.Extension.WireGuard.Tunnel;
 /// <param name="httpOverTlsApplicationProtocols">What curl's connector offers through ALPN for <c>https</c>; <see langword="null" /> offers <c>http/1.1</c> alone.</param>
 /// <param name="quicConnector">
 /// Curl's connector, whose QUIC dialer opens its UDP through the hook's datagram connector and so through the tunnel
-/// (ADR-1162); <see langword="null" /> refuses QUIC.
+/// (ADR-1163); <see langword="null" /> refuses QUIC.
 /// </param>
 internal sealed class WireGuardConnector(
     WireGuardConfiguration configuration,
@@ -41,7 +41,7 @@ internal sealed class WireGuardConnector(
     /// <inheritdoc />
     public IReadOnlyList<string> HttpOverTlsApplicationProtocols => httpOverTlsApplicationProtocols ?? Http11Only;
 
-    /// <summary>Opens a QUIC connection through curl's connector, whose datagrams the tunnel carries (ADR-1162).</summary>
+    /// <summary>Opens a QUIC connection through curl's connector, whose datagrams the tunnel carries (ADR-1163).</summary>
     /// <param name="target">The target.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>
     /// <returns>Curl's connector's result, or a refusal without one.</returns>
@@ -49,7 +49,7 @@ internal sealed class WireGuardConnector(
         quicConnector?.ConnectMultiplexedAsync(target, cancellationToken)
             ?? ValueTask.FromResult(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector"));
 
-    /// <summary>Opens a session on a QUIC connection through curl's connector, so its pool shares the connection (ADR-1162).</summary>
+    /// <summary>Opens a session on a QUIC connection through curl's connector, so its pool shares the connection (ADR-1163).</summary>
     /// <param name="target">The target.</param>
     /// <param name="openSession">Opens the session on the connection.</param>
     /// <param name="cancellationToken">Cancels the connect.</param>

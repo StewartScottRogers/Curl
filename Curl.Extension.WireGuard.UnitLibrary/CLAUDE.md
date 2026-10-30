@@ -9,14 +9,14 @@ library or another extension.
   Composition's option, description and connection hook catalogues; `Activate` reads and parses the file, and any
   failure is an `ArgumentException` the host reports as exit 2. `WireGuardConnectionHook` (an `IConnectionHook`)
   gives a `WireGuardConnector` over curl's TLS provider, ALPN list and connector, and a `WireGuardDatagramConnector`
-  that opens each UDP socket inside the tunnel (ADR-1162).
+  that opens each UDP socket inside the tunnel (ADR-1163).
 - `Tunnel/` joins the pieces below: `WireGuardConnector` opens each connection in its own tunnel - `WireGuardRoute`'s
   cryptokey routing picks the peer and source address, `IWireGuardUdpOpener` (`SystemWireGuardUdpOpener` in
   production) opens the UDP socket, `WireGuardTunnelHandshake` retries initiations every Rekey-Timeout for
   Rekey-Attempt-Time, `WireGuardPacketTunnel` is the `IIpPacketChannel` sealing and opening transport data, and
   `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. A host name is resolved
   first by DNS over TCP through its own tunnel to the first `DNS` address (ADR-1161), `WireGuardDnsMessage` building
-  the query and reading the answer; without one it is exit 6. UDP and QUIC are carried too (ADR-1162):
+  the query and reading the answer; without one it is exit 6. UDP and QUIC are carried too (ADR-1163):
   `WireGuardDatagramConnector` opens each `IDatagramChannel` in its own tunnel, a `UserSpaceUdpChannel` whose
   `WireGuardTunnelLifetime` closes the socket and keys, resolving a host name through
   `WireGuardConnector.ResolveThroughTunnelAsync`; `WireGuardConnector.ConnectMultiplexedAsync` hands QUIC to curl's
