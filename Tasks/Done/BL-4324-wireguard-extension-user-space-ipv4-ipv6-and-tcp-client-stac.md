@@ -30,7 +30,7 @@ Split from BL-4147. The tunnel carries raw IP packets; the transfer above needs 
 
 ## Notes
 
-- Delivered directly rather than through the full /feature agent stages, to fit the run: the plan is ADR-1118 (no fragment reassembly, no IPv6 extension headers, out-of-order segments dropped and re-acknowledged, 65535-byte window without scaling, no Nagle/congestion control/persist timer, RFC 6298 timer clamped 1 s to 60 s, 6 SYN and 15 data retransmissions as Linux, RST by exact sequence match, DisposeAsync sends FIN and waits for its ACK). UDP for `DNS` left to BL-4147.
+- Delivered directly rather than through the full /feature agent stages, to fit the run: the plan is ADR-1121 (no fragment reassembly, no IPv6 extension headers, out-of-order segments dropped and re-acknowledged, 65535-byte window without scaling, no Nagle/congestion control/persist timer, RFC 6298 timer clamped 1 s to 60 s, 6 SYN and 15 data retransmissions as Linux, RST by exact sequence match, DisposeAsync sends FIN and waits for its ACK). UDP for `DNS` left to BL-4147.
 - Added `Curl.Extension.WireGuard.UnitLibrary/CLAUDE.md` to touches: it documents the library and must name `IpStack/`. No task in Doing on origin/work/dark-factory names it.
 - Tests drive `TcpConnection` through a scripted packet channel and peer on a manual `TimeProvider` (`Curl.Extension.WireGuard.UnitTests/IpStack`), so they are platform-neutral: no sockets, paths or OS error text (SocketErrorCode only).
 - Measure-CodeQuality -Library Curl.Extension.WireGuard.UnitLibrary: 100% line, 100% branch, 0 failing members, max complexity 10. Fast tests green; `dotnet build` clean.

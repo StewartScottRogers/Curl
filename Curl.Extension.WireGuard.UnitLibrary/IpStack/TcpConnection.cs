@@ -8,7 +8,7 @@ namespace Curl.Extension.WireGuard.IpStack;
 /// One TCP client connection (RFC 9293) over an <see cref="IIpPacketChannel" />: the three-way handshake with the
 /// Maximum Segment Size option, in-order delivery with a 65535-byte receive window, sending within the peer's window,
 /// retransmission on the RFC 6298 timer, and FIN and RST. Segments that arrive out of order are dropped and
-/// acknowledged again, so the peer retransmits them (ADR-1118).
+/// acknowledged again, so the peer retransmits them (ADR-1121).
 /// </summary>
 public sealed class TcpConnection : IAsyncDisposable
 {

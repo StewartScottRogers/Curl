@@ -7,7 +7,7 @@ namespace Curl.Extension.WireGuard.IpStack;
 /// <summary>
 /// Builds and parses IPv4 (RFC 791) and IPv6 (RFC 8200) packets. Packets it builds are never fragmented: IPv4 ones
 /// carry Don't Fragment. Parsing refuses fragments, skips IPv4 options and does not follow IPv6 extension headers
-/// (ADR-1118).
+/// (ADR-1121).
 /// </summary>
 public static class IpPacketCodec
 {

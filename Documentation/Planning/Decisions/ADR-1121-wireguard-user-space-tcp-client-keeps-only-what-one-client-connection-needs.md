@@ -1,4 +1,4 @@
-# ADR-1118 — The WireGuard extension's user-space TCP client keeps only what one client connection needs
+# ADR-1121 — The WireGuard extension's user-space TCP client keeps only what one client connection needs
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

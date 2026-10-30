@@ -12,7 +12,7 @@ library or another extension. It is not yet registered in any Composition catalo
   `AllowedIPs`, `PersistentKeepalive`). Keys are 32 bytes of base64; wg-quick's host-side keys (`Table`, `FwMark`,
   `SaveConfig` and the up and down hooks) are ignored. Every error throws `WireGuardConfigurationException`, a
   `FormatException` whose message starts `line N:`.
-- `IpStack/` is a user-space IPv4, IPv6 and TCP client (ADR-1118) over an `IIpPacketChannel` that sends and receives
+- `IpStack/` is a user-space IPv4, IPv6 and TCP client (ADR-1121) over an `IIpPacketChannel` that sends and receives
   raw IP packets. `IpPacketCodec` and `TcpSegmentCodec` build and parse packets and segments with their RFC 1071
   `InternetChecksum`s; `TcpConnection.ConnectAsync` opens one connection (handshake with MSS, in-order receive,
   window-limited send, `RetransmissionTimeoutEstimator`'s RFC 6298 timer on an injected `TimeProvider`, FIN and RST);
