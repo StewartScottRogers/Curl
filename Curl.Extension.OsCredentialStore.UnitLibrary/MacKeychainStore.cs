@@ -3,7 +3,7 @@ using System.Net;
 namespace Curl.Extension.OsCredentialStore;
 
 /// <summary>
-/// The macOS keychain (ADR-1139 section 3): the generic password item whose service is the name given, read with
+/// The macOS keychain (ADR-1144 section 3): the generic password item whose service is the name given, read with
 /// <c>/usr/bin/security find-generic-password -g -s &lt;name&gt;</c>. Its <c>acct</c> attribute is the user and the
 /// password it prints the password; a non-zero exit (44 when no item matches) means the keychain holds none.
 /// </summary>

@@ -1,4 +1,4 @@
-# ADR-1139 — --user-from-keychain reads the platform's credential store
+# ADR-1144 — --user-from-keychain reads the platform's credential store
 
 - **Status:** Accepted
 - **Date:** 2026-10-30

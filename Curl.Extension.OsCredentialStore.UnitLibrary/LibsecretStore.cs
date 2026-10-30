@@ -3,7 +3,7 @@ using System.Net;
 namespace Curl.Extension.OsCredentialStore;
 
 /// <summary>
-/// libsecret, the freedesktop.org Secret Service (ADR-1139 section 4): the first item whose <c>service</c> attribute
+/// libsecret, the freedesktop.org Secret Service (ADR-1144 section 4): the first item whose <c>service</c> attribute
 /// is the name given, read with <c>secret-tool search --unlock service &lt;name&gt;</c>. Its <c>secret = </c> line is
 /// the password and its <c>attribute.user = </c> line, or failing that <c>attribute.username = </c>, the user. A
 /// non-zero exit, or output with no secret, means the store holds none.

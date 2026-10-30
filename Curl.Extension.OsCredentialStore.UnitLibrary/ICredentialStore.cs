@@ -2,7 +2,7 @@ using System.Net;
 
 namespace Curl.Extension.OsCredentialStore;
 
-/// <summary>One platform's credential store, read by the name <c>--user-from-keychain</c> gives (ADR-1139).</summary>
+/// <summary>One platform's credential store, read by the name <c>--user-from-keychain</c> gives (ADR-1144).</summary>
 internal interface ICredentialStore
 {
     /// <summary>Gets the store's name, as an error message names it.</summary>

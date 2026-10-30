@@ -1,6 +1,6 @@
 namespace Curl.Extension.OsCredentialStore;
 
-/// <summary>Picks the credential store of the platform Curl runs on (ADR-1139 section 1).</summary>
+/// <summary>Picks the credential store of the platform Curl runs on (ADR-1144 section 1).</summary>
 internal static class CredentialStores
 {
     /// <summary>Gives the store the running OS has.</summary>

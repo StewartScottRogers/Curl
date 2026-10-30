@@ -4,7 +4,7 @@ using System.Text;
 namespace Curl.Extension.OsCredentialStore;
 
 /// <summary>
-/// Windows Credential Manager (ADR-1139 section 2): the generic credential whose target name is the name given,
+/// Windows Credential Manager (ADR-1144 section 2): the generic credential whose target name is the name given,
 /// its <c>UserName</c> the user and its <c>CredentialBlob</c> the password.
 /// </summary>
 /// <param name="reader">Reads the credential with <c>CredReadW</c>.</param>

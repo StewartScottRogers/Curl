@@ -3,7 +3,7 @@ using System.Text;
 namespace Curl.Extension.OsCredentialStore;
 
 /// <summary>
-/// Reads the values macOS <c>security find-generic-password -g</c> prints (ADR-1139 section 3): an attribute as
+/// Reads the values macOS <c>security find-generic-password -g</c> prints (ADR-1144 section 3): an attribute as
 /// <c>"acct"&lt;blob&gt;="alice"</c> on standard output and the password as <c>password: "secret"</c> on standard
 /// error, each either quoted text, <c>0x</c> and the bytes in hexadecimal (then, after spaces, a quoted rendering)
 /// when they are not printable, or <c>&lt;NULL&gt;</c> when empty.

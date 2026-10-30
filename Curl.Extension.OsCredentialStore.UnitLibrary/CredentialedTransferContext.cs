@@ -2,7 +2,7 @@ namespace Curl.Extension.OsCredentialStore;
 
 /// <summary>
 /// The transfer as <c>--user-from-keychain</c> hands it to curl's handler: the transfer's own context, with the
-/// user name and password read from the OS credential store in place of any <c>-u</c> gave (ADR-1139).
+/// user name and password read from the OS credential store in place of any <c>-u</c> gave (ADR-1144).
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>
 /// <param name="credentials">The credential read from the store.</param>
