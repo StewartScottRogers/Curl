@@ -1,5 +1,5 @@
 ---
-id: BL-4308
+id: BL-4313
 title: Fix flaky CoAP DTLS test LostServerFinishedFlight under a loaded full run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4308 — Fix flaky CoAP DTLS test LostServerFinishedFlight under a loaded full run
+# BL-4313 — Fix flaky CoAP DTLS test LostServerFinishedFlight under a loaded full run
 
 ## Goal
 

@@ -40,7 +40,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - Default: the trust root is a user-supplied PEM file rather than an embedded Sigstore public-good root, which would go stale without a TUF client (ADR-1093).
 - CURL_EXTENSIONS=0: `SigstoreExtensionTests.Composition_RegistersTheOptionsOnlyWhileExtensionsAreOn` shows the options leave the option table, so they are refused as unknown (exit 2) as for every extension; without `--sigstore-bundle` no hook is activated, so transfers are unchanged.
 - Measure-CodeQuality.ps1 -Library Curl.Extension.Sigstore.UnitLibrary: 100% line, 100% branch, 0 failing members (after splitting three methods past complexity 10). 38 tests.
-- Full fast run: all green except Curl.Extension.Coap.UnitTests LostServerFinishedFlight, which passed alone; filed as BL-4308.
+- Full fast run: all green except Curl.Extension.Coap.UnitTests LostServerFinishedFlight, which passed alone; filed as BL-4313.
 - Linux and macOS: tests use only temp-directory files and certificates generated in memory (CertificateRequest), no paths or OS error text pinned, so they are platform-neutral.
 
 ## Log
