@@ -1,4 +1,4 @@
-# ADR-1106: Proto imports resolve through an injected reader, and types resolve as protoc does
+# ADR-1108: Proto imports resolve through an injected reader, and types resolve as protoc does
 
 - Status: Accepted
 - Date: 2026-10-29

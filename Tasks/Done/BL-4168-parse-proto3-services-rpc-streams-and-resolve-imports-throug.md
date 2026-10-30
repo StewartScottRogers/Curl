@@ -29,7 +29,7 @@ Second of three parts split from BL-4165. Extends BL-4170's parser under `Descri
 
 ## Notes
 
-- 2026-10-29, lane 11: delivered directly in the session (no sub-agents, for the run's budget); design in ADR-1106.
+- 2026-10-29, lane 11: delivered directly in the session (no sub-agents, for the run's budget); design in ADR-1108.
   `ProtoServiceParser` reads `service`/`rpc` (stream either side, options in both bodies; a scalar request or
   response is a syntax error); `ProtoFileParser` reads `import`, `import public` and `import weak` into
   `ProtoImportDescriptor` (path, kind, keyword line and column). `ProtoFileSetReader.TryRead` reads a file and
