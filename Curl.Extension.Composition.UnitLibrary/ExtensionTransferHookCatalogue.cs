@@ -40,5 +40,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.RecordReplay.RecordReplayExtension.HookFor,
         DnsQuery.Client.DnsQueryExtension.HookFor,
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.HookFor,
+        Curl.Extension.Dpop.DpopExtension.HookFor,
     ];
 }

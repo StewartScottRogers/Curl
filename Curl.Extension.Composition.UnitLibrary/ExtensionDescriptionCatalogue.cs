@@ -61,5 +61,6 @@ internal static class ExtensionDescriptionCatalogue
         DnsQuery.Client.DnsQueryExtension.Description,
         PluginProtocol.PluginProtocolExtension.Description,
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.Description,
+        Curl.Extension.Dpop.DpopExtension.Description,
     ];
 }

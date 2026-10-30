@@ -68,5 +68,6 @@ internal static class ExtensionOptionCatalogue
         DnsQuery.Client.DnsQueryExtension.TransportOption,
         DnsQuery.Client.DnsQueryExtension.JsonOption,
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.UserFromKeychainOption,
+        Curl.Extension.Dpop.DpopExtension.Option,
     ];
 }
