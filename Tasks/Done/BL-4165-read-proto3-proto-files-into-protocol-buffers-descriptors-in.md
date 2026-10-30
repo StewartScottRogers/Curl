@@ -8,7 +8,7 @@ depends-on: [BL-4164, BL-4170, BL-4168, BL-4169]
 touches: [Curl.Protobuf.UnitLibrary/Descriptors, Curl.Protobuf.UnitTests/Descriptors]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4165 — Read proto3 .proto files into Protocol Buffers descriptors in Curl.Protobuf
 
@@ -22,15 +22,17 @@ Second of three parts split from BL-4099. Builds on BL-4164's wire codec. Code g
 
 ## Acceptance criteria
 
-- [ ] A proto3 `.proto` file's messages, enums and services are read into descriptors, with unit tests for each construct listed under Context.
-- [ ] A message described by a descriptor is encoded to and decoded from binary through the wire codec, checked against byte vectors from the Protocol Buffers encoding specification.
-- [ ] A malformed `.proto` file fails with a typed error naming line and column, never an exception escaping; unit tests.
-- [ ] `Curl.Protobuf.UnitLibrary` meets the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] A proto3 `.proto` file's messages, enums and services are read into descriptors, with unit tests for each construct listed under Context.
+- [x] A message described by a descriptor is encoded to and decoded from binary through the wire codec, checked against byte vectors from the Protocol Buffers encoding specification.
+- [x] A malformed `.proto` file fails with a typed error naming line and column, never an exception escaping; unit tests.
+- [x] `Curl.Protobuf.UnitLibrary` meets the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
 - 2026-10-29 (lane 5): Split for size before any code: the parser, services and imports, and the descriptor-driven codec each fill a run with the 100% coverage gate. BL-4170 (messages, enums, fields, errors), BL-4168 (services, rpc, imports), BL-4169 (dynamic message codec, under `DynamicMessages/`). Once all three are Done this task only verifies the criteria and moves to Done.
+
+- 2026-10-29 (lane 3): Verified only, no code changed. The parser tests in `Curl.Protobuf.UnitTests/Descriptors` (ProtoParserTests, ProtoServiceParserTests, ProtoFileSetReaderTests) cover syntax, package, import, option, nested messages, enums, oneof, map, repeated, optional, reserved, every scalar type and rpc with each stream shape. DynamicMessageEncoderTests pins the specification's vectors (150, "testing", nested, packed), and ProtoParserErrorTests checks the typed line and column errors. Measure-CodeQuality.ps1 gives Curl.Protobuf.UnitLibrary 100% line and branch coverage, maximum complexity 10 and 0 failing members. The solution builds clean (0 warnings) and every fast test passes. The changes are platform-neutral (no paths or OS text), which covers CI on Linux and macOS.
 
 ## Log
 
@@ -38,3 +40,4 @@ Second of three parts split from BL-4099. Builds on BL-4164's wire codec. Code g
 - 2026-10-29: Backlog -> Doing. Criteria at claim: db2edfd5 ef33a4ad 05c7963a 7ae6d7ff 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size into BL-4170, BL-4168 and BL-4169; waits on them
 - 2026-10-29: Backlog -> Doing. Criteria at claim: db2edfd5 ef33a4ad 05c7963a 7ae6d7ff 3d836d5e.
+- 2026-10-29: Doing -> Done. Curl.Protobuf reads proto3 .proto files into descriptors and encodes and decodes messages through them, at the four quality gates
