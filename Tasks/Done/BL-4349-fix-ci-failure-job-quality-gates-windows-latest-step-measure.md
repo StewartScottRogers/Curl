@@ -8,7 +8,7 @@ depends-on: []
 touches: [Measure-CodeQuality.ps1, Curl.Extension.Composition.UnitLibrary/ExtensionCommandLineOptions.cs]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4349 — Fix CI failure job Quality gates (windows-latest) step Measure coverage, complexity and CRAP on Windows
 
@@ -38,3 +38,4 @@ Lanes test only on Windows, so reproduce with `gh run view 41071219626 --log-fai
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 10cc6e68.
+- 2026-10-30: Doing -> Done. ExtensionCommandLineOptions.Checked is back inside the complexity gate; the quality step reports 0 failing members
