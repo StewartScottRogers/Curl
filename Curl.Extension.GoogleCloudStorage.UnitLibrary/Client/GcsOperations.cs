@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.GoogleCloudStorage.Client;
 
 /// <summary>
-/// The three things a <c>gs://</c> URL does (ADR-1095), each as the Cloud Storage XML API names it: "GET Object",
+/// The three things a <c>gs://</c> URL does (ADR-1099), each as the Cloud Storage XML API names it: "GET Object",
 /// "PUT Object" in one request, and "List objects" (<c>list-type=2</c>) with the <c>/</c> delimiter, following
 /// continuation tokens to the last page.
 /// </summary>

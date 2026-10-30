@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.GoogleCloudStorage.Client;
 
-/// <summary>The <c>gs://</c> extension's description and handler factory (ADR-1095).</summary>
+/// <summary>The <c>gs://</c> extension's description and handler factory (ADR-1099).</summary>
 public static class GcsExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

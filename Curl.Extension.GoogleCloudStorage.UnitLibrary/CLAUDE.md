@@ -4,7 +4,7 @@ The Google Cloud Storage extension (ADR-0999), for `gs://` URLs over the Cloud S
 Namespace `Curl.Extension.GoogleCloudStorage`. It references the base class library and
 `Curl.Protocol.Abstractions`, and never `Curl.Protocol.Http` or another extension, so the signer
 is written here rather than shared with the S3 extension. It is registered in
-`Curl.Extension.Composition` by `Client/GcsExtension` (ADR-1095).
+`Curl.Extension.Composition` by `Client/GcsExtension` (ADR-1099).
 
 - `Client/GcsProtocolHandler` serves `gs://bucket/object`: `-T` uploads (one PUT Object), an empty
   name or one ending in `/` lists (List objects, `list-type=2`, delimiter `/`, every page), anything

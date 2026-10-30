@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.GoogleCloudStorage.Client;
 
 /// <summary>
-/// Serves <c>gs://bucket/object</c> (ADR-1095): with <c>-T</c> it uploads the object, with an empty name or one ending in
+/// Serves <c>gs://bucket/object</c> (ADR-1099): with <c>-T</c> it uploads the object, with an empty name or one ending in
 /// <c>/</c> it lists the names under it, otherwise it downloads the object. <c>--oauth2-bearer</c> sends an OAuth 2.0
 /// access token; otherwise <c>--user ACCESS_ID:SECRET</c> signs with an HMAC key; with neither the requests go
 /// unauthenticated, for public objects. The server is <see cref="GcsEndpoint"/>; the requests are <see cref="GcsOperations"/>.

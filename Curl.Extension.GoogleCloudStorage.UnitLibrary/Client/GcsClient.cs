@@ -8,7 +8,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.GoogleCloudStorage.Client;
 
 /// <summary>
-/// Sends one XML API request per connection (ADR-1095): it adds <c>Host</c> and then either the OAuth 2.0
+/// Sends one XML API request per connection (ADR-1099): it adds <c>Host</c> and then either the OAuth 2.0
 /// <c>Authorization: Bearer</c> header or, with an HMAC key, the V4 signing process's <c>GOOG4-HMAC-SHA256</c> headers over
 /// the payload's SHA-256, and turns a response of 300 or above into a failure naming the <c>Error</c> code ("XML API error
 /// responses").

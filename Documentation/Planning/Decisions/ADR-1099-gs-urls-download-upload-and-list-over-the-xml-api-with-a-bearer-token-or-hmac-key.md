@@ -1,4 +1,4 @@
-# ADR-1095: gs:// URLs download, upload and list over the XML API with a bearer token or HMAC key
+# ADR-1099: gs:// URLs download, upload and list over the XML API with a bearer token or HMAC key
 
 - Status: Accepted
 - Date: 2026-10-29

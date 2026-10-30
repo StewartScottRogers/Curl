@@ -1,7 +1,7 @@
 namespace Curl.Extension.GoogleCloudStorage.Client;
 
 /// <summary>
-/// The server a <c>gs://bucket/object</c> request goes to (ADR-1095): the XML API endpoint <c>storage.googleapis.com</c> over
+/// The server a <c>gs://bucket/object</c> request goes to (ADR-1099): the XML API endpoint <c>storage.googleapis.com</c> over
 /// TLS, or the emulator <c>STORAGE_EMULATOR_HOST</c> names, the variable Google's client libraries read. The bucket is always
 /// the first path segment (the XML API's path-style request URI), so any bucket name works with the one certificate.
 /// </summary>
