@@ -1,4 +1,4 @@
-# ADR-1101: az:// and abfs:// URLs download, upload in blocks and list, with a SAS or an Entra ID token
+# ADR-1105: az:// and abfs:// URLs download, upload in blocks and list, with a SAS or an Entra ID token
 
 - Status: Accepted
 - Date: 2026-10-29

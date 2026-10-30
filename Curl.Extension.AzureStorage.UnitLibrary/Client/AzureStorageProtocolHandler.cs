@@ -6,7 +6,7 @@ namespace Curl.Extension.AzureStorage.Client;
 
 /// <summary>
 /// Serves <c>az://account/container/blob</c> through <see cref="AzureBlobOperations"/> and
-/// <c>abfs[s]://filesystem@account/path</c> through <see cref="AzureDataLakeOperations"/> (ADR-1101): with <c>-T</c> it
+/// <c>abfs[s]://filesystem@account/path</c> through <see cref="AzureDataLakeOperations"/> (ADR-1105): with <c>-T</c> it
 /// uploads, with an empty name or one ending in <c>/</c> it lists, otherwise it downloads. The URL is mapped by
 /// <see cref="AzureStorageUrlMapping"/> and authorized with the credential <see cref="AzureStorageCredential.Choose"/> picks.
 /// </summary>

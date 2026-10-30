@@ -5,7 +5,7 @@ The Azure Storage extension (ADR-0999), for the `az://` and `abfs://` schemes. N
 (for `IConnection`) and `Curl.Extension.Abstractions` (for its description), never `Curl.Protocol.Http`
 or another extension. It is registered in `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs`.
 
-- `Client/` is the handler (ADR-1101). `AzureStorageExtension` gives the description and creates
+- `Client/` is the handler (ADR-1105). `AzureStorageExtension` gives the description and creates
   `AzureStorageProtocolHandler`, which maps the URL, chooses the credential and hands `az` to
   `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, List Blobs) and
   `abfs`/`abfss` to `AzureDataLakeOperations` (Path Read, Path Create, Path Update append and flush,

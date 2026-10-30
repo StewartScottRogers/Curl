@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.AzureStorage.Client;
 
 /// <summary>
-/// What an <c>abfs[s]://filesystem@account/path</c> URL does (ADR-1101), each as the Data Lake Storage Gen2 REST API names
+/// What an <c>abfs[s]://filesystem@account/path</c> URL does (ADR-1105), each as the Data Lake Storage Gen2 REST API names
 /// it: Path Read, Path Create then a Path Update append per block and a Path Update flush, and Path List of one directory,
 /// following the <c>x-ms-continuation</c> header to the last page.
 /// </summary>

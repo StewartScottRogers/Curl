@@ -8,7 +8,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.AzureStorage.Client;
 
 /// <summary>
-/// What an <c>az://account/container/blob</c> URL does (ADR-1101), each as the Blob service REST API names it: Get Blob,
+/// What an <c>az://account/container/blob</c> URL does (ADR-1105), each as the Blob service REST API names it: Get Blob,
 /// Put Blob or, once the upload fills a block, Put Block for each block and Put Block List, and List Blobs with the
 /// <c>/</c> delimiter, following <c>NextMarker</c> to the last page.
 /// </summary>

@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.AzureStorage.Client;
 
-/// <summary>The <c>az://</c> and <c>abfs://</c> extension's description and handler factory (ADR-1101).</summary>
+/// <summary>The <c>az://</c> and <c>abfs://</c> extension's description and handler factory (ADR-1105).</summary>
 public static class AzureStorageExtension
 {
     /// <summary>The size of each Put Block or Path Update append, and the size from which an upload is sent in them: 8 MiB.</summary>

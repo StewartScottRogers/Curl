@@ -7,7 +7,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.AzureStorage.Client;
 
 /// <summary>
-/// Sends one Azure Storage REST request per connection, over HTTPS on port 443 (ADR-1101): each request is addressed,
+/// Sends one Azure Storage REST request per connection, over HTTPS on port 443 (ADR-1105): each request is addressed,
 /// versioned and authorized by <see cref="AzureStorageRequestAuthorizer"/>, and a response of 300 or above becomes a failure
 /// naming the <c>Error</c> body's code ("Status and error codes").
 /// </summary>
