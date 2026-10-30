@@ -35,3 +35,4 @@ First of BL-4144's split (wire format, then client flow BL-4317, then the option
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: fa808710 a938e6cd 5c1db5d9 c554a8b3 13c89c68 e35aff77 3d836d5e.
