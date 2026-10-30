@@ -50,8 +50,8 @@ public sealed class SocketOpenerTcpDialerTests
     [TestMethod]
     public async Task ConnectAsync_WithAnOpenerOnAClosedPort_AsksOnceTellsOnceThatTheSocketClosedAndFailsWithExit7()
     {
-        using var unlistened = BoundUnlistenedSocket();
-        var port = PortOf(unlistened);
+        using var refused = await RefusedLoopbackPort.OpenAsync();
+        var port = refused.Port;
         var opener = new RecordingSocketOpener(_ => TcpSocketOpenDecision.Proceed);
 
         var result = await ConnectAsync(port, opener);
@@ -81,8 +81,8 @@ public sealed class SocketOpenerTcpDialerTests
     [TestMethod]
     public async Task DialAsync_WithASuppliedSocketWhoseConnectFails_ThrowsAndTellsTheOpenerItClosed()
     {
-        using var unlistened = BoundUnlistenedSocket();
-        var endPoint = (IPEndPoint)unlistened.LocalEndPoint!;
+        using var refused = await RefusedLoopbackPort.OpenAsync();
+        var endPoint = refused.EndPoint;
         using var supplied = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         var opener = new RecordingSocketOpener(_ => TcpSocketOpenDecision.Supplied(supplied.Handle, alreadyConnected: false));
         var dialer = new SocketOpenerTcpDialer(new FakeTcpDialer(), opener);
@@ -161,18 +161,6 @@ public sealed class SocketOpenerTcpDialerTests
     }
 
     private static int PortOf(Socket listener) => ((IPEndPoint)listener.LocalEndPoint!).Port;
-
-    /// <summary>
-    /// A loopback socket bound to a port the system handed it and never listening, so a connect to that port is
-    /// refused; held for the whole test, so a test running beside it cannot be handed the port and accept the
-    /// connect (BL-4368).
-    /// </summary>
-    private static Socket BoundUnlistenedSocket()
-    {
-        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-        return socket;
-    }
 
     private sealed class RecordingSocketOpener(Func<IPEndPoint, TcpSocketOpenDecision> decide) : ITcpSocketOpener
     {
