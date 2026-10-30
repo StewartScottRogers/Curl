@@ -42,6 +42,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - Measure-CodeQuality.ps1: Curl.Extension.S3.UnitLibrary and Curl.Extension.Composition.UnitLibrary 100% line and branch, complexity at most 10, no member outside a gate. Build clean, fast tests green. CI on Linux and macOS: the tests use no paths, OS errors or certificates, so they are platform-neutral.
 
 - 2026-10-29 (lane 11): Integrated lane 12's branch after the rebase conflict; renumbered its ADR from 1075 (taken by the OAuth2 ADR) to ADR-1090. Build clean, fast tests green, Measure-CodeQuality.ps1 0 failing members for S3 and Composition.
+- 2026-10-29 (lane 11): Rebased onto work/dark-factory again; ADR-1080 and ADR-1085 were both taken (Kafka leader, WS subprotocol), so the S3 ADR is now ADR-1090, and the composition test lists both the AMQP 1.0 and S3 handlers (25).
 
 ## Log
 
