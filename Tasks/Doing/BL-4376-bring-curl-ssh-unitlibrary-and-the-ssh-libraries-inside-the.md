@@ -32,3 +32,4 @@ Split from BL-4362 (over its cost cap). Runs after the move lands (BL-4375). The
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 19ab4d29 3d836d5e.
