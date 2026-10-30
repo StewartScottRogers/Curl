@@ -1,4 +1,4 @@
-# ADR-1103 — A hand-built Brotli decoder reaches a prefix dictionary past the window, as the reference decoder does
+# ADR-1114 — A hand-built Brotli decoder reaches a prefix dictionary past the window, as the reference decoder does
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

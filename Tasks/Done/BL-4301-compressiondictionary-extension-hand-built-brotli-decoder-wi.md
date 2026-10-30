@@ -31,7 +31,7 @@ Third part of BL-4132, split for size. The .NET 10 `BrotliDecoder` cannot attach
 
 Filed by BL-4132's first run when it split the task for size.
 
-- Plan: `BrotliDictionaryDecoder.Decode(compressed, prefixDictionary)` in `Brotli/`, one class per RFC 7932 part (bit reader, prefix codes, block switches, context maps, literal context, distances, static dictionary with transforms, compressed meta-block). ADR-1103 records the decisions.
+- Plan: `BrotliDictionaryDecoder.Decode(compressed, prefixDictionary)` in `Brotli/`, one class per RFC 7932 part (bit reader, prefix codes, block switches, context maps, literal context, distances, static dictionary with transforms, compressed meta-block). ADR-1114 records the decisions.
 - The static dictionary was taken from the reference libbrotlicommon 1.2.0 (its SHA-256 matches Appendix A) and is a Base64 constant in a .cs file rather than an embedded resource: that would have needed the project file, outside `touches`, and Base64 needs no resource lookup under AOT. The transform tables were read from the same library.
 - Test data: streams recorded with brotli 1.2.0 (`-q 1/5/11`, `-w 10/16/18/22/24`, `-D`), held as Base64 in `BrotliRecordedStreams.cs` with the inputs' SHA-256 (no project file change for content files). The reference encoder used neither several block types nor NDIRECT, so `BrotliBlockSwitchTests` and `BrotliDistancesTests` hand-build those bits.
 - Measured: a copy from the prefix dictionary enters the ring of last distances; the recorded dictionary streams decode only that way.
