@@ -12,7 +12,7 @@ namespace Curl.Extension.WireGuard.Tunnel;
 /// Opens each connection of a transfer inside its own WireGuard tunnel (ADR-1159): the peer that cryptokey routing
 /// picks for the target address, a new UDP socket and handshake to it, and a user-space TCP connection through it;
 /// curl's TLS handshake runs over that for a TLS target (ADR-1055). A host name is resolved by DNS over TCP through
-/// the tunnel to the configuration's first <c>DNS</c> address (ADR-1160), never by the system resolver.
+/// the tunnel to the configuration's first <c>DNS</c> address (ADR-1161), never by the system resolver.
 /// </summary>
 /// <param name="configuration">The wg-quick configuration.</param>
 /// <param name="opener">Opens the UDP socket to the peer.</param>
@@ -85,7 +85,7 @@ internal sealed class WireGuardConnector(
 
     /// <summary>
     /// Resolves the target's host name by DNS over TCP to the configuration's first <c>DNS</c> address, through its
-    /// own tunnel (ADR-1160), then connects to the first address of the answer; the system resolver is never asked.
+    /// own tunnel (ADR-1161), then connects to the first address of the answer; the system resolver is never asked.
     /// </summary>
     private async ValueTask<ConnectResult> ResolveAndConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {

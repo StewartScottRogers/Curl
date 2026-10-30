@@ -29,7 +29,7 @@ BL-4147 (ADR-1159) tunnels connections to IP addresses only: `WireGuardConnector
 
 ## Notes
 
-- Plan (ADR-1160): `WireGuardConnector` resolves a non-IP host by one DNS over TCP query (RFC 1035 4.2.2, RFC 7766)
+- Plan (ADR-1161): `WireGuardConnector` resolves a non-IP host by one DNS over TCP query (RFC 1035 4.2.2, RFC 7766)
   to the first `DNS` entry that is an IP address, over its own tunnel (handshake and TCP to port 53, closed once the
   answer is read), then connects to the first address of the answer as for an IP target. A when the interface has an
   IPv4 address, else AAAA; CNAMEs in the answer skipped; IDN names sent as A-labels. Every failure is exit 6
@@ -37,7 +37,7 @@ BL-4147 (ADR-1159) tunnels connections to IP addresses only: `WireGuardConnector
 - Default taken: a separate tunnel for the lookup rather than sharing one session between two TCP connections, as the
   IP stack has one receive loop per channel; costs a second handshake per connection.
 - Touches widened to the library's CLAUDE.md (it said "IP address targets only (BL-4354 adds names)") and ADR-1159's
-  Names line (now points at ADR-1160); no other task in Doing on origin/work/dark-factory names WireGuard.
+  Names line (now points at ADR-1161); no other task in Doing on origin/work/dark-factory names WireGuard.
 - `TunnelTestPeer.AcceptHandshakeAsync` now skips transport datagrams the DNS tunnel sent last before the next
   initiation.
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.WireGuard.UnitLibrary: 100% line, 100% branch, 0 failing,
@@ -48,4 +48,4 @@ BL-4147 (ADR-1159) tunnels connections to IP addresses only: `WireGuardConnector
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: e007d461 91e0739a 8b7b522d 3d836d5e.
-- 2026-10-30: Doing -> Done. --wireguard resolves host names by DNS over TCP to the configuration's first DNS server through the tunnel (ADR-1160)
+- 2026-10-30: Doing -> Done. --wireguard resolves host names by DNS over TCP to the configuration's first DNS server through the tunnel (ADR-1161)

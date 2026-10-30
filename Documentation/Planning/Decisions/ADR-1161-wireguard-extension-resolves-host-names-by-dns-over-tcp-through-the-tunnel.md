@@ -1,4 +1,4 @@
-# ADR-1160: The WireGuard extension resolves host names by DNS over TCP through the tunnel
+# ADR-1161: The WireGuard extension resolves host names by DNS over TCP through the tunnel
 
 - Status: Accepted
 - Date: 2026-10-30
