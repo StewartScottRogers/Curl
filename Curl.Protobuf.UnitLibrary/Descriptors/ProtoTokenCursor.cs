@@ -5,6 +5,9 @@ internal sealed class ProtoTokenCursor(string source, List<ProtoToken> tokens)
 {
     private int index;
 
+    /// <summary>The first token of each type reference read through this cursor, by reference identity.</summary>
+    public Dictionary<ProtoTypeReference, ProtoToken> ReferenceTokens { get; } = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>The next token, not consumed.</summary>
     public ProtoToken Peek => tokens[index];
 

@@ -9,7 +9,15 @@ internal static class ProtoFileParser
         ["option"] = (cursor, file) => ProtoOptionParser.ParseOptionStatement(cursor, file.Options),
         ["message"] = (cursor, file) => file.Messages.Add(ProtoMessageParser.ParseMessage(cursor)),
         ["enum"] = (cursor, file) => file.Enums.Add(ProtoEnumParser.ParseEnum(cursor)),
+        ["service"] = (cursor, file) => file.Services.Add(ProtoServiceParser.ParseService(cursor)),
+        ["import"] = ParseImport,
         [";"] = ProtoStatements.ParseEmpty,
+    };
+
+    private static readonly Dictionary<string, ProtoImportKind> ImportKinds = new()
+    {
+        ["public"] = ProtoImportKind.Public,
+        ["weak"] = ProtoImportKind.Weak,
     };
 
     /// <summary>Reads the whole file.</summary>
@@ -22,7 +30,7 @@ internal static class ProtoFileParser
             ProtoStatements.ParseStatement(cursor, file, Statements, ParseUnknownStatement);
         }
 
-        return new ProtoFileDescriptor(syntax, file.Package ?? string.Empty, file.Options, file.Messages, file.Enums);
+        return new ProtoFileDescriptor(syntax, file.Package ?? string.Empty, file.Imports, file.Options, file.Messages, file.Enums, file.Services);
     }
 
     private static string ParseSyntax(ProtoTokenCursor cursor)
@@ -46,6 +54,19 @@ internal static class ProtoFileParser
 
         file.Package = cursor.ExpectFullIdentifier("a package name");
         cursor.Expect(";");
+    }
+
+    private static void ParseImport(ProtoTokenCursor cursor, ProtoFileBody file)
+    {
+        var keyword = cursor.Expect("import");
+        if (ImportKinds.TryGetValue(ProtoTokenCursor.Keyword(cursor.Peek), out var kind))
+        {
+            cursor.Next();
+        }
+
+        var path = cursor.Expect(ProtoTokenKind.String, "an import path").Text;
+        cursor.Expect(";");
+        file.Imports.Add(new ProtoImportDescriptor(path, kind, keyword.Line, keyword.Column));
     }
 
     private static void ParseUnknownStatement(ProtoTokenCursor cursor, ProtoFileBody file) =>

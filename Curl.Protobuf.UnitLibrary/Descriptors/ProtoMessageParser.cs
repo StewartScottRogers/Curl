@@ -137,10 +137,14 @@ internal static class ProtoMessageParser
         return (new ProtoTypeReference(ProtoFieldType.Map, $"map<{key.Name}, {value.Name}>"), key, value);
     }
 
-    private static ProtoTypeReference ParseTypeReference(ProtoTokenCursor cursor)
+    /// <summary>Reads a type as written, a leading '.' allowed, and records its first token in the cursor.</summary>
+    public static ProtoTypeReference ParseTypeReference(ProtoTokenCursor cursor)
     {
+        var first = cursor.Peek;
         var name = (cursor.TryConsume(".") ? "." : string.Empty) + cursor.ExpectFullIdentifier("a field type");
-        return new ProtoTypeReference(ScalarTypes.GetValueOrDefault(name, ProtoFieldType.Named), name);
+        var reference = new ProtoTypeReference(ScalarTypes.GetValueOrDefault(name, ProtoFieldType.Named), name);
+        cursor.ReferenceTokens.Add(reference, first);
+        return reference;
     }
 
     private static int ParseFieldNumber(ProtoTokenCursor cursor, ProtoMessageBody message)
