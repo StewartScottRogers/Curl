@@ -25,6 +25,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Description,
         Xmpp.Client.XmppExtension.Description,
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
+        Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Description,
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.Description,
         McpClient.Client.McpClientExtension.Description,
         OAuth2.Options.OAuth2Options.Description,
