@@ -1160,3 +1160,4 @@ Each option and the specific reason it lost.
 | [1113](ADR-1113-oblivious-http-encapsulation-skips-unknown-kems-and-throws-three-typed-exceptions.md) | Oblivious HTTP encapsulation skips unknown KEMs and throws three typed exceptions (BL-4310) | Accepted | 2026-10-29 |
 | [1114](ADR-1114-hand-built-brotli-decoder-reaches-a-prefix-dictionary-past-the-window.md) | A hand-built Brotli decoder reaches a prefix dictionary past the window, as the reference decoder does (BL-4301) | Accepted | 2026-10-29 |
 | [1115](ADR-1115-masque-wire-format-follows-rfc-9298-and-rfc-9484-over-http-1-1-upgrade.md) | The MASQUE extension's wire format follows RFC 9298 and RFC 9484 over an HTTP/1.1 upgrade (BL-4319) | Accepted | 2026-10-29 |
+| [1115](ADR-1115-virtual-machine-socket-end-point-writes-its-own-family-bytes.md) | The virtual machine socket end point writes its own family bytes (BL-4322) | Accepted | 2026-10-29 |

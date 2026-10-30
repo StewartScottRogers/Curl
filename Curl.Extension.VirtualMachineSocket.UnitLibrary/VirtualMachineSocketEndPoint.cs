@@ -17,15 +17,17 @@ public sealed class VirtualMachineSocketEndPoint(VirtualMachineSocketAddress add
     public override AddressFamily AddressFamily => address.Family;
 
     /// <summary>
-    /// Gives the socket address: the family bytes as this platform's <see cref="SocketAddress" /> writes them, then the
-    /// structure's bytes after its two-byte family unchanged.
+    /// Gives the socket address: every byte of the structure, its two-byte family included, unchanged. It starts as an
+    /// <see cref="AddressFamily.Unspecified" /> address because .NET on Linux and macOS refuses to build a
+    /// <see cref="SocketAddress" /> for a family it does not know, such as <c>AF_VSOCK</c> or <c>AF_HYPERV</c>
+    /// (ADR-1115).
     /// </summary>
     /// <returns>The socket address.</returns>
     public override SocketAddress Serialize()
     {
         byte[] bytes = address.ToSocketAddressBytes();
-        SocketAddress socketAddress = new(address.Family, bytes.Length);
-        for (int index = 2; index < bytes.Length; index++)
+        SocketAddress socketAddress = new(AddressFamily.Unspecified, bytes.Length);
+        for (int index = 0; index < bytes.Length; index++)
         {
             socketAddress[index] = bytes[index];
         }

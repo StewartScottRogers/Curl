@@ -109,8 +109,7 @@ public sealed class VirtualMachineSocketAddressTests
 
         byte[] bytes = address.ToSocketAddressBytes();
         Assert.AreEqual(bytes.Length, socketAddress.Size);
-        Assert.AreEqual(address.Family, socketAddress.Family);
-        CollectionAssert.AreEqual(bytes[2..], Enumerable.Range(2, bytes.Length - 2).Select(index => socketAddress[index]).ToArray());
+        CollectionAssert.AreEqual(bytes, Enumerable.Range(0, bytes.Length).Select(index => socketAddress[index]).ToArray());
         Assert.AreEqual(address.Family, endPoint.AddressFamily);
         Assert.AreSame(address, endPoint.Address);
         Assert.AreSame(endPoint, endPoint.Create(socketAddress));
