@@ -280,7 +280,9 @@ Seven read-only analysts group each area's gaps by cause: `gap-behaviour` (Opus)
 `gap-options` and `gap-environment` (Sonnet), `gap-protocols`, `gap-features`,
 `gap-writeout` and `gap-exitcodes` (Haiku).
 
-Run it with `Gap\RunGapAnalysis.cmd -NewTab` (in herdr; never with `Start-Process`).
+Run it with `Gap\RunGapAnalysis.cmd -NewTab` (in herdr; never with `Start-Process`), or on
+Linux and macOS with `Gap/RunGapAnalysis.sh -NewTab` (PowerShell 7, `pwsh`, required; same
+arguments), which measures its own platform locally and leaves windows to a Windows run (BL-3928).
 Findings are `Gap/Findings/GF-####-*.md` on the `gap` branch, and close only when a later
 run re-measures every item as `match` (or `excluded` with a reason), never because a task reached Done. Claude files
 their tasks without asking (`Gap/Triage.md`); Stewart may reject any finding. The weekly
