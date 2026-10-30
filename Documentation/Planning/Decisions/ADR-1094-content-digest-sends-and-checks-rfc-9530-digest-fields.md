@@ -1,4 +1,4 @@
-# ADR-1092 — --content-digest sends and checks RFC 9530 digest fields
+# ADR-1094 — --content-digest sends and checks RFC 9530 digest fields
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

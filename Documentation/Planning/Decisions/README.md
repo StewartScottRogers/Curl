@@ -1138,4 +1138,4 @@ Each option and the specific reason it lost.
 | [1092](ADR-1092-zsync-fetches-only-the-blocks-a-seed-file-lacks-following-zsync-0-6.md) | --zsync fetches only the blocks a seed file lacks, following zsync 0.6 (BL-4130) | Accepted | 2026-10-29 |
 | [1090](ADR-1090-oci-pulls-manifests-by-tag-and-blobs-by-digest-over-https-with-the-registry-bearer-token.md) | OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token (BL-4292) | Accepted | 2026-10-29 |
 | [1093](ADR-1093-oci-pulls-manifests-by-tag-and-blobs-by-digest-over-https-with-the-registry-bearer-token.md) | OCI pulls manifests by tag and blobs by digest over HTTPS with the registry Bearer token (BL-4292) | Accepted | 2026-10-29 |
-| [1092](ADR-1092-content-digest-sends-and-checks-rfc-9530-digest-fields.md) | --content-digest sends and checks RFC 9530 digest fields (BL-4134) | Accepted | 2026-10-29 |
+| [1094](ADR-1094-content-digest-sends-and-checks-rfc-9530-digest-fields.md) | --content-digest sends and checks RFC 9530 digest fields (BL-4134) | Accepted | 2026-10-29 |

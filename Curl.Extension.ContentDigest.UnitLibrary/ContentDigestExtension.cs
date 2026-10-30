@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ContentDigest;
 
 /// <summary>
-/// The <c>--content-digest</c> extension (ADR-1092): HTTP digest fields (RFC 9530). It sends a <c>-d</c> body's
+/// The <c>--content-digest</c> extension (ADR-1094): HTTP digest fields (RFC 9530). It sends a <c>-d</c> body's
 /// <c>Content-Digest</c> and <c>Repr-Digest</c>, asks for the server's with <c>Want-Content-Digest</c> and
 /// <c>Want-Repr-Digest</c>, and fails the transfer when a digest the server sent does not match the body.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.

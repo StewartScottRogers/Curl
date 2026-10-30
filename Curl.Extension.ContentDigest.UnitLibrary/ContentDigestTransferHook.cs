@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ContentDigest;
 
 /// <summary>
-/// The <c>--content-digest</c> transfer hook (ADR-1092). On the way out it asks for the server's digests
+/// The <c>--content-digest</c> transfer hook (ADR-1094). On the way out it asks for the server's digests
 /// (<c>Want-Content-Digest</c>, <c>Want-Repr-Digest</c>, RFC 9530 §4) and gives a <c>-d</c> body's SHA-256
 /// <c>Content-Digest</c> (§2) and <c>Repr-Digest</c> (§3), the same value since curl sends the body with no
 /// content coding; a field <c>-H</c> already gave is left to it. On the way back it hashes the body as it is

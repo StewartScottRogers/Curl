@@ -35,11 +35,11 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
-- 2026-10-29 (BL-4134 run): The extension is a transfer hook with no URL scheme, so it registers in the option, description and transfer hook catalogues (added to touches; no other task in Doing on origin/work/dark-factory names them, and all three are merge=union shared list files) rather than in `ExtensionCatalogue.cs`, which lists protocol handlers only; HttpCache does the same. Option `--content-digest` (a flag), SHA-256 sent, SHA-256 and SHA-512 checked, exit 56 on a mismatch: ADR-1092.
+- 2026-10-29 (BL-4134 run): The extension is a transfer hook with no URL scheme, so it registers in the option, description and transfer hook catalogues (added to touches; no other task in Doing on origin/work/dark-factory names them, and all three are merge=union shared list files) rather than in `ExtensionCatalogue.cs`, which lists protocol handlers only; HttpCache does the same. Option `--content-digest` (a flag), SHA-256 sent, SHA-256 and SHA-512 checked, exit 56 on a mismatch: ADR-1094.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.ContentDigest.UnitLibrary` 100% line and branch, 40 members, 0 failing, worst CRAP 10 (one method split for complexity). Fast tests green on Windows; the tests use no paths, OS errors or certificates, so they are platform-neutral, which meets the CI criterion.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 57705860 4b92a9cd 56c85819 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Done. Content-Digest extension built, registered, documented in ADR-1092, gates met
+- 2026-10-29: Doing -> Done. Content-Digest extension built, registered, documented in ADR-1094, gates met

@@ -1,6 +1,6 @@
 # Curl.Extension.ContentDigest.UnitLibrary
 
-The HTTP digest fields extension (ADR-0999, ADR-1092), tested against RFC 9530. Namespace
+The HTTP digest fields extension (ADR-0999, ADR-1094), tested against RFC 9530. Namespace
 `Curl.Extension.ContentDigest`. It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared
 layers it brings.
 
