@@ -31,3 +31,4 @@ Measured by Measure-CodeQuality.ps1 on 2026-10-30: `CertificateCheckHooks.Checke
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: fbecace0.
