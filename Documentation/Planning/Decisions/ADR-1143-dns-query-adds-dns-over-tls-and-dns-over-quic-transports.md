@@ -1,4 +1,4 @@
-# ADR-1141: The DNS query extension adds DNS over TLS and DNS over QUIC as --dns-transport tls and quic
+# ADR-1143: The DNS query extension adds DNS over TLS and DNS over QUIC as --dns-transport tls and quic
 
 - Status: Accepted
 - Date: 2026-10-30

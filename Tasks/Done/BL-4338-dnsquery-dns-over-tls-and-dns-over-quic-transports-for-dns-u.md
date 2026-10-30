@@ -32,7 +32,7 @@ Builds on BL-4337's `Transport/DnsQueryTransportSelection.cs`. DoT: `ProtocolHan
 
 ## Notes
 
-- Decisions (ADR-1141): the names are `tls` and `quic`, beside `udp` and `tcp`. Each transport now gives its own
+- Decisions (ADR-1143): the names are `tls` and `quic`, beside `udp` and `tcp`. Each transport now gives its own
   default port (`IDnsQueryTransport.DefaultPort`), so a URL naming no port is asked on 853 over TLS and QUIC, and a URL
   naming no server asks the system's first DNS server's address on that port. DoT reuses the TCP transport's framing
   (`DnsTcpTransport.ExchangeOverAsync`) rather than copying it. DoQ sends Message ID 0 and puts the query's ID back on
