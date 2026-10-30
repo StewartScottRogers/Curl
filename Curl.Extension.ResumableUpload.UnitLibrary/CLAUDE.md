@@ -6,7 +6,7 @@ The resumable upload extension (ADR-0999), for `--resumable-upload`. Namespace
 another extension.
 
 - `ResumableUploadExtension` holds the `--resumable-upload` flag, the description `curl --extensions`
-  lists and `HookFor`, which gives the transfer hook only when the flag was given (ADR-1149).
+  lists and `HookFor`, which gives the transfer hook only when the flag was given (ADR-1151).
   `Curl.Extension.Composition` registers all three in its option, description and transfer hook catalogues.
 
 - `Transfer/ResumableUploadTransferHook` uploads an http or https transfer's `-T` body in place of curl's

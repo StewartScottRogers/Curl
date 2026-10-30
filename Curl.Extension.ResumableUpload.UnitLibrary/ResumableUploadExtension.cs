@@ -6,7 +6,7 @@ using Curl.Extension.ResumableUpload.Transfer;
 namespace Curl.Extension.ResumableUpload;
 
 /// <summary>
-/// The <c>--resumable-upload</c> extension (ADR-1149): uploads an http or https transfer's <c>-T</c> body by tus 1.0
+/// The <c>--resumable-upload</c> extension (ADR-1151): uploads an http or https transfer's <c>-T</c> body by tus 1.0
 /// when the server offers it, otherwise by draft-ietf-httpbis-resumable-upload, resuming after a broken connection.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>

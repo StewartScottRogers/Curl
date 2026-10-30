@@ -1,4 +1,4 @@
-# ADR-1149: --resumable-upload is a flag that takes over an HTTP -T upload
+# ADR-1151: --resumable-upload is a flag that takes over an HTTP -T upload
 
 - Status: Accepted
 - Date: 2026-10-30
