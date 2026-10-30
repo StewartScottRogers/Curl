@@ -31,7 +31,8 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
   delimiter) and fetches again from after the last whole batch until it reaches the partition's high watermark. A
   fetch that makes no progress ends the transfer, so it never loops. Records before the offset in the first batch are
   skipped, control batches are skipped, a partial batch at the end of a fetch is ignored (the guide allows the
-  broker to send one), a null value is written as an empty line, and gzip batches are read with `GZipStream`.
+  broker to send one), a null value is written as an empty line, and gzip batches are read with `GZipStream`
+  (snappy, lz4 and zstd: see "Left out").
 - Exit codes: a partition error code is 8 (`Kafka broker answered error <code> (<NAME>) for topic <t> partition <p>`);
   a malformed response, a failed CRC-32C, a wrong correlation id or a size outside 4 bytes to 64 MiB is 8; the
   connection ending inside or before a response, or a failed read, is 56; a failed write to the broker is 55; a
@@ -39,8 +40,9 @@ the protocol versions to speak, a mapping from curl's options to requests, and e
 
 ## Left out, and why
 
-- Snappy, lz4 and zstd batches end with exit 8: the BCL has none of the three, and each is a decoder of its own to
-  write by hand, filed as BL-4277.
+- Snappy, lz4 and zstd batches: no longer left out. BL-4277 reads them with decoders written by hand under the
+  extension's `Wire/Compression` (raw and xerial-framed snappy, the LZ4 frame format, zstd frames per RFC 8878); a
+  corrupt one ends with exit 8 and a message naming the codec.
 - Metadata and leader routing: superseded by ADR-1080 (BL-4275), which asks the URL's broker for Metadata v4 first
   and sends Produce or Fetch to the partition's leader.
 - SASL authentication (`--user`): superseded by ADR-1082 (BL-4276), which authenticates every connection with SASL

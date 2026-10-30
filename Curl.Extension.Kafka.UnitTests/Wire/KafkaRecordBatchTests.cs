@@ -98,8 +98,24 @@ public sealed class KafkaRecordBatchTests
     }
 
     [TestMethod]
+    [DataRow(KafkaRecordBatch.SnappyCodec)]
+    [DataRow(KafkaRecordBatch.Lz4Codec)]
+    [DataRow(KafkaRecordBatch.ZstdCodec)]
+    public void Decode_SnappyLz4OrZstdBatch_ReadsItsRecords(int codec)
+    {
+        byte[] records = [.. KafkaTestBytes.Record(0, "first"u8.ToArray()), .. KafkaTestBytes.Record(1, "second"u8.ToArray())];
+
+        KafkaRecordSet set = KafkaRecordBatch.Decode(KafkaTestBytes.Batch(0, 1, 2, Compressed(codec, records), (short)codec), 0);
+
+        CollectionAssert.AreEqual(new[] { "first", "second" }, set.Records.Select(record => Encoding.UTF8.GetString(record.Value.Span)).ToArray());
+    }
+
+    [TestMethod]
     [DataRow((short)KafkaRecordBatch.GzipCodec, "Kafka record batch holds bad gzip data")]
-    [DataRow((short)2, "Kafka record batch uses compression codec 2, which the kafka extension does not read")]
+    [DataRow((short)KafkaRecordBatch.SnappyCodec, "Kafka record batch holds bad snappy data")]
+    [DataRow((short)KafkaRecordBatch.Lz4Codec, "Kafka record batch holds bad lz4 data")]
+    [DataRow((short)KafkaRecordBatch.ZstdCodec, "Kafka record batch holds bad zstd data")]
+    [DataRow((short)5, "Kafka record batch uses compression codec 5, which the kafka extension does not read")]
     public void Decode_UnreadableCompression_Throws(short attributes, string message) =>
         Assert.AreEqual(message, Assert.ThrowsExactly<FormatException>(() => KafkaRecordBatch.Decode(KafkaTestBytes.Batch(0, 0, 1, [1, 2, 3], attributes), 0)).Message);
 
@@ -121,4 +137,15 @@ public sealed class KafkaRecordBatchTests
     [TestMethod]
     public void Decode_MoreRecordsCountedThanHeld_ThrowsTruncated() =>
         Assert.AreEqual(KafkaReader.Truncated, Assert.ThrowsExactly<FormatException>(() => KafkaRecordBatch.Decode(KafkaTestBytes.Batch(0, 1, 2, KafkaTestBytes.Record(0, [1])), 0)).Message);
+
+    /// <summary>
+    /// Hand-assembles the smallest stream each codec's format allows: a raw snappy stream of one literal, an LZ4 frame
+    /// of one stored block, and a single-segment zstd frame of one raw block.
+    /// </summary>
+    private static byte[] Compressed(int codec, byte[] plain) => codec switch
+    {
+        KafkaRecordBatch.SnappyCodec => [(byte)plain.Length, (byte)((plain.Length - 1) << 2), .. plain],
+        KafkaRecordBatch.Lz4Codec => [0x04, 0x22, 0x4D, 0x18, 0x60, 0x40, 0x00, .. BitConverter.GetBytes(plain.Length | int.MinValue), .. plain, 0, 0, 0, 0],
+        _ => [0x28, 0xB5, 0x2F, 0xFD, 0x20, (byte)plain.Length, (byte)((plain.Length << 3) | 1), (byte)(plain.Length >> 5), 0, .. plain],
+    };
 }

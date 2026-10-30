@@ -1,12 +1,14 @@
 using System.IO.Compression;
+using Curl.Extension.Kafka.Wire.Compression;
+using Curl.Extension.Kafka.Wire.Compression.Zstd;
 
 namespace Curl.Extension.Kafka.Wire;
 
 /// <summary>
 /// Writes and reads record batches with magic 2 (the protocol guide's "Messages", "Record Batch" and "Record"):
 /// a batch header whose CRC-32C covers everything from the attributes on, then records with zig-zag varint fields.
-/// Reading takes uncompressed and gzip batches, skips control batches and a partial batch at the end of a fetch, and
-/// keeps only records at or after the offset asked for.
+/// Reading takes uncompressed, gzip, snappy, lz4 and zstd batches, skips control batches and a partial batch at the end
+/// of a fetch, and keeps only records at or after the offset asked for.
 /// </summary>
 internal static class KafkaRecordBatch
 {
@@ -15,6 +17,15 @@ internal static class KafkaRecordBatch
 
     /// <summary>The attributes' compression codec for gzip.</summary>
     internal const int GzipCodec = 1;
+
+    /// <summary>The attributes' compression codec for snappy, raw or xerial-framed.</summary>
+    internal const int SnappyCodec = 2;
+
+    /// <summary>The attributes' compression codec for the LZ4 frame format.</summary>
+    internal const int Lz4Codec = 3;
+
+    /// <summary>The attributes' compression codec for zstd (RFC 8878).</summary>
+    internal const int ZstdCodec = 4;
 
     /// <summary>The attributes' bit that marks a control batch (transaction markers).</summary>
     internal const short ControlFlag = 0x20;
@@ -27,6 +38,14 @@ internal static class KafkaRecordBatch
 
     /// <summary>The bytes from <c>baseTimestamp</c> to <c>baseSequence</c> that reading skips.</summary>
     private const int SkippedHeaderLength = (3 * sizeof(long)) + sizeof(short) + sizeof(int);
+
+    /// <summary>The codecs the BCL has no decoder for, each read by one written by hand under <c>Wire/Compression</c>.</summary>
+    private static readonly Dictionary<int, HandWrittenDecoder> HandWrittenDecoders = new()
+    {
+        [SnappyCodec] = new("snappy", SnappyDecompressor.Decompress),
+        [Lz4Codec] = new("lz4", Lz4FrameDecompressor.Decompress),
+        [ZstdCodec] = new("zstd", ZstdFrameDecompressor.Decompress),
+    };
 
     /// <summary>Gives a batch of one record with no key and no headers whose value is <paramref name="value"/>.</summary>
     internal static byte[] Encode(ReadOnlySpan<byte> value, long timestampMilliseconds)
@@ -105,8 +124,21 @@ internal static class KafkaRecordBatch
     {
         0 => records,
         GzipCodec => Gunzipped(records),
+        _ when HandWrittenDecoders.TryGetValue(codec, out HandWrittenDecoder? decoder) => Decoded(decoder, records),
         _ => throw new FormatException($"Kafka record batch uses compression codec {codec}, which the kafka extension does not read"),
     };
+
+    private static byte[] Decoded(HandWrittenDecoder decoder, ReadOnlyMemory<byte> records)
+    {
+        try
+        {
+            return decoder.Decompress(records.Span);
+        }
+        catch (FormatException corrupt)
+        {
+            throw new FormatException($"Kafka record batch holds bad {decoder.CodecName} data", corrupt);
+        }
+    }
 
     private static byte[] Gunzipped(ReadOnlyMemory<byte> records)
     {
@@ -139,4 +171,10 @@ internal static class KafkaRecordBatch
             }
         }
     }
+
+    /// <summary>Decompresses a codec's bytes, throwing <see cref="FormatException"/> when they are corrupt.</summary>
+    private delegate byte[] Decompressor(ReadOnlySpan<byte> input);
+
+    /// <summary>A codec's name, as a corrupt batch's message gives it, and its hand-written decompressor.</summary>
+    private sealed record HandWrittenDecoder(string CodecName, Decompressor Decompress);
 }
