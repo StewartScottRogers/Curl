@@ -32,3 +32,4 @@ BL-4147 (ADR-1159) tunnels connections to IP addresses only: `WireGuardConnector
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: e007d461 91e0739a 8b7b522d 3d836d5e.
