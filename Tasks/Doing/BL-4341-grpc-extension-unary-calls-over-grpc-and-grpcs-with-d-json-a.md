@@ -36,3 +36,4 @@ Second of three parts of BL-4102, on BL-4340's `Wire/`. Specification: grpc.io P
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 12ee8bbf 90d861e8 73389f94 62009cc1 2881ec96 e35aff77 3d836d5e.
