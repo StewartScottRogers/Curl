@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Grpc.Client;
 
-/// <summary>The request and response message types of the method a call invokes, as a <c>.proto</c> file declares them (ADR-1145).</summary>
+/// <summary>The request and response message types of the method a call invokes, as a <c>.proto</c> file declares them (ADR-1147).</summary>
 /// <param name="Input">The request message type.</param>
 /// <param name="Output">The response message type.</param>
 internal sealed record GrpcProtoMethod(DynamicMessageType Input, DynamicMessageType Output)

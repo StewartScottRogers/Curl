@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Grpc.Client;
 
-/// <summary>Turns <c>-d</c> JSON into a request message and a response message into JSON, by the proto3 JSON mapping (ADR-1145).</summary>
+/// <summary>Turns <c>-d</c> JSON into a request message and a response message into JSON, by the proto3 JSON mapping (ADR-1147).</summary>
 internal static class GrpcMessageJson
 {
     /// <summary>Encodes the <c>-d</c> data as a message of the request type; no <c>-d</c>, or an empty one, sends the empty message.</summary>

@@ -34,7 +34,7 @@ Second of three parts of BL-4102, on BL-4340's `Wire/`. Specification: grpc.io P
 ## Notes
 
 - Touches widened (no task in Doing on origin/work/dark-factory names them): the library csproj gains `Curl.Http2` and `Curl.Protobuf` references (its CLAUDE.md allows them for the client flow), the test csproj gains `Curl.Extension.Composition` and `Curl.Core` for the registration and `CURL_EXTENSIONS=0` tests (as the CoAP tests do), `CLAUDE.md` describes `Client/`, and `--proto` reaches the handler through a transfer hook registered by one line in `ExtensionTransferHookCatalogue.cs` (as `--coap-observe` does).
-- `--proto` in the criteria is `--grpc-proto` on the command line: `--proto` is curl's own option (allowed protocols) and an extension never changes curl's behaviour (ADR-1145).
+- `--proto` in the criteria is `--grpc-proto` on the command line: `--proto` is curl's own option (allowed protocols) and an extension never changes curl's behaviour (ADR-1147).
 - ADR renumbered from 1138 to 1145: ADR-1138 and ADR-1139 were taken by other lanes first.
 - Quality: `Measure-CodeQuality.ps1 -Library Curl.Extension.Grpc.UnitLibrary` gives 100% line, 100% branch, max complexity 8, 0 failing members. The Composition changes are one registration line per catalogue.
 - CI on Linux and macOS: the tests use no paths, OS error text or certificates that differ by platform (proto files in a temporary directory, JSON written with LF line ends on every platform), and the fast tests are green here.

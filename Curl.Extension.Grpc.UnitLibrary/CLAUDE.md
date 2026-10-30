@@ -1,6 +1,6 @@
 # Curl.Extension.Grpc.UnitLibrary
 
-The gRPC extension (ADR-0999, ADR-1133, ADR-1145): calling a gRPC method over HTTP/2 as grpc.io's
+The gRPC extension (ADR-0999, ADR-1133, ADR-1147): calling a gRPC method over HTTP/2 as grpc.io's
 PROTOCOL-HTTP2.md specifies. It sits in `/Extensions/Grpc/` in `Curl.slnx` and references
 `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Extension.Abstractions.UnitLibrary` and the shared
 `Curl.Http2.UnitLibrary` and `Curl.Protobuf.UnitLibrary`. It never references a `Curl.Protocol.*`
@@ -20,7 +20,7 @@ stream or connection. Server reflection (BL-4342) builds on both.
   statuscodes.md name of its `GrpcStatusCode`.
 - Everything a peer gets wrong is a `GrpcWireException`.
 
-`Client/` (namespace `Curl.Extension.Grpc.Client`, ADR-1145) makes the call:
+`Client/` (namespace `Curl.Extension.Grpc.Client`, ADR-1147) makes the call:
 
 - `GrpcExtension` is the description `curl --extensions` lists, the `--grpc-proto` option, its hook
   and the handler factory, registered by one line each in `ExtensionCatalogue.cs`,

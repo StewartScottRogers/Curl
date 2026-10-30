@@ -3,7 +3,7 @@ using Curl.Protobuf.Descriptors;
 
 namespace Curl.Extension.Grpc.Client;
 
-/// <summary>Reads <c>.proto</c> files by import path from one directory: the directory of the <c>--grpc-proto</c> file (ADR-1145).</summary>
+/// <summary>Reads <c>.proto</c> files by import path from one directory: the directory of the <c>--grpc-proto</c> file (ADR-1147).</summary>
 /// <param name="directory">The directory import paths are relative to.</param>
 internal sealed class ProtoFileDirectoryReader(string directory) : IProtoFileReader
 {

@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Grpc.Client;
 
-/// <summary>A gRPC call that cannot be made or completed, with the curl exit code it ends the transfer with (ADR-1145).</summary>
+/// <summary>A gRPC call that cannot be made or completed, with the curl exit code it ends the transfer with (ADR-1147).</summary>
 internal sealed class GrpcClientException : Exception
 {
     /// <summary>Initializes a new instance of the <see cref="GrpcClientException" /> class.</summary>

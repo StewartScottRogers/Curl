@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Grpc.Client;
 
-/// <summary>The <c>grpc://</c> extension's description, its <c>--grpc-proto</c> option, its hook and its handler factory (ADR-1145).</summary>
+/// <summary>The <c>grpc://</c> extension's description, its <c>--grpc-proto</c> option, its hook and its handler factory (ADR-1147).</summary>
 public static class GrpcExtension
 {
     /// <summary>

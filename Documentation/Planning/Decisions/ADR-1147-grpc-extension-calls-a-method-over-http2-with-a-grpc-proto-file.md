@@ -1,4 +1,4 @@
-# ADR-1145: The gRPC extension calls a method over HTTP/2 with a --grpc-proto file
+# ADR-1147: The gRPC extension calls a method over HTTP/2 with a --grpc-proto file
 
 - Status: Accepted
 - Date: 2026-10-29

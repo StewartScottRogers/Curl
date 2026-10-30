@@ -4,7 +4,7 @@ namespace Curl.Extension.Grpc.Client;
 
 /// <summary>
 /// The service and method a <c>grpc://host:port/package.Service/Method</c> URL names: its path is exactly
-/// PROTOCOL-HTTP2.md's <c>:path</c>, <c>/</c> Service-Name <c>/</c> {method name} (ADR-1145).
+/// PROTOCOL-HTTP2.md's <c>:path</c>, <c>/</c> Service-Name <c>/</c> {method name} (ADR-1147).
 /// </summary>
 /// <param name="Service">The fully qualified service name, such as <c>helloworld.Greeter</c>.</param>
 /// <param name="Method">The method name, such as <c>SayHello</c>.</param>

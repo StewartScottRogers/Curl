@@ -4,7 +4,7 @@ using HttpRequestOptions = Curl.Protocol.Abstractions.HttpRequestOptions;
 namespace Curl.Extension.Grpc.Client;
 
 /// <summary>
-/// A <c>grpc://</c> or <c>grpcs://</c> transfer given <c>--grpc-proto</c> (ADR-1145): the transfer's own context, with the
+/// A <c>grpc://</c> or <c>grpcs://</c> transfer given <c>--grpc-proto</c> (ADR-1147): the transfer's own context, with the
 /// <c>.proto</c> file the gRPC handler reads the method's message types from.
 /// </summary>
 /// <param name="inner">The transfer's own context.</param>

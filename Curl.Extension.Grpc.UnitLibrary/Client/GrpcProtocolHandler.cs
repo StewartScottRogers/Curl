@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.Grpc.Client;
 
 /// <summary>
-/// Serves <c>grpc://host[:port]/package.Service/Method</c> and <c>grpcs://</c> (ADR-1145): encodes the <c>-d</c> JSON as the
+/// Serves <c>grpc://host[:port]/package.Service/Method</c> and <c>grpcs://</c> (ADR-1147): encodes the <c>-d</c> JSON as the
 /// <c>--grpc-proto</c> file's request message, calls the method over HTTP/2 (prior knowledge for <c>grpc://</c>, TLS with ALPN
 /// <c>h2</c> for <c>grpcs://</c>) and writes each response message as proto3 JSON. A <c>grpc-status</c> other than 0 ends the
 /// transfer with exit 22 and the status and its <c>grpc-message</c>.
