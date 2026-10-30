@@ -1,5 +1,5 @@
 ---
-id: BL-4349
+id: BL-4351
 title: Let --compression-dictionary decode dcb and dcz beside --compressed
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4349 — Let --compression-dictionary decode dcb and dcz beside --compressed
+# BL-4351 — Let --compression-dictionary decode dcb and dcz beside --compressed
 
 ## Goal
 
