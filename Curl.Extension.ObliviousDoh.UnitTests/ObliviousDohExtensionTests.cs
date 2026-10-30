@@ -84,7 +84,7 @@ public sealed class ObliviousDohExtensionTests
 
     [TestMethod]
     public void ResolverHookCatalogue_BesideDohUrl_ThrowsNamingBoth() =>
-        Assert.Contains("--odoh-proxy and --doh-url", Assert.ThrowsExactly<ArgumentException>(() => ResolverHooks.ActivatedBy(Values("https://p.example/", "https://t.example/"), ExtensionResolverHookCatalogue.Entries, dohUrlGiven: true)).Message);
+        Assert.Contains("--odoh-proxy and --doh-url", Assert.ThrowsExactly<ExtensionHookConflictException>(() => ResolverHooks.ActivatedBy(Values("https://p.example/", "https://t.example/"), ExtensionResolverHookCatalogue.Entries, dohUrlGiven: true)).Message);
 
     [TestMethod]
     public void Listing_NamesTheExtensionAndItsOptions()

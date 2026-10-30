@@ -5,10 +5,10 @@ priority: Normal
 assignee: Claude
 pipeline: direct
 depends-on: []
-touches: [Curl.Console/CurlComposition.cs, Curl.Console/ExtensionOptionConflictException.cs, Curl.Extension.Abstractions.UnitLibrary/Connection/ConnectionHooks.cs, Curl.Extension.Abstractions.UnitLibrary/Resolution/ResolverHooks.cs, Curl.Extension.Abstractions.UnitLibrary/Scheme/SchemeHooks.cs, Curl.Console.UnitTests, Curl.Extension.Abstractions.UnitTests]
+touches: [Curl.Console/CurlComposition.cs, Curl.Console/ExtensionOptionConflictException.cs, Curl.Extension.Abstractions.UnitLibrary/Connection/ConnectionHooks.cs, Curl.Extension.Abstractions.UnitLibrary/Resolution/ResolverHooks.cs, Curl.Extension.Abstractions.UnitLibrary/Scheme/SchemeHooks.cs, Curl.Console.UnitTests, Curl.Extension.Abstractions.UnitTests, Curl.Extension.EncryptedDns.UnitTests/EncryptedDnsExtensionTests.cs, Curl.Extension.ObliviousDoh.UnitTests/ObliviousDohExtensionTests.cs]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4343 — Catch only the extension hook conflict, not every ArgumentException, in CurlComposition
 
@@ -31,15 +31,18 @@ Found by the silent-failure-hunter and type-design-analyzer reviewers.
 
 ## Acceptance criteria
 
-- [ ] The three hook classes throw a dedicated conflict exception type, not a bare `ArgumentException`, and `CurlComposition` catches only that type.
-- [ ] A unit test in `Curl.Console.UnitTests` shows that an activator throwing `ArgumentNullException` is not turned into an `ExtensionOptionConflictException`.
-- [ ] The existing conflict tests (connection, resolver and scheme) still pass with the same `curl:` message and exit code.
-- [ ] The doc comment on `ExtensionOptionConflictException` names connection, scheme and resolver conflicts.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] The three hook classes throw a dedicated conflict exception type, not a bare `ArgumentException`, and `CurlComposition` catches only that type.
+- [x] A unit test in `Curl.Console.UnitTests` shows that an activator throwing `ArgumentNullException` is not turned into an `ExtensionOptionConflictException`.
+- [x] The existing conflict tests (connection, resolver and scheme) still pass with the same `curl:` message and exit code.
+- [x] The doc comment on `ExtensionOptionConflictException` names connection, scheme and resolver conflicts.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Added the exception as `Curl.Extension.Abstractions.ExtensionHookConflictException` (public, not an ArgumentException subclass, message without the parameter-name suffix). Two extension test files asserted the old ArgumentException, so they joined `touches`; no other Doing task touches them.
 
 ## Log
 
 - 2026-10-30: Created by the shift-end review (ADR-0710) of a9f1a8149..b79175cc5.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: af33de7a 5ad29198 80d6345a fcb49394 3d836d5e.
+- 2026-10-30: Doing -> Done. Extension hook conflicts throw ExtensionHookConflictException and CurlComposition catches only it

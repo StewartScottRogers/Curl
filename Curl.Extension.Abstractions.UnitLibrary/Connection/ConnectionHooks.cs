@@ -20,12 +20,12 @@ public sealed class ConnectionHooks
     /// <param name="values">The extension options the option group gave.</param>
     /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
     /// <returns>The activated hook, or <see cref="None" />.</returns>
-    /// <exception cref="ArgumentException">Two or more extensions' options claim the transfer's connection; the message names each option.</exception>
+    /// <exception cref="ExtensionHookConflictException">Two or more extensions' options claim the transfer's connection; the message names each option.</exception>
     public static ConnectionHooks ActivatedBy(ExtensionOptionValues values, IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> activators)
     {
         IConnectionHook[] hooks = [.. activators.Select(activator => activator(values)).OfType<IConnectionHook>()];
         return hooks.Length > 1
-            ? throw new ArgumentException($"the options {string.Join(" and ", hooks.Select(hook => $"--{hook.Option.Name}"))} each supply the connection a transfer runs over; give only one of them", nameof(values))
+            ? throw new ExtensionHookConflictException($"the options {string.Join(" and ", hooks.Select(hook => $"--{hook.Option.Name}"))} each supply the connection a transfer runs over; give only one of them")
             : new ConnectionHooks(hooks.SingleOrDefault());
     }
 

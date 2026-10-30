@@ -21,13 +21,13 @@ public sealed class ResolverHooks
     /// <param name="activators">One per extension: its hook when its option was given, otherwise <see langword="null" />.</param>
     /// <param name="dohUrlGiven">Whether the option group gave curl's <c>--doh-url</c>, which also supplies the resolver.</param>
     /// <returns>The activated hook, or <see cref="None" />.</returns>
-    /// <exception cref="ArgumentException">Two or more of the extensions' options and <c>--doh-url</c> claim the transfer's resolver; the message names each option.</exception>
+    /// <exception cref="ExtensionHookConflictException">Two or more of the extensions' options and <c>--doh-url</c> claim the transfer's resolver; the message names each option.</exception>
     public static ResolverHooks ActivatedBy(ExtensionOptionValues values, IEnumerable<Func<ExtensionOptionValues, IResolverHook?>> activators, bool dohUrlGiven)
     {
         IResolverHook[] hooks = [.. activators.Select(activator => activator(values)).OfType<IResolverHook>()];
         string[] claimants = [.. hooks.Select(hook => $"--{hook.Option.Name}"), .. dohUrlGiven ? (string[])["--doh-url"] : []];
         return claimants.Length > 1
-            ? throw new ArgumentException($"the options {string.Join(" and ", claimants)} each supply the resolver a transfer looks host names up with; give only one of them", nameof(values))
+            ? throw new ExtensionHookConflictException($"the options {string.Join(" and ", claimants)} each supply the resolver a transfer looks host names up with; give only one of them")
             : new ResolverHooks(hooks.SingleOrDefault());
     }
 

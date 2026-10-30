@@ -49,19 +49,18 @@ public sealed class ResolverHooksTests
     [TestMethod]
     public void ActivatedBy_WithAnExtensionResolverAndDohUrl_FailsNamingBoth()
     {
-        ArgumentException failure = Assert.ThrowsExactly<ArgumentException>(() => ResolverHooks.ActivatedBy(
+        ExtensionHookConflictException failure = Assert.ThrowsExactly<ExtensionHookConflictException>(() => ResolverHooks.ActivatedBy(
             ValuesOf(Dot),
             [ExampleHook.ActivatedBy(Dot, new ExampleHook(Dot))],
             dohUrlGiven: true));
 
-        Assert.AreEqual("values", failure.ParamName);
         StringAssert.StartsWith(failure.Message, "the options --example-dot and --doh-url each supply the resolver a transfer looks host names up with; give only one of them");
     }
 
     [TestMethod]
     public void ActivatedBy_WithTwoExtensionsClaimingTheResolver_FailsNamingBothOptions()
     {
-        ArgumentException failure = Assert.ThrowsExactly<ArgumentException>(() => ResolverHooks.ActivatedBy(
+        ExtensionHookConflictException failure = Assert.ThrowsExactly<ExtensionHookConflictException>(() => ResolverHooks.ActivatedBy(
             ValuesOf(Dot, Odoh),
             [ExampleHook.ActivatedBy(Dot, new ExampleHook(Dot)), ExampleHook.ActivatedBy(Odoh, new ExampleHook(Odoh))],
             dohUrlGiven: false));

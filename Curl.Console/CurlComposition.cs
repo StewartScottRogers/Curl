@@ -740,7 +740,7 @@ internal static class CurlComposition
         {
             return SchemeHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, services);
         }
-        catch (ArgumentException conflict)
+        catch (ExtensionHookConflictException conflict)
         {
             throw OptionConflictOf(conflict);
         }
@@ -784,7 +784,7 @@ internal static class CurlComposition
         {
             return ConnectionHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators);
         }
-        catch (ArgumentException conflict)
+        catch (ExtensionHookConflictException conflict)
         {
             throw OptionConflictOf(conflict);
         }
@@ -814,7 +814,7 @@ internal static class CurlComposition
         {
             return ResolverHooks.ActivatedBy(ExtensionOptionValuesOf(options), activators, options.DohUrl is not null);
         }
-        catch (ArgumentException conflict)
+        catch (ExtensionHookConflictException conflict)
         {
             throw OptionConflictOf(conflict);
         }
@@ -826,10 +826,9 @@ internal static class CurlComposition
     internal static Func<IDnsResolver, IDnsResolver>? ExtensionResolverOf(ResolverHooks? hooks) =>
         hooks is { Hook: not null } ? hooks.ResolverOver : null;
 
-    // An extension hook conflict as curl's command-line error. ArgumentException.Message ends with
-    // " (Parameter 'values')", which curl's line does not carry.
-    private static ExtensionOptionConflictException OptionConflictOf(ArgumentException conflict) =>
-        new(conflict.Message.Replace($" (Parameter '{conflict.ParamName}')", string.Empty, StringComparison.Ordinal));
+    // An extension hook conflict as curl's command-line error.
+    private static ExtensionOptionConflictException OptionConflictOf(ExtensionHookConflictException conflict) =>
+        new(conflict.Message);
 
     /// <summary>Gives the engine's <c>extensionConnector</c> for an option group's connection hook.</summary>
     /// <param name="hooks">The group's connection hook, or <see langword="null" /> for none.</param>
