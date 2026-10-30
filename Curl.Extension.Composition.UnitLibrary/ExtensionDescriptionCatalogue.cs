@@ -44,6 +44,7 @@ internal static class ExtensionDescriptionCatalogue
         OciRegistry.Client.OciRegistryExtension.Description,
         Curl.Extension.ContentDigest.ContentDigestExtension.Description,
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
+        Curl.Extension.RateLimit.RateLimitExtension.Description,
         GoogleCloudStorage.Client.GcsExtension.Description,
         AzureStorage.Client.AzureStorageExtension.Description,
     ];

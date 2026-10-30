@@ -1150,3 +1150,4 @@ Each option and the specific reason it lost.
 | [1103](ADR-1103-resumable-upload-picks-tus-by-options-and-resumes-from-the-servers-offset.md) | The resumable upload picks tus by `OPTIONS` and otherwise the IETF draft, and resumes from the server's offset after a broken connection (BL-4307) | Accepted | 2026-10-29 |
 | [1104](ADR-1104-oblivious-http-hpke-wraps-curl-cryptography-hpke-with-typed-exceptions.md) | Oblivious HTTP's HPKE wraps Curl.Cryptography's Hpke with typed exceptions (BL-4311) | Accepted | 2026-10-29 |
 | [1105](ADR-1105-az-and-abfs-urls-download-upload-in-blocks-and-list-with-sas-or-entra-id.md) | az:// and abfs:// URLs download, upload in blocks and list, with a SAS or an Entra ID token (BL-4126) | Accepted | 2026-10-29 |
+| [1100](ADR-1100-ratelimit-pace-holds-an-origin-whose-ratelimit-quota-is-used-up-until-it-resets.md) | --ratelimit-pace holds an origin whose RateLimit quota is used up until it resets (BL-4139) | Accepted | 2026-10-29 |
