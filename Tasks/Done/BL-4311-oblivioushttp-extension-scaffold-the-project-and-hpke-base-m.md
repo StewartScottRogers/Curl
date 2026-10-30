@@ -34,7 +34,7 @@ Split from BL-4137 (Oblivious HTTP relay extension) for size. Create the project
 - Added `Curl.Extension.ObliviousHttp.UnitLibrary/CLAUDE.md` to `touches`: the new project's own rules file, which no other task can hold.
 - Tests: 25 in `Curl.Extension.ObliviousHttp.UnitTests` (A.1.1 and A.2.1 enc, both ciphertexts in sequence, 32-byte export from both sides; tampered ciphertext, wrong skR, wrong aad and a short ciphertext throw `HpkeOpenException`; short keys throw `HpkeSetupException`).
 - Measure-CodeQuality.ps1 -Library Curl.Extension.ObliviousHttp.UnitLibrary: line 100%, branch 100%, 16 members, 0 failing, worst CRAP 2.
-- `dotnet build` clean (VerifyExtensionIsolation passes); the full fast run passed except `Curl.Extension.Coap.UnitTests`' `LostServerHelloFlight` DTLS timer test, which passed alone straight afterwards: filed as BL-4312. The change is platform-neutral (no paths, OS text or certificates), which covers CI on Linux and macOS.
+- `dotnet build` clean (VerifyExtensionIsolation passes); the full fast run passed except `Curl.Extension.Coap.UnitTests`' `LostServerHelloFlight` DTLS timer test, which passed alone straight afterwards: filed as BL-4314. The change is platform-neutral (no paths, OS text or certificates), which covers CI on Linux and macOS.
 
 ## Log
 

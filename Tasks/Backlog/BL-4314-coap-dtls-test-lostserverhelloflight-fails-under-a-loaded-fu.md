@@ -1,5 +1,5 @@
 ---
-id: BL-4312
+id: BL-4314
 title: Coap DTLS test LostServerHelloFlight fails under a loaded full fast-test run
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4312 — Coap DTLS test LostServerHelloFlight fails under a loaded full fast-test run
+# BL-4314 — Coap DTLS test LostServerHelloFlight fails under a loaded full fast-test run
 
 ## Goal
 
