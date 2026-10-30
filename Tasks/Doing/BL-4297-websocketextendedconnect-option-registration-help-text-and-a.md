@@ -37,3 +37,4 @@ Last part of BL-4112. Ties together the HTTP/2 flow (BL-4295) and the HTTP/3 flo
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 07dc8f5e 5478781e e1dc305c a2918b8f 7ed051e6 e35aff77 3d836d5e.
