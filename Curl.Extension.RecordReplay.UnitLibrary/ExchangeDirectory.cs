@@ -1,7 +1,7 @@
 namespace Curl.Extension.RecordReplay;
 
 /// <summary>
-/// A directory of exchange files (ADR-1129 section 1), one per request, named <c>&lt;key&gt;.exchange</c> by its
+/// A directory of exchange files (ADR-1135 section 1), one per request, named <c>&lt;key&gt;.exchange</c> by its
 /// <see cref="ExchangeKey" />. A write goes to a temporary file first and replaces the file in one move, so a
 /// reader sees the old exchange or the new one, never half of one.
 /// </summary>

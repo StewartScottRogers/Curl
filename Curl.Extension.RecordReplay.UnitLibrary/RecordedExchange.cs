@@ -1,6 +1,6 @@
 namespace Curl.Extension.RecordReplay;
 
-/// <summary>One recorded HTTP exchange (ADR-1129 section 3): the request it answers and the response curl received.</summary>
+/// <summary>One recorded HTTP exchange (ADR-1135 section 3): the request it answers and the response curl received.</summary>
 /// <param name="Method">The request method, such as <c>GET</c>.</param>
 /// <param name="Url">The URL as the transfer was given it.</param>
 /// <param name="StatusCode">The final response's status code.</param>

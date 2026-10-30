@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.RecordReplay;
 
 /// <summary>
-/// The <c>--record</c> and <c>--replay</c> extension (ADR-1129): records each HTTP exchange to a directory in the
+/// The <c>--record</c> and <c>--replay</c> extension (ADR-1135): records each HTTP exchange to a directory in the
 /// Curl exchange record format 1, and answers transfers from such a directory without the network.
 /// <c>Curl.Extension.Composition</c> registers its options, description and transfer hook.
 /// </summary>
@@ -26,10 +26,10 @@ public static class RecordReplayExtension
     /// <summary>Gets what <c>curl --extensions</c> says about the extension.</summary>
     public static ExtensionDescription Description { get; } = new(
         "record-replay",
-        "Records HTTP exchanges to a directory and replays them later without the network (Curl exchange record format 1, ADR-1129).",
+        "Records HTTP exchanges to a directory and replays them later without the network (Curl exchange record format 1, ADR-1135).",
         [],
         [RecordOption, ReplayOption],
-        new Uri("https://github.com/StewartScottRogers/Curl/blob/master/Documentation/Planning/Decisions/ADR-1129-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md"));
+        new Uri("https://github.com/StewartScottRogers/Curl/blob/master/Documentation/Planning/Decisions/ADR-1135-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md"));
 
     /// <summary>Gives the extension's transfer hook when the option group gave <c>--record</c> or <c>--replay</c>.</summary>
     /// <param name="values">The option group's extension options.</param>

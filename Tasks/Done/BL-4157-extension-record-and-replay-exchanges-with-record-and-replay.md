@@ -36,7 +36,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 - 2026-10-29 (lane 11): Built as a transfer hook (ADR-1019), modelled on `--cache-dir`. Added the option, description and transfer hook catalogues to `touches`: they are shared list files (`Tasks/SharedListFiles.txt`) that each extension adds lines to, and an option-only extension registers there. As ADR-1106 and ADR-1126, it adds no line to `ExtensionCatalogue.cs`, which lists URL-scheme handlers only; the first criterion's "one line" registration is met by its lines in those catalogues.
-- Decisions (ADR-1129, numbered 1129 because the shared branch already holds an ADR-1128): Curl exchange record format 1, one `<sha256 key>.exchange` file per request keyed by method, URL and `-d` body; HTTP(S) transfers only; a replay miss is exit 7 unless `--record` is also given, then it is fetched and recorded. Request headers, `-F` bodies, timings and HAR/WARC are left out, with why in the ADR.
+- Decisions (ADR-1135, numbered 1129 because the shared branch already holds an ADR-1128): Curl exchange record format 1, one `<sha256 key>.exchange` file per request keyed by method, URL and `-d` body; HTTP(S) transfers only; a replay miss is exit 7 unless `--record` is also given, then it is fetched and recorded. Request headers, `-F` bodies, timings and HAR/WARC are left out, with why in the ADR.
 - CURL_EXTENSIONS=0: checked as the other extensions do, by `ExtensionCommandLineOptions.For` leaving both options out (so the parser refuses them as unknown, exit 2); with neither option `HookFor` gives no hook, so transfers run unchanged.
 - Measured: `Measure-CodeQuality.ps1 -Library Curl.Extension.RecordReplay.UnitLibrary`: 100% line, 100% branch, 29 members, 0 failing, worst CRAP 10. `dotnet build` clean; fast tests green (99 test projects passed, 30 in RecordReplay.UnitTests). Tests are platform-neutral (temp directories, a file in place of a directory for the unwritable case), so CI on Linux and macOS needs nothing more.
 
@@ -44,4 +44,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 02c5665a 12bfaf34 e1579917 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Done. --record and --replay record HTTP exchanges to a directory and replay them without the network (ADR-1129)
+- 2026-10-29: Doing -> Done. --record and --replay record HTTP exchanges to a directory and replay them without the network (ADR-1135)

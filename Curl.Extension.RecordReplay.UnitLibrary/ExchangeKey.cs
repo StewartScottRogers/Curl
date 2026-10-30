@@ -4,7 +4,7 @@ using System.Text;
 namespace Curl.Extension.RecordReplay;
 
 /// <summary>
-/// Names the request a transfer sends (ADR-1129 section 2): its method, and its key, the lowercase hexadecimal
+/// Names the request a transfer sends (ADR-1135 section 2): its method, and its key, the lowercase hexadecimal
 /// SHA-256 of the Latin-1 line <c>&lt;method&gt; &lt;url&gt;</c> and an LF followed by the <c>-d</c> body bytes.
 /// </summary>
 public static class ExchangeKey

@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.RecordReplay;
 
 /// <summary>
-/// The <c>--record</c> and <c>--replay</c> transfer hook (ADR-1129). An HTTP transfer whose request has an exchange in
+/// The <c>--record</c> and <c>--replay</c> transfer hook (ADR-1135). An HTTP transfer whose request has an exchange in
 /// the replay directory is answered from it without contacting the server (section 5); one that has none fails with
 /// exit 7 unless a record directory is given too, when it goes out. A transfer that goes out with a record directory
 /// is written on as received and, when a response arrived, recorded (section 4). A transfer that is not HTTP runs

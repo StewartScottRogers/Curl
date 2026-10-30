@@ -4,7 +4,7 @@ using System.Text;
 namespace Curl.Extension.RecordReplay;
 
 /// <summary>
-/// Encodes and decodes an exchange file (ADR-1129 section 3): the line <c>CURL-EXCHANGE 1</c>, the line
+/// Encodes and decodes an exchange file (ADR-1135 section 3): the line <c>CURL-EXCHANGE 1</c>, the line
 /// <c>&lt;method&gt; &lt;url&gt;</c>, the line <c>&lt;status&gt; &lt;head length&gt; &lt;body length&gt;</c>, each ended by
 /// one LF, then the head bytes and the body bytes. Lines are Latin-1; nothing follows the body.
 /// </summary>

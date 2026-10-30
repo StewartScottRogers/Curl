@@ -1,4 +1,4 @@
-# ADR-1129 — Record and replay store exchanges in Curl exchange record format 1
+# ADR-1135 — Record and replay store exchanges in Curl exchange record format 1
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
