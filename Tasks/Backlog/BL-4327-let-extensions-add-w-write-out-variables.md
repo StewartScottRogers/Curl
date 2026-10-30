@@ -1,5 +1,5 @@
 ---
-id: BL-4313
+id: BL-4327
 title: Let extensions add -w write-out variables
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4313 — Let extensions add -w write-out variables
+# BL-4327 — Let extensions add -w write-out variables
 
 ## Goal
 
