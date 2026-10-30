@@ -42,3 +42,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 439ee074 9b42f6a5 a6cc4924 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits for BL-4327: no hook yet lets an extension add a -w write-out variable
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 439ee074 9b42f6a5 a6cc4924 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
