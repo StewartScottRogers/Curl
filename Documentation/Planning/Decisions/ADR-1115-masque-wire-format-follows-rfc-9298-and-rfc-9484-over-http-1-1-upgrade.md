@@ -1,4 +1,4 @@
-# ADR-1112: The MASQUE extension's wire format follows RFC 9298 and RFC 9484 over an HTTP/1.1 upgrade
+# ADR-1115: The MASQUE extension's wire format follows RFC 9298 and RFC 9484 over an HTTP/1.1 upgrade
 
 - Status: Accepted
 - Date: 2026-10-29

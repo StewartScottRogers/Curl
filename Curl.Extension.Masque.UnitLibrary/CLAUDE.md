@@ -1,6 +1,6 @@
 # Curl.Extension.Masque.UnitLibrary
 
-The MASQUE extension (ADR-0999, ADR-1112): proxying UDP (CONNECT-UDP, RFC 9298) and IP
+The MASQUE extension (ADR-0999, ADR-1115): proxying UDP (CONNECT-UDP, RFC 9298) and IP
 (CONNECT-IP, RFC 9484) through an HTTP proxy. It sits in `/Extensions/Masque/` in
 `Curl.slnx` and references only `Curl.Protocol.Abstractions.UnitLibrary`,
 `Curl.Extension.Abstractions.UnitLibrary` and the shared `Curl.HttpDatagram.UnitLibrary`
