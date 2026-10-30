@@ -14,8 +14,8 @@ public sealed class DtlsClientHelloTests
 
         CollectionAssert.AreEqual(new byte[] { 0xFE, 0xFD }, body[..2]);
         CollectionAssert.AreEqual(Random, body[2..34]);
-        CollectionAssert.AreEqual(new byte[] { 0, 2, 0xC0, 0x0C, 0, 4, 0xC0, 0x2B, 0xC0, 0x2F, 1, 0 }, body[34..46]);
-        Assert.AreEqual(body.Length - 48, (body[46] << 8) | body[47]);
+        CollectionAssert.AreEqual(new byte[] { 0, 2, 0xC0, 0x0C, 0, 6, 0xC0, 0x2B, 0xC0, 0x2F, 0xC0, 0xAE, 1, 0 }, body[34..48]);
+        Assert.AreEqual(body.Length - 50, (body[48] << 8) | body[49]);
     }
 
     [TestMethod]

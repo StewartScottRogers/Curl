@@ -97,14 +97,14 @@ public sealed class DtlsTestServerTests
         using EcdhKeyShare clientShare = EcdhKeyShare.Generate(TlsNamedGroup.Secp256r1);
         byte[] preMasterSecret = clientShare.ComputeSharedSecret(((Tls12EcdheParameters)serverKeyExchange.Parameters).PublicKey)!;
         byte[] masterSecret = TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret, ClientRandom, server.ServerRandom);
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(masterSecret, ClientRandom, server.ServerRandom);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(masterSecret, ClientRandom, server.ServerRandom);
         byte[] keyExchangeBody = new Tls12ClientKeyExchange(Tls12KeyExchange.Ecdhe, [(byte)clientShare.PublicKey.Length, .. clientShare.PublicKey]).Encode()[HandshakeMessage.HeaderLength..];
         byte[] keyExchangeFragment = HandshakeFragmentOf(keyExchangeBody, 2, HandshakeType.ClientKeyExchange);
         transcript.AddRange(keyExchangeFragment);
         byte[] verifyData = TlsPrf.Sha256.ComputeClientVerifyData(masterSecret, SHA256.HashData(transcript.ToArray()));
         byte[] finishedFragment = HandshakeFragmentOf(verifyData, 3, HandshakeType.Finished);
-        using DtlsAes128GcmRecordProtector clientProtector = new(keys.ClientWrite, 1);
-        using DtlsAes128GcmRecordUnprotector serverUnprotector = new(keys.ServerWrite, 1);
+        using DtlsRecordProtector clientProtector = new(keys.ClientWrite, 1);
+        using DtlsRecordUnprotector serverUnprotector = new(keys.ServerWrite, 1);
 
         server.Receive(Epoch0Record(TlsContentType.Handshake, keyExchangeFragment, 2));
         server.Receive(Epoch0Record(TlsContentType.ChangeCipherSpec, [1], 3));

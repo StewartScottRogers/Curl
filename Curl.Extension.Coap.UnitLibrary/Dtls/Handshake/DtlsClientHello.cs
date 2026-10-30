@@ -8,7 +8,7 @@ namespace Curl.Extension.Coap.Dtls.Handshake;
 /// <summary>
 /// The DTLS 1.2 ClientHello body (RFC 6347 section 4.2.1): TLS 1.2's ClientHello with a cookie after
 /// the session id. It offers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and
-/// TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (RFC 5289), the secp256r1 group, uncompressed points and the
+/// TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 (RFC 5289) and TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 (RFC 7251), the secp256r1 group, uncompressed points and the
 /// signature schemes <see cref="DtlsServerKeyExchangeSignature" /> verifies, extended_master_secret (RFC 7627), and names a host
 /// name target in server_name.
 /// </summary>
@@ -17,11 +17,14 @@ internal static class DtlsClientHello
     /// <summary>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256.</summary>
     public const ushort EcdheEcdsaWithAes128GcmSha256 = 0xC02B;
 
+    /// <summary>TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8.</summary>
+    public const ushort EcdheEcdsaWithAes128Ccm8 = 0xC0AE;
+
     /// <summary>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256.</summary>
     public const ushort EcdheRsaWithAes128GcmSha256 = 0xC02F;
 
     /// <summary>Gets the cipher suites the client offers, in preference order.</summary>
-    public static IReadOnlyList<ushort> CipherSuites { get; } = [EcdheEcdsaWithAes128GcmSha256, EcdheRsaWithAes128GcmSha256];
+    public static IReadOnlyList<ushort> CipherSuites { get; } = [EcdheEcdsaWithAes128GcmSha256, EcdheRsaWithAes128GcmSha256, EcdheEcdsaWithAes128Ccm8];
 
     /// <summary>Writes the ClientHello body with <paramref name="cookie" />, empty before a HelloVerifyRequest.</summary>
     public static byte[] Encode(byte[] random, byte[] cookie, string targetHost)

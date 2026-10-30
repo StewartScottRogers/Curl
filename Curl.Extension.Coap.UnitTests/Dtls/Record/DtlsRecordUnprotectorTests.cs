@@ -5,7 +5,7 @@ using Curl.Tls;
 namespace Curl.Extension.Coap.Dtls.Record;
 
 [TestClass]
-public sealed class DtlsAes128GcmRecordUnprotectorTests
+public sealed class DtlsRecordUnprotectorTests
 {
     internal static readonly byte[] MasterSecret = [.. Enumerable.Range(1, TlsPrf.MasterSecretLength).Select(value => (byte)value)];
 
@@ -16,9 +16,9 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_Rfc6347Section4_1_2_RoundTripsApplicationDataFromClientToServer()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordProtector client = new(keys.ClientWrite, 1);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordProtector client = new(keys.ClientWrite, 1);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
 
         AssertRoundTrips(client, server, "GET /temperature");
         AssertRoundTrips(client, server, "GET /humidity");
@@ -27,9 +27,9 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_Rfc6347Section4_1_2_RoundTripsApplicationDataFromServerToClient()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordProtector server = new(keys.ServerWrite, 1);
-        using DtlsAes128GcmRecordUnprotector client = new(keys.ServerWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordProtector server = new(keys.ServerWrite, 1);
+        using DtlsRecordUnprotector client = new(keys.ServerWrite, 1);
 
         AssertRoundTrips(server, client, "22.5 C");
     }
@@ -37,9 +37,9 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_Rfc6347Section4_1_2_6_DropsAReplayedRecord()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordProtector client = new(keys.ClientWrite, 1);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordProtector client = new(keys.ClientWrite, 1);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
         byte[] record = client.Protect(TlsContentType.ApplicationData, [1, 2, 3]);
 
         Assert.IsTrue(server.TryUnprotect(record, out _, out _));
@@ -50,9 +50,9 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_Rfc6347Section4_1_2_7_DropsARecordWithAChangedByteAndStillTakesTheGenuineOne()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordProtector client = new(keys.ClientWrite, 1);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordProtector client = new(keys.ClientWrite, 1);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
         byte[] record = client.Protect(TlsContentType.ApplicationData, [1, 2, 3]);
         byte[] forged = [.. record];
         forged[22] ^= 0x01;
@@ -65,9 +65,9 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_Rfc5246Section6_2_3_3_DropsARecordWhoseHeaderWasChanged()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordProtector client = new(keys.ClientWrite, 1);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordProtector client = new(keys.ClientWrite, 1);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
         byte[] record = client.Protect(TlsContentType.ApplicationData, [1, 2, 3]);
         record[0] = (byte)TlsContentType.Handshake;
 
@@ -75,10 +75,32 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     }
 
     [TestMethod]
+    public void TryUnprotect_Rfc7251_Aes128Ccm8RoundTripsWithAnEightByteTagAndDropsATamperedRecord()
+    {
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom, Tls12BulkCipher.Aes128Ccm8);
+        using DtlsRecordProtector client = new(keys.ClientWrite, 1, Tls12BulkCipher.Aes128Ccm8);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1, Tls12BulkCipher.Aes128Ccm8);
+        byte[] record = client.Protect(TlsContentType.ApplicationData, [1, 2, 3]);
+
+        Assert.AreEqual(DtlsRecordHeader.HeaderLength + 8 + 3 + 8, record.Length);
+        AssertRoundTrips(client, server, "GET /temperature");
+        record[^1] ^= 1;
+        Assert.IsFalse(server.TryUnprotect(record, out _, out _));
+    }
+
+    [TestMethod]
+    public void Construct_AnUnsupportedBulkCipher_Throws()
+    {
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new DtlsRecordUnprotector(keys.ClientWrite, 1, Tls12BulkCipher.Aes256Gcm));
+    }
+
+    [TestMethod]
     public void TryUnprotect_Rfc6347Section4_1_PassesAnEpochZeroRecordThroughUnprotected()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
         byte[] record = [.. new DtlsRecordHeader(TlsContentType.Handshake, DtlsRecordHeader.Dtls12Version, 0, 5, 3).Encode(), 7, 8, 9];
 
         Assert.IsTrue(server.TryUnprotect(record, out DtlsRecordHeader header, out byte[] plaintext));
@@ -89,9 +111,9 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_Rfc6347Section4_1_DropsARecordOfAnotherEpoch()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordProtector client = new(keys.ClientWrite, 2);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordProtector client = new(keys.ClientWrite, 2);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
 
         Assert.IsFalse(server.TryUnprotect(client.Protect(TlsContentType.ApplicationData, [1]), out _, out _));
     }
@@ -99,8 +121,8 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_DropsARecordTooShortForTheExplicitNonceAndTag()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
         byte[] record = [.. new DtlsRecordHeader(TlsContentType.ApplicationData, DtlsRecordHeader.Dtls12Version, 1, 0, 23).Encode(), .. new byte[23]];
 
         Assert.IsFalse(server.TryUnprotect(record, out _, out _));
@@ -109,14 +131,14 @@ public sealed class DtlsAes128GcmRecordUnprotectorTests
     [TestMethod]
     public void TryUnprotect_DropsARecordShorterThanItsHeader()
     {
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
-        using DtlsAes128GcmRecordUnprotector server = new(keys.ClientWrite, 1);
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(MasterSecret, ClientRandom, ServerRandom);
+        using DtlsRecordUnprotector server = new(keys.ClientWrite, 1);
 
         Assert.IsFalse(server.TryUnprotect(new byte[5], out DtlsRecordHeader header, out _));
         Assert.AreEqual(default, header);
     }
 
-    private static void AssertRoundTrips(DtlsAes128GcmRecordProtector sender, DtlsAes128GcmRecordUnprotector receiver, string text)
+    private static void AssertRoundTrips(DtlsRecordProtector sender, DtlsRecordUnprotector receiver, string text)
     {
         byte[] sent = Encoding.ASCII.GetBytes(text);
         byte[] record = sender.Protect(TlsContentType.ApplicationData, sent);

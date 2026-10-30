@@ -71,14 +71,14 @@ registered by one line in `ExtensionCatalogue.cs` and described in `ExtensionDes
 
 Each throws `FormatException` for bytes the RFC does not allow.
 
-`Dtls/Record/` (namespace `Curl.Extension.Coap.Dtls.Record`) protects DTLS 1.2 records with AES-128-GCM
-(RFC 5288, RFC 6347 section 4.1.2):
+`Dtls/Record/` (namespace `Curl.Extension.Coap.Dtls.Record`) protects DTLS 1.2 records with AES-128-GCM or AES-128-CCM_8
+(RFC 5288, RFC 6655, RFC 7251, RFC 6347 section 4.1.2):
 
-- `DtlsAes128GcmKeyBlock` derives both sides' 16-byte keys and 4-byte write IVs with `TlsPrf.Sha256`.
-- `DtlsAes128GcmRecordNonce` is the nonce: the write IV, then the 8-byte explicit part, the epoch and
+- `DtlsKeyBlock` derives both sides' 16-byte keys and 4-byte write IVs with `TlsPrf.Sha256`.
+- `DtlsRecordNonce` is the nonce: the write IV, then the 8-byte explicit part, the epoch and
   sequence number, sent before the ciphertext.
-- `DtlsAes128GcmRecordProtector` writes one epoch's records, numbered from 0, with the 16-byte tag over
-  `DtlsRecordHeader.AdditionalData`; `DtlsAes128GcmRecordUnprotector` reads them, passing an epoch-0
+- `DtlsRecordProtector` writes one epoch's records, numbered from 0, with the tag over
+  `DtlsRecordHeader.AdditionalData`; `DtlsRecordUnprotector` reads them, passing an epoch-0
   record through and dropping one that does not parse, is of another epoch, is a replay or fails its tag.
 
 `Dtls/Retransmission/` (namespace `Curl.Extension.Coap.Dtls.Retransmission`) resends handshake flights
@@ -90,7 +90,7 @@ resends them on a timer that starts at 1 second and doubles up to 60 seconds on 
 `Dtls/Handshake/` (namespace `Curl.Extension.Coap.Dtls.Handshake`, ADR-1078) runs the DTLS 1.2 client handshake
 (RFC 6347 section 4.2, RFC 5246 section 7.3):
 
-- `DtlsClientHandshake` sends a `DtlsClientHello` (TLS_ECDHE_ECDSA and TLS_ECDHE_RSA with AES-128-GCM, secp256r1,
+- `DtlsClientHandshake` sends a `DtlsClientHello` (TLS_ECDHE_ECDSA and TLS_ECDHE_RSA with AES-128-GCM, TLS_ECDHE_ECDSA with AES-128-CCM_8, secp256r1,
   server_name for a host name), again with a HelloVerifyRequest's cookie; takes ServerHello, Certificate,
   ServerKeyExchange and ServerHelloDone through `DtlsHandshakeMessageReader` (message_seq order, fragments rebuilt,
   repeats dropped); hands the chain to `ITlsProvider.VerifyServerCertificateChain` (a rejection fails with its exit

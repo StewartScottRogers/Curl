@@ -3,11 +3,11 @@ using System.Buffers.Binary;
 namespace Curl.Extension.Coap.Dtls.Record;
 
 /// <summary>
-/// The 12-byte AES-GCM nonce of a DTLS 1.2 record (RFC 5288 section 3): the 4-byte write IV
+/// The 12-byte AES-GCM or AES-CCM nonce of a DTLS 1.2 record (RFC 5288 section 3): the 4-byte write IV
 /// followed by the 8-byte explicit part, which the sender sets to the record's 64-bit epoch and
 /// sequence number and sends before the ciphertext.
 /// </summary>
-internal static class DtlsAes128GcmRecordNonce
+internal static class DtlsRecordNonce
 {
     /// <summary>The length in bytes of the explicit part sent in the record.</summary>
     public const int ExplicitLength = 8;

@@ -17,7 +17,7 @@ forbid changing `Curl.Tls` for an extension. Upstream curl has no CoAP, so no cu
   on `Curl.Tls`'s public pieces (`ServerHello`, `Tls12CertificateMessage`, `Tls12ServerKeyExchange`,
   `Tls12ClientKeyExchange`, `EcdhKeyShare`, `TlsPrf`) and the extension's own `Dtls/Wire`, `Dtls/Record` and
   `Dtls/Retransmission`.
-- It offers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 for now, the suites
+- It offers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 and TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 and (BL-4283) TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 (RFC 7251), the suites
   the record layer (`Dtls/Record`, BL-4266) protects. RFC 7252 section 9.1.3.2 makes
   TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 the CoAP baseline; BL-4283 adds it on the BCL's `AesCcm`. Group secp256r1;
   signature schemes ecdsa_secp256r1_sha256, rsa_pss_rsae_sha256 and rsa_pkcs1_sha256; server_name for a host name.
@@ -33,4 +33,4 @@ forbid changing `Curl.Tls` for an extension. Upstream curl has no CoAP, so no cu
 
 ## Consequences
 
-A `coaps://` server that offers only CCM_8 or PSK suites fails with exit 35 until a task adds them.
+A `coaps://` server that offers only PSK suites fails with exit 35 until a task adds them.

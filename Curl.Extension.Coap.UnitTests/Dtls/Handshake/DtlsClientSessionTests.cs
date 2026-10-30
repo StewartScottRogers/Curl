@@ -26,6 +26,21 @@ public sealed class DtlsClientSessionTests
     }
 
     [TestMethod]
+    public async Task SendAsyncThenReceiveAsync_Rfc7251_ApplicationDataRoundTripsProtectedWithAes128Ccm8()
+    {
+        using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa) { UseAes128Ccm8 = true };
+        DtlsTestServerChannel channel = new(server);
+        using DtlsClientSession session = await DtlsClientHandshakeTests.RunAsync(channel, insecure: true);
+
+        await session.SendAsync(new byte[] { 1, 2, 3 }, CancellationToken.None);
+        byte[] echoed = await session.ReceiveAsync(CancellationToken.None);
+
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, server.ReceivedApplicationData.Single());
+        CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, echoed);
+        Assert.AreEqual(8 + 3 + 8, DtlsRecordHeader.Decode(channel.Sent.Last()).Length);
+    }
+
+    [TestMethod]
     public async Task ReceiveAsync_Rfc6347Section4_1_2_6_ReplayedRecord_IsDropped()
     {
         using DtlsTestServer server = new(DtlsTestServerKeyKind.Ecdsa);

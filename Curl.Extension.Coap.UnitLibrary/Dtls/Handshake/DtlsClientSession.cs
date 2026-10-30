@@ -11,7 +11,7 @@ namespace Curl.Extension.Coap.Dtls.Handshake;
 /// gives the server's, dropping a record that is not protected application data, fails its tag or is a
 /// replay (RFC 6347 section 4.1.2.6).
 /// </summary>
-internal sealed class DtlsClientSession(IDatagramChannel channel, DtlsAes128GcmRecordProtector protector, DtlsAes128GcmRecordUnprotector unprotector) : IDisposable
+internal sealed class DtlsClientSession(IDatagramChannel channel, DtlsRecordProtector protector, DtlsRecordUnprotector unprotector) : IDisposable
 {
     private const int MaximumDatagramLength = 65535;
 

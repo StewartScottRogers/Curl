@@ -8,7 +8,7 @@ depends-on: [BL-4251]
 touches: [Curl.Extension.Coap.UnitLibrary/Dtls/Record, Curl.Extension.Coap.UnitLibrary/Dtls/Handshake/DtlsClientHandshake.cs, Curl.Extension.Coap.UnitLibrary/Dtls/Handshake/DtlsClientHello.cs, Curl.Extension.Coap.UnitTests/Dtls/Handshake, Curl.Extension.Coap.UnitTests/Dtls/Record, Curl.Extension.Coap.UnitTests/Dtls/TestServer/DtlsTestServer.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4283 — Extension CoAP: offer TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 in DTLS 1.2
 
@@ -22,14 +22,17 @@ BL-4251 (ADR-1078) offers only the two AES-128-GCM suites, because `Dtls/Record`
 
 ## Acceptance criteria
 
-- [ ] Unit tests run a full handshake with the CCM_8 suite against the in-memory test server and round-trip application data.
-- [ ] ADR-1078 says the suite is offered.
-- [ ] Curl.Extension.Coap.UnitLibrary meets the four quality gates by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Unit tests run a full handshake with the CCM_8 suite against the in-memory test server and round-trip application data.
+- [x] ADR-1078 says the suite is offered.
+- [x] Curl.Extension.Coap.UnitLibrary meets the four quality gates by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- Renamed DtlsAes128Gcm* record types to DtlsRecordProtector, DtlsRecordUnprotector, DtlsRecordNonce and DtlsKeyBlock (they now serve two suites), so the touched tests DtlsTestServerTests and the project CLAUDE.md changed too. CCM_8 uses Curl.Cryptography AeadAesCcm (BCL AesCcm is unsupported on macOS); the Coap project references it through Curl.Tls.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 01ae170e 42bc4207 cf4c1338 3d836d5e.
+- 2026-10-29: Doing -> Done. CCM_8 offered and negotiated; quality gates pass, fast tests green

@@ -139,7 +139,8 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
         byte[] masterSecret = hello.Extensions.Any(extension => extension.Type == TlsExtensionType.ExtendedMasterSecret)
             ? TlsPrf.Sha256.ComputeExtendedMasterSecret(preMasterSecret!, SHA256.HashData([.. transcript]))
             : TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret!, clientRandom, hello.Random);
-        return await FinishAsync(masterSecret, DtlsAes128GcmKeyBlock.Derive(masterSecret, clientRandom, hello.Random), keyExchangeFragment, cancellationToken).ConfigureAwait(false);
+        Tls12BulkCipher bulkCipher = hello.CipherSuite == DtlsClientHello.EcdheEcdsaWithAes128Ccm8 ? Tls12BulkCipher.Aes128Ccm8 : Tls12BulkCipher.Aes128Gcm;
+        return await FinishAsync(masterSecret, DtlsKeyBlock.Derive(masterSecret, clientRandom, hello.Random, bulkCipher), bulkCipher, keyExchangeFragment, cancellationToken).ConfigureAwait(false);
     }
 
     private byte[] VerifyCertificateChain(Tls12CertificateMessage certificate)
@@ -155,10 +156,10 @@ internal sealed class DtlsClientHandshake(IDatagramChannel channel, ITlsProvider
     }
 
     /// <summary>Sends ClientKeyExchange, ChangeCipherSpec and the protected Finished, and checks the server's Finished (RFC 5246 section 7.4.9).</summary>
-    private async ValueTask<DtlsClientSession> FinishAsync(byte[] masterSecret, Tls12KeyBlock keys, byte[] keyExchangeFragment, CancellationToken cancellationToken)
+    private async ValueTask<DtlsClientSession> FinishAsync(byte[] masterSecret, Tls12KeyBlock keys, Tls12BulkCipher bulkCipher, byte[] keyExchangeFragment, CancellationToken cancellationToken)
     {
-        DtlsAes128GcmRecordProtector protector = new(keys.ClientWrite, 1);
-        DtlsAes128GcmRecordUnprotector unprotector = new(keys.ServerWrite, 1);
+        DtlsRecordProtector protector = new(keys.ClientWrite, 1, bulkCipher);
+        DtlsRecordUnprotector unprotector = new(keys.ServerWrite, 1, bulkCipher);
         DtlsClientSession session = new(channel, protector, unprotector);
         try
         {

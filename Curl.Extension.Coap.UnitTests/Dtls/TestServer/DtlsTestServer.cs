@@ -14,7 +14,7 @@ namespace Curl.Extension.Coap.Dtls.TestServer;
 /// with it gets ServerHello, Certificate, ServerKeyExchange (ECDHE, signed) and
 /// ServerHelloDone, the client's key exchange, ChangeCipherSpec and Finished get the server's
 /// ChangeCipherSpec and Finished, and protected application data is echoed. A client that
-/// retransmits gets the cached flight again. The server always negotiates AES-128-GCM and the
+/// retransmits gets the cached flight again. The server negotiates AES-128-GCM, or AES-128-CCM_8 when UseAes128Ccm8 is set, and the
 /// plain master secret (it ignores extended_master_secret), and the handshake transcript holds
 /// unfragmented messages with their DTLS headers (RFC 6347 section 4.2.6).
 /// </summary>
@@ -50,9 +50,9 @@ internal sealed class DtlsTestServer : IDisposable
 
     private bool changeCipherSpecReceived;
 
-    private DtlsAes128GcmRecordProtector? protector;
+    private DtlsRecordProtector? protector;
 
-    private DtlsAes128GcmRecordUnprotector? unprotector;
+    private DtlsRecordUnprotector? unprotector;
 
     /// <summary>Creates a server with a freshly generated key and self-signed certificate.</summary>
     public DtlsTestServer(DtlsTestServerKeyKind keyKind)
@@ -85,7 +85,10 @@ internal sealed class DtlsTestServer : IDisposable
     public byte[] Cookie { get; } = [0xC0, 0x0C, 0x1E, 0x00, 0x11, 0x22, 0x33, 0x44];
 
     /// <summary>Gets the cipher suite the server picks.</summary>
-    public ushort CipherSuite => keyKind == DtlsTestServerKeyKind.Ecdsa ? (ushort)0xC02B : (ushort)0xC02F;
+    public ushort CipherSuite => UseAes128Ccm8 ? Handshake.DtlsClientHello.EcdheEcdsaWithAes128Ccm8 : keyKind == DtlsTestServerKeyKind.Ecdsa ? (ushort)0xC02B : (ushort)0xC02F;
+
+    /// <summary>Gets or sets whether an ECDSA server picks TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8 (RFC 7251) instead of the GCM suite.</summary>
+    public bool UseAes128Ccm8 { get; set; }
 
     /// <summary>Gets the ClientHello random the server last accepted.</summary>
     public byte[] ClientRandom { get; private set; } = [];
@@ -199,9 +202,10 @@ internal sealed class DtlsTestServer : IDisposable
         masterSecret = EchoExtendedMasterSecret
             ? TlsPrf.Sha256.ComputeExtendedMasterSecret(preMasterSecret, SHA256.HashData(transcript.ToArray()))
             : TlsPrf.Sha256.ComputeMasterSecret(preMasterSecret, ClientRandom, ServerRandom);
-        Tls12KeyBlock keys = DtlsAes128GcmKeyBlock.Derive(masterSecret, ClientRandom, ServerRandom);
-        unprotector = new DtlsAes128GcmRecordUnprotector(keys.ClientWrite, 1);
-        protector = new DtlsAes128GcmRecordProtector(keys.ServerWrite, 1);
+        Tls12BulkCipher bulkCipher = UseAes128Ccm8 ? Tls12BulkCipher.Aes128Ccm8 : Tls12BulkCipher.Aes128Gcm;
+        Tls12KeyBlock keys = DtlsKeyBlock.Derive(masterSecret, ClientRandom, ServerRandom, bulkCipher);
+        unprotector = new DtlsRecordUnprotector(keys.ClientWrite, 1, bulkCipher);
+        protector = new DtlsRecordProtector(keys.ServerWrite, 1, bulkCipher);
         return [];
     }
 

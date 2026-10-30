@@ -4,12 +4,12 @@ using Curl.Tls;
 namespace Curl.Extension.Coap.Dtls.Record;
 
 [TestClass]
-public sealed class DtlsAes128GcmRecordProtectorTests
+public sealed class DtlsRecordProtectorTests
 {
     [TestMethod]
     public void Protect_Rfc5288Section3_WritesTheHeaderAndTheEpochAndSequenceNumberAsTheExplicitNonce()
     {
-        using DtlsAes128GcmRecordProtector client = new(ClientWriteKeys(), 1);
+        using DtlsRecordProtector client = new(ClientWriteKeys(), 1);
         client.Protect(TlsContentType.ApplicationData, [1]);
 
         byte[] record = client.Protect(TlsContentType.ApplicationData, [1, 2, 3]);
@@ -23,11 +23,11 @@ public sealed class DtlsAes128GcmRecordProtectorTests
     [TestMethod]
     public void Protect_PlaintextPastTwoToTheFourteenth_IsRefused()
     {
-        using DtlsAes128GcmRecordProtector client = new(ClientWriteKeys(), 1);
+        using DtlsRecordProtector client = new(ClientWriteKeys(), 1);
 
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => client.Protect(TlsContentType.ApplicationData, new byte[DtlsAes128GcmRecordProtector.MaximumPlaintextLength + 1]));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => client.Protect(TlsContentType.ApplicationData, new byte[DtlsRecordProtector.MaximumPlaintextLength + 1]));
     }
 
     private static Tls12WriteKeys ClientWriteKeys() =>
-        DtlsAes128GcmKeyBlock.Derive(DtlsAes128GcmRecordUnprotectorTests.MasterSecret, DtlsAes128GcmRecordUnprotectorTests.ClientRandom, DtlsAes128GcmRecordUnprotectorTests.ServerRandom).ClientWrite;
+        DtlsKeyBlock.Derive(DtlsRecordUnprotectorTests.MasterSecret, DtlsRecordUnprotectorTests.ClientRandom, DtlsRecordUnprotectorTests.ServerRandom).ClientWrite;
 }
