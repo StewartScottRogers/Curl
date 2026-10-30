@@ -33,3 +33,4 @@ Second of BL-4144's split, on BL-4319's wire format. `OpenAsync(host, port)` con
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 826d30f6 6fa7d036 c9e51c58 e35aff77 3d836d5e.
