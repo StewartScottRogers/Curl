@@ -1134,3 +1134,4 @@ Each option and the specific reason it lost.
 | [1090](ADR-1090-s3-urls-download-upload-in-parts-and-list-signed-with-sigv4.md) | s3:// URLs download, upload in parts and list, signed with SigV4 (BL-4124) | Accepted | 2026-10-29 |
 | [1082](ADR-1082-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |
 | [1085](ADR-1085-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |
+| [1090](ADR-1090-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |

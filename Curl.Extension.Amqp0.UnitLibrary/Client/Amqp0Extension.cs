@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.Amqp0.Client;
 
-/// <summary>The <c>amqp://</c> and <c>amqps://</c> extension's description and handler factory (ADR-1085).</summary>
+/// <summary>The <c>amqp://</c> and <c>amqps://</c> extension's description and handler factory (ADR-1090).</summary>
 public static class Amqp0Extension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

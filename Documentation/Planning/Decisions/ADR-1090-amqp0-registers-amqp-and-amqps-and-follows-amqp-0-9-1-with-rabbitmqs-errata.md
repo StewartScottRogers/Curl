@@ -1,4 +1,4 @@
-# ADR-1085 — The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata
+# ADR-1090 — The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
