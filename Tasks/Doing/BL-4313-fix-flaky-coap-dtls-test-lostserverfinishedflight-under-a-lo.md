@@ -30,3 +30,4 @@ Found by BL-4136 on 2026-10-29: it failed once in a full `dotnet test --filter "
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 00ae00f6 3d836d5e.
