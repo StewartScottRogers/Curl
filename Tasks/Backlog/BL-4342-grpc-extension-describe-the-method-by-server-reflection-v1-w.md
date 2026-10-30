@@ -34,3 +34,4 @@ Third of three parts of BL-4102, on BL-4340's `Wire/` and BL-4341's `Client/`. S
 
 - 2026-10-29: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 955021ab 07666595 e35aff77 3d836d5e.
+- 2026-10-30: Doing -> Backlog. Lane 13 claimed it as the shift ended (time up, 02:48); its worktree holds no work, so the next shift refused to start with it orphaned in Doing
