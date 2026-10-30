@@ -363,6 +363,7 @@ internal static class CurlComposition
     /// </param>
     /// <param name="extensionOptions">The extensions' long options the parser reads (ADR-1006); <see langword="null" /> for every registered extension's. Tests pass their own.</param>
     /// <param name="extensionResolverHookActivators">The extensions' resolver hook activators (ADR-1012); <see langword="null" /> for <see cref="ExtensionResolverHookCatalogue.Entries" />. Tests pass their own.</param>
+    /// <param name="extensionConnectionHookActivators">The extensions' connection hook activators (ADR-1010); <see langword="null" /> for <see cref="ExtensionConnectionHookCatalogue.Entries" />. Tests pass their own.</param>
     /// <returns>The runner.</returns>
     internal static CurlCommandRunner CreateRunner(
         Stream standardOutput,
@@ -394,15 +395,17 @@ internal static class CurlComposition
         Func<int, byte[]>? digestRandomBytes = null,
         bool parsesAsEchBuild = false,
         IReadOnlyList<ExtensionOption>? extensionOptions = null,
-        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>>? extensionResolverHookActivators = null)
+        IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>>? extensionResolverHookActivators = null,
+        IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>>? extensionConnectionHookActivators = null)
     {
         ConnectionCache runConnections = new(TimeProvider.System);
         LateBoundDiagnosticLog runLog = new();
         Func<string, string?> environment = readEnvironmentVariable ?? (_ => null);
         string? dnsServer = honoursDnsServerVariable ? environment(DnsServerVariableName) : null;
         IReadOnlyList<Func<ExtensionOptionValues, IResolverHook?>> resolverActivators = extensionResolverHookActivators ?? ExtensionResolverHookCatalogue.Entries;
+        IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators = ConnectionHookActivatorsOf(extensionConnectionHookActivators);
         return new(
-            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector))), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes)),
+            SharingRunCookies((options, cookies) => CreateDialingTransferDispatch(tcpDialer, ExtensionResolverHooksOf(options, resolverActivators).ResolverOver(DialingDohResolverOf(options, tcpDialer, DnsServerVariableResolverOf(EasyOptionsFromCommandLine.NetworkOf(options), dnsServer, dnsResolver, datagramConnector))), datagramConnector, cookies, options, runConnections, runLog, usesHandBuiltNtlm, environment, ftpListener, signingClock, webSocketRandomSource, securityContexts, featureMask, digestRandomBytes, connectionActivators)),
             RunFileSystemOf(fileSystem),
             new PhysicalFileSystem(),
             standardOutput,
@@ -430,6 +433,12 @@ internal static class CurlComposition
             debugWriteOut: DebugWriteOutStandIn.OfHonoured(honoursDebugWriteOutVariables, environment),
             extensionOptions: extensionOptions);
     }
+
+    /// <summary>The connection hook activators the dialing runner activates: <paramref name="given" />, or <see cref="ExtensionConnectionHookCatalogue.Entries" /> when none were given.</summary>
+    /// <param name="given">The activators a test gave, or <see langword="null" />.</param>
+    /// <returns>The run's connection hook activators.</returns>
+    private static IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>> ConnectionHookActivatorsOf(IReadOnlyList<Func<ExtensionOptionValues, IConnectionHook?>>? given) =>
+        given ?? ExtensionConnectionHookCatalogue.Entries;
 
     /// <summary>The HSTS clock a <c>CURL_TIME</c> fixes (<see cref="HstsClockOf" />) when the seam is on; <see langword="null" />, for the real clock, when it is off.</summary>
     /// <param name="honoursHstsTimeVariable">Whether the seam is on.</param>
@@ -461,7 +470,7 @@ internal static class CurlComposition
     }
 
     /// <summary>
-    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?)" />:
+    /// Builds one option group's dispatch for the dialing <see cref="CreateRunner(Stream, Stream, Stream, ITcpDialer, IDnsResolver, IDatagramConnector, bool, IWriteOutFileOpener?, bool, Func{string, string?}?, IConnectionListener?, DefaultConfigFileSearch?, TimeProvider?, bool, bool, bool, bool, bool?, bool, IExtendedAttributeWriter?, bool, IWebSocketRandomSource?, IFileSystem?, ISecurityContextFactory?, EngineFeatureMask, bool, Func{int, byte[]}?, bool, IReadOnlyList{ExtensionOption}?, IReadOnlyList{Func{ExtensionOptionValues, IResolverHook?}}?, IReadOnlyList{Func{ExtensionOptionValues, IConnectionHook?}}?)" />:
     /// the group's <see cref="TcpConnector" /> over <paramref name="tcpDialer" /> and
     /// <paramref name="dnsResolver" />, pooled in <paramref name="runConnections" />, with a proxy
     /// selector that reads the environment through <paramref name="readEnvironmentVariable" />, and the connector's <c>--resolve</c> entries
@@ -482,6 +491,7 @@ internal static class CurlComposition
     /// <param name="givenSecurityContexts">Makes the group's NTLM, Negotiate and Kerberos contexts; <see cref="CreateDialingSecurityContextFactory" /> when <see langword="null" />.</param>
     /// <param name="featureMask">The features the run behaves as built without, which the dispatch carries.</param>
     /// <param name="digestRandomBytes">Where Digest and DIGEST-MD5 draw their client nonce's bytes from; <see cref="System.Security.Cryptography.RandomNumberGenerator" /> when <see langword="null" />.</param>
+    /// <param name="connectionActivators">One per extension: its connection hook when its option was given, otherwise <see langword="null" />.</param>
     /// <returns>The dispatch.</returns>
     private static TransferDispatch CreateDialingTransferDispatch(
         ITcpDialer tcpDialer,
@@ -498,9 +508,10 @@ internal static class CurlComposition
         IWebSocketRandomSource? webSocketRandomSource,
         ISecurityContextFactory? givenSecurityContexts,
         EngineFeatureMask featureMask,
-        Func<int, byte[]>? digestRandomBytes)
+        Func<int, byte[]>? digestRandomBytes,
+        IEnumerable<Func<ExtensionOptionValues, IConnectionHook?>> connectionActivators)
     {
-        ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options);
+        ConnectionHooks connectionHooks = ExtensionConnectionHooksOf(options, connectionActivators);
         CertificateCheckHooks certificateCheckHooks = ExtensionCertificateCheckHooksOf(options);
         EasyNetworkOptions network = EasyOptionsFromCommandLine.NetworkOf(options);
         EasyTlsOptions tls = EasyOptionsFromCommandLine.TlsOf(options);
@@ -514,7 +525,7 @@ internal static class CurlComposition
         HttpProxyTunnelOptions proxyTunnelOptions = CreateProxyTunnelOptions(http, proxy, authentication, proxyContexts, diagnosticLog);
         EngineTraceComponents traces = EasyOptionsFromCommandLine.TraceComponentsOf(options);
         EngineToolOptions tool = EasyOptionsFromCommandLine.ToolOptionsOf(options);
-        QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, datagramConnector);
+        QuicDialer quicDialer = CreateDatagramConnectorQuicDialer(traces, tlsClientOptions, connectionHooks.DatagramConnectorOver(datagramConnector));
         TcpConnector tcpConnector = CreateTcpConnector(tool, traces, network, http, proxy, authentication, dnsResolver, tcpDialer, tlsProvider, TimeProvider.System, proxyTunnelOptions, proxyTlsProvider, quicDialer, socks5SecurityContexts: proxyContexts, featureMask: featureMask);
         PoolingConnector poolingConnector = CreatePoolingConnector(tool, network, tls, http, proxy, tcpConnector, TimeProvider.System, runConnections, featureMask);
         ISecurityContextFactory securityContexts = givenSecurityContexts ?? CreateDialingSecurityContextFactory(poolingConnector, datagramConnector, diagnosticLog, usesHandBuiltNtlm);
@@ -842,7 +853,6 @@ internal static class CurlComposition
     /// <returns><see cref="ConnectionHooks.DatagramConnectorOver" />, or <see langword="null" /> without a hook, so the engine keeps curl's datagram connector.</returns>
     internal static Func<IDatagramConnector, IDatagramConnector>? ExtensionDatagramConnectorOf(ConnectionHooks? hooks) =>
         hooks is { Hook: not null } ? hooks.DatagramConnectorOver : null;
-
     /// <summary>
     /// Gives the certificate checks <see cref="ExtensionCertificateCheckHookCatalogue.Entries" /> activate for an
     /// option group's extension options (ADR-1016).
