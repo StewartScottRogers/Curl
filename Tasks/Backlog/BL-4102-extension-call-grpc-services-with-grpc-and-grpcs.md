@@ -4,7 +4,7 @@ title: Extension: Call gRPC services with grpc:// and grpcs://
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4092, BL-4099]
+depends-on: [BL-4091, BL-4093, BL-4092, BL-4099, BL-4340, BL-4341, BL-4342]
 touches: [Curl.Extension.Grpc.UnitLibrary, Curl.Extension.Grpc.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 1): Split for size before any code, as the Notes above anticipated: a new project with the wire format, a unary HTTP/2 client flow with `--proto`, and server reflection v1 are three runs at 100% coverage. Every hook they need exists (`ProtocolHandlerServices` and `ExtensionCatalogue` as Coap uses them, `Curl.Http2.UnitLibrary` `Http2Connection`, `Curl.Protobuf.UnitLibrary` descriptors and JSON mapping). Filed BL-4340 (project and `Wire/`), BL-4341 (`Client/`, registration, `--extensions`, `CURL_EXTENSIONS=0`, ADR; depends on BL-4340) and BL-4342 (`Reflection/`; depends on both), each in its own subfolder. Once all three are Done this task only verifies its criteria against the finished library and closes.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: b2bf8f98 31a72d1f 99ed0a8d bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size into BL-4340, BL-4341 and BL-4342; waits on them
