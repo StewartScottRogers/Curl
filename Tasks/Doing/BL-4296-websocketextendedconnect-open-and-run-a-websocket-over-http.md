@@ -35,3 +35,4 @@ Third part of BL-4112. Uses the wire layer from BL-4298, the HTTP/3 client sessi
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6b11d967 8722f962 db287935 e35aff77 3d836d5e.
