@@ -1,4 +1,4 @@
-# ADR-1117 — The Oblivious DoH extension follows RFC 9230, named by `--odoh-proxy` and `--odoh-target`
+# ADR-1127 — The Oblivious DoH extension follows RFC 9230, named by `--odoh-proxy` and `--odoh-target`
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

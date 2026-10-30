@@ -28,7 +28,7 @@ public sealed record ObliviousDohEndpoints(Uri Proxy, Uri Target)
 
     /// <summary>
     /// Gets the URL the target's <c>ObliviousDoHConfigs</c> are fetched from, <c>/.well-known/odohconfigs</c> on the
-    /// target's origin; RFC 9230 section 5 leaves discovery out of scope (ADR-1117).
+    /// target's origin; RFC 9230 section 5 leaves discovery out of scope (ADR-1127).
     /// </summary>
     public Uri ConfigsUri => new(Target, "/.well-known/odohconfigs");
 

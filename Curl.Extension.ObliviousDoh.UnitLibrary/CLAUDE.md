@@ -1,6 +1,6 @@
 # Curl.Extension.ObliviousDoh.UnitLibrary
 
-Oblivious DoH lookups (ADR-0999, ADR-1117): an `IDnsResolver` that encrypts each DNS query to a target's HPKE key
+Oblivious DoH lookups (ADR-0999, ADR-1127): an `IDnsResolver` that encrypts each DNS query to a target's HPKE key
 and POSTs it through a proxy, as RFC 9230 lays out. Tested against RFC 9230, not against curl.
 
 - `ObliviousDohExtension`: the `oblivious-doh` description, the options `--odoh-proxy <URL>` and

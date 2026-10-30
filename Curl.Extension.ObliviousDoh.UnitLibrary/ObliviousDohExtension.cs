@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Resolution;
 namespace Curl.Extension.ObliviousDoh;
 
 /// <summary>
-/// The Oblivious DoH extension's options, description and resolver hook activator (ADR-1117):
+/// The Oblivious DoH extension's options, description and resolver hook activator (ADR-1127):
 /// <c>--odoh-proxy &lt;URL&gt;</c> and <c>--odoh-target &lt;URL&gt;</c> look every transfer's host names up over
 /// RFC 9230, each query encrypted to the target and relayed by the proxy. The two are given together.
 /// </summary>
