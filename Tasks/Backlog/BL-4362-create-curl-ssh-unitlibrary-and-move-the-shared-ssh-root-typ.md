@@ -5,7 +5,7 @@ priority: Low
 assignee: Claude
 pipeline: direct
 depends-on: [BL-4320]
-touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests, Curl.slnx, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs, Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj, Curl.Protocol.Abstractions.UnitTests/ProtocolIsolationTests.cs, Documentation/Planning/Decisions/ADR-0120-protocol-libraries-may-reference-the-hand-built-libraries-and-nothing-else-horizontal.md]
+touches: [Curl.Ssh.UnitLibrary, Curl.Ssh.UnitTests, Curl.Protocol.Ssh.UnitLibrary, Curl.Protocol.Ssh.UnitTests/SshWireDecodersTests.cs, Curl.Protocol.Ssh.UnitTests/SshWireDecodersAdversarialTests.cs, Curl.Protocol.Ssh.UnitTests/Fakes/RepeatingRandomSource.cs, Curl.Protocol.Ssh.UnitTests/GlobalUsings/Curl.Ssh.cs, Curl.Protocol.Ssh.UnitTests/Curl.Protocol.Ssh.UnitTests.csproj, Curl.slnx, Curl.Conformance.SshServer.UnitLibrary, Curl.Conformance.SshServer.UnitTests, Curl.Console/CurlComposition.cs, Curl.Engine.UnitLibrary/EngineComposition.PlatformBuilds.cs, Curl.Engine.UnitTests/EngineCompositionPlatformLibraryTests.cs, Curl.Protocol.Ssh.IntegrationTests/Curl.Protocol.Ssh.IntegrationTests.csproj, Curl.Protocol.Abstractions.UnitTests/ProtocolIsolationTests.cs, Documentation/Planning/Decisions/ADR-0120-protocol-libraries-may-reference-the-hand-built-libraries-and-nothing-else-horizontal.md]
 requirement: none
 created: 2026-10-30
 completed:
@@ -29,6 +29,8 @@ Part 1 of BL-4328 (SSH transport layer into a shared library so extensions such 
 - [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
+
+- 2026-10-30 (BL-4367): `touches` narrowed from the whole Curl.Protocol.Ssh.UnitTests to the files and folders this task changes there. That project now imports each moving namespace once, in `GlobalUsings/Curl.Protocol.Ssh.<Folder>.cs`, so moving a folder changes that one file (to `global using Curl.Ssh.<Folder>;`) rather than the using lines of every test that names its types; root types moved to Curl.Ssh get their own new `GlobalUsings/Curl.Ssh.cs`.
 
 - 2026-10-30: Split from BL-4328 (over its cost cap); see its Notes for the dependency closure measured. Each moved folder's namespaces become `Curl.Ssh.<Folder>`; every moved type is `internal`, so `Curl.Ssh.UnitLibrary` needs `InternalsVisibleTo` for the consumers listed in BL-4328's Notes.
 - Continues the stashed work of BL-4328.
