@@ -38,3 +38,4 @@ Builds on BL-4336's `Wire/` and `Rendering/`. Parse the URL as RFC 4501 section 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 8489097a 699d1913 588e50c5 8439c2d0 478f867b 3d836d5e.
