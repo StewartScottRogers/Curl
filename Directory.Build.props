@@ -161,8 +161,10 @@
     3. An extension library references no other extension but Curl.Extension.Abstractions; only
        Curl.Extension.Composition, which lists them all, references the extensions.
   -->
-  <!-- BeforeBuild, ahead of the SDK adding transitive project references, so only a project's own references are checked. -->
-  <Target Name="VerifyExtensionIsolation" BeforeTargets="BeforeBuild">
+  <!-- Ahead of the SDK's IncludeTransitiveProjectReferences, so only a project's own references are checked.
+       BeforeBuild alone is too late under Rebuild (dotnet build's no-incremental switch): its Clean runs that
+       target first, so by BeforeBuild ProjectReference holds the transitive references too (BL-4294). -->
+  <Target Name="VerifyExtensionIsolation" BeforeTargets="IncludeTransitiveProjectReferences;BeforeBuild">
     <PropertyGroup>
       <_IsExtensionProject>$(MSBuildProjectName.StartsWith('Curl.Extension.'))</_IsExtensionProject>
       <_IsExtensionTestProject>false</_IsExtensionTestProject>
