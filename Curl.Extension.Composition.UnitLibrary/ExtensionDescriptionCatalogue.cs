@@ -31,6 +31,7 @@ internal static class ExtensionDescriptionCatalogue
         Xmpp.Client.XmppExtension.Description,
         Curl.Extension.HttpCache.HttpCacheExtension.Description,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Description,
+        Curl.Extension.ResumableUpload.ResumableUploadExtension.Description,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Description,
         Curl.Extension.Checksum.ChecksumExtension.Description,
         Curl.Extension.Sigstore.SigstoreExtension.Description,

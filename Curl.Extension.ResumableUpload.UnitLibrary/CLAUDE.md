@@ -3,8 +3,11 @@
 The resumable upload extension (ADR-0999), for `--resumable-upload`. Namespace
 `Curl.Extension.ResumableUpload`. It references the base class library, `Curl.Protocol.Abstractions`
 (for `IConnection`) and `Curl.Extension.Abstractions` (for `ITransferHook`), never `Curl.Protocol.Http` or
-another extension. The option, its registration in `ExtensionCatalogue.cs` and its description (BL-4129)
-arrive in a later task.
+another extension.
+
+- `ResumableUploadExtension` holds the `--resumable-upload` flag, the description `curl --extensions`
+  lists and `HookFor`, which gives the transfer hook only when the flag was given (ADR-1149).
+  `Curl.Extension.Composition` registers all three in its option, description and transfer hook catalogues.
 
 - `Transfer/ResumableUploadTransferHook` uploads an http or https transfer's `-T` body in place of curl's
   handler (ADR-1103): `OPTIONS` picks `TusUploadProtocol` or `IetfUploadProtocol`, `ResumableUploadFlow`

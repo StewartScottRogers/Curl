@@ -26,6 +26,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Option,
         Curl.Extension.HttpCache.HttpCacheExtension.Option,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Option,
+        Curl.Extension.ResumableUpload.ResumableUploadExtension.Option,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Option,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.SeedOption,
         Curl.Extension.Checksum.ChecksumExtension.Option,
