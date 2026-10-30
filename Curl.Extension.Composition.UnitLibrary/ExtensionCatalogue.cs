@@ -23,5 +23,6 @@ internal static class ExtensionCatalogue
         Kafka.Client.KafkaExtension.CreateHandler,
         Redis.Client.RedisExtension.CreateHandler,
         SignalR.SignalRExtension.CreateHandler,
+        Mqtt5.Mqtt5Extension.CreateHandler,
     ];
 }

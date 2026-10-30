@@ -32,5 +32,6 @@ internal static class ExtensionDescriptionCatalogue
         Redis.Client.RedisExtension.Description,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.Description,
         SignalR.SignalRExtension.Description,
+        Mqtt5.Mqtt5Extension.Description,
     ];
 }
