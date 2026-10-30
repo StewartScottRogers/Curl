@@ -4,8 +4,8 @@ title: Extension: Check DNSSEC and DANE TLSA records
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4096, BL-4097]
-touches: [Curl.Extension.Dane.UnitLibrary, Curl.Extension.Dane.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4096, BL-4097, BL-4328, BL-4329, BL-4330, BL-4331, BL-4332]
+touches: [Curl.Extension.Dane.UnitLibrary, Curl.Extension.Dane.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionCertificateCheckHookCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 11, first pass before any code): too big for one run, split per the note above. BL-4328 scaffolds the library and the DNSSEC-aware DNS codec (`Wire/`); BL-4329 matches a chain against TLSA records (`Tlsa/`); BL-4330 verifies RRSIG/DNSKEY/DS and holds the root anchors (`Dnssec/`); BL-4332 looks up and validates the TLSA RRset over UDP/TCP from the root (`Lookup/`). A missing hook was also found: `ICertificateCheckHook.RefusalOfAsync` gives a check the host but not the port, which the TLSA name `_<port>._tcp.<host>` needs (RFC 6698 section 3); BL-4331 adds it. Hooks confirmed present: `ICertificateCheckHook` and `ExtensionCertificateCheckHookCatalogue` (ADR-1016), `IDatagramConnector`/`UdpDatagramConnector`, Ed25519/Ed448 in `Curl.Cryptography.UnitLibrary` (an allowed shared layer). What is left here once they are Done: the option (`--dane`, its resolver choice), the hook and its activator, the catalogue lines (option, description, certificate check hook - shared list files, added to `touches`), the ADR, the library's full CLAUDE.md, `--extensions`/`--ai-help extensions`, and the quality run.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: aeadf7b1 b8ef90ec 647040e9 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4328, BL-4329, BL-4330, BL-4331 and BL-4332 (codec, TLSA matching, DNSSEC verification, port in the certificate check hook, validating lookup)
