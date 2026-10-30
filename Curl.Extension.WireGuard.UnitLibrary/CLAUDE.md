@@ -23,7 +23,7 @@ library or another extension. It is not yet registered in any Composition catalo
   (type 4, 32 or more), each with `Encode` and `TryDecode` (`false` for any other datagram); `WireGuardMessageType`;
   `WireGuardMessageAuthentication` derives the mac1 and cookie keys and writes and checks mac1 and mac2; the internal
   `WireGuardMessageLayout` holds the shared header and field writes.
-- `Noise/` runs the initiator's Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s handshake:
+- `Noise/` runs the initiator's Noise_IKpsk2_25519_ChaChaPoly_BLAKE2s handshake (ADR-1127):
   `WireGuardHandshakeInitiator` (`CreateInitiation`, `TryConsumeCookieReply`, `TryConsumeResponse`, `ConnectAsync`
   over an `IWireGuardDatagramChannel`, `ForPeer` from the configuration), with the clock and a
   `RandomNumberGenerator` injected; `WireGuardTransportSession` (`Seal` pads to 16 bytes under a 64-bit counter,

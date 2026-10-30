@@ -30,7 +30,7 @@ Split from BL-4147. Specification: WireGuard whitepaper (Donenfeld, revision e2d
 
 ## Notes
 
-- Delivered directly rather than through the /feature agents, to fit one lane run. Messages/ is bytes in, bytes out per whitepaper 5.4.2-5.4.7; Noise/ holds the initiator, the transport session, the RFC 6479 replay window and the Noise symmetric state. Decisions in ADR-1121.
+- Delivered directly rather than through the /feature agents, to fit one lane run. Messages/ is bytes in, bytes out per whitepaper 5.4.2-5.4.7; Noise/ holds the initiator, the transport session, the RFC 6479 replay window and the Noise symmetric state. Decisions in ADR-1127.
 - Touches widened to the library's csproj (it now references Curl.Cryptography.UnitLibrary) and its CLAUDE.md; no other task in Doing on origin/work/dark-factory names either (BL-4324 holds only IpStack/).
 - The clock is a TimeProvider; the random source is an injected System.Security.Cryptography.RandomNumberGenerator, so tests use a repeatable subclass without a package.
 - The tests' WireGuardTestResponder is written from the whitepaper on Curl.Cryptography alone (its own KDF, hashing and AEAD calls), not on NoiseSymmetricState. "Replayed timestamp": the responder rejects an initiation whose TAI64N timestamp is not newer; the initiator also rejects a replayed response.
