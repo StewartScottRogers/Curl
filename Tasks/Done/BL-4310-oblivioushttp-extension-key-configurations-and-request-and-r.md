@@ -33,7 +33,7 @@ Split from BL-4137 (Oblivious HTTP relay extension) for size; builds on BL-4311'
 - Plan: `Encapsulation/` holds `KeyConfiguration` (one RFC 9458 section 3.1 configuration), `KeyConfigurationList`
   (the section 3.2 `application/ohttp-keys` list and `SelectFirstSupported`, giving a `KeyConfigurationChoice`),
   `ObliviousRequest` (section 4.3 encapsulation, keeping the HPKE sender context for section 4.4 response
-  decapsulation; the response AEAD is in `ResponseAead`) and `ObliviousHttpMediaTypes`. Decisions are in ADR-1111: a list
+  decapsulation; the response AEAD is in `ResponseAead`) and `ObliviousHttpMediaTypes`. Decisions are in ADR-1113: a list
   leaves out entries whose KEM is unknown, because their length prefix lets it skip them, while a single configuration
   with an unknown KEM throws, because its public key cannot be delimited. The first supported KDF and AEAD pair in the
   gateway's order is chosen. The three exceptions are `MalformedKeyConfigurationException` (FormatException),

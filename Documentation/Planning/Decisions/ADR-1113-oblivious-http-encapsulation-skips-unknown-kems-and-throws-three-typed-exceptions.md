@@ -1,4 +1,4 @@
-# ADR-1111 — Oblivious HTTP encapsulation skips unknown KEMs and throws three typed exceptions
+# ADR-1113 — Oblivious HTTP encapsulation skips unknown KEMs and throws three typed exceptions
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -17,7 +17,7 @@ registered in any Composition catalogue (BL-4137 does that).
   are Latin-1 strings. `QuicVariableLengthInteger` writes RFC 9000 section 16 integers and `BinaryHttpReader` reads
   them, here rather than taken from a protocol library. An invalid message throws `BinaryHttpFormatException`, a
   `FormatException`.
-- `Encapsulation/` is RFC 9458 sections 3 and 4 (ADR-1111): `KeyConfiguration.Parse` reads one key configuration,
+- `Encapsulation/` is RFC 9458 sections 3 and 4 (ADR-1113): `KeyConfiguration.Parse` reads one key configuration,
   `KeyConfigurationList.Parse` an `application/ohttp-keys` list (leaving out configurations whose KEM is not
   supported) and `SelectFirstSupported` gives the first configuration and KDF and AEAD pair this library implements as
   a `KeyConfigurationChoice`. `ObliviousRequest.Encapsulate` builds the `message/ohttp-req` body and keeps the HPKE
