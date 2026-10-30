@@ -18,7 +18,7 @@ including `Curl.Extension.Amqp0.UnitLibrary` (AMQP 0-9-1, which owns `amqp://` a
   `Amqp1MalformedEncodingException`.
 - `Client/`: the send/receive client of `amqp1://` and `amqp1s://` (ADR-1062). `Amqp1ProtocolHandler` serves the
   schemes, `Amqp1ClientFlow` runs the exchange after `Amqp1SaslNegotiation`, and `Amqp1Extension` holds the
-  description and handler factory registered in `Curl.Extension.Composition` (ADR-1082). No options of its own.
+  description and handler factory registered in `Curl.Extension.Composition` (ADR-1085). No options of its own.
 
 References only `Curl.Extension.Abstractions` (and through it `Curl.Protocol.Abstractions`). Held to the four
 quality gates in the root `CLAUDE.md`. Its tests are in `Curl.Extension.Amqp1.UnitTests`.
