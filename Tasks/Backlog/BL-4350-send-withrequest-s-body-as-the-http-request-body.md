@@ -1,5 +1,5 @@
 ---
-id: BL-4349
+id: BL-4350
 title: Send WithRequest's body as the HTTP request body
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4349 — Send WithRequest's body as the HTTP request body
+# BL-4350 — Send WithRequest's body as the HTTP request body
 
 ## Goal
 
