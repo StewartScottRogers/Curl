@@ -3,8 +3,19 @@
 The WireGuard extension (ADR-0999), tested against wg(8) and wg-quick(8), not against curl. Namespace
 `Curl.Extension.WireGuard`. It references `Curl.Cryptography.UnitLibrary`; it may also reference
 `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Extension.Abstractions.UnitLibrary`, never a `Curl.Protocol.*`
-library or another extension. It is not yet registered in any Composition catalogue and has no `--wireguard` option
-(BL-4147 wires both).
+library or another extension.
+
+- `WireGuardExtension` holds `--wireguard <conf>` (ADR-1150), its description and `Activate`, registered in
+  Composition's option, description and connection hook catalogues; `Activate` reads and parses the file, and any
+  failure is an `ArgumentException` the host reports as exit 2. `WireGuardConnectionHook` (an `IConnectionHook`)
+  gives a `WireGuardConnector` over curl's TLS provider and ALPN list, and a datagram connector that refuses UDP.
+- `Tunnel/` joins the pieces below: `WireGuardConnector` opens each connection in its own tunnel - `WireGuardRoute`'s
+  cryptokey routing picks the peer and source address, `IWireGuardUdpOpener` (`SystemWireGuardUdpOpener` in
+  production) opens the UDP socket, `WireGuardTunnelHandshake` retries initiations every Rekey-Timeout for
+  Rekey-Attempt-Time, `WireGuardPacketTunnel` is the `IIpPacketChannel` sealing and opening transport data, and
+  `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. IP address targets only
+  (BL-4349 adds names), TCP only (BL-4350 adds UDP), no rekeying (BL-4351). Its tests drive it against
+  `TunnelTestPeer`, a responder and TCP server written from the whitepaper.
 
 - `Configuration/` reads a wg-quick configuration file (ADR-1117): `WireGuardConfigurationParser.Parse` gives a
   `WireGuardConfiguration` holding the `WireGuardInterface` (`PrivateKey`, `Address` as `WireGuardCidr`s, `DNS`,

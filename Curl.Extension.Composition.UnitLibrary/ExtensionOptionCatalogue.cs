@@ -15,6 +15,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.NamedPipe.NamedPipeExtension.Option,
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Option,
         Curl.Extension.QuicMigration.QuicMigrationExtension.Option,
+        Curl.Extension.WireGuard.WireGuardExtension.Option,
         GraphQl.GraphQlOptions.Document,
         GraphQl.GraphQlOptions.Variables,
         GraphQl.GraphQlOptions.Operation,

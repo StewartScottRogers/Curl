@@ -20,5 +20,6 @@ public static class ExtensionConnectionHookCatalogue
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Activate,
         Curl.Extension.QuicMigration.QuicMigrationExtension.Activate,
         Curl.Extension.Masque.MasqueExtension.Activate,
+        Curl.Extension.WireGuard.WireGuardExtension.Activate,
     ];
 }
