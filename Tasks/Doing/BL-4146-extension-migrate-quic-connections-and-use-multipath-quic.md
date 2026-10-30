@@ -43,3 +43,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 3bb4418d d00a2947 dae9b5ab e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4320: HTTP/3's QUIC dialer opens its own UDP sockets, so the extension's datagram connector never sees a QUIC datagram
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 3bb4418d d00a2947 dae9b5ab e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
