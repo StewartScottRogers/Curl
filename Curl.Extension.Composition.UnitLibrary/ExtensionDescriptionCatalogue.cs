@@ -49,6 +49,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.ContentDigest.ContentDigestExtension.Description,
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Description,
+        Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Description,
         Curl.Extension.RateLimit.RateLimitExtension.Description,
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Description,
         GoogleCloudStorage.Client.GcsExtension.Description,
