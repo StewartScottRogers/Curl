@@ -36,3 +36,4 @@ Likely fix: check only the project's own references, not transitive ones, e.g. b
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 49975296 2e3569be 9239b4d0 fd900c2c.
