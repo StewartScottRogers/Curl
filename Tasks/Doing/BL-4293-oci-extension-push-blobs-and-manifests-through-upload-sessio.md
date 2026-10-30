@@ -32,3 +32,4 @@ Split from BL-4127 (extension 26 of 63; ADR-0999). OCI Distribution Specificatio
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 082e6c1b d29e13e1 3180db99 3d836d5e.
