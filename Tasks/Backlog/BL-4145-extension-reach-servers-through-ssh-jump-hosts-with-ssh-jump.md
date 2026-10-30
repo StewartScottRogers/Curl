@@ -4,7 +4,7 @@ title: Extension: Reach servers through SSH jump hosts with --ssh-jump
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4095]
+depends-on: [BL-4091, BL-4093, BL-4095, BL-4315, BL-4316, BL-4317]
 touches: [Curl.Extension.SshJump.UnitLibrary, Curl.Extension.SshJump.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 5): Requeued before any code. The jump host needs a full SSH client (transport, key exchange, host keys, user authentication, connection channels); all of it lives in `Curl.Protocol.Ssh.UnitLibrary` (about 8,300 lines outside SFTP/SCP), which an extension may not reference (ADR-0999). Rather than duplicate it, filed BL-4315 (shared `Curl.Ssh.UnitLibrary` with the transport layer), BL-4316 (keys, host keys, authentication) and BL-4317 (session, connection layer and a `direct-tcpip` channel exposed as an `IConnection`). Once they are Done, this task supplies an `IConnector` through the BL-4095 connector hook that opens a session to the jump host and returns a direct-tcpip channel, so SFTP, SCP and every other scheme run through it, plus the option, ADR and description.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 1a58a3c5 2feb1157 41e8e2fd e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits on BL-4315, BL-4316 and BL-4317, which move the SSH client into a shared Curl.Ssh.UnitLibrary an extension may reference
