@@ -1,4 +1,4 @@
-# ADR-1101: dcz decodes with Curl.Zstandard, primed by a raw content dictionary
+# ADR-1107: dcz decodes with Curl.Zstandard, primed by a raw content dictionary
 
 - Status: Accepted
 - Date: 2026-10-29

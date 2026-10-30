@@ -2,7 +2,7 @@
 
 The Compression Dictionary Transport extension's RFC 9842 wire format and dictionary store (ADR-0999, ADR-1100).
 Namespace `Curl.Extension.CompressionDictionary`. It references only `Curl.Extension.Abstractions.UnitLibrary`
-and the shared layers it brings, and `Curl.Zstandard.UnitLibrary` for `dcz` (ADR-1101). It has no option, hook
+and the shared layers it brings, and `Curl.Zstandard.UnitLibrary` for `dcz` (ADR-1107). It has no option, hook
 or catalogue line yet: BL-4132 adds them once the `dcb` decoder (BL-4301) exists.
 
 - `UseAsDictionary` parses the `Use-As-Dictionary` response header (§2.1) through

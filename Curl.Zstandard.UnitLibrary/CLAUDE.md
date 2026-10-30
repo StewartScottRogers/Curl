@@ -20,7 +20,7 @@ decoder that decodes every frame of the reference implementation's golden corpus
   block is an empty block, as curl's streaming libzstd treats it (ADR-0192). Its second
   constructor takes a raw content dictionary (RFC 8878 section 5), which primes each
   frame's history, and a window limit in bytes, for the compression dictionary
-  extension's `dcz` (ADR-1101).
+  extension's `dcz` (ADR-1107).
 - `ZstandardSequencesDecoder` decodes a sequences section (`Number_of_Sequences`,
   `Symbol_Compression_Modes`, predefined, RLE, FSE-compressed and repeated tables, the FSE
   bitstream) and keeps the frame's last tables and three repeat offsets;
