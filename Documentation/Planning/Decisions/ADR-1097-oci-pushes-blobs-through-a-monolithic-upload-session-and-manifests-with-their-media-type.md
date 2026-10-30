@@ -1,4 +1,4 @@
-# ADR-1094: OCI pushes blobs through a monolithic upload session and manifests with their media type
+# ADR-1097: OCI pushes blobs through a monolithic upload session and manifests with their media type
 
 - Status: Accepted
 - Date: 2026-10-29

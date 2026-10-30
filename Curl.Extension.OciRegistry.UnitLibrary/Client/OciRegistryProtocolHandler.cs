@@ -8,7 +8,7 @@ namespace Curl.Extension.OciRegistry.Client;
 /// Serves <c>oci://registry[:port]/name[:tag]</c> and <c>oci://registry[:port]/name@digest</c> over HTTPS, port 443 by
 /// default: without <c>-T</c> it pulls the manifest or blob the path names (<see cref="OciPullReference"/>) through
 /// <see cref="OciPullFlow"/> (ADR-1093); with <c>-T</c> it pushes the upload as that manifest, or as that blob once its
-/// SHA-256 digest matches the URL's, through <see cref="OciPushFlow"/> (ADR-1094). Either way it writes the final
+/// SHA-256 digest matches the URL's, through <see cref="OciPushFlow"/> (ADR-1097). Either way it writes the final
 /// response's body to the output.
 /// </summary>
 /// <param name="connector">Opens the connections to the registry, its token endpoint and any redirect target.</param>

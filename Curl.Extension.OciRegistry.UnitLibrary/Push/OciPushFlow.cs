@@ -6,7 +6,7 @@ namespace Curl.Extension.OciRegistry.Push;
 
 /// <summary>
 /// Pushes one blob or manifest to a repository (OCI Distribution Specification 1.1, "Pushing blobs", "Pushing
-/// manifests", ADR-1094). A blob is first checked with <c>HEAD</c> and, when the registry lacks it, uploaded as a
+/// manifests", ADR-1097). A blob is first checked with <c>HEAD</c> and, when the registry lacks it, uploaded as a
 /// monolithic upload: <c>POST /v2/&lt;name&gt;/blobs/uploads/</c> opens a session, and <c>PUT &lt;Location&gt;?digest=</c>
 /// sends the whole blob. A manifest is one <c>PUT /v2/&lt;name&gt;/manifests/&lt;reference&gt;</c> with its
 /// <c>mediaType</c> as <c>Content-Type</c>. The first 401 is answered with a token for <see cref="Scope"/>, which every

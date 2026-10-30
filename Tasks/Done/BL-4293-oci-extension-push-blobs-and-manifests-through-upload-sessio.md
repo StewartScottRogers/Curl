@@ -29,7 +29,7 @@ Split from BL-4127 (extension 26 of 63; ADR-0999). OCI Distribution Specificatio
 
 ## Notes
 
-- Plan: `Push/OciPushFlow` does HEAD, then a monolithic `POST /v2/<name>/blobs/uploads/` and `PUT <Location>?digest=` for a blob, and one `PUT /v2/<name>/manifests/<ref>` with the manifest's `mediaType` (default the OCI image manifest's) for a manifest; `Push/OciPushContent` computes the SHA-256 digest (BCL) and checks it against the URL's (exit 25 on mismatch). The handler pushes when `-T` gives an upload. Choices recorded in ADR-1094.
+- Plan: `Push/OciPushFlow` does HEAD, then a monolithic `POST /v2/<name>/blobs/uploads/` and `PUT <Location>?digest=` for a blob, and one `PUT /v2/<name>/manifests/<ref>` with the manifest's `mediaType` (default the OCI image manifest's) for a manifest; `Push/OciPushContent` computes the SHA-256 digest (BCL) and checks it against the URL's (exit 25 on mismatch). The handler pushes when `-T` gives an upload. Choices recorded in ADR-1097.
 - Touches widened from the two Push folders to also take `Curl.Extension.OciRegistry.UnitLibrary/Client` and `Curl.Extension.OciRegistry.UnitTests/Client/OciRegistryProtocolHandlerTests.cs`: the handler must dispatch to the push, and the token flow was moved from `OciPullFlow` into `Client/OciRegistrySession` so pull and push share it. No task in Doing on work/dark-factory named either.
 - Renamed `OciPullException` to `OciTransferException`, since a push throws it too.
 - A 401 during a push asks the token for `repository:<name>:push,pull` in place of the challenge's scope; the token goes only to the registry's own scheme, host and port.
