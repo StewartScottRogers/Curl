@@ -48,3 +48,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Doing -> Backlog. Split for size into BL-4311, BL-4309 and BL-4310 (HPKE, Binary HTTP, encapsulation); also waits on BL-4303 for the relay POST context
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 0ccaeafb c14da2cb 82b195bf e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-30: Doing -> Backlog. Out of time: code and tests written (uncommitted, stashed); the quality run and full verification remain, see Notes
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 0ccaeafb c14da2cb 82b195bf e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
