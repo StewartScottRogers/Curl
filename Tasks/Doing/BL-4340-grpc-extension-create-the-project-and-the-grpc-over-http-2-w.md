@@ -35,3 +35,4 @@ First of three parts of BL-4102 (split for size; then BL-4341 client flow, BL-43
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: eb6d7ef2 f9b63d98 3d27b122 25e23d36 e35aff77 3d836d5e.
