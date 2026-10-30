@@ -6,7 +6,7 @@ using Curl.Extension.Masque.Wire;
 
 namespace Curl.Extension.Masque;
 
-/// <summary>The <c>--masque</c> extension's option, description and connection hook activator (ADR-1149).</summary>
+/// <summary>The <c>--masque</c> extension's option, description and connection hook activator (ADR-1153).</summary>
 public static class MasqueExtension
 {
     /// <summary>Gets <c>--masque &lt;uri-template&gt;</c>.</summary>

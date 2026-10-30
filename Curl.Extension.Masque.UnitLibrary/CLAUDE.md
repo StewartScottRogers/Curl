@@ -10,7 +10,7 @@ request for `-x` (ADR-0250).
 
 Namespace `Curl.Extension.Masque`, with `Wire` and `Tunnel` below it. `Wire/` is the wire
 format; it works on bytes and owns no stream or socket. `Tunnel/` is the client flow (ADR-1122),
-and `MasqueExtension` is the option (ADR-1149).
+and `MasqueExtension` is the option (ADR-1153).
 
 - `MasqueExtension` holds `--masque <uri-template>`, its description and `Activate`: a template naming
   `target_host` or `target_port` opens CONNECT-UDP, any other CONNECT-IP, and one that does not expand is

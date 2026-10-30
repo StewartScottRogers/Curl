@@ -1,4 +1,4 @@
-# ADR-1149 — --masque runs QUIC and HTTP/3 through a CONNECT-UDP or CONNECT-IP proxy
+# ADR-1153 — --masque runs QUIC and HTTP/3 through a CONNECT-UDP or CONNECT-IP proxy
 
 - **Status:** Accepted
 - **Date:** 2026-10-30
