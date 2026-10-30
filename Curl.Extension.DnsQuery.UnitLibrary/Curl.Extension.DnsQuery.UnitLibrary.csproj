@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Networking.UnitLibrary\Curl.Networking.UnitLibrary.csproj" />
   </ItemGroup>
 
   <ItemGroup>

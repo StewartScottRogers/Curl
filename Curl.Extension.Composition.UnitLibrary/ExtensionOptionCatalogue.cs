@@ -65,5 +65,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.GrpcWeb.GrpcWebExtension.Option,
         Curl.Extension.RecordReplay.RecordReplayExtension.RecordOption,
         Curl.Extension.RecordReplay.RecordReplayExtension.ReplayOption,
+        DnsQuery.Client.DnsQueryExtension.TransportOption,
+        DnsQuery.Client.DnsQueryExtension.JsonOption,
     ];
 }

@@ -31,5 +31,6 @@ internal static class ExtensionCatalogue
         OciRegistry.Client.OciRegistryExtension.CreateHandler,
         GoogleCloudStorage.Client.GcsExtension.CreateHandler,
         AzureStorage.Client.AzureStorageExtension.CreateHandler,
+        DnsQuery.Client.DnsQueryExtension.CreateHandler,
     ];
 }

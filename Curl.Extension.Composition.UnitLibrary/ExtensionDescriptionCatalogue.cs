@@ -58,5 +58,6 @@ internal static class ExtensionDescriptionCatalogue
         AzureStorage.Client.AzureStorageExtension.Description,
         Curl.Extension.GrpcWeb.GrpcWebExtension.Description,
         Curl.Extension.RecordReplay.RecordReplayExtension.Description,
+        DnsQuery.Client.DnsQueryExtension.Description,
     ];
 }
