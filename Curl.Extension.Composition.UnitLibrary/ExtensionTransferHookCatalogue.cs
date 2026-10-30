@@ -32,6 +32,7 @@ public static class ExtensionTransferHookCatalogue
         PrivacyPass.Options.PrivacyPassOptions.ActivatedBy,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.HookFor,
         Curl.Extension.ContentDigest.ContentDigestExtension.HookFor,
+        Curl.Extension.StructuredFields.StructuredFieldsExtension.HookFor,
         Curl.Extension.Har.HarExtension.HookFor,
         Curl.Extension.ClientHints.ClientHintsExtension.HookFor,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.HookFor,

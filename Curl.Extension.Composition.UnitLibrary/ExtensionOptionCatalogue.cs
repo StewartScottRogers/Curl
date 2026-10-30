@@ -56,6 +56,7 @@ internal static class ExtensionOptionCatalogue
         OpenApi.OpenApiOptions.Operation,
         OpenApi.OpenApiOptions.Server,
         Curl.Extension.ContentDigest.ContentDigestExtension.Option,
+        Curl.Extension.StructuredFields.StructuredFieldsExtension.Option,
         Curl.Extension.Har.HarExtension.Option,
         Curl.Extension.ClientHints.ClientHintsExtension.Option,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Option,
