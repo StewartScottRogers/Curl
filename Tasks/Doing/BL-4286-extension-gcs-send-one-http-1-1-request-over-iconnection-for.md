@@ -32,3 +32,4 @@ Split from BL-4125 for size, as BL-4199 was split from BL-4124. Copy the shape o
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: ff25c198 1a0f684d 3180db99 3d836d5e.
