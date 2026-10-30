@@ -70,6 +70,30 @@ public sealed class CertificateCheckHooksTests
     }
 
     [TestMethod]
+    public async Task ConnectorOver_WithAHookThatThrowsAndAConnectionDisposingAsynchronously_DisposesItBeforeTheExceptionContinues()
+    {
+        TrackedConnection connection = new(disposesAsynchronously: true);
+        ThrowingHook pinning = new(Dane);
+        CertificateCheckHooks hooks = CertificateCheckHooks.ActivatedBy(ValuesOf(Dane), [values => values.IsGiven(Dane) ? pinning : null]);
+        IConnector checking = hooks.ConnectorOver(new FixedConnector(ConnectResult.Connected(connection, null, peerCertificates: Chain)));
+
+        await Assert.ThrowsExactlyAsync<FormatException>(async () => await checking.ConnectAsync(Target, CancellationToken.None));
+
+        Assert.IsTrue(connection.IsDisposed);
+    }
+
+    [TestMethod]
+    public async Task ConnectorOver_WithAHookRefusingAndAConnectionDisposingAsynchronously_FailsWithExit60AfterDisposingIt()
+    {
+        TrackedConnection connection = new(disposesAsynchronously: true);
+        IConnector checking = HooksOf(new ExampleHook(Dane, "refused")).ConnectorOver(new FixedConnector(ConnectResult.Connected(connection, null, peerCertificates: Chain)));
+
+        ConnectResult result = await checking.ConnectAsync(Target, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.PeerFailedVerification, result.ExitCode);
+        Assert.IsTrue(connection.IsDisposed);
+    }
+    [TestMethod]
     public async Task ConnectorOver_WithHooksLettingTheChainStand_GivesCurlsResultBack()
     {
         ConnectResult accepted = ConnectResult.Connected(new TrackedConnection(), null, peerCertificates: Chain);
@@ -290,7 +314,7 @@ public sealed class CertificateCheckHooksTests
         }
     }
 
-    private sealed class TrackedConnection : IConnection
+    private sealed class TrackedConnection(bool disposesAsynchronously = false) : IConnection
     {
         public bool IsDisposed { get; private set; }
 
@@ -304,10 +328,14 @@ public sealed class CertificateCheckHooksTests
 
         public ValueTask FlushAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
+            if (disposesAsynchronously)
+            {
+                await Task.Yield();
+            }
+
             IsDisposed = true;
-            return ValueTask.CompletedTask;
         }
     }
 }

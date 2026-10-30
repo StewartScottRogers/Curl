@@ -14,19 +14,21 @@ completed:
 
 ## Goal
 
-<!-- One sentence: the observable outcome once this task is done. -->
+CertificateCheckHooks.CheckedAsync is split below complexity 10 and fully covered.
 
 ## Context
 
-<!-- Why this matters, and where to start: requirement IDs, ADRs, projects, files, upstream curl links with the curl version. -->
+Quality gate failure in Curl.Extension.Abstractions.UnitLibrary (see Notes).
 
 ## Acceptance criteria
 
-- [ ] <!-- A statement someone else can check from the repository without asking a question. -->
+- [x] Measure-CodeQuality.ps1 reports Curl.Extension.Abstractions.UnitLibrary at 100% line, 100% branch, no member over complexity 10.
 
 ## Notes
 
 Measured by Measure-CodeQuality.ps1 on 2026-10-30: `CertificateCheckHooks.CheckedAsync` (CertificateCheckHooks.cs:77) is at line 95%, branch 91.67%, cyclomatic complexity 12; line 98 is uncovered. Split the method below complexity 10 and test every branch.
+
+Done: split into CheckedAsync, FirstRefusalOrDisposeAsync and FirstRefusalAsync; the catch no longer awaits, so no uncovered compiler rethrow stub (rethrow is `throw thrown`). Added two tests with an asynchronously disposing connection.
 
 ## Log
 

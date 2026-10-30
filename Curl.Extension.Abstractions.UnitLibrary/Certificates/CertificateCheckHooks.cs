@@ -75,28 +75,57 @@ public sealed class CertificateCheckHooks
     /// <returns><paramref name="result" /> when it failed, was reused, had no TLS or every check let it stand; otherwise exit 60 with the refusal, after its connection is disposed.</returns>
     internal async ValueTask<ConnectResult> CheckedAsync(ConnectResult result, string host, int? port, bool handshook, CancellationToken cancellationToken)
     {
-        if (result.Connection is not { } connection || result.IsReused || (!handshook && result.PeerCertificates.Count == 0))
+        if (result.Connection is not { } connection || IsUnchecked(result, handshook))
         {
             return result;
         }
 
-        try
+        if (await FirstRefusalOrDisposeAsync(result, connection, host, port, cancellationToken).ConfigureAwait(false) is not { } refusal)
         {
-            foreach (ICertificateCheckHook hook in Hooks)
-            {
-                if (await hook.RefusalOfAsync(result.PeerCertificates, host, port, cancellationToken).ConfigureAwait(false) is { } refusal)
-                {
-                    await connection.DisposeAsync().ConfigureAwait(false);
-                    return ConnectResult.Failed(CurlExitCode.PeerFailedVerification, refusal);
-                }
-            }
-        }
-        catch
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            throw;
+            return result;
         }
 
-        return result;
+        await connection.DisposeAsync().ConfigureAwait(false);
+        return ConnectResult.Failed(CurlExitCode.PeerFailedVerification, refusal);
+    }
+
+    private static bool IsUnchecked(ConnectResult result, bool handshook) =>
+        result.IsReused || (!handshook && result.PeerCertificates.Count == 0);
+
+    /// <summary>Runs the checks in order until one refuses, disposing <paramref name="connection" /> when a check throws.</summary>
+    /// <returns>The first refusal, or <see langword="null" /> when every check let the chain stand.</returns>
+    private async ValueTask<string?> FirstRefusalOrDisposeAsync(ConnectResult result, IConnection connection, string host, int? port, CancellationToken cancellationToken)
+    {
+        Exception? thrown = null;
+        string? refusal = null;
+        try
+        {
+            refusal = await FirstRefusalAsync(result.PeerCertificates, host, port, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            thrown = exception;
+        }
+
+        if (thrown is not null)
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw thrown;
+        }
+
+        return refusal;
+    }
+
+    private async ValueTask<string?> FirstRefusalAsync(IReadOnlyList<ReadOnlyMemory<byte>> peerCertificates, string host, int? port, CancellationToken cancellationToken)
+    {
+        foreach (ICertificateCheckHook hook in Hooks)
+        {
+            if (await hook.RefusalOfAsync(peerCertificates, host, port, cancellationToken).ConfigureAwait(false) is { } refusal)
+            {
+                return refusal;
+            }
+        }
+
+        return null;
     }
 }
