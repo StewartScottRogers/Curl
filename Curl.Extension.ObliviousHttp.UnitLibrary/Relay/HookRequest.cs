@@ -32,6 +32,7 @@ internal sealed record HookRequest(string Role, CurlUrl Url, string Method, byte
         using MemoryStream received = new();
         TransferResult result = await next(context
             .WithRequest(request.Url, request.Method, request.Body)
+            .WithoutOwnHeaders()
             .WithRequestHeaders(request.Headers())
             .WithOutputs(received, null, null));
         request.ThrowIfNotAnswered(result);

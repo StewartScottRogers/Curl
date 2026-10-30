@@ -30,6 +30,9 @@ public sealed class ObliviousHttpTransferHookTests
         Assert.AreEqual("POST", relay.Http!.CustomMethod);
         CollectionAssert.Contains(relay.Http.Headers.ToList(), "Content-Type: message/ohttp-req");
         CollectionAssert.Contains(relay.Http.Headers.ToList(), "Accept: message/ohttp-res");
+        CollectionAssert.DoesNotContain(relay.Http.Headers.ToList(), "Accept: text/plain");
+        CollectionAssert.DoesNotContain(keys.Http.Headers.ToList(), "Accept: text/plain");
+        Assert.IsNull(relay.Credentials);
         byte[] expected = BinaryHttpRequestEncoder.EncodeKnownLength(new BinaryHttpRequest("GET", "https", "example.com", "/hello.txt?x=1", [new("Accept", "text/plain")], ReadOnlyMemory<byte>.Empty));
         CollectionAssert.AreEqual(expected, servers.OpenedRequest);
         Assert.AreEqual("hello", Text(context.Output));

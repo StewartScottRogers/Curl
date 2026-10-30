@@ -36,15 +36,17 @@ transfer is unchanged (ADR-0999).
   unsupported key configuration, or a response that does not decode or authenticate 8; a failed relay or key
   transfer keeps its own result.
 
+## The relay and key fetches carry only the headers the hook names
+
+BL-4352: `WithoutOwnHeaders` in `Curl.Extension.Abstractions` clears the transfer's `-H`, `-A`, `-e`, `-b` strings, bearer
+token, SigV4, HTTP signature and `--user` from those two requests, so they travel only inside the encapsulated request
+(RFC 9458 section 2). The `-d` data already did. Stored cookies matching the relay's host are still sent. Decided by
+Claude under Stewart's delegation.
+
 ## Left out, and why
 
 - **Uploads (`-T`), `-I`, `-r`, `-C`, `-z` and `-F`** fail with exit 2 ("--ohttp-relay cannot send ..."): the hook API
   carries these into the relay's POST as well as the inner request, so the relay would see them.
-- **The relay and key fetches carry the transfer's own `-H`, `-A`, `-b` and `--user`**, because the hook API can replace
-  the URL, method and body of a request but not curl's own header options. The hook does replace the body, so the
-  `-d` data travels only inside the encapsulated request. The key fetch is a GET with an empty body. Removing the
-  transfer's own headers from the outer request needs a new hook API in `Curl.Extension.Abstractions`; that is
-  follow-up work.
 - **Informational responses and trailers** in the Binary HTTP response are decoded but not written; `-f` applies to
   the relay's answer, not the inner response.
 - **Chunked Oblivious HTTP** (the later chunked-ohttp draft) is not an RFC and is not implemented.

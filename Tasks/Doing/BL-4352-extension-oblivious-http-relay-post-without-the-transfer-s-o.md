@@ -22,12 +22,14 @@ ADR-1149 left this out: TransferContextRequests.WithRequest (BL-4303) replaces t
 
 ## Acceptance criteria
 
-- [ ] Curl.Extension.Abstractions gives a hook a request with no -H, -A, -e, -b or --user of the transfer's, with unit tests.
-- [ ] HookRequest.SendAsync uses it, and an ObliviousHttpTransferHookTests test shows a -H line reaching only the encapsulated request.
-- [ ] ADR-1149's Left out section no longer lists it.
-- [ ] The changed libraries meet the four quality gates by Measure-CodeQuality.ps1, dotnet build is clean and the fast tests pass.
+- [x] Curl.Extension.Abstractions gives a hook a request with no -H, -A, -e, -b or --user of the transfer's, with unit tests.
+- [x] HookRequest.SendAsync uses it, and an ObliviousHttpTransferHookTests test shows a -H line reaching only the encapsulated request.
+- [x] ADR-1149's Left out section no longer lists it.
+- [x] The changed libraries meet the four quality gates by Measure-CodeQuality.ps1, dotnet build is clean and the fast tests pass.
 
 ## Notes
+
+- Relay and key fetches use `WithoutOwnHeaders` (also clears `-b` strings via SendsCookieStrings=false; stored cookies matching the relay host still go). The ADR is ADR-1157 (the task named ADR-1149 in error); its Left out entry is replaced. Quality run: 0 failing members.
 
 ## Log
 

@@ -75,6 +75,61 @@ public sealed class TransferContextRequestsTests
     }
 
     [TestMethod]
+    public void WithoutOwnHeaders_HttpTransfer_ClearsHeadersAndCredentialsButKeepsMethodAndProxyHeaders()
+    {
+        TransferContext own = new()
+        {
+            Url = CurlUrl.Parse("http://example.com/"),
+            Output = new MemoryStream(),
+            Credentials = new System.Net.NetworkCredential("u", "p"),
+            Http = new HttpRequestOptions
+            {
+                Headers = ["X-Own: 1"],
+                ProxyHeaders = ["X-Proxy: 1"],
+                CustomMethod = "PUT",
+                UserAgent = "ua",
+                Referer = "http://r/",
+                AutoReferer = true,
+                BearerToken = "t",
+                AwsSigV4 = "aws:amz",
+            },
+        };
+
+        ITransferContext given = own.WithoutOwnHeaders();
+
+        Assert.IsNull(given.Credentials);
+        Assert.IsEmpty(given.Http!.Headers);
+        CollectionAssert.AreEqual(new[] { "X-Proxy: 1" }, given.Http.ProxyHeaders.ToArray());
+        Assert.AreEqual("PUT", given.Http.CustomMethod);
+        Assert.IsNull(given.Http.UserAgent);
+        Assert.IsNull(given.Http.Referer);
+        Assert.IsFalse(given.Http.AutoReferer);
+        Assert.IsFalse(given.Http.SendsCookieStrings);
+        Assert.IsNull(given.Http.BearerToken);
+        Assert.IsNull(given.Http.AwsSigV4);
+        Assert.IsNull(given.Http.HttpSignature);
+        Assert.IsNotNull(own.Credentials);
+        Assert.HasCount(1, own.Http.Headers);
+    }
+
+    [TestMethod]
+    public void WithoutOwnHeaders_TransferThatIsNotHttp_HasNoHttpOptionsAndNoCredentials()
+    {
+        TransferContext own = new() { Url = CurlUrl.Parse("ftp://example.com/"), Output = new MemoryStream(), Credentials = new System.Net.NetworkCredential("u", "p") };
+
+        ITransferContext given = own.WithoutOwnHeaders();
+
+        Assert.IsNull(given.Http);
+        Assert.IsNull(given.Credentials);
+    }
+
+    [TestMethod]
+    public void WithoutOwnHeaders_WithoutAContext_Throws()
+    {
+        Assert.ThrowsExactly<ArgumentNullException>(() => TransferContextRequests.WithoutOwnHeaders(null!));
+    }
+
+    [TestMethod]
     public void WithRequest_EveryOtherMember_IsTheTransfersOwn()
     {
         TransferContext context = new() { Url = CurlUrl.Parse("http://example.com/"), Output = new MemoryStream(), HeaderOutput = new MemoryStream(), DumpHeaderOutput = new MemoryStream() };
