@@ -4,7 +4,7 @@ title: CompressionDictionary extension: hand-built Brotli decoder with a prefix 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4299]
+depends-on: [BL-4302]
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/Brotli, Curl.Extension.CompressionDictionary.UnitTests/Brotli]
 requirement: none
 created: 2026-10-29

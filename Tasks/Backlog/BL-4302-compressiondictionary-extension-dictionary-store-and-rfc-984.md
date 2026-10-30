@@ -1,5 +1,5 @@
 ---
-id: BL-4299
+id: BL-4302
 title: CompressionDictionary extension: dictionary store and RFC 9842 header and framing wire format
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4299 — CompressionDictionary extension: dictionary store and RFC 9842 header and framing wire format
+# BL-4302 — CompressionDictionary extension: dictionary store and RFC 9842 header and framing wire format
 
 ## Goal
 

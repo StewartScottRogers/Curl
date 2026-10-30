@@ -4,7 +4,7 @@ title: CompressionDictionary extension: hand-built Zstandard decoder with a raw 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4299]
+depends-on: [BL-4302]
 touches: [Curl.Extension.CompressionDictionary.UnitLibrary/Zstd, Curl.Extension.CompressionDictionary.UnitTests/Zstd]
 requirement: none
 created: 2026-10-29
