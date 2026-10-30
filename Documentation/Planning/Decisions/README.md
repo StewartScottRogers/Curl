@@ -1210,3 +1210,4 @@ Each option and the specific reason it lost.
 | [1161](ADR-1161-wireguard-extension-resolves-host-names-by-dns-over-tcp-through-the-tunnel.md) | The WireGuard extension resolves host names by DNS over TCP through the tunnel (BL-4354) | Accepted | 2026-10-30 |
 | [1162](ADR-1162-ssh-unit-tests-import-each-moving-namespace-once-in-a-global-using-file.md) | The SSH unit tests import each moving namespace once, in a global using file of its own (BL-4367) | Accepted | 2026-10-30 |
 | [1163](ADR-1163-wireguard-extension-carries-udp-and-quic-through-the-tunnel.md) | The WireGuard extension carries UDP, and so QUIC, through the tunnel (BL-4355) | Accepted | 2026-10-30 |
+| [1149](ADR-1149-webdav-tools-list-and-sync-a-collection-through-curls-http-stack.md) | --webdav-list and --webdav-sync list and sync a WebDAV collection through curl's HTTP stack (BL-4131) | Accepted | 2026-10-30 |

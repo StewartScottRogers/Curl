@@ -8,7 +8,7 @@ depends-on: [BL-4091, BL-4093, BL-4094, BL-4303, BL-4304, BL-4305]
 touches: [Curl.Extension.WebDavTools.UnitLibrary, Curl.Extension.WebDavTools.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4373 — Extension: Land the WebDavTools list and sync code (build and fast tests)
 
@@ -22,11 +22,11 @@ Split from BL-4131, whose code was finished but not committed when the shift dea
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.WebDavTools.UnitLibrary` and `Curl.Extension.WebDavTools.UnitTests` exist in `/Extensions/WebDavTools/` in `Curl.slnx`, registered in the option, transfer-hook and description catalogues, and `VerifyExtensionIsolation` passes.
-- [ ] ADR-1149 exists, is marked "Decided by Claude under Stewart's delegation", and has its row in `Documentation/Planning/Decisions/README.md`.
-- [ ] `dotnet build` is clean.
-- [ ] The fast tests pass, including the WebDavTools tests (about 99) and the `CURL_EXTENSIONS=0` test that refuses `--webdav-list` with exit 2.
-- [ ] The work is committed.
+- [x] `Curl.Extension.WebDavTools.UnitLibrary` and `Curl.Extension.WebDavTools.UnitTests` exist in `/Extensions/WebDavTools/` in `Curl.slnx`, registered in the option, transfer-hook and description catalogues, and `VerifyExtensionIsolation` passes.
+- [x] ADR-1149 exists, is marked "Decided by Claude under Stewart's delegation", and has its row in `Documentation/Planning/Decisions/README.md`.
+- [x] `dotnet build` is clean.
+- [x] The fast tests pass, including the WebDavTools tests (about 99) and the `CURL_EXTENSIONS=0` test that refuses `--webdav-list` with exit 2.
+- [x] The work is committed.
 
 ## Notes
 
@@ -38,3 +38,4 @@ Run no `Measure-CodeQuality.ps1` here: it took 64 minutes for Composition. BL-43
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: e93d9b26 81e106cc 42b24d12 a7e7b52e 1d40d7f1.
+- 2026-10-30: Doing -> Done. Library builds clean; WebDavTools (99), Composition and Console fast tests green.

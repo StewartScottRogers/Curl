@@ -28,6 +28,8 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.HttpCache.HttpCacheExtension.Option,
         Curl.Extension.SegmentedDownload.SegmentedDownloadExtension.Option,
         Curl.Extension.ResumableUpload.ResumableUploadExtension.Option,
+        Curl.Extension.WebDavTools.WebDavToolsExtension.ListOption,
+        Curl.Extension.WebDavTools.WebDavToolsExtension.SyncOption,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.Option,
         Curl.Extension.DeltaDownload.DeltaDownloadExtension.SeedOption,
         Curl.Extension.Checksum.ChecksumExtension.Option,

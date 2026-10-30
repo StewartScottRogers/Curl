@@ -1,8 +1,23 @@
 # Curl.Extension.WebDavTools.UnitLibrary
 
-The WebDAV tools extension (ADR-0999): listing a WebDAV collection with `PROPFIND`. Namespace
-`Curl.Extension.WebDavTools`. It references only the base class library. The options, the catalogue
-registration and the ADR arrive in BL-4131.
+The WebDAV tools extension (ADR-0999, ADR-1149): `--webdav-list` lists a WebDAV collection from a
+`PROPFIND`, and `--webdav-sync <dir>` downloads a collection tree into a local folder. Namespace
+`Curl.Extension.WebDavTools`. It references only `Curl.Extension.Abstractions.UnitLibrary`.
+
+- `WebDavToolsExtension` declares the two options and the description, and `HookFor` gives the hook for
+  an option group: the listing hook, the sync hook, or `Transfer/RefusedWebDavTransferHook` (exit 2) for
+  both options together or an empty folder. `Curl.Extension.Composition` registers them in its option,
+  description and transfer hook catalogues; `ExtensionCatalogue.cs` has no line, as there is no scheme.
+- `Transfer/WebDavCollectionListing` sends a `Depth: 1` `PROPFIND` through curl's handler
+  (`WithRequest`, `WithRequestHeaders`) and reads the 207 body: exit 1 for a transfer that is not HTTP,
+  22 for an answer that is not 207, 8 for a body the reader refuses, and a failed transfer's own result.
+- `Transfer/WebDavListTransferHook` writes one tab-separated line per `response`: `collection` or `file`,
+  length, last modified (RFC 1123), href; `-` for a property not reported.
+- `Transfer/WebDavSyncTransferHook` plans each listing with `Sync/WebDavSyncPlanner`, downloads each file
+  that is not current with `GET` into a `.webdav-part` file renamed over the local copy on a 2xx, sets its
+  last-write time to `getlastmodified`, then syncs each sub-collection into its own folder. It writes
+  `refused`, `current` and `downloaded` lines; a non-2xx `GET` fails with exit 22, a folder it cannot
+  write with exit 23, and the first failure ends the sync.
 
 - `Propfind/WebDavPropfindRequest` gives the `PROPFIND` method, the request body (a `DAV:propfind`
   whose `prop` names `resourcetype`, `getcontentlength`, `getlastmodified` and `getetag`), its media
