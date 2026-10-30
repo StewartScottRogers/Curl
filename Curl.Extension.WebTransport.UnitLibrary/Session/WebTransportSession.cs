@@ -8,7 +8,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.WebTransport.Session;
 
 /// <summary>
-/// One WebTransport session over an HTTP/3 connection (draft-ietf-webtrans-http3-16, ADR-1077): waits
+/// One WebTransport session over an HTTP/3 connection (draft-ietf-webtrans-http3-16, ADR-1089): waits
 /// for the server's SETTINGS (section 3.1), opens the session with an extended CONNECT (section 3.2),
 /// sends the data on a stream or in a datagram (sections 4.2, 4.3 and 4.5), writes the server's answer
 /// to the output, and closes the session with <c>WT_CLOSE_SESSION</c> (section 6).

@@ -4,7 +4,7 @@ using Curl.HttpDatagram;
 namespace Curl.Extension.WebTransport.Wire;
 
 /// <summary>
-/// The codepoints of WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16, ADR-1077) and the
+/// The codepoints of WebTransport over HTTP/3 (draft-ietf-webtrans-http3-16, ADR-1089) and the
 /// stream headers it puts in front of a session's stream data.
 /// </summary>
 internal static class WebTransportWire

@@ -1,4 +1,4 @@
-# ADR-1077: WebTransport opens one session over HTTP/3 and carries the data by the wt query field
+# ADR-1089: WebTransport opens one session over HTTP/3 and carries the data by the wt query field
 
 - Status: Accepted
 - Date: 2026-10-29

@@ -5,7 +5,7 @@ using Curl.Tls;
 namespace Curl.Extension.WebTransport.Session;
 
 /// <summary>
-/// Dials the QUIC connection a WebTransport session runs on (ADR-1077): ALPN <c>h3</c> and a non-zero
+/// Dials the QUIC connection a WebTransport session runs on (ADR-1089): ALPN <c>h3</c> and a non-zero
 /// <c>max_datagram_frame_size</c> (draft-ietf-webtrans-http3-16 section 3.1, RFC 9221 section 3), with
 /// curl's other transport parameters.
 /// </summary>

@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.WebTransport;
 
-/// <summary>The <c>webtransport://</c> extension's description and handler factory (ADR-1077).</summary>
+/// <summary>The <c>webtransport://</c> extension's description and handler factory (ADR-1089).</summary>
 public static class WebTransportExtension
 {
     /// <summary>Gets what <c>curl --extensions</c> and <c>curl --ai-help extensions</c> say of it.</summary>

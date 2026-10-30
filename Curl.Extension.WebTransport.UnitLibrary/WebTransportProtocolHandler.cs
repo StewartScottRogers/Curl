@@ -6,7 +6,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.WebTransport;
 
 /// <summary>
-/// Serves <c>webtransport://host[:port]/path[?query]</c> (ADR-1077): dials HTTP/3 over QUIC, opens a
+/// Serves <c>webtransport://host[:port]/path[?query]</c> (ADR-1089): dials HTTP/3 over QUIC, opens a
 /// WebTransport session at <c>https://host[:port]/path</c>, sends the <c>-d</c> data on a bidirectional
 /// stream (the default, <c>wt=bidi</c>), a unidirectional stream (<c>wt=uni</c>) or in a datagram
 /// (<c>wt=datagram</c>), and writes the server's answer.

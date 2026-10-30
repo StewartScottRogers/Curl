@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.WebTransport.Session;
 
 /// <summary>
-/// What one <c>webtransport://host[:port]/path[?query]</c> transfer does (ADR-1077): the CONNECT's
+/// What one <c>webtransport://host[:port]/path[?query]</c> transfer does (ADR-1089): the CONNECT's
 /// <c>:authority</c> and <c>:path</c>, how the data travels (the query field <c>wt=bidi</c>, the default,
 /// <c>wt=uni</c> or <c>wt=datagram</c>, which is not sent to the server) and the data itself.
 /// </summary>

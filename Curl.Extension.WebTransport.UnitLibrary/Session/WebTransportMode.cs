@@ -1,6 +1,6 @@
 namespace Curl.Extension.WebTransport.Session;
 
-/// <summary>How a <c>webtransport://</c> transfer carries its data (ADR-1077).</summary>
+/// <summary>How a <c>webtransport://</c> transfer carries its data (ADR-1089).</summary>
 internal enum WebTransportMode
 {
     /// <summary>On a client bidirectional stream; the server's answer on the same stream is the output (section 4.3).</summary>

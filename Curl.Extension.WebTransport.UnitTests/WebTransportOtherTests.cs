@@ -88,7 +88,7 @@ public sealed class WebTransportWireTests
         Assert.ThrowsExactly<ArgumentException>(() => new WebTransportCloseSession(0, new string('x', 1025)).ToCapsuleBytes());
 }
 
-/// <summary>Checks how <see cref="WebTransportRequest" /> reads a <c>webtransport://</c> URL (ADR-1077).</summary>
+/// <summary>Checks how <see cref="WebTransportRequest" /> reads a <c>webtransport://</c> URL (ADR-1089).</summary>
 [TestClass]
 public sealed class WebTransportRequestTests
 {
