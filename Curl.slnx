@@ -317,6 +317,7 @@
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
   <Folder Name="/Extensions/Masque/"><Project Path="Curl.Extension.Masque.UnitLibrary/Curl.Extension.Masque.UnitLibrary.csproj" /><Project Path="Curl.Extension.Masque.UnitTests/Curl.Extension.Masque.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WireGuard/"><Project Path="Curl.Extension.WireGuard.UnitLibrary/Curl.Extension.WireGuard.UnitLibrary.csproj" /><Project Path="Curl.Extension.WireGuard.UnitTests/Curl.Extension.WireGuard.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/VirtualMachineSocket/"><Project Path="Curl.Extension.VirtualMachineSocket.UnitLibrary/Curl.Extension.VirtualMachineSocket.UnitLibrary.csproj" /><Project Path="Curl.Extension.VirtualMachineSocket.UnitTests/Curl.Extension.VirtualMachineSocket.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/ClientHints/"><Project Path="Curl.Extension.ClientHints.UnitLibrary/Curl.Extension.ClientHints.UnitLibrary.csproj" /><Project Path="Curl.Extension.ClientHints.UnitTests/Curl.Extension.ClientHints.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/ObliviousHttp/"><Project Path="Curl.Extension.ObliviousHttp.UnitLibrary/Curl.Extension.ObliviousHttp.UnitLibrary.csproj" /><Project Path="Curl.Extension.ObliviousHttp.UnitTests/Curl.Extension.ObliviousHttp.UnitTests.csproj" /></Folder>
