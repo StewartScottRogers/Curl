@@ -4,7 +4,7 @@ title: MASQUE extension client flow: CONNECT-UDP and CONNECT-IP datagram connect
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4316]
+depends-on: [BL-4319]
 touches: [Curl.Extension.Masque.UnitLibrary/Tunnel, Curl.Extension.Masque.UnitTests/Tunnel]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ The MASQUE extension has an `IDatagramConnector` that opens a CONNECT-UDP or CON
 
 ## Context
 
-Second of BL-4144's split, on BL-4316's wire format. `OpenAsync(host, port)` connects to the proxy the URI template names through the `IConnector` the hook is given (TLS for an `https` template), sends BL-4316's upgrade request, and on `101` returns a channel: CONNECT-UDP carries each datagram as one DATAGRAM capsule with context ID 0 (RFC 9298 section 5); CONNECT-IP sends ADDRESS_REQUEST, waits for ADDRESS_ASSIGN, and wraps each datagram in an IP and UDP packet from the assigned address to the target (RFC 9484 sections 4.7 and 6). See `Curl.Networking`'s `CapsuleDatagramChannel` (ADR-0726) for how curl's own `-x` tunnel behaves, without referencing it. Failures map to curl exit codes: a proxy that cannot be reached keeps the connector's code, a refused upgrade is exit 7 with the status, a tunnel the proxy closes fails receive as a reset socket.
+Second of BL-4144's split, on BL-4319's wire format. `OpenAsync(host, port)` connects to the proxy the URI template names through the `IConnector` the hook is given (TLS for an `https` template), sends BL-4319's upgrade request, and on `101` returns a channel: CONNECT-UDP carries each datagram as one DATAGRAM capsule with context ID 0 (RFC 9298 section 5); CONNECT-IP sends ADDRESS_REQUEST, waits for ADDRESS_ASSIGN, and wraps each datagram in an IP and UDP packet from the assigned address to the target (RFC 9484 sections 4.7 and 6). See `Curl.Networking`'s `CapsuleDatagramChannel` (ADR-0726) for how curl's own `-x` tunnel behaves, without referencing it. Failures map to curl exit codes: a proxy that cannot be reached keeps the connector's code, a refused upgrade is exit 7 with the status, a tunnel the proxy closes fails receive as a reset socket.
 
 ## Acceptance criteria
 

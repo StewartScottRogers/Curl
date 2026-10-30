@@ -1,5 +1,5 @@
 ---
-id: BL-4315
+id: BL-4318
 title: Let QUIC dial through an extension connection hook's datagram connector
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4315 — Let QUIC dial through an extension connection hook's datagram connector
+# BL-4318 — Let QUIC dial through an extension connection hook's datagram connector
 
 ## Goal
 

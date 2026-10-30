@@ -1,5 +1,5 @@
 ---
-id: BL-4316
+id: BL-4319
 title: MASQUE extension wire format: URI templates, upgrade requests, CONNECT-IP capsules and IP packets
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4316 — MASQUE extension wire format: URI templates, upgrade requests, CONNECT-IP capsules and IP packets
+# BL-4319 — MASQUE extension wire format: URI templates, upgrade requests, CONNECT-IP capsules and IP packets
 
 ## Goal
 
