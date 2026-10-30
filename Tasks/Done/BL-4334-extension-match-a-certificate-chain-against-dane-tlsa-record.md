@@ -30,7 +30,7 @@ Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333'
 ## Notes
 
 - Filed by BL-4151's run on 2026-10-29 when it split that task for size. Document the folder in XML comments; BL-4151 adds it to the library's CLAUDE.md.
-- Done directly rather than through the /feature agents: one small static matcher in one folder (default chosen to save cost). Decisions in ADR-1126: EE usages match the first certificate, TA usages any later one, as OpenSSL does; an empty set is NoUsableRecords too; no name, expiry or signature checks (PKIX already ran, ADR-1016).
+- Done directly rather than through the /feature agents: one small static matcher in one folder (default chosen to save cost). Decisions in ADR-1128: EE usages match the first certificate, TA usages any later one, as OpenSSL does; an empty set is NoUsableRecords too; no name, expiry or signature checks (PKIX already ran, ADR-1016).
 - Measured: Measure-CodeQuality.ps1 -Library Curl.Extension.Dane.UnitLibrary gives 100% line and branch, 54 members, 0 failing, worst CRAP 10. Dane unit tests 48 passed; full fast run has no failure. Tests use generated ECDSA certificates only, no paths or OS text, so they are platform-neutral.
 
 ## Log

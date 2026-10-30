@@ -1,4 +1,4 @@
-# ADR-1126: The DANE TLSA matcher compares records with the chain as the server sent it
+# ADR-1128: The DANE TLSA matcher compares records with the chain as the server sent it
 
 - Status: Accepted
 - Date: 2026-10-29
