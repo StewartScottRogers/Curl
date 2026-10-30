@@ -1167,3 +1167,4 @@ Each option and the specific reason it lost.
 | [1120](ADR-1120-protobuf-json-mapping-reads-through-jsondocument-and-returns-a-typed-error.md) | The Protocol Buffers JSON mapping reads through JsonDocument and returns a typed error (BL-4166) | Accepted | 2026-10-29 |
 | [1121](ADR-1121-wireguard-user-space-tcp-client-keeps-only-what-one-client-connection-needs.md) | The WireGuard extension's user-space TCP client keeps only what one client connection needs (BL-4324) | Accepted | 2026-10-29 |
 | [1122](ADR-1122-masque-client-flow-opens-datagram-channels-through-curls-connector.md) | The MASQUE client flow opens datagram channels through curl's connector (BL-4317) | Accepted | 2026-10-29 |
+| [1120](ADR-1120-dane-wire-codec-sends-edns0-do-and-decodes-without-throwing.md) | The Dane extension's wire codec sends EDNS0 with DO and decodes without throwing (BL-4333) | Accepted | 2026-10-29 |
