@@ -36,3 +36,4 @@ Part 1 of BL-4328 (SSH transport layer into a shared library so extensions such 
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: e09ab28e 112a1330 10174c6c e35aff77 3d836d5e.
