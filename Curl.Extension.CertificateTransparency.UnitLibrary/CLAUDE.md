@@ -1,6 +1,6 @@
 # Curl.Extension.CertificateTransparency.UnitLibrary
 
-The Certificate Transparency extension (ADR-0999, ADR-1119), tested against RFC 6962 and RFC 9162. Namespace
+The Certificate Transparency extension (ADR-0999, ADR-1129), tested against RFC 6962 and RFC 9162. Namespace
 `Curl.Extension.CertificateTransparency`. It references only `Curl.Extension.Abstractions.UnitLibrary` and the shared
 layers it brings.
 

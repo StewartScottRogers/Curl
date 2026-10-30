@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Description;
 namespace Curl.Extension.CertificateTransparency;
 
 /// <summary>
-/// The <c>--require-sct &lt;log list&gt;</c> extension (ADR-1119): Certificate Transparency (RFC 6962, RFC 9162). After curl
+/// The <c>--require-sct &lt;log list&gt;</c> extension (ADR-1129): Certificate Transparency (RFC 6962, RFC 9162). After curl
 /// verified a server's chain, it refuses the connection with exit 60 unless the server's certificate carries an embedded
 /// SCT from a log in the given log list that verifies. <c>Curl.Extension.Composition</c> registers its option, description
 /// and certificate check hook.

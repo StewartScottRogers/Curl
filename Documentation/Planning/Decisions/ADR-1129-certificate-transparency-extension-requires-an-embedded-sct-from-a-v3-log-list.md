@@ -1,4 +1,4 @@
-# ADR-1119 — The Certificate Transparency extension requires an embedded SCT from a log in a v3 log list
+# ADR-1129 — The Certificate Transparency extension requires an embedded SCT from a log in a v3 log list
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

@@ -6,7 +6,7 @@ namespace Curl.Extension.CertificateTransparency;
 
 /// <summary>
 /// Refuses a chain curl accepted unless the server's certificate carries a valid SCT from a log in the
-/// <c>--require-sct</c> log list (ADR-1119). The list is read for each new TLS connection.
+/// <c>--require-sct</c> log list (ADR-1129). The list is read for each new TLS connection.
 /// </summary>
 /// <param name="logListPath">The log list file <c>--require-sct</c> named.</param>
 /// <param name="readFile">Reads a whole file.</param>
