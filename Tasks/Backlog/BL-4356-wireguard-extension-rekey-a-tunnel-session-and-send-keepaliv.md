@@ -4,7 +4,7 @@ title: WireGuard extension: rekey a tunnel session and send keepalives during a 
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4147, BL-4354, BL-4355]
+depends-on: [BL-4147, BL-4354, BL-4371, BL-4372]
 touches: [Curl.Extension.WireGuard.UnitLibrary/Tunnel, Curl.Extension.WireGuard.UnitTests/Tunnel]
 requirement: none
 created: 2026-10-30
