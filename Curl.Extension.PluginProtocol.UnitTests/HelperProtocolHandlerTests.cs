@@ -3,7 +3,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.PluginProtocol;
 
 /// <summary>
-/// Checks the conversation with a helper against the protocol of ADR-1129, git's remote-helper model
+/// Checks the conversation with a helper against the protocol of ADR-1142, git's remote-helper model
 /// (gitremote-helpers) adapted, with recorded helper output and no process.
 /// </summary>
 [TestClass]

@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.PluginProtocol;
 
 /// <summary>
-/// The helper program extension's description and handler factory (ADR-1129): a URL whose scheme no handler
+/// The helper program extension's description and handler factory (ADR-1142): a URL whose scheme no handler
 /// serves runs through a program named <c>curl-proto-&lt;scheme&gt;</c> on <c>PATH</c>.
 /// </summary>
 public static class PluginProtocolExtension

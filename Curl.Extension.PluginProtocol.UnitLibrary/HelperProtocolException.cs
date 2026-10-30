@@ -2,7 +2,7 @@ using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.PluginProtocol;
 
-/// <summary>A helper broke the protocol of ADR-1129 or reported a failure; carries the exit code Curl reports.</summary>
+/// <summary>A helper broke the protocol of ADR-1142 or reported a failure; carries the exit code Curl reports.</summary>
 /// <param name="exitCode">The exit code Curl reports.</param>
 /// <param name="message">What went wrong.</param>
 /// <param name="bytesTransferred">The body bytes written before it went wrong.</param>

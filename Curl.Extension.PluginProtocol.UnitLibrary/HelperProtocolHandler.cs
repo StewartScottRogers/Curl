@@ -4,7 +4,7 @@ namespace Curl.Extension.PluginProtocol;
 
 /// <summary>
 /// Serves each scheme a <c>curl-proto-&lt;scheme&gt;</c> program was found for by running that program and talking
-/// to it over its standard input and output (ADR-1129).
+/// to it over its standard input and output (ADR-1142).
 /// </summary>
 /// <param name="programs">The helper programs' paths by lowercase scheme.</param>
 /// <param name="starter">Starts a helper.</param>

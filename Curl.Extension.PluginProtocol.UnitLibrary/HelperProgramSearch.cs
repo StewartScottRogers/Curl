@@ -2,7 +2,7 @@ namespace Curl.Extension.PluginProtocol;
 
 /// <summary>
 /// Finds the <c>curl-proto-&lt;scheme&gt;</c> programs in the <c>PATH</c> directories, as a shell finds a command
-/// (ADR-1129): the first directory holding a scheme's program wins, and on Windows a program's extension must be one
+/// (ADR-1142): the first directory holding a scheme's program wins, and on Windows a program's extension must be one
 /// of <c>PATHEXT</c>'s.
 /// </summary>
 /// <param name="path">The <c>PATH</c> variable, or <see langword="null" /> when it is not set.</param>

@@ -4,7 +4,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.PluginProtocol;
 
 /// <summary>
-/// One transfer's conversation with a helper, git's remote-helper model adapted (ADR-1129): Curl sends
+/// One transfer's conversation with a helper, git's remote-helper model adapted (ADR-1142): Curl sends
 /// <c>capabilities</c> and reads the helper's capability lines up to an empty one ("Capabilities"), then sends
 /// <c>get &lt;url&gt;</c>, or <c>put &lt;url&gt;</c> followed by the upload, and closes the helper's input
 /// ("Commands"); the helper answers <c>ok</c> and the body up to the end of its output, or <c>error &lt;message&gt;</c>.

@@ -1,8 +1,8 @@
 # Curl.Extension.PluginProtocol.UnitLibrary
 
-The helper program extension (ADR-0999, ADR-1129): a URL whose scheme neither curl nor another extension serves
+The helper program extension (ADR-0999, ADR-1142): a URL whose scheme neither curl nor another extension serves
 runs through a program named `curl-proto-<scheme>` on `PATH`, git's remote-helper model adapted. Namespace
-`Curl.Extension.PluginProtocol`. Tested against gitremote-helpers and ADR-1129, not against curl.
+`Curl.Extension.PluginProtocol`. Tested against gitremote-helpers and ADR-1142, not against curl.
 
 - `PluginProtocolExtension` holds the `ExtensionDescription`, `CurlSchemes` (the schemes a helper never takes) and
   `CreateHandler`, which `Curl.Extension.Composition`'s `ExtensionCatalogue` calls with the other extensions' schemes.

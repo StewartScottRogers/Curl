@@ -36,7 +36,7 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 - 2026-10-29 (lane 2): Done directly rather than through the `/feature` subagent stages, to stay inside the
-  run's cost cap; the design is ADR-1129. The handler's schemes are the `curl-proto-*` programs found on PATH
+  run's cost cap; the design is ADR-1142. The handler's schemes are the `curl-proto-*` programs found on PATH
   at start-up, minus curl's own schemes (`PluginProtocolExtension.CurlSchemes`) and every scheme another
   extension's description lists, so a helper can never clash with or override a handler. The catalogue line
   passes `ExtensionDescriptionCatalogue`'s schemes in, so no other Composition file changed.
@@ -56,4 +56,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 33082493 a435a8fc a8348ce6 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-30: Doing -> Done. URLs whose scheme has a curl-proto-<scheme> program on PATH run through that helper (ADR-1129); without one, or with CURL_EXTENSIONS=0, curl's unsupported-scheme error
+- 2026-10-30: Doing -> Done. URLs whose scheme has a curl-proto-<scheme> program on PATH run through that helper (ADR-1142); without one, or with CURL_EXTENSIONS=0, curl's unsupported-scheme error
