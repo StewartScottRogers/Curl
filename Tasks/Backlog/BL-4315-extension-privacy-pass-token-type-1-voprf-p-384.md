@@ -1,20 +1,20 @@
 ---
-id: BL-4309
-title: Extension: Privacy Pass issuer directory discovery (RFC 9578 section 4)
+id: BL-4315
+title: Extension: Privacy Pass token type 1 (VOPRF P-384)
 priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4138]
-touches: [Curl.Extension.PrivacyPass.UnitLibrary/Options, Curl.Extension.PrivacyPass.UnitTests/Options]
+touches: [Curl.Extension.PrivacyPass.UnitLibrary/Tokens, Curl.Extension.PrivacyPass.UnitTests/Tokens]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4309 — Extension: Privacy Pass issuer directory discovery (RFC 9578 section 4)
+# BL-4315 — Extension: Privacy Pass token type 1 (VOPRF P-384)
 
 ## Goal
 
-`--privacy-pass` can be given the issuer origin and finds the issuer request URL and token keys from its issuer directory (RFC 9578 §4, `/.well-known/private-token-issuer-directory`). See ADR-1095.
+`--privacy-pass` also answers a PrivateToken challenge of token type 0x0001 (privately verifiable, VOPRF(P-384, SHA-384), RFC 9578 §5, RFC 9497), with P-384 and hash-to-curve built by hand in the extension. See ADR-1095.
 
 <!-- One sentence: the observable outcome once this task is done. -->
 

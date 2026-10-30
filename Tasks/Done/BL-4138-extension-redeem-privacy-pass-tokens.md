@@ -38,7 +38,7 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - Plan (ADR-1095): `--privacy-pass <issuer request URL>` is a transfer hook like OAuth2. A 401 with a `PrivateToken` challenge of type 2 is answered by RFC 9578 §6 Blind RSA issuance (RFC 9474 blinding, hand-written on BigInteger) and the transfer is sent again with `Authorization: PrivateToken`. The HTTP client is copied from the OCI extension, since extensions never reference each other.
 - Registration: the extension adds an option and no scheme handler, so its one line each goes in ExtensionOptionCatalogue, ExtensionDescriptionCatalogue and ExtensionTransferHookCatalogue (shared list files, added to touches), not in ExtensionCatalogue (which holds only handler factories), as with OAuth2. The build (VerifyExtensionIsolation) is clean.
 - Checked: `curl --extensions` and `--ai-help extensions` list privacy-pass; `CURL_EXTENSIONS=0 curl --privacy-pass ...` exits 2. The quality report has 100% line and branch coverage and no member failing. The solution build is clean and the fast tests are green. The tests are platform-neutral (no paths, OS text or certificates), so they meet the Linux and macOS criterion.
-- Filed BL-4308 (token type 1, VOPRF P-384) and BL-4309 (issuer directory discovery).
+- Filed BL-4315 (token type 1, VOPRF P-384) and BL-4316 (issuer directory discovery).
 
 ## Log
 
