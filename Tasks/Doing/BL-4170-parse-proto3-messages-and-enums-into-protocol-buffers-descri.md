@@ -103,3 +103,4 @@ First of three parts split from BL-4165 (itself split from BL-4099) because the 
 - 2026-10-29: Doing -> Backlog. Run budget spent after the parser and descriptors (uncommitted for the shift's stash, builds clean); unit tests, quality run and commit remain, recorded under Notes
 - 2026-10-29: Backlog -> Blocked. Stewart: dark factory cost cap: its runs of the last day already cost 1.39 of its 3.13 US dollar cost cap, so it was not run again; split the task; the automatic split failed: the push of the split was refused
 - 2026-10-29: Blocked -> Backlog. Cost cap window passed: its runs of the last 24 hours now leave 1 US dollar or more of its cost cap, so the cost cap allows a fresh run
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 690e3591 ee2341fd 7ae6d7ff 3d836d5e.
