@@ -17,7 +17,8 @@ extension is tested against the RFCs, not against curl.
   transfer hook (ADR-1007, ADR-1039) like the OAuth 2.0 extension. Without it no hook exists and every transfer is
   unchanged; with `CURL_EXTENSIONS=0` the option is not offered, so curl refuses it as an unknown option (exit 2).
 - The hook runs the transfer with its outputs held back. When the answer is a 401 whose `WWW-Authenticate` carries a
-  `PrivateToken` challenge (RFC 9577 §2.1.1) of token type `0x0002`, the held-back 401 is dropped, a token is issued
+  `PrivateToken` challenge (RFC 9577 §2.1.1) of token type `0x0001` or `0x0002` (the first such challenge, in field
+  order; any other type is passed over), the held-back 401 is dropped, a token is issued
   and the transfer runs again with `Authorization: PrivateToken token="..."` (RFC 9577 §2.2.1). Any other first
   response is written out as received.
 - Issuance follows RFC 9578 §6 (Blind RSA, 2048-bit): token input = type, a 32-byte random nonce, SHA-256 of the
@@ -37,5 +38,8 @@ extension is tested against the RFCs, not against curl.
 
 ## Not yet done (filed as tasks, not left out)
 
-- Token type `0x0001` (VOPRF on P-384, RFC 9578 §5) needs a hand-built P-384 and hash-to-curve.
+- Token type `0x0001` (VOPRF on P-384, RFC 9578 §5): done by BL-4321 and BL-4315. The 49-byte compressed `token-key`
+  is decoded on a hand-built P-384, the token input is blinded by VOPRF(P-384, SHA-384) (RFC 9497, hash-to-curve by
+  RFC 9380 P384_XMD:SHA-384_SSWU_RO_), the issuer's DLEQ proof in the 144-byte `TokenResponse` is verified before the
+  output is used, and a proof that does not verify is exit 8. Decided by Claude under Stewart's delegation.
 - Discovering the request URL and keys from the issuer directory (RFC 9578 §4): done by ADR-1119, from the issuer origin given to `--privacy-pass`.
