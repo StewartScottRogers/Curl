@@ -34,3 +34,4 @@ Part 4 of BL-4328, the last. Move Transport, KeyExchange, the HostKeys signature
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Deferred. Its work is already in BL-4362's stashed change (the whole BL-4328 move, ADR-1162); look again once BL-4362 is Done, when nothing should be left
