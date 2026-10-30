@@ -6,7 +6,7 @@ namespace Curl.Extension.Dane.Dnssec;
 /// <summary>
 /// Checks a child zone's DNSKEY against its parent's DS RRset (RFC 4035 section 5.2): a DS with the key's tag and
 /// algorithm whose digest of the key's canonical owner name and DNSKEY RDATA (RFC 4034 section 5.1.4) matches.
-/// Digest types 2 SHA-256 (RFC 4509) and 4 SHA-384 (RFC 6605) are supported; type 1 SHA-1 is not (ADR-1124).
+/// Digest types 2 SHA-256 (RFC 4509) and 4 SHA-384 (RFC 6605) are supported; type 1 SHA-1 is not (ADR-1131).
 /// </summary>
 public static class DelegationVerifier
 {

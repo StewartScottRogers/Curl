@@ -1,4 +1,4 @@
-# ADR-1124: The Dane extension's DNSSEC verifier supports RFC 8624's algorithms and treats the rest as insecure
+# ADR-1131: The Dane extension's DNSSEC verifier supports RFC 8624's algorithms and treats the rest as insecure
 
 - Status: Accepted
 - Date: 2026-10-29
