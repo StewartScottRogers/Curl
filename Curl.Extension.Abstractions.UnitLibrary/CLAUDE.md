@@ -17,7 +17,9 @@ The contract for extensions that need more than a URL scheme (ADR-0999). Namespa
   outermost first in request order and curl's handler innermost (ADR-1019): a hook may skip `next` and
   write its own response and `TransferResult` (a fresh cached response), or call `next` with
   `context.WithOutputs(...)` (`TransferContextOutputs`) to capture curl's response and write a different
-  one (a stored response for a 304). By default it calls `next` unchanged.
+  one (a stored response for a 304), or with `context.WithRequest(url, method, body)`
+  (`TransferContextRequests`) to send a request of its own (a WebDAV `PROPFIND`) through curl's HTTP stack; a
+  null method or body keeps the transfer's own. By default it calls `next` unchanged.
 - `Connection/IConnectionHook` supplies the connector (and optionally the datagram connector) a
   transfer runs over in place of curl's, given curl's so it can reach a first hop through it.
   `ConnectionHooks.ActivatedBy` keeps the one hook whose option was given and throws an
