@@ -32,3 +32,4 @@ ADR-1149 left this out: TransferContextRequests.WithRequest (BL-4303) replaces t
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 2f5e1687 40f512f9 37551924 9e24dc71.
