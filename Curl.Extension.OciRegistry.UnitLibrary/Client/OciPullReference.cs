@@ -1,7 +1,7 @@
 namespace Curl.Extension.OciRegistry.Client;
 
 /// <summary>
-/// What an <c>oci://</c> URL's path asks to pull (ADR-1093): <c>/name[:tag]</c> a manifest, the tag <c>latest</c> when
+/// What an <c>oci://</c> URL's path asks to pull, or with <c>-T</c> to push (ADR-1093, ADR-1094): <c>/name[:tag]</c> a manifest, the tag <c>latest</c> when
 /// the path names none, or <c>/name@digest</c> a blob, checked against the OCI Distribution Specification 1.1's
 /// grammar for names, tags and digests ("Pulling manifests", "Pulling blobs").
 /// </summary>

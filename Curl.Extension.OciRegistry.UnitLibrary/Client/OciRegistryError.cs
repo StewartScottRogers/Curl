@@ -5,7 +5,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.OciRegistry.Client;
 
 /// <summary>
-/// Turns a registry's error response into a failed pull (OCI Distribution Specification 1.1, "Error Codes"): the first
+/// Turns a registry's error response into a failed pull or push (OCI Distribution Specification 1.1, "Error Codes"): the first
 /// <c>errors[].code</c> and <c>message</c> of its body join curl's <c>-f</c> message, and <c>UNAUTHORIZED</c>,
 /// <c>DENIED</c>, a 401 or a 403 fail as a denied login (exit 67), every other error as curl's <c>-f</c> does (exit 22).
 /// </summary>
@@ -14,11 +14,11 @@ internal static class OciRegistryError
     /// <summary>Creates the failure for <paramref name="response"/>.</summary>
     /// <param name="response">The registry's response, whose status is not 2xx.</param>
     /// <returns>The failure to throw.</returns>
-    public static OciPullException From(OciHttpResponse response)
+    public static OciTransferException From(OciHttpResponse response)
     {
         var (code, message) = ReadFirstError(response.Body);
         var detail = code is null ? string.Empty : $" ({code}: {message})";
-        return new OciPullException(ExitCodeFor(code, response.StatusCode), $"The requested URL returned error: {response.StatusCode}{detail}");
+        return new OciTransferException(ExitCodeFor(code, response.StatusCode), $"The requested URL returned error: {response.StatusCode}{detail}");
     }
 
     private static CurlExitCode ExitCodeFor(string? code, int statusCode) =>

@@ -1,12 +1,15 @@
 using Curl.Extension.OciRegistry.Http;
+using Curl.Extension.OciRegistry.Push;
 using Curl.Protocol.Abstractions;
 
 namespace Curl.Extension.OciRegistry.Client;
 
 /// <summary>
-/// Serves <c>oci://registry[:port]/name[:tag]</c> and <c>oci://registry[:port]/name@digest</c> (ADR-1093): pulls the
-/// manifest or blob the path names (<see cref="OciPullReference"/>) from the registry over HTTPS, port 443 by default,
-/// through <see cref="OciPullFlow"/>, and writes its body to the output.
+/// Serves <c>oci://registry[:port]/name[:tag]</c> and <c>oci://registry[:port]/name@digest</c> over HTTPS, port 443 by
+/// default: without <c>-T</c> it pulls the manifest or blob the path names (<see cref="OciPullReference"/>) through
+/// <see cref="OciPullFlow"/> (ADR-1093); with <c>-T</c> it pushes the upload as that manifest, or as that blob once its
+/// SHA-256 digest matches the URL's, through <see cref="OciPushFlow"/> (ADR-1094). Either way it writes the final
+/// response's body to the output.
 /// </summary>
 /// <param name="connector">Opens the connections to the registry, its token endpoint and any redirect target.</param>
 internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtocolHandler
@@ -33,25 +36,41 @@ internal sealed class OciRegistryProtocolHandler(IConnector connector) : IProtoc
     {
         ArgumentNullException.ThrowIfNull(context);
         return OciPullReference.Parse(context.Url.AbsolutePath) is { } reference
-            ? await PullAsync(context, reference)
+            ? await TransferAsync(context, reference)
             : TransferResult.Failure(CurlExitCode.UrlMalformat, NoReferenceMessage);
     }
 
-    private async ValueTask<TransferResult> PullAsync(ITransferContext context, OciPullReference reference)
+    private async ValueTask<TransferResult> TransferAsync(ITransferContext context, OciPullReference reference)
     {
-        // A port of -1 is UriBuilder's "the scheme's default", 443 for https.
-        var url = new UriBuilder(Uri.UriSchemeHttps, context.Url.IdnHost, context.Url.Port, reference.ApiPath).Uri;
-        var flow = new OciPullFlow(new OciHttpClient(connector), context.Credentials);
+        var session = new OciRegistrySession(new OciHttpClient(connector), context.Credentials);
         context.Progress.ReportTransferStarted();
         try
         {
-            var body = await flow.PullAsync(url, reference.IsBlob ? BlobMediaTypes : ManifestMediaTypes, context.CancellationToken);
+            var body = context.Upload is { } upload
+                ? await PushAsync(context, session, reference, upload)
+                : await new OciPullFlow(session).PullAsync(
+                    RegistryUrl(context, reference.ApiPath), reference.IsBlob ? BlobMediaTypes : ManifestMediaTypes, context.CancellationToken);
             await context.Output.WriteAsync(body, context.CancellationToken);
             return TransferResult.Success(body.Length);
         }
-        catch (OciPullException failure)
+        catch (OciTransferException failure)
         {
             return TransferResult.Failure(failure.ExitCode, failure.Message);
         }
     }
+
+    private static async Task<byte[]> PushAsync(ITransferContext context, OciRegistrySession session, OciPullReference reference, Stream upload)
+    {
+        using var buffer = new MemoryStream();
+        await upload.CopyToAsync(buffer, context.CancellationToken);
+        var content = buffer.ToArray();
+        var flow = new OciPushFlow(session, RegistryUrl(context, "/"), reference.Repository);
+        return reference.IsBlob
+            ? await flow.PushBlobAsync(OciPushContent.VerifyDigest(reference.Reference, content), content, context.CancellationToken)
+            : await flow.PushManifestAsync(reference.Reference, content, context.CancellationToken);
+    }
+
+    // A port of -1 is UriBuilder's "the scheme's default", 443 for https.
+    private static Uri RegistryUrl(ITransferContext context, string path) =>
+        new UriBuilder(Uri.UriSchemeHttps, context.Url.IdnHost, context.Url.Port, path).Uri;
 }
