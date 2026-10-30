@@ -52,8 +52,63 @@ function Write-IdlePollHeartbeat {
     Write-Heartbeat 'idle' 'polling'
 }
 
+if ($TestCoordinatorWatchdog) {
+    # The stale-stamp decision, the stamp file, which processes a replacement stops, and a
+    # timed external call, with no shift, lane or network.
+    $results = [System.Collections.Generic.List[object]]::new()
+    $check = { param([string]$Name, [bool]$Ok, [string]$Got) $results.Add($Ok); Write-Host "$(if ($Ok) { 'PASS' } else { 'FAIL' }) ${Name}: $Got" -ForegroundColor $(if ($Ok) { 'Green' } else { 'Red' }) }
+    $t0 = [datetime]'2026-10-30T12:00:00Z'
+    $end = $t0.AddHours(2)
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(8) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 3
+    & $check 'a stamp under 3 heartbeats old leaves the coordinator alone' ($d.Action -ceq 'none') "$($d.Action) ($($d.Why))"
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(9) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 3
+    & $check 'a stamp 3 heartbeats old replaces the coordinator' ($d.Action -ceq 'replace') "$($d.Action) ($($d.Why))"
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(9) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 0
+    & $check 'with publishing off a heartbeat counts as 3 minutes' ($d.Action -ceq 'replace') "$($d.Action)"
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(9) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 5
+    & $check 'the interval follows -HeartbeatMinutes' ($d.Action -ceq 'none') "$($d.Action)"
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(30) -StampAt $null -ShiftEnd $end -HeartbeatMinutes 3
+    & $check 'no stamp, no replacement' ($d.Action -ceq 'none') "$($d.Action)"
+    $d = Get-CoordinatorWatchdogDecision -Now $end.AddMinutes(1) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 3
+    & $check 'a coordinator is not replaced once the shift is over' ($d.Action -ceq 'none') "$($d.Action)"
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(30) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 3 -ReplacingSince $t0.AddMinutes(25)
+    & $check 'a replacement started 5 minutes ago is waited for' ($d.Action -ceq 'none') "$($d.Action) ($($d.Why))"
+    $d = Get-CoordinatorWatchdogDecision -Now $t0.AddMinutes(30) -StampAt $t0 -ShiftEnd $end -HeartbeatMinutes 3 -ReplacingSince $t0.AddMinutes(10)
+    & $check 'a replacement that never came up is replaced again' ($d.Action -ceq 'replace') "$($d.Action)"
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) "coordinator-watchdog-$PID"
+    New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+    try {
+        $stampFile = Join-Path $scratch 'coordinator.stamp'
+        $script:CoordinatorArguments = '-Lanes Auto -Continuous'
+        Write-CoordinatorStamp -Path $stampFile -End $end
+        $fields = Read-CoordinatorStamp $stampFile
+        $back = ConvertFrom-UtcStamp $fields['shiftEnd']
+        & $check 'the stamp holds the pid, the arguments and the shift end' ($fields['pid'] -ceq "$PID" -and $fields['args'] -ceq '-Lanes Auto -Continuous' -and $back -eq $end.ToUniversalTime() -and (ConvertFrom-UtcStamp $fields['at'])) "pid=$($fields['pid']) args=$($fields['args']) shiftEnd=$($fields['shiftEnd'])"
+        & $check 'a missing stamp reads as empty' ((Read-CoordinatorStamp (Join-Path $scratch 'none')).Count -eq 0) 'empty'
+    } finally { Remove-Item $scratch -Recurse -Force -ErrorAction SilentlyContinue }
+    $table = @(
+        [pscustomobject]@{ ProcessId = 10; ParentProcessId = 1; CommandLine = 'powershell -File RunDarkFactory.ps1 -Lanes 2' },
+        [pscustomobject]@{ ProcessId = 11; ParentProcessId = 10; CommandLine = 'git push origin x' },
+        [pscustomobject]@{ ProcessId = 14; ParentProcessId = 11; CommandLine = 'git-remote-https' },
+        [pscustomobject]@{ ProcessId = 12; ParentProcessId = 10; CommandLine = 'powershell -File RunDarkFactory.ps1 -Lane 1 -Branch b' },
+        [pscustomobject]@{ ProcessId = 13; ParentProcessId = 12; CommandLine = 'dotnet build' })
+    $stop = (Get-CoordinatorOwnProcessIds -Table $table -CoordinatorId 10) -join ','
+    & $check 'a replacement stops what the coordinator started, deepest first, and no lane' ($stop -ceq '14,11') $stop
+    & $check 'git push and gh calls are timed' ((Test-TimedExternalCall 'git' @('-C', 'x y', 'push', '-q')) -and (Test-TimedExternalCall 'gh' @('run', 'list')) -and (Test-TimedExternalCall 'git' @('fetch'))) 'timed'
+    & $check 'local git calls are not timed' (-not (Test-TimedExternalCall 'git' @('-C', 'x', 'status')) -and -not (Test-TimedExternalCall 'git' @())) 'not timed'
+    $shell = Get-FactoryPowerShellExe
+    $fast = Invoke-ExternalWithTimeout -FilePath $shell -CallArgs @('-NoProfile', '-Command', "'a b'; [Console]::Error.WriteLine('oops'); exit 3") -Seconds 60
+    & $check 'a call that answers returns its output, errors and exit code' (-not $fast.TimedOut -and $fast.ExitCode -eq 3 -and ($fast.Output -join '|') -ceq 'a b' -and ($fast.Errors -join '|') -ceq 'oops') "exit $($fast.ExitCode) out=$($fast.Output -join '|') err=$($fast.Errors -join '|')"
+    $watch = [System.Diagnostics.Stopwatch]::StartNew()
+    $slow = Invoke-ExternalWithTimeout -FilePath $shell -CallArgs @('-NoProfile', '-Command', 'Start-Sleep 60') -Seconds 2
+    & $check 'a call that never answers is stopped at the timeout' ($slow.TimedOut -and $slow.ExitCode -eq 124 -and $watch.Elapsed.TotalSeconds -lt 30) "timed out=$($slow.TimedOut) after $([int]$watch.Elapsed.TotalSeconds)s"
+    exit $(if ($results -contains $false) { 1 } else { 0 })
+}
+
 if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     try { $Host.UI.RawUI.WindowTitle = "Dark factory - $(if ($AutoLanes) { 'auto' } else { $LaneCount }) lanes" } catch { }
+    # The gh and git calls that wait on a network stop at a timeout instead of hanging the loop (BL-4353).
+    Enable-ExternalCallTimeouts
     if ($ShiftBranch) { $moved = Restore-ShiftBranch -Branch $ShiftBranch; if ($moved) { Write-Trace '-' 'branch' $moved 'Red' } }
     $branch = (git -C $Root rev-parse --abbrev-ref HEAD).Trim()
     if ($branch -in 'master', 'main') { Stop-ShiftStart "on $branch; switch to a feature branch"; exit 1 }
@@ -68,7 +123,9 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     # (lane: no) in Doing is an interactive session's, so it is left alone (BL-2069).
     $stuck = @(Get-ChildItem (Join-Path $Root 'Tasks\Doing') -Filter 'BL-*.md' -ErrorAction SilentlyContinue | Where-Object { -not (Test-InteractiveOnlyTask $_.FullName) } | ForEach-Object { Get-TaskIdFromFileName $_.Name })
     $adopt = @{}
-    if ($stuck.Count) {
+    # A coordinator taking over a shift (-TakeOverShift) keeps that shift's running lanes, so
+    # nothing in Doing is a previous shift's to adopt.
+    if ($stuck.Count -and -not $TakeOverShift) {
         $previous = Get-ChildItem $LogDir -Directory -Filter 'lanes-*' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
         if ($previous) {
             $prevStamp = $previous.Name.Substring(6)
@@ -390,7 +447,17 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
 
     # The lane count a fixed shift asked for; capacity steps never go above it.
     $requestedLanes = if ($AutoLanes) { $LaneCount } else { [math]::Max([int]$Lanes, $LaneCount) }
-    foreach ($n in 1..$LaneCount) {
+    # A coordinator taking over this shift's stamp (-TakeOverShift) starts no lane: the lanes
+    # that run and have not written a summary are the shift's active ones.
+    $takenOver = @()
+    if ($TakeOverShift) {
+        $takenOver = @(1..16 | Where-Object { (Get-LaneState $_ 'pid') -and -not (Test-Path (Join-Path $summaries "lane-$_.txt")) -and (Test-LaneAlive $_) })
+        foreach ($n in $takenOver) { $activeLanes.Add($n); $startedLanes.Add($n) }
+        if ($takenOver.Count) { $LaneCount = [math]::Max($LaneCount, ($takenOver | Measure-Object -Maximum).Maximum) }
+        Remove-Item (Get-CoordinatorReplacingPath) -ErrorAction SilentlyContinue
+        Write-Trace '-' 'watchdog' "took over shift $Stamp from a coordinator that stopped; lanes $($takenOver -join ',') keep running" 'Yellow'
+    }
+    foreach ($n in $(if ($TakeOverShift) { @() } else { 1..$LaneCount })) {
         $where = Start-Lane -N $n
         $activeLanes.Add($n)
         Write-Trace '-' 'lane' "lane $n started in $(Join-Path $LanesDir "lane-$n") ($where)"
@@ -407,6 +474,8 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
     $nextCapacityStep = (Get-Date).AddMinutes(5)
     $nextCiFixLaneCheck = (Get-Date).AddMinutes(1)
     while ((Get-Date) -lt $giveUp) {
+        # The lanes watch this stamp and replace a coordinator whose loop stops (BL-4353).
+        Write-CoordinatorStamp
         # The coordinator announces the usage limit for every lane, and lanes waiting for a
         # new session add that wait to their shift, so the coordinator waits longer too.
         Update-LimitNotice
@@ -478,9 +547,10 @@ if (($AutoLanes -or $LaneCount -gt 1) -and -not $Lane) {
         # And the one that sees every CI run: it files a High task for each new failure.
         Invoke-CiWatch -Branch $branch
         $running =@($procs | Where-Object { $_.Tab -or -not $_.Process.HasExited }).Count
-        if ($running -eq 0) { break }
+        if ($running -eq 0 -and -not $TakeOverShift) { break }
         Start-Sleep -Seconds 5
     }
+    Remove-Item (Get-CoordinatorStampPath) -ErrorAction SilentlyContinue
 
     # Something may have checked out another branch here during the shift; pulling into it
     # would fast-forward the wrong branch.

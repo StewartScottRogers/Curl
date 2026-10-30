@@ -399,6 +399,23 @@
     live board page reads it. -TestHeartbeat rehearses the files, the merge and the
     commit, without pushing.
 
+    COORDINATOR WATCHDOG
+
+    A coordinator that hangs would stop the CI watch, the heartbeats and every lane restart
+    while the lanes carry on (BL-4353). Two guards. The coordinator's gh calls and its git
+    fetch, push, pull, ls-remote and clone calls run with a 180 second timeout; a call that
+    gives no answer is stopped, traced ("timeout") and exits 124, and the loop goes on. And
+    each pass of its loop the coordinator stamps <repo>.logs\lanes-<stamp>\coordinator.stamp
+    (its pid, the time, the shift's end and its arguments). Every lane checks the stamp once
+    a minute with its heartbeat; when the loop has not completed for 3 heartbeat intervals
+    (-HeartbeatMinutes, 3 when publishing is off) and the shift has time left, the first lane
+    to create coordinator.replacing stops the coordinator and what it started (a stuck git or
+    gh) - never a lane - and starts a new coordinator with the same arguments, -Hours set to
+    the time left, the shift's -ShiftStamp and -TakeOverShift. That coordinator starts no
+    lane: it takes the shift's running lanes as its own, traces "watchdog", and goes on.
+    A replacement not stamping within 10 minutes is replaced again. -TestCoordinatorWatchdog
+    proves the decision, the stamp, the processes stopped and the timeout.
+
     MACHINE PROBE (-ProbeMachine)
 
     Measures how many lanes this PC sustains, since parallel builds are a shift's CPU
@@ -518,6 +535,12 @@ param(
     [switch]$Restart,
     # Prove which lanes -Restart may stop from their heartbeat phases, and exit.
     [switch]$TestRestart,
+    # Prove the coordinator watchdog's stale-stamp decision, the stamp file, the processes a
+    # replacement stops and the timeout on gh and git calls (BL-4353), and exit.
+    [switch]$TestCoordinatorWatchdog,
+    # Start as the replacement for a coordinator that stopped working: with -ShiftStamp it
+    # keeps that shift's running lanes instead of starting any. Started by a lane's watchdog.
+    [switch]$TakeOverShift,
     # Prove how failing test names are read from dotnet test output, and exit.
     [switch]$TestFlakyTests,
     # Prove, on a throwaway repository, which test projects a lane's commits select for the

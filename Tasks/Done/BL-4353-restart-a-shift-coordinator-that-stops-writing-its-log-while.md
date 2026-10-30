@@ -5,10 +5,10 @@ priority: High
 assignee: Claude
 pipeline: bugfix
 depends-on: []
-touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/Heartbeat.ps1]
+touches: [DarkFactory/ShiftCoordinator.ps1, DarkFactory/Heartbeat.ps1, RunDarkFactory.ps1]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4353 — Restart a shift coordinator that stops writing its log while its lanes run
 
@@ -24,13 +24,18 @@ Start by finding what the coordinator was doing: the heartbeat loop in `DarkFact
 
 ## Acceptance criteria
 
-- [ ] The external calls in the coordinator's loop that can block (gh, git push/fetch, usage reads) run with a timeout, and a timeout is traced instead of hanging the loop.
-- [ ] A coordinator whose loop has not completed for 3 heartbeat intervals is replaced by a new one with the same arguments, without stopping the lanes; the trace says so. A self-test (`-Test*` in the files touched) proves the stale-stamp decision.
-- [ ] The script help describes the watchdog.
+- [x] The external calls in the coordinator's loop that can block (gh, git push/fetch, usage reads) run with a timeout, and a timeout is traced instead of hanging the loop.
+- [x] A coordinator whose loop has not completed for 3 heartbeat intervals is replaced by a new one with the same arguments, without stopping the lanes; the trace says so. A self-test (`-Test*` in the files touched) proves the stale-stamp decision.
+- [x] The script help describes the watchdog.
 
 ## Notes
+
+- Decided by Claude (ADR-1159): timeouts via coordinator-only `git`/`gh` shadow functions (180 s, network subcommands only); lanes watch `coordinator.stamp` and replace the coordinator with `-TakeOverShift` + the shift's `-ShiftStamp`, keeping the lanes. Added RunDarkFactory.ps1 to touches (new parameters and help); no other Doing task touches it.
+- The hang itself was not found (no log); the unbounded `gh`/`git` network calls in the loop are the candidates, now bounded.
+- Proof: `-TestCoordinatorWatchdog` 15 PASS; `-TestHeartbeat`, `-TestRestart`, `-TestCiWatch` exit 0. No C# changed, so no build/quality run needed.
 
 ## Log
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 3b8207b9 93aa094b 0d992756.
+- 2026-10-30: Doing -> Done. Coordinator gh/git network calls time out; lanes replace a coordinator silent for 3 heartbeats without stopping lanes (ADR-1159)
