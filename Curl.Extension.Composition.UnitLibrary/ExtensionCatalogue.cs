@@ -33,5 +33,6 @@ internal static class ExtensionCatalogue
         AzureStorage.Client.AzureStorageExtension.CreateHandler,
         DnsQuery.Client.DnsQueryExtension.CreateHandler,
         services => PluginProtocol.PluginProtocolExtension.CreateHandler(services, ExtensionDescriptionCatalogue.Entries.SelectMany(description => description.Schemes)),
+        Grpc.Client.GrpcExtension.CreateHandler,
     ];
 }

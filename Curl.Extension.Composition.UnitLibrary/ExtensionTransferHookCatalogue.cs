@@ -42,5 +42,6 @@ public static class ExtensionTransferHookCatalogue
         DnsQuery.Client.DnsQueryExtension.HookFor,
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.HookFor,
         Curl.Extension.Dpop.DpopExtension.HookFor,
+        Grpc.Client.GrpcExtension.HookFor,
     ];
 }

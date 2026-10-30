@@ -63,5 +63,6 @@ internal static class ExtensionDescriptionCatalogue
         PluginProtocol.PluginProtocolExtension.Description,
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.Description,
         Curl.Extension.Dpop.DpopExtension.Description,
+        Grpc.Client.GrpcExtension.Description,
     ];
 }
