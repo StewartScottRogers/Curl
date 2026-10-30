@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ConnectRpc;
 
 /// <summary>
-/// What <c>--connect-rpc</c> does to an HTTP transfer (ADR-1127). A unary call POSTs the <c>-d</c> message as
+/// What <c>--connect-rpc</c> does to an HTTP transfer (ADR-1139). A unary call POSTs the <c>-d</c> message as
 /// <c>application/json</c> and writes the response unchanged ("Unary-Request", "Unary-Response"); a streaming call
 /// POSTs the <c>-d</c> messages in envelopes as <c>application/connect+json</c> and writes each reply message on its
 /// own line, failing with exit 22 when the end-of-stream message carries an error ("Streaming-Request",

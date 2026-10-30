@@ -1,6 +1,6 @@
 # Curl.Extension.ConnectRpc.UnitLibrary
 
-The `--connect-rpc` extension (ADR-0999, ADR-1127): Connect protocol unary and streaming calls over HTTP with the
+The `--connect-rpc` extension (ADR-0999, ADR-1139): Connect protocol unary and streaming calls over HTTP with the
 JSON codec. Namespace `Curl.Extension.ConnectRpc`. Tested against the Connect protocol reference
 (https://connectrpc.com/docs/protocol), not against curl.
 

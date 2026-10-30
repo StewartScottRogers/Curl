@@ -1,4 +1,4 @@
-# ADR-1127: --connect-rpc sends Connect unary and streaming calls with JSON
+# ADR-1139: --connect-rpc sends Connect unary and streaming calls with JSON
 
 - Status: Accepted
 - Date: 2026-10-29

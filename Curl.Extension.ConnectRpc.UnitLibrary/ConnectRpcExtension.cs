@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.ConnectRpc;
 
 /// <summary>
-/// The <c>--connect-rpc</c> extension (ADR-1127): a Connect protocol unary or streaming call over HTTP, the request
+/// The <c>--connect-rpc</c> extension (ADR-1139): a Connect protocol unary or streaming call over HTTP, the request
 /// message given with <c>-d</c>. <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>
 public static class ConnectRpcExtension
