@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Curl.Extension.DnsQuery.Client;
 using Curl.Extension.DnsQuery.UnitTests.Transport;
+using Curl.Extension.DnsQuery.UnitTests.Transport.Tls;
 using Curl.Extension.DnsQuery.UnitTests.Wire;
 using Curl.Protocol.Abstractions;
 
@@ -70,6 +71,21 @@ public sealed class DnsQueryProtocolHandlerTests
 
         Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
         Assert.AreEqual(("udp", "198.51.100.1", 53), server.Opened.Single());
+    }
+
+    [TestMethod]
+    public async Task ExecuteAsync_TlsAndNoServerInTheUrl_QueriesTheSystemsFirstDnsServerOnPort853()
+    {
+        var server = new ScriptedDnsServer((_, _) => [], [.. DnsWire.UInt16(Answer.Length), .. Answer]);
+        Assert.IsTrue(CurlUrl.TryParseAllowingEmptyHost("dns:///example.com", false, false, out CurlUrl? url, out _));
+        var handler = new DnsQueryProtocolHandler(new(server, server, new HandshakingTlsProvider(), null!), () => [new IPEndPoint(IPAddress.Parse("198.51.100.1"), 53)], _ => [0x12, 0x34]);
+        var output = new MemoryStream();
+
+        TransferResult result = await handler.ExecuteAsync(new DnsQueryContext(new TransferContext { Url = url, Output = output, TimeProvider = new ImmediateTimeProvider() }, "tls", json: false));
+
+        Assert.AreEqual(CurlExitCode.Ok, result.ExitCode);
+        Assert.AreEqual(("tcp", "198.51.100.1", 853), server.Opened.Single());
+        Assert.Contains("example.com.", Encoding.UTF8.GetString(output.ToArray()));
     }
 
     [TestMethod]

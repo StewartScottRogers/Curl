@@ -40,7 +40,7 @@ internal sealed class DnsQueryProtocolHandler(ProtocolHandlerServices services, 
     {
         DnsQueryContext? options = context as DnsQueryContext;
         IDnsQueryTransport transport = DnsQueryTransportSelection.TransportOf(options?.Transport ?? DnsQueryTransportSelection.Udp, services);
-        DnsQueryRequest request = DnsQueryRequest.Of(context.Url);
+        DnsQueryRequest request = DnsQueryRequest.Of(context.Url, transport.DefaultPort);
         ushort id = BinaryPrimitives.ReadUInt16BigEndian(randomBytes(2));
         byte[] query = Required(DnsQueryEncoder.Encode(id, request.Name, request.Type, request.Class, recursionDesired: true), CurlExitCode.UrlMalformat);
         (string host, int port) = ServerOf(request);
@@ -57,7 +57,10 @@ internal sealed class DnsQueryProtocolHandler(ProtocolHandlerServices services, 
         return TransferResult.Success(output.Length);
     }
 
-    /// <summary>Gives the URL's server, or the system's first DNS server when the URL names none (RFC 4501 section 2).</summary>
+    /// <summary>
+    /// Gives the URL's server, or the system's first DNS server's address when the URL names none (RFC 4501 section 2),
+    /// on the request's port, which is the transport's default when the URL names no server.
+    /// </summary>
     private (string Host, int Port) ServerOf(DnsQueryRequest request)
     {
         if (request.Server is { } server)
@@ -67,7 +70,7 @@ internal sealed class DnsQueryProtocolHandler(ProtocolHandlerServices services, 
 
         IPEndPoint first = systemDnsServers().FirstOrDefault()
             ?? throw new DnsQueryException(CurlExitCode.CouldntResolveHost, "The dns: URL names no server and the system has no DNS server configured");
-        return (first.Address.ToString(), first.Port);
+        return (first.Address.ToString(), request.Port);
     }
 
     private static T Required<T>(DnsOutcome<T> outcome, CurlExitCode exitCode)

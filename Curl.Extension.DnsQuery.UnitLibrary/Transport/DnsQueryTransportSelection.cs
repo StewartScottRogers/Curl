@@ -1,5 +1,7 @@
 using Curl.Extension.DnsQuery.Client;
+using Curl.Extension.DnsQuery.Transport.Quic;
 using Curl.Extension.DnsQuery.Transport.Tcp;
+using Curl.Extension.DnsQuery.Transport.Tls;
 using Curl.Extension.DnsQuery.Transport.Udp;
 using Curl.Protocol.Abstractions;
 
@@ -17,8 +19,14 @@ internal static class DnsQueryTransportSelection
     /// <summary>TCP with a two-octet length prefix (RFC 1035 section 4.2.2).</summary>
     public const string Tcp = "tcp";
 
+    /// <summary>DNS over TLS (RFC 7858), port 853 by default.</summary>
+    public const string Tls = "tls";
+
+    /// <summary>DNS over QUIC (RFC 9250), port 853 by default.</summary>
+    public const string Quic = "quic";
+
     /// <summary>Gets every transport's name, in the order <c>--dns-transport</c>'s help lists them.</summary>
-    public static IReadOnlyList<string> Names { get; } = [Udp, Tcp];
+    public static IReadOnlyList<string> Names { get; } = [Udp, Tcp, Tls, Quic];
 
     /// <summary>Gives the transport a name names, over curl's connection services.</summary>
     /// <param name="name">The name, in either case.</param>
@@ -30,6 +38,8 @@ internal static class DnsQueryTransportSelection
         {
             Udp => new DnsUdpTransport(services.DatagramConnector, new DnsTcpTransport(services.Connector)),
             Tcp => new DnsTcpTransport(services.Connector),
+            Tls => new DnsTlsTransport(services.Connector, services.TlsProvider),
+            Quic => new DnsQuicTransport(services.DatagramConnector, services.TlsProvider),
             _ => throw new DnsQueryException(CurlExitCode.FailedInit, $"--dns-transport {name} names no transport; give one of {string.Join(", ", Names)}"),
         };
 }

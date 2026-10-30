@@ -20,6 +20,14 @@ public sealed class DnsQueryRequestTests
         Assert.AreEqual(5353, DnsQueryRequest.Of(CurlUrl.Parse("dns://ns.example.net:5353/example.com")).Port);
 
     [TestMethod]
+    public void Of_NoPortInTheAuthority_QueriesTheTransportsDefaultPort() =>
+        Assert.AreEqual(853, DnsQueryRequest.Of(CurlUrl.Parse("dns://ns.example.net/example.com"), 853).Port);
+
+    [TestMethod]
+    public void Of_PortInTheAuthority_QueriesThatPortOverTheTransportsDefault() =>
+        Assert.AreEqual(5353, DnsQueryRequest.Of(CurlUrl.Parse("dns://ns.example.net:5353/example.com"), 853).Port);
+
+    [TestMethod]
     [DataRow("dns://h/example.com?type=AAAA", (ushort)28, (ushort)1)]
     [DataRow("dns://h/example.com?TYPE=mx;CLASS=ch", (ushort)15, (ushort)3)]
     [DataRow("dns://h/example.com?class=IN;type=TYPE65", (ushort)65, (ushort)1)]

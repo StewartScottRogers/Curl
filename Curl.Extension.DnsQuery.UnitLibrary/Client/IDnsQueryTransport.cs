@@ -5,6 +5,9 @@ namespace Curl.Extension.DnsQuery.Client;
 /// <summary>Carries one DNS query to a server and its answer back (ADR-1140).</summary>
 internal interface IDnsQueryTransport
 {
+    /// <summary>Gets the port a URL that names no port is queried on over this transport.</summary>
+    int DefaultPort { get; }
+
     /// <summary>Sends <paramref name="query" /> to the server and gives its answer.</summary>
     /// <param name="host">The server's host or address.</param>
     /// <param name="port">The server's port.</param>

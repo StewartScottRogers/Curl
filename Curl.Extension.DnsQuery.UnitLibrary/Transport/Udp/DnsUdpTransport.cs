@@ -25,6 +25,9 @@ internal sealed class DnsUdpTransport(IDatagramConnector connector, IDnsQueryTra
     private const int MaximumDatagramLength = 65535;
 
     /// <inheritdoc />
+    public int DefaultPort => DnsQueryRequest.DefaultPort;
+
+    /// <inheritdoc />
     public async ValueTask<byte[]> ExchangeAsync(string host, int port, byte[] query, ITransferContext context)
     {
         DatagramOpenResult open = await connector.OpenAsync(host, port, context.CancellationToken).ConfigureAwait(false);

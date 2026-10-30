@@ -109,6 +109,8 @@ public sealed class DnsUdpTransportTests
 
         public List<(string Host, int Port)> Asked { get; } = [];
 
+        public int DefaultPort => 53;
+
         public ValueTask<byte[]> ExchangeAsync(string host, int port, byte[] query, ITransferContext context)
         {
             Asked.Add((host, port));

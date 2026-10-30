@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Curl.Extension.DnsQuery.UnitTests" />
     <InternalsVisibleTo Include="Curl.Extension.EncryptedDns.UnitTests" />
     <InternalsVisibleTo Include="Curl.Extension.WebTransport.UnitTests" />
     <InternalsVisibleTo Include="Curl.Networking.UnitTests" />
