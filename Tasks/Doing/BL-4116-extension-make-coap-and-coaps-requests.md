@@ -44,3 +44,4 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: d6b5ac49 5bfa7aa8 eda661d1 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4245 to BL-4252 (CoAP codec, coap:// client, block-wise, Observe, certificate-verification seam for extensions, DTLS framing, DTLS handshake, coaps://)
+- 2026-10-29: Backlog -> Doing. Criteria at claim: d6b5ac49 5bfa7aa8 eda661d1 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
