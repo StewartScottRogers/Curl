@@ -1191,3 +1191,4 @@ Each option and the specific reason it lost.
 | [1143](ADR-1143-dns-query-adds-dns-over-tls-and-dns-over-quic-transports.md) | The DNS query extension adds DNS over TLS and DNS over QUIC as --dns-transport tls and quic (BL-4338) | Accepted | 2026-10-30 |
 | [1144](ADR-1144-user-from-keychain-reads-the-platform-credential-store.md) | --user-from-keychain reads the platform's credential store (BL-4163) | Accepted | 2026-10-30 |
 | [1145](ADR-1145-dpop-signs-a-proof-per-http-request-with-a-pem-key.md) | --dpop signs a DPoP proof for every HTTP request with a PEM key (BL-4162) | Accepted | 2026-10-30 |
+| [1127](ADR-1127-har-writes-each-option-groups-http-transfers-as-a-har-1-2-archive.md) | --har writes each option group's HTTP transfers as a HAR 1.2 archive (BL-4155) | Accepted | 2026-10-29 |
