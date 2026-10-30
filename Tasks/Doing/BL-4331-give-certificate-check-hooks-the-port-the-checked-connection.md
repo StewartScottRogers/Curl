@@ -34,3 +34,4 @@ DANE (BL-4151) looks up TLSA records at `_<port>._tcp.<host>` (RFC 6698 section 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: aa0b566e c0b425b0 e7c4212f 3d836d5e.
