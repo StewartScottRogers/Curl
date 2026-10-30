@@ -33,3 +33,4 @@ Split from BL-4126 for size, following the S3 split (BL-4197, BL-4199). Create b
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 9cccb331 0c3c6e57 d089179a 3180db99 3d836d5e.
