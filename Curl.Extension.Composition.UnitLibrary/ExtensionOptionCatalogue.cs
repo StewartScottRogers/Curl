@@ -18,6 +18,7 @@ internal static class ExtensionOptionCatalogue
         GraphQl.GraphQlOptions.Operation,
         GraphQl.GraphQlOptions.Introspect,
         Curl.Extension.JsonRpc.JsonRpcExtension.Option,
+        Curl.Extension.WebSocketSubprotocols.WebSocketSubprotocolsExtension.Option,
         Coap.Observe.CoapObserveTransferHook.Option,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.Option,
         Curl.Extension.HttpCache.HttpCacheExtension.Option,

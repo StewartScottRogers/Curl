@@ -18,6 +18,7 @@ public static class ExtensionTransferHookCatalogue
     [
         GraphQl.GraphQlTransferHook.ActivatedBy,
         Curl.Extension.JsonRpc.JsonRpcExtension.HookFor,
+        Curl.Extension.WebSocketSubprotocols.WebSocketSubprotocolsExtension.HookFor,
         Coap.Observe.CoapObserveTransferHook.ActivatedBy,
         Curl.Extension.ServerSentEvents.ServerSentEventsExtension.HookFor,
         Curl.Extension.HttpCache.HttpCacheExtension.HookFor,

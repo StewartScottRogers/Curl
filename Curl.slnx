@@ -317,6 +317,7 @@
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
   <Folder Name="/Extensions/GoogleCloudStorage/"><Project Path="Curl.Extension.GoogleCloudStorage.UnitLibrary/Curl.Extension.GoogleCloudStorage.UnitLibrary.csproj" /><Project Path="Curl.Extension.GoogleCloudStorage.UnitTests/Curl.Extension.GoogleCloudStorage.UnitTests.csproj" /></Folder>
+  <Folder Name="/Extensions/WebSocketSubprotocols/"><Project Path="Curl.Extension.WebSocketSubprotocols.UnitLibrary/Curl.Extension.WebSocketSubprotocols.UnitLibrary.csproj" /><Project Path="Curl.Extension.WebSocketSubprotocols.UnitTests/Curl.Extension.WebSocketSubprotocols.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/Xmpp/"><Project Path="Curl.Extension.Xmpp.UnitLibrary/Curl.Extension.Xmpp.UnitLibrary.csproj" /><Project Path="Curl.Extension.Xmpp.UnitTests/Curl.Extension.Xmpp.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/HttpFile/"><Project Path="Curl.Extension.HttpFile.UnitLibrary/Curl.Extension.HttpFile.UnitLibrary.csproj" /><Project Path="Curl.Extension.HttpFile.UnitTests/Curl.Extension.HttpFile.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/Redis/"><Project Path="Curl.Extension.Redis.UnitLibrary/Curl.Extension.Redis.UnitLibrary.csproj" /><Project Path="Curl.Extension.Redis.UnitTests/Curl.Extension.Redis.UnitTests.csproj" /></Folder>
