@@ -1,4 +1,4 @@
-# ADR-1127 — The WireGuard handshake takes an injected clock and random source and is tested against a responder written from the whitepaper
+# ADR-1136 — The WireGuard handshake takes an injected clock and random source and is tested against a responder written from the whitepaper
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
