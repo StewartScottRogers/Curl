@@ -1,4 +1,4 @@
-# ADR-1092: The compression dictionary extension's wire format and store (BL-4302)
+# ADR-1100: The compression dictionary extension's wire format and store (BL-4302)
 
 - Status: Accepted
 - Date: 2026-10-29

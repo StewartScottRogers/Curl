@@ -1144,4 +1144,4 @@ Each option and the specific reason it lost.
 | [1097](ADR-1097-oci-pushes-blobs-through-a-monolithic-upload-session-and-manifests-with-their-media-type.md) | OCI pushes blobs through a monolithic upload session and manifests with their media type (BL-4293) | Accepted | 2026-10-29 |
 | [1098](ADR-1098-websocket-over-http-3-waits-for-settings-and-maps-fin-and-reset-as-rfc-9220-says.md) | A WebSocket over HTTP/3 waits for SETTINGS and maps FIN and reset as RFC 9220 says (BL-4296) | Accepted | 2026-10-29 |
 | [1099](ADR-1099-gs-urls-download-upload-and-list-over-the-xml-api-with-a-bearer-token-or-hmac-key.md) | gs:// URLs download, upload and list over the XML API with a bearer token or HMAC key (BL-4125) | Accepted | 2026-10-29 |
-| [1092](ADR-1092-compression-dictionary-wire-format-and-store.md) | The compression dictionary extension's wire format and store (BL-4302) | Accepted | 2026-10-29 |
+| [1100](ADR-1100-compression-dictionary-wire-format-and-store.md) | The compression dictionary extension's wire format and store (BL-4302) | Accepted | 2026-10-29 |

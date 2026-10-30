@@ -38,7 +38,7 @@ Start by scaffolding the two projects with the `new-project` skill, in `/Extensi
 Filed by BL-4132's first run when it split the task for size.
 
 - Built by hand (no new-project skill run needed beyond its steps): csproj files modelled on HttpCache, one `<Folder>` line under the slnx marker; the build (with VerifyExtensionIsolation) is clean.
-- Decisions in ADR-1092: hand-written RFC 8941 parser, URLPattern subset (`*`, `:name`, regexp groups rejected, same origin), match-dest ignored for selection (curl has no destinations), longest match then newest, two files per dictionary named by SHA-256 hex. Dictionary expiry left to BL-4132.
+- Decisions in ADR-1100: hand-written RFC 8941 parser, URLPattern subset (`*`, `:name`, regexp groups rejected, same origin), match-dest ignored for selection (curl has no destinations), longest match then newest, two files per dictionary named by SHA-256 hex. Dictionary expiry left to BL-4132.
 - Measure-CodeQuality.ps1 for the library: 100% line, 100% branch, worst CRAP 10, 0 failing members. Fast tests green (81 in the new project). Tests are platform-neutral (temp directory paths via Path.Combine, https URLs only).
 
 ## Log
