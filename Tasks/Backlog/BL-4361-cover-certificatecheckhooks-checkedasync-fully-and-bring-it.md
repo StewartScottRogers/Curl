@@ -1,5 +1,5 @@
 ---
-id: BL-4360
+id: BL-4361
 title: Cover CertificateCheckHooks.CheckedAsync fully and bring it under complexity 10
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4360 — Cover CertificateCheckHooks.CheckedAsync fully and bring it under complexity 10
+# BL-4361 — Cover CertificateCheckHooks.CheckedAsync fully and bring it under complexity 10
 
 ## Goal
 
