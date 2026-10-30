@@ -40,7 +40,7 @@ public static class ExtensionCommandLineOptions
         Dictionary<string, ExtensionOption> byName = new(StringComparer.Ordinal);
         foreach (ExtensionOption option in options)
         {
-            if (string.IsNullOrEmpty(option.Name) || option.Name[0] == '-' || option.Name.Contains('='))
+            if (!IsSelectableName(option.Name))
             {
                 throw new InvalidOperationException($"The extension option \"{option.Name}\" (\"{option.Help}\") has a name the command line can never select: a name is not empty, does not start with '-' and holds no '='.");
             }
@@ -58,4 +58,10 @@ public static class ExtensionCommandLineOptions
 
         return options;
     }
+
+    /// <summary>Reports whether the command line can select <paramref name="name" /> as <c>--name</c>: it is not empty, does not start with a dash and holds no equals sign.</summary>
+    /// <param name="name">An extension option's name.</param>
+    /// <returns><c>true</c> when the parser can match the name.</returns>
+    private static bool IsSelectableName(string? name) =>
+        !string.IsNullOrEmpty(name) && name[0] != '-' && !name.Contains('=');
 }
