@@ -4,8 +4,8 @@ title: Extension: Show Structured Field Values readably
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.StructuredFields.UnitLibrary, Curl.Extension.StructuredFields.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4313]
+touches: [Curl.Extension.StructuredFields.UnitLibrary, Curl.Extension.StructuredFields.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 7, first pass before any edit): an `ITransferHook` (the shape ContentDigest uses) can already write readable lines to `-v` through `context.Events.ReportInfo` in `ExecuteAsync`, but no hook can add a `-w` variable: `Curl.Output.UnitLibrary/TransferWriteOutVariables.cs` reads only `TransferResult.Report`. Filed BL-4313 for that hook and requeued. Plan once it lands: an `ITransferHook` that, under the extension option, parses the response fields RFC 9651 structured fields are known for (RFC 9651 §3 types: Dictionary, List, Item) and reports each as `* <field>: <readable form>` lines and as write-out values. Added the three Composition catalogues it registers in (shared list files) to touches.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 439ee074 9b42f6a5 a6cc4924 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Waits for BL-4313: no hook yet lets an extension add a -w write-out variable
