@@ -1,16 +1,16 @@
 ---
-id: BL-4329
+id: BL-4334
 title: Extension: Match a certificate chain against DANE TLSA records
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4328]
+depends-on: [BL-4333]
 touches: [Curl.Extension.Dane.UnitLibrary/Tlsa, Curl.Extension.Dane.UnitTests/Tlsa]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4329 — Extension: Match a certificate chain against DANE TLSA records
+# BL-4334 — Extension: Match a certificate chain against DANE TLSA records
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4328's library and its decoded TLSA record. Specification: RFC 6698 section 2.1 (fields), RFC 7671 sections 5.1 to 5.4 (usages DANE-EE(3), DANE-TA(2), PKIX-EE(1), PKIX-TA(0)) and section 5.1's rule that DANE-EE ignores names and expiry. Selectors 0 (full certificate) and 1 (SubjectPublicKeyInfo, via `X509Certificate2.PublicKey.ExportSubjectPublicKeyInfo`), matching types 0 (exact), 1 (SHA-256), 2 (SHA-512). Records with an unknown usage, selector or matching type are unusable and ignored (RFC 6698 section 4.1); a set with no usable record gives "no usable records", distinct from "no match". Curl's own PKIX verification has already accepted the chain when this runs (ADR-1016), so PKIX-TA/PKIX-EE match against the chain as sent.
+Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333's library and its decoded TLSA record. Specification: RFC 6698 section 2.1 (fields), RFC 7671 sections 5.1 to 5.4 (usages DANE-EE(3), DANE-TA(2), PKIX-EE(1), PKIX-TA(0)) and section 5.1's rule that DANE-EE ignores names and expiry. Selectors 0 (full certificate) and 1 (SubjectPublicKeyInfo, via `X509Certificate2.PublicKey.ExportSubjectPublicKeyInfo`), matching types 0 (exact), 1 (SHA-256), 2 (SHA-512). Records with an unknown usage, selector or matching type are unusable and ignored (RFC 6698 section 4.1); a set with no usable record gives "no usable records", distinct from "no match". Curl's own PKIX verification has already accepted the chain when this runs (ADR-1016), so PKIX-TA/PKIX-EE match against the chain as sent.
 
 ## Acceptance criteria
 

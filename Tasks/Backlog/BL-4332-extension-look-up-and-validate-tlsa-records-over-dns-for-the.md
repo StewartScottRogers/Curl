@@ -4,7 +4,7 @@ title: Extension: Look up and validate TLSA records over DNS for the Dane extens
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4328, BL-4330]
+depends-on: [BL-4333, BL-4335]
 touches: [Curl.Extension.Dane.UnitLibrary/Lookup, Curl.Extension.Dane.UnitTests/Lookup]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4328's `Wire/` codec and BL-4330's `Dnssec/` verifiers. It takes an `IDatagramConnector` (from `Curl.Protocol.Abstractions`; production uses `Curl.Networking.UnitLibrary`'s `UdpDatagramConnector`) and an `IConnector` for TCP fallback when a reply is truncated (RFC 7766 section 5 / RFC 1035 section 4.2.2, two-octet length prefix), the server's address, and a `TimeProvider` for timeouts. Queries go to a recursive resolver with DO and CD set (RFC 4035 section 3.2.2, so the client validates itself); a reply's AD bit is never trusted. The walk: TLSA name per RFC 6698 section 3; follow CNAMEs (RFC 7671 section 7); for each zone from the root down fetch DNSKEY and DS and verify them with BL-4330's code; the TLSA RRSIG against the zone's DNSKEY. Absence: NOERROR/NODATA or NXDOMAIN proved with NSEC (RFC 4035 section 5.4) or NSEC3 (RFC 5155 section 8) gives absent-secure; an insecure delegation (proved absence of DS) gives insecure; anything failing verification gives bogus. Record in an ADR marked "Decided by Claude under Stewart's delegation" anything left out (for example NSEC3 opt-out handling) and why.
+Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333's `Wire/` codec and BL-4335's `Dnssec/` verifiers. It takes an `IDatagramConnector` (from `Curl.Protocol.Abstractions`; production uses `Curl.Networking.UnitLibrary`'s `UdpDatagramConnector`) and an `IConnector` for TCP fallback when a reply is truncated (RFC 7766 section 5 / RFC 1035 section 4.2.2, two-octet length prefix), the server's address, and a `TimeProvider` for timeouts. Queries go to a recursive resolver with DO and CD set (RFC 4035 section 3.2.2, so the client validates itself); a reply's AD bit is never trusted. The walk: TLSA name per RFC 6698 section 3; follow CNAMEs (RFC 7671 section 7); for each zone from the root down fetch DNSKEY and DS and verify them with BL-4335's code; the TLSA RRSIG against the zone's DNSKEY. Absence: NOERROR/NODATA or NXDOMAIN proved with NSEC (RFC 4035 section 5.4) or NSEC3 (RFC 5155 section 8) gives absent-secure; an insecure delegation (proved absence of DS) gives insecure; anything failing verification gives bogus. Record in an ADR marked "Decided by Claude under Stewart's delegation" anything left out (for example NSEC3 opt-out handling) and why.
 
 ## Acceptance criteria
 

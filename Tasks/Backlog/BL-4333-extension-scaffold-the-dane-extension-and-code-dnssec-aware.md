@@ -1,5 +1,5 @@
 ---
-id: BL-4328
+id: BL-4333
 title: Extension: Scaffold the Dane extension and code DNSSEC-aware DNS messages
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4328 — Extension: Scaffold the Dane extension and code DNSSEC-aware DNS messages
+# BL-4333 — Extension: Scaffold the Dane extension and code DNSSEC-aware DNS messages
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-First of the split of BL-4151 (DNSSEC and DANE TLSA extension, ADR-0999). Create the library and its `.UnitTests` twin with the `new-project` skill, in `/Extensions/Dane/` in `Curl.slnx` (one single-line `<Folder>` under the extensions marker comment). It references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Extension.Abstractions.UnitLibrary`, `Curl.Networking.UnitLibrary` and `Curl.Cryptography.UnitLibrary` (Ed25519/Ed448 for BL-4330), with `InternalsVisibleTo` its tests, so the later subtasks only add files in their own folders. `Curl.Extension.EncryptedDns.UnitLibrary/Wire` has an A/AAAA codec to read for style, but an extension never references another extension: this codec is its own. No catalogue line and no option yet (BL-4151 adds them).
+First of the split of BL-4151 (DNSSEC and DANE TLSA extension, ADR-0999). Create the library and its `.UnitTests` twin with the `new-project` skill, in `/Extensions/Dane/` in `Curl.slnx` (one single-line `<Folder>` under the extensions marker comment). It references `Curl.Protocol.Abstractions.UnitLibrary`, `Curl.Extension.Abstractions.UnitLibrary`, `Curl.Networking.UnitLibrary` and `Curl.Cryptography.UnitLibrary` (Ed25519/Ed448 for BL-4335), with `InternalsVisibleTo` its tests, so the later subtasks only add files in their own folders. `Curl.Extension.EncryptedDns.UnitLibrary/Wire` has an A/AAAA codec to read for style, but an extension never references another extension: this codec is its own. No catalogue line and no option yet (BL-4151 adds them).
 
 `Wire/`: a query encoder for any QTYPE with an EDNS0 OPT record (RFC 6891 section 6.1.2) with the DO bit set (RFC 4035 section 3.2.1) and optionally CD; a response decoder giving the header (ID, TC, AD, CD, RCODE) and the answer and authority records, owner names decompressed (RFC 1035 section 4.1.4), with typed RDATA for TLSA (RFC 6698 section 2.1), DNSKEY (RFC 4034 section 2.1), RRSIG (section 3.1), DS (section 5.1), NSEC (section 4.1), NSEC3 (RFC 5155 section 3.2) and CNAME, and the raw RDATA of each record kept for canonical-form signing (RFC 4034 section 6).
 
@@ -33,7 +33,7 @@ First of the split of BL-4151 (DNSSEC and DANE TLSA extension, ADR-0999). Create
 
 ## Notes
 
-- Filed by BL-4151's run on 2026-10-29 when it split that task for size before any code. BL-4329, BL-4330 and BL-4332 add their own folders; BL-4151 adds the option, hook, catalogue lines and the full CLAUDE.md.
+- Filed by BL-4151's run on 2026-10-29 when it split that task for size before any code. BL-4334, BL-4335 and BL-4332 add their own folders; BL-4151 adds the option, hook, catalogue lines and the full CLAUDE.md.
 
 ## Log
 

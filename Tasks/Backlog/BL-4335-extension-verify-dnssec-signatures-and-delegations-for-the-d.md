@@ -1,16 +1,16 @@
 ---
-id: BL-4330
+id: BL-4335
 title: Extension: Verify DNSSEC signatures and delegations for the Dane extension
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4328]
+depends-on: [BL-4333]
 touches: [Curl.Extension.Dane.UnitLibrary/Dnssec, Curl.Extension.Dane.UnitTests/Dnssec]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4330 — Extension: Verify DNSSEC signatures and delegations for the Dane extension
+# BL-4335 — Extension: Verify DNSSEC signatures and delegations for the Dane extension
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4328's decoded records. Specification: RFC 4034 section 6 (canonical name order, canonical RR form, canonical RRset order), section 3.1.8.1 (signature data), appendix B (key tag), section 5.1.4 (DS digest); RFC 4035 section 5.3 (RRSIG validity: signer name, labels, inception and expiration against an injected `TimeProvider`, wildcard expansion); RFC 4509 and RFC 6605 (SHA-256 DS digest type 2, SHA-384 type 4). Algorithms (RFC 8624 MUST/RECOMMENDED): 8 RSA/SHA-256 and 10 RSA/SHA-512 (RFC 5702), 13 ECDSA P-256/SHA-256 and 14 P-384/SHA-384 (RFC 6605) through the BCL, 15 Ed25519 and 16 Ed448 (RFC 8080) through `Curl.Cryptography.UnitLibrary`. An unsupported algorithm or digest makes the RRset insecure, not bogus (RFC 4035 section 5.2). Root trust anchors: KSK-20326 and KSK-38696 as DS records from IANA's root-anchors.xml.
+Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333's decoded records. Specification: RFC 4034 section 6 (canonical name order, canonical RR form, canonical RRset order), section 3.1.8.1 (signature data), appendix B (key tag), section 5.1.4 (DS digest); RFC 4035 section 5.3 (RRSIG validity: signer name, labels, inception and expiration against an injected `TimeProvider`, wildcard expansion); RFC 4509 and RFC 6605 (SHA-256 DS digest type 2, SHA-384 type 4). Algorithms (RFC 8624 MUST/RECOMMENDED): 8 RSA/SHA-256 and 10 RSA/SHA-512 (RFC 5702), 13 ECDSA P-256/SHA-256 and 14 P-384/SHA-384 (RFC 6605) through the BCL, 15 Ed25519 and 16 Ed448 (RFC 8080) through `Curl.Cryptography.UnitLibrary`. An unsupported algorithm or digest makes the RRset insecure, not bogus (RFC 4035 section 5.2). Root trust anchors: KSK-20326 and KSK-38696 as DS records from IANA's root-anchors.xml.
 
 ## Acceptance criteria
 
