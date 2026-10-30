@@ -34,3 +34,4 @@ Extensions may reference shared layers but no `Curl.Protocol.*` library (ADR-099
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: acac56da ea52861d e35aff77 3d836d5e.
