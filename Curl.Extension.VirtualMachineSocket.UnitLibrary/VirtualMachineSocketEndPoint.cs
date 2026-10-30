@@ -20,7 +20,7 @@ public sealed class VirtualMachineSocketEndPoint(VirtualMachineSocketAddress add
     /// Gives the socket address: every byte of the structure, its two-byte family included, unchanged. It starts as an
     /// <see cref="AddressFamily.Unspecified" /> address because .NET on Linux and macOS refuses to build a
     /// <see cref="SocketAddress" /> for a family it does not know, such as <c>AF_VSOCK</c> or <c>AF_HYPERV</c>
-    /// (ADR-1115).
+    /// (ADR-1116).
     /// </summary>
     /// <returns>The socket address.</returns>
     public override SocketAddress Serialize()

@@ -32,7 +32,7 @@ Lanes test only on Windows, so reproduce with `gh run view 41002071588 --log-fai
 
 ## Notes
 
-- Cause (job logs 123888843507, 123888843473): `new SocketAddress((AddressFamily)40|34, n)` throws PlatformNotSupportedException in .NET's Unix PAL, which maps only families it knows. `Serialize` now builds an `Unspecified` address and copies every byte of the structure, family included (ADR-1115); the test compares all bytes instead of `SocketAddress.Family`.
+- Cause (job logs 123888843507, 123888843473): `new SocketAddress((AddressFamily)40|34, n)` throws PlatformNotSupportedException in .NET's Unix PAL, which maps only families it knows. `Serialize` now builds an `Unspecified` address and copies every byte of the structure, family included (ADR-1116); the test compares all bytes instead of `SocketAddress.Family`.
 - Passes locally (52/52); Measure-CodeQuality for Curl.Extension.VirtualMachineSocket.UnitLibrary: 0 failing members. The change has no platform branch, so CI on Linux and macOS is met by keeping it platform-neutral; the shift's CI watch files any failure.
 
 ## Log

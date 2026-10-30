@@ -1,4 +1,4 @@
-# ADR-1115 — The virtual machine socket end point writes its own family bytes
+# ADR-1116 — The virtual machine socket end point writes its own family bytes
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
