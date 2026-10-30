@@ -1206,4 +1206,4 @@ Each option and the specific reason it lost.
 | [1157](ADR-1157-oblivious-http-extension-sends-requests-through-a-relay.md) | The Oblivious HTTP extension sends requests through a relay with --ohttp-relay and --ohttp-keys (BL-4137) | Accepted | 2026-10-30 |
 | [1158](ADR-1158-a-ci-fix-goes-first-claim-lane-and-integrate-lock.md) | A CI fix goes first: claimed before other work, given a lane, and integrated ahead (AF-0475 to AF-0481) | Accepted | 2026-10-30 |
 | [1159](ADR-1159-wireguard-extension-tunnels-each-connection-through-a-user-space-wireguard-peer.md) | The WireGuard extension tunnels each connection through a user-space WireGuard peer (BL-4147) | Accepted | 2026-10-30 |
-| [1159](ADR-1159-a-hung-shift-coordinator-is-replaced-by-a-lane-without-stopping-the-lanes.md) | A hung shift coordinator is replaced by a lane, without stopping the lanes (BL-4353) | Accepted | 2026-10-30 |
+| [1160](ADR-1160-a-hung-shift-coordinator-is-replaced-by-a-lane-without-stopping-the-lanes.md) | A hung shift coordinator is replaced by a lane, without stopping the lanes (BL-4353) | Accepted | 2026-10-30 |

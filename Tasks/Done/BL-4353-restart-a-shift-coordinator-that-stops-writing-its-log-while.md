@@ -30,7 +30,7 @@ Start by finding what the coordinator was doing: the heartbeat loop in `DarkFact
 
 ## Notes
 
-- Decided by Claude (ADR-1159): timeouts via coordinator-only `git`/`gh` shadow functions (180 s, network subcommands only); lanes watch `coordinator.stamp` and replace the coordinator with `-TakeOverShift` + the shift's `-ShiftStamp`, keeping the lanes. Added RunDarkFactory.ps1 to touches (new parameters and help); no other Doing task touches it.
+- Decided by Claude (ADR-1160): timeouts via coordinator-only `git`/`gh` shadow functions (180 s, network subcommands only); lanes watch `coordinator.stamp` and replace the coordinator with `-TakeOverShift` + the shift's `-ShiftStamp`, keeping the lanes. Added RunDarkFactory.ps1 to touches (new parameters and help); no other Doing task touches it.
 - The hang itself was not found (no log); the unbounded `gh`/`git` network calls in the loop are the candidates, now bounded.
 - Proof: `-TestCoordinatorWatchdog` 15 PASS; `-TestHeartbeat`, `-TestRestart`, `-TestCiWatch` exit 0. No C# changed, so no build/quality run needed.
 
@@ -38,4 +38,4 @@ Start by finding what the coordinator was doing: the heartbeat loop in `DarkFact
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 3b8207b9 93aa094b 0d992756.
-- 2026-10-30: Doing -> Done. Coordinator gh/git network calls time out; lanes replace a coordinator silent for 3 heartbeats without stopping lanes (ADR-1159)
+- 2026-10-30: Doing -> Done. Coordinator gh/git network calls time out; lanes replace a coordinator silent for 3 heartbeats without stopping lanes (ADR-1160)

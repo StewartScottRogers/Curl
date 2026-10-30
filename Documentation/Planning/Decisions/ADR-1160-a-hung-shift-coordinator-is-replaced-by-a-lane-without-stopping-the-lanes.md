@@ -1,4 +1,4 @@
-# ADR-1159 — A hung shift coordinator is replaced by a lane, without stopping the lanes
+# ADR-1160 — A hung shift coordinator is replaced by a lane, without stopping the lanes
 
 - Status: Accepted
 - Date: 2026-10-30
