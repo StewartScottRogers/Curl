@@ -1,4 +1,4 @@
-# ADR-1120: The Dane extension's wire codec sends EDNS0 with DO and decodes without throwing
+# ADR-1123: The Dane extension's wire codec sends EDNS0 with DO and decodes without throwing
 
 - Status: Accepted
 - Date: 2026-10-29

@@ -1,6 +1,6 @@
 # Curl.Extension.Dane.UnitLibrary
 
-DNSSEC validation and DANE TLSA certificate matching (ADR-0999, ADR-1120), built up by BL-4151's split: BL-4333 the
+DNSSEC validation and DANE TLSA certificate matching (ADR-0999, ADR-1123), built up by BL-4151's split: BL-4333 the
 wire codec, BL-4334, BL-4335 and BL-4332 their own folders, and BL-4151 the option, the hook and the catalogue line.
 Namespace `Curl.Extension.Dane.Wire` so far. Tested against RFC 1035, RFC 4034, RFC 4035, RFC 5155, RFC 6698 and
 RFC 6891, not against curl. It references `Curl.Protocol.Abstractions`, `Curl.Extension.Abstractions`,
