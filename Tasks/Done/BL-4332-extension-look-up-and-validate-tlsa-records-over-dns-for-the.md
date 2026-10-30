@@ -8,7 +8,7 @@ depends-on: [BL-4333, BL-4335]
 touches: [Curl.Extension.Dane.UnitLibrary/Lookup, Curl.Extension.Dane.UnitTests/Lookup]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4332 — Extension: Look up and validate TLSA records over DNS for the Dane extension
 
@@ -22,11 +22,11 @@ Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333'
 
 ## Acceptance criteria
 
-- [ ] Unit tests drive the lookup over fake datagram and stream connectors replaying recorded responses for a signed TLSA RRset (secure), an unsigned zone below a proved insecure delegation (insecure), a tampered signature (bogus) and an NSEC- and an NSEC3-proved absence, each named after its RFC section, with no network.
-- [ ] A truncated UDP reply is retried over TCP and a timeout gives a lookup failure; unit tests with a fake `TimeProvider`.
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records what the lookup leaves out and why.
-- [ ] The library meets the four quality gates by `Measure-CodeQuality.ps1 -Library Curl.Extension.Dane.UnitLibrary`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] Unit tests drive the lookup over fake datagram and stream connectors replaying recorded responses for a signed TLSA RRset (secure), an unsigned zone below a proved insecure delegation (insecure), a tampered signature (bogus) and an NSEC- and an NSEC3-proved absence, each named after its RFC section, with no network.
+- [x] A truncated UDP reply is retried over TCP and a timeout gives a lookup failure; unit tests with a fake `TimeProvider`.
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records what the lookup leaves out and why.
+- [x] The library meets the four quality gates by `Measure-CodeQuality.ps1 -Library Curl.Extension.Dane.UnitLibrary`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -36,3 +36,4 @@ Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333'
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 6bb14aa5 fab06f69 65981ee3 6db41805 3d836d5e.
+- 2026-10-29: Doing -> Done. TLSA lookup over DNS with DNSSEC chain validation from the root: secure, insecure, bogus, absent and failed
