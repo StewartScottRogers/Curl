@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Curl.Extension.WebSocketExtendedConnect.UnitLibrary\Curl.Extension.WebSocketExtendedConnect.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Extension.Composition.UnitLibrary\Curl.Extension.Composition.UnitLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Curl.Http3.UnitTests\InMemoryMultiplexedConnection.cs" Link="Fakes\InMemoryMultiplexedConnection.cs" />
+    <Compile Include="..\Curl.Http3.UnitTests\InMemoryMultiplexedStream.cs" Link="Fakes\InMemoryMultiplexedStream.cs" />
+    <Compile Include="..\Curl.WebSocket.UnitTests\Fakes\FixedRandomSource.cs" Link="Fakes\FixedRandomSource.cs" />
+  </ItemGroup>
+
+</Project>
