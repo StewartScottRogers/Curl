@@ -4,8 +4,8 @@ title: Extension: Proxy UDP and IP through MASQUE
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4095, BL-4101]
-touches: [Curl.Extension.Masque.UnitLibrary, Curl.Extension.Masque.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4095, BL-4101, BL-4315, BL-4316, BL-4317]
+touches: [Curl.Extension.Masque.UnitLibrary, Curl.Extension.Masque.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionConnectionHookCatalogue.cs]
 requirement: none
 created: 2026-10-29
 completed:
@@ -34,8 +34,14 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 ## Notes
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
+- 2026-10-29 (lane 1, sizing pass before any code): split as the note above asks, and requeued. What the work needs:
+  - BL-4315: on the real network the engine's QUIC dialer opens its own UDP sockets (`EngineComposition.Transports.cs` `DialersOf`, `EngineDialing` null), so a connection hook's `DatagramConnectorOver` (ADR-1010) reaches only TFTP today; HTTP/3 cannot run through a MASQUE hook until QUIC dials through it. `QuicDialer.DialThroughTunnelAsync` is internal to `Curl.Networking`, so the engine route is the clean one.
+  - BL-4316: the project pair and the wire format (URI templates, HTTP/1.1 upgrade request and reply, CONNECT-IP capsules, IP/UDP packets), on the shared `Curl.HttpDatagram.UnitLibrary` (BL-4101).
+  - BL-4317: the datagram connector and channels over curl's connector.
+  - Left for this task: the option (planned: one `--masque <uri-template>`, CONNECT-UDP or CONNECT-IP chosen by the template's variables), the `IConnectionHook` keeping curl's TCP connector and replacing the datagram connector, its lines in `ExtensionOptionCatalogue.cs`, `ExtensionDescriptionCatalogue.cs` and `ExtensionConnectionHookCatalogue.cs` (added to touches: shared list files, one entry per line; how NamedPipe registers), the ADR, `--extensions`/`--ai-help extensions`, the CURL_EXTENSIONS=0 test and the quality run. `ExtensionCatalogue.cs` (protocol handler factories) likely needs no line, since MASQUE adds no scheme.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: cd391c17 c5786e7e dc0f73b9 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split before any code: waits on BL-4315 (QUIC dials through an extension's datagram connector), BL-4316 (MASQUE wire format) and BL-4317 (MASQUE tunnel client flow)
