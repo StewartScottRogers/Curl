@@ -8,7 +8,7 @@ depends-on: [BL-4344]
 touches: [Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferContextRequests.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/RetargetedTransferContext.cs, Curl.Extension.Abstractions.UnitTests/Transfer/TransferContextRequestsTests.cs]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4350 — Send WithRequest's body as the HTTP request body
 
@@ -35,3 +35,4 @@ Found in BL-4131 (ADR-1149) by running `curl -v --webdav-list` against a loopbac
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: aeb92ef5 a4721c93 e7c4212f 3d836d5e.
+- 2026-10-30: Doing -> Done. WithRequest sends its body as Http.Body
