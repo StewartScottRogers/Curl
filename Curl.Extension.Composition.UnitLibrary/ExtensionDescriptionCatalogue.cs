@@ -34,6 +34,7 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.Description,
         McpClient.Client.McpClientExtension.Description,
         OAuth2.Options.OAuth2Options.Description,
+        PrivacyPass.Options.PrivacyPassOptions.Description,
         Kafka.Client.KafkaExtension.Description,
         Redis.Client.RedisExtension.Description,
         Curl.Extension.WebSocketRepl.WebSocketReplExtension.Description,

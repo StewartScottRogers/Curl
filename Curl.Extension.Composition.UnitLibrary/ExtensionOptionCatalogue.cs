@@ -35,6 +35,7 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.EncryptedDns.EncryptedDnsExtension.DnsOverQuicOption,
         HttpFile.HttpFileOptions.File,
         HttpFile.HttpFileOptions.Environment,
+        PrivacyPass.Options.PrivacyPassOptions.Issuer,
         OAuth2.Options.OAuth2Options.ClientCredentials,
         OAuth2.Options.OAuth2Options.Device,
         OAuth2.Options.OAuth2Options.Pkce,
