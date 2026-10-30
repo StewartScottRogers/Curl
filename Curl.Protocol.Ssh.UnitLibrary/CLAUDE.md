@@ -25,9 +25,10 @@ authentication (ADR-0865); a failure, or the connection cache's close, ends the 
 `TransferResult`. On the way it reports curl's `-v` lines, worded in `SshInfoLines`, through
 `ITransferEvents`, and each block written to the output through
 `ReceivedDataReportingStream` (ADR-0262). Curl's own diagnostic log (component `ssh`,
-ADR-0222, BL-925) is worded in `SshDiagnosticLog`, which the handler builds from
-`ITransferContext.DiagnosticLog` and hangs on `SshTransport.DiagnosticLog`, so the packet
-reader and writer, the authentication, the channel and the SFTP session all write to it;
+ADR-0222, BL-925) is worded in `SshDiagnosticLog`, which the handler builds over the
+`Curl.Ssh` transport's `SshTransportLog` it hangs on `SshTransport.DiagnosticLog`
+(ADR-1165), so the packet reader and writer, the authentication, the channel and the SFTP
+session all write to the same log;
 a new SSH step logs through it, never a password, pass phrase or key byte. The console passes the platform's preset and ADR-0022's credential
 encoding. `Curl.Protocol.Ssh.UnitTests` drives it end to end against the public
 `Fakes.InMemorySshServer`, an `IConnector` answering each connection with a real
@@ -36,15 +37,20 @@ the root, runs the readers of server bytes - packets, zlib, `KEXINIT`, SFTP attr
 host-key signatures - over raw bytes for the audit fuzzer (ADR-0394); a new reader of
 what a server sends gets a method there.
 
-Folders follow ADR-0122's structure. `Transport` frames packets and runs the
+Folders follow ADR-0122's structure. The transport layer - the `Transport`, `Negotiation`,
+`KeyExchange`, `PacketProtection` and `Compression` folders, the host-key signature verifiers
+of `HostKeys` and the root `ISshRandomSource`, `SshConnectionLostException`,
+`Libssh2ErrorCode` and `SshTransferException` - lives in `Curl.Ssh.UnitLibrary` (namespaces
+`Curl.Ssh.*`, ADR-1165) so extensions can use it; this library keeps the rest. There,
+`Transport` frames packets and runs the
 handshake (`SshTransport`: identification, `KEXINIT`, key exchange, `NEWKEYS`, a
 server's re-exchange); `Negotiation` holds the presets - each with the prime sizes group
 exchange asks for, (2048, 4096, 4096) on Windows and (2048, 4096, 8192) on OpenSSL
 (ADR-0268) - and the catalogue of
 implemented names; `KeyExchange` holds one `ISshKeyExchange` per method family - the hybrid post-quantum
 methods in `HybridKemSshKeyExchange`, which pairs two `ISshKeyShare`s (ML-KEM or sntrup761
-with X25519 or a NIST curve) and hashes K as a `string` (ADR-0265) - and `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type - a certificate checked with its certified key alone by `OpenSshCertificateSshSignatureVerifier`, as libssh2 does, and the `sk-` keys over `SecurityKeySignedData` (ADR-0266) - and
-`KnownHostsFile` and `SshHostKeyChecker`, which accept or refuse the host key (ADR-0213);
+with X25519 or a NIST curve) and hashes K as a `string` (ADR-0265) - and `SshKeyDerivation`; `HostKeys` holds one `ISshSignatureVerifier` per host-key type - a certificate checked with its certified key alone by `OpenSshCertificateSshSignatureVerifier`, as libssh2 does, and the `sk-` keys over `SecurityKeySignedData` (ADR-0266) - while this library's `HostKeys`
+holds `KnownHostsFile` and `SshHostKeyChecker`, which accept or refuse the host key (ADR-0213);
 `PacketProtection` holds one `ISshPacketProtection` per cipher family, which the packet
 reader and writer switch to at each `NEWKEYS` (ADR-0212) - `ChaCha20Poly1305PacketProtection`
 (ADR-0259), `AesGcmPacketProtection` and `CipherAndMacPacketProtection`; `Compression` holds

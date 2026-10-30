@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Curl.Ssh;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Keys;

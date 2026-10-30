@@ -270,6 +270,10 @@
     <Project Path="Curl.Quic.UnitLibrary/Curl.Quic.UnitLibrary.csproj" />
     <Project Path="Curl.Quic.UnitTests/Curl.Quic.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Wire/Ssh/">
+    <Project Path="Curl.Ssh.UnitLibrary/Curl.Ssh.UnitLibrary.csproj" />
+    <Project Path="Curl.Ssh.UnitTests/Curl.Ssh.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Wire/WebSocket/">
     <Project Path="Curl.WebSocket.UnitLibrary/Curl.WebSocket.UnitLibrary.csproj" />
     <Project Path="Curl.WebSocket.UnitTests/Curl.WebSocket.UnitTests.csproj" />

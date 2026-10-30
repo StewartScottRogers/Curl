@@ -1,23 +1,11 @@
-using System.Security.Cryptography;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.HostKeys;
 
 namespace Curl.Protocol.Ssh;
 
-/// <content>The server's host key and the check's verdict (BL-4366).</content>
+/// <content>The host key check's verdict; the key itself is the transport log's (BL-4366).</content>
 internal sealed partial class SshDiagnosticLog
 {
-    /// <summary>Logs, at <c>info</c>, the host key's type and SHA-256 fingerprint.</summary>
-    /// <param name="hostKey">The server's host key blob.</param>
-    internal void HostKeyPresented(byte[] hostKey)
-    {
-        if (log.IsEnabled(DiagnosticLogLevel.Info))
-        {
-            string fingerprint = Convert.ToBase64String(SHA256.HashData(hostKey)).TrimEnd('=');
-            Write(DiagnosticLogLevel.Info, $"host key {SshKeyBlobReader.ReadKeyTypeName(hostKey)} SHA256:{fingerprint}");
-        }
-    }
-
     /// <summary>
     /// Logs the host key check's verdict: <c>warning</c> when no known-hosts file was read
     /// and the key was taken unchecked, as <c>--insecure</c> does; <c>info</c> otherwise.

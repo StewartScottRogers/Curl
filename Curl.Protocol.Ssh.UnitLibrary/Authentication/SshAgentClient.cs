@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Authentication;
 

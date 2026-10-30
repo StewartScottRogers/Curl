@@ -5,6 +5,10 @@ using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
 using Curl.Protocol.Ssh.Sftp;
+using Curl.Ssh;
+using Curl.Ssh.Fakes;
+using Curl.Ssh.KeyExchange;
+using Curl.Ssh.Negotiation;
 
 namespace Curl.Protocol.Ssh;
 

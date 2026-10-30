@@ -1,5 +1,5 @@
 using System.Text;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Connection;
 
@@ -65,9 +65,9 @@ internal sealed class SshSessionChannel(SshTransport transport)
     internal uint OpenFailureReasonCode { get; private set; }
 
     /// <summary>
-    /// Gets where the sessions steps are logged: the transports log.
+    /// Gets where the session's steps are logged: beside the transport's log, to the same diagnostic log.
     /// </summary>
-    internal SshDiagnosticLog DiagnosticLog => transport.DiagnosticLog;
+    internal SshDiagnosticLog DiagnosticLog { get; } = new(transport.DiagnosticLog);
 
     /// <summary>
     /// Sends <c>SSH_MSG_CHANNEL_OPEN</c> for a <c>session</c> channel and waits for the
@@ -92,14 +92,14 @@ internal sealed class SshSessionChannel(SshTransport transport)
         if (answer[0] == SshConnectionMessageNumber.ChannelOpenFailure)
         {
             OpenFailureReasonCode = confirmation.ReadUInt32();
-            transport.DiagnosticLog.ChannelOpened(false);
+            DiagnosticLog.ChannelOpened(false);
             return false;
         }
 
         remoteChannelNumber = confirmation.ReadUInt32();
         remoteWindow = confirmation.ReadUInt32();
         remoteMaximumPacketSize = Math.Max(confirmation.ReadUInt32(), 1);
-        transport.DiagnosticLog.ChannelOpened(true);
+        DiagnosticLog.ChannelOpened(true);
         return true;
     }
 
@@ -140,7 +140,7 @@ internal sealed class SshSessionChannel(SshTransport transport)
         await transport.PacketWriter.WriteAsync(request.ToArray(), cancellationToken).ConfigureAwait(false);
         byte[] answer = await WaitForAsync(SshConnectionMessageNumber.ChannelSuccess, SshConnectionMessageNumber.ChannelFailure, cancellationToken).ConfigureAwait(false);
         bool started = answer[0] == SshConnectionMessageNumber.ChannelSuccess;
-        transport.DiagnosticLog.ChannelRequested(requestType, value, started);
+        DiagnosticLog.ChannelRequested(requestType, value, started);
         return started;
     }
 

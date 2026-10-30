@@ -5,7 +5,7 @@ using Curl.Testing;
 namespace Curl.Protocol.Ssh;
 
 /// <summary>
-/// Pins the lines <see cref="SshDiagnosticLog" /> words for the steps an end-to-end session
+/// Pins the lines <see cref="SshDiagnosticLog" /> and <see cref="SshTransportLog" /> word for the steps an end-to-end session
 /// does not reach (BL-925), and that a disabled level writes nothing.
 /// </summary>
 [TestClass]
@@ -25,7 +25,7 @@ public sealed class SshDiagnosticLogTests
         Diagnostics.Arrange("level", DiagnosticLogLevel.Error);
         Diagnostics.Arrange("failure", "SessionEstablishmentFailed(-5, \"Unable to exchange encryption keys\")");
 
-        new SshDiagnosticLog(recording).Failed(SshTransferException.SessionEstablishmentFailed(-5, "Unable to exchange encryption keys"));
+        new SshDiagnosticLog(new SshTransportLog(recording)).Failed(SshTransferException.SessionEstablishmentFailed(-5, "Unable to exchange encryption keys"));
 
         WriteLines(
             new[] { "failed with FailedInit (2): Failure establishing ssh session: -5, Unable to exchange encryption keys (libssh2 -5)" },
@@ -42,7 +42,7 @@ public sealed class SshDiagnosticLogTests
         Diagnostics.Arrange("level", DiagnosticLogLevel.Info);
         Diagnostics.Arrange("algorithms", "curve25519-sha256, ssh-ed25519, aes256-gcm@openssh.com both ways, no MACs, no compression");
 
-        new SshDiagnosticLog(recording).KeysReExchanged(Algorithms);
+        new SshTransportLog(recording).KeysReExchanged(Algorithms);
 
         WriteLines(
             new[] { "key re-exchange: kex curve25519-sha256, host key ssh-ed25519, cipher aes256-gcm@openssh.com/aes256-gcm@openssh.com, MAC implicit/implicit, compression none/none" },
@@ -56,7 +56,7 @@ public sealed class SshDiagnosticLogTests
     public void StepsNotReachedEndToEnd_AreWordedAsPinned()
     {
         var recording = new RecordingDiagnosticLog(DiagnosticLogLevel.Verbose);
-        SshDiagnosticLog log = new(recording);
+        SshDiagnosticLog log = new(new SshTransportLog(recording));
         Diagnostics.Arrange("level", DiagnosticLogLevel.Verbose);
         Diagnostics.Arrange("steps", "no methods listed, channel refused, exec refused, SFTP answer 101, scp upload started, transfer failed");
 
@@ -80,16 +80,16 @@ public sealed class SshDiagnosticLogTests
     public void EveryStep_AtNone_WritesNothing()
     {
         var recording = new RecordingDiagnosticLog(DiagnosticLogLevel.None);
-        SshDiagnosticLog log = new(recording);
+        SshDiagnosticLog log = new(new SshTransportLog(recording));
         Diagnostics.Arrange("level", DiagnosticLogLevel.None);
         Diagnostics.Arrange("steps", "every SshDiagnosticLog step once");
 
-        log.MessageSent(20);
-        log.MessageReceived(20);
-        log.HandshakeNegotiated(new SshNegotiatedHandshake("SSH-2.0-c", "SSH-2.0-s", [], [], Algorithms));
-        log.KeysExchanged("curve25519-sha256", TimeSpan.Zero);
-        log.KeysReExchanged(Algorithms);
-        log.HostKeyPresented([]);
+        log.Transport.MessageSent(20);
+        log.Transport.MessageReceived(20);
+        log.Transport.HandshakeNegotiated(new SshNegotiatedHandshake("SSH-2.0-c", "SSH-2.0-s", [], [], Algorithms));
+        log.Transport.KeysExchanged("curve25519-sha256", TimeSpan.Zero);
+        log.Transport.KeysReExchanged(Algorithms);
+        log.Transport.HostKeyPresented([]);
         log.HostKeyAccepted(new SshOptions(), null);
         log.AuthenticationMethodsListed("password");
         log.AuthenticationTried("password");
@@ -115,7 +115,7 @@ public sealed class SshDiagnosticLogTests
         Diagnostics.Arrange("level", DiagnosticLogLevel.Error);
         Diagnostics.Arrange("failure", "SshLayerError()");
 
-        new SshDiagnosticLog(recording).Failed(SshTransferException.SshLayerError());
+        new SshDiagnosticLog(new SshTransportLog(recording)).Failed(SshTransferException.SshLayerError());
 
         WriteLines(new[] { "failed with Ssh (79): Error in the SSH layer" }, recording.At(DiagnosticLogLevel.Error));
         CollectionAssert.AreEqual(new[] { "failed with Ssh (79): Error in the SSH layer" }, recording.At(DiagnosticLogLevel.Error));

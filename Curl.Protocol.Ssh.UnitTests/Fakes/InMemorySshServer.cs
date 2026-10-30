@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Ssh.Fakes;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

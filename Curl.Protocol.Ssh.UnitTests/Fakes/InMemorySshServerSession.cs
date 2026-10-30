@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Curl.Cryptography;
 using Curl.Protocol.Ssh.Sftp;
-using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
+using static Curl.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

@@ -1,5 +1,6 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Ssh.HostKeys;
 
 namespace Curl.Protocol.Ssh.HostKeys;
 

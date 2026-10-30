@@ -1,9 +1,10 @@
 using System.Security.Cryptography;
-using Curl.Protocol.Ssh.Compression;
 using Curl.Protocol.Ssh.HostKeys;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Sftp;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh.Compression;
+using Curl.Ssh.HostKeys;
+using Curl.Ssh.Negotiation;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh;
 

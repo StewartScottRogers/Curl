@@ -1,3 +1,4 @@
+using Curl.Ssh;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Keys;

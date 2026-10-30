@@ -1,5 +1,7 @@
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Fakes;
+using Curl.Ssh;
+using Curl.Ssh.Fakes;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.HostKeys;

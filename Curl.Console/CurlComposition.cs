@@ -37,10 +37,10 @@ using Curl.Protocol.Rtsp;
 using Curl.Protocol.Smb;
 using Curl.Protocol.Smtp;
 using Curl.Protocol.Ssh;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Telnet;
 using Curl.Protocol.Tftp;
 using Curl.Protocol.Ws;
+using Curl.Ssh.Negotiation;
 using Libcurl.Misc.ErrorText;
 using static Curl.Engine.EngineComposition;
 

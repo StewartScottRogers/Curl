@@ -21,7 +21,7 @@
   <ItemGroup>
     <Compile Include="..\Curl.Protocol.Ssh.UnitTests\GlobalUsings\*.cs" LinkBase="GlobalUsings" />
     <Compile Include="..\Curl.Protocol.Ssh.UnitTests\Fakes\InMemorySshAgent.cs" Link="Fakes\InMemorySshAgent.cs" />
-    <Compile Include="..\Curl.Protocol.Ssh.UnitTests\Fakes\SshTestEncoding.cs" Link="Fakes\SshTestEncoding.cs" />
+    <Compile Include="..\Curl.Ssh.UnitTests\Fakes\SshTestEncoding.cs" Link="Fakes\SshTestEncoding.cs" />
     <Compile Include="..\Curl.Protocol.Ssh.UnitTests\Fakes\TestUserKeys.cs" Link="Fakes\TestUserKeys.cs" />
   </ItemGroup>
 

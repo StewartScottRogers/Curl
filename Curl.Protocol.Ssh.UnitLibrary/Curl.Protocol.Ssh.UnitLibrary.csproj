@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Curl.Cryptography.UnitLibrary\Curl.Cryptography.UnitLibrary.csproj" />
     <ProjectReference Include="..\Curl.Protocol.Abstractions.UnitLibrary\Curl.Protocol.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Ssh.UnitLibrary\Curl.Ssh.UnitLibrary.csproj" />
   </ItemGroup>
 
   <ItemGroup>

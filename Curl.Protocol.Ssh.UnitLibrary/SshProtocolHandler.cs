@@ -3,12 +3,13 @@ using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Authentication;
 using Curl.Protocol.Ssh.HostKeys;
-using Curl.Protocol.Ssh.KeyExchange;
 using Curl.Protocol.Ssh.Keys;
-using Curl.Protocol.Ssh.Negotiation;
 using Curl.Protocol.Ssh.Scp;
 using Curl.Protocol.Ssh.Sftp;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.KeyExchange;
+using Curl.Ssh.Negotiation;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh;
 
@@ -302,7 +303,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> RunSessionAsync(ITransferContext context, SshSessionTarget target, long connectionNumber, SshConnectPhaseLimit connectPhase, SshStateTrace trace, Func<SshDiagnosticLog, ValueTask<TransferResult>> session)
     {
         ITransferEvents events = context.Events;
-        SshDiagnosticLog log = new(context.DiagnosticLog);
+        SshDiagnosticLog log = new(new SshTransportLog(context.DiagnosticLog));
         try
         {
             TransferResult result = await session(log).ConfigureAwait(false);
@@ -375,7 +376,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         SshAlgorithmPreferences offered = SshHostKeyChecker.NarrowHostKeys(
             preferences.WithCompression(target.Options.Compression), target.Host, target.Port, target.Options, target.KnownHosts, context.Events);
         SshSessionConnection sessionConnection = new(connection);
-        SshTransport transport = new(sessionConnection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource, log);
+        SshTransport transport = new(sessionConnection, offered, SshAlgorithmCatalogue.Implemented, randomSource, ephemeralKeySource, log.Transport);
         SshKeyExchangeResult keys = await ExchangeKeysAsync(context, transport, log, connectPhase).ConfigureAwait(false);
         SshKeptSession session = new(transport, sessionConnection, new SftpSessionSlot(keepsSession: true), loginKey);
         return await TransferAndKeepOrDisconnectAsync(context, connection, session, () => AuthenticateAndTransferAsync(context, target, session, keys.HostKey, trace, connectPhase)).ConfigureAwait(false);
@@ -392,10 +393,10 @@ public sealed class SshProtocolHandler : IProtocolHandler
         try
         {
             SshNegotiatedHandshake handshake = await transport.NegotiateAlgorithmsAsync(connectPhase).ConfigureAwait(false);
-            log.HandshakeNegotiated(handshake);
+            log.Transport.HandshakeNegotiated(handshake);
             long started = context.TimeProvider.GetTimestamp();
             keys = await transport.ExchangeKeysAsync(handshake, connectPhase).ConfigureAwait(false);
-            log.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
+            log.Transport.KeysExchanged(handshake.Algorithms.KeyExchange, context.TimeProvider.GetElapsedTime(started));
         }
         catch (OperationCanceledException exception) when (transport.HasServerIdentificationArrived)
         {
@@ -420,7 +421,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
         await authentication.RequestServiceAsync(connectPhase).ConfigureAwait(false);
         transport.DiagnosticLog.HostKeyPresented(hostKey);
         await CheckHostKeyAsync(hostKey, target, events, trace, connectPhase).ConfigureAwait(false);
-        transport.DiagnosticLog.HostKeyAccepted(target.Options, target.KnownHosts);
+        new SshDiagnosticLog(transport.DiagnosticLog).HostKeyAccepted(target.Options, target.KnownHosts);
         await authentication.AuthenticateAsync(context.Credentials, connectPhase).ConfigureAwait(false);
         trace.Enter(SshUserAuthentication.AuthDoneState);
         events.ReportInfo(SshInfoLines.AuthenticationComplete);
@@ -459,7 +460,7 @@ public sealed class SshProtocolHandler : IProtocolHandler
     private static async ValueTask<TransferResult> TransferAsync(ITransferContext context, SshTransport transport, bool overScp, SshStateTrace trace, SftpSessionSlot sftp, SshTransferClock clock)
     {
         TransferResult result;
-        SshDiagnosticLog log = transport.DiagnosticLog;
+        SshDiagnosticLog log = new(transport.DiagnosticLog);
         log.TransferStarted(context.Url.Scheme, context.Url.AbsolutePath, context.Upload is not null);
         long started = context.TimeProvider.GetTimestamp();
         clock.MarkTransferReady();

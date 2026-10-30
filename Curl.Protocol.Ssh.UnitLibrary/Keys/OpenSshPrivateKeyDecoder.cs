@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Keys;
 

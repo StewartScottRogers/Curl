@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh;
+using Curl.Ssh;
 
 namespace Curl.Conformance.SshServer;
 

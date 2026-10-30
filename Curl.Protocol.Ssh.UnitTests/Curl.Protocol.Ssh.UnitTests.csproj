@@ -16,4 +16,15 @@
     <ProjectReference Include="..\Curl.Protocol.Ssh.UnitLibrary\Curl.Protocol.Ssh.UnitLibrary.csproj" />
   </ItemGroup>
 
+  <!--
+    The transport layer's fakes, which the in-memory SSH server and the authentication and
+    channel tests also use, linked rather than referenced: a ProjectReference to
+    Curl.Ssh.UnitTests would bring a second TestDiagnostics.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Curl.Ssh.UnitTests\Fakes\*.cs" Link="Fakes\%(Filename)%(Extension)" />
+    <Compile Include="..\Curl.Ssh.UnitTests\SshAuthenticationDiagnostics.cs" Link="SshAuthenticationDiagnostics.cs" />
+    <Compile Include="..\Curl.Ssh.UnitTests\SshByteDiagnostics.cs" Link="SshByteDiagnostics.cs" />
+  </ItemGroup>
+
 </Project>

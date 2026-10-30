@@ -1,5 +1,6 @@
 using System.Formats.Asn1;
-using static Curl.Protocol.Ssh.Fakes.SshTestEncoding;
+using Curl.Ssh.Fakes;
+using static Curl.Ssh.Fakes.SshTestEncoding;
 
 namespace Curl.Protocol.Ssh.Fakes;
 

@@ -1,6 +1,7 @@
 using System.Text;
 using Curl.Protocol.Abstractions;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Sftp;
 
@@ -63,10 +64,10 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
     /// </returns>
     /// <exception cref="SshTransferException">
     /// The session could not start (<see cref="SftpSession.StartAsync" />); <c>REALPATH</c>
-    /// failed; the open failed (<see cref="SshTransferException.SftpUploadFailed" />, or
-    /// <see cref="SshTransferException.SftpCreateFailed" /> after the directories were
+    /// failed; the open failed (<see cref="SftpStatusFailures.UploadFailed" />, or
+    /// <see cref="SftpStatusFailures.CreateFailed" /> after the directories were
     /// made); a <c>MKDIR</c> failed with a status curl does not go on past
-    /// (<see cref="SshTransferException.SftpRequestFailed" />); or the connection broke
+    /// (<see cref="SftpStatusFailures.RequestFailed" />); or the connection broke
     /// before the copy (exit 79, <c>Error in the SSH layer</c>).
     /// </exception>
     internal async ValueTask<TransferResult> UploadAsync(
@@ -158,7 +159,7 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         (byte[]? handle, uint status) = await session.OpenAsync(path, flags, createFileMode, cancellationToken).ConfigureAwait(false);
         handle ??= options.CreateDirectories && StatusesThatCreateDirectories.Contains(status)
             ? await CreateDirectoriesAndOpenAsync(session, path, flags, createFileMode, cancellationToken).ConfigureAwait(false)
-            : throw SshTransferException.SftpUploadFailed(status);
+            : throw SftpStatusFailures.UploadFailed(status);
         return (handle, offset);
     }
 
@@ -184,7 +185,7 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         }
 
         (byte[]? handle, uint status) = await session.OpenAsync(path, flags, createFileMode, cancellationToken).ConfigureAwait(false);
-        return handle ?? throw SshTransferException.SftpCreateFailed(status);
+        return handle ?? throw SftpStatusFailures.CreateFailed(status);
     }
 
     private async ValueTask MakeDirectoryAsync(SftpSession session, byte[] directory, CancellationToken cancellationToken)
@@ -193,7 +194,7 @@ internal sealed class SftpFileUpload(SshTransport transport, ITransferEvents eve
         uint status = await session.MakeDirectoryAsync(directory, cancellationToken).ConfigureAwait(false);
         if (!MakeDirectoryStatusesPassed.Contains(status))
         {
-            throw SshTransferException.SftpRequestFailed(status);
+            throw SftpStatusFailures.RequestFailed(status);
         }
     }
 

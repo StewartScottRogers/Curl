@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Curl.Protocol.Abstractions;
+using Curl.Ssh;
 using Curl.Testing;
 
 namespace Curl.Protocol.Ssh.Sftp;

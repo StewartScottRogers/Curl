@@ -3,9 +3,10 @@ using System.Net;
 using System.Text;
 using Curl.Protocol.Abstractions;
 using Curl.Protocol.Ssh.Keys;
-using Curl.Protocol.Ssh.Negotiation;
-using Curl.Protocol.Ssh.PacketProtection;
-using Curl.Protocol.Ssh.Transport;
+using Curl.Ssh;
+using Curl.Ssh.Negotiation;
+using Curl.Ssh.PacketProtection;
+using Curl.Ssh.Transport;
 
 namespace Curl.Protocol.Ssh.Authentication;
 
@@ -45,6 +46,7 @@ internal sealed class SshUserAuthentication(
     ISshAgentConnector? agentConnector = null)
 {
     private readonly ITransferEvents events = events ?? NoTransferEvents.Instance;
+    private readonly SshDiagnosticLog diagnosticLog = new(transport.DiagnosticLog);
 
     /// <summary>The service the client requests before authenticating.</summary>
     internal const string UserAuthService = "ssh-userauth";
@@ -168,7 +170,7 @@ internal sealed class SshUserAuthentication(
         byte[] user = credentialEncoding.GetBytes(userName);
         byte[] password = credentialEncoding.GetBytes(credentials?.Password ?? string.Empty);
         string? methods = await ListMethodsAsync(user, cancellationToken).ConfigureAwait(false);
-        transport.DiagnosticLog.AuthenticationMethodsListed(methods);
+        diagnosticLog.AuthenticationMethodsListed(methods);
         if (methods is null)
         {
             events.ReportInfo(SshInfoLines.AcceptedWithoutAuthentication);
@@ -396,9 +398,9 @@ internal sealed class SshUserAuthentication(
     // One method tried, with the diagnostic log naming it and its outcome (BL-925).
     private async ValueTask<bool> TryLoggedAsync(string method, Func<ValueTask<bool>> attempt)
     {
-        transport.DiagnosticLog.AuthenticationTried(method);
+        diagnosticLog.AuthenticationTried(method);
         bool succeeded = await attempt().ConfigureAwait(false);
-        transport.DiagnosticLog.AuthenticationEnded(method, succeeded);
+        diagnosticLog.AuthenticationEnded(method, succeeded);
         return succeeded;
     }
 

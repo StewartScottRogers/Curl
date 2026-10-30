@@ -35,6 +35,7 @@ public sealed class ProtocolIsolationTests
             ["Curl.Quic.UnitLibrary"] = [Tls, Cryptography, Abstractions],
             ["Curl.Http3.UnitLibrary"] = [Http2, Abstractions],
             ["Curl.WebSocket.UnitLibrary"] = [],
+            ["Curl.Ssh.UnitLibrary"] = [Cryptography, Abstractions],
         };
 
     [TestMethod]
@@ -108,6 +109,7 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Http3.UnitLibrary")]
     [DataRow("Curl.Zstandard.UnitLibrary")]
     [DataRow("Curl.WebSocket.UnitLibrary")]
+    [DataRow("Curl.Ssh.UnitLibrary")]
     public void ForbiddenProtocolReferences_AllowedLibrary_IsNotForbidden(string referenced)
     {
         TestDiagnostics diagnostics = TestDiagnostics.For(TestContext);
@@ -149,6 +151,7 @@ public sealed class ProtocolIsolationTests
     [DataRow("Curl.Http2.UnitLibrary", Abstractions)]
     [DataRow("Curl.Quic.UnitLibrary", "Curl.Tls.UnitLibrary")]
     [DataRow("Curl.Http3.UnitLibrary", "Curl.Http2.UnitLibrary")]
+    [DataRow("Curl.Ssh.UnitLibrary", "Curl.Cryptography.UnitLibrary")]
     public void ForbiddenHandBuiltReferences_ReferenceInItsRow_IsNotForbidden(
         string library, string referenced)
     {
