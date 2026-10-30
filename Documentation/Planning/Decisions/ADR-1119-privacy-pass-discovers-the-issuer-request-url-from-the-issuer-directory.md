@@ -1,4 +1,4 @@
-# ADR-1111: --privacy-pass discovers the issuer request URL from the issuer directory
+# ADR-1119: --privacy-pass discovers the issuer request URL from the issuer directory
 
 - Status: Accepted
 - Date: 2026-10-29

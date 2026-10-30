@@ -1163,4 +1163,4 @@ Each option and the specific reason it lost.
 | [1116](ADR-1116-virtual-machine-socket-end-point-writes-its-own-family-bytes.md) | The virtual machine socket end point writes its own family bytes (BL-4322) | Accepted | 2026-10-29 |
 | [1117](ADR-1117-wireguard-configuration-parser-ignores-wg-quick-host-keys-and-names-the-line.md) | The WireGuard configuration parser ignores wg-quick's host-side keys and names the line of every error (BL-4326) | Accepted | 2026-10-29 |
 | [1118](ADR-1118-quic-dials-through-an-extension-connection-hooks-datagram-connector.md) | QUIC dials through an extension connection hook's datagram connector (BL-4318) | Accepted | 2026-10-29 |
-| [1111](ADR-1111-privacy-pass-discovers-the-issuer-request-url-from-the-issuer-directory.md) | --privacy-pass discovers the issuer request URL from the issuer directory (BL-4316) | Accepted | 2026-10-29 |
+| [1119](ADR-1119-privacy-pass-discovers-the-issuer-request-url-from-the-issuer-directory.md) | --privacy-pass discovers the issuer request URL from the issuer directory (BL-4316) | Accepted | 2026-10-29 |
