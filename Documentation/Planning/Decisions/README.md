@@ -1180,3 +1180,4 @@ Each option and the specific reason it lost.
 | [1133](ADR-1133-grpc-extension-wire-format-follows-protocol-http2-md.md) | The gRPC extension's wire format follows grpc.io's PROTOCOL-HTTP2.md (BL-4340) | Accepted | 2026-10-29 |
 | [1134](ADR-1134-otel-endpoint-sends-traceparent-and-exports-each-http-transfer-span-as-otlp-json.md) | --otel-endpoint sends a traceparent and exports each HTTP transfer's span as OTLP/HTTP JSON (BL-4156) | Accepted | 2026-10-29 |
 | [1135](ADR-1135-record-and-replay-store-exchanges-in-curl-exchange-record-format-1.md) | Record and replay store exchanges in Curl exchange record format 1 (BL-4157) | Accepted | 2026-10-29 |
+| [1121](ADR-1121-wireguard-handshake-takes-injected-clock-and-random-and-is-tested-against-a-spec-responder.md) | The WireGuard handshake takes an injected clock and random source and is tested against a responder written from the whitepaper (BL-4323) | Accepted | 2026-10-29 |
