@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Curl.Extension.Abstractions.UnitLibrary\Curl.Extension.Abstractions.UnitLibrary.csproj" />
+    <ProjectReference Include="..\Curl.Zstandard.UnitLibrary\Curl.Zstandard.UnitLibrary.csproj" />
   </ItemGroup>
 
   <ItemGroup>
