@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Dpop;
 
 /// <summary>
-/// The <c>--dpop</c> extension (ADR-1136): OAuth 2.0 Demonstrating Proof of Possession (RFC 9449). It signs a DPoP proof
+/// The <c>--dpop</c> extension (ADR-1145): OAuth 2.0 Demonstrating Proof of Possession (RFC 9449). It signs a DPoP proof
 /// JWT for every HTTP request with the private key in a PEM file, sends an access token as <c>Authorization: DPoP</c>,
 /// and retries once with the nonce a server demands. <c>Curl.Extension.Composition</c> registers its option, description
 /// and transfer hook.

@@ -6,7 +6,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.Dpop;
 
 /// <summary>
-/// The <c>--dpop</c> transfer hook (ADR-1136). Every HTTP request carries a fresh DPoP proof in a <c>DPoP</c> header
+/// The <c>--dpop</c> transfer hook (ADR-1145). Every HTTP request carries a fresh DPoP proof in a <c>DPoP</c> header
 /// (RFC 9449 §4.1), signed with the key read once from the key file. An <c>--oauth2-bearer</c> token, or the token of a
 /// <c>-H "Authorization: DPoP ..."</c>, is bound to the proof by <c>ath</c>, and <c>--oauth2-bearer</c>'s is sent as
 /// <c>Authorization: DPoP</c> (§7.1). The last <c>DPoP-Nonce</c> each origin sent goes into its proofs, and a 400 or 401

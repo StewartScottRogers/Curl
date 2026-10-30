@@ -1,6 +1,6 @@
 # Curl.Extension.Dpop.UnitLibrary
 
-The DPoP extension (ADR-0999, ADR-1136), tested against RFC 9449. Namespace `Curl.Extension.Dpop`. It references
+The DPoP extension (ADR-0999, ADR-1145), tested against RFC 9449. Namespace `Curl.Extension.Dpop`. It references
 only `Curl.Extension.Abstractions.UnitLibrary` and the shared layers it brings.
 
 - `DpopExtension` gives the `--dpop <key file>` option, its description and its hook activator, which

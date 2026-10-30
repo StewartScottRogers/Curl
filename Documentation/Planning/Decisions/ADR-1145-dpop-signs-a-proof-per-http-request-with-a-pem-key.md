@@ -1,4 +1,4 @@
-# ADR-1136 — --dpop signs a DPoP proof for every HTTP request with a PEM key
+# ADR-1145 — --dpop signs a DPoP proof for every HTTP request with a PEM key
 
 - **Status:** Accepted
 - **Date:** 2026-10-30
