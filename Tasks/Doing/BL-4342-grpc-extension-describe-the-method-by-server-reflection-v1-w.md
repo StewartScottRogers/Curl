@@ -33,3 +33,4 @@ Third of three parts of BL-4102, on BL-4340's `Wire/` and BL-4341's `Client/`. S
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 955021ab 07666595 e35aff77 3d836d5e.
