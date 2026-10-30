@@ -1203,3 +1203,4 @@ Each option and the specific reason it lost.
 | [1155](ADR-1155-a-task-is-claimed-at-most-twice.md) | A task is claimed at most twice: splits defer, and a second requeue splits (AF-0465 to AF-0474) | Accepted | 2026-10-30 |
 | [1153](ADR-1153-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
 | [1156](ADR-1156-dane-extension-checks-tlsa-records-validated-from-the-root-with-dane.md) | The Dane extension checks TLSA records validated from the root with --dane (BL-4151) | Accepted | 2026-10-30 |
+| [1153](ADR-1153-oblivious-http-extension-sends-requests-through-a-relay.md) | The Oblivious HTTP extension sends requests through a relay with --ohttp-relay and --ohttp-keys (BL-4137) | Accepted | 2026-10-30 |
