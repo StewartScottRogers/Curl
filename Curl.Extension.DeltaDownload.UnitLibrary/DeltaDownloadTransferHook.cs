@@ -51,20 +51,35 @@ internal sealed class DeltaDownloadTransferHook(string controlPath, string? seed
         foreach (var (start, last) in blocks.MissingRanges())
         {
             var part = await CapturedResponse.CaptureAsync(context.WithRequestHeaders([$"Range: bytes={start}-{last}"]), next);
-            if (!part.Result.IsSuccess || part.Code == Ok)
+            if (await EndBeforeJoiningAsync(part, start, last, control.Length, context, next) is { } ended)
             {
-                return part.Result.IsSuccess ? await part.WriteAsync(context) : part.Result;
-            }
-
-            if (!IsRange(part, start, last, control.Length))
-            {
-                return await next(context);
+                return ended;
             }
 
             part.Body.CopyTo(blocks.Target, start);
             first ??= part;
         }
 
+        return await WriteIfIntactAsync(control, blocks, first, context, next);
+    }
+
+    private static async Task<TransferResult?> EndBeforeJoiningAsync(CapturedResponse part, long start, long last, int length, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
+    {
+        if (!part.Result.IsSuccess)
+        {
+            return part.Result;
+        }
+
+        if (part.Code == Ok)
+        {
+            return await part.WriteAsync(context);
+        }
+
+        return IsRange(part, start, last, length) ? null : await next(context);
+    }
+
+    private static async Task<TransferResult> WriteIfIntactAsync(ZsyncControlFile control, SeedBlocks blocks, CapturedResponse? first, ITransferContext context, Func<ITransferContext, ValueTask<TransferResult>> next)
+    {
         var file = blocks.Target.AsMemory(0, control.Length);
         return SHA1.HashData(file.Span).AsSpan().SequenceEqual(control.Sha1)
             ? await WriteAsync(first, file, context)
