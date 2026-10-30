@@ -1,4 +1,4 @@
-# ADR-1100 — --ws-extended-connect opens a WebSocket with extended CONNECT over HTTP/2 or HTTP/3
+# ADR-1111 — --ws-extended-connect opens a WebSocket with extended CONNECT over HTTP/2 or HTTP/3
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

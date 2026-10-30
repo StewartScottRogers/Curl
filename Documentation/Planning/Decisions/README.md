@@ -1155,4 +1155,4 @@ Each option and the specific reason it lost.
 | [1108](ADR-1108-proto-imports-resolve-through-an-injected-reader-and-types-resolve-as-protoc-does.md) | Proto imports resolve through an injected file reader, and named types resolve as protoc does (BL-4168) | Accepted | 2026-10-29 |
 | [1109](ADR-1109-vm-socket-runs-a-transfer-over-a-vsock-or-hyper-v-socket.md) | --vm-socket runs a transfer over a vsock or Hyper-V socket (BL-4143) | Accepted | 2026-10-29 |
 | [1110](ADR-1110-privacy-pass-answers-a-privatetoken-challenge-with-a-blind-rsa-token-from-the-issuer.md) | --privacy-pass answers a PrivateToken challenge with a Blind RSA token from the issuer (BL-4138) | Accepted | 2026-10-29 |
-| [1100](ADR-1100-ws-extended-connect-opens-a-websocket-with-extended-connect-over-http-2-or-http-3.md) | --ws-extended-connect opens a WebSocket with extended CONNECT over HTTP/2 or HTTP/3 (BL-4297) | Accepted | 2026-10-29 |
+| [1111](ADR-1111-ws-extended-connect-opens-a-websocket-with-extended-connect-over-http-2-or-http-3.md) | --ws-extended-connect opens a WebSocket with extended CONNECT over HTTP/2 or HTTP/3 (BL-4297) | Accepted | 2026-10-29 |

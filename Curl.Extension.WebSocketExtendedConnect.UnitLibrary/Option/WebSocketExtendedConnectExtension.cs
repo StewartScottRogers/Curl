@@ -6,7 +6,7 @@ using Curl.WebSocket;
 namespace Curl.Extension.WebSocketExtendedConnect.Option;
 
 /// <summary>
-/// The <c>--ws-extended-connect</c> extension (ADR-1100): opens a ws or wss transfer's WebSocket with extended
+/// The <c>--ws-extended-connect</c> extension (ADR-1111): opens a ws or wss transfer's WebSocket with extended
 /// CONNECT over HTTP/2 (RFC 8441) or HTTP/3 (RFC 9220) instead of the HTTP/1.1 upgrade.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>
