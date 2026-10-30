@@ -33,3 +33,4 @@ Found by BL-4146 (`--quic-migrate`, `Curl.Extension.QuicMigration.UnitLibrary`),
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: ce7c8ec5 d2f41d6d c6ae6efa 478f867b 3d836d5e.
