@@ -7,7 +7,7 @@ using Curl.Extension.WireGuard.Tunnel;
 
 namespace Curl.Extension.WireGuard;
 
-/// <summary>The <c>--wireguard</c> extension's option, description and connection hook activator (ADR-1150).</summary>
+/// <summary>The <c>--wireguard</c> extension's option, description and connection hook activator (ADR-1159).</summary>
 public static class WireGuardExtension
 {
     /// <summary>Gets <c>--wireguard &lt;conf&gt;</c>.</summary>

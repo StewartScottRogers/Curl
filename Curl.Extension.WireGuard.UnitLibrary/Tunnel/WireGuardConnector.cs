@@ -9,7 +9,7 @@ using Curl.Protocol.Abstractions;
 namespace Curl.Extension.WireGuard.Tunnel;
 
 /// <summary>
-/// Opens each connection of a transfer inside its own WireGuard tunnel (ADR-1150): the peer that cryptokey routing
+/// Opens each connection of a transfer inside its own WireGuard tunnel (ADR-1159): the peer that cryptokey routing
 /// picks for the target address, a new UDP socket and handshake to it, and a user-space TCP connection through it;
 /// curl's TLS handshake runs over that for a TLS target (ADR-1055).
 /// </summary>

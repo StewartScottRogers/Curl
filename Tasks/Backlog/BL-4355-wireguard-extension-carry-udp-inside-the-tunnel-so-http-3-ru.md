@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-BL-4147 (ADR-1150) carries TCP alone and replaces curl's datagram connector with `WireGuardDatagramConnector`, which refuses every UDP socket (exit 4) so no QUIC leaves outside the tunnel. This task adds UDP (RFC 768, with the RFC 1071 checksum `InternetChecksum` already has) to the IP stack and a datagram connector that opens an `IDatagramChannel` through the tunnel. Depends on BL-4354 because both change `Tunnel/`.
+BL-4147 (ADR-1159) carries TCP alone and replaces curl's datagram connector with `WireGuardDatagramConnector`, which refuses every UDP socket (exit 4) so no QUIC leaves outside the tunnel. This task adds UDP (RFC 768, with the RFC 1071 checksum `InternetChecksum` already has) to the IP stack and a datagram connector that opens an `IDatagramChannel` through the tunnel. Depends on BL-4354 because both change `Tunnel/`.
 
 ## Acceptance criteria
 

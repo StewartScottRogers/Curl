@@ -1,4 +1,4 @@
-# ADR-1150: The WireGuard extension tunnels each connection through a user-space WireGuard peer
+# ADR-1159: The WireGuard extension tunnels each connection through a user-space WireGuard peer
 
 - Status: Accepted
 - Date: 2026-10-30

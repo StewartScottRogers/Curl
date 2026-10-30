@@ -18,13 +18,13 @@ A transfer through `--wireguard` that lasts longer than Rekey-After-Time (120 s)
 
 ## Context
 
-BL-4147 (ADR-1150) gives each connection one transport session; `WireGuardTransportSession.Seal` refuses past Reject-After-Time (180 s), so a longer transfer fails. Whitepaper sections 6.2 (rekey by the initiator after Rekey-After-Time or Rekey-After-Messages, keeping the old session to receive until the new one confirms) and 6.5 (passive keepalive after Keepalive-Timeout, and `PersistentKeepalive`) say what to add to `WireGuardPacketTunnel`. Test with `TunnelTestPeer` and a `ManualTimeProvider`.
+BL-4147 (ADR-1159) gives each connection one transport session; `WireGuardTransportSession.Seal` refuses past Reject-After-Time (180 s), so a longer transfer fails. Whitepaper sections 6.2 (rekey by the initiator after Rekey-After-Time or Rekey-After-Messages, keeping the old session to receive until the new one confirms) and 6.5 (passive keepalive after Keepalive-Timeout, and `PersistentKeepalive`) say what to add to `WireGuardPacketTunnel`. Test with `TunnelTestPeer` and a `ManualTimeProvider`.
 
 ## Acceptance criteria
 
 - [ ] After Rekey-After-Time the tunnel sends a new initiation, moves sending to the new session once its first message arrives, and still opens packets of the old session until then; unit tests named after whitepaper section 6.2.
 - [ ] A keepalive is sent after Keepalive-Timeout with nothing to send, and every `PersistentKeepalive` seconds when configured; unit tests named after section 6.5.
-- [ ] ADR-1150's Left out section is updated; the four quality gates hold by Measure-CodeQuality.ps1.
+- [ ] ADR-1159's Left out section is updated; the four quality gates hold by Measure-CodeQuality.ps1.
 - [ ] `dotnet build` is clean and the fast tests pass.
 
 ## Notes

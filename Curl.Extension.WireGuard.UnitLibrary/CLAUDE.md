@@ -5,7 +5,7 @@ The WireGuard extension (ADR-0999), tested against wg(8) and wg-quick(8), not ag
 `Curl.Protocol.Abstractions.UnitLibrary` and `Curl.Extension.Abstractions.UnitLibrary`, never a `Curl.Protocol.*`
 library or another extension.
 
-- `WireGuardExtension` holds `--wireguard <conf>` (ADR-1150), its description and `Activate`, registered in
+- `WireGuardExtension` holds `--wireguard <conf>` (ADR-1159), its description and `Activate`, registered in
   Composition's option, description and connection hook catalogues; `Activate` reads and parses the file, and any
   failure is an `ArgumentException` the host reports as exit 2. `WireGuardConnectionHook` (an `IConnectionHook`)
   gives a `WireGuardConnector` over curl's TLS provider and ALPN list, and a datagram connector that refuses UDP.

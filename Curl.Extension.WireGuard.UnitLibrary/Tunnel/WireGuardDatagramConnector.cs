@@ -4,7 +4,7 @@ namespace Curl.Extension.WireGuard.Tunnel;
 
 /// <summary>
 /// Stands in for curl's datagram connector under <c>--wireguard</c>, refusing every UDP socket so that no datagram
-/// (QUIC for HTTP/3) leaves outside the tunnel; the IP stack carries TCP alone (ADR-1150).
+/// (QUIC for HTTP/3) leaves outside the tunnel; the IP stack carries TCP alone (ADR-1159).
 /// </summary>
 internal sealed class WireGuardDatagramConnector : IDatagramConnector
 {
