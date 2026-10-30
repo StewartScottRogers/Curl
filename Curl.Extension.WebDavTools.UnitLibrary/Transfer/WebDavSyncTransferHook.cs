@@ -116,12 +116,7 @@ internal sealed class WebDavSyncTransferHook(string localFolder, IWebDavLocalFil
     // Renames the partial file over the local copy when the GET was answered with a 2xx; otherwise deletes it.
     private static TransferResult Keep(TransferResult result, WebDavSyncItem item, string partialPath)
     {
-        var failure = result switch
-        {
-            { IsSuccess: false } => result,
-            { Report.ResponseCode: >= 200 and < 300 } => null,
-            _ => TransferResult.Failure(CurlExitCode.HttpReturnedError, $"The server answered GET {item.Href} with {result.Report?.ResponseCode ?? 0}"),
-        };
+        var failure = FailureOf(result, item);
         if (failure is not null)
         {
             File.Delete(partialPath);
@@ -135,6 +130,19 @@ internal sealed class WebDavSyncTransferHook(string localFolder, IWebDavLocalFil
         }
 
         return result;
+    }
+
+    private static TransferResult? FailureOf(TransferResult result, WebDavSyncItem item)
+    {
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        var code = result.Report?.ResponseCode ?? 0;
+        return code is >= 200 and < 300
+            ? null
+            : TransferResult.Failure(CurlExitCode.HttpReturnedError, $"The server answered GET {item.Href} with {code}");
     }
 
     private static async Task WriteLineAsync(ITransferContext context, string kind, string text) =>
