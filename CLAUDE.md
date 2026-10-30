@@ -169,7 +169,10 @@ alarm. `-Lanes Auto` paces lanes to the 5-hour window only; `-WeeklyPace` also s
 the weekly budget evenly to its reset (ADR-0130, BL-806). Lane runs load
 `DarkFactory/LaneRules.md` in place of this file, with no user-level settings, plugins or
 MCP servers and a `-MaxRunTurns` turn cap, so a rule a lane needs goes in both files
-(BL-3001). The factory picks the Claude
+(BL-3001). A task is claimed at most twice (ADR-1155): a split for size defers the task
+and files every part of it, the rest included, as new tasks, and a task that reaches the
+turn cap or is sent back to `Backlog` a second time gets the bounded split run instead of
+a third claim. The factory picks the Claude
 model per task - a task's front-matter `model:` wins, else opus for security, crypto,
 feature, protocol, retried and CI-fix work and sonnet for the rest, a routine feature
 task (an upstream unit program port, a harness stand-in and the like, naming no hard

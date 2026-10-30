@@ -120,6 +120,10 @@ moving or editing a task, and move tasks only with its script
 (`.claude/skills/task-board/task-board.ps1`). A task's `touches` names files or narrow
 subfolders, never a whole project it only adds to. A registration table that tasks only
 add lines to is one entry per line and listed in `Tasks/SharedListFiles.txt`.
+A task is claimed at most twice (ADR-1155): a task split for size files every part of its
+work, the rest included, as tasks of their own and goes to `Deferred`, never back to
+`Backlog` to wait on its own subtasks; and the shift splits a task a run sends back to
+`Backlog` a second time rather than offer it a third claim.
 
 ## Git
 Commit by logical unit with Conventional Commits once the build is clean and the fast

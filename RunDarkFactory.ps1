@@ -87,10 +87,23 @@
     among them, still run), no MCP server or claude.ai connector, no auto memory, and
     DarkFactory\LaneRules.md in place of the root CLAUDE.md; a project folder's own
     CLAUDE.md still loads when the run works there. Each run is also capped at
-    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops, and its task
-    goes back to Backlog as too big for one run, to be split in the first turns of its next
-    claim. The task and lane prompts name the cap and ask the run to hand back what is left
-    15 turns before it (AF-0482). -TestLaneFlags proves the flags.
+    -MaxRunTurns turns (default 80, 0 for none); a run that reaches it stops, and its task,
+    too big for one run, gets the cost cap's bounded split run at once rather than a trip
+    back to Backlog for its next claim to split (ADR-1155). The task and lane prompts name
+    the cap and ask the run to hand back what is left 15 turns before it (AF-0482).
+    -TestLaneFlags proves the flags.
+
+    NO THIRD CLAIM
+
+    A task is claimed at most twice and requeued at most once (ADR-1155, AF-0465 to
+    AF-0474). A run that splits a task for size files every part, the rest of the task
+    included, as tasks of their own and moves the task to Deferred, never back to Backlog
+    to wait on its own subtasks; a run out of time hands its task back with its work for the
+    shift to stash, without filing the rest as a task it waits on. And when a run sends a
+    task back to Backlog whose Log already shows a Doing -> Backlog move (a requeue or a
+    park; not a claim released unstarted at the shift's end), the shift splits it with the
+    same bounded split run, carrying any stash to the new tasks; a split skipped or failed
+    blocks it for Stewart to triage. -TestTaskStash proves it.
 
     THE MODEL PER TASK
 
@@ -460,7 +473,8 @@ param(
     # defers the original (Blocked only if the split is skipped or fails). 0 means no cap (ADR-0288, ADR-0407, ADR-0478, ADR-0759).
     [double]$TaskBudgetUsd = 10,
     # The most turns a single headless run may take (claude's --max-turns); a run that
-    # reaches it stops, since its task is too big for one run. 0 means no cap (BL-3001).
+    # reaches it stops, since its task is too big for one run, and its task gets the bounded
+    # split run (ADR-1155). 0 means no cap (BL-3001).
     [ValidateRange(0, 1000)][int]$MaxRunTurns = 80,
     # Model for every run, or auto (the default) to choose one per task; see THE MODEL PER
     # TASK above. "opus" is the moving alias RunClaude.cmd also uses.

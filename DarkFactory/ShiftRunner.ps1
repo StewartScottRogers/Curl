@@ -181,32 +181,43 @@ while ($true) {
     }
     $apiRetries = 0
 
-    # A run that reached the turn cap is too big for one run: back to Backlog for a split (BL-3001).
-    if ($state -eq 'Doing' -and (Test-TurnCapReached)) {
-        Save-StrayChanges $id
-        $why = "stopped at its $MaxRunTurns-turn cap, so the task is too big for one run: split it in the first turns of the next claim"
-        Invoke-Board @('move', '-Id', $id, '-To', 'Backlog', '-Reason', "Dark factory $why; see $(Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl")") | Out-Null
-        git -C $Root add -A Tasks 2>&1 | Out-Null
-        git -C $Root commit -q -m "chore(tasks): requeue $id - dark factory $why" 2>&1 | Out-Null
-        if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
-        $state = Get-TaskState $id
-    }
+    # A run that reached the turn cap is too big for one run (BL-3001): it is split now, like one
+    # that reached its cost cap, not sent back to Backlog for the next claim to split (ADR-1155:
+    # BL-4112, BL-4328 and BL-4341 went back that way on 2026-10-29 and 2026-10-30).
+    $turnCapped = $state -eq 'Doing' -and (Test-TurnCapReached)
 
     if ($state -eq 'Doing') {
         $why = if ($capWhy) { $capWhy }
+            elseif ($turnCapped) { "stopped at its $MaxRunTurns-turn cap, so the task is too big for one run" }
             elseif ($run.TimedOut -and $inOvertime) { "timed out after $TaskMinutes min and again after $overtimeMinutes min of overtime" }
             elseif ($run.TimedOut) { "timed out after $TaskMinutes min" }
             elseif (Test-BudgetSpent) { "stopped at its $($script:RunBudgetUsd) US dollar cost cap (4 times the median run, at least $3, at most -TaskBudgetUsd, less its runs of the last day), so split the task" } else { "run ended in Doing, exit $($run.ExitCode)" }
         Save-StrayChanges $id
         # A task stopped by its cost cap is split by one bounded run (BL-3091), which defers or
         # blocks it itself; one already offered for a split today is blocked as before.
-        $capped = $capWhy -or (-not $run.TimedOut -and (Test-BudgetSpent))
-        $split = if ($capped) { Invoke-TaskSplit $id $why -LeaveForIntegration:([bool]$Lane) } else { 'skipped' }
+        $capped = $capWhy -or $turnCapped -or (-not $run.TimedOut -and (Test-BudgetSpent))
+        $cause = if ($turnCapped) { 'too big for one run' } else { 'over its cost cap' }
+        $split = if ($capped) { Invoke-TaskSplit $id $why -Cause $cause -LeaveForIntegration:([bool]$Lane) } else { 'skipped' }
         if (Test-TaskSplitLeavesBlockToCaller $split) {
             $seeLog = if ($capWhy) { Join-Path $LogDir "$id-*.jsonl" } else { Join-Path $LogDir "$id-$Stamp$LaneTag.jsonl" }
             Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; see $seeLog") | Out-Null
             git -C $Root add -A Tasks 2>&1 | Out-Null
             git -C $Root commit -q -m "chore(tasks): block $id - dark factory $why" 2>&1 | Out-Null
+            if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
+        }
+        $state = Get-TaskState $id
+    }
+    # A task a run sent back to Backlog a second time is split now rather than offered a third
+    # claim (ADR-1155, AF-0465 to AF-0474: 64 requeues on 2026-10-29 and 2026-10-30, and BL-4124,
+    # BL-4132 and BL-4137 claimed 3 times). A split that cannot run blocks it for Stewart to triage.
+    if ($state -eq 'Backlog' -and (Get-TaskRequeueCount (Get-TaskFileLines $id)) -ge 2) {
+        $why = "sent back to Backlog a second time, last for: $(Get-Short (Get-LastLogLine $id) 160)"
+        Save-StrayChanges $id
+        $split = Invoke-TaskSplit $id $why -Cause 'sent back to Backlog twice' -LeaveForIntegration:([bool]$Lane)
+        if (Test-TaskSplitLeavesBlockToCaller $split) {
+            Invoke-Board @('move', '-Id', $id, '-To', 'Blocked', '-Reason', "Stewart: dark factory $why; the automatic split returned '$split', so triage it rather than claim it a third time") | Out-Null
+            git -C $Root add -A Tasks 2>&1 | Out-Null
+            git -C $Root commit -q -m "chore(tasks): block $id - sent back to Backlog twice and not split" 2>&1 | Out-Null
             if (-not $Lane) { git -C $Root push -q 2>&1 | Out-Null }
         }
         $state = Get-TaskState $id

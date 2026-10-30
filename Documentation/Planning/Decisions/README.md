@@ -1200,3 +1200,4 @@ Each option and the specific reason it lost.
 | [1152](ADR-1152-structured-fields-shows-known-rfc-9651-fields-in-verbose-and-write-out.md) | --structured-fields shows known RFC 9651 fields in -v and -w (BL-4140) | Accepted | 2026-10-30 |
 | [1153](ADR-1153-masque-runs-quic-and-http3-through-a-connect-udp-or-connect-ip-proxy.md) | --masque runs QUIC and HTTP/3 through a CONNECT-UDP or CONNECT-IP proxy (BL-4144) | Accepted | 2026-10-30 |
 | [1154](ADR-1154-compression-dictionary-stores-and-advertises-rfc-9842-dictionaries-in-a-transfer-hook.md) | --compression-dictionary stores and advertises RFC 9842 dictionaries in a transfer hook (BL-4132) | Accepted | 2026-10-30 |
+| [1155](ADR-1155-a-task-is-claimed-at-most-twice.md) | A task is claimed at most twice: splits defer, and a second requeue splits (AF-0465 to AF-0474) | Accepted | 2026-10-30 |

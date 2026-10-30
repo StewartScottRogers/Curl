@@ -79,7 +79,9 @@ carry over what still fits rather than starting over.
 # ---------------------------------------------------------------------------- split
 
 # A task over its cost cap is split by one bounded headless run (BL-3091, ADR-0759): at most
-# once per task per day, on Sonnet, with a small cost and turn cap of its own.
+# once per task per day, on Sonnet, with a small cost and turn cap of its own. So is a task
+# whose run stopped at its turn cap, and one a run sent back to Backlog a second time
+# (ADR-1155): neither is offered a third claim.
 $TaskSplitBudgetUsd = 1
 $TaskSplitMaxTurns = 30
 $TaskSplitMinutes = 20
@@ -230,6 +232,22 @@ function Invoke-TaskSplitRun {
     return @{ ExitCode = $p.ExitCode }
 }
 
+function Get-TaskRequeueCount {
+    # How many times -LogLines (a task file's lines) say a run sent the task from Doing back to
+    # Backlog: its own requeues and its parks, not a claim a lane released unstarted at the
+    # shift's end (BL-4347). Two or more means the next claim would be its third (ADR-1155).
+    param([string[]]$LogLines)
+    return @($LogLines | Where-Object { $_ -match '^\s*-\s.*\bDoing -> Backlog\.' -and $_ -notmatch 'never started it' }).Count
+}
+
+function Get-TaskFileLines {
+    # The lines of task -Id's file wherever it is on the board, or none.
+    param([string]$Id)
+    $file = Get-ChildItem (Join-Path $Root 'Tasks') -Recurse -Filter "$Id-*.md" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $file) { return @() }
+    return @(Get-Content -LiteralPath $file.FullName)
+}
+
 function Test-TaskSplitLeavesBlockToCaller {
     # True when the caller of Invoke-TaskSplit must block the task itself (and commit that): the
     # split was not attempted ('skipped') or left the task out of Blocked ('failed'). False for
@@ -239,8 +257,8 @@ function Test-TaskSplitLeavesBlockToCaller {
 }
 
 function Invoke-TaskSplit {
-    # Splits -Id, which is over its cost cap for -Why, into smaller tasks with one split run,
-    # then commits and pushes the board change under the integrate lock. Returns 'skipped'
+    # Splits -Id, which is -Cause (over its cost cap, by default) for -Why, into smaller tasks with
+    # one split run, then commits and pushes the board change under the integrate lock. Returns 'skipped'
     # when -Id was already offered for a split on -Now's day, 'split' when the run filed new
     # tasks and deferred -Id, 'blocked' when it failed and -Id is now in Blocked, 'failed' when it
     # failed and -Id is not in Blocked (the caller then blocks -Id itself), or 'reset-failed' when the
@@ -260,12 +278,12 @@ function Invoke-TaskSplit {
         [scriptblock]$Git = { param([string[]]$GitArgs) Invoke-Git $GitArgs },
         [scriptblock]$HeadSha = { "$(& git -C $Root rev-parse HEAD 2>$null)".Trim() },
         [scriptblock]$BoardCall = { param([string[]]$BoardArgs) Invoke-Board $BoardArgs },
-        [switch]$PullOnRefusal, [switch]$LeaveForIntegration)
+        [switch]$PullOnRefusal, [switch]$LeaveForIntegration, [string]$Cause = 'over its cost cap')
     if (-not (Register-TaskSplitAttempt $Id $Now $MarkerDir)) { return 'skipped' }
     $sha = & $StashSha $Id
     $stash = if ($sha) { "The shift kept its unfinished work as stash $sha." } else { 'It left no stashed work, so there is no stash to store.' }
-    $text = $SplitPrompt.Replace('{ID}', $Id).Replace('{WHY}', $Why).Replace('{STASH}', $stash).Replace('{SHA}', $(if ($sha) { $sha } else { '<none>' })).Replace('{STAMP}', $Now.ToString('yyyyMMdd-HHmmss'))
-    Write-Trace $Id 'split' "over its cost cap; one split run of at most `$$TaskSplitBudgetUsd and $TaskSplitMaxTurns turns" 'Yellow'
+    $text = $SplitPrompt.Replace('{ID}', $Id).Replace('{CAUSE}', $Cause).Replace('{WHY}', $Why).Replace('{STASH}', $stash).Replace('{SHA}', $(if ($sha) { $sha } else { '<none>' })).Replace('{STAMP}', $Now.ToString('yyyyMMdd-HHmmss'))
+    Write-Trace $Id 'split' "$Cause; one split run of at most `$$TaskSplitBudgetUsd and $TaskSplitMaxTurns turns" 'Yellow'
     $before = @(& $ListTaskIds)
     $run = & $RunSplit $Id $text
     $new = @(& $ListTaskIds | Where-Object { $before -notcontains $_ } | Sort-Object -Unique)
@@ -288,7 +306,7 @@ function Invoke-TaskSplit {
         if (-not $failure) {
             & $Git @('add', '-A', 'Tasks') | Out-Null
             $headBefore = & $HeadSha
-            $committed = & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - over its cost cap", '-m', $SkipCiNote)
+            $committed = & $Git @('commit', '-q', '-m', "chore(tasks): split $Id into $($new -join ', ') - $Cause", '-m', $SkipCiNote)
             $pushed = $committed -and -not $LeaveForIntegration -and (& $Git @('push', '-q', 'origin', "HEAD:$Branch"))
             # A claim synced this checkout to the shared branch, so it may take what other lanes
             # pushed since; after a run the lane may hold commits of its own, which only the
@@ -620,6 +638,34 @@ if ($TestTaskStash) {
         # The caller makes no commit and no push for reset-failed (BL-3114).
         & $check 'the caller blocks only skipped and failed splits, never reset-failed' 'True True False False False' "$(Test-TaskSplitLeavesBlockToCaller 'skipped') $(Test-TaskSplitLeavesBlockToCaller 'failed') $(Test-TaskSplitLeavesBlockToCaller 'reset-failed') $(Test-TaskSplitLeavesBlockToCaller 'split') $(Test-TaskSplitLeavesBlockToCaller 'blocked')"
         & $check 'ShiftRunner.ps1 asks Test-TaskSplitLeavesBlockToCaller before its block commit' 'True' "$((Get-Content (Join-Path $PSScriptRoot 'ShiftRunner.ps1') -Raw) -match 'if \(Test-TaskSplitLeavesBlockToCaller \$split\)')"
+        # A task sent back to Backlog a second time is split, never offered a third claim (ADR-1155).
+        $requeueLog = @('- [ ] a criterion', '- 2026-10-29: Backlog -> Doing. Criteria at claim: 1.', '- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-2.',
+            '- 2026-10-30: Backlog -> Doing. Criteria at claim: 1.', "- 2026-10-30: Doing -> Backlog. Lane 4 claimed it after the shift's time was up and never started it.")
+        & $check 'a requeue counts, a claim released unstarted does not' '1' "$(Get-TaskRequeueCount $requeueLog)"
+        & $check 'a second requeue (or a park) counts twice' '2' "$(Get-TaskRequeueCount ($requeueLog + '- 2026-10-30: Doing -> Backlog. Lane 2 could not integrate: rebase conflict.'))"
+        & $check 'a cost cap window passing (Blocked -> Backlog) is no requeue' '0' "$(Get-TaskRequeueCount @('- 2026-10-29: Blocked -> Backlog. Cost cap window passed.'))"
+        & $check 'no task file, no requeues' '0' "$(Get-TaskRequeueCount @())"
+        $runnerText = Get-Content (Join-Path $PSScriptRoot 'ShiftRunner.ps1') -Raw
+        $splitsTwice = $runnerText.Contains('(Get-TaskRequeueCount (Get-TaskFileLines $id)) -ge 2') -and $runnerText.Contains('Invoke-TaskSplit $id $why -Cause ''sent back to Backlog twice''')
+        & $check 'ShiftRunner.ps1 splits a task requeued twice' 'True' "$splitsTwice"
+        $splitsTurnCap = $runnerText.Contains('$capped = $capWhy -or $turnCapped')
+        $requeuesTurnCap = $runnerText.Contains('split it in the first turns of the next claim')
+        & $check 'ShiftRunner.ps1 splits a turn-capped run now, not at its next claim' 'True False' "$splitsTurnCap $requeuesTurnCap"
+        $laneDefers = $LanePrompt.Contains('never sends this task back to Backlog') -and $LanePrompt.Contains('move this task to Deferred')
+        $runDefers = $Prompt.Contains('never sends this task back to Backlog') -and $Prompt.Contains('move this task to Deferred')
+        & $check 'the task prompts defer a task split for size, never requeue it' 'True True' "$laneDefers $runDefers"
+        $waitsOnRest = '(?s)file what is left as a task.{0,80}add its ID to the'
+        & $check 'the deadline rule no longer files the rest as a task the task waits on' 'False False' "$($LanePrompt -match $waitsOnRest) $($Prompt -match $waitsOnRest)"
+        # The split's cause reaches its prompt, trace and commit; the default stays the cost cap.
+        $script:splitSteps.Clear(); $script:splitIds = @('BL-1'); $runs.Clear()
+        $causeGit = { param([string[]]$GitArgs) $script:splitSteps.Add(($GitArgs -join ' ')); $true }
+        $traceText = & { Invoke-TaskSplit 'BL-1' 'sent back twice' -Cause 'sent back to Backlog twice' -Now ([datetime]'2026-11-20') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $false } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $causeGit -BoardCall $boardStub } 6>&1 | Out-String
+        & $check 'the cause is in the split prompt, trace and commit' 'True True True' "$($runs[0].Contains('BL-1 is sent back to Backlog twice: sent back twice.')) $($traceText -match 'sent back to Backlog twice; one split run') $(@($script:splitSteps | Where-Object { $_ -match '^commit .*split BL-1 into BL-2, BL-3 - sent back to Backlog twice' }).Count -eq 1)"
+        $runs.Clear()
+        $null = & { Invoke-TaskSplit 'BL-1' 'cap' -Now ([datetime]'2026-11-21') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { '' } `
+            -ContinuesStash { $false } -StoreStash $failingStore -DropStash { param($h) } -TaskState { 'Deferred' } -EnterLock $lockStub -Git $causeGit -BoardCall $boardStub } 6>&1
+        & $check 'without -Cause the split says over its cost cap' 'True' "$($runs[0].Contains('BL-1 is over its cost cap: cap.'))"
         # A split with a stash and no continuing task traces it in red.
         $script:splitSteps.Clear(); $script:splitIds = @('BL-1')
         $traceText = & { Invoke-TaskSplit 'BL-1' 'cost cap' -Now ([datetime]'2026-11-04') -MarkerDir $markers -RunSplit $okRun -ListTaskIds { $script:splitIds } -StashSha { 'abc123' } `
