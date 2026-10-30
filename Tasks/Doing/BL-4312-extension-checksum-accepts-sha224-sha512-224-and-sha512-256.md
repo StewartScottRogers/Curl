@@ -32,3 +32,4 @@ BL-4135 delivered `--checksum` with sha1, sha256, sha384 and sha512 over the BCL
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: c8c3c32a d1f0d5bf b9bc50d3 3d836d5e.
