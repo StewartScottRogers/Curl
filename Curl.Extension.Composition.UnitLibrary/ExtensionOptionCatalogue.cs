@@ -74,5 +74,6 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.UserFromKeychainOption,
         Curl.Extension.Dpop.DpopExtension.Option,
         Grpc.Client.GrpcExtension.ProtoOption,
+        Curl.Extension.Masque.MasqueExtension.Option,
     ];
 }

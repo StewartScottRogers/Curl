@@ -67,5 +67,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.Description,
         Curl.Extension.Dpop.DpopExtension.Description,
         Grpc.Client.GrpcExtension.Description,
+        Curl.Extension.Masque.MasqueExtension.Description,
     ];
 }
