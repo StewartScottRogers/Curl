@@ -35,3 +35,4 @@ Part of the split of BL-4151 (DNSSEC and DANE TLSA extension). Built on BL-4333'
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 6bb14aa5 fab06f69 65981ee3 6db41805 3d836d5e.
