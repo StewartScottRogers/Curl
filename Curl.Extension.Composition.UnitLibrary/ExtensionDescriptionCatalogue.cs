@@ -14,6 +14,7 @@ internal static class ExtensionDescriptionCatalogue
     [
         Curl.Extension.NamedPipe.NamedPipeExtension.Description,
         Curl.Extension.VirtualMachineSocket.VirtualMachineSocketExtension.Description,
+        Curl.Extension.QuicMigration.QuicMigrationExtension.Description,
         GraphQl.GraphQlOptions.Description,
         Curl.Extension.JsonRpc.JsonRpcExtension.Description,
         ConnectRpc.ConnectRpcExtension.Description,
