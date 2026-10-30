@@ -33,3 +33,4 @@ Split from BL-4137 (Oblivious HTTP relay extension) for size; builds on BL-4311'
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: fc74dce3 a0eee265 73ea1b26 3180db99 3d836d5e.
