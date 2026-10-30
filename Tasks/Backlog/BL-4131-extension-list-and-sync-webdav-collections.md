@@ -4,8 +4,8 @@ title: Extension: List and sync WebDAV collections
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094]
-touches: [Curl.Extension.WebDavTools.UnitLibrary, Curl.Extension.WebDavTools.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4299, BL-4300, BL-4301]
+touches: [Curl.Extension.WebDavTools.UnitLibrary, Curl.Extension.WebDavTools.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionOptionCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionTransferHookCatalogue.cs, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
 completed:
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 3): Split for size before any code, following BL-4125 (GCS). An option extension registers an `ExtensionOption` and an `ITransferHook` (as `SegmentedDownloadExtension` does), but a hook cannot yet change the URL, method or body of the request it passes on (`HookedTransferContext` forwards `Url` and `PostData`; nothing sets `Http.CustomMethod`), so filed BL-4299 (`WithRequest` in Extension.Abstractions/Transfer). Planned default: send PROPFIND and the sync GETs through the engine (TLS, proxy, `--user`) via that hook, not raw HTTP over IConnection. Filed BL-4300 (project scaffold, PROPFIND body and Depth header, 207 Multistatus reader) and BL-4301 (sync planner from a listing and a local folder). This task keeps the options (`--webdav-list`, a sync option taking a local directory), the hook, catalogue, option, transfer-hook and description registration (shared list files, added to touches), the ADR and the CURL_EXTENSIONS=0 test.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 9634e382 6e6e8883 ceea66be e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4299 (hook WithRequest), BL-4300 (scaffold, PROPFIND and Multistatus) and BL-4301 (sync planner)
