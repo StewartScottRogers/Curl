@@ -42,5 +42,6 @@ internal static class ExtensionDescriptionCatalogue
         Amqp0.Client.Amqp0Extension.Description,
         OciRegistry.Client.OciRegistryExtension.Description,
         Curl.Extension.ContentDigest.ContentDigestExtension.Description,
+        GoogleCloudStorage.Client.GcsExtension.Description,
     ];
 }

@@ -29,5 +29,6 @@ internal static class ExtensionCatalogue
         S3.Client.S3Extension.CreateHandler,
         Amqp0.Client.Amqp0Extension.CreateHandler,
         OciRegistry.Client.OciRegistryExtension.CreateHandler,
+        GoogleCloudStorage.Client.GcsExtension.CreateHandler,
     ];
 }
