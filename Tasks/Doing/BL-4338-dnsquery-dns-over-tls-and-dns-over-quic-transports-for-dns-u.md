@@ -37,3 +37,4 @@ Builds on BL-4337's `Transport/DnsQueryTransportSelection.cs`. DoT: `ProtocolHan
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 121af646 7614c36d 1fbc52b6 478f867b 3d836d5e.
