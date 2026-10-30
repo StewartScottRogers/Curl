@@ -4,7 +4,7 @@ title: Extension: Run a transfer through a built-in WireGuard tunnel
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4095]
+depends-on: [BL-4091, BL-4093, BL-4095, BL-4321, BL-4322, BL-4323, BL-4324]
 touches: [Curl.Extension.WireGuard.UnitLibrary, Curl.Extension.WireGuard.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -35,7 +35,10 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
+- 2026-10-29 (lane 4): Split for size before any code. WireGuard needs BLAKE2s, HMAC-BLAKE2s and XChaCha20-Poly1305 (none in the repository; X25519 and ChaCha20-Poly1305 exist in Curl.Cryptography.UnitLibrary, which extensions may reference), the Noise IK handshake and message formats, and a user-space IPv4/IPv6/TCP stack. Filed BL-4321 (crypto primitives), BL-4322 (project scaffold and config parser), BL-4323 (Noise IK and transport data), BL-4324 (IP and TCP stack). This task keeps the final piece: the tunnel connection under the BL-4095 connection hooks, the `--wireguard` option, catalogue registration, description, ADR and gates.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 71678f30 fb9989d2 50ada9e9 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Backlog. Split for size: waits on BL-4321, BL-4322, BL-4323, BL-4324 (crypto primitives, scaffold and config, Noise IK, IP/TCP stack)
