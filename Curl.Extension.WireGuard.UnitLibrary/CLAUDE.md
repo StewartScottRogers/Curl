@@ -13,8 +13,9 @@ library or another extension.
   cryptokey routing picks the peer and source address, `IWireGuardUdpOpener` (`SystemWireGuardUdpOpener` in
   production) opens the UDP socket, `WireGuardTunnelHandshake` retries initiations every Rekey-Timeout for
   Rekey-Attempt-Time, `WireGuardPacketTunnel` is the `IIpPacketChannel` sealing and opening transport data, and
-  `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. IP address targets only
-  (BL-4354 adds names), TCP only (BL-4355 adds UDP), no rekeying (BL-4356). Its tests drive it against
+  `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. A host name is resolved
+  first by DNS over TCP through its own tunnel to the first `DNS` address (ADR-1160), `WireGuardDnsMessage` building
+  the query and reading the answer; without one it is exit 6. TCP only (BL-4355 adds UDP), no rekeying (BL-4356). Its tests drive it against
   `TunnelTestPeer`, a responder and TCP server written from the whitepaper.
 
 - `Configuration/` reads a wg-quick configuration file (ADR-1117): `WireGuardConfigurationParser.Parse` gives a

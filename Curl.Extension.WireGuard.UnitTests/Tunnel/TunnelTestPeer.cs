@@ -86,10 +86,16 @@ internal sealed class TunnelTestPeer : IWireGuardUdpOpener, IWireGuardUdpChannel
 
     public async Task<byte[]> NextSentAsync() => await sent.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
-    /// <summary>Takes the initiation (section 5.4.2) and answers it with a response (5.4.3).</summary>
+    /// <summary>Takes the next initiation (section 5.4.2), skipping what an earlier tunnel sent last, and answers it with a response (5.4.3).</summary>
     public async Task AcceptHandshakeAsync()
     {
-        var initiation = await NextSentAsync();
+        byte[] initiation;
+        do
+        {
+            initiation = await NextSentAsync();
+        }
+        while (initiation[0] != 1);
+
         Assert.IsTrue(Responder.TryConsumeInitiation(initiation));
         Assert.IsTrue(HandshakeInitiationMessage.TryDecode(initiation, out var message));
         initiatorIndex = message.SenderIndex;

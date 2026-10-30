@@ -36,7 +36,7 @@ WireGuard support, so the choices follow the WireGuard whitepaper (Donenfeld, re
 - **UDP is refused, not leaked.** The IP stack carries TCP alone, so the hook's datagram connector refuses every
   UDP socket with exit 4 rather than let QUIC leave outside the tunnel. BL-4355 adds UDP inside the tunnel.
 - **Names.** Only IP address targets are tunnelled for now; a host name fails with exit 6 rather than be looked
-  up outside the tunnel. BL-4354 resolves names through the configuration's `DNS` servers inside the tunnel.
+  up outside the tunnel. ADR-1160 (BL-4354) since resolves names by DNS over TCP to the configuration's `DNS` servers inside the tunnel.
 - **The peer's endpoint** is resolved with the system resolver and reached with a system UDP socket
   (`SystemWireGuardUdpOpener`, excluded from coverage under ADR-0083 as a thin socket adapter); everything above
   it is tested against a whitepaper-written peer with no network.

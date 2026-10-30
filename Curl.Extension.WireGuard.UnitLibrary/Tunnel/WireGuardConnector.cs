@@ -11,7 +11,8 @@ namespace Curl.Extension.WireGuard.Tunnel;
 /// <summary>
 /// Opens each connection of a transfer inside its own WireGuard tunnel (ADR-1159): the peer that cryptokey routing
 /// picks for the target address, a new UDP socket and handshake to it, and a user-space TCP connection through it;
-/// curl's TLS handshake runs over that for a TLS target (ADR-1055).
+/// curl's TLS handshake runs over that for a TLS target (ADR-1055). A host name is resolved by DNS over TCP through
+/// the tunnel to the configuration's first <c>DNS</c> address (ADR-1160), never by the system resolver.
 /// </summary>
 /// <param name="configuration">The wg-quick configuration.</param>
 /// <param name="opener">Opens the UDP socket to the peer.</param>
@@ -44,16 +45,9 @@ internal sealed class WireGuardConnector(
             return ConnectResult.Failed(CurlExitCode.NotBuiltIn, "TLS through the WireGuard tunnel is not built in");
         }
 
-        if (!IPAddress.TryParse(target.Host.Trim('[', ']'), out IPAddress? destination))
-        {
-            return ConnectResult.Failed(CurlExitCode.CouldntResolveHost, $"Could not resolve host: {target.Host} (--wireguard reaches IP addresses only)");
-        }
-
-        WireGuardPeer? peer = WireGuardRoute.PeerFor(configuration.Peers, destination);
-        IPAddress? source = WireGuardRoute.SourceFor(configuration.Interface.Addresses, destination);
-        return peer is null || source is null
-            ? ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {target.Host} port {target.Port}: no WireGuard peer's AllowedIPs and interface Address cover it")
-            : await ConnectThroughAsync(peer, source, new IPEndPoint(destination, target.Port), target, cancellationToken).ConfigureAwait(false);
+        return IPAddress.TryParse(target.Host.Trim('[', ']'), out IPAddress? destination)
+            ? await ConnectToAsync(destination, target, cancellationToken).ConfigureAwait(false)
+            : await ResolveAndConnectAsync(target, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -66,6 +60,92 @@ internal sealed class WireGuardConnector(
         string.Equals(target.PoolScheme, "https", StringComparison.OrdinalIgnoreCase)
             ? target.ApplicationProtocols ?? HttpOverTlsApplicationProtocols
             : [];
+
+    private static ConnectResult Unresolved(ConnectTarget target) =>
+        ConnectResult.Failed(CurlExitCode.CouldntResolveHost, $"Could not resolve host: {target.Host}");
+
+    private static IPAddress? AddressOrNull(string text) => IPAddress.TryParse(text, out IPAddress? address) ? address : null;
+
+    private static async ValueTask<byte[]?> ReadExactlyAsync(IConnection connection, int count, CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[count];
+        for (int filled = 0; filled < count;)
+        {
+            int read = await connection.ReadAsync(buffer.AsMemory(filled), cancellationToken).ConfigureAwait(false);
+            if (read == 0)
+            {
+                return null;
+            }
+
+            filled += read;
+        }
+
+        return buffer;
+    }
+
+    /// <summary>
+    /// Resolves the target's host name by DNS over TCP to the configuration's first <c>DNS</c> address, through its
+    /// own tunnel (ADR-1160), then connects to the first address of the answer; the system resolver is never asked.
+    /// </summary>
+    private async ValueTask<ConnectResult> ResolveAndConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
+    {
+        IPAddress? server = configuration.Interface.DnsServers.Select(AddressOrNull).FirstOrDefault(address => address is not null);
+        IPAddress? destination = server is null ? null : await ResolveAsync(server, target.Host, cancellationToken).ConfigureAwait(false);
+        return destination is null ? Unresolved(target) : await ConnectToAsync(destination, target, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Asks <paramref name="server" /> for <paramref name="host" />'s A record, or AAAA when the interface has no IPv4 address.</summary>
+    private async ValueTask<IPAddress?> ResolveAsync(IPAddress server, string host, CancellationToken cancellationToken)
+    {
+        ushort type = configuration.Interface.Addresses.Any(address => address.Address.AddressFamily == AddressFamily.InterNetwork)
+            ? WireGuardDnsMessage.AddressType
+            : WireGuardDnsMessage.Ipv6AddressType;
+        byte[] idBytes = new byte[2];
+        random.GetBytes(idBytes);
+        ushort id = BitConverter.ToUInt16(idBytes);
+        byte[] query;
+        try
+        {
+            query = WireGuardDnsMessage.EncodeQuery(id, host, type);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+
+        ConnectResult opened = await ConnectToAsync(server, new ConnectTarget(server.ToString(), WireGuardDnsMessage.Port, false), cancellationToken).ConfigureAwait(false);
+        return opened.Connection is { } connection
+            ? await ExchangeAsync(connection, query, id, type, cancellationToken).ConfigureAwait(false)
+            : null;
+    }
+
+    private static async ValueTask<IPAddress?> ExchangeAsync(IConnection connection, byte[] query, ushort id, ushort type, CancellationToken cancellationToken)
+    {
+        await using (connection.ConfigureAwait(false))
+        {
+            try
+            {
+                await connection.WriteAsync(query, cancellationToken).ConfigureAwait(false);
+                await connection.FlushAsync(cancellationToken).ConfigureAwait(false);
+                byte[]? length = await ReadExactlyAsync(connection, 2, cancellationToken).ConfigureAwait(false);
+                byte[]? response = length is null ? null : await ReadExactlyAsync(connection, (length[0] << 8) | length[1], cancellationToken).ConfigureAwait(false);
+                return response is null ? null : WireGuardDnsMessage.AddressesIn(response, id, type).FirstOrDefault();
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+        }
+    }
+
+    private async ValueTask<ConnectResult> ConnectToAsync(IPAddress destination, ConnectTarget target, CancellationToken cancellationToken)
+    {
+        WireGuardPeer? peer = WireGuardRoute.PeerFor(configuration.Peers, destination);
+        IPAddress? source = WireGuardRoute.SourceFor(configuration.Interface.Addresses, destination);
+        return peer is null || source is null
+            ? ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {target.Host} port {target.Port}: no WireGuard peer's AllowedIPs and interface Address cover it")
+            : await ConnectThroughAsync(peer, source, new IPEndPoint(destination, target.Port), target, cancellationToken).ConfigureAwait(false);
+    }
 
     private static ConnectResult Unreachable(ConnectTarget target, Exception exception) =>
         ConnectResult.Failed(CurlExitCode.CouldntConnect, $"Failed to connect to {target.Host} port {target.Port} through the WireGuard tunnel: {exception.Message}");

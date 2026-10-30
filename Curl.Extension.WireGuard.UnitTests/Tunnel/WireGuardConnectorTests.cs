@@ -71,16 +71,130 @@ public sealed class WireGuardConnectorTests
     }
 
     [TestMethod]
-    public async Task ConnectAsync_HostName_CannotBeResolvedInsideTheTunnel()
+    [DataRow("", "example.com", DisplayName = "no DNS line")]
+    [DataRow("DNS = corp.example", "example.com", DisplayName = "a search domain only")]
+    [DataRow("DNS = 192.168.1.1", "example.com", DisplayName = "a DNS server no peer routes")]
+    [DataRow("DNS = 10.0.0.53", "a..b", DisplayName = "an invalid host name")]
+    public async Task ConnectAsync_HostNameWithNoDnsServerToAsk_CannotBeResolvedAndOpensNothing(string dnsLine, string host)
     {
         TunnelTestPeer peer = new();
-        WireGuardConnector connector = new(TunnelTestPeer.Configuration(), peer, TimeProvider.System, RandomNumberGenerator.Create());
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: dnsLine), peer, TimeProvider.System, RandomNumberGenerator.Create());
 
-        ConnectResult result = await connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None);
+        ConnectResult result = await connector.ConnectAsync(new ConnectTarget(host, 80, false), CancellationToken.None);
 
         Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
-        Assert.AreEqual("Could not resolve host: example.com (--wireguard reaches IP addresses only)", result.ErrorMessage);
+        Assert.AreEqual($"Could not resolve host: {host}", result.ErrorMessage);
         Assert.IsNull(peer.OpenedEndpoint);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_HostName_ResolvesItByDnsOverTcpThroughTheTunnelThenConnectsToTheAnswer()
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = corp.example, 10.0.0.53, 10.0.0.54"), peer, new ManualTimeProvider(), RandomNumberGenerator.Create());
+
+        var connecting = connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None).AsTask();
+        var (dnsPacket, dnsSyn, query) = await AcceptDnsQueryAsync(peer);
+        await AnswerAndCloseAsync(peer, dnsPacket, dnsSyn, query, WireGuardDnsMessageTests.Record([0xC0, 0x0C], WireGuardDnsMessage.AddressType, 1, [10, 0, 0, 1]));
+        await peer.AcceptHandshakeAsync();
+        var (packet, syn) = await peer.AcceptTcpAsync();
+        ConnectResult result = await connecting;
+
+        Assert.AreEqual(IPAddress.Parse("10.0.0.53"), dnsPacket.Destination);
+        Assert.AreEqual((ushort)53, dnsSyn.DestinationPort);
+        CollectionAssert.AreEqual(WireGuardDnsMessage.EncodeQuery(IdOf(query), "example.com", WireGuardDnsMessage.AddressType), query);
+        Assert.AreEqual(IPAddress.Parse("10.0.0.1"), packet.Destination);
+        Assert.AreEqual((ushort)80, syn.DestinationPort);
+        Assert.AreEqual(new IPEndPoint(IPAddress.Parse("10.0.0.1"), 80), result.Connection!.RemoteEndPoint);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_HostNameWithAnIpv6InterfaceOnly_AsksForTheIpv6Address()
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(addresses: "fd00::2/128", extraInterfaceLine: "DNS = fd00::53"), peer, new ManualTimeProvider(), RandomNumberGenerator.Create());
+
+        var connecting = connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None).AsTask();
+        var (dnsPacket, dnsSyn, query) = await AcceptDnsQueryAsync(peer);
+        await AnswerAndCloseAsync(peer, dnsPacket, dnsSyn, query, WireGuardDnsMessageTests.Record([0xC0, 0x0C], WireGuardDnsMessage.Ipv6AddressType, 1, IPAddress.Parse("fd00::1").GetAddressBytes()));
+        await peer.AcceptHandshakeAsync();
+        var (packet, _) = await peer.AcceptTcpAsync();
+        ConnectResult result = await connecting;
+
+        Assert.AreEqual(IPAddress.Parse("fd00::53"), dnsPacket.Destination);
+        CollectionAssert.AreEqual(WireGuardDnsMessage.EncodeQuery(IdOf(query), "example.com", WireGuardDnsMessage.Ipv6AddressType), query);
+        Assert.AreEqual(IPAddress.Parse("fd00::1"), packet.Destination);
+        Assert.IsNotNull(result.Connection);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_AnswerWithNoAddress_CannotBeResolved()
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 10.0.0.53"), peer, new ManualTimeProvider(), RandomNumberGenerator.Create());
+
+        var connecting = connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None).AsTask();
+        var (dnsPacket, dnsSyn, query) = await AcceptDnsQueryAsync(peer);
+        await AnswerAndCloseAsync(peer, dnsPacket, dnsSyn, query);
+        ConnectResult result = await connecting;
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+        Assert.AreEqual("Could not resolve host: example.com", result.ErrorMessage);
+        Assert.IsTrue(peer.IsDisposed);
+    }
+
+    [TestMethod]
+    [DataRow(0, DisplayName = "before the length")]
+    [DataRow(2, DisplayName = "after the length")]
+    public async Task ConnectAsync_DnsServerClosesBeforeTheWholeAnswer_CannotBeResolved(int bytesBeforeClose)
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 10.0.0.53"), peer, new ManualTimeProvider(), RandomNumberGenerator.Create());
+
+        var connecting = connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None).AsTask();
+        var (dnsPacket, dnsSyn, query) = await AcceptDnsQueryAsync(peer);
+        byte[] partial = new byte[] { 0, 30 }[..bytesBeforeClose];
+        peer.Reply(dnsPacket, new TcpSegment(dnsSyn.DestinationPort, dnsSyn.SourcePort, TunnelTestPeer.ServerInitialSequenceNumber + 1, dnsSyn.SequenceNumber + 1 + (uint)query.Length, TcpFlags.Ack | TcpFlags.Psh | TcpFlags.Fin, 65535, null, partial));
+        TcpSegment fin = await peer.ReceiveSegmentAsync(TcpFlags.Fin);
+        peer.Reply(dnsPacket, new TcpSegment(dnsSyn.DestinationPort, dnsSyn.SourcePort, TunnelTestPeer.ServerInitialSequenceNumber + 2 + (uint)bytesBeforeClose, fin.SequenceNumber + 1, TcpFlags.Ack, 65535, null, []));
+        ConnectResult result = await connecting;
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+    }
+
+    [TestMethod]
+    public async Task ConnectAsync_DnsServerResetsTheConnection_CannotBeResolved()
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnector connector = new(TunnelTestPeer.Configuration(extraInterfaceLine: "DNS = 10.0.0.53"), peer, new ManualTimeProvider(), RandomNumberGenerator.Create());
+
+        var connecting = connector.ConnectAsync(new ConnectTarget("example.com", 80, false), CancellationToken.None).AsTask();
+        var (dnsPacket, dnsSyn, query) = await AcceptDnsQueryAsync(peer);
+        peer.Reply(dnsPacket, new TcpSegment(dnsSyn.DestinationPort, dnsSyn.SourcePort, TunnelTestPeer.ServerInitialSequenceNumber + 1, dnsSyn.SequenceNumber + 1 + (uint)query.Length, TcpFlags.Rst | TcpFlags.Ack, 0, null, []));
+        ConnectResult result = await connecting;
+
+        Assert.AreEqual(CurlExitCode.CouldntResolveHost, result.ExitCode);
+    }
+
+    private static ushort IdOf(byte[] query) => (ushort)((query[2] << 8) | query[3]);
+
+    /// <summary>Accepts the DNS tunnel's handshake and TCP connection and reads the framed query.</summary>
+    private static async Task<(IpPacket Packet, TcpSegment Syn, byte[] Query)> AcceptDnsQueryAsync(TunnelTestPeer peer)
+    {
+        await peer.AcceptHandshakeAsync();
+        var (packet, syn) = await peer.AcceptTcpAsync();
+        TcpSegment query = await peer.ReceiveSegmentAsync(TcpFlags.None);
+        return (packet, syn, query.Payload);
+    }
+
+    /// <summary>Sends a framed NOERROR answer holding <paramref name="answers" />, then acknowledges the client's FIN with the server's own.</summary>
+    private static async Task AnswerAndCloseAsync(TunnelTestPeer peer, IpPacket packet, TcpSegment syn, byte[] query, params byte[][] answers)
+    {
+        byte[] answer = WireGuardDnsMessageTests.Response(IdOf(query), 0x8180, answers);
+        byte[] framed = [(byte)(answer.Length >> 8), (byte)answer.Length, .. answer];
+        peer.Reply(packet, new TcpSegment(syn.DestinationPort, syn.SourcePort, TunnelTestPeer.ServerInitialSequenceNumber + 1, syn.SequenceNumber + 1 + (uint)query.Length, TcpFlags.Ack | TcpFlags.Psh, 65535, null, framed));
+        TcpSegment fin = await peer.ReceiveSegmentAsync(TcpFlags.Fin);
+        peer.Reply(packet, new TcpSegment(syn.DestinationPort, syn.SourcePort, TunnelTestPeer.ServerInitialSequenceNumber + 1 + (uint)framed.Length, fin.SequenceNumber + 1, TcpFlags.Ack | TcpFlags.Fin, 65535, null, []));
     }
 
     [TestMethod]
