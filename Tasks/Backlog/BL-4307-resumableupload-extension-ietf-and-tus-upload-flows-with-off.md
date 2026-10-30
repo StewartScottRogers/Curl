@@ -1,16 +1,16 @@
 ---
-id: BL-4300
+id: BL-4307
 title: ResumableUpload extension: IETF and tus upload flows with offset retrieval and resumption in a transfer hook
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4299]
+depends-on: [BL-4306]
 touches: [Curl.Extension.ResumableUpload.UnitLibrary, Curl.Extension.ResumableUpload.UnitTests]
 requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4300 — ResumableUpload extension: IETF and tus upload flows with offset retrieval and resumption in a transfer hook
+# BL-4307 — ResumableUpload extension: IETF and tus upload flows with offset retrieval and resumption in a transfer hook
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4129 for size; builds on BL-4299's HTTP/1.1 exchange and header fields. BL-4129 then adds the option, the catalogue lines, the description and the ADR, and gives `HookFor(ExtensionOptionValues)` its option, so expose the hook's constructor (and anything `HookFor` needs) for it.
+Split from BL-4129 for size; builds on BL-4306's HTTP/1.1 exchange and header fields. BL-4129 then adds the option, the catalogue lines, the description and the ADR, and gives `HookFor(ExtensionOptionValues)` its option, so expose the hook's constructor (and anything `HookFor` needs) for it.
 
 Suggested flow (record any change under Notes for BL-4129's ADR): the hook implements `ITransferHook.ExecuteAsync(context, services, next)`; for a transfer that is not http/https or has no `context.Upload`, it calls `next` unchanged. Otherwise it sends `OPTIONS` to the URL through `services.Connector`: a response with `Tus-Resumable: 1.0.0` and `Tus-Version` naming 1.0.0 and `Tus-Extension` naming `creation` selects tus (tus 1.0 "Creation": `POST` with `Upload-Length`, 201 with `Location`; "Core Protocol": `PATCH` with `Content-Type: application/offset+octet-stream` and `Upload-Offset`, `HEAD` for the offset). Otherwise the IETF draft: upload creation (`POST`/`PUT` per curl's method, `Upload-Complete: ?0`, `Upload-Length`, `Upload-Draft-Interop-Version`), the 201's `Location` as the upload resource, upload append (`PATCH`, `Content-Type: application/partial-upload`, `Upload-Offset`, `Upload-Complete: ?1`), and after a broken connection offset retrieval (`HEAD`, `Upload-Offset`) and append from there. Resume at most a fixed number of times. The final response's body, `-i` headers and status are the transfer's (`context.Output`, `context.HeaderOutput`, `TransferResult`); a failure ends with curl's exit code for it (7 connect, 55 send, 56 receive, 22 only with `-f`). Non-seekable upload streams: buffer what was sent past the server's last acknowledged offset or refuse resumption, and say which under Notes.
 

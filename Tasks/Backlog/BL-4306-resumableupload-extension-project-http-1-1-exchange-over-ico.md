@@ -1,5 +1,5 @@
 ---
-id: BL-4299
+id: BL-4306
 title: ResumableUpload extension: project, HTTP/1.1 exchange over IConnection and resumable upload header fields
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4299 — ResumableUpload extension: project, HTTP/1.1 exchange over IConnection and resumable upload header fields
+# BL-4306 — ResumableUpload extension: project, HTTP/1.1 exchange over IConnection and resumable upload header fields
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-Split from BL-4129 (`--resumable-upload`, extension 28 of 63) for size: this is the wire format, BL-4300 the client flow, BL-4129 the option, registration, description and ADR. Extension rules: ADR-0999 and the lane rules' "Extensions". Never reference a `Curl.Protocol.*` library or another extension; model the HTTP/1.1 exchange on `Curl.Extension.AzureStorage.UnitLibrary/Http/` (request writer, response head reader, Content-Length and chunked bodies) and write it here. The hook will reach servers through `TransferHookServices.Connector` (ADR-1039), which opens TLS when `ConnectTarget.UseTls` asks. Use the `new-project` skill; add the `<Folder Name="/Extensions/ResumableUpload/">` line under the marker comment in `Curl.slnx`.
+Split from BL-4129 (`--resumable-upload`, extension 28 of 63) for size: this is the wire format, BL-4307 the client flow, BL-4129 the option, registration, description and ADR. Extension rules: ADR-0999 and the lane rules' "Extensions". Never reference a `Curl.Protocol.*` library or another extension; model the HTTP/1.1 exchange on `Curl.Extension.AzureStorage.UnitLibrary/Http/` (request writer, response head reader, Content-Length and chunked bodies) and write it here. The hook will reach servers through `TransferHookServices.Connector` (ADR-1039), which opens TLS when `ConnectTarget.UseTls` asks. Use the `new-project` skill; add the `<Folder Name="/Extensions/ResumableUpload/">` line under the marker comment in `Curl.slnx`.
 
 Specifications: draft-ietf-httpbis-resumable-upload (latest; header fields `Upload-Complete` and `Upload-Offset` as Structured Field boolean and integer, `Upload-Length`, `Upload-Limit`, `Upload-Draft-Interop-Version`, media type `application/partial-upload`, status 104) and tus 1.0 (`Tus-Resumable`, `Tus-Version`, `Tus-Extension`, `Upload-Offset`, `Upload-Length`, media type `application/offset+octet-stream`).
 
