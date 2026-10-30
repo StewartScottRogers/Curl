@@ -36,3 +36,4 @@ Likely fix: lanes and the probe build with node reuse off (`-nodeReuse:false`, o
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: df6c2889 6e80b5de 196dd9d0 56d74d2a.
