@@ -42,3 +42,4 @@ Found by the silent-failure-hunter and type-design-analyzer reviewers.
 ## Log
 
 - 2026-10-30: Created by the shift-end review (ADR-0710) of a9f1a8149..b79175cc5.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: af33de7a 5ad29198 80d6345a fcb49394 3d836d5e.
