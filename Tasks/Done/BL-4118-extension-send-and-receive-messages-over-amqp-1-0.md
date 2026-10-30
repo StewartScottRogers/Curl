@@ -5,10 +5,10 @@ priority: Low
 assignee: Claude
 pipeline: feature
 depends-on: [BL-4091, BL-4093, BL-4092, BL-4258, BL-4256, BL-4257]
-touches: [Curl.Extension.Amqp1.UnitLibrary, Curl.Extension.Amqp1.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs]
+touches: [Curl.Extension.Amqp1.UnitLibrary, Curl.Extension.Amqp1.UnitTests, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Curl.slnx, Documentation/Planning/Decisions/README.md, Curl.Extension.Composition.UnitLibrary/ExtensionDescriptionCatalogue.cs, Curl.Console.UnitTests/CurlCompositionTests.cs]
 requirement: none
 created: 2026-10-29
-completed:
+completed: 2026-10-29
 ---
 # BL-4118 — Extension: Send and receive messages over AMQP 1.0
 
@@ -22,14 +22,14 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 
 ## Acceptance criteria
 
-- [ ] `Curl.Extension.Amqp1.UnitLibrary` and `Curl.Extension.Amqp1.UnitTests` exist in `/Extensions/Amqp1/` in `Curl.slnx`, registered by one line in `ExtensionCatalogue.cs`, and the build's `VerifyExtensionIsolation` passes.
-- [ ] It provides an AMQP 1.0 scheme that does not clash with extension 16 (decided in the ADR), SASL PLAIN/ANONYMOUS.
-- [ ] Unit tests check its wire behaviour against named sections of OASIS AMQP 1.0, with no network (fake connections or recorded bytes).
-- [ ] With `CURL_EXTENSIONS=0` a URL with its scheme fails exactly as curl fails an unsupported scheme (exit 1, same stderr bytes); unit test.
-- [ ] An ADR marked "Decided by Claude under Stewart's delegation" records its scheme or option names, the specification version followed, and anything left out with why.
-- [ ] Its description appears in `curl --extensions` and `curl --ai-help extensions`.
-- [ ] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
-- [ ] `dotnet build` is clean and the fast tests pass.
+- [x] `Curl.Extension.Amqp1.UnitLibrary` and `Curl.Extension.Amqp1.UnitTests` exist in `/Extensions/Amqp1/` in `Curl.slnx`, registered by one line in `ExtensionCatalogue.cs`, and the build's `VerifyExtensionIsolation` passes.
+- [x] It provides an AMQP 1.0 scheme that does not clash with extension 16 (decided in the ADR), SASL PLAIN/ANONYMOUS.
+- [x] Unit tests check its wire behaviour against named sections of OASIS AMQP 1.0, with no network (fake connections or recorded bytes).
+- [x] With `CURL_EXTENSIONS=0` a URL with its scheme fails exactly as curl fails an unsupported scheme (exit 1, same stderr bytes); unit test.
+- [x] An ADR marked "Decided by Claude under Stewart's delegation" records its scheme or option names, the specification version followed, and anything left out with why.
+- [x] Its description appears in `curl --extensions` and `curl --ai-help extensions`.
+- [x] The changed libraries meet the four quality gates (100% line and branch coverage, complexity at most 10, CRAP at most 30) by `Measure-CodeQuality.ps1`.
+- [x] `dotnet build` is clean and the fast tests pass.
 
 ## Notes
 
@@ -37,9 +37,12 @@ If this is larger than one `/task-run`, split it before starting (wire format, t
 
 - 2026-10-29, lane 3 prerequisite pass (before any code): too large for one run (AMQP 1.0 type system, transport frames and performatives, SASL, message sections, then a link-level client), so it is split like Mqtt5 (BL-4242/4243) into BL-4258 (projects and the Part 1 type system, `Types/`), BL-4256 (protocol headers, frames, performatives, SASL frames, message sections, `Frames/`) and BL-4257 (send/receive client handler over `IConnection` for `amqp1://` and `amqp1s://`, `Client/`). Scheme names `amqp1`/`amqp1s` (default for the ADR here): BL-4117 (extension 16, AMQP 0-9-1) takes `amqp://`/`amqps://`, and a digit suffix follows the `mqtt5` precedent. What is left here once they are Done: the `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs` lines (the latter added to `touches`, needed for the `--extensions` criterion; a shared list file, one line per entry), the ADR for the scheme names, specification version and omissions, the `CURL_EXTENSIONS=0` test and the quality run.
 
+- 2026-10-29, lane 10: registered `Amqp1Extension` (description and handler factory) in both catalogues; ADR-1082 records the schemes, spec version and omissions. `Amqp1ProtocolHandler` no longer null-checks its connector, like every extension handler, because the catalogue builds handlers before a connector is needed. Added `Curl.Console.UnitTests/CurlCompositionTests.cs` to touches (no Doing task on the shared branch holds it): its connecting-handler list gains `Amqp1ProtocolHandler`. Measure-CodeQuality.ps1 for Amqp1 and Composition: 0 failing members. CI on Linux and macOS: the change is platform-neutral and the fast tests are green here.
+
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: f471e4b1 8a40d80f 508cee65 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Split for size before any code: waits on BL-4258 (type system), BL-4256 (frames, performatives, SASL) and BL-4257 (amqp1/amqp1s client)
 - 2026-10-29: Backlog -> Doing. Criteria at claim: f471e4b1 8a40d80f 508cee65 bc772cb6 14cafed8 7ed051e6 e35aff77 3d836d5e.
+- 2026-10-29: Doing -> Done. amqp1:// and amqp1s:// registered as an extension, listed in --extensions and --ai-help extensions, ADR-1082
