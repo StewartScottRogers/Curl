@@ -40,3 +40,4 @@ Builds on BL-4251's DTLS client and BL-4248's complete `coap://` client: run the
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 2db89dcf dd0657e0 13785854 da731085 478f867b 3d836d5e.
 - 2026-10-29: Doing -> Backlog. Waits on BL-4282, which holds Curl.Extension.Coap.UnitTests/Dtls/TestServer/DtlsTestServer.cs; the coaps tests need it to answer application data with a CoAP response
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 2db89dcf dd0657e0 13785854 da731085 478f867b 3d836d5e.
