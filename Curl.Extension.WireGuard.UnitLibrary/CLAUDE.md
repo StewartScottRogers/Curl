@@ -14,7 +14,7 @@ library or another extension.
   production) opens the UDP socket, `WireGuardTunnelHandshake` retries initiations every Rekey-Timeout for
   Rekey-Attempt-Time, `WireGuardPacketTunnel` is the `IIpPacketChannel` sealing and opening transport data, and
   `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. IP address targets only
-  (BL-4349 adds names), TCP only (BL-4350 adds UDP), no rekeying (BL-4351). Its tests drive it against
+  (BL-4354 adds names), TCP only (BL-4355 adds UDP), no rekeying (BL-4356). Its tests drive it against
   `TunnelTestPeer`, a responder and TCP server written from the whitepaper.
 
 - `Configuration/` reads a wg-quick configuration file (ADR-1117): `WireGuardConfigurationParser.Parse` gives a

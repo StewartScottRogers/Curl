@@ -1,16 +1,16 @@
 ---
-id: BL-4350
+id: BL-4355
 title: WireGuard extension: carry UDP inside the tunnel so HTTP/3 runs through --wireguard
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4147, BL-4349]
+depends-on: [BL-4147, BL-4354]
 touches: [Curl.Extension.WireGuard.UnitLibrary/IpStack/Udp, Curl.Extension.WireGuard.UnitTests/IpStack/Udp, Curl.Extension.WireGuard.UnitLibrary/Tunnel/WireGuardDatagramConnector.cs]
 requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4350 — WireGuard extension: carry UDP inside the tunnel so HTTP/3 runs through --wireguard
+# BL-4355 — WireGuard extension: carry UDP inside the tunnel so HTTP/3 runs through --wireguard
 
 ## Goal
 
@@ -18,7 +18,7 @@ completed:
 
 ## Context
 
-BL-4147 (ADR-1150) carries TCP alone and replaces curl's datagram connector with `WireGuardDatagramConnector`, which refuses every UDP socket (exit 4) so no QUIC leaves outside the tunnel. This task adds UDP (RFC 768, with the RFC 1071 checksum `InternetChecksum` already has) to the IP stack and a datagram connector that opens an `IDatagramChannel` through the tunnel. Depends on BL-4349 because both change `Tunnel/`.
+BL-4147 (ADR-1150) carries TCP alone and replaces curl's datagram connector with `WireGuardDatagramConnector`, which refuses every UDP socket (exit 4) so no QUIC leaves outside the tunnel. This task adds UDP (RFC 768, with the RFC 1071 checksum `InternetChecksum` already has) to the IP stack and a datagram connector that opens an `IDatagramChannel` through the tunnel. Depends on BL-4354 because both change `Tunnel/`.
 
 ## Acceptance criteria
 

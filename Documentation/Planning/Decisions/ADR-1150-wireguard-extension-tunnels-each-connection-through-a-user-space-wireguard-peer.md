@@ -34,9 +34,9 @@ WireGuard support, so the choices follow the WireGuard whitepaper (Donenfeld, re
 - **TLS.** Curl's own TLS provider runs over the tunnel's TCP connection (ADR-1055), offering curl's ALPN list
   for `https`, as the named pipe and vsock extensions do.
 - **UDP is refused, not leaked.** The IP stack carries TCP alone, so the hook's datagram connector refuses every
-  UDP socket with exit 4 rather than let QUIC leave outside the tunnel. BL-4350 adds UDP inside the tunnel.
+  UDP socket with exit 4 rather than let QUIC leave outside the tunnel. BL-4355 adds UDP inside the tunnel.
 - **Names.** Only IP address targets are tunnelled for now; a host name fails with exit 6 rather than be looked
-  up outside the tunnel. BL-4349 resolves names through the configuration's `DNS` servers inside the tunnel.
+  up outside the tunnel. BL-4354 resolves names through the configuration's `DNS` servers inside the tunnel.
 - **The peer's endpoint** is resolved with the system resolver and reached with a system UDP socket
   (`SystemWireGuardUdpOpener`, excluded from coverage under ADR-0083 as a thin socket adapter); everything above
   it is tested against a whitepaper-written peer with no network.
@@ -45,11 +45,11 @@ WireGuard support, so the choices follow the WireGuard whitepaper (Donenfeld, re
 
 - Rekeying an established session (section 6.2) and keepalives (section 6.5): a session lives one connection,
   and `WireGuardTransportSession` already refuses to seal past Reject-After-Time, which ends the connection with
-  an error rather than send under expired keys. Long transfers past 180 s need rekeying, which BL-4351 adds.
+  an error rather than send under expired keys. Long transfers past 180 s need rekeying, which BL-4356 adds.
 - `ListenPort` and wg-quick's host-side keys are read but not used: an initiator on an
-  ephemeral port needs neither. `PersistentKeepalive` is BL-4351's, with the keepalives.
+  ephemeral port needs neither. `PersistentKeepalive` is BL-4356's, with the keepalives.
 
 ## Consequences
 
 `curl --wireguard wg0.conf http://10.0.0.1/` runs through a WireGuard peer with no administrator rights. Name
-resolution and UDP through the tunnel follow in BL-4349 and BL-4350.
+resolution and UDP through the tunnel follow in BL-4354 and BL-4355.

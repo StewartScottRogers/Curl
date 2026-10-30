@@ -1,16 +1,16 @@
 ---
-id: BL-4351
+id: BL-4356
 title: WireGuard extension: rekey a tunnel session and send keepalives during a long transfer
 priority: Low
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4147, BL-4349, BL-4350]
+depends-on: [BL-4147, BL-4354, BL-4355]
 touches: [Curl.Extension.WireGuard.UnitLibrary/Tunnel, Curl.Extension.WireGuard.UnitTests/Tunnel]
 requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4351 — WireGuard extension: rekey a tunnel session and send keepalives during a long transfer
+# BL-4356 — WireGuard extension: rekey a tunnel session and send keepalives during a long transfer
 
 ## Goal
 

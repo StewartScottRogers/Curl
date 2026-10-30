@@ -1,5 +1,5 @@
 ---
-id: BL-4349
+id: BL-4354
 title: WireGuard extension: resolve host names through the tunnel's DNS servers
 priority: Low
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-30
 completed:
 ---
-# BL-4349 — WireGuard extension: resolve host names through the tunnel's DNS servers
+# BL-4354 — WireGuard extension: resolve host names through the tunnel's DNS servers
 
 ## Goal
 
