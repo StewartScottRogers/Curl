@@ -32,3 +32,4 @@ Found in BL-4131 (ADR-1149) by running `curl -v --webdav-list` against a loopbac
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: aeb92ef5 a4721c93 e7c4212f 3d836d5e.
