@@ -18,16 +18,21 @@ internal static class DictionaryTransferRequest
     private static bool IsHttp(CurlUrl url) => url.Scheme is "http" or "https";
 
     /// <summary>
-    /// Whether the hook may set <c>Accept-Encoding</c> to the dictionary codings: not when <c>--compressed</c> makes
-    /// curl's handler decode the body (it refuses <c>dcb</c> and <c>dcz</c>), nor when <c>-H</c> already names the codings.
+    /// Whether the hook may add the dictionary codings to <c>Accept-Encoding</c>: not when <c>-H</c> already names the
+    /// codings, nor when <c>--compressed</c> is given with content decoding turned off (<c>--raw</c>), which asks for the
+    /// body as the server encoded it.
     /// </summary>
     public static bool MayAdvertise(ITransferContext context) =>
-        context.Http is { Compressed: false } http
+        context.Http is { } http
+        && !(http.Compressed && http.PassesContentCoding)
         && !http.Headers.Any(line => line.StartsWith("Accept-Encoding:", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The value of the response's first <paramref name="name" /> field; <see langword="null" /> when it has none.</summary>
-    public static string? ResponseFieldOf(TransferResult result, string name) =>
-        result.Report?.ResponseHeaders.FirstOrDefault(field => field.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
+    public static string? ResponseFieldOf(TransferResult result, string name) => ResponseFieldsOf(result, name).FirstOrDefault();
+
+    /// <summary>The values of every <paramref name="name" /> field of the response, in order.</summary>
+    public static IEnumerable<string> ResponseFieldsOf(TransferResult result, string name) =>
+        (result.Report?.ResponseHeaders ?? []).Where(field => field.Key.Equals(name, StringComparison.OrdinalIgnoreCase)).Select(field => field.Value);
 
     private static Uri? TargetUri(CurlUrl url)
     {

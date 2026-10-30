@@ -7,7 +7,8 @@ ADR-1154). Namespace `Curl.Extension.CompressionDictionary`. It references only
 
 - `CompressionDictionaryExtension` gives the option, the description and the hook to `Curl.Extension.Composition`.
 - `CompressionDictionaryTransferHook` stores `Use-As-Dictionary` responses, advertises the best matching dictionary
-  (`Available-Dictionary`, `Dictionary-ID`, `Accept-Encoding: dcb, dcz`) unless `--compressed` or `-H` sets the
+  (`Available-Dictionary`, `Dictionary-ID`, `Accept-Encoding: dcb, dcz`, after curl's `--compressed` codings when that is
+  given, running curl's handler with content decoding off and decoding them through `CompressedResponseBody`) unless `--raw` or `-H` sets the
   codings, and decodes a `dcb` or `dcz` body through `DictionaryCompressedBody` (exit 61 when it cannot).
   `DictionaryTransferRequest` decides which transfers it takes part in.
 

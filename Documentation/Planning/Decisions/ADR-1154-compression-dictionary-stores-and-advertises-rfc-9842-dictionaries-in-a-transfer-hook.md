@@ -26,9 +26,17 @@ RFC 9842 (Compression Dictionary Transport, September 2025), the version followe
   hash and decoded (sections 4, 5). A header naming another dictionary or corrupt data fails the transfer with
   exit 61, `CURLE_BAD_CONTENT_ENCODING`, the code curl gives a body it cannot decode. Any other coding is written
   as received.
-- The hook advertises nothing when `--compressed` is given or `-H` sets `Accept-Encoding`. With `--compressed`,
-  curl's handler decodes the content itself and fails on `dcb` and `dcz` with exit 61, and a hook cannot turn that
-  decoding off through `Curl.Extension.Abstractions`. With `-H`, the user has chosen the codings.
+- With `--compressed` and a matching dictionary (BL-4351), the hook sends `Accept-Encoding` as curl's
+  `--compressed` value (`deflate, gzip, br, zstd`, or the `CURLOPT_ACCEPT_ENCODING` string given) followed by
+  `dcb, dcz`, and runs curl's handler through `TransferContextContentDecoding.WithContentDecodingOff`, a
+  `Curl.Extension.Abstractions` extension that hands it `HttpRequestOptions` with `Compressed` off, because curl's
+  handler refuses `dcb` and `dcz` with exit 61. The hook then decodes every coding the response's `Content-Encoding`
+  fields name, last applied first, through `CompressedResponseBody`: `dcb` and `dcz` against the dictionary, and
+  `gzip` (`x-gzip`), `deflate` (zlib, or raw deflate when the first bytes are no zlib header), `br` and `zstd` as
+  curl does; `identity` and `none` are skipped, and any other coding or corrupt data is exit 61. Without a
+  matching dictionary, curl's handler decodes as it always does.
+- The hook advertises nothing when `-H` sets `Accept-Encoding` (the user has chosen the codings) or when
+  `--compressed` is given with content decoding off (`--raw`, which asks for the body as the server encoded it).
 - A store directory that cannot be written leaves the transfer as it was.
 
 ## Left out, and why
@@ -36,9 +44,12 @@ RFC 9842 (Compression Dictionary Transport, September 2025), the version followe
 - Dictionary expiry by the dictionary response's freshness (section 2.1, RFC 9111): curl keeps no cache
   freshness outside `--cache-dir`, so a stored dictionary stays until it is deleted or replaced by the same hash.
 - `match-dest` (section 2.1.2): curl has no request destinations (ADR-1100).
-- `dcb` and `dcz` together with `--compressed`: this needs a way for a hook to take over content decoding from
-  curl's handler. Without that, `--compressed` keeps working exactly as curl's.
-- A `Content-Encoding` that lists `dcb` or `dcz` with another coding: servers send them alone (section 6).
+- Without `--compressed`, a `Content-Encoding` that lists `dcb` or `dcz` with another coding: servers send them
+  alone (section 6), and curl without `--compressed` decodes nothing.
+- When the hook decodes curl's codings itself under `--compressed`, the exit 61 message is the hook's
+  (`Failed to decode the <codings> body: ...`) rather than curl's per-coding text, a `zstd` frame's window is held
+  to 8 MiB, and a `--max-filesize` limit is checked by curl's handler against the encoded size: the extension is
+  tested against RFC 9842, not curl, and these differ only on bodies that fail or exceed a limit.
 
 ## Consequences
 

@@ -5,9 +5,10 @@ namespace Curl.Extension.CompressionDictionary;
 
 /// <summary>
 /// The <c>--compression-dictionary</c> transfer hook (ADR-1154), a client of RFC 9842. On an HTTP or HTTPS
-/// transfer it looks up the dictionary whose <c>match</c> fits the request URL best (§2.2.2) and, when curl's
-/// handler is not decoding content itself, sends <c>Available-Dictionary</c> (§2.2), <c>Dictionary-ID</c> (§2.3)
-/// and <c>Accept-Encoding: dcb, dcz</c> (§6.1). A <c>dcb</c> or <c>dcz</c> response compressed against it is decoded
+/// transfer it looks up the dictionary whose <c>match</c> fits the request URL best (§2.2.2) and sends
+/// <c>Available-Dictionary</c> (§2.2), <c>Dictionary-ID</c> (§2.3) and <c>Accept-Encoding: dcb, dcz</c> (§6.1), after
+/// curl's own <c>--compressed</c> codings when that is given, running curl's handler with content decoding off so the
+/// hook decodes them itself (BL-4351). A <c>dcb</c> or <c>dcz</c> response compressed against it is decoded
 /// (§4, §5) before curl writes the body; one that does not decode fails the transfer with exit 61, as curl fails
 /// a body it cannot decode. A successful response that carries <c>Use-As-Dictionary</c> (§2.1) is stored, decoded,
 /// as a dictionary. A directory that cannot be written leaves the transfer as it was.
@@ -24,25 +25,52 @@ internal sealed class CompressionDictionaryTransferHook(string directory) : ITra
 
         var store = new DictionaryStore(directory, context.TimeProvider);
         var offered = DictionaryTransferRequest.MayAdvertise(context) ? await FindOfferAsync(store, target, context.CancellationToken) : null;
+        var decodesForCurl = offered is not null && context.Http!.Compressed;
         using MemoryStream received = new();
-        var result = await next(Advertising(offered, context).WithOutputs(received, context.HeaderOutput, context.DumpHeaderOutput));
-        var body = received.ToArray();
-        var coding = DictionaryCompressedBody.CodingOf(DictionaryTransferRequest.ResponseFieldOf(result, "Content-Encoding"));
-        if (offered is not null && coding is { } encoding && result.IsSuccess)
+        var result = await next(Advertising(offered, context, decodesForCurl).WithOutputs(received, context.HeaderOutput, context.DumpHeaderOutput));
+        byte[] body;
+        try
         {
-            try
-            {
-                body = DictionaryCompressedBody.Decode(encoding, body, offered.Dictionary, offered.Content);
-            }
-            catch (InvalidDataException exception)
-            {
-                return TransferResult.Failure(CurlExitCode.BadContentEncoding, "Failed to decode the " + encoding + " body: " + exception.Message, result.BytesTransferred) with { Report = result.Report };
-            }
+            body = DecodedBody(offered, result, decodesForCurl, received.ToArray());
+        }
+        catch (InvalidDataException exception)
+        {
+            return TransferResult.Failure(CurlExitCode.BadContentEncoding, exception.Message, result.BytesTransferred) with { Report = result.Report };
         }
 
         await context.Output.WriteAsync(body, context.CancellationToken);
         await TryStoreAsync(store, target, result, body, context.CancellationToken);
         return result;
+    }
+
+    /// <summary>The body curl writes: <paramref name="received" /> with the codings the hook decodes undone.</summary>
+    /// <exception cref="InvalidDataException">A coding does not decode; the message names the codings.</exception>
+    private static byte[] DecodedBody(DictionaryOffer? offered, TransferResult result, bool decodesForCurl, byte[] received)
+    {
+        var codings = offered is not null && result.IsSuccess ? CodingsToDecode(result, decodesForCurl) : [];
+        try
+        {
+            return codings.Count == 0 ? received : CompressedResponseBody.Decode(codings, received, offered!.Dictionary, offered.Content);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new InvalidDataException("Failed to decode the " + string.Join(", ", codings) + " body: " + exception.Message, exception);
+        }
+    }
+
+    /// <summary>
+    /// The codings the hook decodes: with <c>--compressed</c>, which it took over from curl's handler, every coding the
+    /// response names; without it only a <c>Content-Encoding</c> of exactly <c>dcb</c> or <c>dcz</c>, as curl leaves the rest.
+    /// </summary>
+    private static IReadOnlyList<string> CodingsToDecode(TransferResult result, bool decodesForCurl)
+    {
+        if (decodesForCurl)
+        {
+            return CompressedResponseBody.CodingsOf(DictionaryTransferRequest.ResponseFieldsOf(result, "Content-Encoding"));
+        }
+
+        var field = DictionaryTransferRequest.ResponseFieldOf(result, "Content-Encoding");
+        return DictionaryCompressedBody.CodingOf(field) is null ? [] : [field!];
     }
 
     private static async Task<DictionaryOffer?> FindOfferAsync(DictionaryStore store, Uri target, CancellationToken cancellationToken)
@@ -52,7 +80,7 @@ internal sealed class CompressionDictionaryTransferHook(string directory) : ITra
         return content is null ? null : new DictionaryOffer(dictionary!, content);
     }
 
-    private static ITransferContext Advertising(DictionaryOffer? offered, ITransferContext context)
+    private static ITransferContext Advertising(DictionaryOffer? offered, ITransferContext context, bool decodesForCurl)
     {
         if (offered is null)
         {
@@ -65,8 +93,9 @@ internal sealed class CompressionDictionaryTransferHook(string directory) : ITra
             headers.Add("Dictionary-ID: " + id);
         }
 
-        headers.Add("Accept-Encoding: dcb, dcz");
-        return context.WithRequestHeaders(headers);
+        // RFC 9842 section 6: with --compressed, curl's own codings come first and the handler leaves decoding to the hook.
+        headers.Add("Accept-Encoding: " + (decodesForCurl ? context.Http!.AcceptEncoding + ", " : string.Empty) + "dcb, dcz");
+        return (decodesForCurl ? context.WithContentDecodingOff() : context).WithRequestHeaders(headers);
     }
 
     private static async Task TryStoreAsync(DictionaryStore store, Uri target, TransferResult result, byte[] body, CancellationToken cancellationToken)
