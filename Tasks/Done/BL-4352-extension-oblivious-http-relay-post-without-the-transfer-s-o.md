@@ -8,7 +8,7 @@ depends-on: [BL-4137]
 touches: [Curl.Extension.Abstractions.UnitLibrary/Transfer/TransferContextRequests.cs, Curl.Extension.Abstractions.UnitLibrary/Transfer/RetargetedTransferContext.cs, Curl.Extension.Abstractions.UnitTests, Curl.Extension.ObliviousHttp.UnitLibrary/Relay/HookRequest.cs, Curl.Extension.ObliviousHttp.UnitTests/Relay]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4352 — Extension: Oblivious HTTP relay POST without the transfer's own headers
 
@@ -35,3 +35,4 @@ ADR-1149 left this out: TransferContextRequests.WithRequest (BL-4303) replaces t
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 2f5e1687 40f512f9 37551924 9e24dc71.
+- 2026-10-30: Doing -> Done. WithoutOwnHeaders hook API; relay and key fetches carry only hook headers
