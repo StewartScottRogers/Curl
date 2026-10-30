@@ -20,7 +20,10 @@ public sealed class OpenApiDocumentTests
     }
 
     [TestMethod]
-    [DataRow("openapi: 3.1.0", "openapi: a.yaml is not a JSON OpenAPI description")]
+    [DataRow(" {\"openapi\":", "openapi: a.yaml is not a JSON OpenAPI description")]
+    [DataRow("openapi: [3", "openapi: a.yaml is not a YAML OpenAPI description")]
+    [DataRow("openapi: &v 3.1.0", "openapi: a.yaml uses YAML anchors, aliases or tags, which --openapi does not read")]
+    [DataRow("openapi: 2.0", "openapi: a.yaml is not an OpenAPI 3 description")]
     [DataRow("""{"swagger":"2.0"}""", "openapi: a.yaml is not an OpenAPI 3 description")]
     [DataRow("""{"openapi":"2.0"}""", "openapi: a.yaml is not an OpenAPI 3 description")]
     [DataRow("""{"openapi":3.1}""", "openapi: a.yaml is not an OpenAPI 3 description")]
@@ -30,6 +33,47 @@ public sealed class OpenApiDocumentTests
 
         Assert.AreEqual(CurlExitCode.FailedInit, failure.ExitCode);
         Assert.AreEqual(message, failure.Message);
+    }
+
+    [TestMethod]
+    public void Parse_YamlDescription_GivesTheSameArgumentsAsItsJsonTwin()
+    {
+        const string Json = """{"openapi":"3.1.0","servers":[{"url":"http://h/{v}","variables":{"v":{"default":"v1"}}}],"paths":{"/items/{id}":{"parameters":[{"name":"id","in":"path","required":true}],"post":{"operationId":"add","parameters":[{"name":"tags","in":"query","schema":{"type":"array"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Item"}}}}}}},"components":{"schemas":{"Item":{"properties":{"count":{"type":"integer"},"name":{"type":"string"}}}}}}""";
+        const string Yaml = """
+            openapi: 3.1.0
+            servers:
+            - url: 'http://h/{v}'
+              variables:
+                v: {default: v1}
+            paths:
+              /items/{id}:
+                parameters:
+                  - name: id
+                    in: path
+                    required: true
+                post:
+                  operationId: add
+                  parameters: [{name: tags, in: query, schema: {type: array}}]
+                  requestBody:
+                    content:
+                      application/json:
+                        schema:
+                          $ref: "#/components/schemas/Item"
+            components:
+              schemas:
+                Item:
+                  properties:
+                    count: {type: integer}
+                    name:
+                      type: string
+            """;
+        static OrderedDictionary<string, List<string>> Values() => new() { ["id"] = ["3"], ["tags"] = ["a", "b"], ["count"] = ["2"], ["name"] = ["x"] };
+
+        IReadOnlyList<string> fromJson = OpenApiRequest.Arguments(OpenApiDocument.Parse(Encoding.UTF8.GetBytes(Json), "a.json").FindOperation("add"), null, Values());
+        IReadOnlyList<string> fromYaml = OpenApiRequest.Arguments(OpenApiDocument.Parse(Encoding.UTF8.GetBytes(Yaml), "a.yaml").FindOperation("add"), null, Values());
+
+        Assert.IsNotEmpty(fromJson);
+        CollectionAssert.AreEqual(fromJson.ToArray(), fromYaml.ToArray());
     }
 
     [TestMethod]

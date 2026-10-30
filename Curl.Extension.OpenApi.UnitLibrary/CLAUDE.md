@@ -3,7 +3,8 @@
 The OpenAPI extension (ADR-0999, ADR-1083), tested against the OpenAPI Specification 3.1
 (spec.openapis.org/oas/v3.1.1). Namespace `Curl.Extension.OpenApi`. It references only `Curl.Extension.Abstractions`
 (and through it `Curl.Protocol.Abstractions`) and the base class library; descriptions are read with
-`System.Text.Json`'s `JsonDocument` (no serializer, so AOT-safe).
+`System.Text.Json`'s `JsonDocument` (no serializer, so AOT-safe); `OpenApiYaml` converts a YAML description to JSON
+first (YAML 1.2.2 block and flow collections, plain, quoted and block scalars, comments; no anchors, aliases or tags).
 
 - `OpenApiOptions` declares `--openapi`, `--operation` and `--openapi-server` and the extension's `Description`;
   `Curl.Extension.Composition`'s option and description catalogues list them.

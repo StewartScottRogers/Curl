@@ -1,10 +1,11 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace Curl.Extension.OpenApi;
 
 /// <summary>
-/// An OpenAPI 3 description read from JSON (OpenAPI 3.1 §4.3, §4.8.1), which finds an operation by its
+/// An OpenAPI 3 description read from JSON or YAML (OpenAPI 3.1 §4.3, §4.8.1), which finds an operation by its
 /// <c>operationId</c> and resolves local <c>$ref</c>s (§4.8.23) with JSON Pointer (RFC 6901).
 /// </summary>
 internal sealed class OpenApiDocument
@@ -16,12 +17,16 @@ internal sealed class OpenApiDocument
     private OpenApiDocument(JsonElement root) => this.root = root;
 
     /// <summary>Reads a description.</summary>
-    /// <param name="bytes">The description file's bytes, UTF-8 JSON, with or without a byte order mark.</param>
+    /// <param name="bytes">
+    /// The description file's bytes, UTF-8 with or without a byte order mark: JSON when the first character that is not
+    /// white space is <c>{</c>, else YAML (§4.3), which <see cref="OpenApiYaml" /> converts to JSON.
+    /// </param>
     /// <param name="path">The file's path, for messages.</param>
     /// <returns>The description.</returns>
     internal static OpenApiDocument Parse(byte[] bytes, string path)
     {
-        ReadOnlyMemory<byte> json = bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]) ? bytes.AsMemory(3) : bytes;
+        ReadOnlyMemory<byte> text = bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]) ? bytes.AsMemory(3) : bytes;
+        ReadOnlyMemory<byte> json = text.Span.TrimStart(" \t\r\n"u8).StartsWith("{"u8) ? text : Yaml(text.Span, path);
         JsonElement root;
         try
         {
@@ -77,6 +82,22 @@ internal sealed class OpenApiDocument
         }
 
         throw OpenApiFailure.Of("a $ref chain is circular or too long");
+    }
+
+    private static byte[] Yaml(ReadOnlySpan<byte> text, string path)
+    {
+        try
+        {
+            return OpenApiYaml.ToJson(Encoding.UTF8.GetString(text));
+        }
+        catch (NotSupportedException)
+        {
+            throw OpenApiFailure.Of($"{path} uses YAML anchors, aliases or tags, which --openapi does not read");
+        }
+        catch (FormatException)
+        {
+            throw OpenApiFailure.Of($"{path} is not a YAML OpenAPI description");
+        }
     }
 
     private static bool TryStep(JsonElement element, string token, out JsonElement next)
