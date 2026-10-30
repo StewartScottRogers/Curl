@@ -37,7 +37,7 @@ public sealed class OciRegistryExtensionTests
     public void ExtensionListing_WithExtensionsOn_ListsOciInBothForms()
     {
         Assert.IsTrue(ExtensionListing.Lines(_ => null).Any(line => line.Contains("oci", StringComparison.Ordinal)));
-        Assert.Contains("Pulls from an OCI or Docker registry", ExtensionListing.Markdown(_ => null));
+        Assert.Contains("Pulls from and pushes to an OCI or Docker registry", ExtensionListing.Markdown(_ => null));
     }
 
     [TestMethod]
