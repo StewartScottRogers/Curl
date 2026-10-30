@@ -37,3 +37,4 @@ BL-4147 (ADR-1159) carries TCP alone and `WireGuardDatagramConnector` refuses ev
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 954a2d25 d609389f 866d5a6d 3d836d5e.
