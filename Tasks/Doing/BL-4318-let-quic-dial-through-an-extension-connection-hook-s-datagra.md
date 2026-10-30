@@ -32,3 +32,4 @@ Needed by BL-4144 (MASQUE: QUIC and HTTP/3 through a CONNECT-UDP or CONNECT-IP p
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 3c911cfd e2979694 e35aff77 3d836d5e.
