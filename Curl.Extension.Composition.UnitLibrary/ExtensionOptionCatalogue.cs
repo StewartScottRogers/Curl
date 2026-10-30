@@ -54,6 +54,7 @@ internal static class ExtensionOptionCatalogue
         OpenApi.OpenApiOptions.Server,
         Curl.Extension.ContentDigest.ContentDigestExtension.Option,
         Curl.Extension.ClientHints.ClientHintsExtension.Option,
+        Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Option,
         Curl.Extension.RateLimit.RateLimitExtension.Option,
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.Option,
         Curl.Extension.WebSocketExtendedConnect.Option.WebSocketExtendedConnectExtension.Option,

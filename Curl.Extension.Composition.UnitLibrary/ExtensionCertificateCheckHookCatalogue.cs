@@ -17,5 +17,6 @@ public static class ExtensionCertificateCheckHookCatalogue
     public static IReadOnlyList<Func<ExtensionOptionValues, ICertificateCheckHook?>> Entries { get; } =
     [
         Curl.Extension.MlDsaCertificates.MlDsaCertificatesExtension.HookFor,
+        Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.HookFor,
     ];
 }
