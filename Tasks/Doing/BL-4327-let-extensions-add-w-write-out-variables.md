@@ -34,3 +34,4 @@ Found by BL-4140 (Structured Field Values extension, ADR-0999), whose option mus
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 15c78d37 b2841475 bd0dc039 21c21cdc 478f867b 3d836d5e.
