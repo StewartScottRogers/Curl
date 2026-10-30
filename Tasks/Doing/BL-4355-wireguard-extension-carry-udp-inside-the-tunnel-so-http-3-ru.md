@@ -32,3 +32,4 @@ BL-4147 (ADR-1159) carries TCP alone and replaces curl's datagram connector with
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: 954a2d25 6291ef19 62dbae4c 3d836d5e.
