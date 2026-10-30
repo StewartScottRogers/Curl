@@ -8,15 +8,20 @@ library or another extension.
 - `WireGuardExtension` holds `--wireguard <conf>` (ADR-1159), its description and `Activate`, registered in
   Composition's option, description and connection hook catalogues; `Activate` reads and parses the file, and any
   failure is an `ArgumentException` the host reports as exit 2. `WireGuardConnectionHook` (an `IConnectionHook`)
-  gives a `WireGuardConnector` over curl's TLS provider and ALPN list, and a datagram connector that refuses UDP.
+  gives a `WireGuardConnector` over curl's TLS provider, ALPN list and connector, and a `WireGuardDatagramConnector`
+  that opens each UDP socket inside the tunnel (ADR-1162).
 - `Tunnel/` joins the pieces below: `WireGuardConnector` opens each connection in its own tunnel - `WireGuardRoute`'s
   cryptokey routing picks the peer and source address, `IWireGuardUdpOpener` (`SystemWireGuardUdpOpener` in
   production) opens the UDP socket, `WireGuardTunnelHandshake` retries initiations every Rekey-Timeout for
   Rekey-Attempt-Time, `WireGuardPacketTunnel` is the `IIpPacketChannel` sealing and opening transport data, and
   `WireGuardConnection` is the `IConnection` that owns the TCP stream, socket and keys. A host name is resolved
   first by DNS over TCP through its own tunnel to the first `DNS` address (ADR-1161), `WireGuardDnsMessage` building
-  the query and reading the answer; without one it is exit 6. TCP only (BL-4355 adds UDP), no rekeying (BL-4356). Its tests drive it against
-  `TunnelTestPeer`, a responder and TCP server written from the whitepaper.
+  the query and reading the answer; without one it is exit 6. UDP and QUIC are carried too (ADR-1162):
+  `WireGuardDatagramConnector` opens each `IDatagramChannel` in its own tunnel, a `UserSpaceUdpChannel` whose
+  `WireGuardTunnelLifetime` closes the socket and keys, resolving a host name through
+  `WireGuardConnector.ResolveThroughTunnelAsync`; `WireGuardConnector.ConnectMultiplexedAsync` hands QUIC to curl's
+  connector, whose QUIC dialer opens its UDP through that datagram connector. No rekeying (BL-4356). Its tests drive
+  it against `TunnelTestPeer`, a responder and TCP server written from the whitepaper.
 
 - `Configuration/` reads a wg-quick configuration file (ADR-1117): `WireGuardConfigurationParser.Parse` gives a
   `WireGuardConfiguration` holding the `WireGuardInterface` (`PrivateKey`, `Address` as `WireGuardCidr`s, `DNS`,
@@ -29,7 +34,9 @@ library or another extension.
   `InternetChecksum`s; `TcpConnection.ConnectAsync` opens one connection (handshake with MSS, in-order receive,
   window-limited send, `RetransmissionTimeoutEstimator`'s RFC 6298 timer on an injected `TimeProvider`, FIN and RST);
   `TcpConnectionStream` exposes it as an asynchronous-only `Stream`; `UserSpaceTcpClient.ConnectAsync` picks a random
-  ephemeral port and initial sequence number.
+  ephemeral port and initial sequence number. `Udp/` carries UDP (RFC 768): `UdpDatagramCodec` builds and parses a
+  `UdpDatagram` with its checksum over the pseudo-header (zero sent as all ones; zero accepted over IPv4, refused
+  over IPv6), and `UserSpaceUdpChannel` is an `IDatagramChannel` over an `IIpPacketChannel`.
 - `Messages/` lays out the four messages of whitepaper 5.4.2 to 5.4.7: `HandshakeInitiationMessage` (type 1, 148
   bytes), `HandshakeResponseMessage` (type 2, 92), `CookieReplyMessage` (type 3, 64) and `TransportDataMessage`
   (type 4, 32 or more), each with `Encode` and `TryDecode` (`false` for any other datagram); `WireGuardMessageType`;

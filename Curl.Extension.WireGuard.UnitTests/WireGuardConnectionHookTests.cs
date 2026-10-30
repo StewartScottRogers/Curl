@@ -43,15 +43,67 @@ public sealed class WireGuardConnectionHookTests
     }
 
     [TestMethod]
-    public async Task DatagramConnectorOver_AnyUdpSocket_IsRefusedSoNothingLeavesOutsideTheTunnel()
+    public async Task DatagramConnectorOver_AddressOutsideTheTunnel_GivesTheTunnelDatagramConnectorThatOpensNothing()
+    {
+        TunnelTestPeer peer = new();
+        WireGuardConnectionHook hook = new(TunnelTestPeer.Configuration(), peer, TimeProvider.System, RandomNumberGenerator.Create());
+
+        IDatagramConnector connector = hook.DatagramConnectorOver(null!);
+        DatagramOpenResult result = await connector.OpenAsync("192.168.1.1", 443, CancellationToken.None);
+
+        Assert.IsInstanceOfType<WireGuardDatagramConnector>(connector);
+        Assert.IsNull(result.Channel);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, result.ExitCode);
+        Assert.IsNull(peer.OpenedEndpoint);
+    }
+
+    [TestMethod]
+    public async Task ConnectorOver_QuicConnect_GoesThroughCurlsConnectorWhoseDatagramsTheTunnelCarries()
     {
         WireGuardConnectionHook hook = new(TunnelTestPeer.Configuration(), new TunnelTestPeer(), TimeProvider.System, RandomNumberGenerator.Create());
+        QuicRecordingConnector curl = new();
+        ConnectTarget target = new("10.0.0.1", 443, true);
 
-        DatagramOpenResult result = await hook.DatagramConnectorOver(null!).OpenAsync("10.0.0.1", 443, CancellationToken.None);
+        IConnector connector = hook.ConnectorOver(curl, new RefusingTlsProvider());
+        MultiplexedConnectResult connection = await connector.ConnectMultiplexedAsync(target, CancellationToken.None);
+        ConnectResult session = await connector.ConnectMultiplexedSessionAsync(target, _ => null!, CancellationToken.None);
 
-        Assert.IsNull(result.Channel);
-        Assert.AreEqual(CurlExitCode.NotBuiltIn, result.ExitCode);
-        Assert.AreEqual("UDP to 10.0.0.1 port 443 through the WireGuard tunnel is not built in", result.ErrorMessage);
+        CollectionAssert.AreEqual(new[] { "connection", "session" }, curl.Calls);
+        Assert.AreEqual("curl's QUIC", connection.ErrorMessage);
+        Assert.AreEqual("curl's QUIC session", session.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task ConnectMultiplexed_WithoutCurlsConnector_IsRefused()
+    {
+        IConnector connector = new WireGuardConnector(TunnelTestPeer.Configuration(), new TunnelTestPeer(), TimeProvider.System, RandomNumberGenerator.Create());
+        ConnectTarget target = new("10.0.0.1", 443, true);
+
+        MultiplexedConnectResult connection = await connector.ConnectMultiplexedAsync(target, CancellationToken.None);
+        ConnectResult session = await connector.ConnectMultiplexedSessionAsync(target, _ => null!, CancellationToken.None);
+
+        Assert.AreEqual(CurlExitCode.CouldntConnect, connection.ExitCode);
+        Assert.AreEqual(CurlExitCode.CouldntConnect, session.ExitCode);
+    }
+
+    private sealed class QuicRecordingConnector : IConnector
+    {
+        public List<string> Calls { get; } = [];
+
+        public ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("TCP never goes through curl's connector under --wireguard.");
+
+        public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken)
+        {
+            Calls.Add("connection");
+            return ValueTask.FromResult(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "curl's QUIC"));
+        }
+
+        public ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(ConnectTarget target, Func<IMultiplexedConnection, IConnection> openSession, CancellationToken cancellationToken)
+        {
+            Calls.Add("session");
+            return ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntConnect, "curl's QUIC session"));
+        }
     }
 
     private sealed class RefusingTlsProvider : ITlsProvider

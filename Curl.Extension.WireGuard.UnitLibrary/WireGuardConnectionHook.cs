@@ -30,11 +30,12 @@ internal sealed class WireGuardConnectionHook(WireGuardConfiguration configurati
     public IConnector ConnectorOver(IConnector curlConnector, ITlsProvider curlTlsProvider)
     {
         ArgumentNullException.ThrowIfNull(curlConnector);
-        return new WireGuardConnector(configuration, opener, timeProvider, random, curlTlsProvider, curlConnector.HttpOverTlsApplicationProtocols);
+        return new WireGuardConnector(configuration, opener, timeProvider, random, curlTlsProvider, curlConnector.HttpOverTlsApplicationProtocols, curlConnector);
     }
 
-    /// <summary>Gives a datagram connector that refuses every UDP socket, so nothing leaves outside the tunnel.</summary>
+    /// <summary>Gives a datagram connector that opens each UDP socket inside its own tunnel, so nothing leaves outside it (ADR-1162).</summary>
     /// <param name="curlDatagramConnector">The datagram connector curl would use; set aside.</param>
-    /// <returns>The refusing datagram connector.</returns>
-    public IDatagramConnector DatagramConnectorOver(IDatagramConnector curlDatagramConnector) => new WireGuardDatagramConnector();
+    /// <returns>The tunnel's datagram connector.</returns>
+    public IDatagramConnector DatagramConnectorOver(IDatagramConnector curlDatagramConnector) =>
+        new WireGuardDatagramConnector(configuration, opener, timeProvider, random, new WireGuardConnector(configuration, opener, timeProvider, random));
 }

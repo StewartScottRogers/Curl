@@ -20,13 +20,18 @@ namespace Curl.Extension.WireGuard.Tunnel;
 /// <param name="random">The randomness for the handshake's ephemeral keys and indexes.</param>
 /// <param name="tlsProvider">The TLS provider curl built from the option group's TLS options; <see langword="null" /> refuses a TLS target.</param>
 /// <param name="httpOverTlsApplicationProtocols">What curl's connector offers through ALPN for <c>https</c>; <see langword="null" /> offers <c>http/1.1</c> alone.</param>
+/// <param name="quicConnector">
+/// Curl's connector, whose QUIC dialer opens its UDP through the hook's datagram connector and so through the tunnel
+/// (ADR-1162); <see langword="null" /> refuses QUIC.
+/// </param>
 internal sealed class WireGuardConnector(
     WireGuardConfiguration configuration,
     IWireGuardUdpOpener opener,
     TimeProvider timeProvider,
     RandomNumberGenerator random,
     ITlsProvider? tlsProvider = null,
-    IReadOnlyList<string>? httpOverTlsApplicationProtocols = null) : IConnector
+    IReadOnlyList<string>? httpOverTlsApplicationProtocols = null,
+    IConnector? quicConnector = null) : IConnector
 {
     /// <summary>wg-quick's MTU when the configuration names none.</summary>
     public const int DefaultMtu = 1420;
@@ -35,6 +40,23 @@ internal sealed class WireGuardConnector(
 
     /// <inheritdoc />
     public IReadOnlyList<string> HttpOverTlsApplicationProtocols => httpOverTlsApplicationProtocols ?? Http11Only;
+
+    /// <summary>Opens a QUIC connection through curl's connector, whose datagrams the tunnel carries (ADR-1162).</summary>
+    /// <param name="target">The target.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>Curl's connector's result, or a refusal without one.</returns>
+    public ValueTask<MultiplexedConnectResult> ConnectMultiplexedAsync(ConnectTarget target, CancellationToken cancellationToken) =>
+        quicConnector?.ConnectMultiplexedAsync(target, cancellationToken)
+            ?? ValueTask.FromResult(MultiplexedConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector"));
+
+    /// <summary>Opens a session on a QUIC connection through curl's connector, so its pool shares the connection (ADR-1162).</summary>
+    /// <param name="target">The target.</param>
+    /// <param name="openSession">Opens the session on the connection.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <returns>Curl's connector's result, or a refusal without one.</returns>
+    public ValueTask<ConnectResult> ConnectMultiplexedSessionAsync(ConnectTarget target, Func<IMultiplexedConnection, IConnection> openSession, CancellationToken cancellationToken) =>
+        quicConnector?.ConnectMultiplexedSessionAsync(target, openSession, cancellationToken)
+            ?? ValueTask.FromResult(ConnectResult.Failed(CurlExitCode.CouldntConnect, "QUIC through the WireGuard tunnel needs curl's connector"));
 
     /// <inheritdoc />
     public async ValueTask<ConnectResult> ConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
@@ -89,9 +111,21 @@ internal sealed class WireGuardConnector(
     /// </summary>
     private async ValueTask<ConnectResult> ResolveAndConnectAsync(ConnectTarget target, CancellationToken cancellationToken)
     {
-        IPAddress? server = configuration.Interface.DnsServers.Select(AddressOrNull).FirstOrDefault(address => address is not null);
-        IPAddress? destination = server is null ? null : await ResolveAsync(server, target.Host, cancellationToken).ConfigureAwait(false);
+        IPAddress? destination = await ResolveThroughTunnelAsync(target.Host, cancellationToken).ConfigureAwait(false);
         return destination is null ? Unresolved(target) : await ConnectToAsync(destination, target, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resolves <paramref name="host" /> by DNS over TCP to the configuration's first <c>DNS</c> address through its own
+    /// tunnel (ADR-1161), giving the first address of the answer.
+    /// </summary>
+    /// <param name="host">The host name.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>The address, or <see langword="null" /> when there is no DNS server to ask or no answer.</returns>
+    internal async ValueTask<IPAddress?> ResolveThroughTunnelAsync(string host, CancellationToken cancellationToken)
+    {
+        IPAddress? server = configuration.Interface.DnsServers.Select(AddressOrNull).FirstOrDefault(address => address is not null);
+        return server is null ? null : await ResolveAsync(server, host, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Asks <paramref name="server" /> for <paramref name="host" />'s A record, or AAAA when the interface has no IPv4 address.</summary>
