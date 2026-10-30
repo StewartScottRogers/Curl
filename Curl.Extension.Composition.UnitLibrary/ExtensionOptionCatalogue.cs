@@ -67,5 +67,6 @@ internal static class ExtensionOptionCatalogue
         Curl.Extension.RecordReplay.RecordReplayExtension.ReplayOption,
         DnsQuery.Client.DnsQueryExtension.TransportOption,
         DnsQuery.Client.DnsQueryExtension.JsonOption,
+        Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.UserFromKeychainOption,
     ];
 }

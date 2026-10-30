@@ -316,6 +316,7 @@
     <Project Path="Curl.Extension.Composition.UnitTests/Curl.Extension.Composition.UnitTests.csproj" />
   </Folder>
   <!-- A new extension adds ONE line directly below this comment: a single-line <Folder Name="/Extensions/<Name>/"> holding its UnitLibrary and UnitTests <Project/> elements. One line, so merge=union keeps two branches' lines whole (ADR-1003). -->
+  <Folder Name="/Extensions/OsCredentialStore/"><Project Path="Curl.Extension.OsCredentialStore.UnitLibrary/Curl.Extension.OsCredentialStore.UnitLibrary.csproj" /><Project Path="Curl.Extension.OsCredentialStore.UnitTests/Curl.Extension.OsCredentialStore.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/GrpcWeb/"><Project Path="Curl.Extension.GrpcWeb.UnitLibrary/Curl.Extension.GrpcWeb.UnitLibrary.csproj" /><Project Path="Curl.Extension.GrpcWeb.UnitTests/Curl.Extension.GrpcWeb.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/Grpc/"><Project Path="Curl.Extension.Grpc.UnitLibrary/Curl.Extension.Grpc.UnitLibrary.csproj" /><Project Path="Curl.Extension.Grpc.UnitTests/Curl.Extension.Grpc.UnitTests.csproj" /></Folder>
   <Folder Name="/Extensions/CodeGeneration/"><Project Path="Curl.Extension.CodeGeneration.UnitLibrary/Curl.Extension.CodeGeneration.UnitLibrary.csproj" /><Project Path="Curl.Extension.CodeGeneration.UnitTests/Curl.Extension.CodeGeneration.UnitTests.csproj" /></Folder>

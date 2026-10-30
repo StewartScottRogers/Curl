@@ -39,5 +39,6 @@ public static class ExtensionTransferHookCatalogue
         Curl.Extension.GrpcWeb.GrpcWebExtension.HookFor,
         Curl.Extension.RecordReplay.RecordReplayExtension.HookFor,
         DnsQuery.Client.DnsQueryExtension.HookFor,
+        Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.HookFor,
     ];
 }

@@ -60,5 +60,6 @@ internal static class ExtensionDescriptionCatalogue
         Curl.Extension.RecordReplay.RecordReplayExtension.Description,
         DnsQuery.Client.DnsQueryExtension.Description,
         PluginProtocol.PluginProtocolExtension.Description,
+        Curl.Extension.OsCredentialStore.OsCredentialStoreExtension.Description,
     ];
 }

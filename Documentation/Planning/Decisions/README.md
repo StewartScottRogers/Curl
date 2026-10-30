@@ -1189,3 +1189,4 @@ Each option and the specific reason it lost.
 | [1141](ADR-1141-certificate-checks-get-the-port-the-checking-connector-opened-the-connection-to.md) | Certificate checks get the port the checking connector opened the connection to (BL-4331) | Accepted | 2026-10-29 |
 | [1142](ADR-1142-plugin-protocol-hands-unknown-schemes-to-curl-proto-helpers.md) | The plugin protocol extension hands unknown schemes to `curl-proto-<scheme>` helpers (BL-4160) | Accepted | 2026-10-29 |
 | [1143](ADR-1143-dns-query-adds-dns-over-tls-and-dns-over-quic-transports.md) | The DNS query extension adds DNS over TLS and DNS over QUIC as --dns-transport tls and quic (BL-4338) | Accepted | 2026-10-30 |
+| [1139](ADR-1139-user-from-keychain-reads-the-platform-credential-store.md) | --user-from-keychain reads the platform's credential store (BL-4163) | Accepted | 2026-10-30 |
