@@ -35,3 +35,4 @@ Specifications: draft-ietf-httpbis-resumable-upload (latest; header fields `Uplo
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: 354dee81 1d1f627d 15aa7efe 3180db99 3d836d5e.
