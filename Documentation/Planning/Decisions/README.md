@@ -1135,4 +1135,4 @@ Each option and the specific reason it lost.
 | [1082](ADR-1082-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |
 | [1085](ADR-1085-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |
 | [1091](ADR-1091-amqp0-registers-amqp-and-amqps-and-follows-amqp-0-9-1-with-rabbitmqs-errata.md) | The amqp0 extension registers amqp and amqps and follows AMQP 0-9-1 with RabbitMQ's errata (BL-4117) | Accepted | 2026-10-29 |
-| [1090](ADR-1090-zsync-fetches-only-the-blocks-a-seed-file-lacks-following-zsync-0-6.md) | --zsync fetches only the blocks a seed file lacks, following zsync 0.6 (BL-4130) | Accepted | 2026-10-29 |
+| [1092](ADR-1092-zsync-fetches-only-the-blocks-a-seed-file-lacks-following-zsync-0-6.md) | --zsync fetches only the blocks a seed file lacks, following zsync 0.6 (BL-4130) | Accepted | 2026-10-29 |

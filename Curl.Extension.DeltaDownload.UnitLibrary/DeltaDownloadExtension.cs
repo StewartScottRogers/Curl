@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.DeltaDownload;
 
 /// <summary>
-/// The <c>--zsync</c> extension (ADR-1090): uses a zsync 0.6 control file to take the blocks of a file it already
+/// The <c>--zsync</c> extension (ADR-1092): uses a zsync 0.6 control file to take the blocks of a file it already
 /// holds from a local seed file and fetch only the changed ones as HTTP byte ranges. <c>Curl.Extension.Composition</c>
 /// registers its options, description and transfer hook.
 /// </summary>

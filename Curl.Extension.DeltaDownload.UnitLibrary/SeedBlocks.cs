@@ -1,7 +1,7 @@
 namespace Curl.Extension.DeltaDownload;
 
 /// <summary>
-/// The blocks of a zsync target file found in a local seed file (ADR-1090): a window of one block's length is
+/// The blocks of a zsync target file found in a local seed file (ADR-1092): a window of one block's length is
 /// rolled over the seed, zero-padded by one block so the short last block can match, and where its weak checksum
 /// equals a block's the window's MD4 digest is compared too; with <c>Hash-Lengths</c> sequence matches of 2 the
 /// following block must match right after it as well. A match moves the window on by a whole block.

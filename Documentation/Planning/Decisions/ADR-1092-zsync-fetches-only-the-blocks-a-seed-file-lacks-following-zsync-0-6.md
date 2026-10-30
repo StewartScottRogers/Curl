@@ -1,4 +1,4 @@
-# ADR-1090 — `--zsync` fetches only the blocks a seed file lacks, following the zsync 0.6 control file format
+# ADR-1092 — `--zsync` fetches only the blocks a seed file lacks, following the zsync 0.6 control file format
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

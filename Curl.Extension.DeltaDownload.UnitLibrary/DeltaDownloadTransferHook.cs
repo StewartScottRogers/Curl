@@ -4,7 +4,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.DeltaDownload;
 
 /// <summary>
-/// The <c>--zsync</c> transfer hook (ADR-1090). For a plain HTTP GET it reads the zsync 0.6 control file, finds the
+/// The <c>--zsync</c> transfer hook (ADR-1092). For a plain HTTP GET it reads the zsync 0.6 control file, finds the
 /// target's blocks in the local seed file, asks the URL only for the ranges of the blocks still missing
 /// (<c>Range: bytes=first-last</c>, one request per run of missing blocks) and writes the joined file once its SHA-1
 /// equals the control file's. A 200 to a range, the server ignoring <c>Range</c>, is written as received; a failed

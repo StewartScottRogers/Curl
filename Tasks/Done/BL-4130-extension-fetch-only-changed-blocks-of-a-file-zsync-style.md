@@ -36,11 +36,11 @@ From the extensions list Stewart chose in full on 2026-10-29. Extension rules: A
 If this is larger than one `/task-run`, split it before starting (wire format, then the client flow, then the options). Never reference a `Curl.Protocol.*` library or another extension: code it shares with curl's protocols (framing, a handshake) moves into a shared layer under its own task first, or is written here.
 
 - 2026-10-29: Added the option, description and transfer-hook catalogues to touches: an option-only extension registers there, not in ExtensionCatalogue.cs (ADR-1069, ADR-1087); no other Doing task names them, and they are shared list files. ExtensionCatalogue.cs gets no line, since the extension adds no protocol handler.
-- 2026-10-29: Decided (ADR-1090): `--zsync <control-file>` plus `--zsync-seed <file>`, defaulting to the control file's Filename; unreadable or malformed control file is exit 26; requests run in turn, one per run of missing blocks; SHA-1 mismatch or a bad 206 reruns the transfer as curl does. MD4 written by hand (RFC 1320).
+- 2026-10-29: Decided (ADR-1092): `--zsync <control-file>` plus `--zsync-seed <file>`, defaulting to the control file's Filename; unreadable or malformed control file is exit 26; requests run in turn, one per run of missing blocks; SHA-1 mismatch or a bad 206 reruns the transfer as curl does. MD4 written by hand (RFC 1320).
 - 2026-10-29: Quality measured once with Measure-CodeQuality.ps1: only the copied CapturedResponse and WholeResourceGet branches were short, now covered by CapturedResponseTests and WholeResourceGetTests. CI on Linux and macOS: tests use temporary directories via Path.Combine and no platform-specific text, so the criterion is met by staying platform-neutral.
 
 ## Log
 
 - 2026-10-29: Created.
 - 2026-10-29: Backlog -> Doing. Criteria at claim: 68b799a4 164f279b b37a9b72 e1dc305c 14cafed8 7ed051e6 e35aff77 3d836d5e.
-- 2026-10-29: Doing -> Done. zsync extension: --zsync and --zsync-seed fetch only missing blocks, ADR-1090
+- 2026-10-29: Doing -> Done. zsync extension: --zsync and --zsync-seed fetch only missing blocks, ADR-1092

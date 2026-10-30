@@ -6,7 +6,7 @@ namespace Curl.Extension.DeltaDownload;
 /// <summary>
 /// A zsync 0.6 control file (<c>.zsync</c>): header lines <c>Name: value</c> ending at an empty line, then for each
 /// block of the target file its weak checksum's last <see cref="WeakChecksumBytes" /> bytes and its MD4 digest's
-/// first <see cref="StrongChecksumBytes" /> bytes (ADR-1090).
+/// first <see cref="StrongChecksumBytes" /> bytes (ADR-1092).
 /// </summary>
 /// <param name="BlockSize">The <c>Blocksize</c> header: the length of every block, the last zero-padded.</param>
 /// <param name="Length">The <c>Length</c> header: the target file's length in bytes.</param>
