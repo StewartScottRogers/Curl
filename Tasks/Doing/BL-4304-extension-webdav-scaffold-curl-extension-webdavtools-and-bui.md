@@ -34,3 +34,4 @@ Split from BL-4131 (WebDAV list and sync) for size, as BL-4284 and BL-4285 were 
 ## Log
 
 - 2026-10-29: Created.
+- 2026-10-29: Backlog -> Doing. Criteria at claim: ef607c7b 11e4fb57 698374f9 3e341d5b 3180db99 3d836d5e.
