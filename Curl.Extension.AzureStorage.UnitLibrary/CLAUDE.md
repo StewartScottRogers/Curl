@@ -2,8 +2,16 @@
 
 The Azure Storage extension (ADR-0999), for the `az://` and `abfs://` schemes. Namespace
 `Curl.Extension.AzureStorage`. It references the base class library and `Curl.Protocol.Abstractions`
-(for `IConnection`), never `Curl.Protocol.Http` or another extension. The handler, the options and
-its registration in `ExtensionCatalogue.cs` arrive in later tasks (BL-4126).
+(for `IConnection`) and `Curl.Extension.Abstractions` (for its description), never `Curl.Protocol.Http`
+or another extension. It is registered in `ExtensionCatalogue.cs` and `ExtensionDescriptionCatalogue.cs`.
+
+- `Client/` is the handler (ADR-1101). `AzureStorageExtension` gives the description and creates
+  `AzureStorageProtocolHandler`, which maps the URL, chooses the credential and hands `az` to
+  `AzureBlobOperations` (Get Blob, Put Blob, Put Block and Put Block List from 8 MiB, List Blobs) and
+  `abfs`/`abfss` to `AzureDataLakeOperations` (Path Read, Path Create, Path Update append and flush,
+  Path List). `AzureStorageClient` sends one request per connection over HTTPS on 443 and turns a status
+  of 300 or above into exit 22 naming the `Error` code; every other failure is an
+  `AzureStorageTransferException` carrying its exit code.
 
 - `Http/AzureStorageHttpClientConnection` sends one HTTP/1.1 request at a time over an `IConnection`
   (RFC 9112) and returns an `AzureStorageHttpResponse` whose body is a stream framed by

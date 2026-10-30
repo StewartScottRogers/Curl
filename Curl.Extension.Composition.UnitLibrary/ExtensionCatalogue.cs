@@ -30,5 +30,6 @@ internal static class ExtensionCatalogue
         Amqp0.Client.Amqp0Extension.CreateHandler,
         OciRegistry.Client.OciRegistryExtension.CreateHandler,
         GoogleCloudStorage.Client.GcsExtension.CreateHandler,
+        AzureStorage.Client.AzureStorageExtension.CreateHandler,
     ];
 }
