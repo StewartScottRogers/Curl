@@ -48,6 +48,7 @@ internal static class ExtensionDescriptionCatalogue
         Amqp0.Client.Amqp0Extension.Description,
         OciRegistry.Client.OciRegistryExtension.Description,
         Curl.Extension.ContentDigest.ContentDigestExtension.Description,
+        Curl.Extension.Har.HarExtension.Description,
         Curl.Extension.ClientHints.ClientHintsExtension.Description,
         Curl.Extension.CertificateTransparency.CertificateTransparencyExtension.Description,
         Curl.Extension.OpenTelemetry.OpenTelemetryExtension.Description,
