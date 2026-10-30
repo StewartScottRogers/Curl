@@ -8,7 +8,7 @@ depends-on: []
 touches: [DarkFactory/Park.ps1, DarkFactory/ShiftCoordinator.ps1, DarkFactory/ShiftRunner.ps1]
 requirement: none
 created: 2026-10-30
-completed:
+completed: 2026-10-30
 ---
 # BL-4347 — Return a task in Doing held by no lane to Backlog at shift start when no work for it exists anywhere
 
@@ -26,14 +26,18 @@ Also find out why a lane could hold a fresh claim at shift end (the runner check
 
 ## Acceptance criteria
 
-- [ ] `Get-OrphanAction` returns 'backlog' (with no branch) for a task with no dirty lane worktree, no parked branch and no lane branch holding commits beyond the shift branch, and still returns 'refuse' when a lane branch has such commits; the factory's self-test (`-Test*` switch covering Park.ps1) proves each case.
-- [ ] Shift start with such a task traces the requeue, commits and pushes the task's move to Backlog, and starts the shift.
-- [ ] A lane stopped at time-up never leaves an unstarted claim in Doing: either it cannot claim past the deadline, or it returns the claim to Backlog as it ends; the self-test or the trace of a rehearsal shows it.
-- [ ] `DarkFactory/LaneRules.md` and the script help say what now happens, if either describes the old refusal.
+- [x] `Get-OrphanAction` returns 'backlog' (with no branch) for a task with no dirty lane worktree, no parked branch and no lane branch holding commits beyond the shift branch, and still returns 'refuse' when a lane branch has such commits; the factory's self-test (`-Test*` switch covering Park.ps1) proves each case.
+- [x] Shift start with such a task traces the requeue, commits and pushes the task's move to Backlog, and starts the shift.
+- [x] A lane stopped at time-up never leaves an unstarted claim in Doing: either it cannot claim past the deadline, or it returns the claim to Backlog as it ends; the self-test or the trace of a rehearsal shows it.
+- [x] `DarkFactory/LaneRules.md` and the script help say what now happens, if either describes the old refusal.
 
 ## Notes
+
+- Decision: a task in Doing with no work anywhere returns to Backlog (no branch in the Reason). Lane branches are checked with Get-LaneBranchesAhead (local factory/lane-* vs origin/shift branch).
+- Cause of the stranded claim: a lane claimed just before the deadline; the runner now releases a claim made past $shiftEnd (Invoke-ReleaseClaim) and stops with "time up". Proven by -TestPark. Shift-start trace is the existing requeue trace and commit/push path.
 
 ## Log
 
 - 2026-10-30: Created.
 - 2026-10-30: Backlog -> Doing. Criteria at claim: 701ecc44 c223562e 97acddf8 06eff321.
+- 2026-10-30: Doing -> Done. Orphan with no work anywhere returns to Backlog; unstarted claims past shift end are released; -TestPark proves it

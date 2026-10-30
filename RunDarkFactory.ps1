@@ -519,8 +519,10 @@ param(
     # launcher, and that a claude -p run inherits it, and exit.
     [switch]$TestLaneMarker,
     # Prove, on a throwaway repository, that a park pushes its move to Backlog or reports
-    # that it could not, how shift start settles a task in Doing held by no lane, and that a
-    # refused start raises the alarm (BL-1071), and exit.
+    # that it could not, how shift start settles a task in Doing held by no lane (adopted,
+    # or back to Backlog when no work for it exists, refused only when a lane branch holds
+    # commits beyond the shift branch), that a claim past the shift's end is released to
+    # Backlog, and that a refused start raises the alarm (BL-1071, BL-4347), and exit.
     [switch]$TestPark,
     # Prove, on a throwaway repository, that a claim applies its task's own shift stash and
     # no other, and that a stash that no longer applies leaves the worktree clean and the

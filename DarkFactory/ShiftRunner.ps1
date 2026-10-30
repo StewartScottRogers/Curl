@@ -101,6 +101,15 @@ while ($true) {
             }
             Write-Trace '-' 'wait' $claim.Why 'DarkGray'; Write-Heartbeat 'wait' (Get-Short $claim.Why 80); Start-Sleep -Seconds 60; continue }
         $id = $claim.Id
+        # A claim past the shift's end is never started: it goes back to Backlog at once (BL-4347).
+        if ((Get-Date) -gt $shiftEnd) {
+            Write-Trace $id 'release' 'claimed after the shift time was up; back to Backlog unstarted' 'Yellow'
+            $unreleased = Invoke-ReleaseClaim -Id $id
+            if ($unreleased) { $parkLines += $unreleased; Write-Trace $id 'RELEASE FAILED' $unreleased 'Red' }
+            Add-ShiftRequeued $id
+            Set-LaneState 'task' ''
+            $stopWhy = 'time up'; break
+        }
     } else {
         Set-HeartbeatTask ''
         Write-Heartbeat 'claim'
