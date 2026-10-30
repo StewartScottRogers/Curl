@@ -77,5 +77,7 @@ internal static class ExtensionOptionCatalogue
         Grpc.Client.GrpcExtension.ProtoOption,
         Curl.Extension.Masque.MasqueExtension.Option,
         Curl.Extension.CompressionDictionary.CompressionDictionaryExtension.Option,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.RelayOption,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.KeysOption,
     ];
 }

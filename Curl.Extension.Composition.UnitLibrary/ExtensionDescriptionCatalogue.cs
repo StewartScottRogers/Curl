@@ -70,5 +70,6 @@ internal static class ExtensionDescriptionCatalogue
         Grpc.Client.GrpcExtension.Description,
         Curl.Extension.Masque.MasqueExtension.Description,
         Curl.Extension.CompressionDictionary.CompressionDictionaryExtension.Description,
+        Curl.Extension.ObliviousHttp.ObliviousHttpExtension.Description,
     ];
 }
