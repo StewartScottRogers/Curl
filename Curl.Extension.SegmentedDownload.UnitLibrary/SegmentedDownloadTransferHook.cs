@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.SegmentedDownload;
 
 /// <summary>
-/// The <c>--segments</c> transfer hook (ADR-1085). A plain HTTP GET first asks for its first byte
+/// The <c>--segments</c> transfer hook (ADR-1087). A plain HTTP GET first asks for its first byte
 /// (<c>Range: bytes=0-0</c>, RFC 9110 §14.2) to learn the complete length from the 206's <c>Content-Range</c>
 /// (§14.4). It then asks for <paramref name="count" /> consecutive ranges in parallel, each conditional on the
 /// first response's strong entity tag through <c>If-Range</c> (§13.1.5), and writes them in order once every one

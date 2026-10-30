@@ -1,4 +1,4 @@
-# ADR-1085 — `--segments` downloads a plain HTTP GET as parallel byte ranges, in a transfer hook
+# ADR-1087 — `--segments` downloads a plain HTTP GET as parallel byte ranges, in a transfer hook
 
 - **Status:** Accepted
 - **Date:** 2026-10-29

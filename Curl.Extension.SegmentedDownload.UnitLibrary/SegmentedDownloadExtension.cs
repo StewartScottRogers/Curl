@@ -6,7 +6,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.SegmentedDownload;
 
 /// <summary>
-/// The <c>--segments</c> extension (ADR-1085): downloads one HTTP resource as several byte ranges fetched in
+/// The <c>--segments</c> extension (ADR-1087): downloads one HTTP resource as several byte ranges fetched in
 /// parallel (RFC 9110 §14) and writes them in order, as one body. <c>Curl.Extension.Composition</c> registers
 /// its option, description and transfer hook.
 /// </summary>
