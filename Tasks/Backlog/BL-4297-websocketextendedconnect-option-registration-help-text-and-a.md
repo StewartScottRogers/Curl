@@ -4,7 +4,7 @@ title: WebSocketExtendedConnect: option, registration, help text and ADR
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195, BL-4294, BL-4295, BL-4296]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195, BL-4298, BL-4295, BL-4296]
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Option, Curl.Extension.WebSocketExtendedConnect.UnitTests/Option, Curl.Extension.Composition.UnitLibrary/ExtensionCatalogue.cs, Documentation/Planning/Decisions/README.md]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ Curl has an option that opens `ws://`/`wss://` with extended CONNECT on HTTP/2 o
 
 ## Context
 
-Last part of BL-4112. Ties together the HTTP/2 flow (BL-4295) and the HTTP/3 flow (BL-4296) on the wire layer (BL-4294). Extension rules: ADR-0999 and CLAUDE.md "Extensions".
+Last part of BL-4112. Ties together the HTTP/2 flow (BL-4295) and the HTTP/3 flow (BL-4296) on the wire layer (BL-4298). Extension rules: ADR-0999 and CLAUDE.md "Extensions".
 
 ## Acceptance criteria
 

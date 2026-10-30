@@ -1,5 +1,5 @@
 ---
-id: BL-4294
+id: BL-4298
 title: WebSocketExtendedConnect: scaffold the extension and its RFC 8441/9220 wire format
 priority: Normal
 assignee: Claude
@@ -10,7 +10,7 @@ requirement: none
 created: 2026-10-29
 completed:
 ---
-# BL-4294 — WebSocketExtendedConnect: scaffold the extension and its RFC 8441/9220 wire format
+# BL-4298 — WebSocketExtendedConnect: scaffold the extension and its RFC 8441/9220 wire format
 
 ## Goal
 

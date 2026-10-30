@@ -4,7 +4,7 @@ title: WebSocketExtendedConnect: open and run a WebSocket over HTTP/2 (RFC 8441)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195, BL-4294]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195, BL-4298]
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Http2, Curl.Extension.WebSocketExtendedConnect.UnitTests/Http2]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ A client flow in the extension opens a WebSocket on an HTTP/2 stream with extend
 
 ## Context
 
-Second part of BL-4112. Uses the wire layer from BL-4294, `Http2Connection` in the shared `Curl.Http2.UnitLibrary`, the shared WebSocket codec from BL-4196 and the scheme hook from BL-4195. Specification: RFC 8441.
+Second part of BL-4112. Uses the wire layer from BL-4298, `Http2Connection` in the shared `Curl.Http2.UnitLibrary`, the shared WebSocket codec from BL-4196 and the scheme hook from BL-4195. Specification: RFC 8441.
 
 ## Acceptance criteria
 

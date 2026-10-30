@@ -4,7 +4,7 @@ title: WebSocketExtendedConnect: open and run a WebSocket over HTTP/3 (RFC 9220)
 priority: Normal
 assignee: Claude
 pipeline: feature
-depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195, BL-4294]
+depends-on: [BL-4091, BL-4093, BL-4094, BL-4196, BL-4194, BL-4195, BL-4298]
 touches: [Curl.Extension.WebSocketExtendedConnect.UnitLibrary/Http3, Curl.Extension.WebSocketExtendedConnect.UnitTests/Http3]
 requirement: none
 created: 2026-10-29
@@ -18,7 +18,7 @@ A client flow in the extension opens a WebSocket on an HTTP/3 request stream wit
 
 ## Context
 
-Third part of BL-4112. Uses the wire layer from BL-4294, the HTTP/3 client session moved into `Curl.Http3` by BL-4194, the shared WebSocket codec from BL-4196 and the scheme hook from BL-4195. Specification: RFC 9220.
+Third part of BL-4112. Uses the wire layer from BL-4298, the HTTP/3 client session moved into `Curl.Http3` by BL-4194, the shared WebSocket codec from BL-4196 and the scheme hook from BL-4195. Specification: RFC 9220.
 
 ## Acceptance criteria
 
