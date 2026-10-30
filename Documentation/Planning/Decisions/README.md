@@ -1176,4 +1176,4 @@ Each option and the specific reason it lost.
 | [1129](ADR-1129-certificate-transparency-extension-requires-an-embedded-sct-from-a-v3-log-list.md) | The Certificate Transparency extension requires an embedded SCT from a log in a v3 log list (BL-4152) | Accepted | 2026-10-29 |
 | [1130](ADR-1130-extensions-add-write-out-variables-through-the-transfer-report-never-shadowing-curls.md) | Extensions add `-w` write-out variables through the transfer report, never shadowing curl's (BL-4327) | Accepted | 2026-10-29 |
 | [1131](ADR-1131-dane-dnssec-verifies-rfc-8624-algorithms-and-treats-the-rest-as-insecure.md) | The Dane extension's DNSSEC verifier supports RFC 8624's algorithms and treats the rest as insecure (BL-4335) | Accepted | 2026-10-29 |
-| [1127](ADR-1127-grpc-web-sends-one-framed-message-and-checks-grpc-status.md) | --grpc-web sends one framed message and checks grpc-status (BL-4103) | Accepted | 2026-10-29 |
+| [1132](ADR-1132-grpc-web-sends-one-framed-message-and-checks-grpc-status.md) | --grpc-web sends one framed message and checks grpc-status (BL-4103) | Accepted | 2026-10-29 |

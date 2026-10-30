@@ -3,7 +3,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.GrpcWeb;
 
 /// <summary>
-/// What <c>--grpc-web</c> does to an HTTP transfer (ADR-1127): sends the <c>-d</c> data, or an empty message when
+/// What <c>--grpc-web</c> does to an HTTP transfer (ADR-1132): sends the <c>-d</c> data, or an empty message when
 /// there is none, as one framed <c>application/grpc-web+proto</c> message (PROTOCOL-WEB.md, "Content-Type" and
 /// "Message framing") over whichever HTTP version curl's options pick ("HTTP wire protocols"), and writes the
 /// messages of a 200 gRPC-Web reply without their frames before checking its <c>grpc-status</c>

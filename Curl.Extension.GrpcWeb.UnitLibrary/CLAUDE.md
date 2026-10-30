@@ -1,6 +1,6 @@
 # Curl.Extension.GrpcWeb.UnitLibrary
 
-The `--grpc-web` extension (ADR-0999, ADR-1127): one unary gRPC-Web call over HTTP/1.1 or HTTP/2. Namespace
+The `--grpc-web` extension (ADR-0999, ADR-1132): one unary gRPC-Web call over HTTP/1.1 or HTTP/2. Namespace
 `Curl.Extension.GrpcWeb`. Tested against the gRPC-Web protocol (grpc.io PROTOCOL-WEB.md), not against curl.
 
 - `GrpcWebExtension` holds the `--grpc-web` `ExtensionOption`, the `ExtensionDescription` and `HookFor`, the transfer

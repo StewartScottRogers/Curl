@@ -5,7 +5,7 @@ using Curl.Extension.Abstractions.Transfer;
 namespace Curl.Extension.GrpcWeb;
 
 /// <summary>
-/// The <c>--grpc-web</c> extension (ADR-1127): one unary gRPC-Web call over HTTP/1.1 or HTTP/2, the <c>-d</c> data
+/// The <c>--grpc-web</c> extension (ADR-1132): one unary gRPC-Web call over HTTP/1.1 or HTTP/2, the <c>-d</c> data
 /// sent as the request message and the reply's messages written out, its <c>grpc-status</c> checked.
 /// <c>Curl.Extension.Composition</c> registers its option, description and transfer hook.
 /// </summary>

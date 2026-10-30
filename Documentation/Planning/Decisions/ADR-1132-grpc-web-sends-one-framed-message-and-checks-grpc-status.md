@@ -1,4 +1,4 @@
-# ADR-1127 — --grpc-web sends one framed message and checks grpc-status
+# ADR-1132 — --grpc-web sends one framed message and checks grpc-status
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
