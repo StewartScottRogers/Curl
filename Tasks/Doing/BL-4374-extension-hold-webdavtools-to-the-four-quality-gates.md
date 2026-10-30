@@ -33,3 +33,4 @@ Split from BL-4131 (over its cost cap). Depends on BL-4373, which lands the code
 ## Log
 
 - 2026-10-30: Created.
+- 2026-10-30: Backlog -> Doing. Criteria at claim: a37f1904 0d68fc99 3d836d5e.
